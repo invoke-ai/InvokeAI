@@ -49,6 +49,8 @@ from invokeai.app.services.shared.graph import CollectInvocation, IterateInvocat
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_common import calibration_run_id
 from invokeai.app.util.profiler import Profiler
+from invokeai.app.util.startup_utils import log_attention_backends
+from invokeai.backend.util.attention import attention_caller
 from invokeai.backend.util.device_pool import (
     GENERATION_DEVICE_POOL,
     idle_device_borrowed,
@@ -498,9 +500,14 @@ class DefaultSessionRunner(SessionRunnerBase):
                     self.workflow_call_coordinator.begin_workflow_call_boundary(invocation, queue_item, workflow_record)
                     return
 
-                # Invoke the node, optionally on a borrowed idle GPU (text encoders only).
+                # Invoke the node, optionally on a borrowed idle GPU (text encoders only). Its attention calls are
+                # attributed to its type, which the pinned-kernel report (`attention_backend`) names.
                 # Leaving `invocation_resources` releases what the context held for the run, however it ended.
-                with self._maybe_offload_to_idle_gpu(invocation), data.invocation_resources:
+                with (
+                    self._maybe_offload_to_idle_gpu(invocation),
+                    attention_caller(invocation.get_type()),
+                    data.invocation_resources,
+                ):
                     run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
                 output = run_result.output
                 control_collection = None
@@ -1244,6 +1251,21 @@ class DefaultSessionProcessor(SessionProcessorBase):
                 f"Could not release cached VRAM after the session on {worker.label}", exc_info=True
             )
 
+    def _log_attention_backends(self, worker: _SessionWorker) -> None:
+        """Log which SDPA kernels this worker's device has and the order they are tried in, once per device.
+
+        Asked for each item about to run, rather than at startup: the probe allocates, so on the boot path it would
+        create a CUDA context on an idle server, and so would an item that is skipped before it runs in single-device
+        mode. `log_attention_backends` remembers the device, so the probe runs on the first such item, before models are
+        resident; it ends with `empty_cache()`. A diagnostic: it must not fail the item.
+        """
+        try:
+            log_attention_backends(self._invoker.services.logger, worker.device or TorchDevice.choose_torch_device())
+        except Exception:
+            self._invoker.services.logger.debug(
+                f"Could not probe the attention backends on {worker.label}", exc_info=True
+            )
+
     def _warn_if_vram_paged(self, worker: _SessionWorker) -> None:
         """Say so when Windows keeps part of this worker's GPU memory in shared system memory across sessions.
 
@@ -1495,6 +1517,8 @@ class DefaultSessionProcessor(SessionProcessorBase):
                     # Python will never cede allocated memory back to the OS, so anything we can do to reduce the peak
                     # allocation is well worth it.
                     gc.collect()
+
+                    self._log_attention_backends(worker)
 
                     self._invoker.services.logger.info(
                         f"Executing queue item {worker.queue_item.item_id}, session {worker.queue_item.session_id} "

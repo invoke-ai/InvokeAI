@@ -1334,7 +1334,7 @@ wheels = [
 
 [[package]]
 name = "diffusers"
-version = "0.41.0"
+version = "0.42.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "filelock" },
@@ -1347,9 +1347,9 @@ dependencies = [
     { name = "requests" },
     { name = "safetensors" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/a8/bc/34a91d366fe8e546637d702403e4d8cd5dbdf705a15fb3725d34a7ab3416/diffusers-0.41.0.tar.gz", hash = "sha256:69dcced7230b6bc0b70b5c6cfdff1aa62da487ab52ae74b642e46b1b9bfacc47", size = 5026281, upload-time = "2026-10-06T06:24:14.884Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a1/4f/21d79e9a2f040416ef4707fbd1bcbaa6f31d33cf63159d78647f78944792/diffusers-0.42.1.tar.gz", hash = "sha256:ce855ab670c8cd1c7a61be8f12fbc68c081bca8ec5e747273946d8d6c2aff23b", size = 5264977, upload-time = "2026-10-27T07:22:26.434Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/fe/c4/5bf8afd1ff3a8d99da7a18b1067ae0b4e2a037c38f3851890a989c511fd3/diffusers-0.41.0-py3-none-any.whl", hash = "sha256:ea8918b7dfd92ce793b6db689a551b8cd25d52c6c0fcd3ade0706a5fd2a25990", size = 6063887, upload-time = "2026-10-06T06:24:12.455Z" },
+    { url = "https://files.pythonhosted.org/packages/e1/e9/4328c781bc64f8b74363f66674c00e65021e9a857fb9cb4882ed447956cd/diffusers-0.42.1-py3-none-any.whl", hash = "sha256:9154faa704ce00e0b77f568e0d64786064368528aab5fc14eeea92f87d788014", size = 6355908, upload-time = "2026-10-27T07:22:24.331Z" },
 ]
 
 [package.optional-dependencies]
@@ -2149,7 +2149,7 @@ requires-dist = [
     { name = "blake3", marker = "platform_machine == 'ARM64' and sys_platform == 'win32'", specifier = "==1.0.9", index = "https://github.com/invoke-ai/InvokeAI/releases/download/win-arm64-wheels-v1/index.html" },
     { name = "compel", specifier = ">=2.4.0,<3" },
     { name = "deprecated" },
-    { name = "diffusers", extras = ["torch"], specifier = "==0.41.0" },
+    { name = "diffusers", extras = ["torch"], specifier = "==0.42.1" },
     { name = "dnspython" },
     { name = "dynamicprompts" },
     { name = "einops" },
