@@ -185,31 +185,80 @@ _FLUX1_HIDDEN_SIZE = 3072
 # Klein 4B uses mlp_ratio=6 (ffn_dim=18432 for hidden_size=3072).
 _FLUX1_MLP_RATIO = 4
 
+# Trigger once per LyCORIS layer from its w1 entry; the dimension helpers resolve w2 independently.
+_LYCORIS_IN_DIM_SUFFIXES = (
+    ".lokr_w1",
+    ".lokr_w1_b",
+    ".hada_w1_b",
+)
+_LYCORIS_OUT_DIM_SUFFIXES = (
+    ".lokr_w1",
+    ".lokr_w1_a",
+    ".hada_w1_a",
+)
+_BFL_LYCORIS_ATTN_IN_SUFFIXES = tuple(f".img_attn.proj{suffix}" for suffix in _LYCORIS_IN_DIM_SUFFIXES)
+_BFL_LYCORIS_MLP_OUT_SUFFIXES = tuple(f".img_mlp.0{suffix}" for suffix in _LYCORIS_OUT_DIM_SUFFIXES)
+
+
+def _lokr_operand_dim(
+    state_dict: dict[str | int, Any],
+    key_prefix: str,
+    operand: Literal["w1", "w2"],
+    axis: Literal[0, 1],
+) -> int | None:
+    full_key = f"{key_prefix}.lokr_{operand}"
+    if full_key in state_dict:
+        return state_dict[full_key].shape[axis]
+
+    factor_key = f"{full_key}_{'a' if axis == 0 else 'b'}"
+    if factor_key not in state_dict:
+        return None
+    return state_dict[factor_key].shape[axis]
+
 
 def _lokr_in_dim(state_dict: dict[str | int, Any], key_prefix: str) -> int | None:
     """Compute the input dimension of a LOKR layer: w1.shape[1] * w2.shape[1].
 
-    Supports both full LOKR (lokr_w1/lokr_w2) and factorized LOKR (lokr_w1_b/lokr_w2_b).
-    Returns None if the required keys are not present.
+    Each Kronecker operand may independently be stored whole or as an ``_a``/``_b`` factor pair.
     """
-    if f"{key_prefix}.lokr_w1" in state_dict and f"{key_prefix}.lokr_w2" in state_dict:
-        return state_dict[f"{key_prefix}.lokr_w1"].shape[1] * state_dict[f"{key_prefix}.lokr_w2"].shape[1]
-    elif f"{key_prefix}.lokr_w1_b" in state_dict and f"{key_prefix}.lokr_w2_b" in state_dict:
-        return state_dict[f"{key_prefix}.lokr_w1_b"].shape[1] * state_dict[f"{key_prefix}.lokr_w2_b"].shape[1]
-    return None
+    w1_dim = _lokr_operand_dim(state_dict, key_prefix, "w1", 1)
+    w2_dim = _lokr_operand_dim(state_dict, key_prefix, "w2", 1)
+    if w1_dim is None or w2_dim is None:
+        return None
+    return w1_dim * w2_dim
 
 
 def _lokr_out_dim(state_dict: dict[str | int, Any], key_prefix: str) -> int | None:
     """Compute the output dimension of a LOKR layer: w1.shape[0] * w2.shape[0].
 
-    Supports both full LOKR (lokr_w1/lokr_w2) and factorized LOKR (lokr_w1_a/lokr_w2_a).
-    Returns None if the required keys are not present.
+    Each Kronecker operand may independently be stored whole or as an ``_a``/``_b`` factor pair.
     """
-    if f"{key_prefix}.lokr_w1" in state_dict and f"{key_prefix}.lokr_w2" in state_dict:
-        return state_dict[f"{key_prefix}.lokr_w1"].shape[0] * state_dict[f"{key_prefix}.lokr_w2"].shape[0]
-    elif f"{key_prefix}.lokr_w1_a" in state_dict and f"{key_prefix}.lokr_w2_a" in state_dict:
-        return state_dict[f"{key_prefix}.lokr_w1_a"].shape[0] * state_dict[f"{key_prefix}.lokr_w2_a"].shape[0]
-    return None
+    w1_dim = _lokr_operand_dim(state_dict, key_prefix, "w1", 0)
+    w2_dim = _lokr_operand_dim(state_dict, key_prefix, "w2", 0)
+    if w1_dim is None or w2_dim is None:
+        return None
+    return w1_dim * w2_dim
+
+
+def _loha_dim(state_dict: dict[str | int, Any], key_prefix: str, axis: Literal[0, 1]) -> int | None:
+    factor = "a" if axis == 0 else "b"
+    w1_key = f"{key_prefix}.hada_w1_{factor}"
+    w2_key = f"{key_prefix}.hada_w2_{factor}"
+    if w1_key not in state_dict or w2_key not in state_dict:
+        return None
+    w1_dim = state_dict[w1_key].shape[axis]
+    w2_dim = state_dict[w2_key].shape[axis]
+    return w1_dim if w1_dim == w2_dim else None
+
+
+def _lycoris_in_dim(state_dict: dict[str | int, Any], key_prefix: str) -> int | None:
+    lokr_dim = _lokr_in_dim(state_dict, key_prefix)
+    return lokr_dim if lokr_dim is not None else _loha_dim(state_dict, key_prefix, 1)
+
+
+def _lycoris_out_dim(state_dict: dict[str | int, Any], key_prefix: str) -> int | None:
+    lokr_dim = _lokr_out_dim(state_dict, key_prefix)
+    return lokr_dim if lokr_dim is not None else _loha_dim(state_dict, key_prefix, 0)
 
 
 def _is_flux2_lora(mod: ModelOnDisk) -> bool:
@@ -280,26 +329,26 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
         elif "vector_in" in key and key.endswith("lora_A.weight"):
             return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
 
-        # BFL LyCORIS (LoKR/LoHA): attention projection → check hidden_size via product of dims
-        elif key.endswith((".img_attn.proj.lokr_w1", ".img_attn.proj.lokr_w1_b")):
+        # BFL LyCORIS: attention projection → check hidden_size from the reconstructed layer dimensions
+        elif key.endswith(_BFL_LYCORIS_ATTN_IN_SUFFIXES):
             layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lycoris_in_dim(state_dict, layer_prefix)
             if in_dim is not None:
                 if in_dim != _FLUX1_HIDDEN_SIZE:
                     return True
                 bfl_hidden_size = in_dim  # ambiguous, keep checking
 
         # BFL LyCORIS: context_embedder/txt_in
-        elif "txt_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
+        elif "txt_in" in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
             layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lycoris_in_dim(state_dict, layer_prefix)
             if in_dim is not None:
                 return in_dim in _FLUX2_CONTEXT_IN_DIMS
 
         # BFL LyCORIS: vector_in
-        elif "vector_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
+        elif "vector_in" in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
             layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lycoris_in_dim(state_dict, layer_prefix)
             if in_dim is not None:
                 return in_dim in _FLUX2_VEC_IN_DIMS
 
@@ -314,10 +363,10 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
                 if ffn_dim != bfl_hidden_size * _FLUX1_MLP_RATIO:
                     return True
                 break
-            # BFL LyCORIS: check output dim of img_mlp.0 via product of dims
-            if key.startswith(_bfl_prefixes) and key.endswith((".img_mlp.0.lokr_w1", ".img_mlp.0.lokr_w1_a")):
+            # BFL LyCORIS: check output dim of img_mlp.0
+            if key.startswith(_bfl_prefixes) and key.endswith(_BFL_LYCORIS_MLP_OUT_SUFFIXES):
                 layer_prefix = key.rsplit(".", 1)[0]
-                out_dim = _lokr_out_dim(state_dict, layer_prefix)
+                out_dim = _lycoris_out_dim(state_dict, layer_prefix)
                 if out_dim is not None and out_dim != bfl_hidden_size * _FLUX1_MLP_RATIO:
                     return True
                 break
@@ -330,19 +379,19 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
         if key.startswith("lora_unet_txt_in.") or key.startswith("lora_unet_context_embedder."):
             if key.endswith("lora_down.weight"):
                 return state_dict[key].shape[1] in _FLUX2_CONTEXT_IN_DIMS
-            # Kohya LyCORIS (LoKR)
-            elif key.endswith((".lokr_w1", ".lokr_w1_b")):
+            # Kohya LyCORIS
+            elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
                 layer_prefix = key.rsplit(".", 1)[0]
-                in_dim = _lokr_in_dim(state_dict, layer_prefix)
+                in_dim = _lycoris_in_dim(state_dict, layer_prefix)
                 if in_dim is not None:
                     return in_dim in _FLUX2_CONTEXT_IN_DIMS
         if key.startswith("lora_unet_vector_in.") or key.startswith("lora_unet_time_text_embed_text_embedder_"):
             if key.endswith("lora_down.weight"):
                 return state_dict[key].shape[1] in _FLUX2_VEC_IN_DIMS
-            # Kohya LyCORIS (LoKR)
-            elif key.endswith((".lokr_w1", ".lokr_w1_b")):
+            # Kohya LyCORIS
+            elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
                 layer_prefix = key.rsplit(".", 1)[0]
-                in_dim = _lokr_in_dim(state_dict, layer_prefix)
+                in_dim = _lycoris_in_dim(state_dict, layer_prefix)
                 if in_dim is not None:
                     return in_dim in _FLUX2_VEC_IN_DIMS
 
@@ -363,10 +412,10 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
             if kohya_hidden_size != _FLUX1_HIDDEN_SIZE:
                 return True
             break
-        # LoKR variant
-        elif "_img_attn_proj." in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
+        # LyCORIS variant
+        elif "_img_attn_proj." in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
             layer_prefix = key.rsplit(".", 1)[0]
-            in_dim = _lokr_in_dim(state_dict, layer_prefix)
+            in_dim = _lycoris_in_dim(state_dict, layer_prefix)
             if in_dim is not None:
                 if in_dim != _FLUX1_HIDDEN_SIZE:
                     return True
@@ -384,10 +433,10 @@ def _is_flux2_lora_state_dict(state_dict: dict[str | int, Any]) -> bool:
                 if ffn_dim != kohya_hidden_size * _FLUX1_MLP_RATIO:
                     return True
                 break
-            # LoKR variant
-            if key.startswith("lora_unet_") and "_img_mlp_0." in key and key.endswith((".lokr_w1", ".lokr_w1_a")):
+            # LyCORIS variant
+            if key.startswith("lora_unet_") and "_img_mlp_0." in key and key.endswith(_LYCORIS_OUT_DIM_SUFFIXES):
                 layer_prefix = key.rsplit(".", 1)[0]
-                out_dim = _lokr_out_dim(state_dict, layer_prefix)
+                out_dim = _lycoris_out_dim(state_dict, layer_prefix)
                 if out_dim is not None and out_dim != kohya_hidden_size * _FLUX1_MLP_RATIO:
                     return True
                 break
@@ -460,21 +509,21 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
         if key.endswith(".img_attn.proj.lora_A.weight"):
             return _variant_from_hidden_size(state_dict[key].shape[1])
 
-        # BFL LyCORIS (LoKR): context embedder (txt_in)
-        if "txt_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+        # BFL LyCORIS: context embedder (txt_in)
+        if "txt_in" in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_context_dim(in_dim)
 
-        # BFL LyCORIS (LoKR): vector embedder (vector_in)
-        if "vector_in" in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+        # BFL LyCORIS: vector embedder (vector_in)
+        if "vector_in" in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_vec_dim(in_dim)
 
-        # BFL LyCORIS (LoKR): attention projection
-        if key.endswith((".img_attn.proj.lokr_w1", ".img_attn.proj.lokr_w1_b")):
-            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+        # BFL LyCORIS: attention projection
+        if key.endswith(_BFL_LYCORIS_ATTN_IN_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)
 
@@ -485,17 +534,17 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
         if key.startswith("lora_unet_txt_in.") or key.startswith("lora_unet_context_embedder."):
             if key.endswith("lora_down.weight"):
                 return _variant_from_context_dim(state_dict[key].shape[1])
-            # Kohya LyCORIS (LoKR)
-            elif key.endswith((".lokr_w1", ".lokr_w1_b")):
-                in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+            # Kohya LyCORIS
+            elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+                in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
                 if in_dim is not None:
                     return _variant_from_context_dim(in_dim)
         if key.startswith("lora_unet_vector_in.") or key.startswith("lora_unet_time_text_embed_text_embedder_"):
             if key.endswith("lora_down.weight"):
                 return _variant_from_vec_dim(state_dict[key].shape[1])
-            # Kohya LyCORIS (LoKR)
-            elif key.endswith((".lokr_w1", ".lokr_w1_b")):
-                in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+            # Kohya LyCORIS
+            elif key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+                in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
                 if in_dim is not None:
                     return _variant_from_vec_dim(in_dim)
 
@@ -510,9 +559,9 @@ def _get_flux2_lora_variant(state_dict: dict[str | int, Any]) -> Flux2VariantTyp
         # Check img_attn_proj hidden_size
         if "_img_attn_proj." in key and key.endswith("lora_down.weight"):
             return _variant_from_hidden_size(state_dict[key].shape[1])
-        # LoKR variant
-        elif "_img_attn_proj." in key and key.endswith((".lokr_w1", ".lokr_w1_b")):
-            in_dim = _lokr_in_dim(state_dict, key.rsplit(".", 1)[0])
+        # LyCORIS variant
+        elif "_img_attn_proj." in key and key.endswith(_LYCORIS_IN_DIM_SUFFIXES):
+            in_dim = _lycoris_in_dim(state_dict, key.rsplit(".", 1)[0])
             if in_dim is not None:
                 return _variant_from_hidden_size(in_dim)
 
