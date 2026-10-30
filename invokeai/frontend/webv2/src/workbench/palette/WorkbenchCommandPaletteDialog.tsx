@@ -302,20 +302,20 @@ const WorkbenchCommandPaletteDialog = ({
           }
 
           const { revertPatch } = selection;
+          const readGenerateValues = (id: string) => {
+            const project = workbenchQueries.getProject(id);
+
+            return project ? getProjectWidgetValues(project, 'generate') : null;
+          };
 
           notifyGenerateModelSwitched({
-            getCurrentModelKey: () => {
-              const project = workbenchQueries.getProject(projectId);
-              const modelKey = project ? getProjectWidgetValues(project, 'generate').modelKey : undefined;
-
-              return typeof modelKey === 'string' ? modelKey : undefined;
-            },
             locale: i18n.resolvedLanguage,
             model,
             notifications: notify,
             projectId,
             result: selection.result,
-            revert: () => generation.patchSettings(revertPatch, projectId),
+            revertPatch,
+            settings: { patchGenerateSettings: generation.patchSettings, readGenerateValues },
             t,
           });
         },

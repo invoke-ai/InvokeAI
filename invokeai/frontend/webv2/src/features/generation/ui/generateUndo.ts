@@ -34,6 +34,26 @@ interface GenerateUndoOffer {
 }
 
 /**
+ * The entries of `revertPatch` whose key still holds what the change wrote, so restoring them never discards a later
+ * edit; null when the project is gone. Typing still inside a draft's debounce counts as an edit since, so drafts flush
+ * before the comparison.
+ */
+export const readStillAppliedRevert = (
+  settings: Pick<GenerationUiAdapter['settings'], 'readGenerateValues'>,
+  projectId: string,
+  revertPatch: Readonly<Record<string, unknown>>,
+  written: object
+): [string, unknown][] | null => {
+  flushGenerateDrafts();
+  const current = settings.readGenerateValues(projectId);
+  const writtenValues = written as Readonly<Record<string, unknown>>;
+
+  return current
+    ? Object.entries(revertPatch).filter(([key]) => areJsonValuesStructurallyEqual(current[key], writtenValues[key]))
+    : null;
+};
+
+/**
  * Reports a Generate change that already happened, with an Undo that restores the earlier value of each key the
  * change set. A key edited since keeps the edit, so an Undo never discards later work; with nothing left to restore it
  * says so. No toast when the change set nothing.
@@ -50,7 +70,6 @@ export const offerGenerateUndo = ({
   ui,
 }: GenerateUndoOffer): void => {
   const revertPatch = getGenerateValuesRevertPatch(before, after);
-  const written = after as Readonly<Record<string, unknown>>;
 
   if (Object.keys(revertPatch).length === 0) {
     return;
@@ -59,13 +78,13 @@ export const offerGenerateUndo = ({
   ui.notifications.undoable(title, {
     ...(message ? { message } : {}),
     onUndo: () => {
-      // Typing still inside a draft's debounce counts as an edit since, so it lands before the comparison.
-      flushGenerateDrafts();
-      const current = ui.settings.readGenerateValues(projectId);
-      const entries = Object.entries(revertPatch);
-      const stillApplied = entries.filter(([key]) => areJsonValuesStructurallyEqual(current?.[key], written[key]));
+      const stillApplied = readStillAppliedRevert(ui.settings, projectId, revertPatch, after);
 
-      if (current && stillApplied.length > 0 && (!isWhole || stillApplied.length === entries.length)) {
+      if (
+        stillApplied &&
+        stillApplied.length > 0 &&
+        (!isWhole || stillApplied.length === Object.keys(revertPatch).length)
+      ) {
         ui.settings.patchGenerateSettings(Object.fromEntries(stillApplied), projectId);
       } else {
         ui.notifications.info(t('widgets.generate.undoStale'));

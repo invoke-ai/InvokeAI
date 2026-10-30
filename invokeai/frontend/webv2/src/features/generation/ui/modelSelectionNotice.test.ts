@@ -54,26 +54,32 @@ describe('describeModelSwitchChanges', () => {
 });
 
 describe('notifyGenerateModelSwitched', () => {
-  const notify = (getCurrentModelKey: () => string | undefined) => {
+  /**
+   * Switches from SDXL at 30 steps to FLUX dev, which stored 28 steps; `later` is what the project holds when Undo is
+   * pressed.
+   */
+  const notify = (later: Record<string, unknown>) => {
     const notifications = { info: vi.fn(), undoable: vi.fn() };
-    const revert = vi.fn();
+    const patchGenerateSettings = vi.fn();
+    let stored: Record<string, unknown> = { modelKey: 'flux-dev', steps: 28 };
 
     notifyGenerateModelSwitched({
-      getCurrentModelKey,
       locale: 'en',
       model: { key: 'flux-dev', name: 'FLUX dev' },
       notifications,
       projectId: 'project-1',
       result: { changes: [{ count: 1, kind: 'turnedOff', subject: 'concepts' }], dimensionsAdjusted: false, settings },
-      revert,
+      revertPatch: { modelKey: 'sdxl', steps: 30 },
+      settings: { patchGenerateSettings, readGenerateValues: () => stored },
       t,
     });
+    stored = later;
 
-    return { notifications, revert, undo: () => notifications.undoable.mock.calls[0]![1].onUndo() };
+    return { notifications, patchGenerateSettings, undo: () => notifications.undoable.mock.calls[0]![1].onUndo() };
   };
 
   it('reports the switch with an Undo for its project that a newer whole-form change supersedes', () => {
-    const { notifications, revert, undo } = notify(() => 'flux-dev');
+    const { notifications, patchGenerateSettings, undo } = notify({ modelKey: 'flux-dev', steps: 28 });
 
     expect(notifications.undoable).toHaveBeenCalledExactlyOnceWith('Switched to FLUX dev', {
       message: 'Turned off, kept for later: 1 concept.',
@@ -82,15 +88,24 @@ describe('notifyGenerateModelSwitched', () => {
       supersedes: 'generate-settings:project-1',
     });
     undo();
-    expect(revert).toHaveBeenCalledOnce();
+    expect(patchGenerateSettings).toHaveBeenCalledExactlyOnceWith({ modelKey: 'sdxl', steps: 30 }, 'project-1');
   });
 
-  it('undoes nothing, and says so, once the project uses another model', () => {
-    const { notifications, revert, undo } = notify(() => 'sdxl');
+  it('puts the model back but keeps an edit made since to a value the switch set', () => {
+    const { notifications, patchGenerateSettings, undo } = notify({ modelKey: 'flux-dev', steps: 40 });
 
     undo();
 
-    expect(revert).not.toHaveBeenCalled();
+    expect(patchGenerateSettings).toHaveBeenCalledExactlyOnceWith({ modelKey: 'sdxl' }, 'project-1');
+    expect(notifications.info).not.toHaveBeenCalled();
+  });
+
+  it('undoes nothing, and says so, once the project uses another model', () => {
+    const { notifications, patchGenerateSettings, undo } = notify({ modelKey: 'sdxl', steps: 28 });
+
+    undo();
+
+    expect(patchGenerateSettings).not.toHaveBeenCalled();
     expect(notifications.info).toHaveBeenCalledExactlyOnceWith(
       'The model changed after switching to FLUX dev, so nothing was undone.'
     );

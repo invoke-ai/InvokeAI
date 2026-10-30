@@ -112,17 +112,13 @@ export const GenerateModelCard = ({
       );
 
       notifyGenerateModelSwitched({
-        getCurrentModelKey: () => {
-          const modelKey = ui.settings.readGenerateValues(projectId)?.modelKey;
-
-          return typeof modelKey === 'string' ? modelKey : undefined;
-        },
         locale: i18n.resolvedLanguage,
         model,
         notifications: ui.notifications,
         projectId,
         result,
-        revert: () => ui.settings.patchGenerateSettings(revertPatch, projectId),
+        revertPatch,
+        settings: ui.settings,
         t,
       });
     }

@@ -9,7 +9,9 @@ import type { TFunction } from 'i18next';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
-import { getGenerateSettingsUndoKey } from './generateUndo';
+import type { GenerationUiAdapter } from './GenerationUiContext';
+
+import { getGenerateSettingsUndoKey, readStillAppliedRevert } from './generateUndo';
 
 /** The order a switch's changes are told in: what is lost first, then what is only set aside or moved. */
 const MODEL_SWITCH_CHANGE_KINDS: readonly GenerateModelSwitchChangeKind[] = [
@@ -62,38 +64,48 @@ interface ModelSwitchNotifier {
 
 /**
  * Reports a switch that already happened, naming what it set aside, with an Undo that restores the earlier choices.
- * The Undo reverts only the keys the switch changed, so it acts only while the project still uses the model the switch
- * picked; a newer whole-form change also withdraws it.
+ * The Undo acts only while the project still uses the model the switch picked, and then puts back only the keys that
+ * still hold what the switch wrote, so an edit made since (steps, size) is kept; a newer whole-form change withdraws it.
+ * Call it right after the switch committed synchronously: what the project stores then is taken as what the switch
+ * wrote, which the commit resolved and so may differ from `result.settings`.
  */
 export const notifyGenerateModelSwitched = ({
-  getCurrentModelKey,
   locale,
   model,
   notifications,
   projectId,
   result,
-  revert,
+  revertPatch,
+  settings,
   t,
 }: {
-  /** The project's model now, read when Undo is pressed. */
-  getCurrentModelKey: () => string | undefined;
   locale: string | undefined;
   model: Pick<GenerateModelConfig, 'key' | 'name'>;
   notifications: ModelSwitchNotifier;
   projectId: string;
   result: Pick<GenerateModelSelectionResult, 'changes' | 'dimensionsAdjusted' | 'settings'>;
-  revert: () => void;
+  /** The earlier value of each key the switch changed. */
+  revertPatch: Readonly<Record<string, unknown>>;
+  settings: Pick<GenerationUiAdapter['settings'], 'patchGenerateSettings' | 'readGenerateValues'>;
   t: TFunction;
 }): void => {
+  const written = settings.readGenerateValues(projectId) ?? {};
   const message = describeModelSwitchChanges(result, t, locale).join(' ');
 
   notifications.undoable(t('widgets.generate.switchedModel', { name: model.name }), {
     ...(message ? { message } : {}),
     onUndo: () => {
-      if (getCurrentModelKey() === model.key) {
-        revert();
-      } else {
+      if (settings.readGenerateValues(projectId)?.modelKey !== model.key) {
         notifications.info(t('widgets.generate.switchUndoStale', { name: model.name }));
+        return;
+      }
+
+      const stillApplied = readStillAppliedRevert(settings, projectId, revertPatch, written);
+
+      if (stillApplied && stillApplied.length > 0) {
+        settings.patchGenerateSettings(Object.fromEntries(stillApplied), projectId);
+      } else {
+        notifications.info(t('widgets.generate.undoStale'));
       }
     },
     projectId,
