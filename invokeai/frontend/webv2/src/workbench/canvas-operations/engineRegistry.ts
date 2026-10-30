@@ -104,8 +104,9 @@ export const createEngineRegistry = (
     const activeTool = engine.interaction.get('activeTool');
     carries.delete(projectId);
     carries.set(projectId, {
-      // Select Object's tool belongs to its operation, which ends with the engine.
-      activeTool: activeTool === 'sam' ? 'view' : activeTool,
+      // Select Object's tool belongs to its operation, which ends with the engine. Transform opens an edit session on
+      // the selected layer when chosen, so reopening the canvas on it would start an edit the user never asked for.
+      activeTool: activeTool === 'sam' || activeTool === 'transform' ? 'view' : activeTool,
       bookmarkedLayerId: engine.interaction.get('layerQuickSwitch').bookmarkedLayerId,
       // Steps trimmed at cooldown or evicted before count too: History's start point says how many went.
       droppedHistorySteps: past.length + future.length + evicted + dropped,

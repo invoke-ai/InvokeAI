@@ -269,21 +269,23 @@ export const useClearCanvas = () => {
 
   return useCallback(
     async (stopGenerations: boolean): Promise<void> => {
-      const project = queries.getProject(projectId);
-      if (!project) {
-        return;
-      }
       const ports = portsFor(projectId);
-      const stop = stopGenerations
-        ? getInFlightCanvasItems(project.canvas, project.queue.items).map((item) => item.id)
-        : [];
       const name = t('widgets.canvas.restorePoints.beforeClear');
       const outcome = await clearCanvasWithRestorePoint({
         cancelQueueItem: (queueItemId) => queue.cancel(projectId, queueItemId, null),
-        document: project.canvas.document,
         name,
         ports,
-        stop,
+        readTarget: () => {
+          const project = queries.getProject(projectId);
+          return project
+            ? {
+                document: project.canvas.document,
+                stop: stopGenerations
+                  ? getInFlightCanvasItems(project.canvas, project.queue.items).map((item) => item.id)
+                  : [],
+              }
+            : null;
+        },
       });
       switch (outcome.status) {
         case 'gone':
@@ -295,8 +297,8 @@ export const useClearCanvas = () => {
           notify.error(t('widgets.canvas.controls.clearUnsaved'), t('widgets.canvas.controls.clearFailedMessage'));
           return;
       }
-      const stopped = stop.length > 0 ? t('widgets.canvas.controls.clearedStopped', { count: stop.length }) : null;
-      const { restorePointId } = outcome;
+      const { restorePointId, stopped: stoppedCount } = outcome;
+      const stopped = stoppedCount > 0 ? t('widgets.canvas.controls.clearedStopped', { count: stoppedCount }) : null;
       if (restorePointId === null) {
         notify.success(t('widgets.canvas.controls.cleared'), stopped ?? undefined);
         return;

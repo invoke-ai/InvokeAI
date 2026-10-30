@@ -74,18 +74,24 @@ const crossPaintBarrier = async (engine: RestorePointEngine): Promise<boolean> =
 };
 
 export interface ClearCanvasRequest {
-  readonly document: Pick<CanvasDocumentContractV3, 'height' | 'width'>;
   readonly ports: RestorePointPorts;
   /** The restore point's name. */
   readonly name: string;
-  /** Queue items to stop first; empty to let them finish (their results are then dropped). */
-  readonly stop: readonly string[];
+  /**
+   * The document whose size the new canvas keeps, and the queue items to stop first (empty to let them finish; their
+   * results are then dropped). Read once the strokes have saved, so a run enqueued or a resize made meanwhile counts.
+   * Null when the project closed.
+   */
+  readonly readTarget: () => {
+    readonly document: Pick<CanvasDocumentContractV3, 'height' | 'width'>;
+    readonly stop: readonly string[];
+  } | null;
   readonly cancelQueueItem: (queueItemId: string) => void;
 }
 
 export type ClearCanvasOutcome =
-  /** `restorePointId` is null for a blank canvas, which had nothing to keep. */
-  | { status: 'cleared'; restorePointId: string | null }
+  /** `restorePointId` is null for a blank canvas, which had nothing to keep; `stopped` counts the items stopped. */
+  | { status: 'cleared'; restorePointId: string | null; stopped: number }
   /** The latest strokes could not be saved, so clearing would lose them; nothing changed. */
   | { status: 'unsaved' }
   /** The canvas did not take the new document; its restore point is withdrawn, nothing changed. */
@@ -105,16 +111,21 @@ export const clearCanvasWithRestorePoint = async (request: ClearCanvasRequest): 
   if (!(await crossPaintBarrier(engine))) {
     return { status: 'unsaved' };
   }
+  // Everything from here runs synchronously, so nothing can be enqueued or resized between this read and the swap.
+  const target = request.readTarget();
+  if (!target) {
+    return { status: 'gone' };
+  }
   const isBlank = request.ports.isBlank();
   const restorePointId = isBlank ? null : saveRestorePoint(request.ports, 'clear-canvas', request.name);
   if (!isBlank && restorePointId === null) {
     return { status: 'gone' };
   }
-  for (const queueItemId of request.stop) {
+  for (const queueItemId of target.stop) {
     request.cancelQueueItem(queueItemId);
   }
   const replaced = engine.document.replaceDocument(
-    createNewCanvasState(request.document.width, request.document.height).document
+    createNewCanvasState(target.document.width, target.document.height).document
   );
   if (!replaced) {
     if (restorePointId) {
@@ -122,7 +133,7 @@ export const clearCanvasWithRestorePoint = async (request: ClearCanvasRequest): 
     }
     return { status: 'failed' };
   }
-  return { restorePointId, status: 'cleared' };
+  return { restorePointId, status: 'cleared', stopped: target.stop.length };
 };
 
 export type RestoreOutcome =

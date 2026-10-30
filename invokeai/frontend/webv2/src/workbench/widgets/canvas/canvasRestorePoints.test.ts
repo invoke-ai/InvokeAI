@@ -60,14 +60,14 @@ const createFixture = ({ blank = false, flush, lock = null, open = true, swaps =
   return { applied, engage, engine, order, ports };
 };
 
+/** `stop` is read when the clear asks for it, so a test can enqueue a run while the strokes save. */
 const clear = (fixture: ReturnType<typeof createFixture>, stop: string[] = []) => {
   const cancelQueueItem = vi.fn((id: string) => fixture.order.push(`stop ${id}`));
   const outcome = clearCanvasWithRestorePoint({
     cancelQueueItem,
-    document: { height: 64, width: 32 },
     name: 'Before clearing the canvas',
     ports: fixture.ports,
-    stop,
+    readTarget: () => ({ document: { height: 64, width: 32 }, stop: [...stop] }),
   });
   return { cancelQueueItem, outcome };
 };
@@ -79,6 +79,7 @@ describe('clearCanvasWithRestorePoint', () => {
     await expect(clear(fixture, ['queue-1']).outcome).resolves.toEqual({
       restorePointId: 'point-1',
       status: 'cleared',
+      stopped: 1,
     });
     expect(fixture.engine.lifecycle.flushPendingUploads).toHaveBeenCalledWith({ waitForHeldPixels: false });
     expect(fixture.applied).toEqual([
@@ -98,6 +99,19 @@ describe('clearCanvasWithRestorePoint', () => {
     });
   });
 
+  it('stops a run enqueued while the strokes save', async () => {
+    const stop = ['queue-1'];
+    const fixture = createFixture({
+      flush: () => {
+        stop.push('queue-2');
+        return Promise.resolve();
+      },
+    });
+
+    await expect(clear(fixture, stop).outcome).resolves.toMatchObject({ status: 'cleared', stopped: 2 });
+    expect(fixture.order).toEqual(['flush', 'saveCanvasSnapshot', 'stop queue-1', 'stop queue-2', 'replace']);
+  });
+
   it('clears nothing when the latest strokes cannot be saved', async () => {
     const fixture = createFixture({ flush: () => Promise.reject(new Error('offline')) });
     const { cancelQueueItem, outcome } = clear(fixture, ['queue-1']);
@@ -110,7 +124,7 @@ describe('clearCanvasWithRestorePoint', () => {
 
   it('keeps no restore point of a blank canvas', async () => {
     const fixture = createFixture({ blank: true });
-    await expect(clear(fixture).outcome).resolves.toEqual({ restorePointId: null, status: 'cleared' });
+    await expect(clear(fixture).outcome).resolves.toEqual({ restorePointId: null, status: 'cleared', stopped: 0 });
     expect(fixture.order).toEqual(['flush', 'replace']);
   });
 

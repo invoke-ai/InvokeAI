@@ -34,6 +34,8 @@ interface HarnessOptions {
   /** Mirror refresh fails, so an accepted mutation can never be mirrored. */
   readonly mirrorBroken?: boolean;
   readonly staged?: boolean;
+  /** Landing the open sessions also takes the candidate off staging. */
+  readonly unstagedBySettle?: boolean;
   /** Overrides the initial selection: the new project's empty inpaint mask. */
   readonly selectedLayerId?: string | null;
 }
@@ -106,7 +108,13 @@ const createHarness = (options: HarnessOptions = {}) => {
       return () => listeners.delete(listener);
     },
   });
-  const settleEditSessions = vi.fn(() => !options.sessionStuck);
+  const settleEditSessions = vi.fn(() => {
+    if (options.unstagedBySettle) {
+      const stagingArea = { ...project.canvas.stagingArea, pendingImageIds: [], pendingImages: [] };
+      project = { ...project, canvas: { ...project.canvas, stagingArea } };
+    }
+    return !options.sessionStuck;
+  });
   const controller = new StagedResultController({
     createEventId: () => 'event-1',
     ctx,
@@ -259,11 +267,21 @@ describe('StagedResultController', () => {
     expect(h.history.canUndo()).toBe(false);
   });
 
-  it('returns missing without mutation when the candidate is no longer staged', () => {
+  it('returns missing without mutation, and lands no session, when the candidate is no longer staged', () => {
     const h = createHarness({ staged: false });
 
     expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
     expect(h.dispatched).toEqual([]);
+    expect(h.settleEditSessions).not.toHaveBeenCalled();
+  });
+
+  it('returns missing when landing the open sessions takes the candidate off staging', () => {
+    const h = createHarness({ unstagedBySettle: true });
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
+    expect(h.settleEditSessions).toHaveBeenCalledOnce();
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
   });
 
   it('rejects retained commit capabilities after disposal', () => {

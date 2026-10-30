@@ -295,6 +295,23 @@ describe('createEngineRegistry', () => {
     registry.disposeAll();
   });
 
+  it.each(['sam', 'transform'] as const)('reopens a canvas closed on the %s tool on View', async (tool) => {
+    const fakeTimers = createFakeTimers();
+    const registry = createEngineRegistry({ gracePeriodMs: 30_000, timers: fakeTimers.timers });
+    const deps = createFakeDeps();
+    deps.mutationPort.dispatch({ document: documentFrom([layerContract('r1')]), type: 'replaceCanvasDocument' });
+    const engine = registry.getOrCreateEngine('p1', deps);
+    engine.tools.setTool(tool);
+    expect(engine.interaction.get('activeTool')).toBe(tool);
+
+    registry.releaseEngine('p1');
+    fakeTimers.flush();
+    await drainUntil(() => registry.getEngine('p1') === undefined);
+
+    expect(registry.getOrCreateEngine('p1', deps).interaction.get('activeTool')).toBe('view');
+    registry.disposeAll();
+  });
+
   it('records a frame resize asked for outside the canvas as one canvas undo step', () => {
     const registry = createEngineRegistry();
     const liveEngines = createLiveCanvasEngines();

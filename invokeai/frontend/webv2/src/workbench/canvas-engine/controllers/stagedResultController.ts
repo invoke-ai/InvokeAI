@@ -80,21 +80,30 @@ export class StagedResultController {
     if (this.disposed) {
       return { status: 'missing' };
     }
-    // A held document or a gesture refuses before anything lands, so a refused accept never ends a session.
-    const permit = o.ctx.capturePermit(owner);
-    if (!permit || o.ctx.isGestureActive() || !o.settleEditSessions()) {
-      return { status: 'busy' };
-    }
-    const canvas = o.getCanvasState();
-    if (!canvas) {
-      return { status: 'missing' };
-    }
     const candidateFingerprint = getCanvasStagingCandidateFingerprint(options.candidate);
-    if (
-      !canvas.stagingArea.pendingImages.some(
+    const readCanvasWithCandidate = (): CanvasStateContractV3 | null => {
+      const state = o.getCanvasState();
+      return state?.stagingArea.pendingImages.some(
         (pending) => getCanvasStagingCandidateFingerprint(pending) === candidateFingerprint
       )
-    ) {
+        ? state
+        : null;
+    };
+    // A held document, a gesture or a candidate already gone refuses before anything lands, so a refused accept never
+    // ends a session.
+    const permit = o.ctx.capturePermit(owner);
+    if (!permit || o.ctx.isGestureActive()) {
+      return { status: 'busy' };
+    }
+    if (!readCanvasWithCandidate()) {
+      return { status: 'missing' };
+    }
+    if (!o.settleEditSessions()) {
+      return { status: 'busy' };
+    }
+    // Landing the sessions dispatched steps of their own, so the canvas is read again.
+    const canvas = readCanvasWithCandidate();
+    if (!canvas) {
       return { status: 'missing' };
     }
     if (!o.ctx.isPermitCurrent(permit) || o.ctx.isGestureActive()) {
