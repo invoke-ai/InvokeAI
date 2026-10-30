@@ -13,7 +13,7 @@ vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
   useActiveQueueProgress: () => ({ progress: null, queueItems: [], summary: { total: 0 } }),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
-vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcutBinding: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutBinding: () => null }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 // The card's module fails as a dropped connection would. Its own file: a page loads that module once.
 vi.mock('./InvokePopoverBody', () => ({

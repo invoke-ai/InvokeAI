@@ -12,6 +12,7 @@ import { DiscordIcon, LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
 import { useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
+import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { openWhatsNew } from '@workbench/shell/whatsNewStore';
@@ -34,7 +35,6 @@ import { useCallback, useRef, useState, type ComponentType, type ElementType } f
 import { useTranslation } from 'react-i18next';
 
 import { TopbarMenuChevron } from './TopbarMenuChevron';
-import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
@@ -198,7 +198,7 @@ const AppMenuGlyph = () => (
 
 const SearchMenuAction = () => {
   const { t } = useTranslation();
-  const shortcut = useTopbarShortcut(OPEN_COMMAND_PALETTE_HOTKEY.commandId);
+  const shortcut = useShortcutLabel(OPEN_COMMAND_PALETTE_HOTKEY.commandId);
   const label = shortcut ? t('commandPalette.buttonTooltip', { hotkey: shortcut }) : t('commandPalette.buttonLabel');
 
   return <AppMenuAction icon={SearchIcon} label={label} value="command-palette" onClick={openCommandPalette} />;
@@ -208,7 +208,7 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
   const { t } = useTranslation();
   // Reads the effective binding, so a remapped or unbound shortcut is never
   // advertised as one that still works.
-  const shortcut = useTopbarShortcut('app.openSettings');
+  const shortcut = useShortcutLabel('app.openSettings');
   const label = shortcut ? t('common.settingsWithShortcut', { hotkey: shortcut }) : t('common.settings');
 
   return <AppMenuAction icon={SettingsIcon} label={label} value="settings" onClick={onClick} />;

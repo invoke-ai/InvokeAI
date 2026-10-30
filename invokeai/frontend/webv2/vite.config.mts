@@ -150,6 +150,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/hotkeys/hintSources.tsx',
   '/workbench/hotkeys/shortcutHints.ts',
   '/workbench/hotkeys/targetWidget.ts',
+  // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
+  '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.

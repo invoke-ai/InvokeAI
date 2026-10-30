@@ -27,6 +27,7 @@ import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
+import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel } from '@workbench/layoutPresets';
@@ -53,7 +54,6 @@ import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 import { useActiveLayoutPresetId, useLayoutDrift, useUnsavedInactiveLayoutPresetIds } from './useLayoutDrift';
-import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const TAB_FILL_TRANSITION =
@@ -560,7 +560,7 @@ const PresetMenu = ({
 }) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
-  const saveShortcut = useTopbarShortcut('app.saveLayoutPreset');
+  const saveShortcut = useShortcutLabel('app.saveLayoutPreset');
   const { preset } = target;
   const isCustom = preset.isBuiltIn !== true;
 

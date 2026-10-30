@@ -64,7 +64,7 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
   };
 });
 
-vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutLabel: () => null }));
 
 import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetStrip } from './LayoutPresetStrip';

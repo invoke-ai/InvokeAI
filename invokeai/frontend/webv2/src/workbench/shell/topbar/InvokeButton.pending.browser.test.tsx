@@ -21,7 +21,7 @@ vi.mock('@workbench/queue-integration/useActiveQueueProgress', () => ({
   useActiveQueueProgress: () => ({ progress: null, queueItems: [], summary: { total: 0 } }),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: () => {} }) }));
-vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcutBinding: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutBinding: () => null }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('./InvokePopoverBody', async () => {
   chunk.requests += 1;

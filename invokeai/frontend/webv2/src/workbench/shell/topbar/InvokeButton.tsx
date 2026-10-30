@@ -6,6 +6,7 @@ import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
+import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
 import { isRoutingLocked } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useNotify } from '@workbench/useNotify';
@@ -19,7 +20,6 @@ import type { InvocationState } from './useInvocationState';
 import { getInvokeIconMode } from './invokeButtonModel';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
-import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 type InvokePopoverBodyComponent = typeof InvokePopoverBodyModule.InvokePopoverBody;
 
@@ -73,8 +73,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const { invoke, isPreparing, isValid, issues } = state;
-  const shortcutBinding = useTopbarShortcutBinding('app.invoke');
-  const frontBinding = useTopbarShortcutBinding('app.invokeFront');
+  const shortcutBinding = useShortcutBinding('app.invoke');
+  const frontBinding = useShortcutBinding('app.invokeFront');
   const shortcutParts = shortcutBinding?.parts ?? null;
   // Shift+click queues at the front: holding it over a ready button says so before the click.
   const isShiftHeld = useModifierHeld('Shift');

@@ -1,3 +1,4 @@
+import type * as UseShortcutBindingModule from '@workbench/hotkeys/useShortcutBinding';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -8,7 +9,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import type { InvocationIssue, InvocationState } from './useInvocationState';
-import type * as UseTopbarShortcutModule from './useTopbarShortcut';
 
 // Verify progress returns after hover ends unless focus-visible remains; mouse click-focus must not pin the play
 // icon. Mock queue plumbing to isolate that gate.
@@ -35,9 +35,9 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     },
   }),
 }));
-vi.mock('./useTopbarShortcut', async (importOriginal) => ({
-  ...(await importOriginal<typeof UseTopbarShortcutModule>()),
-  useTopbarShortcutBinding: (commandId: string) => harness.bindings[commandId] ?? null,
+vi.mock('@workbench/hotkeys/useShortcutBinding', async (importOriginal) => ({
+  ...(await importOriginal<typeof UseShortcutBindingModule>()),
+  useShortcutBinding: (commandId: string) => harness.bindings[commandId] ?? null,
 }));
 // The list's ways out are their own module's concern; here each layer issue offers one that records its layer.
 vi.mock('./invokeIssueActions', () => ({
