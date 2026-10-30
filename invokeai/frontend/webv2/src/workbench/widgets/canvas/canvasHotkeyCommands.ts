@@ -1,4 +1,6 @@
 import type {
+  AdjustmentRefusal,
+  LayerUnreadable,
   CanvasDocumentContractV3,
   CanvasEngine,
   LayerStackMoveKind,
@@ -15,17 +17,66 @@ import {
 } from '@workbench/canvas-engine/api';
 import { publishLayerPanelSelection } from '@workbench/layerPanelState';
 import {
+  CANVAS_HISTORY_HOTKEYS,
+  executeCanvasToolCommand,
+  isCanvasToolCommand,
+  type CanvasToolCommandContext,
+  type HotkeyTableEntry,
+} from '@workbench/widgets/canvas/canvasToolCommands';
+import {
   commitPreparedEdit,
   type LayerOperationRefusal,
   type PreparedCommitOutcome,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import {
   canGroupSelection,
+  canRemoveFromGroup,
   canUngroupSelection,
   groupLayers,
+  removeFromGroup,
   ungroupLayers,
 } from '@workbench/widgets/layers/layerGroupCommands';
 import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
+
+/** Keys that act only while the Canvas itself holds focus; rows and fields own them elsewhere. */
+export const CANVAS_ONLY_HOTKEYS = [
+  ...CANVAS_HISTORY_HOTKEYS,
+  // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
+  // then intercepted to cycle staging slots while any slot exists.
+  ['canvas.prevEntity', 'widgets.canvas.commands.previousEntity', ['alt+[']],
+  ['canvas.nextEntity', 'widgets.canvas.commands.nextEntity', ['alt+]']],
+  ['canvas.quickSwitch', 'widgets.canvas.commands.quickSwitch', ['q']],
+  ['canvas.deleteSelected', 'widgets.canvas.commands.deleteSelected', ['delete', 'backspace']],
+  ['canvas.resetSelected', 'widgets.canvas.commands.resetSelected', ['shift+c']],
+  ['canvas.toggleNonRasterLayers', 'widgets.canvas.commands.toggleNonRasterLayers', ['shift+h']],
+  ['canvas.copySelection', 'widgets.canvas.commands.copySelection', ['mod+c']],
+  ['canvas.cutSelection', 'widgets.canvas.commands.cutSelection', ['mod+x']],
+  ['canvas.pasteImage', 'widgets.canvas.commands.pasteImage', ['mod+v']],
+  // Selection: select all / deselect / invert (engine-owned transient selection).
+  ['canvas.selectAll', 'widgets.canvas.commands.selectAll', ['mod+a']],
+  ['canvas.deselect', 'widgets.canvas.commands.deselect', ['mod+d']],
+  ['canvas.invertSelection', 'widgets.canvas.commands.invertSelection', ['mod+shift+i']],
+  // Move the selected layer: arrows nudge 1px, shift+arrows 10px.
+  ['canvas.nudgeLeft', 'widgets.canvas.commands.nudgeLeft', ['arrowleft']],
+  ['canvas.nudgeRight', 'widgets.canvas.commands.nudgeRight', ['arrowright']],
+  ['canvas.nudgeUp', 'widgets.canvas.commands.nudgeUp', ['arrowup']],
+  ['canvas.nudgeDown', 'widgets.canvas.commands.nudgeDown', ['arrowdown']],
+  ['canvas.nudgeLeftLarge', 'widgets.canvas.commands.nudgeLeftLarge', ['shift+arrowleft']],
+  ['canvas.nudgeRightLarge', 'widgets.canvas.commands.nudgeRightLarge', ['shift+arrowright']],
+  ['canvas.nudgeUpLarge', 'widgets.canvas.commands.nudgeUpLarge', ['shift+arrowup']],
+  ['canvas.nudgeDownLarge', 'widgets.canvas.commands.nudgeDownLarge', ['shift+arrowdown']],
+  // Layer management.
+  ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
+  ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
+  ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
+  ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']],
+  ['canvas.layerForward', 'widgets.canvas.commands.layerForward', ['mod+]']],
+  ['canvas.layerBackward', 'widgets.canvas.commands.layerBackward', ['mod+[']],
+  ['canvas.layerToFront', 'widgets.canvas.commands.layerToFront', ['mod+shift+]']],
+  ['canvas.layerToBack', 'widgets.canvas.commands.layerToBack', ['mod+shift+[']],
+  // No default key — assignable through the hotkeys settings; the canvas menu offers the same action.
+  ['canvas.cropAllLayersToFrame', 'widgets.canvas.contextMenu.cropAllLayersToBbox', []],
+] as const satisfies readonly HotkeyTableEntry[];
 
 /** Command id → document-space nudge delta (shift variants are ×10). */
 const NUDGE_DELTAS: Record<string, { dx: number; dy: number }> = {
@@ -86,26 +137,23 @@ const quickSwitchLayerId = (document: CanvasDocumentContractV3, engine: CanvasEn
 };
 
 /** Pass hotkey dependencies explicitly so dispatch can be tested without mounting React. */
-export interface CanvasHotkeyContext {
+export interface CanvasHotkeyContext extends Omit<CanvasToolCommandContext, 'engine' | 'selectedLayerId'> {
   readonly document: CanvasDocumentContractV3;
   readonly engine: CanvasEngine | null;
   /** Any staging slot exists, so left/right cycle candidates instead of nudging. */
   readonly hasStagingSlots: boolean;
   /** A staged candidate is selected, so Delete discards it instead of touching layers. */
   readonly hasSelectedStagedCandidate: boolean;
-  readonly isInteractionLocked: boolean;
   readonly selectedLayerIds: readonly string[];
   readonly dispatch: CanvasProjectMutationDispatch;
   readonly copySelection: (cut: boolean) => void;
-  /** Swaps the project foreground/background pair — a preference, never a document edit. */
-  readonly swapActiveColors: () => void;
-  /** Resets the pair to the black-on-white default. */
-  readonly resetActiveColors: () => void;
+  /** Crops every unlocked layer to the frame and reports the outcome, as the canvas menu does. */
+  readonly cropAllLayers: () => void;
   readonly pasteFromClipboard: () => void;
   readonly notifyLayerDuplicateFailed: () => void;
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
-  readonly reportLayerOperation: (refusal: LayerOperationRefusal) => void;
+  readonly reportLayerOperation: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void;
   readonly t: (key: string) => string;
 }
 
@@ -113,9 +161,9 @@ export interface CanvasHotkeyContext {
  * Routes one canvas command id to its effect.
  *
  * Ordering is load-bearing and reads top-down as a precedence list: staging
- * cycling and staged-candidate discard win over layer commands, the interaction
- * lock then blocks everything except the view tool, and only after those do
- * nudge, reorder, and the per-command table apply.
+ * cycling and staged-candidate discard win over layer commands, companion keys
+ * apply their own lock rule, the interaction lock then blocks everything else,
+ * and only after those do nudge, reorder, and the per-command table apply.
  */
 export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyContext): void => {
   const { dispatch, document, engine, t } = ctx;
@@ -140,22 +188,12 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     return;
   }
 
-  // The color pair is a preference, not a document edit, so X/D stay live even
-  // while the surface is interaction-locked.
-  if (commandId === 'canvas.toggleFillColor') {
-    ctx.swapActiveColors();
-    return;
-  }
-
-  if (commandId === 'canvas.setFillColorsToDefault') {
-    ctx.resetActiveColors();
+  if (isCanvasToolCommand(commandId)) {
+    executeCanvasToolCommand(commandId, { ...ctx, selectedLayerId: selectedLayer?.id ?? null });
     return;
   }
 
   if (ctx.isInteractionLocked) {
-    if (commandId === 'canvas.tool.view') {
-      engine?.tools.setTool('view');
-    }
     return;
   }
 
@@ -211,6 +249,8 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     ctx.copySelection(commandId === 'canvas.cutSelection');
   } else if (commandId === 'canvas.pasteImage') {
     ctx.pasteFromClipboard();
+  } else if (commandId === 'canvas.cropAllLayersToFrame') {
+    ctx.cropAllLayers();
   } else if (commandId === 'canvas.toggleNonRasterLayers') {
     // Hide overlays without disabling generation content; showing restores individually hidden nodes too.
     const overlays = index.nodes.filter((entry) => isOverlayStack(entry.stack));
@@ -241,71 +281,12 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     engine?.history.undo();
   } else if (commandId === 'canvas.redo') {
     engine?.history.redo();
-  } else if (commandId === 'canvas.tool.view') {
-    engine?.tools.setTool('view');
-  } else if (commandId === 'canvas.tool.move') {
-    engine?.tools.setTool('move');
-  } else if (commandId === 'canvas.transformSelected') {
-    // Selecting the transform tool opens a session on the selected layer (if any
-    // eligible one); Apply/Cancel (enter/esc) are handled engine-side.
-    engine?.tools.setTool('transform');
-  } else if (commandId === 'canvas.tool.bbox') {
-    engine?.tools.setTool('bbox');
-  } else if (commandId === 'canvas.tool.brush') {
-    engine?.tools.setTool('brush');
-  } else if (commandId === 'canvas.tool.eraser') {
-    engine?.tools.setTool('eraser');
-  } else if (commandId === 'canvas.tool.lasso') {
-    if (engine) {
-      // Repeating the active tool shortcut cycles its shape.
-      if (engine.interaction.get('activeTool') === 'lasso') {
-        const lasso = engine.interaction.get('lassoOptions');
-        engine.interaction.set('lassoOptions', {
-          ...lasso,
-          shape: lasso.shape === 'freehand' ? 'polygon' : 'freehand',
-        });
-      } else {
-        engine.tools.setTool('lasso');
-      }
-    }
-  } else if (commandId === 'canvas.tool.marquee') {
-    if (engine) {
-      if (engine.interaction.get('activeTool') === 'marquee') {
-        const marquee = engine.interaction.get('marqueeOptions');
-        engine.interaction.set('marqueeOptions', {
-          ...marquee,
-          kind: marquee.kind === 'rect' ? 'ellipse' : 'rect',
-        });
-      } else {
-        engine.tools.setTool('marquee');
-      }
-    }
-  } else if (commandId === 'canvas.tool.shape') {
-    if (engine) {
-      if (engine.interaction.get('activeTool') === 'shape') {
-        // Repeat presses cycle the kind, like the marquee hotkey.
-        const shape = engine.interaction.get('shapeOptions');
-        const order = ['rect', 'ellipse', 'triangle', 'star', 'polygon', 'freehand'] as const;
-        const next = order[(order.indexOf(shape.kind) + 1) % order.length]!;
-        engine.interaction.set('shapeOptions', { ...shape, kind: next });
-      } else {
-        engine.tools.setTool('shape');
-      }
-    }
-  } else if (commandId === 'canvas.tool.text') {
-    engine?.tools.setTool('text');
-  } else if (commandId === 'canvas.tool.gradient') {
-    engine?.tools.setTool('gradient');
   } else if (commandId === 'canvas.selectAll') {
     engine?.selection.selectAll();
   } else if (commandId === 'canvas.deselect') {
     engine?.selection.deselect();
   } else if (commandId === 'canvas.invertSelection') {
     engine?.selection.invertSelection();
-  } else if (commandId === 'canvas.brushSizeDown') {
-    engine?.tools.stepBrushSize(-1);
-  } else if (commandId === 'canvas.brushSizeUp') {
-    engine?.tools.stepBrushSize(1);
   } else if (commandId === 'canvas.duplicateLayer') {
     // With a live pixel selection, mod+J is "layer via copy" — it lifts just
     // the selected pixels. With none, it duplicates the whole layer.
@@ -333,7 +314,7 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
             ctx.notifyLayerDuplicateFailed();
             return;
           }
-          ctx.reportLayerOperation(result.status);
+          ctx.reportLayerOperation(result.status === 'unreadable' ? result : result.status);
         })
         .catch(() => {
           // The engine keeps rejected transactions atomic; route both rejection
@@ -348,16 +329,26 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       );
     }
   } else if (commandId === 'canvas.ungroupLayers') {
-    if (engine && selected && canUngroupSelection(engine.document.model(), ctx.selectedLayerIds)) {
+    // Groups dissolve; a selection of leaves of one group moves out above it instead.
+    const model = engine?.document.model() ?? null;
+    if (engine && selected && canUngroupSelection(model, ctx.selectedLayerIds)) {
       ctx.reportPreparedCommit(ungroupLayers(engine, ctx.selectedLayerIds, t('widgets.canvas.commands.ungroupLayers')));
+    } else if (engine && selected && canRemoveFromGroup(model, ctx.selectedLayerIds)) {
+      ctx.reportPreparedCommit(
+        removeFromGroup(engine, ctx.selectedLayerIds, t('widgets.layers.actions.removeFromGroup'))
+      );
     }
   } else if (commandId === 'canvas.mergeDown') {
     // Share canMergeLayerDown with the layer menu so shortcuts respect identical eligibility.
     if (engine && selectedLayer && canMergeLayerDown(document, selectedLayer.id, true)) {
-      const result = engine.layers.mergeLayerDown(selectedLayer.id);
-      if (result !== 'merged') {
-        ctx.reportLayerOperation(result);
-      }
+      void engine.layers.mergeLayerDown(selectedLayer.id).then(
+        (result) => {
+          if (result !== 'merged') {
+            ctx.reportLayerOperation(result);
+          }
+        },
+        () => ctx.reportLayerOperation('failed')
+      );
     }
   }
 };

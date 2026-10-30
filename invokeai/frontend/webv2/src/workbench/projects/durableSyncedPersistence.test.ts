@@ -3,7 +3,11 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
+import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import {
   createDraftProject,
   createInitialWorkbenchState,
@@ -13,6 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
 import type { ProjectDraftStore } from './draftStore';
+import type * as projectLifecycleLocksModule from './projectLifecycleLocks';
 import type { WorkbenchSessionBlob } from './session';
 
 import { ProjectCreateAbsentError } from './api';
@@ -40,7 +45,8 @@ const listQueueRunProjectIds = vi.hoisted(() =>
   )
 );
 
-vi.mock('./projectLifecycleLocks', () => ({
+vi.mock('./projectLifecycleLocks', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectLifecycleLocksModule>()),
   acquireProjectMutationLock: vi.fn(() =>
     Promise.resolve({ kind: 'acquired' as const, release: () => Promise.resolve() })
   ),
@@ -107,7 +113,8 @@ const toSummary = (record: ProjectWithWorkspaceDTO): ProjectSummaryDTO => ({
   workspace_updated_at: record.workspace_updated_at,
 });
 
-const createApi = () => {
+/** A fake server; `clientMaxCanvasSchemaVersion` is the canvas schema its reader declares, refused below a floor. */
+const createApi = (clientMaxCanvasSchemaVersion = MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) => {
   const records = new Map<string, ProjectWithWorkspaceDTO>();
   const api: DurableProjectPersistenceApi & { records: Map<string, ProjectWithWorkspaceDTO> } = {
     records,
@@ -142,6 +149,20 @@ const createApi = () => {
       const record = records.get(projectId);
       if (!record) {
         return Promise.reject(Object.assign(new Error('not found'), { status: 404 }));
+      }
+      if (record.minimum_canvas_schema_version > clientMaxCanvasSchemaVersion) {
+        return Promise.reject(
+          new ApiError(
+            JSON.stringify({
+              detail: {
+                code: 'canvas_schema_unsupported',
+                max_canvas_schema_version: clientMaxCanvasSchemaVersion,
+                minimum_canvas_schema_version: record.minimum_canvas_schema_version,
+              },
+            }),
+            412
+          )
+        );
       }
       return Promise.resolve(structuredClone(record));
     }),
@@ -404,6 +425,121 @@ describe('durable project persistence', () => {
     expect(api.createProject).not.toHaveBeenCalled();
   });
 
+  it('resolves a conflict in this tab alone when Web Locks are unavailable, as on a plain-HTTP origin', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const discarded = createDraftProject([]);
+    const copied = createDraftProject([discarded]);
+    for (const project of [discarded, copied]) {
+      api.records.set(project.id, toRecord(project, 2));
+      await draftStore.stage({
+        baseRevision: 1,
+        documentJson: JSON.stringify(serializeProjectDocumentV3({ ...project, name: 'local edit' })),
+        documentSchemaVersion: 3,
+        editorSessionId: 'editor-1',
+        generation: 1,
+        projectId: project.id,
+        updatedAt: Date.parse(now),
+        writerToken: 'old-writer',
+      });
+      await draftStore.settleConflict(project.id, 'editor-1', 'old-writer', 1, {
+        kind: 'revision',
+        serverRevision: 2,
+      });
+    }
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: discarded.id,
+      editorSessionId: 'editor-1',
+      openProjectIds: [discarded.id, copied.id],
+    });
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    const saveDraftAsNew = vi.fn((input: { copyProjectId: string; name: string }) => {
+      const copy = toRecord({ ...copied, id: input.copyProjectId, name: input.name });
+      api.records.set(copy.project_id, copy);
+      return Promise.resolve(copy);
+    });
+    const service = createDurableSyncedWorkbenchPersistence(owner, {
+      api,
+      draftStore: Promise.resolve(draftStore),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => Promise.resolve() }),
+      now: () => now,
+      saveDraftAsNew,
+      writerToken: 'writer-1',
+    });
+    // A plain-HTTP origin has no navigator.locks; Node 24 defines one, so remove it explicitly.
+    vi.stubGlobal('navigator', {});
+
+    try {
+      const loaded = await service.loadWorkbench();
+
+      await service.resolveConflictDiscard(discarded.id);
+      const copy = await service.resolveConflictSaveAsNew(loaded.state.projects.find(({ id }) => id === copied.id)!);
+
+      await expect(draftStore.get(discarded.id, 'editor-1')).resolves.toMatchObject({ kind: 'empty' });
+      expect(saveDraftAsNew).toHaveBeenCalledOnce();
+      expect(api.records.has(copy.targetProjectId)).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('refuses conflict resolution when the lock request fails although the browser has Web Locks', async () => {
+    // A secure context: other tabs can hold the lock, so a failed request is not single-tab mode.
+    vi.stubGlobal('navigator', { locks: {} });
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    const service = createService(owner, api);
+
+    try {
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+      await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('cross-tab coordination');
+      // The refused copy released its capture, so a retry is not reported as already saving.
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('cross-tab coordination');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
+  it('still refuses conflict resolution without Web Locks while a queue journal row exists', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'unavailable' });
+    vi.mocked(createAccountOwnedQueueRunJournal).mockResolvedValue({
+      availability: 'available',
+      acknowledgeReceipt: vi.fn(),
+      listPendingReceipts: vi.fn(),
+      close: vi.fn(),
+      deleteForProject: vi.fn(),
+      listAll: vi.fn(),
+      listProjectIds: vi.fn().mockResolvedValue({ kind: 'available', projectIds: [project.id] }),
+      listForProject: vi.fn().mockResolvedValue({
+        entries: [{ item: {}, projectId: project.id, queueItemId: 'run-1', submissionOrder: 1 }],
+        kind: 'available',
+        removedCorrupt: 0,
+      }),
+      record: vi.fn(),
+      settle: vi.fn(),
+    });
+    const service = createService(owner, api);
+    vi.stubGlobal('navigator', {});
+
+    try {
+      await expect(service.resolveConflictSaveAsNew(project)).rejects.toThrow('active queue runs');
+      await expect(service.resolveConflictDiscard(project.id)).rejects.toThrow('active queue runs');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+
+    expect(api.createProject).not.toHaveBeenCalled();
+  });
+
   it('refuses conflict resolution when a dormant queue journal row exists', async () => {
     const owner = captureAccountScope();
     const api = createApi();
@@ -514,6 +650,59 @@ describe('durable project persistence', () => {
     expect(loaded.state.activeProjectId).toBe(projects[1]!.id);
     expect(list).toHaveBeenCalledOnce();
     expect(listForProject).not.toHaveBeenCalled();
+  });
+
+  it('opens a project saved at another origin with media URLs of this one, without saving it', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const stale = 'http://192.168.1.5:9090/api/v1/images/i';
+    const base = createDraftProject([]);
+    const project: Project = {
+      ...base,
+      widgetInstances: {
+        ...base.widgetInstances,
+        gallery: {
+          ...base.widgetInstances.gallery!,
+          state: {
+            ...base.widgetInstances.gallery!.state,
+            values: {
+              ...base.widgetInstances.gallery!.state.values,
+              selectedImage: {
+                boardId: 'none',
+                category: 'general',
+                createdAt: now,
+                fullUrl: `${stale}/x.png/full`,
+                height: 8,
+                isIntermediate: false,
+                kind: 'image',
+                name: 'x.png',
+                starred: false,
+                thumbnailUrl: `${stale}/x.png/thumbnail`,
+                width: 8,
+              },
+            },
+          },
+        },
+      },
+    };
+    api.records.set(project.id, toSplitRecord(project));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api);
+
+    const loaded = await service.loadWorkbench();
+
+    const [opened] = loaded.state.projects;
+    expect(opened!.widgetInstances.gallery!.state.values.selectedImage).toMatchObject({
+      fullUrl: expect.stringMatching(/^http:\/\/localhost\/api\/v1\/images\/i\/x\.png\/full$/),
+      thumbnailUrl: expect.stringMatching(/^http:\/\/localhost\/api\/v1\/images\/i\/x\.png\/thumbnail$/),
+    });
+    await service.saveWorkbench(loaded.state);
+    expect(api.updateProject).not.toHaveBeenCalled();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 
   it('restores a server project with durable queue work after another tab empties the session', async () => {
@@ -3902,7 +4091,12 @@ describe('recovering a project whose halves were acknowledged apart', () => {
       updatedAt: Date.parse(now),
       writerToken: 'old-writer',
     });
-    const elsewhere = { ...project, promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }] };
+    // Another tab saved its workspace, Auto-switch included: project settings travel only with the workspace half.
+    const elsewhere = {
+      ...project,
+      promptHistory: [{ negativePrompt: null, positivePrompt: 'from another tab' }],
+      settings: { ...project.settings, viewerAutoSwitch: 'latest' as const },
+    };
     api.records.set(project.id, toSplitRecord(elsewhere, 1, 2));
     const { conflicts, service } = await openWith(api, project.id, draftStore);
     expect(conflicts).toMatchObject([{ half: 'workspace' }]);
@@ -3915,6 +4109,7 @@ describe('recovering a project whose halves were acknowledged apart', () => {
     await service.saveWorkbench(stateWith([resolved.project]));
 
     expect(resolved.project).toMatchObject({ name: 'Edited here', promptHistory: elsewhere.promptHistory });
+    expect(resolved.project.settings.viewerAutoSwitch).toBe('latest');
     expect(api.records.get(project.id)).toMatchObject({ name: 'Edited here', revision: 2, workspace: { revision: 2 } });
   });
 });
@@ -4114,6 +4309,42 @@ describe('saving the two halves', () => {
     ...project,
     name: 'Renamed',
     settings: { ...project.settings, useCpuNoise: !project.settings.useCpuNoise },
+  });
+
+  it('raises the canvas floor to 5 with the content that adds a noise adjustment', async () => {
+    const { api, project, service } = await open(toSplitRecord(createDraftProject([])));
+    const grained = applyCanvasProjectMutation(project, {
+      anchor: stackTopAnchor(project.id),
+      layer: {
+        ...createEmptyPaintLayer('Grain', 'grain'),
+        adjustments: [
+          {
+            amount: 0.1,
+            distribution: 'gaussian',
+            grain: 'monochrome',
+            id: 'noise',
+            isEnabled: false,
+            response: 'flat',
+            seed: 1,
+            size: 1,
+            type: 'noise',
+          },
+        ],
+      },
+      type: 'addCanvasLayer',
+    });
+
+    const saved = await service.saveWorkbench(stateWith([grained]));
+
+    expect(saved.error).toBeNull();
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.minimum_canvas_schema_version)).toEqual(
+      [5]
+    );
+    // A build that reads at most schema 4 is now refused the project by the server instead of loading it.
+    expect(api.records.get(project.id)).toMatchObject({
+      data: { canvas: { document: { version: 5 }, version: 5 } },
+      minimum_canvas_schema_version: 5,
+    });
   });
 
   it('sends only the workspace on the next save when the content already landed', async () => {
@@ -4556,6 +4787,52 @@ describe('a project from before the split whose workflow repeats an item id', ()
       minimum_document_schema_version: 3,
       name: 'Still whole',
       revision: 2,
+    });
+  });
+
+  it('raises the canvas floor to 5 when a whole save adds a noise adjustment, so a v4 reader is refused', async () => {
+    const project = withRepeatedNode(createDraftProject([]));
+    const { api, project: loaded, service } = await open(toRecord(project));
+    const grained = applyCanvasProjectMutation(loaded, {
+      anchor: stackTopAnchor(loaded.id),
+      layer: {
+        ...createEmptyPaintLayer('Grain', 'grain'),
+        adjustments: [
+          {
+            amount: 0.1,
+            distribution: 'uniform',
+            grain: 'monochrome',
+            id: 'noise',
+            isEnabled: true,
+            response: 'flat',
+            seed: 3,
+            size: 1,
+            type: 'noise',
+          },
+        ],
+      },
+      type: 'addCanvasLayer',
+    });
+
+    const saved = await service.saveWorkbench(stateWith([grained]));
+
+    expect(saved.error).toBeNull();
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+    expect(vi.mocked(api.updateProject).mock.calls.map(([, request]) => request.minimum_canvas_schema_version)).toEqual(
+      [5]
+    );
+    const stored = api.records.get(project.id)!;
+    expect(stored).toMatchObject({
+      data: { canvas: { version: 5 }, documentSchemaVersion: 3 },
+      minimum_canvas_schema_version: 5,
+    });
+    const v4Reader = createApi(4);
+    v4Reader.records.set(project.id, stored);
+    await expect(
+      createService(captureAccountScope(), v4Reader).hydrateProjectFromServer(project.id)
+    ).resolves.toMatchObject({
+      refused: { refusal: { status: 'unsupported-version', version: 5 }, source: 'canvas' },
+      status: 'refused',
     });
   });
 

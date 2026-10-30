@@ -22,7 +22,12 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { DATE_BOARD_ID_PREFIX, isDateBoardId, parseGalleryItemKey } from '@features/gallery/core/items';
+import {
+  ALL_READABLE_BOARDS_ID,
+  DATE_BOARD_ID_PREFIX,
+  isDateBoardId,
+  parseGalleryItemKey,
+} from '@features/gallery/core/items';
 import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
@@ -44,14 +49,7 @@ import { getGalleryVideoThumbnailUrl } from './videoUrls';
 
 type BackendBoardDTO = components['schemas']['BoardDTO'];
 
-/**
- * 'board' is a real backend board; 'uncategorized' is the pseudo-board for
- * unassigned images (board_id 'none'); 'date' is a read-only virtual board
- * grouping images by creation date (id 'by_date:YYYY-MM-DD').
- */
-export const ALL_READABLE_BOARDS_ID = 'all';
-
-export { isDateBoardId };
+export { ALL_READABLE_BOARDS_ID, isDateBoardId };
 
 const getDateFromBoardId = (boardId: string): string => boardId.slice(DATE_BOARD_ID_PREFIX.length);
 
@@ -347,9 +345,9 @@ export const listGalleryBoards = async ({
     boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
-    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is
-    // assembled here, so its video totals need their own requests.
-    getGalleryVideoTotal({ boardId: 'none', signal }),
+    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is assembled here, so its
+    // video totals need their own requests. Like a board's, they count only what the Media and Uploads views list.
+    getGalleryVideoTotal({ boardId: 'none', categories: [...imageCategories, ...assetCategories], signal }),
     getGalleryVideoTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
@@ -484,6 +482,8 @@ export const getGalleryVideoMetadata = async (
 /** The workflow and graph a piece of media embeds, each as stringified JSON, when it has them. */
 export interface GalleryMediaWorkflow {
   graph: string | null;
+  /** Image inputs resolved for this output; the full source graph remains available for workflow loading. */
+  resolved_inputs?: string | null;
   workflow: string | null;
 }
 

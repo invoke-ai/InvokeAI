@@ -65,7 +65,7 @@ let root: Root | null = null;
 const SETTLE_MS = 900;
 
 /**
- * Real-time settle, for the tests that type through the real keyboard. Everything else fakes the clock (see
+ * Real-time settle, for some of the tests that type through the real keyboard. The rest fake the clock (see
  * `setValue`): this file runs beside other browser test files that share the page's focus, and seconds of real
  * typing and waiting here were enough to knock their popovers and menus closed on CI.
  */
@@ -144,7 +144,7 @@ const spinner = (): HTMLInputElement => {
   const input = host?.querySelector('input[type="number"]');
 
   if (!(input instanceof HTMLInputElement)) {
-    throw new Error('the clustering-strength spinner is not in the document');
+    throw new TypeError('the clustering-strength spinner is not in the document');
   }
 
   return input;
@@ -206,11 +206,15 @@ describe('ClusterStrengthField', () => {
   });
 
   it('does not mistake a half-typed number for a cleared box', async () => {
+    // Faked so the keys stay one burst however slowly a loaded browser
+    // delivers them: on the real clock, a "." landing past the debounce finds
+    // the box genuinely empty and commits that as a deliberate clear.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     // `type="number"` reports an empty value for "0." too. Reading that as
     // "use the heuristic" would throw the user's setting away mid-keystroke.
     await render(0.0945);
     await setValue('0.25');
-    await settle();
+    await settleFake();
     settings.patch.mockClear();
 
     // One keyboard sequence: clear() waits long enough to commit the intentionally empty box before type() runs.
@@ -219,7 +223,7 @@ describe('ClusterStrengthField', () => {
     expect(spinner().value).toBe('');
     expect(spinner().validity.badInput).toBe(true);
 
-    await settle();
+    await settleFake();
 
     expect(settings.patch).not.toHaveBeenCalled();
   });

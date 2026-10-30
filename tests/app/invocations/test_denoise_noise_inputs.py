@@ -18,7 +18,7 @@ from invokeai.app.invocations.metadata_linked import (
 )
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
-from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import Z_IMAGE_SHIFT_FIT, ZImageDenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
 from invokeai.backend.flux.schedulers import (
     ANIMA_SCHEDULER_MAP,
@@ -753,60 +753,6 @@ def test_flux2_partial_denoise_short_circuit_uses_first_clipped_timestep():
     assert torch.equal(result, expected)
 
 
-def test_flux2_lcm_scheduler_setup_passes_mu():
-    from invokeai.backend.flux2.denoise import denoise
-
-    class DummyScheduler:
-        def __init__(self) -> None:
-            self.received_mu = None
-            self.timesteps = torch.tensor([750.0, 500.0], dtype=torch.float32)
-            self.sigmas = torch.tensor([0.75, 0.5, 0.0], dtype=torch.float32)
-            self.config = SimpleNamespace(num_train_timesteps=1000)
-
-        def set_timesteps(self, num_inference_steps: int, device: str | torch.device, mu: float | None = None) -> None:
-            self.received_mu = mu
-
-        def step(
-            self,
-            model_output: torch.Tensor,
-            timestep: torch.Tensor,
-            sample: torch.Tensor,
-            generator: torch.Generator | None = None,
-        ):
-            return SimpleNamespace(prev_sample=sample)
-
-    class DummyModel(torch.nn.Module):
-        def forward(
-            self,
-            hidden_states: torch.Tensor,
-            encoder_hidden_states: torch.Tensor,
-            timestep: torch.Tensor,
-            img_ids: torch.Tensor,
-            txt_ids: torch.Tensor,
-            guidance: torch.Tensor,
-            joint_attention_kwargs: dict | None = None,
-            return_dict: bool = False,
-        ):
-            return (torch.zeros_like(hidden_states),)
-
-    scheduler = DummyScheduler()
-    denoise(
-        model=DummyModel(),
-        img=torch.zeros(1, 4, 8),
-        img_ids=torch.zeros(1, 4, 4, dtype=torch.long),
-        txt=torch.zeros(1, 4, 8),
-        txt_ids=torch.zeros(1, 4, 4, dtype=torch.long),
-        timesteps=[0.75, 0.5, 0.0],
-        step_callback=lambda _: None,
-        guidance=1.0,
-        cfg_scale=[1.0, 1.0],
-        scheduler=scheduler,
-        mu=0.42,
-    )
-
-    assert scheduler.received_mu == pytest.approx(0.42)
-
-
 @pytest.mark.skipif(FLUX_SCHEDULER_MAP.get("lcm") is None, reason="FlowMatchLCMScheduler not available")
 def test_flux2_lcm_step_noise_follows_the_generator():
     """LCM re-noises the sample on every step, so FLUX.2 must draw that noise from the seeded
@@ -869,7 +815,6 @@ def _run_until_backend_denoise(invocation, module: str, context: MagicMock, *ext
 
     with ExitStack() as stack:
         stack.enter_context(patch(f"{module}.TorchDevice.choose_torch_device", return_value=torch.device("cpu")))
-        stack.enter_context(patch(f"{module}.peak_dequant_transient_bytes", return_value=0))
         stack.enter_context(patch(f"{module}.requires_sidecar_patching", return_value=False))
         stack.enter_context(patch(f"{module}.LayerPatcher.apply_smart_model_patches", return_value=nullcontext()))
         stack.enter_context(patch(f"{module}.denoise", side_effect=recording_denoise))
@@ -913,6 +858,7 @@ def test_flux_invocation_passes_a_seeded_step_generator_to_denoise(seed: int, ex
         invocation,
         module,
         context,
+        patch(f"{module}.peak_dequant_transient_bytes", return_value=0),
         patch(f"{module}.FLUXConditioningInfo", object),
         patch(f"{module}.RegionalPromptingExtension.from_text_conditioning", return_value=MagicMock()),
         patch(f"{module}.get_schedule", return_value=[1.0, 0.5, 0.0]),
@@ -1025,7 +971,7 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
         patch(f"{module}.TorchDevice.choose_bfloat16_safe_dtype", return_value=torch.bfloat16),
         patch(f"{module}.ZImageRegionalPromptingExtension.from_text_conditionings", return_value=regional_extension),
         patch.object(invocation, "_load_text_conditioning", return_value=[]),
-        patch.object(invocation, "_estimate_working_memory", return_value=0),
+        patch(f"{module}.estimate_z_image_denoise_working_memory"),
         patch.dict(ZIMAGE_SCHEDULER_MAP, {"lcm": _RecordingLCM}),
         pytest.raises(_StopAtStep),
     ):
@@ -1035,17 +981,11 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
     _assert_step_generator(step_generators[0], expected_seed)
 
 
+# Heun is covered through the node in test_z_image_denoise_schedulers.py.
 @pytest.mark.parametrize(
     "scheduler_name",
     [
         "euler",
-        pytest.param(
-            "heun",
-            marks=pytest.mark.xfail(
-                reason="Known img2img preblend mismatch for Z-Image with scheduler-defined first step.",
-                strict=True,
-            ),
-        ),
         pytest.param(
             "lcm",
             marks=pytest.mark.xfail(
@@ -1058,7 +998,7 @@ def test_z_image_invocation_steps_lcm_with_a_seeded_generator(seed: int, expecte
 def test_z_image_img2img_preblend_matches_scheduler_first_sigma(scheduler_name: str):
     invocation = ZImageDenoiseInvocation.model_construct(steps=8, width=1024, height=1024)
     img_seq_len = (invocation.height // 8 // 2) * (invocation.width // 8 // 2)
-    shift = invocation._calculate_shift(img_seq_len)
+    shift = Z_IMAGE_SHIFT_FIT.shift(img_seq_len)
     sigmas = invocation._get_sigmas(shift, invocation.steps)
     sigmas = sigmas[int(0.25 * (len(sigmas) - 1)) :]
     scheduler_class = ZIMAGE_SCHEDULER_MAP[scheduler_name]

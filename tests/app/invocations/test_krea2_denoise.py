@@ -1,3 +1,5 @@
+import dataclasses
+import json
 import math
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
@@ -5,6 +7,7 @@ from typing import ClassVar
 
 import pytest
 import torch
+from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
 from invokeai.app.invocations.fields import (
     DenoiseMaskField,
@@ -153,18 +156,16 @@ def test_cfg_scale_list_is_built_against_full_step_count_then_clipped() -> None:
     # must be prepared against the full step count (``total_sigmas``) and *then* sliced to the active
     # window — preparing it against the already-reduced count would reject the user's full-length list.
     steps = 8
-    invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=[float(i) for i in range(steps)])
+    invocation = Krea2DenoiseInvocation.model_construct(
+        cfg_scale=[float(i) for i in range(steps)], denoising_start=0.25, denoising_end=0.75
+    )
 
-    full_cfg_scale = invocation._prepare_cfg_scale(steps)  # built against the FULL step count -> ok
-    assert len(full_cfg_scale) == steps
-
-    # Slicing to the active window [start_idx:end_idx] (as _run_diffusion does) keeps the right per-step values.
-    start_idx, end_idx = 2, 6
-    assert full_cfg_scale[start_idx:end_idx] == [2.0, 3.0, 4.0, 5.0]
+    # Steps 2..5 of 8 run, each with its own configured value.
+    assert invocation._active_cfg_scale(steps) == [2.0, 3.0, 4.0, 5.0]
 
     # Preparing against the reduced (clipped) count instead would have raised — the bug this guards against.
     with pytest.raises(ValueError):
-        invocation._prepare_cfg_scale(end_idx - start_idx)
+        invocation._prepare_cfg_scale(4)
 
 
 def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
@@ -737,7 +738,7 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
 
 
 def _mu_branch_invocation(shift: float | None = None) -> Krea2DenoiseInvocation:
-    # shift=None so the resolution-aware calculate_shift branch runs (not the fixed-mu override); width/height
+    # shift=None so the resolution-aware mu branch runs (not the fixed-mu override); width/height
     # 16 -> a 2x2 latent -> 1x1 grid -> image_seq_len == 1.
     return Krea2DenoiseInvocation.model_construct(
         transformer=TransformerField(transformer=_model_identifier(), loras=[]),
@@ -757,7 +758,7 @@ def _mu_branch_invocation(shift: float | None = None) -> Krea2DenoiseInvocation:
 
 
 def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2VariantType.Base):
-    # variant=Base -> _is_distilled() is False -> the resolution-aware mu (calculate_shift) branch is taken.
+    # variant=Base -> _is_distilled() is False -> the resolution-aware mu branch is taken.
     # Pass variant=Turbo to exercise the distilled fixed-mu branch instead.
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
@@ -775,16 +776,9 @@ def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2Variant
     )
 
 
-def _install_mu_capturing_scheduler(
-    monkeypatch, captured: list[float], config_kwargs: dict, stop: bool = False
-) -> None:
-    class _MuCapturingScheduler:
-        def __init__(self, **_kwargs) -> None:
-            # The real diffusers scheduler exposes shift params on .config (a FrozenDict, attribute-access);
-            # the denoise reads them via getattr(scheduler.config, <key>, <krea-2 default>). Omitting a key
-            # here (SimpleNamespace without the attr) exercises that fallback, which only the stock scheduler
-            # reaches: a real scheduler_config.json missing a key gets the diffusers scheduler's default.
-            self.config = SimpleNamespace(num_train_timesteps=1000, **config_kwargs)
+def _install_mu_capturing_scheduler(monkeypatch, captured: list[float], stop: bool = False) -> None:
+    class _MuCapturingScheduler(FlowMatchEulerDiscreteScheduler):
+        """The real scheduler, so a checkpoint's scheduler_config.json loads as it would in production."""
 
         def set_timesteps(self, *, sigmas, mu, device) -> None:
             captured.append(mu)
@@ -800,25 +794,6 @@ def _install_mu_capturing_scheduler(
     )
 
 
-def test_run_diffusion_mu_honors_scheduler_config_shift_params(monkeypatch, tmp_path) -> None:
-    # Regression: the undistilled (Raw) resolution-aware mu path must derive its shift params from the loaded
-    # scheduler's config so a checkpoint shipping a customized scheduler_config.json samples with its own
-    # shift, rather than the hardcoded Krea-2 defaults.
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
-    _patch_runtime(monkeypatch)  # patches TorchDevice + LayerPatcher (and the default _Scheduler)...
-    captured: list[float] = []
-    custom = {"base_image_seq_len": 100, "max_image_seq_len": 1000, "base_shift": 0.3, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, custom)  # ...then override the scheduler.
-
-    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
-
-    image_seq_len = 1  # width=height=16
-    assert captured == [pytest.approx(calculate_shift(image_seq_len, **custom))]
-    # Sanity: the custom config actually moves mu away from the stock-default result.
-    assert captured[0] != pytest.approx(calculate_shift(image_seq_len))
-
-
 class _StopAtTimesteps(Exception):
     """Ends a run once the scheduler has been handed its mu."""
 
@@ -831,57 +806,56 @@ class _StopAtTimesteps(Exception):
         (2048, 768, 1.1229166666666667),  # 6144 tokens: area decides, not a side
         (1280, 1280, 1.15),  # 6400 tokens: the line's end
         (2048, 2048, 1.15),  # 16384 tokens: would be 2.206 extrapolated
-        (4096, 4096, 1.15),  # 65536 tokens: would be 7.41
     ],
 )
-def test_raw_mu_follows_the_fit_up_to_its_end_and_holds_there(width: int, height: int, mu: float) -> None:
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
-    # One token per 16x16 pixels, as `_run_diffusion` counts them.
-    assert calculate_shift((width // 16) * (height // 16)) == pytest.approx(mu)
-
-
-def test_raw_mu_holds_at_the_end_of_a_custom_scheduler_fit(monkeypatch, tmp_path) -> None:
-    # A checkpoint's own scheduler_config.json moves the end of the fit, and the hold moves with it.
+def test_raw_mu_follows_the_stock_fit_up_to_its_end_and_holds_there(monkeypatch, tmp_path, width, height, mu) -> None:
+    # The model folder has no scheduler/, as for a GGUF or single-file transformer, so the stock scheduler is used.
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    custom = {"base_image_seq_len": 256, "max_image_seq_len": 1024, "base_shift": 0.3, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, custom, stop=True)
+    _install_mu_capturing_scheduler(monkeypatch, captured, stop=True)
     invocation = _mu_branch_invocation()
-    invocation.width = invocation.height = 2048
+    invocation.width, invocation.height = width, height
 
     with pytest.raises(_StopAtTimesteps):
         invocation._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    assert captured == [pytest.approx(1.5)]
+    assert captured == [pytest.approx(mu)]
 
 
-def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(monkeypatch, tmp_path) -> None:
-    # A scheduler config that omits some shift params must fall back to the Krea-2 defaults for exactly the
-    # missing keys, honoring the ones it does provide.
-    from invokeai.backend.krea2.sampling_utils import (
-        KREA2_BASE_SHIFT,
-        KREA2_MAX_IMAGE_SEQ_LEN,
-        calculate_shift,
+@pytest.mark.parametrize(
+    ("size", "mu"),
+    [
+        (16, 0.168),  # 1 token: 0.3 + 1.2 * (1 - 100) / 900, below this fit's lower end
+        (2048, 1.5),  # 16384 tokens: held at this config's max_shift
+    ],
+)
+def test_raw_mu_follows_and_holds_at_the_end_of_a_checkpoints_own_scheduler_fit(
+    monkeypatch, tmp_path, size: int, mu: float
+) -> None:
+    (tmp_path / "scheduler").mkdir()
+    (tmp_path / "scheduler" / "scheduler_config.json").write_text(
+        json.dumps(
+            {
+                "_class_name": "FlowMatchEulerDiscreteScheduler",
+                "use_dynamic_shifting": True,
+                "base_image_seq_len": 100,
+                "max_image_seq_len": 1000,
+                "base_shift": 0.3,
+                "max_shift": 1.5,
+                "time_shift_type": "exponential",
+            }
+        )
     )
-
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    # Provide only base_image_seq_len + max_shift; base_shift and max_image_seq_len must default.
-    partial = {"base_image_seq_len": 100, "max_shift": 1.5}
-    _install_mu_capturing_scheduler(monkeypatch, captured, partial)
+    _install_mu_capturing_scheduler(monkeypatch, captured, stop=True)
+    invocation = _mu_branch_invocation()
+    invocation.width = invocation.height = size
 
-    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+    with pytest.raises(_StopAtTimesteps):
+        invocation._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    image_seq_len = 1
-    expected = calculate_shift(
-        image_seq_len,
-        base_image_seq_len=100,
-        max_image_seq_len=KREA2_MAX_IMAGE_SEQ_LEN,
-        base_shift=KREA2_BASE_SHIFT,
-        max_shift=1.5,
-    )
-    assert captured == [pytest.approx(expected)]
+    assert captured == [pytest.approx(mu)]
 
 
 @pytest.mark.parametrize("shift", [0.0, -1.0])
@@ -896,7 +870,7 @@ def test_run_diffusion_treats_a_non_positive_shift_as_unset_on_turbo(monkeypatch
 
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=shift)._run_diffusion(
         _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)
@@ -907,22 +881,20 @@ def test_run_diffusion_treats_a_non_positive_shift_as_unset_on_turbo(monkeypatch
 
 def test_run_diffusion_treats_a_zero_shift_as_unset_on_raw(monkeypatch, tmp_path) -> None:
     # The same bypass must fall through to the resolution-aware branch for an undistilled checkpoint.
-    from invokeai.backend.krea2.sampling_utils import calculate_shift
-
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=0.0)._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
 
-    assert captured == [pytest.approx(calculate_shift(1))]
+    assert captured == [pytest.approx(0.5 + 0.65 * (1 - 256) / 6144)]  # 1 token on the stock fit
 
 
 def test_run_diffusion_still_honors_an_explicit_positive_shift(monkeypatch, tmp_path) -> None:
     # The override itself must keep working - only non-positive values are reinterpreted as "unset".
     _patch_runtime(monkeypatch)
     captured: list[float] = []
-    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+    _install_mu_capturing_scheduler(monkeypatch, captured)
 
     _mu_branch_invocation(shift=1.8)._run_diffusion(
         _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)
@@ -1386,3 +1358,569 @@ class TestTheAttentionScoreMatrixReachesTheReservation:
         assert len(set(transformer.combined_sequence_lengths)) == 2, "the passes must attend over different lengths"
         assert asked[0]["seq_len"] == max(transformer.combined_sequence_lengths)
         assert asked[0]["has_attn_mask"] is True
+
+
+# --- Edit references (reference_latents) -----------------------------------------------------------------
+
+# width=height=16 is a 2x2 latent, i.e. one target token. The references are larger on purpose: their own
+# grids, not the target's, must size their tokens and position ids.
+_REFERENCE_TENSORS = {
+    "ref-a": torch.ones(1, KREA2_LATENT_CHANNELS, 1, 4, 2),  # 5D, as the Qwen-Image VAE emits: 2x1 grid
+    "ref-b": torch.ones(1, KREA2_LATENT_CHANNELS, 2, 2),  # 4D: 1x1 grid
+    "ref-wrong-channels": torch.ones(1, 4, 2, 2),
+    "ref-odd": torch.ones(1, KREA2_LATENT_CHANNELS, 3, 2),
+    "ref-two-frames": torch.ones(1, KREA2_LATENT_CHANNELS, 2, 2, 2),
+}
+_REFERENCE_TOKENS = 2 + 1
+
+
+def _reference_context(
+    tmp_path, transformer, positive_references: int = 0, negative_references: int | None = None, **kwargs
+):
+    """`_runtime_context` plus the reference tensors, with prompts encoded as having seen `*_references` images."""
+    context = _runtime_context(tmp_path, transformer, **kwargs)
+    base_tensors = context.tensors.load
+    context.tensors.load = lambda name: _REFERENCE_TENSORS[name] if name in _REFERENCE_TENSORS else base_tensors(name)
+    counts = {
+        "positive": positive_references,
+        "negative": positive_references if negative_references is None else negative_references,
+    }
+    base_conditioning = context.conditioning.load
+
+    def load_conditioning(name: str) -> ConditioningFieldData:
+        data = base_conditioning(name)
+        if name not in counts:
+            return data
+        info = dataclasses.replace(data.conditionings[0], num_reference_images=counts[name])
+        return ConditioningFieldData(conditionings=[info])
+
+    context.conditioning.load = load_conditioning
+    context.util.signal_progress = lambda *_args, **_kwargs: None
+    return context
+
+
+def _references(*names: str) -> list[LatentsField]:
+    return [LatentsField(latents_name=name) for name in names]
+
+
+def _tiny_krea2_transformer():
+    from diffusers.models.transformers.transformer_krea2 import Krea2Transformer2DModel
+
+    # Text width and layer count match the runtime context's (1, seq, 12, 8) prompt embeddings.
+    torch.manual_seed(0)
+    return Krea2Transformer2DModel(
+        in_channels=64,
+        num_layers=2,
+        attention_head_dim=8,
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        intermediate_size=16,
+        timestep_embed_dim=8,
+        text_hidden_dim=8,
+        num_text_layers=12,
+        text_num_attention_heads=2,
+        text_num_key_value_heads=2,
+        text_intermediate_size=16,
+        num_layerwise_text_blocks=1,
+        num_refiner_text_blocks=1,
+        axes_dims_rope=(2, 2, 4),
+    ).eval()
+
+
+def _refusing_context(tmp_path, positive_references: int = 0, negative_references: int | None = None):
+    context = _reference_context(tmp_path, _Transformer(), positive_references, negative_references)
+
+    def load(_identifier):
+        raise AssertionError("the transformer must not be loaded for a refused request")
+
+    context.models.load = load
+    return context
+
+
+@pytest.mark.parametrize(
+    ("configure", "message"),
+    [
+        (
+            lambda inv: setattr(inv, "reference_latents", _references("ref-b", "ref-b", "ref-b", "ref-b")),
+            "at most 3 reference latents, got 4",
+        ),
+        (
+            lambda inv: setattr(inv, "style_reference", _style_reference_field()),
+            "cannot be combined with a style reference",
+        ),
+        (
+            lambda inv: setattr(
+                inv,
+                "positive_conditioning",
+                Krea2ConditioningField(conditioning_name="positive", mask=TensorField(tensor_name="positive-region")),
+            ),
+            "cannot be combined with regional",
+        ),
+        (
+            lambda inv: setattr(
+                inv,
+                "negative_conditioning",
+                [Krea2ConditioningField(conditioning_name="negative", mask=TensorField(tensor_name="negative-region"))],
+            ),
+            "cannot be combined with regional",
+        ),
+        (lambda inv: setattr(inv, "reference_latents", _references("ref-wrong-channels")), r"expected \(1, 16"),
+        (lambda inv: setattr(inv, "reference_latents", _references("ref-two-frames")), r"expected \(1, 16"),
+        (lambda inv: setattr(inv, "reference_latents", _references("ref-a", "ref-odd")), "latents 2 are 3x2"),
+    ],
+)
+def test_run_diffusion_refuses_unusable_references_before_loading_the_transformer(
+    monkeypatch, tmp_path, configure, message
+) -> None:
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references("ref-a")
+    configure(invocation)
+    # The prompts agree with the references, so only the refusal under test can fire.
+    encoded = len(invocation._reference_latent_fields())
+
+    with pytest.raises(ValueError, match=message):
+        invocation._run_diffusion(_refusing_context(tmp_path, positive_references=encoded))
+
+
+@pytest.mark.parametrize(
+    ("reference_latents", "positive_references", "negative_references", "message"),
+    [
+        # Latents without the prompt having seen the images.
+        (
+            ["ref-b"],
+            0,
+            None,
+            "positive Krea-2 prompt was encoded with 0 reference image.*has 1 reference latents. Connect the same reference images, in the same order",
+        ),
+        # A prompt encoded with references, but no latents for the transformer.
+        ([], 2, None, "positive Krea-2 prompt was encoded with 2 reference image.*has 0 reference latents"),
+        # The positive prompt agrees; the negative one does not.
+        (["ref-a", "ref-b"], 2, 1, "negative Krea-2 prompt was encoded with 1 reference image"),
+    ],
+)
+def test_run_diffusion_refuses_prompts_encoded_with_a_different_reference_count(
+    monkeypatch, tmp_path, reference_latents, positive_references, negative_references, message
+) -> None:
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references(*reference_latents)
+
+    with pytest.raises(ValueError, match=message):
+        invocation._run_diffusion(_refusing_context(tmp_path, positive_references, negative_references))
+
+
+def test_a_zero_strength_style_reference_is_no_conflict_with_references() -> None:
+    # Strength 0 is documented as "nothing connected".
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.reference_latents = _references("ref-b")
+    invocation.style_reference = _style_reference_field(style_strength=0.0)
+
+    invocation._validate_inputs()
+
+
+@torch.no_grad()
+def test_run_diffusion_feeds_the_references_to_both_cfg_passes(monkeypatch, tmp_path) -> None:
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    _patch_runtime(monkeypatch)
+    transformer = _tiny_krea2_transformer()
+    calls: list[dict] = []
+    real_forward = denoise_module.forward_with_references
+
+    def recording_forward(model, hidden_states, encoder_hidden_states, timestep, position_ids, references):
+        calls.append({"text_len": encoder_hidden_states.shape[1], "ids": position_ids, "refs": references})
+        return real_forward(model, hidden_states, encoder_hidden_states, timestep, position_ids, references)
+
+    monkeypatch.setattr(denoise_module, "forward_with_references", recording_forward)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references("ref-a", "ref-b")
+
+    latents = invocation._run_diffusion(
+        _reference_context(tmp_path, transformer, positive_references=2, negative_text_seq_len=3)
+    )
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    # Two steps, conditional then unconditional, each with its own text length and the same references.
+    assert [call["text_len"] for call in calls] == [2, 3, 2, 3]
+    for call in calls:
+        assert call["refs"].shape == (1, _REFERENCE_TOKENS, KREA2_LATENT_CHANNELS * 4)
+        assert torch.equal(
+            call["ids"][call["text_len"] :],
+            torch.tensor([[0, 0, 0], [1, 0, 0], [1, 1, 0], [2, 0, 0]], dtype=torch.float32),
+        )
+
+
+def test_run_diffusion_without_references_keeps_the_stock_transformer_call(monkeypatch, tmp_path) -> None:
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    _patch_runtime(monkeypatch)
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("the reference path ran without references")
+
+    monkeypatch.setattr(denoise_module, "forward_with_references", unexpected)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = []
+
+    invocation._run_diffusion(_reference_context(tmp_path, transformer))
+
+    assert transformer.position_id_lengths == [2 + 1, 2 + 1] * 2
+
+
+def test_run_diffusion_reserves_memory_for_the_reference_tokens(monkeypatch, tmp_path) -> None:
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    asked_seq_lens: list[int] = []
+
+    def reservation(reference_latents) -> int:
+        transformer = _Transformer()
+        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
+        info = _TransformerInfo(transformer)
+        context = _reference_context(tmp_path, transformer, positive_references=len(reference_latents or []))
+        context.models.load = lambda _identifier: info
+        invocation = _runtime_invocation(cfg_scale=1.0)
+        invocation.reference_latents = reference_latents
+        invocation._run_diffusion(context)
+        return info.working_mem_bytes
+
+    def score_matrix_bytes(**kwargs) -> int:
+        asked_seq_lens.append(kwargs["seq_len"])
+        return 0
+
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        denoise_module, "forward_with_references", lambda _model, hidden_states, *_args: torch.zeros_like(hidden_states)
+    )
+    monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+
+    without_references = reservation(None)
+    with_references = reservation(_references("ref-a", "ref-b"))
+
+    # Every reference token is an image token to every block; 0.5 MiB per token is the estimate's own rate.
+    assert with_references - without_references == _REFERENCE_TOKENS * int(0.5 * 1024**2)
+    # The attention the score matrix is priced for spans text + target + references.
+    assert asked_seq_lens == [2 + 1, 2 + 1 + _REFERENCE_TOKENS]
+
+
+@torch.no_grad()
+def test_run_diffusion_inpaints_only_the_target_next_to_references(monkeypatch, tmp_path) -> None:
+    # img2img + inpaint act on the unpacked target latents. With references in the sequence the transformer
+    # must still return target tokens only, and the kept region must land exactly on the init latents.
+    _patch_runtime(monkeypatch)
+    init = torch.randn(1, KREA2_LATENT_CHANNELS, 2, 2, generator=torch.Generator().manual_seed(3))
+    keep_left_half = torch.zeros(1, 1, 16, 16)
+    keep_left_half[..., :8] = 1.0  # the denoise mask marks what to keep; the node inverts it
+    context = _reference_context(tmp_path, _tiny_krea2_transformer(), positive_references=2)
+    tensors = {"init": init, "mask": keep_left_half}
+    reference_tensors = context.tensors.load
+    context.tensors.load = lambda name: tensors[name] if name in tensors else reference_tensors(name)
+    invocation = _runtime_invocation(cfg_scale=1.0, with_mask=True)
+    invocation.reference_latents = _references("ref-a", "ref-b")
+
+    latents = invocation._run_diffusion(context)
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    torch.testing.assert_close(latents[0, :, 0, :, 0], init[0, :, :, 0])
+    assert not torch.allclose(latents[0, :, 0, :, 1], init[0, :, :, 1])
+
+
+@pytest.mark.parametrize(("cfg_scale", "refused"), [(1.0, False), ([1.0, 1.0], False), ([1.0, 4.0], True)])
+def test_the_negative_prompt_reference_count_matters_only_when_cfg_runs(cfg_scale, refused) -> None:
+    # A workflow can leave a negative prompt connected at CFG 1, where it never runs.
+    invocation = _runtime_invocation(cfg_scale=cfg_scale)
+    invocation.reference_latents = _references("ref-a", "ref-b")
+    context = _reference_context(None, _Transformer(), positive_references=2, negative_references=0)
+
+    if refused:
+        with pytest.raises(ValueError, match="negative Krea-2 prompt was encoded with 0 reference image"):
+            invocation._validate_reference_counts(context)
+    else:
+        invocation._validate_reference_counts(context)
+
+
+@pytest.mark.parametrize(
+    ("cfg_scale", "denoising_start", "denoising_end", "refused"),
+    [
+        # CFG only in steps the window skips: the negative prompt never runs.
+        ([4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 0.5, 1.0, False),
+        ([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 4.0, 4.0], 0.0, 0.5, False),
+        # A CFG step inside the window: it runs and must match.
+        ([4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], 0.0, 1.0, True),
+        ([1.0, 1.0, 1.0, 1.0, 4.0, 1.0, 1.0, 1.0], 0.5, 1.0, True),
+    ],
+)
+def test_the_negative_prompt_reference_count_follows_the_clipped_cfg_schedule(
+    cfg_scale, denoising_start, denoising_end, refused
+) -> None:
+    invocation = _runtime_invocation(cfg_scale=cfg_scale)
+    invocation.steps = 8
+    invocation.denoising_start = denoising_start
+    invocation.denoising_end = denoising_end
+    invocation.reference_latents = _references("ref-b")
+    context = _reference_context(None, _Transformer(), positive_references=1, negative_references=0)
+
+    if refused:
+        with pytest.raises(ValueError, match="negative Krea-2 prompt was encoded with 0 reference image"):
+            invocation._validate_reference_counts(context)
+    else:
+        invocation._validate_reference_counts(context)
+
+
+def test_run_diffusion_never_loads_a_negative_prompt_whose_cfg_steps_are_skipped(monkeypatch, tmp_path) -> None:
+    # CFG only in steps 0-1, which denoising_start=0.5 skips: validation and the run must agree that the negative
+    # prompt does not run, so its mismatched reference count is no obstacle and it is never read.
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        denoise_module, "forward_with_references", lambda _model, hidden_states, *_args: torch.zeros_like(hidden_states)
+    )
+    invocation = _runtime_invocation(cfg_scale=[4.0, 4.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    invocation.steps = 8
+    invocation.denoising_start = 0.5
+    invocation.latents = LatentsField(latents_name="init")
+    invocation.reference_latents = _references("ref-b")
+    context = _reference_context(tmp_path, _Transformer(), positive_references=1, negative_references=0)
+    loaded: list[str] = []
+    load_conditioning = context.conditioning.load
+    context.conditioning.load = lambda name: loaded.append(name) or load_conditioning(name)
+
+    latents = invocation._run_diffusion(context)
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert "negative" not in loaded
+
+
+@pytest.mark.parametrize(
+    ("denoising_start", "denoising_end", "window"),
+    [
+        # 0.45 * 8 = 3.6 and 0.95 * 8 = 7.6 round up; truncating would give (3, 7).
+        (0.45, 0.95, (4, 8)),
+        # 0.3 * 8 = 2.4 and 0.8 * 8 = 6.4 round down.
+        (0.3, 0.8, (2, 6)),
+    ],
+)
+def test_the_step_window_rounds_to_the_nearest_step(denoising_start, denoising_end, window) -> None:
+    invocation = Krea2DenoiseInvocation.model_construct(denoising_start=denoising_start, denoising_end=denoising_end)
+
+    assert invocation._step_window(8) == window
+
+
+@pytest.mark.parametrize("prompt", ["positive", "negative"])
+def test_run_diffusion_refuses_a_collection_of_prompts_with_references(monkeypatch, tmp_path, prompt: str) -> None:
+    # Several prompts are concatenated, so each would bring the references' vision tokens into the text again.
+    _patch_runtime(monkeypatch)
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references("ref-b")
+    setattr(invocation, f"{prompt}_conditioning", [Krea2ConditioningField(conditioning_name=prompt)] * 2)
+
+    with pytest.raises(
+        ValueError,
+        match=f"The {prompt} Krea-2 prompt is a collection of 2 prompts.*connect a single 'Prompt - Krea-2' node",
+    ):
+        invocation._run_diffusion(_refusing_context(tmp_path, positive_references=1))
+
+
+@pytest.mark.parametrize(
+    ("references", "positive_prompts", "negative_prompts", "cfg_scale"),
+    [
+        (1, 1, 1, 4.0),  # a collection of one is a single prompt
+        (1, 1, 2, 1.0),  # the negative collection never runs at CFG 1
+        (0, 2, 2, 4.0),  # without references, several prompts are ordinary
+    ],
+    ids=["single_prompts", "unused_negative_collection", "no_references"],
+)
+def test_prompt_collections_are_refused_only_where_references_meet_them(
+    references, positive_prompts, negative_prompts, cfg_scale
+) -> None:
+    invocation = _runtime_invocation(cfg_scale=cfg_scale)
+    invocation.reference_latents = _references(*["ref-b"] * references)
+    invocation.positive_conditioning = [Krea2ConditioningField(conditioning_name="positive")] * positive_prompts
+    invocation.negative_conditioning = [Krea2ConditioningField(conditioning_name="negative")] * negative_prompts
+
+    invocation._validate_reference_counts(_reference_context(None, _Transformer(), positive_references=references))
+
+
+# --- Edit references in K/V-cache mode (reference_kv_cache) ----------------------------------------------
+
+
+def _main_block_kv_state(transformer):
+    return transformer.attn_processors["transformer_blocks.0.attn.processor"].reference_kv_cache
+
+
+def _record_reference_kv(monkeypatch) -> list[tuple[int, torch.Tensor]]:
+    from invokeai.backend.krea2.reference_edit import Krea2ReferenceKVCache
+
+    stored: list[tuple[int, torch.Tensor]] = []
+    real_store = Krea2ReferenceKVCache.store
+
+    def store(self, block_index, key, value):
+        stored.append((block_index, value.clone()))
+        real_store(self, block_index, key, value)
+
+    monkeypatch.setattr(Krea2ReferenceKVCache, "store", store)
+    return stored
+
+
+@torch.no_grad()
+def test_the_reference_kv_cache_is_built_once_per_run_and_released(monkeypatch, tmp_path) -> None:
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+    from invokeai.backend.krea2.reference_edit import Krea2ReferenceKVCache
+
+    _patch_runtime(monkeypatch)
+    stored = _record_reference_kv(monkeypatch)
+    extended: list[int] = []
+    real_extend = Krea2ReferenceKVCache.extend
+
+    def extend(self, block_index, key, value, attention_mask):
+        extended.append(block_index)
+        return real_extend(self, block_index, key, value, attention_mask)
+
+    monkeypatch.setattr(Krea2ReferenceKVCache, "extend", extend)
+
+    def unexpected(*_args, **_kwargs):
+        pytest.fail("K/V-cache mode must not put the references into the per-step sequence")
+
+    monkeypatch.setattr(denoise_module, "forward_with_references", unexpected)
+    transformer = _tiny_krea2_transformer()
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_latents = _references("ref-a", "ref-b")
+    invocation.reference_kv_cache = True
+
+    latents = invocation._run_diffusion(
+        _reference_context(tmp_path, transformer, positive_references=2, negative_text_seq_len=3)
+    )
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    # Two steps with CFG are four transformer passes, but the references ran through the blocks once.
+    assert [block_index for block_index, _ in stored] == [0, 1]
+    assert stored[0][1].shape[2] == _REFERENCE_TOKENS
+    # ...and every block of every pass attended over the cached reference keys.
+    assert extended == [0, 1] * (2 * 2)
+    # The processors stay on the cached transformer; the cache must not.
+    state = _main_block_kv_state(transformer)
+    assert len(state) == 0
+    assert state.mode.name == "OFF"
+
+
+@torch.no_grad()
+def test_the_reference_kv_cache_is_released_when_a_step_raises(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _tiny_krea2_transformer()
+    context = _reference_context(tmp_path, transformer, positive_references=1)
+
+    def step_callback(state, _base) -> None:
+        if state.step >= 1:
+            raise RuntimeError("step failure")
+
+    context.util.sd_step_callback = step_callback
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.reference_latents = _references("ref-b")
+    invocation.reference_kv_cache = True
+
+    with pytest.raises(RuntimeError, match="step failure"):
+        invocation._run_diffusion(context)
+
+    assert len(_main_block_kv_state(transformer)) == 0
+
+
+@torch.no_grad()
+def test_the_reference_kv_cache_is_built_from_the_lora_patched_weights(monkeypatch, tmp_path) -> None:
+    from contextlib import contextmanager
+
+    _patch_runtime(monkeypatch)
+    stored = _record_reference_kv(monkeypatch)
+    transformer = _tiny_krea2_transformer()
+
+    @contextmanager
+    def doubling_patch(*, model, **_kwargs):
+        # Stands in for a LoRA on block 0's value projection. V has no norm or bias, so the cached V doubles.
+        weight = model.transformer_blocks[0].attn.to_v.weight
+        weight.mul_(2.0)
+        try:
+            yield
+        finally:
+            weight.div_(2.0)
+
+    def cached_block0_value(patcher) -> torch.Tensor:
+        stored.clear()
+        monkeypatch.setattr(
+            "invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches", patcher
+        )
+        invocation = _runtime_invocation(cfg_scale=1.0)
+        invocation.reference_latents = _references("ref-b")
+        invocation.reference_kv_cache = True
+        invocation._run_diffusion(_reference_context(tmp_path, transformer, positive_references=1))
+        return next(value for block_index, value in stored if block_index == 0)
+
+    plain = cached_block0_value(lambda **_kwargs: nullcontext())
+    patched = cached_block0_value(doubling_patch)
+
+    torch.testing.assert_close(patched, 2.0 * plain)
+
+
+def test_the_reference_kv_cache_flag_without_references_changes_nothing(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=4.0)
+    invocation.reference_kv_cache = True
+
+    invocation._run_diffusion(_reference_context(tmp_path, transformer))
+
+    assert transformer.installed_processors["transformer_blocks.0.attn.processor"].reference_kv_cache is None
+    assert transformer.position_id_lengths == [2 + 1, 2 + 1] * 2
+
+
+@pytest.mark.parametrize("reference_kv_cache", [False, True], ids=["joint", "kv_cache"])
+def test_references_refuse_a_subclass_with_its_own_processors(reference_kv_cache: bool) -> None:
+    # Its processors are sized for [text | target]: joint references would reach them as extra image tokens, and the
+    # K/V cache lives in the stock processors it replaces. Without references it runs (see the seam regression test).
+    invocation = _SubclassWithOwnProcessors.model_construct(
+        positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
+        reference_latents=_references("ref-b"),
+        reference_kv_cache=reference_kv_cache,
+    )
+
+    with pytest.raises(ValueError, match="installs its own Krea-2 attention processors, which cannot take reference"):
+        invocation._validate_inputs()
+
+
+def test_the_reference_kv_cache_reserves_its_cache_instead_of_per_step_tokens(monkeypatch, tmp_path) -> None:
+    import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+    def reservation(reference_latents, kv_cache: bool) -> int:
+        transformer = _Transformer()
+        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
+        info = _TransformerInfo(transformer)
+        context = _reference_context(tmp_path, transformer, positive_references=len(reference_latents or []))
+        context.models.load = lambda _identifier: info
+        invocation = _runtime_invocation(cfg_scale=1.0)
+        invocation.reference_latents = reference_latents
+        invocation.reference_kv_cache = kv_cache
+        invocation._run_diffusion(context)
+        return info.working_mem_bytes
+
+    asked_seq_lens: list[int] = []
+
+    def score_matrix_bytes(**kwargs) -> int:
+        asked_seq_lens.append(kwargs["seq_len"])
+        return 0
+
+    _patch_runtime(monkeypatch)
+    # The stub transformer has no blocks to cache; the precompute itself is covered with a real model above.
+    monkeypatch.setattr(denoise_module, "precompute_reference_kv", lambda *_args: None)
+    monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+
+    without_references = reservation(None, kv_cache=True)
+    cached = reservation(_references("ref-a", "ref-b"), kv_cache=True)
+
+    # Krea-2 defaults where the stub config is silent: 28 blocks, 12 K/V heads; fp32 under the patched runtime.
+    retained = 28 * 2 * 12 * 128 * _REFERENCE_TOKENS * 4
+    widest_append = 2 * 48 * 128 * _REFERENCE_TOKENS * 4
+    assert cached - without_references == retained + widest_append
+    # Scores: S = 2 text + 1 target queries over S + 3 reference keys is the larger area (18 > 3 * 3), priced as
+    # the smallest square that holds it.
+    step, references = 2 + 1, _REFERENCE_TOKENS
+    assert asked_seq_lens == [step, math.ceil(math.sqrt(max(step * (step + references), references**2)))]

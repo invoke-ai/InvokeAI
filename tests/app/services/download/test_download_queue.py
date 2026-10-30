@@ -194,6 +194,86 @@ def test_mismatched_416_resume_keeps_in_progress_file(tmp_path: Path) -> None:
 
 
 @pytest.mark.timeout(timeout=10, method="thread")
+def test_refused_resume_keeps_the_partials_validator(tmp_path: Path) -> None:
+    # The server ignores If-Range "v1" and sends the whole of a newer revision. Its ETag describes that revision,
+    # not the partial on disk, so a later resume must not send it.
+    source = AnyHttpUrl("https://test.com/changed.safetensors")
+    destination = tmp_path / "changed.safetensors"
+    in_progress_path = destination.with_name(destination.name + ".downloading")
+    in_progress_path.write_bytes(b"old revision, first half")
+
+    session = TestSession()
+    new_revision = b"new revision"
+    session.mount(
+        str(source),
+        TestAdapter(new_revision, headers={"ETag": '"v2"', "Content-Length": str(len(new_revision))}),
+    )
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=destination, etag='"v1"')
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required and job.resume_refused
+    assert job.etag == '"v1"'
+    assert in_progress_path.read_bytes() == b"old revision, first half"
+    assert not destination.exists()
+
+
+class _RangeAdapter(TestAdapter):
+    """Serves `data` under a Content-Disposition file name, honoring Range with HTTP 206 and If-Range by ETag."""
+
+    def __init__(self, data: bytes, file_name: str, etag: str) -> None:
+        super().__init__(data)
+        self.data = data
+        self.headers = {"Content-Disposition": f'attachment; filename="{file_name}"', "ETag": etag}
+
+    def send(self, request, stream=False, **kwargs):
+        headers = {**self.headers, "Content-Length": str(len(self.data))}
+        byte_range = request.headers.get("Range")
+        if byte_range and request.headers.get("If-Range") in (None, self.headers["ETag"]):
+            start = int(byte_range.removeprefix("bytes=").removesuffix("-"))
+            headers["Content-Length"] = str(len(self.data) - start)
+            headers["Content-Range"] = f"bytes {start}-{len(self.data) - 1}/{len(self.data)}"
+            return TestAdapter(self.data[start:], status=206, headers=headers).send(request, stream=stream, **kwargs)
+        return TestAdapter(self.data, headers=headers).send(request, stream=stream, **kwargs)
+
+
+@pytest.mark.parametrize("etag", ['"v1"', None], ids=["validated", "unvalidated"])
+@pytest.mark.timeout(timeout=10, method="thread")
+def test_directory_resume_never_appends_to_a_file_the_response_does_not_name(tmp_path: Path, etag: str | None) -> None:
+    # A directory download resumes its only partial file, but the response names the file. When it names another,
+    # the range it sends continues nothing on disk.
+    source = AnyHttpUrl("https://test.com/download/model")
+    data = b"0123456789abcdefghij"
+    partial = tmp_path / "old_name.safetensors.downloading"
+    partial.write_bytes(data[:10])
+    session = TestSession()
+    session.mount(str(source), _RangeAdapter(data, "new_name.safetensors", '"v1"'))
+    queue = DownloadQueueService(requests_session=session, requests_session_is_trusted=True)
+    queue.start()
+    try:
+        job = DownloadJob(source=source, dest=tmp_path, etag=etag)
+        queue.submit_download_job(job)
+        queue.join()
+    finally:
+        queue.stop()
+
+    assert not (tmp_path / "new_name.safetensors").exists()
+    assert not (tmp_path / "new_name.safetensors.downloading").exists()
+    assert job.status == DownloadJobStatus.PAUSED
+    assert job.resume_required and job.resume_refused
+    # The pause records the partial it kept, so a restart can find and remove it.
+    assert job.download_path == tmp_path / "old_name.safetensors"
+    assert job.etag == etag  # the response's ETag describes the file it named, not this partial
+    assert partial.read_bytes() == data[:10]
+
+
+@pytest.mark.timeout(timeout=10, method="thread")
 def test_event_bus(tmp_path: Path, mm2_session: Session) -> None:
     event_bus = TestEventService()
 
@@ -703,6 +783,38 @@ def test_private_opt_in_still_honors_explicit_download_proxy(monkeypatch: Any) -
         assert merged["proxies"]["https"] == "http://proxy.internal:3128"
     finally:
         queue._requests.close()
+
+
+def test_head_request_is_sent_like_a_download(monkeypatch: Any) -> None:
+    """The installer asks a host for a file's commit with `head()`; it must take the downloads' address policy and
+    explicit download proxy, and must not follow redirects."""
+    session = TestSession()
+    session.mount(
+        "https://hub.example/file", TestAdapter(b"", status=302, headers={"Location": "https://cdn.example/x"})
+    )
+    queue = DownloadQueueService(
+        app_config=InvokeAIAppConfig(allow_private_download_urls=True, download_proxy="http://proxy.internal:3128"),
+        requests_session=session,
+        requests_session_is_trusted=True,
+    )
+    queue._request_proxies = {"http": "http://proxy.internal:3128", "https": "http://proxy.internal:3128"}
+    sent: list[dict[str, Any]] = []
+    real_send = session.send
+    monkeypatch.setattr(session, "send", lambda request, **kwargs: sent.append(kwargs) or real_send(request, **kwargs))
+
+    response = queue.head("https://hub.example/file", headers={"Authorization": "Bearer t"})
+
+    assert response.status_code == 302
+    assert sent[0]["proxies"]["https"] == "http://proxy.internal:3128"
+    assert sent[0]["allow_redirects"] is False
+
+    guarded = DownloadQueueService(
+        app_config=InvokeAIAppConfig(allow_private_download_urls=False),
+        requests_session=TestSession(),
+        requests_session_is_trusted=True,
+    )
+    with pytest.raises(UnsafeDownloadURLException):
+        guarded.head("http://127.0.0.1:19191/file")
 
 
 @pytest.mark.timeout(timeout=10, method="thread")

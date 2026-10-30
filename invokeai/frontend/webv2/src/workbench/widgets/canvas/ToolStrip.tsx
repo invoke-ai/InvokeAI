@@ -16,14 +16,14 @@ import {
   BrushIcon,
   CircleIcon,
   EraserIcon,
-  FrameIcon,
   HandIcon,
   LassoIcon,
   MousePointer2Icon,
   PenLineIcon,
   PentagonIcon,
   Rotate3dIcon,
-  SquareDashedIcon,
+  ScanIcon,
+  SquareDashedMousePointerIcon,
   SquareIcon,
   StarIcon,
   TriangleIcon,
@@ -154,12 +154,14 @@ const SelectFamilyButton = ({
   const items: ToolFlyoutItem[] = useMemo(
     () => [
       {
-        icon: SquareDashedIcon,
+        description: t('widgets.canvas.tools.marqueeHelp'),
+        icon: SquareDashedMousePointerIcon,
         id: 'marquee',
         label: t('widgets.canvas.tools.marquee'),
         hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
       },
       {
+        description: t('widgets.canvas.tools.lassoHelp'),
         icon: LassoIcon,
         id: 'lasso',
         label: t('widgets.canvas.tools.lasso'),
@@ -180,7 +182,7 @@ const SelectFamilyButton = ({
     <ToolFamilyButton
       currentId={current}
       disabled={!isCanvasToolEnabled(current, isInteractionLocked)}
-      icon={current === 'lasso' ? LassoIcon : SquareDashedIcon}
+      icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
       isActive={activeTool === 'marquee' || activeTool === 'lasso'}
       items={items}
       label={t(current === 'lasso' ? 'widgets.canvas.tools.lasso' : 'widgets.canvas.tools.marquee')}
@@ -233,7 +235,7 @@ const ToolStripRoot = ({
         />
         <ToolStripButton
           engine={engine}
-          icon={FrameIcon}
+          icon={ScanIcon}
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.bbox')}
           toolId="bbox"

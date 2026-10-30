@@ -73,12 +73,14 @@ export {
   getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
   getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryView,
+  settleGallerySearchScope,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {

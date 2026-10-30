@@ -43,6 +43,8 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.database import (  # noqa: F401
@@ -56,6 +58,13 @@ from tests.fixtures.database import (  # noqa: F401
 from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
+
+# The app installs this from apply_monkeypatches(); the suite runs real transformers forwards on the CPU, so on a
+# CUDA torch build without a device (NVIDIA's Windows ARM64 build on a GPU-less runner) it needs the same shim.
+# Only there: every other CUDA build raises rather than crashes, and a process-wide patch would hide what the
+# rest of the suite runs against (Linux CI is a CUDA build without a GPU, too).
+if is_windows_arm64():
+    install_cuda_stream_capture_shim()
 
 # Fixtures that put a test on the backend under test, which `-m uses_database` selects.
 _DATABASE_FIXTURES = {"empty_database", "database"}
@@ -83,8 +92,7 @@ def _clear_deferred_empty_cache():
     TorchDevice._empty_cache_deferred.clear()
 
 
-_PRODUCTION_PASSWORD_CONTEXT = password_utils.pwd_context
-_TEST_PASSWORD_CONTEXT = _PRODUCTION_PASSWORD_CONTEXT.copy(bcrypt__rounds=4)
+_PRODUCTION_BCRYPT_ROUNDS = password_utils.BCRYPT_ROUNDS
 
 
 @pytest.fixture(autouse=True)
@@ -92,13 +100,13 @@ def _cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     """At the production cost factor every user a test creates or logs in costs a fifth of a second, which
     was most of the multiuser router tests' run time. Cost-4 hashes still round-trip, and stored cost-12
     hashes still verify. Tests about the cost itself request `production_password_hashing`."""
-    monkeypatch.setattr(password_utils, "pwd_context", _TEST_PASSWORD_CONTEXT)
+    monkeypatch.setattr(password_utils, "BCRYPT_ROUNDS", 4)
 
 
 @pytest.fixture
 def production_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Hash at the production cost factor, for tests that assert or measure it."""
-    monkeypatch.setattr(password_utils, "pwd_context", _PRODUCTION_PASSWORD_CONTEXT)
+    monkeypatch.setattr(password_utils, "BCRYPT_ROUNDS", _PRODUCTION_BCRYPT_ROUNDS)
 
 
 @pytest.fixture(autouse=True)
@@ -108,6 +116,18 @@ def _fast_service_polling(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(download_default, "_QUEUE_POLL_SECONDS", 0.02)
     monkeypatch.setattr(model_install_default, "_INSTALL_QUEUE_POLL_SECONDS", 0.02)
     monkeypatch.setattr(image_index_default, "_POLL_SECONDS", 0.02)
+
+
+@pytest.fixture(autouse=True)
+def _working_memory_platform_from_the_test_not_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A working-memory estimate prices the allocator torch is configured with and the OS it runs on. Read from the
+    host, a developer's `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` or a Windows runner moves every expected
+    value. Tests start from no allocator configuration on Linux and set what they are about."""
+    from invokeai.backend.working_memory import platform
+
+    for var in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(platform, "_host_os", lambda: "linux")
 
 
 @pytest.fixture

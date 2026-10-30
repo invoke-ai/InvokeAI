@@ -1,10 +1,13 @@
 import math
 from contextlib import ExitStack
-from typing import Callable, ClassVar, Iterator, Optional
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional, TypeAlias
 
 import torch
 import torchvision.transforms as tv_transforms
+from diffusers.models.controlnets.controlnet_qwenimage import QwenImageControlNetModel
 from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
+from PIL import Image
 from torchvision.transforms.functional import resize as tv_resize
 from tqdm import tqdm
 
@@ -20,9 +23,15 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
+from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
+from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
+from invokeai.backend.fun_controlnet.qwen_image import QwenImageFunControlBranch
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
@@ -31,10 +40,38 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import 
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
-from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    PipelineIntermediateState,
+    image_resized_to_grid_as_tensor,
+)
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.sage_attention import sage_attention_scope
+
+if TYPE_CHECKING:
+    from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+
+# The stock Qwen-Image scheduler, for GGUF and single-file transformers, which ship no scheduler/ folder. Its shift
+# fit runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area) and is held there. Past that end
+# the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps sit above sigma 0.9
+# and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the image instead of refining it.
+# diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image at a constant mu of 1.15.
+QWEN_IMAGE_SCHEDULER_CONFIG = {
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 0.9,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 8192,
+    "shift_terminal": 0.02,
+    "num_train_timesteps": 1000,
+    "time_shift_type": "exponential",
+}
+
+QwenImageControlModel: TypeAlias = QwenImageFunControlBranch | QwenImageControlNetModel
+"""Either Qwen-Image ControlNet design: the Fun branch hooked into the transformer's blocks, or the InstantX
+ControlNet run beside it."""
 
 
 @invocation(
@@ -42,7 +79,7 @@ from invokeai.backend.util.sage_attention import sage_attention_scope
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.0.1",
+    version="1.1.1",
     classification=Classification.Prototype,
 )
 class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -85,6 +122,16 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         "Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the "
         "scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.",
     )
+    control: Optional[QwenImageControlField] = InputField(
+        default=None,
+        description="Qwen Image ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+        input=Input.Connection,
+    )
+    vae: Optional[VAEField] = InputField(
+        default=None,
+        description=FieldDescriptions.vae + " Required for control conditioning.",
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> LatentsOutput:
@@ -93,6 +140,21 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         name = context.tensors.save(tensor=latents)
         return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    @staticmethod
+    def _schedule(
+        model_path: Path, width: int, height: int, patch_size: int, shift: float | None
+    ) -> tuple["FlowMatchEulerDiscreteScheduler", float]:
+        """The scheduler for this transformer and the mu to set its timesteps with.
+
+        mu is the fixed `shift`'s log when one is set (Lightning LoRAs), else the loaded scheduler config's own
+        resolution-dependent fit over the target image's tokens, held at its end.
+        """
+        scheduler = load_scheduler(model_path, QWEN_IMAGE_SCHEDULER_CONFIG)
+        if shift is not None:
+            return scheduler, math.log(shift)
+        image_seq_len = (height // LATENT_SCALE_FACTOR) * (width // LATENT_SCALE_FACTOR) // patch_size**2
+        return scheduler, ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         if self.denoise_mask is None:
@@ -252,6 +314,11 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         transformer_info = context.models.load(self.transformer.transformer)
         assert isinstance(transformer_info.model, QwenImageTransformer2DModel)
+        has_zero_cond_t = bool(
+            getattr(transformer_info.model, "zero_cond_t", False)
+            or getattr(transformer_info.model.config, "zero_cond_t", False)
+        )
+        control_info, control_model = self._load_control_model(context, has_zero_cond_t)
 
         # Load conditioning
         pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
@@ -288,50 +355,13 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         latent_height = self.height // LATENT_SCALE_FACTOR
         latent_width = self.width // LATENT_SCALE_FACTOR
-        image_seq_len = (latent_height * latent_width) // (patch_size**2)
 
         # Use the actual FlowMatchEulerDiscreteScheduler to compute sigmas/timesteps,
         # exactly matching the diffusers pipeline.
-        import math
-
         import numpy as np
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
 
-        # Try to load the scheduler config from the model's directory (Diffusers models
-        # have a scheduler/ subdir). For GGUF models this path doesn't exist, so fall
-        # back to instantiating the scheduler with the known Qwen Image defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-        scheduler_path = model_path / "scheduler"
-        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
-        else:
-            scheduler = FlowMatchEulerDiscreteScheduler(
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=0.9,
-                base_image_seq_len=256,
-                max_image_seq_len=8192,
-                shift_terminal=0.02,
-                num_train_timesteps=1000,
-                time_shift_type="exponential",
-            )
-
-        if self.shift is not None:
-            # Lightning LoRA: fixed shift
-            mu = math.log(self.shift)
-        else:
-            # Dynamic shift: a line through the scheduler config's two points, held at the last one. The stock
-            # config runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area). Past that
-            # end the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps
-            # sit above sigma 0.9 and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the
-            # image instead of refining it. diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image
-            # at a constant mu of 1.15. The scheduler registers every init argument, so a key that a checkpoint's
-            # scheduler_config.json omits takes FlowMatchEulerDiscreteScheduler's own default (max_shift 1.15,
-            # max_image_seq_len 4096), not the stock Qwen-Image value.
-            config = scheduler.config
-            m = (config.max_shift - config.base_shift) / (config.max_image_seq_len - config.base_image_seq_len)
-            b = config.base_shift - m * config.base_image_seq_len
-            mu = min(image_seq_len, config.max_image_seq_len) * m + b
+        scheduler, mu = self._schedule(model_path, self.width, self.height, patch_size, self.shift)
 
         init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
@@ -396,12 +426,8 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Pack latents into 2x2 patches: (B, C, H, W) -> (B, H/2*W/2, C*4)
         latents = self._pack_latents(latents, 1, out_channels, latent_height, latent_width)
 
-        # Determine whether the model uses reference latent conditioning (zero_cond_t).
         # Edit models (zero_cond_t=True) expect [noisy_patches ; ref_patches] in the sequence.
         # Txt2img models (zero_cond_t=False) only take noisy patches.
-        has_zero_cond_t = getattr(transformer_info.model, "zero_cond_t", False) or getattr(
-            transformer_info.model.config, "zero_cond_t", False
-        )
         use_ref_latents = has_zero_cond_t
 
         ref_latents_packed = None
@@ -461,19 +487,70 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         noisy_seq_len = latents.shape[1]
+        model_input_seq_len = noisy_seq_len + (ref_latents_packed.shape[1] if ref_latents_packed is not None else 0)
 
         transformer_config = context.models.get_config(self.transformer.transformer)
-        # An nvfp4 or GGUF build dequantizes each packed Linear per forward, a transient its resident size does not
-        # cover. The cache holds back the larger of this and its default working memory, not their sum: this node has
-        # no activation estimate to add it to. Read from the unlocked model, before the lock; zero for every other
-        # build.
-        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+        # The forward's activations, which the cache keeps free by offloading as much of the transformer as that
+        # takes, plus the per-forward dequantization transient of an nvfp4 or GGUF build, alive alongside them and
+        # invisible to the estimate. All read from the unlocked model, before the lock; the transient is zero for a
+        # dense build.
+        text_seq_len = max(
+            pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0
+        )
+        working_mem_bytes = self._estimate_working_memory(
+            image_seq_len=model_input_seq_len,
+            text_seq_len=text_seq_len,
+            element_size=inference_dtype.itemsize,
+            control_model=control_model,
+        )
+        # Where SDPA has no fused kernel for the joint [text ; image] sequence (ROCm on Windows, MPS) it materializes
+        # the score matrices, which the linear term above was not priced for: 24 heads x 4608^2 scores is ~1 GB at
+        # 1024px with a 512-token prompt. A text mask, when the encoder emits one, narrows which fused kernels apply.
+        working_mem_bytes += self._attention_score_bytes(
+            transformer_info.model,
+            seq_len=model_input_seq_len + text_seq_len,
+            device=device,
+            dtype=inference_dtype,
+            has_attention_mask=pos_prompt_mask is not None or neg_prompt_mask is not None,
+        )
+        working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+
+        # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
+        control_context: torch.Tensor | None = None
+        if control_model is not None:
+            control_context = self._build_control_context(context, control_model, latent_height, latent_width)
+            control_context = control_context.to(device=device, dtype=inference_dtype)
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=dequant_bytes)
+                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
             )
             assert isinstance(transformer, QwenImageTransformer2DModel)
+            control_hooks: FunControlHooks | None = None
+            controlnet: QwenImageControlNetModel | None = None
+            if control_info is not None:
+                assert self.control is not None and control_context is not None
+                # Locked with the same working memory: the transformer can no longer be offloaded, so a control model
+                # placed with only the default reservation would fill the room kept for the forward.
+                (_, locked_control) = exit_stack.enter_context(
+                    control_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                )
+                if isinstance(locked_control, QwenImageControlNetModel):
+                    # Run beside the transformer and fed what it is fed: loaded by the same dtype policy, it takes the
+                    # same activations and hands its residuals back in the dtype the transformer adds them in.
+                    controlnet = locked_control
+                else:
+                    assert isinstance(locked_control, QwenImageFunControlBranch)
+                    # Dtype invariant: the loader cast the branch to the device's bfloat16-safe dtype, the policy the
+                    # transformer loaders follow, which is `inference_dtype` wherever this node runs. Should the safe
+                    # dtype ever be another one, the branch still runs its chain in its own dtype and casts every
+                    # tensor on the way in and the hint on the way out (`QwenImageFunControlBranch.block_runner` /
+                    # `add_hint`), so no cache-managed module is cast here.
+                    control_hooks = exit_stack.enter_context(
+                        install_fun_control(
+                            transformer, locked_control, control_context, scale=self.control.control_context_scale
+                        )
+                    )
             # Quantized weights (packed nvfp4 Linears, GGUF, SDNQ) cannot take a direct patch, so their LoRAs ride as
             # sidecars. Asked of the loaded module tree: a `checkpoint` build may hold packed Linears.
             model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)
@@ -493,6 +570,13 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
+                # One gate per step: both guidance branches run with the control, or neither does.
+                control_active = self.control is not None and should_apply(
+                    step_idx, total_steps, self.control.begin_step_percent, self.control.end_step_percent
+                )
+                if control_hooks is not None:
+                    control_hooks.active = control_active
+
                 # The pipeline passes timestep / 1000 to the transformer
                 timestep = t.expand(latents.shape[0]).to(inference_dtype)
 
@@ -503,12 +587,29 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 else:
                     model_input = latents
 
+                # The InstantX ControlNet runs once per step, on the positive prompt, and both guidance branches add
+                # its residuals, already scaled: diffusers' QwenImageControlNetPipeline. Skipped outside the step range.
+                controlnet_block_samples: list[torch.Tensor] | None = None
+                if controlnet is not None and control_active:
+                    assert self.control is not None
+                    controlnet_block_samples = controlnet(
+                        hidden_states=model_input,
+                        controlnet_cond=control_context,
+                        conditioning_scale=self.control.control_context_scale,
+                        encoder_hidden_states=pos_prompt_embeds,
+                        encoder_hidden_states_mask=pos_prompt_mask,
+                        timestep=timestep / 1000,
+                        img_shapes=img_shapes,
+                        return_dict=False,
+                    )
+
                 noise_pred_cond = transformer(
                     hidden_states=model_input,
                     encoder_hidden_states=pos_prompt_embeds,
                     encoder_hidden_states_mask=pos_prompt_mask,
                     timestep=timestep / 1000,
                     img_shapes=img_shapes,
+                    controlnet_block_samples=controlnet_block_samples,
                     return_dict=False,
                 )[0]
                 # Only keep the noisy-latent portion of the output
@@ -521,6 +622,7 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         encoder_hidden_states_mask=neg_prompt_mask,
                         timestep=timestep / 1000,
                         img_shapes=img_shapes,
+                        controlnet_block_samples=controlnet_block_samples,
                         return_dict=False,
                     )[0]
                     noise_pred_uncond = noise_pred_uncond[:, :noisy_seq_len]
@@ -556,6 +658,148 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         latents = self._unpack_latents(latents, latent_height, latent_width)
         latents = latents.unsqueeze(2)
         return latents
+
+    def _load_control_model(
+        self, context: InvocationContext, has_zero_cond_t: bool
+    ) -> tuple[LoadedModel, QwenImageControlModel] | tuple[None, None]:
+        """The ControlNet in RAM, and the model it holds, ahead of the transformer's lock so the reservation can size
+        what the ControlNet keeps alive."""
+        if self.control is None:
+            return None, None
+        if self.vae is None:
+            raise ValueError(
+                "Qwen Image ControlNet needs the VAE that encodes its images: connect one to the 'vae' input."
+            )
+        if self.reference_latents is not None:
+            raise ValueError("Qwen Image ControlNet cannot be combined with reference latents.")
+        # Both ControlNets were trained beside the generation transformer. An Edit transformer takes a
+        # [noisy ; reference] sequence and modulates the two apart (zero_cond_t), a layout neither ever saw.
+        if has_zero_cond_t:
+            raise ValueError(
+                "Qwen Image ControlNet applies to the Qwen Image generation transformer, not to an Edit transformer."
+            )
+        control_info = context.models.load(self.control.control_model)
+        control_model = control_info.model
+        if isinstance(control_model, QwenImageControlNetModel):
+            # Its control input is the control image's latent and nothing else: no mask or masked-image channels
+            # an inpainting condition could go into.
+            if self.control.inpaint_image_name is not None or self.control.inpaint_mask_name is not None:
+                raise ValueError(
+                    f"'{self.control.control_model.name}' is an InstantX Qwen Image ControlNet, which takes a control "
+                    "image only and has no inpainting condition: disconnect the inpaint image and mask."
+                )
+        elif not isinstance(control_model, QwenImageFunControlBranch):
+            raise TypeError(
+                f"Expected a Qwen Image ControlNet for '{self.control.control_model.name}', "
+                f"got {type(control_model).__name__}."
+            )
+        return control_info, control_model
+
+    @staticmethod
+    def _estimate_working_memory(
+        image_seq_len: int,
+        text_seq_len: int,
+        element_size: int,
+        *,
+        control_model: QwenImageControlModel | None = None,
+    ) -> int:
+        """Peak transformer activations, in bytes, for the model cache to keep free.
+
+        Estimates pending calibration on this transformer. 0.25 MiB per token plus a 1 GiB base are the figures the
+        Qwen-Image-2.1 node reserves, measured there at 0.14 MiB per token in bf16 on an RTX 4090, with the margin
+        for the allocator. The per-token term is a bf16 figure and scales with `element_size`, the compute dtype's
+        width. The guidance branches run one after the other, so CFG adds nothing to the peak.
+
+        A ControlNet adds image-sized tensors (one batch item, `image_seq_len` tokens at its width):
+
+        - The Fun branch runs its blocks over the image sequence and keeps one hint per block alive until the last
+          listed base layer has consumed it. `blocks + 4` is what Z-Image measured for its adapter over the plain
+          forward (`z_image_denoise.py`), pending the same measurement here.
+        - The InstantX ControlNet adds no fitted coefficient, only what provably stays alive. It runs its forward
+          before the transformer's: its blocks are the transformer's at the same joint sequence and never run beside
+          them, so their activations are inside the base term, and so is the transient at the end of its forward
+          (block outputs, projections, scaled copies: three image-sized tensors per block, under a tenth of the
+          per-token base at Qwen-Image's width). What stays alive through both guidance forwards is the list of
+          scaled residuals, one per block: exactly `blocks` tensors.
+        """
+        mib, gib = 1024**2, 1024**3
+        width = element_size / 2
+        estimated = int((image_seq_len + text_seq_len) * 0.25 * mib * width) + gib
+        if control_model is None:
+            return estimated
+        if isinstance(control_model, QwenImageFunControlBranch):
+            estimated += (
+                (len(control_model.control_blocks) + 4) * image_seq_len * control_model.hidden_size * element_size
+            )
+        else:
+            # The alias's other member. Not `elif` + `assert_never`: mypy cannot narrow a diffusers model class out of
+            # a union, so the remainder would never type as `Never`.
+            estimated += len(control_model.controlnet_blocks) * image_seq_len * control_model.inner_dim * element_size
+        return estimated
+
+    @staticmethod
+    def _attention_score_bytes(
+        transformer: object, *, seq_len: int, device: torch.device, dtype: torch.dtype, has_attention_mask: bool
+    ) -> int:
+        """The score matrix attention materializes on a build without a fused kernel for it (0 where it has one).
+
+        Every block attends the joint [text ; image] sequence once per forward through diffusers' attention dispatch;
+        the padding mask, when the encoder emits one, reaches the kernel as an additive mask.
+        """
+        config = getattr(transformer, "config", None)
+        num_heads = getattr(config, "num_attention_heads", None)
+        head_dim = getattr(config, "attention_head_dim", None)
+        if not isinstance(num_heads, int) or not isinstance(head_dim, int):
+            return 0
+        return sdpa_score_matrix_bytes(
+            device=device,
+            dtype=dtype,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            seq_len=seq_len,
+            has_attn_mask=has_attention_mask,
+            via_diffusers_dispatch=True,
+        )
+
+    def _build_control_context(
+        self, context: InvocationContext, control_model: QwenImageControlModel, latent_height: int, latent_width: int
+    ) -> torch.Tensor:
+        """The packed control context at the generation size, from the control field's images, as ``control_model``
+        takes it: ``(1, S_img, 132)`` control, keep-mask and masked-image latents for the Fun branch, ``(1, S_img, 64)``
+        the control image's latents alone for the InstantX ControlNet (diffusers' QwenImageControlNetPipeline)."""
+        assert self.control is not None and self.vae is not None
+        control = self.control
+        vae_info = context.models.load(self.vae.vae)
+        tiled = control.tiled or context.config.get().force_tiled_decode
+
+        def encode(pixels: torch.Tensor) -> torch.Tensor:
+            latents = QwenImageImageToLatentsInvocation.vae_encode(
+                vae_info=vae_info, image_tensor=pixels, tiled=tiled, tile_size=control.tile_size
+            )
+            # The video-style VAE returns (B, C, 1, h, w); the context is one frame.
+            return latents.squeeze(2)
+
+        def pixels(image_name: str, mode: str) -> torch.Tensor:
+            image = context.images.get_pil(image_name).convert(mode)
+            resample = Image.Resampling.LANCZOS if mode == "RGB" else Image.Resampling.BILINEAR
+            image = image.resize((self.width, self.height), resample)
+            # (1, C, H, W): pixels in [-1, 1], a mask in [0, 1].
+            return image_resized_to_grid_as_tensor(image, normalize=mode == "RGB", multiple_of=16).unsqueeze(0)
+
+        if isinstance(control_model, QwenImageFunControlBranch):
+            context_4d = build_fun_control_context(
+                encode=encode,
+                control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
+                inpaint_image=(
+                    pixels(control.inpaint_image_name, "RGB") if control.inpaint_image_name is not None else None
+                ),
+                inpaint_mask=pixels(control.inpaint_mask_name, "L") if control.inpaint_mask_name is not None else None,
+            )
+        else:
+            # The InstantX ControlNet, the alias's other member (see `_estimate_working_memory`).
+            assert control.image_name is not None
+            context_4d = encode(pixels(control.image_name, "RGB"))
+        return self._pack_latents(context_4d, 1, context_4d.shape[1], latent_height, latent_width)
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

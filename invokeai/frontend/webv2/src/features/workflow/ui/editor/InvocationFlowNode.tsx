@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowNodeExecutionState as NodeExecutionState } from '@features/workflow/ui/contracts';
+import type { TFunction } from 'i18next';
 
 import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Input, Stack, Text } from '@chakra-ui/react';
 import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/graph';
@@ -916,6 +917,20 @@ const CompactNodeBody = ({ inputCount, outputCount }: { inputCount: number; outp
   );
 };
 
+/** What a node without a template says: still loading, definitions unavailable, or a type this backend lacks. */
+const getTemplatelessNodeMessage = (
+  t: TFunction,
+  { documentNode, templateStatus }: InvocationFlowNodeType['data'],
+  isCompact: boolean
+): string =>
+  templateStatus === 'loading'
+    ? t('nodes.loadingNode')
+    : templateStatus === 'error'
+      ? t('nodes.nodeDefinitionsUnavailable')
+      : isCompact
+        ? t('nodes.unknownNodeType')
+        : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
+
 const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const { t } = useTranslation();
   const node = data.documentNode;
@@ -928,7 +943,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
 
   return (
     <NodeShell
-      isMissing={!templateView}
+      isMissing={!templateView && data.templateStatus === 'loaded'}
       isOutdated={isOutdated}
       isRunning={execution?.status === 'running'}
       outcome={getExecutionOutcome(execution)}
@@ -945,7 +960,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
       ) : (
         <Text color="fg.subtle" fontSize="xs" px="3" {...getWorkflowNodeBodyProps()} py="2">
-          {t('nodes.unknownNodeType')}
+          {getTemplatelessNodeMessage(t, data, true)}
         </Text>
       )}
       <CompactHiddenHandles
@@ -968,10 +983,12 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const execution = useWorkflowNodeExecutionState(node.id);
 
   if (!templateView) {
+    const isMissing = !isWorkflowImageExport && data.templateStatus === 'loaded';
+
     return (
-      <NodeShell isMissing={!isWorkflowImageExport} selected={selected ?? false}>
+      <NodeShell isMissing={isMissing} selected={selected ?? false}>
         <HStack gap="1.5" minW={isWorkflowImageExport ? '0' : undefined} p="3">
-          {!isWorkflowImageExport ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
+          {isMissing ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
           <Stack flex={isWorkflowImageExport ? '1' : undefined} gap="0" minW={isWorkflowImageExport ? '0' : undefined}>
             {isWorkflowImageExport ? (
               <MiddleTruncate
@@ -989,7 +1006,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
             )}
             {!isWorkflowImageExport ? (
               <Text color="fg.subtle" fontSize="xs">
-                Unknown node type "{node.data.type}". It cannot run on this backend.
+                {getTemplatelessNodeMessage(t, data, false)}
               </Text>
             ) : null}
           </Stack>

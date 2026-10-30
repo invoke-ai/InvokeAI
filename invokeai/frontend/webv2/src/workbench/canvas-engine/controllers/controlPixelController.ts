@@ -15,6 +15,7 @@ import type {
   PreparedLayerCacheReplacement,
 } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 import type { PixelEditTransaction, PixelEditPatch, StrokeCommittedEvent } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -33,6 +34,8 @@ import { HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/h
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
 import { createLayerSnapshotEntry } from '@workbench/canvas-engine/history/layerSnapshot';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
+import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { adjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import { strokeCommitLabel } from '@workbench/canvas-engine/strokeCommit';
 
 import type { CanvasMutationContext, EditStep, EditTransaction } from './mutationContext';
@@ -46,6 +49,10 @@ export interface PixelEditControllerOptions {
   readonly deleteDerived: (layerId: string) => void;
   readonly getActiveProjectId: () => string | null;
   readonly getAdjustedSurface: (layer: PixelEditableLayer, entry: LayerCacheEntry) => RasterSurface | null;
+  /** The display's adjusted copy only when it is exact (spatial results landed); never builds one. */
+  readonly peekAdjustedSurface: (layer: PixelEditableLayer, entry: LayerCacheEntry) => RasterSurface | null;
+  /** Why a layer's displayed spatial adjustments are not exact; undefined while exact. */
+  readonly getAdjustmentStatus: (layerId: string) => AdjustedSurfaceStatus | undefined;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly getTransformSession: () => unknown;
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
@@ -149,6 +156,22 @@ export class PixelEditController {
       return null;
     }
     const entry = o.layers.get(layerId);
+    // Materializing bakes what the display shows; a spatial stack's interim is not that layer's pixels. It may still
+    // become exact while its job computes; a stack that cannot run never will, so that refusal names the cause.
+    if (
+      decision.status !== 'direct' &&
+      layer.type === 'raster' &&
+      hasSpatialAdjustments(layer.adjustments) &&
+      entry &&
+      !isEmpty(entry.rect) &&
+      !o.peekAdjustedSurface(layer, entry)
+    ) {
+      const status = o.getAdjustmentStatus(layerId);
+      o.reportRefusal(
+        status === undefined || status === 'computing' ? 'not-ready' : adjustmentRefusal(document, layerId, status)
+      );
+      return null;
+    }
     const beforeBytes = entry && !isEmpty(entry.rect) ? entry.rect.width * entry.rect.height * 4 : 0;
     // A materialized edit records the whole layer before and after.
     const historyBytes =

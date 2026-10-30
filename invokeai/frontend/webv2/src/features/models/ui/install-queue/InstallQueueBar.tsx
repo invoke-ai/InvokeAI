@@ -9,7 +9,11 @@ import {
 } from '@features/models/data/api';
 import {
   ensureInstallsLoaded,
+  dismissInstallJob,
+  dismissInstallJobs,
+  projectInstallCancelled,
   refreshInstalls,
+  replaceInstallJob,
   useInstallProgress,
   useInstallsSelector,
 } from '@features/models/data/installsStore';
@@ -95,14 +99,20 @@ export const InstallQueueBar = () => {
   const runBulk = useCallback(
     (
       run: ReturnType<typeof useScopedAction>['run'],
-      call: (id: number, signal: AbortSignal) => Promise<unknown>,
-      targets: ModelInstallJob[]
+      call: (id: number, signal: AbortSignal) => Promise<ModelInstallJob | null>,
+      targets: ModelInstallJob[],
+      onSucceeded?: (id: number, result: ModelInstallJob | null) => void
     ) =>
       run(
         async (owner) => {
           // allSettled: one failure must not hide the others' outcomes, and the rest still deserve a fresh list.
           const results = await Promise.allSettled(targets.map((job) => call(job.id, owner.signal)));
           assertAccountScopeCurrent(owner);
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              onSucceeded?.(targets[index]!.id, result.value);
+            }
+          });
           await refreshInstalls(owner);
           assertAccountScopeCurrent(owner);
 
@@ -130,11 +140,15 @@ export const InstallQueueBar = () => {
   const handlePrune = () =>
     runPrune(
       async (owner) => {
-        await pruneCompletedModelInstalls(owner.signal);
+        const prunedJobIds = await pruneCompletedModelInstalls(owner.signal);
         assertAccountScopeCurrent(owner);
+        dismissInstallJobs(prunedJobIds);
         await refreshInstalls(owner);
       },
-      (message) => notify.error(t('models.pruneFailed'), message)
+      (message) => {
+        notify.error(t('models.pruneFailed'), message);
+        void refreshInstalls();
+      }
     );
 
   return (
@@ -215,7 +229,18 @@ export const InstallQueueBar = () => {
                           label={t('models.cancelAll')}
                           tone="danger"
                           value="cancel-all"
-                          onSelect={() => void runBulk(runCancelAll, cancelModelInstall, cancellableJobs)}
+                          onSelect={() =>
+                            void runBulk(runCancelAll, cancelModelInstall, cancellableJobs, (id, result) => {
+                              if (result === null) {
+                                dismissInstallJob(id);
+                              } else {
+                                replaceInstallJob(result);
+                                if (!['completed', 'error', 'cancelled'].includes(result.status)) {
+                                  projectInstallCancelled(id);
+                                }
+                              }
+                            })
+                          }
                         />
                       </MenuContent>
                     </Menu.Positioner>

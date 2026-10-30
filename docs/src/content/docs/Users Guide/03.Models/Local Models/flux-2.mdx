@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
-description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing.
-lastUpdated: 2026-10-16
+description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
+lastUpdated: 2026-10-28
 sidebar:
   order: 5
 ---
@@ -34,7 +34,7 @@ Base models need 28 steps, distilled ones 4.
 | FLUX.2 Klein 9B | FLUX Non-Commercial License | The weights may not be used commercially; generated images may, except to train a competing model | Yes, on Black Forest Labs' repositories |
 | FLUX.2 [dev] | FLUX [dev] Non-Commercial License | As for Klein 9B | Yes, on Black Forest Labs' repositories |
 
-The Qwen3 and Mistral text encoders are Apache 2.0. Some repackaged copies show a different license in their metadata; the original model's license is the one that applies.
+The Qwen3 and Mistral text encoders are Apache 2.0. The FLUX.2 [dev] ControlNet Union is released under the FLUX [dev] Non-Commercial License, like FLUX.2 [dev] itself. Some repackaged copies show a different license in their metadata; the original model's license is the one that applies.
 
 This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
@@ -98,6 +98,7 @@ fp8 weights instead of expanding them.
 | FLUX.2 [dev] (Diffusers) | Diffusers pipeline | ~80 GB |
 | FLUX.2 [dev] (Diffusers, NF4) | NF4-quantized transformer and text encoder | ~18 GB VRAM with offload |
 | FLUX.2 [dev] Transformer (GGUF Q3_K_M / Q4_K_M / Q5_K_M / Q6_K / Q8_0) | GGUF | ~15.9 / 20 / 24 / 27.9 / 35.5 GB |
+| FLUX.2 [dev] ControlNet Union | bf16 single file; see [ControlNet](#controlnet) | ~8.2 GB |
 
 The GGUF transformers need a separate Mistral encoder. Q3_K_M and Q4_K_M install the GGUF Q4 encoder, the
 larger quants the GGUF Q8 encoder. Other encoder starters are the Comfy-Org builds — *FP8* (~18 GB, best
@@ -127,8 +128,8 @@ Selecting a FLUX.2 model applies these defaults:
 - **Size** — width and height must be multiples of 16.
 - **Negative prompt** — not available in the Generate tab or on the Canvas.
 
-Text-to-image, image-to-image, inpainting and outpainting all work on the Canvas. FLUX.2 has no ControlNet
-or IP-Adapter support.
+Text-to-image, image-to-image, inpainting and outpainting all work on the Canvas. FLUX.2 [dev] takes a
+[ControlNet](#controlnet); Klein models take none, and FLUX.2 has no IP-Adapter support.
 
 ## Reference images
 
@@ -137,6 +138,42 @@ Generate tab or the Canvas and describe the result you want in the prompt. No ex
 
 In the workflow editor, wrap each image in a **Kontext Conditioning - FLUX** node and connect it (or a
 collection of them) to the **Reference Images** input of **FLUX2 Denoise**.
+
+## ControlNet
+
+The **FLUX.2 [dev] ControlNet Union** starter model is alibaba-pai's *Fun-ControlNet-Union* for FLUX.2 [dev]
+(~8.2 GB, FLUX [dev] Non-Commercial License). One model handles every condition: **Canny**, **HED**, **Depth**,
+**Pose**, **MLSD**, **Scribble** and **Gray** control images, plus **inpainting**. The starter model installs
+`FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors`, the build to use: Scribble and Gray exist only in it, and the
+repository's earlier file lost FLUX.2 [dev]'s CFG distillation during control training and performs worse, which the
+2602 build restores. It works with FLUX.2 [dev] only:
+the Klein transformers are narrower than the one it was trained beside. With a Klein model selected, a control
+layer's settings and the **Invoke** button say that the ControlNet is not compatible, and nothing is generated until
+the layer is disabled or the model changed.
+
+On the Canvas, add a **Control Layer** while a FLUX.2 [dev] model is selected. Its adapter type is **FLUX.2 [dev]
+ControlNet** and its pixels are the control image; the layer's **Filter** turns a raster into one of the conditions
+(Canny, HED, Depth Anything, DW Openpose, MLSD, Scribble or Grayscale). The layer's **Weight** is the model's control
+scale: it ranges from `0` to `2`, starts at `0.75`, and `0.65` to `0.80` is the recommended range. **Step range**
+limits the steps the control applies to. **Only one** FLUX.2 [dev] ControlNet layer can be used per generation, and
+it can be combined with reference images.
+
+When the Canvas inpaints or outpaints with a control layer present, the ControlNet also receives the image being
+regenerated and the mask of the region as its inpainting condition. Without a control layer, inpainting and
+outpainting are guided by the inpaint mask alone.
+
+In the workflow editor, the same thing is the **FLUX.2 [dev] ControlNet** node feeding the **Control** input of
+**FLUX2 Denoise**. Give it a control **Image**, an **Inpaint Image** together with its **Inpaint Mask** (white is
+regenerated), or both. Its **Control Scale**, **Begin Step Percent** and **End Step Percent** are the layer's weight
+and step range. The images are resized to the generation size and encoded with the VAE connected to **FLUX2
+Denoise**; **Tiled** and **Tile Size** tile that encode, and an untiled encode that runs out of memory is retried in
+tiles. **FLUX2 Denoise** stops with a message when the ControlNet meets a Klein model.
+
+:::note[Memory]
+The ControlNet's 8.2 GB of weights stay loaded beside the [dev] transformer for the whole generation, and its
+blocks add activation memory that grows with the image size and the number of reference images. On a GPU that
+cannot hold all of it, Invoke keeps part of the models in system RAM, and each step is slower.
+:::
 
 ## Regional guidance
 
@@ -149,7 +186,11 @@ happens.
 FLUX.2 LoRAs are labelled with the variant they were trained for, and the Generate tab only offers LoRAs
 that match the selected model's variant. LoRAs patch the transformer and, where they include text-encoder
 layers, the Qwen3 or Mistral encoder. In workflows use **Apply LoRA - Flux2 Klein** or **Apply LoRA -
-FLUX.2 [dev]** (and their *Collection* versions).
+FLUX.2 [dev]** (and their *Collection* versions). Supported layouts include LyCORIS, Diffusers/PEFT and
+ComfyUI/OneTrainer PEFT files whose module names start with `diffusion_model.`. Per-layer `.alpha` values in
+these `diffusion_model.` files set the LoRA scale.
+LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr operand may be stored whole
+or as a factorized `_a` / `_b` pair.
 
 ## PiD super-resolution decode
 
@@ -164,7 +205,8 @@ Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 | --- | --- |
 | **Main Model - Flux2 Klein** / **Main Model - FLUX.2 [dev]** | Loads the transformer, encoder and VAE |
 | **Prompt - Flux2 Klein** / **Prompt - FLUX.2 [dev]** | Encodes the prompt |
-| **FLUX2 Denoise** | Runs the diffusion; takes the VAE and optional reference images |
+| **FLUX2 Denoise** | Runs the diffusion; takes the VAE, optional reference images and, for [dev], a ControlNet |
+| **FLUX.2 [dev] ControlNet** | Configures the ControlNet Union: control image and/or inpaint image with mask, scale, step range |
 | **Latents to Image - FLUX2** / **Image to Latents - FLUX2** | VAE decode / encode |
 
 **FLUX2 Denoise** also has a **CFG Scale** and a negative conditioning input, which the Generate tab leaves

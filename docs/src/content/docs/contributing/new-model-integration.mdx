@@ -1,7 +1,7 @@
 ---
 title: New Model Type Integration Checklist
 description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
-lastUpdated: 2026-10-02
+lastUpdated: 2026-10-28
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
@@ -157,7 +157,7 @@ It checks only that the facets are *present*, not that their values are right.
 
 | Facet | Required | What it declares | Read by |
 | --- | --- | --- | --- |
-| `LatentSpaceFacet` | yes | Latent channels, spatial compression, latent→RGB projection | Step previews (`app/util/step_callback.py`) |
+| `LatentSpaceFacet` | yes | Latent channels, spatial compression, latent→RGB projection | Step previews (`app/util/step_callback.py`), and which Tiny AutoEncoder renders them |
 | `ConditioningFacet` | yes | The `*ConditioningInfo` class the text encoder writes | The safe-globals list for conditioning deserialization |
 | `DefaultSettingsFacet` | yes | Steps, CFG or guidance, scheduler and size per variant (`None` is the fallback); optional `by_name_hint` | Stored on the model config at identification; prefills the UI |
 | `ModalityFacet` | yes | Modes (`txt2img`, `img2img`, `inpaint`, `outpaint`, video modes) and `metadata_slug` | Must equal `GENERATION_MODES`; which canvas tools the UI offers |
@@ -215,7 +215,7 @@ Things to get right:
 
 - **Latent space.** If the architecture uses a VAE InvokeAI already supports, reuse its shared space from `facets/latent_space.py`:
   - `FLUX_16`: FLUX.1, Z-Image
-  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4
+  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4, MOSS-Image
   - `WAN21_16`: Wan 2.1, Qwen-Image, Krea-2, Anima
   - `WAN22_48`
 
@@ -291,6 +291,8 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
    ```
 
    If GGUF files exist, add a `Main_GGUF_NewModel_Config` with `format: Literal[ModelFormat.GGUFQuantized]` that *requires* `_has_ggml_tensors`.
+
+   If the pinned `diffusers` does not export the pipeline class -- InvokeAI vendors the classes of MiniMax H3 (an unreleased diffusers branch) and MOSS-Image (remote code) -- add its `_class_name` to `_PINNED_MODEL_CLASS_MARKERS` in `configs/factory.py`. Before any config runs, `_validate_path_looks_like_model` accepts a folder whose root config names a known class; any other folder with more than 50 files is refused as a general-purpose directory.
 
    The identification helpers are in `configs/identification_utils.py`:
    - `NotAMatchError`: "not this config"
@@ -393,6 +395,8 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 1. **Diffusers-format main model**
 
    Subclass `GenericDiffusersLoader`. It resolves each submodel's class from `model_index.json`. Override `_load_model` only for what the pipeline gets wrong: tokenizer quirks, config patches, dtype, or dropping unused modules.
+
+   Where `model_index.json` names classes the pinned libraries do not have, vendor them under `invokeai/backend/new_model/` and subclass `ModelLoader` instead, dispatching each submodel explicitly, as `MossImageDiffusersModel` (`moss_image.py`) does.
 
    ```python title="invokeai/backend/model_manager/load/model_loaders/new_model.py"
    @ModelLoaderRegistry.register(base=BaseModelType.NewModel, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -601,7 +605,7 @@ Packages are discovered automatically. A directory of node modules without an `_
            ...
    ```
 
-   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=<int>)`, or `working_memory=` for an estimator that declares an `EstimatorSpec`.
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device()`: `working_memory=` from an estimator that declares an `EstimatorSpec`, so that calibration runs measure the forward (the Z-Image denoise's is in `invokeai/backend/z_image/denoise_working_memory.py`, MOSS-Image's in `invokeai/backend/moss_image/working_memory.py`), or `working_mem_bytes=<int>` for a plain reservation. A model locked while the transformer is, such as a ControlNet adapter, reserves the estimate's `reservation_bytes` with `working_mem_bytes=`. See the VAE step below and the [model manager](/development/architecture/model-manager/).
 
 4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
@@ -626,10 +630,11 @@ Packages are discovered automatically. A directory of node modules without an `_
 
 - **Backend package (optional).** Put reusable math in `invokeai/backend/new_model/`: noise, packing, position IDs, schedules and text encoding. FLUX, FLUX.2 and Krea-2 have one; Qwen-Image and Z-Image keep the loop in the denoise node. Use a package once code is shared between nodes or needs its own tests.
 - **Schedulers.** Flow-matching architectures use diffusers' `FlowMatchEulerDiscreteScheduler`, or the shared maps in `invokeai/backend/flux/schedulers.py`: `FLUX_SCHEDULER_MAP`, `ZIMAGE_SCHEDULER_MAP` and `ERNIE_IMAGE_SCHEDULER_MAP`, each with name values and labels. Declare which set the UI offers in `FeaturesFacet.scheduler_set`. Set `scheduler_applies_to_graph=True` only if the denoise node really takes a scheduler field. Reproduce the reference sigma schedule and shift (`mu`, time-shift type, terminal shift) exactly, and test it against the reference scheduler.
+- **Resolution-dependent shift.** A `mu` interpolated from the image token count goes through `invokeai/backend/rectified_flow/schedule_shift.py`. Declare the two anchors as a `ShiftFit`, or read them with `ShiftFit.from_scheduler_config` from the scheduler `load_scheduler` returns: a checkpoint's own `scheduler/scheduler_config.json`, else the family's stock config for single-file and GGUF installs. Hand `fit.mu(...)` to `FlowMatchEulerDiscreteScheduler.set_timesteps(mu=...)` (exponential form), or `fit.shift(...)`, which is `e^mu`, to `time_shift` for a hand-built schedule (linear form). The fit is held at its upper anchor (`hold_below_base` also holds it below the lower one, as LTX-2's is). Reference pipelines extrapolate past it, and at large frames that puts nearly every step at high noise, so an image-to-image pass replaces its input instead of refining it. Test the family's anchors and form; the module's own tests cover the line and the hold.
 - **External noise (optional).** Only if the denoise node accepts a noise tensor: extend `LatentNoiseType` and its shape and grid logic in `invokeai/app/invocations/latent_noise.py`, and extend `noise_type` in `invocations/noise.py`. Validate with `validate_noise_tensor_shape`.
 - **Timestep-dependent conditioning.** Most architectures turn the text embeddings into the transformer's context once, before the loop. If a module between encoder and transformer reads the timestep -- Anima-3.8B's semantic connector does -- the context has to be recomputed at every step, for the positive, the negative and every regional conditioning. Pass the timestep exactly as the reference does: the connector scales sigma by 1000 before embedding it, so it gets a float32 sigma, where bf16's rounding would move its high frequencies by radians. A mask that leaves a query no key (an empty prompt encoded as one masked token) needs a defined result; `masked_sdpa` makes it zero instead of leaving it to the SDPA backend.
 - **Inpainting.** Rectified-flow models use `RectifiedFlowInpaintExtension` (`invokeai/backend/rectified_flow/rectified_flow_inpaint_extension.py`).
-- **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback.
+- **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback. With `tiny_autoencoder_previews` on, the same callback decodes with an installed Tiny AutoEncoder for the space ([Tiny AutoEncoder previews](#tiny-autoencoder-previews)).
 
 ---
 
@@ -654,7 +659,7 @@ File: `invokeai/app/invocations/metadata.py`
 
 2. **Metadata fields (if needed).**
 
-   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
+   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation, or if a node output feeds it through an edge, as `ideogram4_caption` and `moss_image_layout_prompt` record the prompt assembled at run time. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
 </Steps>
 
 ---
@@ -824,7 +829,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 6. **Recall** (`src/workbench/image-actions/`)
 
-   - In `imageRecall.ts`, add the component keys the builder writes into metadata to `hasComponentModels` and to the component patch.
+   - In `imageRecall.ts`, add one `RECALLED_COMPONENTS` entry per component key the builder writes into metadata (step 4). `hasComponentModels` and the component patch are derived from that table.
+   - A per-family setting that is not a model, such as Krea-2's rebalance or MOSS-Image's skip layers, needs its own metadata reader, a `RecalledField` member, its flag in `getImageRecallCapabilities` and its patch in `buildImageRecallSettings`.
    - Add the base to `GUIDANCE_BASES` in `recallParameters.ts` if it takes the shared guidance slider.
 
    Nothing checks recall against what the builder writes, so test it.
@@ -884,8 +890,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
 ### Reference images
 
-- Backend: set `FeaturesFacet.max_reference_images` (and `reference_images_require_variant` if only one variant supports them). Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
-- webv2: extend the reference-image config union (`types.ts`), `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`), and wire the images in the builder.
+- Backend: set `FeaturesFacet.max_reference_images`, plus `reference_images_require_variant` if only one variant supports them or `reference_images_require_format` if only one format does. Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
+- webv2: extend the reference-image config union (`types.ts`); the config-type set and the normalize, clone and sync switches in `settings.ts`; the persisted union in `src/workbench/canvasMigration.ts`; and `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`). Wire the images in the builder, and report any setting that keeps them from running in `getReferenceImageValidationReasons`, not only from the builder.
 
 ### Control and regional guidance
 
@@ -895,6 +901,21 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 ### PiD decoding
 
 Declare `PiDDecoderVariantType` in the `VariantFacet`, and extend `configs/pid_decoder.py`, `load/model_loaders/pid_decoder.py` and `backend/pid/decode.py`. In webv2, update `pid.ts` and `pidGraph.ts`.
+
+### Tiny AutoEncoder previews
+
+A Tiny AutoEncoder (TAE) record serves every architecture whose step-callback sample resolves to the same `LatentSpace` object: `latent_space_with_channels(record.base, record.latent_channels) is resolve_latent_space(base, sample)` (`backend/tiny_autoencoder/preview.py`). An architecture that reuses a declared space, as Z-Image reuses `FLUX_16` and ERNIE-Image `FLUX2_32`, gets TAE previews from the existing records with no further work.
+
+A new latent space gets TAE previews only if a TAE exists for it. Then:
+
+- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). If another base's TAE has the same architecture and channel count, both TAEs' published names must be in `_TAE_NAME_PATTERNS`: identification tells them apart only by name.
+- **Loader:** one more `@ModelLoaderRegistry.register(base=..., type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)` on `TinyAutoencoderLoader` (`load/model_loaders/tiny_autoencoder.py`).
+- **Starter:** next to the family's VAE in its starter module, with a pinned `resolve/<sha>` URL and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle.
+- **Decoder:** a network the vendored code in `backend/tiny_autoencoder/` does not have is vendored there, and `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
+
+The TAE decodes the latent the denoise node hands to the step callback, so check that this is the latent the TAE was trained on, with the same normalization and channel order. The previews must also go through `context.util.sd_step_callback` (or `flux_step_callback`/`flux2_step_callback`); a node that renders its own preview image does not get TAE previews.
+
+Send the first step callback, step 0 included, only once the denoise model is locked (`model_on_device`). The TAE is loaded at the first preview and locked only if it fits next to the models already in VRAM; before the main model is locked, it always fits.
 
 ---
 
@@ -913,6 +934,7 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/backend/architectures/test_modality.py` | Nothing if `GENERATION_MODES` matches `ModalityFacet` |
 | `tests/backend/architectures/test_capabilities_fixture.py` | Regenerate the webv2 fixture (see section 11) |
 | `tests/app/invocations/test_frontend_graph_node_types.py` | `SUPPORTED_BASE_COUNTS`, possibly `LITERAL_FLOORS` |
+| `tests/app/invocations/test_ideal_size.py` | A row in `IDEAL_SIZE_AT_NODE_DEFAULTS`: the size Ideal Size returns for the base at the node's defaults, derived by hand from the declared default size and `dimension_grid` |
 | `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |
 | `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
 | `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs |

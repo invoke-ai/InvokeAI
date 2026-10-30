@@ -114,9 +114,12 @@ class TestGuard:
         q, k, v = (torch.randn(1, 2, 8, NARROW) for _ in range(3))
         mask = torch.ones(8, 8, dtype=torch.bool)
 
-        F.scaled_dot_product_attention(q, k, v, mask, 0.0, True, scale=0.25)
+        # An explicit mask and is_causal=True are mutually exclusive from torch 2.14 on, so the two
+        # arguments are exercised in separate calls.
+        F.scaled_dot_product_attention(q, k, v, mask, 0.0, False, scale=0.25)
+        F.scaled_dot_product_attention(q, k, v, None, 0.0, True, scale=0.25)
 
-        assert calls == [(NARROW, mask, 0.0, True, 0.25, False)]
+        assert calls == [(NARROW, mask, 0.0, False, 0.25, False), (NARROW, None, 0.0, True, 0.25, False)]
 
     def test_wide_heads_refuse_arguments_the_math_call_cannot_forward(self, monkeypatch):
         _install_as_if_rocm(monkeypatch)
@@ -154,6 +157,8 @@ class TestGuard:
         # Pin both entry points apply_monkeypatches rebinds so monkeypatch restores them afterwards.
         monkeypatch.setattr(F, "scaled_dot_product_attention", original)
         monkeypatch.setattr(torch.cuda, "empty_cache", torch.cuda.empty_cache)
+        # And the stream-capture shim, which apply_monkeypatches installs on Windows ARM64 without a GPU.
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", torch.cuda.is_current_stream_capturing)
         monkeypatch.setattr(attention, "_IS_ROCM", True)
 
         apply_monkeypatches()
@@ -494,6 +499,8 @@ class TestClassicVaeEstimators:
         monkeypatch.setattr(attention, "_IS_ROCM", True)
         monkeypatch.setattr(torch.version, "hip", None)
         monkeypatch.setattr(vwm.TorchDevice, "choose_torch_device", classmethod(lambda cls: torch.device("cuda", 0)))
+        # The native allocator, whatever the machine running the suite configures.
+        monkeypatch.setattr("invokeai.backend.working_memory.platform._allocator_for", lambda device: "native")
 
     @staticmethod
     def _vae(spec):
@@ -509,13 +516,14 @@ class TestClassicVaeEstimators:
         return tokens * tokens * attention.SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
     @staticmethod
-    def _cudnn_decode_bytes(px: int) -> float:
-        """A bf16 decode's convolution term at the shipped cuDNN coefficient."""
+    def _cudnn_decode_bytes(px: int) -> int:
+        """An SD fp16 decode's convolution line at the shipped cuDNN coefficients: the GPU run casts the VAE to fp16."""
         from invokeai.backend.util.vae_working_memory import VAE_SD_SPEC
         from invokeai.backend.working_memory.coefficients import shipped_coefficients
         from invokeai.backend.working_memory.platform import Platform
 
-        return px * px * 2 * shipped_coefficients(VAE_SD_SPEC, Platform("cudnn")).values["k_decode"]
+        values = shipped_coefficients(VAE_SD_SPEC, Platform("cudnn", "native", "linux")).values
+        return int(values["k_decode_fp16"] * px * px + values["b_decode_fp16"])
 
     def test_sdxl_untiled_decode_reserves_the_score_matrix_when_it_dominates(self, monkeypatch):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
@@ -542,15 +550,24 @@ class TestClassicVaeEstimators:
             == linear
         )
 
-    @pytest.mark.parametrize("estimator", ["estimate_vae_working_memory_sd3", "estimate_vae_working_memory_cogview4"])
-    def test_the_other_autoencoder_kl_estimators_price_it_too(self, estimator):
+    def test_the_sd3_estimator_prices_it_too(self):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-        import invokeai.backend.util.vae_working_memory as vwm
+        from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd3
 
         latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
-        estimate = getattr(vwm, estimator)("decode", latents, self._vae(AutoencoderKL))
+        estimate = estimate_vae_working_memory_sd3("decode", latents, self._vae(AutoencoderKL))
         assert estimate.reservation_bytes == self._score_bytes(2048)
+
+    def test_the_cogview4_vae_has_no_attention_to_price(self):
+        """Its config sets `mid_block_add_attention: false`: the guard never sees it."""
+        from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+
+        from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4
+
+        latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
+        estimate = estimate_vae_working_memory_cogview4("decode", latents, self._vae(AutoencoderKL))
+        assert all(term.coefficient is not None for term in estimate.terms)
 
     def test_a_tiny_autoencoder_has_no_attention_to_price(self):
         from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny

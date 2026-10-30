@@ -18,15 +18,13 @@ import accelerate
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
+from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config, MainModelDefaultSettings
 from invokeai.backend.model_manager.load.load_default import (
     _FP8_DEFAULT_SKIP_PATTERNS,
     _FP8_SUPPORTED_PYTORCH_LAYERS,
 )
-from invokeai.backend.model_manager.load.model_loaders.anima import (
-    ANIMA_TRANSFORMER_CONFIG,
-    AnimaCheckpointModel,
-)
+from invokeai.backend.model_manager.load.model_loaders.anima import AnimaCheckpointModel
 from invokeai.backend.model_manager.taxonomy import SubModelType
 
 # Every cast-eligible module in the real Anima graph that the declared patterns protect. Pinned
