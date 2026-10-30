@@ -124,14 +124,18 @@ export class QueueItemCancelledError extends Error {
   }
 }
 
-/** Thrown by `waitForResults` when a backend item of the run failed; names that item so the failure can point at it. */
+/**
+ * Thrown by `waitForResults` when backend items of the run failed. `message` and `failure` describe a representative
+ * failure; `failedBackendItemIds` names every item that genuinely failed, so the failure notice can show and retry
+ * them all. Empty when the run's items only vanished (`failure: 'removed'`).
+ */
 export class QueueItemFailedError extends Error {
-  readonly backendItemId: number;
+  readonly failedBackendItemIds: readonly number[];
   readonly failure: QueueItemFailureCause;
 
-  constructor(backendItemId: number, message: string, failure: QueueItemFailureCause) {
+  constructor(failedBackendItemIds: readonly number[], message: string, failure: QueueItemFailureCause) {
     super(message);
-    this.backendItemId = backendItemId;
+    this.failedBackendItemIds = failedBackendItemIds;
     this.failure = failure;
     this.name = 'QueueItemFailedError';
   }
@@ -201,6 +205,8 @@ interface RunState {
   backendItemIds: number[];
   backendBatchId?: string;
   outcomePromises: Promise<TerminalOutcome>[];
+  /** Routing still in flight for completed items; a failure waits for it so their results are not dropped. */
+  pendingRouting: Set<Promise<unknown>>;
 }
 
 interface RunProgressState {
@@ -626,9 +632,12 @@ export const createQueueCoordinator = (
         // Keep following until routing lands; terminal events precede finished-image selection by network round
         // trips.
         activeProgressTarget.settle(progressTarget);
-        void Promise.resolve(routingPromise)
+        const routing = Promise.resolve(routingPromise)
           .finally(releaseProgressSlot)
           .catch(() => undefined);
+        const pendingRouting = runs.get(wait.localQueueItemId)?.pendingRouting;
+        pendingRouting?.add(routing);
+        void routing.finally(() => pendingRouting?.delete(routing));
       } else {
         releaseProgressSlot();
       }
@@ -714,6 +723,7 @@ export const createQueueCoordinator = (
       outcomePromises: backendItemIds.map((backendItemId) =>
         trackBackendItem(localQueueItemId, backendItemId, trackingContext)
       ),
+      pendingRouting: new Set(),
     });
 
     publishRunProgress(localQueueItemId);
@@ -1238,15 +1248,19 @@ export const createQueueCoordinator = (
     try {
       const outcomes = await Promise.all(run.outcomePromises);
       // A genuine failure explains the run better than an item that vanished beside it, and leaves something to retry.
-      const genuineFailureIndex = outcomes.findIndex(
-        (outcome) => outcome.status === 'failed' && outcome.cause !== 'removed'
+      const isGenuineFailure = (outcome: TerminalOutcome | undefined) =>
+        outcome?.status === 'failed' && outcome.cause !== 'removed';
+      const failedBackendItemIds = run.backendItemIds.filter((_backendItemId, index) =>
+        isGenuineFailure(outcomes[index])
       );
-      const failureIndex =
-        genuineFailureIndex >= 0 ? genuineFailureIndex : outcomes.findIndex((outcome) => outcome.status === 'failed');
-      const failure = outcomes[failureIndex];
+      const failure = outcomes.find(isGenuineFailure) ?? outcomes.find((outcome) => outcome.status === 'failed');
 
       if (failure?.status === 'failed') {
-        throw new QueueItemFailedError(run.backendItemIds[failureIndex], failure.error, failure.cause);
+        // The failed status ends routing; let completed siblings' results land first. No timeout bounds this: it waits
+        // on the same result reads the success path awaits, and a route started before dispose still finishes or
+        // fails with its request (unstarted routes are released when the runtime goes inactive).
+        await Promise.all(run.pendingRouting);
+        throw new QueueItemFailedError(failedBackendItemIds, failure.error, failure.cause);
       }
 
       const completedBackendItemIds = run.backendItemIds.filter(

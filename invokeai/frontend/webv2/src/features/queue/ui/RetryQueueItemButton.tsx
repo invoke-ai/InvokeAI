@@ -36,7 +36,7 @@ export const RetryQueueItemButton = ({
       try {
         const retriedItemIds = await queueCommands.retryItems([itemId]);
         await refreshQueue();
-        const report = describeQueueRetry({ isProjectClosedHere, itemId, retriedItemIds });
+        const report = describeQueueRetry({ isProjectClosedHere, itemIds: [itemId], retriedItemIds });
 
         notify[report.kind](t(report.titleKey), t(report.messageKey, report.values));
       } catch (error) {

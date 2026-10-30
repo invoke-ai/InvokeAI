@@ -3766,7 +3766,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     state = workbenchReducer(state, {
       error: 'CUDA out of memory',
-      failedBackendItemId: 41,
+      failedBackendItemIds: [41],
       projectId: project.id,
       queueItemId: queueItem.id,
       status: 'failed',
@@ -3776,7 +3776,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(state.notifications[0]).toMatchObject({
       actions: [
         { itemId: 41, kind: 'reveal-queue-item' },
-        { itemId: 41, kind: 'retry-queue-item' },
+        { itemIds: [41], kind: 'retry-queue-item' },
       ],
       category: 'run-outcome',
       kind: 'error',
@@ -3786,6 +3786,72 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       titleKey: 'notifications.runOutcome.failed',
       titleValues: { project: project.name },
     });
+  });
+
+  it('counts the failed items of a several-item run and retries them all from one action, withdrawn as one', () => {
+    let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41, 42, 43, 44, 45],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      error: 'CUDA out of memory',
+      failedBackendItemIds: [41, 42, 43, 44],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(state.notifications[0]).toMatchObject({
+      actions: [
+        { itemId: 41, kind: 'reveal-queue-item' },
+        { itemIds: [41, 42, 43, 44], kind: 'retry-queue-item' },
+      ],
+      title: `4 of 5 items failed in ${project.name}`,
+      titleKey: 'notifications.runOutcome.failedItems',
+      titleValues: { count: 4, project: project.name, total: 5 },
+    });
+
+    // Only the retry of exactly these items is withdrawn; showing the first stays on offer.
+    const unrelated = workbenchReducer(state, { itemIds: [41], type: 'withdrawNotificationRetry' });
+    expect(unrelated).toBe(state);
+    state = workbenchReducer(state, { itemIds: [44, 43, 42, 41], type: 'withdrawNotificationRetry' });
+    expect(state.notifications[0]?.actions).toEqual([{ itemId: 41, kind: 'reveal-queue-item' }]);
+  });
+
+  it('reports a several-item run whose items all vanished as a plain failure with nothing to show or retry', () => {
+    let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41, 42, 43],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      error: 'Queue item 41 is no longer on the backend.',
+      errorCode: 'removed',
+      failedBackendItemIds: [],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    expect(state.notifications[0]).toMatchObject({
+      messageKey: 'notifications.runOutcome.removedMessage',
+      title: `Run failed in ${project.name}`,
+      titleKey: 'notifications.runOutcome.failed',
+    });
+    expect(state.notifications[0]).not.toHaveProperty('actions');
   });
 
   it('reports a failure no backend item explains without follow-ups it cannot offer', () => {

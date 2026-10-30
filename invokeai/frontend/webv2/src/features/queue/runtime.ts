@@ -138,8 +138,8 @@ export interface QueueHistoryCommands {
     error?: string;
     /** Set when `error` is a stand-in the notice words itself: the backend gave no reason, or the item vanished. */
     errorCode?: QueueRunErrorCode;
-    /** The backend item whose failure ended the run, so the failure notice can show and retry it. */
-    failedBackendItemId?: number;
+    /** The backend items whose failure ended the run, so the failure notice can show and retry them. */
+    failedBackendItemIds?: readonly number[];
     notify?: boolean;
     projectId: string;
     queueItemId: string;
@@ -1214,7 +1214,7 @@ export const createQueueRuntime = ({
         error: toErrorMessage(error),
         ...(error instanceof QueueItemFailedError
           ? {
-              failedBackendItemId: error.backendItemId,
+              failedBackendItemIds: error.failedBackendItemIds,
               ...(error.failure === 'unexplained' ? { errorCode: 'unexplained' as const } : {}),
             }
           : {}),

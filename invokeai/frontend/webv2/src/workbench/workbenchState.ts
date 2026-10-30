@@ -453,8 +453,8 @@ type WorkbenchReducerAction =
       queueItemId: string;
       status: QueueHistoryItemStatus;
       error?: string;
-      /** The backend item whose failure ended the run; its failure notice offers to show and retry it. */
-      failedBackendItemId?: number;
+      /** The backend items whose failure ended the run; its failure notice offers to show and retry them. */
+      failedBackendItemIds?: readonly number[];
       /** `error` is a stand-in: the backend gave no reason, or the item vanished from its queue. */
       errorCode?: 'removed' | 'unexplained';
       notify?: boolean;
@@ -616,7 +616,7 @@ type WorkbenchReducerAction =
   | { type: 'clearNotifications' }
   | { type: 'dismissNotification'; notificationId: string }
   /** Withdraws Retry for a backend item from every notice once it has been retried. */
-  | { type: 'withdrawNotificationRetry'; itemId: number }
+  | { type: 'withdrawNotificationRetry'; itemIds: readonly number[] }
   /** Puts back notifications a Clear removed (its Undo), behind any recorded since. */
   | { type: 'restoreNotifications'; notifications: readonly WorkbenchNotification[] }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
@@ -822,7 +822,8 @@ const describeRunFailure = (
 
 /**
  * Says which run ended and where: its project, and its prompt or workflow name. A failure stays until dismissed and,
- * once the backend item that failed is known and still there, offers to show it in the queue and to retry it.
+ * once the backend items that failed are known and still there, offers to show the first in the queue and to retry
+ * them all at once. A run of several items says how many of them failed.
  */
 const createRunOutcomeNotification = (
   project: Project,
@@ -831,12 +832,12 @@ const createRunOutcomeNotification = (
   {
     error,
     errorCode,
-    failedBackendItemId,
+    failedBackendItemIds = [],
     status,
   }: {
     error?: string;
     errorCode?: 'removed' | 'unexplained';
-    failedBackendItemId?: number;
+    failedBackendItemIds?: readonly number[];
     status: 'cancelled' | 'failed';
   }
 ): WorkbenchNotification => {
@@ -854,16 +855,19 @@ const createRunOutcomeNotification = (
     });
   }
 
+  const [firstFailedItemId] = failedBackendItemIds;
+  const itemCount = Math.max(queueItem?.backendItemIds?.length ?? 0, failedBackendItemIds.length);
+
   return createNotification({
     ...describeRunFailure(queueItem, error?.trim() ?? '', errorCode),
     // An item that vanished has nothing left to show or retry.
-    ...(failedBackendItemId === undefined || errorCode === 'removed'
+    ...(firstFailedItemId === undefined || errorCode === 'removed'
       ? {}
       : {
           actions: [
-            { itemId: failedBackendItemId, kind: 'reveal-queue-item' },
+            { itemId: firstFailedItemId, kind: 'reveal-queue-item' },
             {
-              itemId: failedBackendItemId,
+              itemIds: failedBackendItemIds,
               kind: 'retry-queue-item',
               ...(queueItem?.snapshot.destination === 'canvas' ? { canvasProjectId: project.id } : {}),
             },
@@ -873,9 +877,13 @@ const createRunOutcomeNotification = (
     kind: 'error',
     persistent: true,
     projectId: project.id,
-    title: `Run failed in ${project.name}`,
-    titleKey: 'notifications.runOutcome.failed',
-    titleValues,
+    ...(itemCount > 1 && failedBackendItemIds.length > 0
+      ? {
+          title: `${failedBackendItemIds.length} of ${itemCount} items failed in ${project.name}`,
+          titleKey: 'notifications.runOutcome.failedItems',
+          titleValues: { ...titleValues, count: failedBackendItemIds.length, total: itemCount },
+        }
+      : { title: `Run failed in ${project.name}`, titleKey: 'notifications.runOutcome.failed', titleValues }),
   });
 };
 
@@ -5477,7 +5485,7 @@ const reduceWorkbenchAction = (
         createRunOutcomeNotification(project, queueItem, {
           error: action.error,
           errorCode: action.errorCode,
-          failedBackendItemId: action.failedBackendItemId,
+          failedBackendItemIds: action.failedBackendItemIds,
           status: action.status,
         })
       );
@@ -6293,8 +6301,11 @@ const reduceWorkbenchAction = (
       return notifications.length === state.notifications.length ? state : { ...state, notifications };
     }
     case 'withdrawNotificationRetry': {
+      // The notices offering this same retry; a notice for other items of the run keeps its own.
       const isRetry = (candidate: WorkbenchNotificationAction) =>
-        candidate.kind === 'retry-queue-item' && candidate.itemId === action.itemId;
+        candidate.kind === 'retry-queue-item' &&
+        candidate.itemIds.length === action.itemIds.length &&
+        candidate.itemIds.every((itemId) => action.itemIds.includes(itemId));
 
       if (!state.notifications.some((notification) => notification.actions?.some(isRetry))) {
         return state;

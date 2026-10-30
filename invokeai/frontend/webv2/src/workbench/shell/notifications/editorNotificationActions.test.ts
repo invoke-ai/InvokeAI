@@ -118,9 +118,9 @@ describe('editor notification actions', () => {
     const none = setup({ retryQueueItems: () => Promise.resolve([]) });
     const failed = setup({ retryQueueItems: () => Promise.reject(new Error('Queue item 43 not found')) });
 
-    queued.context.retryQueueItem({ itemId: 41 });
-    none.context.retryQueueItem({ itemId: 42 });
-    failed.context.retryQueueItem({ itemId: 43 });
+    queued.context.retryQueueItem({ itemIds: [41] });
+    none.context.retryQueueItem({ itemIds: [42] });
+    failed.context.retryQueueItem({ itemIds: [43] });
 
     await vi.waitFor(() => expect(failed.store.getSnapshot().notifications).toHaveLength(1));
     // Recorded as keys and values, so the notice follows the language.
@@ -128,11 +128,13 @@ describe('editor notification actions', () => {
       actions: [{ itemId: 99, kind: 'reveal-queue-item' }],
       kind: 'success',
       messageKey: 'widgets.queue.retryQueuedDescription',
-      messageValues: { id: 41 },
+      messageValues: { count: 1, id: 41 },
       titleKey: 'widgets.queue.retryQueued',
     });
     expect(none.store.getSnapshot().notifications[0]).toMatchObject({
       kind: 'info',
+      message: 'Queue item #42 is not a failed or canceled job the server can retry.',
+      messageValues: { count: 1, id: 42 },
       titleKey: 'widgets.queue.retryNotQueued',
     });
     expect(failed.store.getSnapshot().notifications[0]).toMatchObject({
@@ -141,8 +143,48 @@ describe('editor notification actions', () => {
       titleKey: 'widgets.queue.retryFailed',
     });
     // A failed attempt may be tried again; a done one is not offered again.
-    expect(failed.context.canRetryQueueItem(43)).toBe(true);
-    expect(queued.context.canRetryQueueItem(41)).toBe(false);
+    expect(failed.context.canRetryQueueItem([43])).toBe(true);
+    expect(queued.context.canRetryQueueItem([41])).toBe(false);
+  });
+
+  it('retries every failed item of a run in one request and says how many were queued again', async () => {
+    const retryQueueItems = vi.fn(() => Promise.resolve([101, 102, 103, 104]));
+    const { context, store } = setup({ retryQueueItems });
+    store.commands.notifications.add({
+      actions: [{ itemIds: [41, 42, 43, 44], kind: 'retry-queue-item' }],
+      kind: 'error',
+      title: 'Run failed',
+    });
+
+    context.retryQueueItem({ itemIds: [41, 42, 43, 44] });
+
+    await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(2));
+    expect(retryQueueItems).toHaveBeenCalledOnce();
+    expect(retryQueueItems).toHaveBeenCalledWith([41, 42, 43, 44]);
+    const [report, failure] = store.getSnapshot().notifications;
+    expect(report).toMatchObject({
+      actions: [{ itemId: 101, kind: 'reveal-queue-item' }],
+      message: '4 queue items were queued again from their saved sessions.',
+    });
+    // Several items asked for are counted, not named by the first.
+    expect(report?.messageValues).toEqual({ count: 4 });
+    // The notice that offered the retry no longer does.
+    expect(failure).not.toHaveProperty('actions');
+  });
+
+  it('says how many of several items the server queued again when it skipped some', async () => {
+    const { context, store } = setup({ retryQueueItems: () => Promise.resolve([101]) });
+
+    context.retryQueueItem({ itemIds: [41, 42, 43] });
+
+    await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(1));
+    const [report] = store.getSnapshot().notifications;
+    expect(report).toMatchObject({
+      message:
+        '1 of 3 queue items was queued again from its saved session; the others are not failed or canceled jobs the server can retry.',
+      messageKey: 'widgets.queue.retryQueuedPartialDescription',
+    });
+    expect(report?.messageValues).toEqual({ count: 1, total: 3 });
   });
 
   it('queues a rerun once however often Retry is pressed, from any notice', async () => {
@@ -150,11 +192,11 @@ describe('editor notification actions', () => {
     const { context } = setup({ retryQueueItems });
     const { context: otherNotice } = setup({ retryQueueItems });
 
-    context.retryQueueItem({ itemId: 51 });
-    context.retryQueueItem({ itemId: 51 });
-    otherNotice.retryQueueItem({ itemId: 51 });
-    await vi.waitFor(() => expect(context.canRetryQueueItem(51)).toBe(false));
-    context.retryQueueItem({ itemId: 51 });
+    context.retryQueueItem({ itemIds: [51, 52] });
+    context.retryQueueItem({ itemIds: [51, 52] });
+    otherNotice.retryQueueItem({ itemIds: [52, 51] });
+    await vi.waitFor(() => expect(context.canRetryQueueItem([51, 52])).toBe(false));
+    context.retryQueueItem({ itemIds: [51, 52] });
 
     expect(retryQueueItems).toHaveBeenCalledOnce();
   });
@@ -162,7 +204,7 @@ describe('editor notification actions', () => {
   it('says a Canvas rerun goes to another tab when its project is closed here', async () => {
     const { context, store } = setup({ retryQueueItems: () => Promise.resolve([101]) });
 
-    context.retryQueueItem({ canvasProjectId: 'closed-project', itemId: 61 });
+    context.retryQueueItem({ canvasProjectId: 'closed-project', itemIds: [61] });
 
     await vi.waitFor(() =>
       expect(store.getSnapshot().notifications[0]?.messageKey).toBe('widgets.queue.retryQueuedProjectClosedDescription')

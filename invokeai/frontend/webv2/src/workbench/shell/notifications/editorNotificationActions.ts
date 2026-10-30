@@ -34,10 +34,12 @@ export interface EditorNotificationActionSources {
 }
 
 /**
- * Retries already asked for from a notice, by backend item: a rerun is queued once however many notices, toasts or
- * clicks offer it. Session-only, per account.
+ * Retries already asked for from a notice, by the set of backend items it retries: a rerun is queued once however many
+ * notices, toasts or clicks offer it. Session-only, per account.
  */
-const retryStates = new Map<number, 'done' | 'running'>();
+const retryStates = new Map<string, 'done' | 'running'>();
+
+const toRetryKey = (itemIds: readonly number[]): string => [...itemIds].sort((a, b) => a - b).join(',');
 
 registerAccountOwnedResource({ clear: () => retryStates.clear(), name: 'notification-queue-retries' });
 
@@ -67,10 +69,11 @@ export const createEditorNotificationActionContext = ({
       openWidget('queue');
       requestQueueItemReveal(itemId);
     },
-    canRetryQueueItem: (itemId) => !retryStates.has(itemId),
-    retryQueueItem: ({ canvasProjectId, itemId }) => {
-      // Once per backend item: every toast and list entry offering this retry shares the guard.
-      if (retryStates.has(itemId)) {
+    canRetryQueueItem: (itemIds) => !retryStates.has(toRetryKey(itemIds)),
+    retryQueueItem: ({ canvasProjectId, itemIds }) => {
+      const retryKey = toRetryKey(itemIds);
+      // Once per set of backend items: every toast and list entry offering this retry shares the guard.
+      if (retryStates.has(retryKey)) {
         return;
       }
 
@@ -78,21 +81,21 @@ export const createEditorNotificationActionContext = ({
       // English stands in for any key the catalog lacks; the record shows the active language.
       const english = (key: string, values?: Record<string, number>) => t(key, { ...values, lng: 'en' });
 
-      retryStates.set(itemId, 'running');
-      retryQueueItems([itemId])
+      retryStates.set(retryKey, 'running');
+      retryQueueItems([...itemIds])
         .then((retriedItemIds) => {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
-          retryStates.set(itemId, 'done');
-          // The notices that offered it now say it is done; the report below links the rerun.
-          notifications.withdrawRetry(itemId);
+          retryStates.set(retryKey, 'done');
+          // The notices that offered it now say it is done; the report below links the first rerun.
+          notifications.withdrawRetry(itemIds);
           const report = describeQueueRetry({
             isProjectClosedHere:
               canvasProjectId !== undefined &&
               !queries.getSnapshot().projects.some((project) => project.id === canvasProjectId),
-            itemId,
+            itemIds,
             retriedItemIds,
           });
 
@@ -115,7 +118,7 @@ export const createEditorNotificationActionContext = ({
           }
 
           // A failed attempt may be tried again.
-          retryStates.delete(itemId);
+          retryStates.delete(retryKey);
           notifications.add({
             kind: 'error',
             message: getApiErrorMessage(error, english('widgets.queue.couldNotRetryItem')),

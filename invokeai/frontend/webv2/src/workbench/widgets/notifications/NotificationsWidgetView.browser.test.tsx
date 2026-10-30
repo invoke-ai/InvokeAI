@@ -93,7 +93,7 @@ describe('notifications widget', () => {
     const failure = {
       actions: [
         { itemId: 41, kind: 'reveal-queue-item' },
-        { itemId: 41, kind: 'retry-queue-item' },
+        { itemIds: [41], kind: 'retry-queue-item' },
       ],
       kind: 'error',
       message: '“A castle at dusk”: CUDA out of memory',
@@ -119,7 +119,7 @@ describe('notifications widget', () => {
   it('queues a retry once: the pressed Retry leaves the notice', async () => {
     retryItems.mockResolvedValue([99]);
     store().commands.notifications.add({
-      actions: [{ itemId: 71, kind: 'retry-queue-item' }],
+      actions: [{ itemIds: [71], kind: 'retry-queue-item' }],
       kind: 'error',
       title: 'Run failed',
     });

@@ -404,7 +404,7 @@ const createCommands = (
       add: command('recordNotice'),
       clear: command('clearNotifications'),
       dismiss: command('dismissNotification', (notificationId: string) => ({ notificationId })),
-      withdrawRetry: command('withdrawNotificationRetry', (itemId: number) => ({ itemId })),
+      withdrawRetry: command('withdrawNotificationRetry', (itemIds: readonly number[]) => ({ itemIds })),
       markAllRead: command('markAllNotificationsRead'),
       markRead: command('markNotificationsRead', (notificationIds: readonly string[]) => ({ notificationIds })),
       restore: command(

@@ -365,7 +365,59 @@ describe('queueCoordinator', () => {
 
     const failure = await resultsPromise.catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(QueueItemFailedError);
-    expect(failure).toMatchObject({ backendItemId: 2, failure: 'reported', message: 'CUDA out of memory' });
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported', message: 'CUDA out of memory' });
+  });
+
+  it('names every failed item of a run so all of them can be retried', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 4,
+      itemIds: [1, 2, 3, 4],
+      requested: 4,
+    });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    for (const itemId of [1, 2, 3, 4]) {
+      harness.socket.fire(
+        'queue_item_status_changed',
+        createStatusEvent({ error_message: `failure ${itemId}`, item_id: itemId, status: 'failed' })
+      );
+    }
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [1, 2, 3, 4], failure: 'reported', message: 'failure 1' });
+  });
+
+  it('lets a completed sibling finish routing its results before a run fails', async () => {
+    const routing = deferred<void>();
+    harness.callbacks.onBackendItemComplete = vi.fn(() => routing.promise);
+    harness.api.enqueueGenerate.mockResolvedValue({ batchId: 'batch-1', enqueued: 2, itemIds: [1, 2], requested: 2 });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    let settled = false;
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z').finally(() => {
+      settled = true;
+    });
+
+    harness.socket.fire('queue_item_status_changed', createStatusEvent({ item_id: 1 }));
+    harness.socket.fire(
+      'queue_item_status_changed',
+      createStatusEvent({ error_message: 'CUDA out of memory', item_id: 2, status: 'failed' })
+    );
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    // The failed status would end routing; item 1's results must land first.
+    expect(settled).toBe(false);
+
+    routing.resolve();
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported' });
   });
 
   it('rejects with QueueItemCancelledError when the backend cancels a run', async () => {
@@ -2360,7 +2412,11 @@ describe('queueCoordinator', () => {
     const failure = await resultsPromise.catch((error: unknown) => error);
     expect(failure).toBeInstanceOf(QueueItemFailedError);
     // Vanished, not failed: nothing is left to show or retry, and a clear this tab asked for explains it.
-    expect(failure).toMatchObject({ failure: 'removed', message: expect.stringContaining('no longer on the backend') });
+    expect(failure).toMatchObject({
+      failedBackendItemIds: [],
+      failure: 'removed',
+      message: expect.stringContaining('no longer on the backend'),
+    });
   });
 
   it('reports the item that failed over one that vanished beside it', async () => {
@@ -2381,7 +2437,34 @@ describe('queueCoordinator', () => {
     );
 
     const failure = await resultsPromise.catch((error: unknown) => error);
-    expect(failure).toMatchObject({ backendItemId: 2, failure: 'reported', message: 'CUDA out of memory' });
+    expect(failure).toMatchObject({ failedBackendItemIds: [2], failure: 'reported', message: 'CUDA out of memory' });
+  });
+
+  it('names only the items that failed when another item of the run vanished between them', async () => {
+    harness.api.enqueueGenerate.mockResolvedValue({
+      batchId: 'batch-1',
+      enqueued: 3,
+      itemIds: [1, 2, 3],
+      requested: 3,
+    });
+    harness.coordinator.connect();
+
+    await harness.coordinator.submitGenerate('local-1', generateRequest);
+    const resultsPromise = harness.coordinator.waitForResults('local-1', '2026-06-10T00:00:00Z');
+
+    harness.api.getItem.mockImplementation((itemId: number) =>
+      itemId === 2 ? Promise.reject(new ApiError('not found', 404)) : new Promise<never>(() => {})
+    );
+    harness.socket.fire('connect', undefined);
+    for (const itemId of [1, 3]) {
+      harness.socket.fire(
+        'queue_item_status_changed',
+        createStatusEvent({ error_message: 'CUDA out of memory', item_id: itemId, status: 'failed' })
+      );
+    }
+
+    const failure = await resultsPromise.catch((error: unknown) => error);
+    expect(failure).toMatchObject({ failedBackendItemIds: [1, 3], failure: 'reported' });
   });
 
   it('prefers one batch cancellation request, falling back to item ids', async () => {

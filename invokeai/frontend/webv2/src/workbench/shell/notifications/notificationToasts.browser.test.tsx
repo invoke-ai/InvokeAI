@@ -162,7 +162,7 @@ describe('notification toasts in the editor', () => {
       store().commands.notifications.add({
         actions: [
           { itemId: 41, kind: 'reveal-queue-item' },
-          { itemId: 41, kind: 'retry-queue-item' },
+          { itemIds: [41], kind: 'retry-queue-item' },
         ],
         kind: 'error',
         message: '“A castle at dusk”: CUDA out of memory',

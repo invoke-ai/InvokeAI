@@ -4243,7 +4243,7 @@ describe('run outcomes', () => {
       )
     );
     expect(commands.setStatus).not.toHaveBeenCalledWith(
-      expect.objectContaining({ failedBackendItemId: expect.anything() })
+      expect.objectContaining({ failedBackendItemIds: expect.anything() })
     );
     await runtime.dispose();
   });
@@ -4257,7 +4257,7 @@ describe('run outcomes', () => {
       expect(commands.setStatus).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'CUDA out of memory',
-          failedBackendItemId: 41,
+          failedBackendItemIds: [41],
           queueItemId: queueItem.id,
           status: 'failed',
         })

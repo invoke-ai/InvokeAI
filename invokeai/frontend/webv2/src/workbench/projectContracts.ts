@@ -116,10 +116,10 @@ export type WorkbenchNotificationAction =
   /** Opens the queue at this backend item. */
   | { kind: 'reveal-queue-item'; itemId: number }
   /**
-   * Re-runs this failed or canceled backend item from its saved session, once. `canvasProjectId`: a Canvas run's
-   * project, whose rerun is staged only by a tab with it open.
+   * Re-runs these failed or canceled backend items of one run from their saved sessions, once, in one request.
+   * `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open.
    */
-  | { kind: 'retry-queue-item'; itemId: number; canvasProjectId?: string }
+  | { kind: 'retry-queue-item'; itemIds: readonly number[]; canvasProjectId?: string }
   /**
    * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
    * while that project is open. `label` replaces "Undo" when the button brings back something other than the

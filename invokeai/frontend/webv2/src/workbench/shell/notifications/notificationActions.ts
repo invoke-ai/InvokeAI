@@ -21,10 +21,10 @@ export interface NotificationActionContext {
   openWidget: (widgetId: WidgetTypeId) => void;
   /** Opens the queue at a backend item. */
   revealQueueItem: (itemId: number) => void;
-  /** Whether a notice may still offer Retry for this backend item: not once it was retried from one. */
-  canRetryQueueItem: (itemId: number) => boolean;
-  /** Re-runs a failed or canceled backend item, at most once, and reports how that went. */
-  retryQueueItem: (action: { canvasProjectId?: string; itemId: number }) => void;
+  /** Whether a notice may still offer Retry for these backend items: not once they were retried from one. */
+  canRetryQueueItem: (itemIds: readonly number[]) => boolean;
+  /** Re-runs a run's failed or canceled backend items in one request, at most once, and reports how that went. */
+  retryQueueItem: (action: { canvasProjectId?: string; itemIds: readonly number[] }) => void;
   t: TFunction;
 }
 
@@ -60,7 +60,7 @@ const handlers: {
     run: ({ itemId }, { revealQueueItem }) => revealQueueItem(itemId),
   },
   'retry-queue-item': {
-    label: ({ itemId }, { canRetryQueueItem, t }) => (canRetryQueueItem(itemId) ? t('common.retry') : null),
+    label: ({ itemIds }, { canRetryQueueItem, t }) => (canRetryQueueItem(itemIds) ? t('common.retry') : null),
     run: (action, { retryQueueItem }) => retryQueueItem(action),
   },
   undo: {
