@@ -19,6 +19,8 @@ import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
+import { useProjectLibrary } from '@workbench/projects/library';
+import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
@@ -56,6 +58,13 @@ import {
   createWorkflowsProvider,
 } from './paletteProviders';
 import { listPaletteWidgets } from './paletteWidgets';
+import { createProjectsProvider } from './projectsProvider';
+
+type OpenProjectName = { id: string; name: string };
+
+const areOpenProjectNamesEqual = (left: readonly OpenProjectName[], right: readonly OpenProjectName[]): boolean =>
+  left.length === right.length &&
+  left.every((project, index) => project.id === right[index]?.id && project.name === right[index]?.name);
 
 const buildStaticAppEntries = (t: TFunction, settingsKeys: string[] | undefined): PaletteEntry[] => [
   buildOpenSettingsEntry(t, () => openWorkbenchSettings(), settingsKeys),
@@ -103,6 +112,13 @@ const WorkbenchCommandPaletteDialog = ({
   const projectId = useActiveProjectSelector((project) => project.id);
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
+  // Names only: project edits must not rebuild the providers or re-key the projects search.
+  const openProjects = useWorkbenchSelector(
+    (snapshot) => snapshot.projects.map(({ id, name }) => ({ id, name })),
+    areOpenProjectNamesEqual
+  );
+  const projectLibrary = useProjectLibrary();
+  const { openProject } = useProjectActions();
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
@@ -251,6 +267,12 @@ const WorkbenchCommandPaletteDialog = ({
     };
 
     return [
+      createProjectsProvider({
+        library: projectLibrary,
+        openProject: (id, name) => void openProject(id, name),
+        openProjects,
+        t,
+      }),
       createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow'), t }),
       createBoardsProvider({
         openGalleryWidget: () => openWidget('gallery'),
@@ -342,8 +364,11 @@ const WorkbenchCommandPaletteDialog = ({
     i18n.resolvedLanguage,
     notify,
     getWidgetsForRegion,
+    openProject,
+    openProjects,
     openWidgetPlacement,
     projectId,
+    projectLibrary,
     promptHistory,
     queueScope,
     readCurrentGenerateContext,

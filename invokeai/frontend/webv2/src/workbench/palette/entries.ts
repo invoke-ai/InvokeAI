@@ -128,6 +128,17 @@ export const PROVIDER_MIN_QUERY_LENGTH = 2;
 /** Group for the synthesized "Search images…"-style scope commands. */
 export const SEARCH_SCOPE_GROUP = 'Search in';
 
+/** Every whitespace-separated query term must appear, case-insensitively; providers filter client-side with it. */
+export const createTermsMatcher = (query: string): ((haystack: string) => boolean) => {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  return (haystack) => {
+    const lower = haystack.toLowerCase();
+
+    return terms.every((term) => lower.includes(term));
+  };
+};
+
 const PALETTE_GROUP_ORDER = [
   'Recent',
   'Generation',

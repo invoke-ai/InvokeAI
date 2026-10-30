@@ -21,7 +21,7 @@ import { absolutizeApiUrl, ApiError } from '@platform/transport/http';
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
-import { PaletteSearchUnavailableError } from './entries';
+import { createTermsMatcher, PaletteSearchUnavailableError } from './entries';
 import { getObjectIdentity } from './objectIdentity';
 
 /** Factories receive host-owned workbench callbacks; extension searches adapt to the same provider contract. */
@@ -34,16 +34,6 @@ const PROVIDER_PAGE_SIZE = 8;
  */
 const loadActiveBoards = (): Promise<GalleryBoard[]> =>
   queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
-
-const createTermsMatcher = (query: string): ((haystack: string) => boolean) => {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-  return (haystack) => {
-    const lower = haystack.toLowerCase();
-
-    return terms.every((term) => lower.includes(term));
-  };
-};
 
 export const createWorkflowsProvider = ({
   openWorkflowWidget,
