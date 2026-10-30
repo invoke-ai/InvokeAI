@@ -55,7 +55,7 @@ Measured on an RTX 4090 at 1024×1024:
 
 The text encoder runs first and is unloaded from the GPU when the transformer needs the room. At 2048×2048 the bf16 transformer needs 15.5 GB and 3.7 s per step.
 
-The VAE needs about 8 GB of working memory to decode a 1024×1024 image, and is priced the same to encode one for image-to-image, inpainting or outpainting (twice that with `precision: float32`). When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks 1024-pixel tiles, and 768 or 512 only on cards with less memory: measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
+The VAE needs about 8 GB of working memory to decode a 1024×1024 image on an NVIDIA card and about 12 GB on an AMD card; with `precision: float32`, about twice that on NVIDIA and about 1.6 times on AMD. Encoding one for image-to-image, inpainting or outpainting is reserved like a decode on NVIDIA and needs about 5 GB on AMD, at either precision. When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks 1024-pixel tiles, and 768 or 512 only on cards with less memory: measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
 
 ### Reference images
 

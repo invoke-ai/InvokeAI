@@ -1,0 +1,1054 @@
+{
+  "schema_version": 1,
+  "coefficients": [
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "values": {
+        "k_decode_bf16": 8000,
+        "k_decode_fp32": 16000,
+        "k_encode_bf16": 8000,
+        "k_encode_fp32": 16000,
+        "b_decode_bf16": 644874240,
+        "b_decode_fp32": 644874240,
+        "b_encode_bf16": 644874240,
+        "b_encode_fp32": 644874240
+      },
+      "stand_ins": [
+        "b_decode_bf16",
+        "b_decode_fp32",
+        "b_encode_bf16",
+        "b_encode_fp32",
+        "k_decode_bf16",
+        "k_decode_fp32",
+        "k_encode_bf16",
+        "k_encode_fp32"
+      ],
+      "provenance": "Declared stand-ins, the original Qwen-Image-2.1 pricing: 4000 bytes per pixel per element byte (8000 for bf16, 16000 for fp32) plus 0.6 GiB, rounded up to a whole MiB, for the decode, and the encode priced as the decode (the encoder is narrower, 96 vs 144 base channels, so this is an upper bound). Only one untiled cuDNN size is measured (RTX 4090, bf16, 1024px, torch version unknown, recorded in GiB to two decimals) so the lines cannot be fitted; the tiled points bound them from below and above."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "cudaMallocAsync"
+      },
+      "values": {
+        "k_decode_bf16": 8000,
+        "k_decode_fp32": 16000,
+        "k_encode_bf16": 8000,
+        "k_encode_fp32": 16000,
+        "b_decode_bf16": 644874240,
+        "b_decode_fp32": 644874240,
+        "b_encode_bf16": 644874240,
+        "b_encode_fp32": 644874240
+      },
+      "stand_ins": [
+        "b_decode_bf16",
+        "b_decode_fp32",
+        "b_encode_bf16",
+        "b_encode_fp32",
+        "k_decode_bf16",
+        "k_decode_fp32",
+        "k_encode_bf16",
+        "k_encode_fp32"
+      ],
+      "provenance": "No Qwen-Image-2.1 point is measured under cudaMallocAsync: priced with the native allocator's stand-ins, the larger of the two on cuDNN (cudaMallocAsync needs 25-35% less)."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "values": {
+        "k_decode_bf16": 15580,
+        "b_decode_bf16": 0,
+        "k_decode_fp32": 18839,
+        "b_decode_fp32": 1452277760,
+        "k_encode_bf16": 5061,
+        "b_encode_bf16": 0,
+        "k_encode_fp32": 4975,
+        "b_encode_fp32": 1048576
+      },
+      "provenance": "Fitted lines are working_memory/fit.py's: the upper envelope of the untiled in-fit points of this entry's lines, plus 5%. AMD Radeon PRO W7900 (gfx1100, 48 GB), Linux, torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, bf16 and fp32, one fresh process per point, peak reserved memory; the points are issue 10036's grid and hold-out. The decode steps up from ~12 KB per pixel to ~14.5 KB past 1.5 Mpx, so its line sits above the points below that. Windows MIOpen under the native allocator (a user override; Invoke defaults to expandable segments there) is priced with these Linux values, unmeasured: the native allocator is documented to need up to 1.6x more on Windows (`platform.priced_as`)."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "expandable",
+        "os": "windows"
+      },
+      "values": {
+        "k_decode_bf16": 15580,
+        "b_decode_bf16": 0,
+        "k_decode_fp32": 18839,
+        "b_decode_fp32": 1452277760,
+        "k_encode_bf16": 5061,
+        "b_encode_bf16": 0,
+        "k_encode_fp32": 4975,
+        "b_encode_fp32": 1048576
+      },
+      "stand_ins": [
+        "b_decode_bf16",
+        "b_decode_fp32",
+        "b_encode_bf16",
+        "b_encode_fp32",
+        "k_decode_bf16",
+        "k_decode_fp32",
+        "k_encode_bf16",
+        "k_encode_fp32"
+      ],
+      "provenance": "No Qwen-Image-2.1 point is measured with MIOpen's expandable segments on Windows: priced with the Linux native allocator's values as declared stand-ins (copied from the MIOpen native entry)."
+    }
+  ],
+  "points": [
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "cudnn"
+      },
+      "measured_bytes": 8997956485,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "The comment in invokeai/backend/qwen_image_2_1/vae.py that shipped the original pricing (commit 37efce36d8): bf16, peak reserved memory, recorded in GiB to two decimals. Torch version unknown."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 1024,
+        "dtype": "bf16",
+        "conv_backend": "cudnn"
+      },
+      "measured_bytes": 8997956485,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "The comment in invokeai/backend/qwen_image_2_1/vae.py that shipped the original pricing (commit 37efce36d8): bf16, peak reserved memory, recorded in GiB to two decimals. Torch version unknown."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "cudnn"
+      },
+      "measured_bytes": 5658619412,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "The comment in invokeai/backend/qwen_image_2_1/vae.py that shipped the original pricing (commit 37efce36d8): bf16, peak reserved memory, recorded in GiB to two decimals. Torch version unknown."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "cudnn",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 512,
+        "dtype": "bf16",
+        "conv_backend": "cudnn"
+      },
+      "measured_bytes": 2877628088,
+      "method": "reserved_peak",
+      "device": "RTX 4090",
+      "provenance": "The comment in invokeai/backend/qwen_image_2_1/vae.py that shipped the original pricing (commit 37efce36d8): bf16, peak reserved memory, recorded in GiB to two decimals. Torch version unknown."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 3219128320,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 768,
+        "width": 768,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7174356992,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 12683575296,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 23563599872,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 35005661184,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1536,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 18979225600,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 1024,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 14044626944,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7939817472,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 512,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 3592421376,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 20195573760,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 37492883456,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 1024,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 23840423936,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 5054136320,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 11362369536,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 1024,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 5475663872,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 896,
+        "width": 1152,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 12490637312,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1344,
+        "width": 768,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 12490637312,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1792,
+        "width": 1792,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 8279556096,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": 1024,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 12683575296,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 30777802752,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 768,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 13457424384,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1280,
+        "width": 1280,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7893680128,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1024,
+        "width": 1024,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 4968153088,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1600,
+        "width": 1600,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 36777754624,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 3072,
+        "width": 3072,
+        "tile": 1024,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 14044626944,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 3072,
+        "width": 3072,
+        "tile": 1024,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 23840423936,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 3072,
+        "width": 3072,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 7979663360,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 9711910912,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 20199768064,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 1536,
+        "width": 1536,
+        "tile": null,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 11177820160,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 1024,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6784286720,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 512,
+        "width": 512,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 1260388352,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 768,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 3099590656,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 512,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 1461714944,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 768,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 3839885312,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "encode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 512,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 1782579200,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.encode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 2048,
+        "width": 2048,
+        "tile": 512,
+        "dtype": "fp32",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 6056574976,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, fp32."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1536,
+        "width": 1536,
+        "tile": 512,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 4555014144,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 3072,
+        "width": 3072,
+        "tile": 512,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 4563402752,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1120,
+        "width": 1120,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 15181283328,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1152,
+        "width": 1152,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 16611540992,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1216,
+        "width": 1216,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 17871929344,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    },
+    {
+      "estimator": "vae.qwen_image_2_1",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "operation": "decode",
+        "height": 1088,
+        "width": 1088,
+        "tile": null,
+        "dtype": "bf16",
+        "conv_backend": "miopen"
+      },
+      "measured_bytes": 14847836160,
+      "method": "reserved_peak",
+      "device": "AMD Radeon PRO W7900 (gfx1100, 48 GB)",
+      "provenance": "torch 2.13.0+rocm10.0.0, real released Qwen-Image-2.1 VAE weights, install_rocm_sdpa_guard() installed, one fresh process per point, vae.decode under patch_qwen_image_vae_tiling(vae, tile, 16) as the nodes run it; torch.cuda.max_memory_reserved() minus the baseline after the weights loaded, 2026-10-26, bf16."
+    }
+  ]
+}
