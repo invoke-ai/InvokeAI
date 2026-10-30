@@ -150,7 +150,7 @@ class TestGuard:
         assert F.scaled_dot_product_attention is original
         assert any("NOT installed" in r.message for r in caplog.records)
 
-    def test_apply_monkeypatches_installs_the_guard(self, monkeypatch):
+    def test_apply_monkeypatches_installs_the_guard(self, monkeypatch, preserve_sdpa_priority_order):
         from invokeai.app.util.startup_utils import apply_monkeypatches
 
         original = F.scaled_dot_product_attention
@@ -192,7 +192,7 @@ def _install_chunking(
     monkeypatch.setattr(attention, "_rocm_cuda", lambda device_type: True)
     monkeypatch.setattr(attention, "SDPA_MATH_CHUNK_BYTES", budget)
     if materializes is not None:
-        monkeypatch.setattr(attention, "_materializes", lambda *args: materializes)
+        monkeypatch.setattr(attention, "sdpa_runs_fused", lambda *args, **kwargs: not materializes)
     install_rocm_sdpa_guard()
     shapes.clear()  # the install probe's own math call
     return shapes
@@ -499,6 +499,8 @@ class TestClassicVaeEstimators:
         monkeypatch.setattr(attention, "_IS_ROCM", True)
         monkeypatch.setattr(torch.version, "hip", None)
         monkeypatch.setattr(vwm.TorchDevice, "choose_torch_device", classmethod(lambda cls: torch.device("cuda", 0)))
+        # The native allocator, whatever the machine running the suite configures.
+        monkeypatch.setattr("invokeai.backend.working_memory.platform._allocator_for", lambda device: "native")
 
     @staticmethod
     def _vae(spec):
@@ -514,13 +516,14 @@ class TestClassicVaeEstimators:
         return tokens * tokens * attention.SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
     @staticmethod
-    def _cudnn_decode_bytes(px: int) -> float:
-        """A bf16 decode's convolution term at the shipped cuDNN coefficient."""
+    def _cudnn_decode_bytes(px: int) -> int:
+        """An SD fp16 decode's convolution line at the shipped cuDNN coefficients: the GPU run casts the VAE to fp16."""
         from invokeai.backend.util.vae_working_memory import VAE_SD_SPEC
         from invokeai.backend.working_memory.coefficients import shipped_coefficients
         from invokeai.backend.working_memory.platform import Platform
 
-        return px * px * 2 * shipped_coefficients(VAE_SD_SPEC, Platform("cudnn")).values["k_decode"]
+        values = shipped_coefficients(VAE_SD_SPEC, Platform("cudnn", "native", "linux")).values
+        return int(values["k_decode_fp16"] * px * px + values["b_decode_fp16"])
 
     def test_sdxl_untiled_decode_reserves_the_score_matrix_when_it_dominates(self, monkeypatch):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
@@ -547,15 +550,24 @@ class TestClassicVaeEstimators:
             == linear
         )
 
-    @pytest.mark.parametrize("estimator", ["estimate_vae_working_memory_sd3", "estimate_vae_working_memory_cogview4"])
-    def test_the_other_autoencoder_kl_estimators_price_it_too(self, estimator):
+    def test_the_sd3_estimator_prices_it_too(self):
         from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-        import invokeai.backend.util.vae_working_memory as vwm
+        from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_sd3
 
         latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
-        estimate = getattr(vwm, estimator)("decode", latents, self._vae(AutoencoderKL))
+        estimate = estimate_vae_working_memory_sd3("decode", latents, self._vae(AutoencoderKL))
         assert estimate.reservation_bytes == self._score_bytes(2048)
+
+    def test_the_cogview4_vae_has_no_attention_to_price(self):
+        """Its config sets `mid_block_add_attention: false`: the guard never sees it."""
+        from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+
+        from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_cogview4
+
+        latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
+        estimate = estimate_vae_working_memory_cogview4("decode", latents, self._vae(AutoencoderKL))
+        assert all(term.coefficient is not None for term in estimate.terms)
 
     def test_a_tiny_autoencoder_has_no_attention_to_price(self):
         from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny

@@ -8,6 +8,12 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
 )
 
+TINY_AUTOENCODER_NOTE = (
+    "Tiny AutoEncoder by madebyollin (MIT). Used only for live denoise previews when "
+    "`tiny_autoencoder_previews: true` is set in invokeai.yaml."
+)
+"""Closes the description of every Tiny AutoEncoder starter, one per family module."""
+
 # This is CLIP-ViT-H-14-laion2B-s32B-b79K
 ip_adapter_sd_image_encoder = StarterModel(
     name="IP Adapter SD1.5 Image Encoder",

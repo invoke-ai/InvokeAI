@@ -75,6 +75,13 @@ const qwenImage21Model: MainModelConfig = {
   name: 'Qwen-Image-2.1',
   type: 'main',
 };
+const mossImageModel: MainModelConfig = {
+  base: 'moss-image',
+  format: 'diffusers',
+  key: 'moss-image-model',
+  name: 'MOSS-Image',
+  type: 'main',
+};
 const externalModel: GenerateModelConfig = {
   base: 'external',
   capabilities: { modes: ['txt2img'], supports_seed: true },
@@ -190,7 +197,7 @@ interface BaseCase {
   denoiseType: string;
   txt2imgMode: string;
   img2imgMode: string;
-  /** sd-3 / flux / flux2 rescale strength with an exponent of 0.2 (legacy parity). */
+  /** sd-3 / flux / flux2 / moss-image rescale strength with an exponent of 0.2 (legacy parity for the first three). */
   optimizedDenoising: boolean;
 }
 
@@ -306,6 +313,15 @@ const BASE_CASES: BaseCase[] = [
     txt2imgMode: 'qwen_image_2_1_txt2img',
     img2imgMode: 'qwen_image_2_1_img2img',
     optimizedDenoising: false,
+  },
+  {
+    model: mossImageModel,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'moss_image_denoise',
+    txt2imgMode: 'moss_image_txt2img',
+    img2imgMode: 'moss_image_img2img',
+    optimizedDenoising: true,
   },
 ];
 
@@ -731,6 +747,7 @@ describe('compileCanvasGraph', () => {
             {
               autoNegative: false,
               id: 'r1',
+              maskBounds: { height: 64, width: 64, x: 0, y: 0 },
               maskImageName: 'r1-mask.png',
               negativePrompt: null,
               positivePrompt: 'a cat',
@@ -1034,6 +1051,22 @@ describe('compileCanvasGraph — inpaint per base', () => {
     expect(metaEdge?.destination.node_id).toBe('canvas_output');
   });
 
+  // Qwen-Image-2.1's denoise adds its cache mode to the record, so the record still passes through it once the blend
+  // takes over the output.
+  it('routes Qwen-Image-2.1 inpaint metadata through the denoise onto the final blend output', () => {
+    const { backendGraph } = compile(qwenImage21Model, 'inpaint');
+    const metadata = getNodeByType(backendGraph, 'core_metadata');
+    const metadataEdges = backendGraph.edges.filter(
+      (edge) => edge.source.field === 'metadata' || edge.destination.field === 'metadata'
+    );
+
+    expect(backendGraph.nodes.canvas_output?.type).toBe('invokeai_img_blend');
+    expect(metadataEdges.map(({ destination, source }) => [source.node_id, destination.node_id])).toEqual([
+      [metadata?.id, 'denoise_latents'],
+      ['denoise_latents', 'canvas_output'],
+    ]);
+  });
+
   it('outputs only the generated mask region with transparency when requested', () => {
     const { backendGraph } = compile(sd1Model, 'inpaint', { outputOnlyMaskedRegions: true });
 
@@ -1277,6 +1310,16 @@ describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
     model: { base: 'qwen-image', key: 'qwen-union', name: 'Qwen Image ControlNet Union', type: 'controlnet' },
     weight: 0.85,
   };
+  const instantxLayer: ControlLayerGraphInput = {
+    ...layer,
+    model: {
+      base: 'qwen-image',
+      key: 'qwen-instantx',
+      name: 'Qwen Image InstantX ControlNet Union',
+      type: 'controlnet',
+    },
+    modelControlArchitecture: 'instantx_union',
+  };
   const CONTROL = 'qwen_image_control_q-control';
   const MASK = 'qwen_image_control_mask_q-control';
   const edgesInto = (graph: BackendGraphContract, nodeId: string) =>
@@ -1371,6 +1414,21 @@ describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
     expect(getEdge(scaled, CONTROL, 'inpaint_image')?.source.node_id).toBe('infill');
   });
 
+  it.each(['inpaint', 'outpaint'] as const)('%s: an InstantX union reads the control image alone', (mode) => {
+    const { backendGraph } = compile(qwenImageModel, mode, { controlLayers: [instantxLayer] });
+
+    expect(backendGraph.nodes[CONTROL]).toMatchObject({
+      control_model: instantxLayer.model,
+      image: { image_name: 'q-control.png' },
+    });
+    expect(backendGraph.nodes[CONTROL]).not.toHaveProperty('inpaint_image');
+    expect(edgesInto(backendGraph, CONTROL)).toEqual([]);
+    expect(backendGraph.nodes[MASK]).toBeUndefined();
+    // The region is still inpainted: the denoise keeps its mask.
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')?.source.node_id).toBe('create_gradient_mask');
+    expect(getEdge(backendGraph, 'denoise_latents', 'control')?.source).toEqual({ field: 'control', node_id: CONTROL });
+  });
+
   it('rejects the control on a Qwen Image Edit model, as the denoise does', () => {
     expect(() => compile({ ...qwenImageModel, variant: 'edit' }, 'inpaint', { controlLayers: [layer] })).toThrow(
       /qwen_image_edit_control/
@@ -1392,15 +1450,19 @@ describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
     const hashed = <T extends object>(config: T, hash: string): T => ({ ...config, hash });
     const model = hashed(qwenImageModel, 'blake3:qwen');
     const controlLayers = [{ ...layer, model: hashed(layer.model, 'blake3:union') }];
+    const instantxLayers = [{ ...instantxLayer, model: hashed(instantxLayer.model, 'blake3:instantx') }];
     let txt2img: BackendGraphContract;
     let inpaint: BackendGraphContract;
     let outpaint: BackendGraphContract;
+    let instantxInpaint: BackendGraphContract;
     try {
       txt2img = compile(model, 'txt2img', { controlLayers }).backendGraph;
       // Without Scale Before Processing the control reads the canvas uploads as fixed image fields.
       inpaint = compile(model, 'inpaint', { controlLayers }).backendGraph;
       // The infilled image and the combined mask reach the control through edges.
       outpaint = compile(model, 'outpaint', { controlLayers, maskImageName: 'canvas-mask.png' }).backendGraph;
+      // An InstantX union inpaints with the control image alone.
+      instantxInpaint = compile(model, 'inpaint', { controlLayers: instantxLayers }).backendGraph;
     } finally {
       clock.mockRestore();
       random.mockRestore();
@@ -1409,6 +1471,7 @@ describe('compileCanvasGraph — Qwen-Image ControlNet (integration)', () => {
       _comment:
         'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Consumed by tests/app/invocations/test_frontend_fun_control_graphs.py, which validates the graphs against the backend invocations.',
       inpaint_control_layer: { ...inpaint, id: 'qwen_image_control_canvas_inpaint' },
+      inpaint_instantx_control_layer: { ...instantxInpaint, id: 'qwen_image_control_canvas_inpaint_instantx' },
       outpaint_control_layer: { ...outpaint, id: 'qwen_image_control_canvas_outpaint' },
       txt2img_control_layer: { ...txt2img, id: 'qwen_image_control_canvas_txt2img' },
     };
@@ -1849,6 +1912,32 @@ describe('compileCanvasGraph — PiD decode', () => {
         .map((edge) => [edge.destination.field, [graph.nodes[edge.source.node_id]?.type, edge.source.field]])
     );
   const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, flux3Model, qwenImageModel, zImageModel];
+  const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
+
+  it('lays MOSS-Image regions out at the PiD generation size, which is smaller than the canvas', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        {
+          autoNegative: false,
+          id: 'r1',
+          maskBounds: { height: 256, width: 192, x: 64, y: 128 },
+          maskImageName: 'r1-mask.png',
+          negativePrompt: null,
+          positivePrompt: 'a cat',
+          referenceImages: [],
+        },
+      ],
+      settings: { ...pidSettings(mossImageModel, 'native'), positivePrompt: 'a market street' },
+    });
+
+    // Native PiD generates a quarter of the 768×1024 bbox and decodes it back up.
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 256, width: 192 });
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({
+      height: 256,
+      regions: [{ bbox: [16, 32, 64, 96], caption: 'a cat', kind: 'object' }],
+      width: 192,
+    });
+  });
 
   it('txt2img fit: the PiD chain replaces the VAE decode and a resize back to the bbox owns canvas_output', () => {
     const { backendGraph } = compile(sdxlModel, 'txt2img', { settings: pidSettings(sdxlModel, 'fit') });
@@ -1911,7 +2000,7 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(getNodeByType(backendGraph, 'core_metadata')?.width).toBe(bbox.width);
   });
 
-  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode reads', () => {
+  it('img2img fit: encodes the composite at the bbox with the VAE the PiD decode records', () => {
     const { backendGraph } = compile(sdxlModel, 'img2img', { settings: pidSettings(sdxlModel, 'fit'), strength: 0.5 });
 
     const encode = backendGraph.nodes.canvas_i2l;
@@ -1959,6 +2048,26 @@ describe('compileCanvasGraph — PiD decode', () => {
     expect(backendGraph.nodes.canvas_processing_output).toBeUndefined();
   });
 
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes and PiD decodes with the VAE override', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), vae: sdxlVae },
+    });
+
+    expect(backendGraph.nodes.vae_loader?.vae_model).toEqual(sdxlVae);
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'vae_loader' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('vae_loader');
+  });
+
+  it.each(['fit', 'native'] as const)('img2img %s (SDXL): encodes through the seamless VAE when tiling', (pidMode) => {
+    const { backendGraph } = compile(sdxlModel, 'img2img', {
+      settings: { ...pidSettings(sdxlModel, pidMode), seamlessXAxis: true, seamlessYAxis: true },
+    });
+
+    expect(backendGraph.nodes.seamless).toMatchObject({ seamless_x: true, seamless_y: true });
+    expect(getEdge(backendGraph, 'canvas_i2l', 'vae')?.source).toEqual({ field: 'vae', node_id: 'seamless' });
+    expect(getEdge(backendGraph, pidDecodeNode(backendGraph)!.id, 'vae')?.source.node_id).toBe('seamless');
+  });
+
   it.each(PID_BASES)('resolves the encode VAE for a $base native img2img', (model) => {
     const { backendGraph } = compile(model, 'img2img', {
       settings: { ...COMPONENT_OVERRIDES[model.base], ...pidSettings(model, 'native') },
@@ -2002,9 +2111,10 @@ describe('compileCanvasGraph — PiD decode', () => {
 });
 
 describe('compileCanvasGraph — regional guidance', () => {
-  const region = (id: string, overrides: Partial<RegionalGuidanceInput> = {}) => ({
+  const region = (id: string, overrides: Partial<RegionalGuidanceInput> = {}): RegionalGuidanceInput => ({
     autoNegative: false,
     id,
+    maskBounds: { height: 256, width: 192, x: 64, y: 128 },
     maskImageName: `${id}-mask.png`,
     negativePrompt: null,
     positivePrompt: 'a cat',
@@ -2118,6 +2228,167 @@ describe('compileCanvasGraph — regional guidance', () => {
       .map((edge) => edge.source.node_id);
     expect(collectedSources).toEqual(['krea2_seed_variance', 'rg_krea2_r1_seed_variance', 'rg_krea2_r2_seed_variance']);
   });
+
+  it('places MOSS-Image regions as layout boxes at the denoise size instead of masking conditioning', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', { layout: { kind: 'text', text: 'SALE' }, positivePrompt: 'a red banner' }),
+        region('r2', { layout: { kind: 'character' }, maskBounds: { height: 64, width: 32, x: 0, y: 0 } }),
+      ],
+      // The bbox is 768×1024, so x doubles and y stays.
+      scaling: { height: 1024, method: 'manual', width: 1536 },
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 1024, width: 1536 });
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({
+      height: 1024,
+      regions: [
+        { bbox: [128, 128, 512, 384], caption: 'a red banner', kind: 'text', text: 'SALE' },
+        { bbox: [0, 0, 64, 64], caption: 'a cat', kind: 'character' },
+      ],
+      type: 'moss_image_layout_prompt',
+      width: 1536,
+    });
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('clamps MOSS-Image boxes to the image, sends text only for text regions, and leaves out what it cannot place', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [
+        region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+        region('stale-text', { layout: { kind: 'character', text: 'kept for a switch back' } }),
+        // alphaBounds reports a mask that misses the bbox as an empty rect.
+        region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+        region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+        region('blank-text', { layout: { kind: 'text', text: ' ' } }),
+        region('no-caption', { positivePrompt: null }),
+      ],
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([
+      { bbox: [700, 0, 768, 80], caption: 'a cat', kind: 'object' },
+      { bbox: [64, 128, 256, 384], caption: 'a cat', kind: 'character' },
+    ]);
+  });
+
+  it('adds no layout node, even on a blank prompt, when no region can be placed', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } })],
+    });
+
+    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('blocks MOSS-Image regions on a blank prompt unless a prompt template supplies one', () => {
+    expect(() =>
+      compile(mossImageModel, 'txt2img', { regionalGuidance: [region('r1')], settings: { positivePrompt: ' ' } })
+    ).toThrow(
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      regionalGuidance: [region('r1')],
+      settings: {
+        positivePrompt: '',
+        promptTemplate: { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' },
+      },
+    });
+    expect(backendGraph.nodes.layout_prompt).toBeDefined();
+  });
+
+  it('keeps fractional MOSS-Image boxes when the processing grid rounds the bbox', () => {
+    // A 1000×1000 bbox denoises at 1008×1008 on the 16 px grid, so every edge scales by 1.008.
+    const { backendGraph } = compile(mossImageModel, 'txt2img', {
+      bbox: { height: 1000, width: 1000, x: 0, y: 0 },
+      regionalGuidance: [region('r1', { maskBounds: { height: 250, width: 500, x: 100, y: 250 } })],
+      settings: { positivePrompt: 'a market street' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1008, width: 1008 });
+    const [element] = backendGraph.nodes.layout_prompt!.regions as { bbox: number[] }[];
+    expect(element?.bbox).toEqual([
+      expect.closeTo(100.8, 9),
+      expect.closeTo(252, 9),
+      expect.closeTo(604.8, 9),
+      expect.closeTo(504, 9),
+    ]);
+  });
+
+  it('leaves a mask base unchanged by a layout role stored for MOSS-Image', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const plain = compile(zImageModel, 'txt2img', { regionalGuidance: [region('r1')] }).backendGraph;
+      const withRole = compile(zImageModel, 'txt2img', {
+        regionalGuidance: [region('r1', { layout: { kind: 'text' } })],
+      }).backendGraph;
+
+      expect(withRole.nodes.rg_pos_cond_r1).toMatchObject({ prompt: 'a cat', type: 'z_image_text_encoder' });
+      expect(withRole).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('writes the MOSS-Image layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...mossImageModel, hash: 'blake3:moss' };
+    // Every kind, a box that starts on the bbox edge and one that ends on it, and multi-line visible text.
+    const regions = [
+      region('sign', {
+        layout: { kind: 'text', text: '一杯温暖\n一刻从容' },
+        maskBounds: { height: 256, width: 512, x: 0, y: 0 },
+        positivePrompt: 'a hand-lettered cafe sign',
+      }),
+      region('barista', { layout: { kind: 'character' }, positivePrompt: 'a barista pouring latte art' }),
+      region('cup', {
+        layout: { kind: 'object', text: 'kept for a switch back' },
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a steaming ceramic cup',
+      }),
+    ];
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a cozy cafe interior, morning light' };
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the MOSS-Image layout graph tests.',
+      inpaint: { ...inpaint, id: 'moss_image_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'moss_image_layout_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/mossImageLayoutCanvasGraphs.json'
+    );
+  });
+
+  it('keeps a MOSS-Image canvas graph without regions on the plain prompt', () => {
+    const { backendGraph } = compile(mossImageModel, 'txt2img');
+
+    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+  });
 });
 
 describe('compileCanvasGraph — SDXL Refiner', () => {
@@ -2199,6 +2470,7 @@ describe('compileCanvasGraph — SDXL Refiner', () => {
         {
           autoNegative: false,
           id: 'r1',
+          maskBounds: { height: 64, width: 64, x: 0, y: 0 },
           maskImageName: 'r1-mask.png',
           negativePrompt: null,
           positivePrompt: 'a cat',
@@ -2348,5 +2620,67 @@ describe('compileCanvasGraph — Krea-2 style reference', () => {
     expect(backendGraph.edges.find((edge) => edge.destination.field === 'style_reference')?.source.node_id).toBe(
       styleReference?.id
     );
+  });
+});
+
+describe('compileCanvasGraph — Krea-2 edit references', () => {
+  const editReference = (imageName: string, isEnabled = true) => ({
+    config: {
+      image: { original: { image: { height: 768, image_name: imageName, width: 512 } } },
+      type: 'krea2_edit_reference_image' as const,
+    },
+    id: imageName,
+    isEnabled,
+  });
+  const region: RegionalGuidanceInput = {
+    autoNegative: false,
+    id: 'r1',
+    maskBounds: { height: 256, width: 192, x: 64, y: 128 },
+    maskImageName: 'r1-mask.png',
+    negativePrompt: null,
+    positivePrompt: 'a cat',
+    referenceImages: [],
+  };
+
+  it('inpaints with the edit references alongside the encoded canvas image', () => {
+    const { backendGraph } = compile(krea2Model, 'inpaint', {
+      settings: { referenceImages: [editReference('pose.png'), editReference('depth.png')] },
+    });
+    const referenceEncoders = Object.values(backendGraph.nodes).filter(
+      (node) => node.type === 'qwen_image_i2l' && node.reference === true
+    );
+
+    // The canvas image is still what gets denoised under the mask; the references only join as clean tokens.
+    expect(getEdge(backendGraph, 'denoise_latents', 'latents')?.source.node_id).toBe('canvas_i2l');
+    expect(backendGraph.nodes.canvas_i2l).not.toHaveProperty('reference');
+    expect(getEdge(backendGraph, 'denoise_latents', 'denoise_mask')).toBeDefined();
+    expect(referenceEncoders.map((node) => node.image)).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    expect(backendGraph.nodes.pos_cond?.reference_images).toEqual([
+      { image_name: 'pose.png' },
+      { image_name: 'depth.png' },
+    ]);
+  });
+
+  it('refuses edit references together with regional guidance, which the denoise cannot place them in', () => {
+    expect(() =>
+      compile(krea2Model, 'txt2img', {
+        regionalGuidance: [region],
+        settings: { referenceImages: [editReference('pose.png')] },
+      })
+    ).toThrow(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
+
+    const { backendGraph } = compile(krea2Model, 'txt2img', {
+      regionalGuidance: [region],
+      settings: { referenceImages: [editReference('pose.png', false)] },
+    });
+
+    expect(backendGraph.nodes.rg_pos_cond_r1).toBeDefined();
+    expect(getEdge(backendGraph, 'denoise_latents', 'reference_latents')).toBeUndefined();
   });
 });

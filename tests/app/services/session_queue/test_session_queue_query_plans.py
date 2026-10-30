@@ -129,6 +129,28 @@ def test_queue_listing_and_counts_read_only_the_listing_index(session_queue: Ses
     assert counts[0].count("SEARCH session_queue") == 1, counts[0]
 
 
+def test_the_lineage_read_tests_the_origin_on_the_listing_index(
+    session_queue: SessionQueue, database: Database
+) -> None:
+    """The calibration status reads the retry source of its own items: the origin is tested on the listing index,
+    and no sort follows."""
+    _enqueue(session_queue)
+    [lineage] = _statements(database, lambda: session_queue.get_queue_item_lineage("default", ORIGIN_PREFIX))
+    assert f"USING INDEX {LISTING_INDEX} (queue_id=?)" in lineage.plan
+    assert "TEMP B-TREE" not in lineage.plan
+
+
+def test_the_unfinished_origins_read_finds_its_rows_by_their_status(
+    session_queue: SessionQueue, database: Database
+) -> None:
+    """The working-memory fits ask before every queue item which calibration items are still to run: it costs the live
+    rows, not the queue's history."""
+    _enqueue(session_queue)
+    [unfinished] = _statements(database, lambda: session_queue.get_unfinished_origins("default", ORIGIN_PREFIX))
+    assert ANY_STATUS_SEEK.search(unfinished.plan), unfinished
+    assert LISTING_INDEX not in unfinished.plan, unfinished
+
+
 def test_a_non_admins_project_reads_keep_their_plans(session_queue: SessionQueue, database: Database) -> None:
     """Limited to the caller's items, a project's listing and counts still read the listing index alone, and its
     current and next items are still found by their status: the account's own index would read its whole history."""

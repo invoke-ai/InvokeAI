@@ -3,6 +3,10 @@
 Replaces the regular FLUX VAE decode with the PiD pixel-diffusion super-res
 decoder (``PiD_res2k_sr4x_official_flux_distill_4step``). Produces a 4x
 super-resolved image from a FLUX latent in a single 4-step distill pass.
+
+The stored latent goes to PiD unchanged: PiD was trained on the FLUX-normalized latent
+(``scale * (raw - shift)``, what the upstream tokenizer encodes to), not the raw latent the
+AutoEncoder's conv decoder consumes.
 """
 
 from contextlib import ExitStack
@@ -25,7 +29,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.util import get_flux_ae_params
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
@@ -43,15 +46,14 @@ from invokeai.backend.util.devices import TorchDevice
     title="Latents to Image - FLUX + PiD (4x SR)",
     tags=["latents", "image", "pid", "flux", "upscale"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class FluxPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Decode a FLUX latent with the PiD pixel-diffusion decoder.
 
-    The FLUX AutoEncoder usually denormalises the stored latent internally
-    before its conv decoder runs (`z / scale + shift`); we apply the same
-    transform manually here so PiD sees the raw latent it was trained on.
+    Produces a 4x super-resolved image in a single pass. PiD takes the stored,
+    FLUX-normalized latent as is.
     """
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
@@ -144,17 +146,13 @@ class FluxPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            # FLUX latent is stored in normalised form (matching FluxAutoEncoder
-            # state); denormalise so PiD sees the same representation it
-            # consumed during training.
-            ae = get_flux_ae_params()
-            denorm_latent = latents.to(device=device, dtype=dtype) / ae.scale_factor + ae.shift_factor
+            latent = latents.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")
             decoder = PiDDecoder(pid_net, backbone=BaseModelType.Flux)
             x0 = decoder.decode(
-                latent=denorm_latent,
+                latent=latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(

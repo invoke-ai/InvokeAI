@@ -12,8 +12,10 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
+  getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getGenerationValidationReasons,
   isExternalTextOnlyCanvasModel,
@@ -353,9 +355,9 @@ export const resolveInvocationRouteInput = (
           );
         }
       }
-    } else if (models) {
+    } else if (values && isSupportedGenerateModel(values.model)) {
       // Wait for models before validating local adapters to avoid false missing-model errors.
-      if (values && isSupportedGenerateModel(values.model)) {
+      if (models) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({
             context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
@@ -364,6 +366,15 @@ export const resolveInvocationRouteInput = (
             models,
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
+      }
+      // Before anything uploads; a region whose mask misses the frame still counts here.
+      const layoutPromptReason = getLayoutPromptRejectionReason({
+        base: values.model.base,
+        prompt: getEffectivePrompts(values).positivePrompt,
+        regions: input.canvasLayers.filter(isCompositableRegionalGuidanceLayer),
+      });
+      if (layoutPromptReason) {
+        validationReasons.push(layoutPromptReason);
       }
     }
   }

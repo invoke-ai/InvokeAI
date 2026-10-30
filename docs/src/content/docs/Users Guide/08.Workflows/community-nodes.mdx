@@ -16,14 +16,6 @@ To use a community workflow, download the `.json` node graph file and load it in
 
 ---
 
-### Anamorphic Tools
-
-**Description:** A set of nodes to perform anamorphic modifications to images, like lens blur, streaks, spherical distortion, and vignetting.
-
-**Node Link:** https://github.com/JPPhoto/anamorphic-tools
-
----
-
 ### Adapters Linked Nodes
 
 **Description:** A set of nodes for linked adapters (ControlNet, IP-Adaptor & T2I-Adapter). This allows multiple adapters to be chained together without using a `collect` node which means it can be used inside an `iterate` node without any collecting on every iteration issues.
@@ -35,6 +27,14 @@ To use a community workflow, download the `.json` node graph file and load it in
 Note: These are inherited from the core nodes so any update to the core nodes should be reflected in these.
 
 **Node Link:** https://github.com/skunkworxdark/adapters-linked-nodes
+
+---
+
+### AutoExpress
+
+**Description:** Builds one prompt per facial expression (up to 28, such as joy, anger and surprise) for a character, in the prompt style of the model family (Danbooru, e621, Pony, Illustrious, SDXL or natural language), plus the matching negative prompt. Iterate over the prompts to inpaint the face once per expression and get a full expression set from one image.
+
+**Node Link:** https://github.com/deepratna-awale/AutoExpress
 
 ---
 
@@ -70,6 +70,16 @@ Note: These are inherited from the core nodes so any update to the core nodes sh
   <img src="https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_before_removal.png" width="49%" alt="Before background removal" />
   <img src="https://raw.githubusercontent.com/veeliks/invoke_birefnet/main/.readme/example_after_removal.png" width="49%" alt="After background removal" />
 </section>
+
+---
+
+### Cinematic Effects Pack
+
+**Description:** A set of nodes for anamorphic lens effects, depth-based bokeh, tone curves, color cast correction, and film grain.
+
+**Node Link:** https://github.com/JPPhoto/cinematic-effects-pack
+
+**Installation note:** This pack replaces [Anamorphic Tools](https://github.com/JPPhoto/anamorphic-tools), [Curves](https://github.com/JPPhoto/curves-node), [Film Grain](https://github.com/JPPhoto/film-grain-node), and [Color Correction Nodes](https://github.com/JPPhoto/color-correction-nodes). Remove the old packs from your `nodes` folder before installing this pack; loading them together may register duplicate invocation IDs.
 
 ---
 
@@ -121,14 +131,6 @@ View:
 
 ---
 
-### Curves
-
-**Description:** Adjust an image's curve based on a user-defined string.
-
-**Node Link:** https://github.com/JPPhoto/curves-node
-
----
-
 ### Depth Map from Wavefront OBJ
 
 **Description:** Render depth maps from Wavefront .obj files (triangulated) using this simple 3D renderer utilizing numpy and matplotlib to compute and color the scene. There are simple parameters to change the FOV, camera position, and model orientation.
@@ -152,14 +154,6 @@ To be imported, an .obj must use triangulated meshes, so make sure to enable tha
 **Example Usage:**
 
 <img src="https://raw.githubusercontent.com/skunkworxdark/enhance-detail-node/refs/heads/main/images/Comparison.png" />
-
----
-
-### Film Grain
-
-**Description:** This node adds a film grain effect to the input image based on the weights, seeds, and blur radii parameters. It works with RGB input images only.
-
-**Node Link:** https://github.com/JPPhoto/film-grain-node
 
 ---
 

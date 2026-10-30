@@ -18,15 +18,15 @@ export const NULL_BASE_ALLOWANCES: Readonly<Partial<Record<ModelTaxonomyType, Re
   /** IP-adapter image encoders (ip_adapter accepts sd-1/sdxl only; flux_ip_adapter). */
   clip_vision: new Set(['flux', 'sd-1', 'sdxl']),
   /** PiD decode (flux/flux2/qwen_image/z_image_pid_decode; sd-3/sdxl pid_decoder configs; prototype). */
-  gemma2_encoder: new Set(['flux', 'flux2', 'flux3', 'qwen-image', 'sd-3', 'sdxl', 'z-image']),
+  gemma2_encoder: new Set(['flux', 'flux2', 'flux3', 'moss-image', 'qwen-image', 'sd-3', 'sdxl', 'z-image']),
   /** FLUX.2 dev text encoder (flux2_dev_model_loader). */
   mistral_encoder: new Set(['flux2']),
   /** anima_model_loader, flux2_klein_model_loader, z_image_model_loader. */
   qwen3_encoder: new Set(['anima', 'flux2', 'z-image']),
   /** krea2_model_loader, qwen_image_2_1_model_loader, flux3_model_loader. */
   qwen3_vl_encoder: new Set(['flux3', 'krea-2', 'qwen-image-2-1']),
-  /** anima_model_loader (Anima-3.8B's semantic connector). */
-  qwen3_5_encoder: new Set(['anima']),
+  /** anima_model_loader (Anima-3.8B's semantic connector), moss_image_model_loader. */
+  qwen3_5_encoder: new Set(['anima', 'moss-image']),
   /** qwen_image_model_loader. */
   qwen_vl_encoder: new Set(['qwen-image']),
   /** FLUX Redux image encoder (flux_redux). */
@@ -47,18 +47,17 @@ export const CROSS_BASE_ALLOWANCES: Readonly<
     anima: new Set(['krea-2']),
     /** z_image_model_loader; flux2_klein_model_loader; anima_model_loader ("A FLUX VAE can also be used"). */
     flux: new Set(['anima', 'flux2', 'z-image']),
-    /** flux3_model_loader (FLUX.3 ships the FLUX.2 VAE). */
-    flux2: new Set(['flux3']),
+    /** flux3_model_loader, moss_image_model_loader: both take the FLUX.2 VAE. */
+    flux2: new Set(['flux3', 'moss-image']),
     /** krea2_model_loader; anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
     'qwen-image': new Set(['anima', 'krea-2']),
     /** anima_model_loader ("Wan 2.1 / QwenImage VAE"). */
     wan: new Set(['anima']),
   },
-  /** z_image_pid_decode reuses the FLUX decoder (assert_pid_decoder_matches_base). */
+  /** Z-Image reuses the FLUX decoder, FLUX.3 and MOSS-Image the FLUX.2 one (assert_pid_decoder_matches_base). */
   pid_decoder: {
     flux: new Set(['z-image']),
-    /** flux2_pid_decode decodes FLUX.3 latents, which are FLUX.2 latents. */
-    flux2: new Set(['flux3']),
+    flux2: new Set(['flux3', 'moss-image']),
   },
 };
 

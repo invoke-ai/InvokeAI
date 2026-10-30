@@ -19,8 +19,8 @@ from invokeai.app.invocations.model import TransformerField, VAEField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
-from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
-from invokeai.backend.flux2.sampling_utils import pack_flux2, unpack_flux2
+from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize
+from invokeai.backend.flux2.sampling_utils import get_flux2_bn_stats, pack_flux2, unpack_flux2
 from invokeai.backend.flux3.denoise import denoise
 from invokeai.backend.flux3.ref_images import FLUX3_MAX_REFERENCE_IMAGES, encode_flux3_references
 from invokeai.backend.flux3.sampling import (
@@ -137,7 +137,7 @@ class Flux3DenoiseInvocation(BaseInvocation):
 
         vae_info = context.models.load(self.vae.vae)
         with vae_info.model_on_device() as (_, vae):
-            bn_stats = read_vae_bn_stats(vae)
+            bn_stats = get_flux2_bn_stats(vae)
         if bn_stats is None:
             raise ValueError("FLUX.3 needs the FLUX.2 VAE, whose latent statistics this VAE does not carry.")
         bn_mean, bn_std = bn_stats

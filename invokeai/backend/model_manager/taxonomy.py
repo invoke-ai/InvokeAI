@@ -78,6 +78,9 @@ class BaseModelType(str, Enum):
     LTX2 = "ltx-2"
     """Indicates the model is associated with the Lightricks LTX-2 family (LTX-2.5 in this version), a
     dual-stream video+audio DiT conditioned by a Gemma text encoder through learned connectors."""
+    MossImage = "moss-image"
+    """Indicates the model is associated with the OpenMOSS MOSS-Image architecture: a single-stream DiT on the
+    FLUX.2 VAE latent, conditioned by Qwen3.5-9B."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -114,6 +117,7 @@ class ModelType(str, Enum):
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
     LTX2DurationHead = "ltx2_duration_head"
+    TinyAutoencoder = "tiny_autoencoder"
     Unknown = "unknown"
 
 
@@ -130,6 +134,8 @@ class SubModelType(str, Enum):
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
     Processor = "processor"
+    # A vision-language encoder's vision tower alone, which the text encoder is loaded without; edits attach it
+    # while they encode, so the language model is cached once. Krea-2 and Qwen-Image-2.1.
     VisionEncoder = "vision_encoder"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
@@ -325,6 +331,9 @@ class Qwen35VariantType(str, Enum):
 
     Qwen35_4B = "qwen3_5_4b"
     """Qwen3.5 4B (hidden_size=2560, 32 layers). Anima-3.8B's semantic encoder, read at layers 7/15/23/31."""
+
+    Qwen35_9B = "qwen3_5_9b"
+    """Qwen3.5 9B (hidden_size=4096, 32 layers). MOSS-Image's text encoder, read after its final norm."""
 
 
 class AnimaVariantType(str, Enum):
