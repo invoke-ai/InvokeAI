@@ -171,6 +171,50 @@ it('animates the conflict dialog out instead of unmounting it on cancel', async 
   }
 });
 
+describe('wildcard list size', () => {
+  const viewportHeight = () => host!.querySelector('[data-list-viewport]')!.getBoundingClientRect().height;
+
+  it('fits a short list to its rows instead of leaving an empty box', async () => {
+    await renderPanel();
+
+    const row = host!.querySelector<HTMLElement>('[data-list-row="w1"]')!;
+    const slot = row.parentElement!.getBoundingClientRect().height;
+
+    const description = [...row.querySelectorAll('span')].find((span) => span.textContent === 'red, green')!;
+
+    expect(viewportHeight()).toBe(slot);
+    // The value line sits inside the row's fixed slot, which would otherwise clip it.
+    expect(description.getBoundingClientRect().bottom).toBeLessThanOrEqual(row.getBoundingClientRect().bottom);
+  });
+
+  it('caps a long list and scrolls it', async () => {
+    await renderPanel(true, {
+      ...catalog,
+      wildcards: Array.from({ length: 20 }, (_, index) => ({ id: `w${index}`, name: `set${index}`, values: ['a'] })),
+    });
+
+    expect(viewportHeight()).toBe(14 * 16);
+  });
+
+  it('keeps its height while a search narrows the matches', async () => {
+    await renderPanel(true, {
+      ...catalog,
+      wildcards: [
+        { id: 'w1', name: 'colors', values: ['red'] },
+        { id: 'w2', name: 'moods', values: ['serene'] },
+      ],
+    });
+    const before = viewportHeight();
+    const search = host!.querySelector<HTMLInputElement>('input[aria-label$="searchWildcards"]')!;
+
+    await act(async () => {
+      await userEvent.fill(search, 'colors');
+    });
+
+    expect(viewportHeight()).toBe(before);
+  });
+});
+
 describe('a failed wildcard read', () => {
   it('says the read failed and why, with a retry, instead of offering to create the first wildcard', async () => {
     const failed = { ...emptyCatalog, errorDetail: 'Database is locked', isError: true, retry: vi.fn() };

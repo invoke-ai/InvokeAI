@@ -16,6 +16,18 @@ import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionH
 import { extractRangeKeepingPinned, getPinnedHeaderShift, lastHeaderAtOrBefore } from './virtualSections';
 
 const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40, snug: 48 };
+const getItemPitch = (density: ListDensity, estimatedRowHeight?: number) =>
+  (estimatedRowHeight ?? ITEM_HEIGHT_PX[density]) + ROW_GAP_PX;
+
+/**
+ * Total height of a fixed-height list's rows, for callers that size the list to its content up to a cap instead
+ * of giving it a fixed box.
+ */
+export const getListContentHeight = (rows: readonly Pick<ListRow<unknown>, 'kind'>[], density: ListDensity): number =>
+  rows.reduce(
+    (total, row) => total + (row.kind === 'header' ? LIST_SECTION_HEADER_HEIGHT_PX : getItemPitch(density)),
+    0
+  );
 const OVERSCAN_ROWS = 8;
 const PRIMARY_SELECTOR = '[data-list-primary]';
 
@@ -151,9 +163,7 @@ export const List = <T,>({
   const listOwnsFocus = useRef(false);
   const lastScrollOffset = useRef(initialScrollOffset ?? 0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
-  const itemPitch =
-    (rowHeight === 'measured' && estimatedRowHeight !== undefined ? estimatedRowHeight : ITEM_HEIGHT_PX[density]) +
-    ROW_GAP_PX;
+  const itemPitch = getItemPitch(density, rowHeight === 'measured' ? estimatedRowHeight : undefined);
 
   const layout = useMemo(() => {
     const headerIndexes: number[] = [];

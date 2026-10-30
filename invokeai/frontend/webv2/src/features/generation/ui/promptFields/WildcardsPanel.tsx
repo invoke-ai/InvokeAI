@@ -5,7 +5,7 @@ import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListRow } from '@platform/ui/list/listRows';
 import type { ChangeEvent } from 'react';
 
-import { Box, Field as ChakraField, HStack, Input, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, Field as ChakraField, HStack, Input, Stack, Text } from '@chakra-ui/react';
 import {
   getWildcardNameError,
   getWildcardValuesError,
@@ -21,7 +21,7 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
-import { List } from '@platform/ui/list/List';
+import { getListContentHeight, List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
 import { LoadError } from '@platform/ui/LoadError';
@@ -47,6 +47,11 @@ const NAME_ERROR_KEY = {
 } as const;
 
 const NO_SELECTION: ReadonlySet<string> = new Set();
+
+/** A title over one description line, no media: the list's regular pitch. */
+const LIST_DENSITY = 'regular';
+/** Past this the list scrolls. */
+const LIST_MAX_HEIGHT = '14rem';
 
 /** Ungrouped names first and unheaded, then each prefix under its header, as one row sequence for the List. */
 const toRows = (groups: ReturnType<typeof groupWildcardsByPrefix<WildcardRecord>>): ListRow<WildcardRecord>[] =>
@@ -87,6 +92,11 @@ export const WildcardsPanel = ({
   const newWildcardRef = useRef<HTMLButtonElement>(null);
   const filtered = useMemo(() => filterWildcards(catalog.wildcards, searchTerm), [catalog.wildcards, searchTerm]);
   const rows = useMemo(() => toRows(groupWildcardsByPrefix(filtered)), [filtered]);
+  // Sized to the whole catalog, not the matches, so typing a search never resizes the popover under the caret.
+  const listHeightPx = useMemo(
+    () => getListContentHeight(toRows(groupWildcardsByPrefix(catalog.wildcards)), LIST_DENSITY),
+    [catalog.wildcards]
+  );
   // Ids the catalog no longer returns (deleted here, elsewhere, or by another tab) drop out of the selection.
   const selection = useMemo(() => {
     const liveIds = new Set(catalog.wildcards.map((wildcard) => wildcard.id));
@@ -241,7 +251,7 @@ export const WildcardsPanel = ({
 
   if (draft) {
     return (
-      <Stack gap="2">
+      <Stack gap="2.5">
         <PromptPanelHeader
           label={
             draft.id === null
@@ -300,7 +310,7 @@ export const WildcardsPanel = ({
   }
 
   return (
-    <Stack gap="2">
+    <Stack gap="2.5">
       <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.wildcards')}>
         <Button ref={newWildcardRef} h={PANEL_HEADER_CONTROL_HEIGHT} size="sm" variant="ghost" onClick={startCreate}>
           <PlusIcon />
@@ -332,92 +342,90 @@ export const WildcardsPanel = ({
               onChange={handleSearchChange}
             />
           </ChakraField.Root>
-          <Separator />
         </>
       ) : null}
 
-      {/* Nothing to select while the list could not be read. */}
-      {isUnreadable ? null : (
-        <Box ref={selectionBarRef}>
-          <ListSelectionBar
-            // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
-            checked={hasSelection ? (hasUnselectedFiltered || filtered.length === 0 ? 'indeterminate' : true) : false}
-            isDisabled={filtered.length === 0 && !hasSelection}
-            label={t('widgets.generate.dynamicPrompts.selectAllWildcards')}
-            summary={
-              hasSelection
-                ? t('widgets.generate.dynamicPrompts.selectedWildcardCount', { count: selection.size })
-                : undefined
+      {/* The bar heads the list it selects in: it sits off the first row by the rows' own gap. */}
+      <Stack gap="0.5">
+        {/* Nothing to select while the list could not be read. */}
+        {isUnreadable ? null : (
+          <Box ref={selectionBarRef}>
+            <ListSelectionBar
+              // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
+              checked={hasSelection ? (hasUnselectedFiltered || filtered.length === 0 ? 'indeterminate' : true) : false}
+              isDisabled={filtered.length === 0 && !hasSelection}
+              label={t('widgets.generate.dynamicPrompts.selectAllWildcards')}
+              summary={
+                hasSelection
+                  ? t('widgets.generate.dynamicPrompts.selectedWildcardCount', { count: selection.size })
+                  : undefined
+              }
+              onCheckedChange={handleToggleSelectAll}
+            >
+              {hasSelection ? (
+                <>
+                  <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
+                    <TrashIcon />
+                    {t('common.delete')}
+                  </Button>
+                  <Tooltip content={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}>
+                    <IconButton
+                      aria-label={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}
+                      size="sm"
+                      variant="ghost"
+                      onClick={clearSelection}
+                    >
+                      <XIcon />
+                    </IconButton>
+                  </Tooltip>
+                </>
+              ) : null}
+            </ListSelectionBar>
+          </Box>
+        )}
+
+        {/* Fits its rows up to the cap; empty, loading and error states take their own height. */}
+        <Box h={listHeightPx > 0 ? `min(${LIST_MAX_HEIGHT}, ${listHeightPx}px)` : undefined}>
+          <List
+            density={LIST_DENSITY}
+            emptyState={
+              catalog.isError && catalog.wildcards.length === 0 ? (
+                <LoadError
+                  detail={catalog.errorDetail}
+                  isRetrying={catalog.isRetrying}
+                  layout="state"
+                  message={t('widgets.generate.dynamicPrompts.couldNotLoadWildcards')}
+                  onRetry={catalog.retry}
+                />
+              ) : (
+                <Text color="fg.subtle" fontSize="xs">
+                  {catalog.isLoading
+                    ? t('widgets.generate.dynamicPrompts.loadingWildcards')
+                    : catalog.wildcards.length === 0
+                      ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
+                      : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
+                </Text>
+              )
             }
-            onCheckedChange={handleToggleSelectAll}
-          >
-            {hasSelection ? (
-              <>
-                <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
-                  <TrashIcon />
-                  {t('common.delete')}
-                </Button>
-                <Tooltip content={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}>
-                  <IconButton
-                    aria-label={t('widgets.generate.dynamicPrompts.clearWildcardSelection')}
-                    size="sm"
-                    variant="ghost"
-                    onClick={clearSelection}
-                  >
-                    <XIcon />
-                  </IconButton>
-                </Tooltip>
-              </>
-            ) : null}
-          </ListSelectionBar>
-        </Box>
-      )}
-
-      <Box h="14rem">
-        <List
-          density="snug"
-          emptyState={
-            catalog.isError && catalog.wildcards.length === 0 ? (
-              <LoadError
-                detail={catalog.errorDetail}
-                isRetrying={catalog.isRetrying}
-                layout="state"
-                message={t('widgets.generate.dynamicPrompts.couldNotLoadWildcards')}
-                onRetry={catalog.retry}
+            label={t('widgets.generate.dynamicPrompts.wildcards')}
+            renderItem={(wildcard: WildcardRecord, rowProps: ListRowProps) => (
+              // Show full wildcard paths because rows display exact insertion syntax.
+              <WildcardRow
+                {...rowProps}
+                isSelected={selection.has(wildcard.id)}
+                wildcard={wildcard}
+                onDelete={setPendingDelete}
+                onEdit={startEdit}
+                onInsert={onInsert}
+                onToggleSelected={toggleSelected}
               />
-            ) : (
-              <Text color="fg.subtle" fontSize="xs">
-                {catalog.isLoading
-                  ? t('widgets.generate.dynamicPrompts.loadingWildcards')
-                  : catalog.wildcards.length === 0
-                    ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
-                    : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
-              </Text>
-            )
-          }
-          label={t('widgets.generate.dynamicPrompts.wildcards')}
-          renderItem={(wildcard: WildcardRecord, rowProps: ListRowProps) => (
-            // Show full wildcard paths because rows display exact insertion syntax.
-            <WildcardRow
-              {...rowProps}
-              isSelected={selection.has(wildcard.id)}
-              wildcard={wildcard}
-              onDelete={setPendingDelete}
-              onEdit={startEdit}
-              onInsert={onInsert}
-              onToggleSelected={toggleSelected}
-            />
-          )}
-          rows={rows}
-        />
-      </Box>
+            )}
+            rows={rows}
+          />
+        </Box>
+      </Stack>
 
-      {isUnreadable ? null : (
-        <>
-          <Separator />
-          <WildcardTransferActions catalog={catalog} />
-        </>
-      )}
+      {isUnreadable ? null : <WildcardTransferActions catalog={catalog} />}
 
       {/* Confirm irreversible deletion of handwritten values. */}
       <ConfirmDialog
