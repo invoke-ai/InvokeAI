@@ -214,11 +214,11 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
         if _is_qwen_image_vae(state_dict) or _wan_vae_z_dim(state_dict) is not None:
             raise NotAMatchError("model is a Wan-family VAE, not a standard VAE")
 
-        # A latent width no AutoencoderKL family has is not one of these VAEs, whatever its name says.
-        # Without this, `_get_base_or_raise` falls through to the name and files a 64-channel
-        # `qwen_image_2.1_vae.safetensors` as SD1 because the name contains "vae".
+        # The file name only separates SD1/SD2/SDXL; it cannot stand in for a latent width the weights do not give.
         latent_channels = _latent_channels(state_dict)
-        if latent_channels is not None and latent_channels not in _VAE_FAMILIES:
+        if latent_channels is None:
+            raise NotAMatchError("no decoder.conv_in.weight, so not a standard VAE")
+        if latent_channels not in _VAE_FAMILIES:
             raise NotAMatchError(f"{latent_channels} latent channels is not a standard VAE")
 
     @classmethod
@@ -232,21 +232,13 @@ class VAE_Checkpoint_Config_Base(Checkpoint_Config_Base):
             # the weights and is ignored rather than obeyed.
             named = backbone_from_components(name_components(mod, override_fields))
             return named if named in _VAE_FAMILIES[16] else BaseModelType.Flux
-        elif latent_channels == 4:
-            # SD/SDXL VAE has 4-dimensional latent space
-            # Try to distinguish SD1/SD2/SDXL by name, fallback to SD1
-            for regexp, base in REGEX_TO_BASE.items():
-                if re.search(regexp, mod.path.name, re.IGNORECASE):
-                    return base
-            # Default to SD1 if we can't determine from name
-            return BaseModelType.StableDiffusion1
-
-        # Fallback: guess based on name
+        # SD/SDXL VAE has 4-dimensional latent space
+        # Try to distinguish SD1/SD2/SDXL by name, fallback to SD1
         for regexp, base in REGEX_TO_BASE.items():
             if re.search(regexp, mod.path.name, re.IGNORECASE):
                 return base
-
-        raise NotAMatchError("cannot determine base type")
+        # Default to SD1 if we can't determine from name
+        return BaseModelType.StableDiffusion1
 
 
 class VAE_Checkpoint_SD1_Config(VAE_Checkpoint_Config_Base, Config_Base):

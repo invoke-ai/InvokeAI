@@ -101,6 +101,8 @@ models. Install the whole MOSS-Image Diffusers folder or a merged single file in
 | Qwen-Image-2.1 | ✓ | ✓ | Qwen-Image-2.1 |
 | CogView4, LTX-2, MiniMax H3 | – | bundled | taken from the model's own folder |
 
+A standalone single-file LTX-2 or MiniMax H3 VAE, video or audio, is not identified and stays Unknown.
+
 Quantized VAE files (fp8, int8, nvfp4) are not supported; use the unquantized VAE. The SD 3, FLUX.2, Qwen-Image,
 Qwen-Image-2.1, Wan, Anima and Ideogram 4 VAEs fail with a message when they load. The FLUX.1 and SD 1.x / SDXL single-file VAEs do
 not check, so a quantized file there fails with an unclear error or decodes incorrectly.
