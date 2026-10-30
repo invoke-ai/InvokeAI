@@ -1740,12 +1740,7 @@ const LEGACY_DEFAULT_LEFT_REGION_WIDGET_IDS: readonly WidgetInstanceId[][] = [
   ['generate', 'workflow', 'gallery'],
 ];
 
-const ensureLeftRegion = (leftRegion: WidgetRegionState | undefined): WidgetRegionState => {
-  const fallback = createWidgetRegions().left;
-
-  if (!leftRegion) {
-    return fallback;
-  }
+const ensureLeftRegion = (leftRegion: WidgetRegionState): WidgetRegionState => {
   let region = leftRegion;
 
   if (!region.instanceIds.includes('upscale')) {
@@ -1766,11 +1761,11 @@ const ensureLeftRegion = (leftRegion: WidgetRegionState | undefined): WidgetRegi
 };
 
 // Exact historical defaults adopt the current rail wholesale; splicing would incorrectly mark untouched layouts as
-// customized.
+// customized. Like every legacy list here, entries are compared after retired widgets are stripped.
 const LEGACY_RIGHT_REGION_WIDGET_IDS: WidgetId[][] = [
   ['queue', 'gallery', 'layers'],
-  // The rail as it shipped before the image map existed.
-  ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'],
+  // The rail as it shipped before the image map existed, less the retired Project panel.
+  ['gallery', 'preview', 'queue', 'layers', 'diagnostics'],
 ];
 
 const isLegacyDefaultRightRegion = (region: WidgetRegionState): boolean =>
@@ -1779,21 +1774,15 @@ const isLegacyDefaultRightRegion = (region: WidgetRegionState): boolean =>
       ids.length === region.instanceIds.length && ids.every((widgetId, index) => region.instanceIds[index] === widgetId)
   );
 
-const ensureRightRegion = (rightRegion: WidgetRegionState | undefined): WidgetRegionState => {
-  const defaultRightRegion = createWidgetRegions().right;
+const ensureRightRegion = (rightRegion: WidgetRegionState): WidgetRegionState =>
+  isLegacyDefaultRightRegion(rightRegion)
+    ? { ...rightRegion, instanceIds: createWidgetRegions().right.instanceIds }
+    : rightRegion;
 
-  if (!rightRegion) {
-    return defaultRightRegion;
-  }
-
-  if (isLegacyDefaultRightRegion(rightRegion)) {
-    return { ...rightRegion, instanceIds: defaultRightRegion.instanceIds };
-  }
-
-  return rightRegion;
-};
-
-/** Exact historical Edit defaults adopt the current rail; customized rails remain unchanged. */
+/**
+ * Exact historical Edit defaults adopt the current rail; customized rails remain unchanged. The canvas editors that
+ * shipped beside Layers are retired, so those rails compare as Layers alone; Layers alone also briefly shipped.
+ */
 const LEGACY_EDIT_RIGHT_REGION_WIDGET_IDS: ReadonlyArray<readonly WidgetInstanceId[]> = [
   ['layers', 'preview', 'gallery', 'image-map', 'queue'],
   ['layers', 'preview', 'gallery', 'queue'],
@@ -1815,8 +1804,7 @@ const ensureEditRightRegion = (right: WidgetRegionState): WidgetRegionState => {
  * Retired widget types; anything persisted about them drops on load. The canvas editors folded into the Layers panel;
  * the Project panel's rename and id copy live in the project switcher, its sync state in the Autosave status.
  */
-const RETIRED_CANVAS_EDITOR_TYPE_IDS: ReadonlySet<string> = new Set(['properties', 'transform']);
-export const RETIRED_WIDGET_TYPE_IDS: ReadonlySet<string> = new Set([...RETIRED_CANVAS_EDITOR_TYPE_IDS, 'project']);
+export const RETIRED_WIDGET_TYPE_IDS: ReadonlySet<string> = new Set(['properties', 'transform', 'project']);
 
 const withoutRetiredInstances = (
   region: WidgetRegionState,
@@ -1912,12 +1900,7 @@ const isLegacyDefaultBottomRegion = (region: WidgetRegionState): boolean =>
   region.instanceIds.length === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS.length &&
   region.instanceIds.every((widgetId, index) => widgetId === LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS[index]);
 
-const ensureBottomRegion = (bottomRegion: WidgetRegionState | undefined): WidgetRegionState => {
-  const fallback = createWidgetRegions().bottom;
-
-  if (!bottomRegion) {
-    return fallback;
-  }
+const ensureBottomRegion = (bottomRegion: WidgetRegionState): WidgetRegionState => {
   if (bottomRegion.instanceIds.includes('queue-status')) {
     return bottomRegion;
   }
@@ -2043,9 +2026,28 @@ const assembleWorkbenchProject = (
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
-  const leftRegion = ensureLeftRegion(legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel']);
-  const bottomRegion = ensureBottomRegion(legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar']);
-  const widgetInstances = cloneWidgetInstances(project.widgetInstances ?? createWidgetInstances());
+  const defaultRegions = createWidgetRegions();
+  // Strip retired widgets before matching historical defaults: the stripped rail is what the next load sees, so
+  // matching it here keeps normalization idempotent.
+  const stripped = stripRetiredWidgets(
+    {
+      left: legacyWidgetRegions?.left ?? legacyWidgetRegions?.['left-panel'] ?? defaultRegions.left,
+      right: legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel'] ?? defaultRegions.right,
+      bottom: legacyWidgetRegions?.bottom ?? legacyWidgetRegions?.['status-bar'] ?? defaultRegions.bottom,
+      center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
+    },
+    cloneWidgetInstances(project.widgetInstances ?? createWidgetInstances()),
+    (project as Partial<Project>).floatingWidgets
+  );
+  const leftRegion = ensureLeftRegion(stripped.widgetRegions.left);
+  const bottomRegion = ensureBottomRegion(stripped.widgetRegions.bottom);
+  const dockedRegions = {
+    ...stripped.widgetRegions,
+    bottom: bottomRegion,
+    left: leftRegion,
+    right: ensureEditRightRegion(ensureRightRegion(stripped.widgetRegions.right)),
+  };
+  const widgetInstances = stripped.widgetInstances;
 
   const generateInstance = widgetInstances.generate;
   const upscaleInstance = widgetInstances.upscale;
@@ -2133,35 +2135,10 @@ const assembleWorkbenchProject = (
     };
   }
 
-  // Historical Edit rails were recorded with the canvas editors, which folded into Layers, but with any Project panel
-  // still in place; compare them that way so a customized rail is never mistaken for a default.
-  const storedRight = ensureRightRegion(legacyWidgetRegions?.right ?? legacyWidgetRegions?.['right-panel']);
-  const rightWithoutEditors = withoutRetiredInstances(
-    storedRight,
-    new Set(
-      storedRight.instanceIds.filter((instanceId) =>
-        RETIRED_CANVAS_EDITOR_TYPE_IDS.has(widgetInstances[instanceId]?.typeId ?? instanceId)
-      )
-    )
-  );
-  const editRight = ensureEditRightRegion(rightWithoutEditors);
-  const stripped = stripRetiredWidgets(
-    {
-      left: leftRegion,
-      right: editRight === rightWithoutEditors ? storedRight : editRight,
-      bottom: bottomRegion,
-      center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
-    },
-    widgetInstances,
-    (project as Partial<Project>).floatingWidgets
-  );
-  const dockedRegions = stripped.widgetRegions;
-  const placedInstances = stripped.widgetInstances;
-
   const placement = normalizeFloatingPlacement(
     dockedRegions,
     (project as Partial<Project>).floatingWidgets,
-    (instanceId) => Object.hasOwn(placedInstances, instanceId)
+    (instanceId) => Object.hasOwn(widgetInstances, instanceId)
   );
 
   return {
@@ -2171,7 +2148,7 @@ const assembleWorkbenchProject = (
     floatingWidgets: placement.floatingWidgets,
     lastFloatingGeometry: normalizeLastFloatingGeometry(
       (project as Partial<Project>).lastFloatingGeometry,
-      (instanceId) => Object.hasOwn(placedInstances, instanceId),
+      (instanceId) => Object.hasOwn(widgetInstances, instanceId),
       placement.floatingWidgets
     ),
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
@@ -2184,7 +2161,7 @@ const assembleWorkbenchProject = (
     queue: isArriving ? { items: [] } : project.queue,
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: placement.widgetRegions,
-    widgetInstances: placedInstances,
+    widgetInstances,
     workflowHistories: isArriving ? {} : (project.workflowHistories ?? {}),
     workflows: resolveProjectWorkflows(project.workflows, legacyProjectGraph),
   };

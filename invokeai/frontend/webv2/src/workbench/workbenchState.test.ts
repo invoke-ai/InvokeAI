@@ -12,7 +12,9 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
 import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
+import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
@@ -29,6 +31,7 @@ import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
@@ -10069,18 +10072,73 @@ describe('loading layouts that dock the retired Project panel', () => {
     expect(normalized.widgetRegions.left).toMatchObject(leftWithoutProject);
   });
 
-  it('keeps a customized right rail rather than mistaking it for a historical Edit default', () => {
-    const normalized = normalizeWorkbenchProject(
+  it('settles every rail in one pass, so loading a saved project twice keeps the same layout', () => {
+    // Retired widgets are stripped before historical defaults are matched; what remains is judged as the next load
+    // would see it.
+    const withRegions = (regions: Partial<Record<WidgetRegion, Partial<WidgetRegionState>>>): Project =>
       savedProject((project) => ({
         ...project,
-        widgetRegions: {
-          ...project.widgetRegions,
-          right: { ...project.widgetRegions.right, activeInstanceId: 'layers', instanceIds: ['layers', 'project'] },
-        },
-      }))
-    );
+        widgetRegions: Object.fromEntries(
+          Object.entries(project.widgetRegions).map(([id, region]) => [
+            id,
+            { ...region, ...regions[id as WidgetRegion] },
+          ])
+        ) as Project['widgetRegions'],
+      }));
+    const cases: { expected: WidgetInstanceId[]; project: Project; region: WidgetRegion }[] = [
+      {
+        expected: ['layers', 'preview'],
+        project: withRegions({
+          right: { activeInstanceId: 'layers', instanceIds: ['layers', 'preview', 'gallery', 'queue', 'project'] },
+        }),
+        region: 'right',
+      },
+      {
+        expected: ['layers', 'preview'],
+        project: withRegions({ right: { activeInstanceId: 'layers', instanceIds: ['layers', 'project'] } }),
+        region: 'right',
+      },
+      {
+        expected: ['gallery', 'image-map', 'queue'],
+        project: withRegions({
+          right: { instanceIds: ['gallery', 'preview', 'queue', 'layers', 'diagnostics', 'project'] },
+        }),
+        region: 'right',
+      },
+      {
+        expected: ['generate', 'workflow', 'upscale', 'gallery'],
+        project: withRegions({
+          left: { activeInstanceId: 'generate', instanceIds: ['generate', 'workflow', 'gallery', 'project'] },
+        }),
+        region: 'left',
+      },
+      {
+        expected: ['server-status', 'queue-status', 'gallery:bottom', 'notifications', 'autosave-status'],
+        project: withRegions({
+          bottom: {
+            activeInstanceId: 'server-status',
+            instanceIds: ['server-status', 'gallery:bottom', 'notifications', 'autosave-status', 'diagnostics:bottom'],
+          },
+        }),
+        region: 'bottom',
+      },
+      ...layoutPresets.flatMap((preset) =>
+        WIDGET_REGIONS.map((region) => ({
+          expected: [...preset.snapshot.widgetRegions[region].instanceIds],
+          project: getActiveProject(
+            workbenchReducer(createInitialWorkbenchState(), { presetId: preset.id, type: 'applyPreset' })
+          ),
+          region,
+        }))
+      ),
+    ];
 
-    expect(normalized.widgetRegions.right).toMatchObject({ activeInstanceId: 'layers', instanceIds: ['layers'] });
+    for (const { expected, project, region } of cases) {
+      const once = normalizeWorkbenchProject(project);
+
+      expect(once.widgetRegions[region].instanceIds).toEqual(expected);
+      expect(normalizeWorkbenchProject(once)).toEqual(once);
+    }
   });
 
   it('drops its floating window and remembered geometry', () => {
