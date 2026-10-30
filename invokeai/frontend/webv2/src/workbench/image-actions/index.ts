@@ -1,11 +1,11 @@
 export {
-  GALLERY_CANVAS_IMPORT_DESTINATIONS,
-  GalleryCanvasImportMenuItems,
   ImageContextMenu,
   getImageContextMenuImages,
-  getImageContextMenuRecallRequestKey,
   type ImageContextMenuTarget,
+  type ImageContextMenuVariant,
 } from './ImageContextMenu';
+export { GALLERY_CANVAS_IMPORT_DESTINATIONS, ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
+export { useImageRecallCapabilities } from './useImageRecallCapabilities';
 export {
   buildImageRecallSettings,
   EMPTY_IMAGE_RECALL_CAPABILITIES,

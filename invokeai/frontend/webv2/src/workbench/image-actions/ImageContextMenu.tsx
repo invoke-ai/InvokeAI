@@ -1,9 +1,6 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
-import type { ModelsSnapshot } from '@features/models';
-import type { SpandrelModelConfig } from '@features/upscale';
 import type { VideoConditioningRole } from '@features/video';
-import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import {
@@ -14,60 +11,46 @@ import {
 } from '@features/gallery';
 import { getGalleryMoveTargets } from '@features/gallery/contracts';
 import { galleryKeys } from '@features/gallery/queries';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
-import { getModelOnlyUpscaleFactors, getSpandrelNativeScale } from '@features/upscale';
 import { canCopyImage } from '@platform/browser/clipboard';
-import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { MenuContent, MenuIconItem } from '@platform/ui';
-import { MenuActionItem, MenuItem } from '@platform/ui/Menu';
-import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
+import { MenuItem } from '@platform/ui/Menu';
 import { useQuery } from '@tanstack/react-query';
 import { formatHotkeyPartLabel } from '@workbench/hotkeys/keys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
-import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { LAYER_KIND_ICONS } from '@workbench/widgets/layers/layerTypeIcon';
-import { useActiveProjectId, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
   AudioLinesIcon,
   BoxIcon,
-  ChevronRightIcon,
   CopyIcon,
   CrosshairIcon,
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
-  FileImageIcon,
   FileJsonIcon,
   FilmIcon,
   FolderIcon,
-  ImageIcon,
   ImagePlayIcon,
   ImagesIcon,
-  LayersIcon,
   QuoteIcon,
-  RulerIcon,
-  ScalingIcon,
-  ScanIcon,
-  ScissorsIcon,
   ShuffleIcon,
-  SlidersHorizontalIcon,
   SproutIcon,
   StarIcon,
   Trash2Icon,
-  TypeIcon,
   WorkflowIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ImageRecallCapabilities } from './imageRecall';
 import type { ImageActions } from './useImageActions';
 
+import { ContextSubMenu, IMAGE_MENU_CONTENT_PROPS } from './ContextSubMenu';
 import { GalleryBoardDestinationGroups } from './GalleryBoardDestinationGroups';
-import { EMPTY_IMAGE_RECALL_CAPABILITIES, type ImageRecallCapabilities } from './imageRecall';
+import { ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
+import { useImageRecallCapabilities } from './useImageRecallCapabilities';
 import { EMPTY_VIDEO_RECALL_CAPABILITIES, type VideoRecallCapabilities, type VideoRecallKind } from './videoRecall';
 
 /** What the menu learns about a video after it opens: metadata recall and whether a workflow is embedded. */
@@ -91,6 +74,12 @@ export interface LegacyImageContextMenuTarget {
 export type ImageContextMenuTarget = LegacyImageContextMenuTarget | GalleryItemContextMenuTarget;
 
 /**
+ * `housekeeping` leaves out the groups a host already offers beside the menu (Preview's Edit and Use menus): what to
+ * continue working on with the image and what to take from it. Single images only; videos and selections stay full.
+ */
+export type ImageContextMenuVariant = 'full' | 'housekeeping';
+
+/**
  * Extra actions owned by Preview's selected native video. Other hosts omit
  * this port, so gallery/grid video menus retain their common-action-only
  * contract and never gain a frame-copy item.
@@ -102,83 +91,12 @@ export interface PreviewVideoContextActions {
   onOpenDetails: () => void;
 }
 
-/** Extras on top of the shared MenuContent surface styling. */
-const MENU_CONTENT_PROPS = {
-  minW: '13rem',
-  overflow: 'hidden',
-} as const;
-const MENU_POSITIONING_PROPS = { placement: 'right-start' } as const;
-
 const isUsableGalleryImage = (value: unknown): value is GalleryImage =>
   Boolean(value) &&
   typeof value === 'object' &&
   typeof (value as GalleryImage).imageName === 'string' &&
   typeof (value as GalleryImage).imageUrl === 'string' &&
   typeof (value as GalleryImage).thumbnailUrl === 'string';
-
-interface GalleryCanvasImportDestinationOption {
-  destination: GalleryCanvasImportDestination;
-  icon: LucideIcon;
-  /** i18n key. */
-  label: string;
-}
-
-/**
- * The canvas layers an image can be added to, in the order every host lists them. Icons are the add-layer menu's per
- * layer kind; a resized control layer is still a control layer, so it takes a resize glyph to tell the two apart.
- */
-export const GALLERY_CANVAS_IMPORT_DESTINATIONS: readonly GalleryCanvasImportDestinationOption[] = [
-  { destination: 'raster', icon: LAYER_KIND_ICONS.raster, label: 'widgets.canvas.import.raster' },
-  { destination: 'control', icon: LAYER_KIND_ICONS.control, label: 'widgets.canvas.import.control' },
-  { destination: 'inpaint-mask', icon: LAYER_KIND_ICONS.inpaint_mask, label: 'widgets.canvas.import.inpaintMask' },
-  {
-    destination: 'regional-guidance',
-    icon: LAYER_KIND_ICONS.regional_guidance,
-    label: 'widgets.canvas.import.regionalGuidance',
-  },
-  {
-    destination: 'regional-reference',
-    icon: LAYER_KIND_ICONS.regional_reference_image,
-    label: 'widgets.canvas.import.regionalReference',
-  },
-  { destination: 'control-resized', icon: ScalingIcon, label: 'widgets.canvas.import.resizedControl' },
-];
-
-/**
- * The canvas destinations as menu items. The host owns the container: the image menu's "Add to current canvas"
- * submenu, or Preview's Edit dropdown.
- */
-export const GalleryCanvasImportMenuItems = ({
-  onSelect,
-}: {
-  onSelect: (destination: GalleryCanvasImportDestination) => void;
-}) => (
-  <>
-    {GALLERY_CANVAS_IMPORT_DESTINATIONS.map((option) => (
-      <GalleryCanvasImportMenuItem key={option.destination} option={option} onSelect={onSelect} />
-    ))}
-  </>
-);
-
-const GalleryCanvasImportMenuItem = ({
-  option,
-  onSelect,
-}: {
-  option: GalleryCanvasImportDestinationOption;
-  onSelect: (destination: GalleryCanvasImportDestination) => void;
-}) => {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => onSelect(option.destination), [onSelect, option.destination]);
-
-  return (
-    <MenuActionItem
-      icon={option.icon}
-      label={t(option.label)}
-      value={`send-to-canvas-${option.destination}`}
-      onSelect={handleSelect}
-    />
-  );
-};
 
 export const getImageContextMenuImages = (target: ImageContextMenuTarget | null): GalleryImage[] => {
   if (target && 'itemRefs' in target) {
@@ -219,20 +137,13 @@ const toGalleryItemContextMenuTarget = (target: ImageContextMenuTarget | null): 
   };
 };
 
-export const getImageContextMenuRecallRequestKey = (image: GalleryImage | null, isBulk: boolean): string | null => {
-  if (!image || isBulk) {
-    return null;
-  }
-
-  return `${image.imageName}:${image.width}:${image.height}`;
-};
-
 /** Shared image context menu anchored to a cursor rect; setting target opens it without a trigger element. */
 export const ImageContextMenu = ({
   actions,
   boards,
   previewVideoActions,
   target,
+  variant = 'full',
   onClose,
 }: {
   actions: ImageActions;
@@ -240,6 +151,7 @@ export const ImageContextMenu = ({
   boards: GalleryBoard[];
   previewVideoActions?: PreviewVideoContextActions;
   target: ImageContextMenuTarget | null;
+  variant?: ImageContextMenuVariant;
   onClose: () => void;
 }) => {
   const itemTarget = toGalleryItemContextMenuTarget(target);
@@ -267,6 +179,7 @@ export const ImageContextMenu = ({
       image={images[0] ?? null}
       images={images}
       target={imageTarget}
+      variant={variant}
       onClose={onClose}
       onRequestDeletion={requestImageDeletion}
     />
@@ -334,7 +247,12 @@ const GalleryItemContextMenuContent = ({
     <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
       <Portal>
         <Menu.Positioner>
-          <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
+          <MenuContent
+            {...IMAGE_MENU_CONTENT_PROPS}
+            maxH="min(28rem, calc(100vh - 2rem))"
+            minW="16rem"
+            overflowY="auto"
+          >
             {isBulk ? (
               <BulkItemMenuItems
                 actions={actions}
@@ -503,11 +421,11 @@ const SingleItemMenuItems = ({
             value="load-video-workflow"
             onClick={handleLoadVideoWorkflow}
           />
-          <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.recallMetadata')}>
+          <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.reuseFromVideo')}>
             <ContextMenuItem
               disabled={isLoadingVideoRecall || !videoRecallCapabilities.all}
               icon={AsteriskIcon}
-              label={t('widgets.gallery.itemActions.recall.verbs.all')}
+              label={t('widgets.gallery.itemMenu.allSettings')}
               value="video-recall-all"
               onClick={handleVideoRecallAll}
             />
@@ -698,6 +616,7 @@ const ImageContextMenuContent = ({
   image,
   images,
   target,
+  variant,
   onClose,
   onRequestDeletion,
 }: {
@@ -706,61 +625,21 @@ const ImageContextMenuContent = ({
   image: GalleryImage;
   images: GalleryImage[];
   target: ImageContextMenuTarget;
+  variant: ImageContextMenuVariant;
   onClose: () => void;
   onRequestDeletion: (imageNames: string[]) => void;
 }) => {
-  const [recallCapabilities, setRecallCapabilities] = useState<ImageRecallCapabilities>(
-    EMPTY_IMAGE_RECALL_CAPABILITIES
-  );
-  const [isLoadingRecallCapabilities, setIsLoadingRecallCapabilities] = useState(false);
   const targetRef = useRef(target);
-  const imageRef = useRef<GalleryImage | null>(null);
 
   // eslint-disable-next-line react/refs
   targetRef.current = target;
 
   const isBulk = images.length > 1;
   const imageNames = useMemo(() => images.map((candidate) => candidate.imageName), [images]);
-  const recallRequestKey = getImageContextMenuRecallRequestKey(image, isBulk);
-  const getImageRecallCapabilities = actions.getImageRecallCapabilities;
-
-  // eslint-disable-next-line react/refs
-  imageRef.current = image;
-
-  useEffect(() => {
-    if (!recallRequestKey) {
-      return;
-    }
-
-    let isCancelled = false;
-    const recallImage = imageRef.current;
-
-    if (!recallImage) {
-      return;
-    }
-
-    setIsLoadingRecallCapabilities((current) => (current ? current : true));
-    getImageRecallCapabilities(recallImage)
-      .then((capabilities) => {
-        if (!isCancelled) {
-          setRecallCapabilities(capabilities);
-        }
-      })
-      .catch(() => {
-        if (!isCancelled) {
-          setRecallCapabilities(EMPTY_IMAGE_RECALL_CAPABILITIES);
-        }
-      })
-      .finally(() => {
-        if (!isCancelled) {
-          setIsLoadingRecallCapabilities(false);
-        }
-      });
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [getImageRecallCapabilities, recallRequestKey]);
+  const { capabilities: recallCapabilities, isLoading: isLoadingRecallCapabilities } = useImageRecallCapabilities(
+    actions,
+    isBulk ? null : image
+  );
 
   const positioning = useMemo(
     () => ({
@@ -785,7 +664,12 @@ const ImageContextMenuContent = ({
     <Menu.Root lazyMount open positioning={positioning} unmountOnExit onOpenChange={handleOpenChange}>
       <Portal>
         <Menu.Positioner>
-          <MenuContent {...MENU_CONTENT_PROPS} maxH="min(28rem, calc(100vh - 2rem))" minW="16rem" overflowY="auto">
+          <MenuContent
+            {...IMAGE_MENU_CONTENT_PROPS}
+            maxH="min(36rem, calc(100vh - 2rem))"
+            minW="16rem"
+            overflowY="auto"
+          >
             {isBulk ? (
               <BulkMenuItems
                 actions={actions}
@@ -801,8 +685,9 @@ const ImageContextMenuContent = ({
                 image={image}
                 images={images}
                 isLoadingRecallCapabilities={isLoadingRecallCapabilities}
-                onRequestDeletion={onRequestDeletion}
                 recallCapabilities={recallCapabilities}
+                variant={variant}
+                onRequestDeletion={onRequestDeletion}
               />
             )}
           </MenuContent>
@@ -818,16 +703,18 @@ const SingleImageMenuItems = ({
   image,
   images,
   isLoadingRecallCapabilities,
-  onRequestDeletion,
   recallCapabilities,
+  variant,
+  onRequestDeletion,
 }: {
   actions: ImageActions;
   boards: GalleryBoard[];
   image: GalleryImage;
   images: GalleryImage[];
   isLoadingRecallCapabilities: boolean;
-  onRequestDeletion: (imageNames: string[]) => void;
   recallCapabilities: ImageRecallCapabilities;
+  variant: ImageContextMenuVariant;
+  onRequestDeletion: (imageNames: string[]) => void;
 }) => {
   const { t } = useTranslation();
   const handleMove = useCallback(
@@ -837,38 +724,9 @@ const SingleImageMenuItems = ({
   const handleDelete = useCallback(() => onRequestDeletion([image.imageName]), [image.imageName, onRequestDeletion]);
   const imageSourceBoardIds = useMemo(() => [image.boardId], [image.boardId]);
   const imageItemRef = useMemo<GalleryItemRef>(() => ({ kind: 'image', name: image.imageName }), [image.imageName]);
-  const handleRecallAll = useRecallImageDataHandler(actions, image, 'all');
-  const handleRecallRemix = useRecallImageDataHandler(actions, image, 'remix');
-  const handleRecallPrompts = useRecallImageDataHandler(actions, image, 'prompts');
-  const handleRecallSeed = useRecallImageDataHandler(actions, image, 'seed');
-  const handleRecallDimensions = useRecallImageDataHandler(actions, image, 'dimensions');
-  const handleRecallClipSkip = useRecallImageDataHandler(actions, image, 'clipSkip');
-  const handleSelectForCompare = useSelectForCompareHandler(actions, image);
-  const handleSavePromptAsTemplate = useCallback(() => void actions.savePromptAsTemplate(image), [actions, image]);
-  const handleUseAsReferenceImage = useUseAsReferenceImageHandler(actions, image);
-  const handleUseAsControl = useCallback(() => void actions.sendImageAsControl(image), [actions, image]);
+  const handleSelectForCompare = useCallback(() => actions.selectForCompare(image), [actions, image]);
   const handleLoadWorkflow = useCallback(() => void actions.loadImageWorkflow(image), [actions, image]);
   const handleGeneratePbrMaps = useCallback(() => void actions.generatePbrMaps(image), [actions, image]);
-  const { generation, widgets } = useWorkbenchCommands();
-  const openWidget = useOpenWorkbenchWidget();
-  const handleSendToUpscale = useCallback(() => {
-    openWidget('upscale', { preferredRegions: ['left'] });
-    widgets.patchValues('upscale', {
-      inputImage: { height: image.height, image_name: image.imageName, width: image.width },
-    });
-    generation.setSource('upscale');
-  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
-  const handleSendToVideo = useCallback(() => {
-    openWidget('video', { preferredRegions: ['left'] });
-    // The first frame, an initial video, and Ref2VA references all claim the same
-    // conditioning slot: sending a frame clears the rivals.
-    widgets.patchValues('video', {
-      firstFrameImage: { height: image.height, image_name: image.imageName, width: image.width },
-      references: [],
-      sourceVideo: null,
-    });
-    generation.setSource('video');
-  }, [generation, image.height, image.imageName, image.width, openWidget, widgets]);
 
   return (
     <>
@@ -887,80 +745,21 @@ const SingleImageMenuItems = ({
         value="load-workflow"
         onClick={handleLoadWorkflow}
       />
-      <ContextSubMenu icon={AsteriskIcon} label={t('widgets.gallery.itemMenu.recallMetadata')}>
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.all}
-          icon={AsteriskIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.all')}
-          value="recall-all"
-          onClick={handleRecallAll}
-        />
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.remix}
-          icon={ShuffleIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.remix')}
-          value="remix"
-          onClick={handleRecallRemix}
-        />
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
-          icon={QuoteIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.prompts')}
-          value="use-prompt"
-          onClick={handleRecallPrompts}
-        />
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.seed}
-          icon={SproutIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.seed')}
-          value="use-seed"
-          onClick={handleRecallSeed}
-        />
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.dimensions}
-          icon={RulerIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.dimensions')}
-          value="use-size"
-          onClick={handleRecallDimensions}
-        />
-        <ContextMenuItem
-          disabled={isLoadingRecallCapabilities || !recallCapabilities.clipSkip}
-          icon={ScissorsIcon}
-          label={t('widgets.gallery.itemActions.recall.verbs.clipSkip')}
-          value="use-clip-skip"
-          onClick={handleRecallClipSkip}
-        />
-      </ContextSubMenu>
-      <Menu.Separator borderColor="border.subtle" />
-      <CanvasDestinationMenuItems actions={actions} images={images} />
-      <UpscaleSubMenu image={image} onSendToUpscale={handleSendToUpscale} />
-      <ContextMenuItem
-        icon={ClapperboardIcon}
-        label={t('widgets.gallery.itemMenu.sendToVideo')}
-        value="send-to-video"
-        onClick={handleSendToVideo}
-      />
-      <ContextMenuItem
-        disabled={!actions.canUseAsReferenceImage}
-        icon={ImageIcon}
-        label={t('widgets.gallery.itemMenu.useAsReferenceImage')}
-        value="use-as-reference-image"
-        onClick={handleUseAsReferenceImage}
-      />
-      <ContextMenuItem
-        icon={SlidersHorizontalIcon}
-        label={t('widgets.gallery.itemActions.useAsControl')}
-        value="use-as-control"
-        onClick={handleUseAsControl}
-      />
-      <ContextMenuItem
-        // Use the same availability signal as Use Prompt to disable empty recall upfront.
-        disabled={isLoadingRecallCapabilities || !recallCapabilities.prompts}
-        icon={TypeIcon}
-        label={t('widgets.gallery.itemMenu.useAsPromptTemplate')}
-        value="use-as-prompt-template"
-        onClick={handleSavePromptAsTemplate}
-      />
+      {variant === 'full' ? (
+        <>
+          <Menu.Separator borderColor="border.subtle" />
+          <ImageContinueGroup actions={actions} images={images} presentation="compact" />
+          <Menu.Separator borderColor="border.subtle" />
+          <ImageUseGroups
+            actions={actions}
+            capabilities={recallCapabilities}
+            image={image}
+            isLoadingCapabilities={isLoadingRecallCapabilities}
+            presentation="compact"
+          />
+          <Menu.Separator borderColor="border.subtle" />
+        </>
+      ) : null}
       <ContextMenuItem
         // The grid's shortcut for the same action, otherwise found only by accident.
         detail={t('widgets.gallery.itemMenu.compareShortcut', { key: formatHotkeyPartLabel('alt') })}
@@ -989,18 +788,6 @@ const SingleImageMenuItems = ({
     </>
   );
 };
-
-type RecallImageDataKind = Parameters<ImageActions['recallImageData']>[1];
-
-const useRecallImageDataHandler = (actions: ImageActions, image: GalleryImage, kind: RecallImageDataKind) =>
-  useCallback(() => void actions.recallImageData(image, kind), [actions, image, kind]);
-
-const useSelectForCompareHandler = (actions: ImageActions, image: GalleryImage) =>
-  useCallback(() => actions.selectForCompare(image), [actions, image]);
-
-const useUseAsReferenceImageHandler = (actions: ImageActions, image: GalleryImage) =>
-  // eslint-disable-next-line react/hooks -- `useAsReferenceImage` is a plain action method; the compiler reads its name as a hook.
-  useCallback(() => actions.useAsReferenceImage(image), [actions, image]);
 
 const OpenInNewTabQuickMenuItem = ({ image }: { image: GalleryImage }) => {
   const { t } = useTranslation();
@@ -1110,7 +897,7 @@ const BulkMenuItems = ({
         {t('widgets.gallery.itemMenu.imagesSelected', { count: images.length })}
       </Text>
       <Menu.Separator borderColor="border.subtle" />
-      <CanvasDestinationMenuItems actions={actions} images={images} />
+      <ImageContinueGroup actions={actions} images={images} presentation="compact" />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
         icon={StarIcon}
@@ -1133,30 +920,6 @@ const BulkMenuItems = ({
         label={t('widgets.gallery.deleteSelection')}
         value="delete-selection"
         onClick={handleDelete}
-      />
-    </>
-  );
-};
-
-/** The open project's canvas leads; starting a separate project from the images is the explicit alternative. */
-const CanvasDestinationMenuItems = ({ actions, images }: { actions: ImageActions; images: GalleryImage[] }) => {
-  const { t } = useTranslation();
-  const handleSend = useCallback(
-    (destination: GalleryCanvasImportDestination) => void actions.sendToCanvas(images, destination),
-    [actions, images]
-  );
-  const handleNewProject = useCallback(() => void actions.createCanvasFromImages(images), [actions, images]);
-
-  return (
-    <>
-      <ContextSubMenu icon={LayersIcon} label={t('widgets.canvas.import.addToCurrentCanvas')}>
-        <GalleryCanvasImportMenuItems onSelect={handleSend} />
-      </ContextSubMenu>
-      <ContextMenuItem
-        icon={FileImageIcon}
-        label={t('widgets.canvas.import.newProjectFromImage', { count: images.length })}
-        value="new-project-from-image"
-        onClick={handleNewProject}
       />
     </>
   );
@@ -1213,204 +976,6 @@ const ChangeBoardSubMenu = ({
     </ContextSubMenu>
   );
 };
-
-/** Every installed upscaler, by name; a shallow-equal list keeps the menu from rerendering on unrelated model edits. */
-const selectInstalledUpscalers = (snapshot: ModelsSnapshot): SpandrelModelConfig[] =>
-  snapshot.models
-    .filter((model) => model.type === 'spandrel_image_to_image')
-    .map((model) => model as SpandrelModelConfig)
-    .sort((a, b) => a.name.localeCompare(b.name));
-
-const selectModelsStatus = (snapshot: ModelsSnapshot): ModelsSnapshot['status'] => snapshot.status;
-
-/**
- * Send to Upscale opens the widget on the image; the items below it upscale the image at once with one upscaler alone,
- * at a factor picked from its submenu, into the gallery, leaving the widget as it is.
- */
-const UpscaleSubMenu = ({ image, onSendToUpscale }: { image: GalleryImage; onSendToUpscale: () => void }) => {
-  const { t } = useTranslation();
-  const upscalers = useModelsSelector(selectInstalledUpscalers);
-  const modelsStatus = useModelsSelector(selectModelsStatus);
-
-  useMountEffect(() => {
-    void ensureModelsLoaded();
-  });
-
-  return (
-    <ContextSubMenu icon={ScanIcon} label={t('widgets.gallery.itemActions.upscale.label')}>
-      <ContextMenuItem
-        icon={ScanIcon}
-        label={t('widgets.gallery.itemActions.upscale.sendTo')}
-        value="send-to-upscale"
-        onClick={onSendToUpscale}
-      />
-      {upscalers.length === 0 ? (
-        // "None installed" only once the library has loaded; until then the list is merely not known yet.
-        <MenuItem
-          unavailableReason={
-            modelsStatus === 'loaded'
-              ? t('widgets.gallery.itemActions.upscale.noUpscalers')
-              : modelsStatus === 'error'
-                ? t('models.couldNotLoad')
-                : t('models.loadingModels')
-          }
-          value="upscale-model-only"
-        >
-          <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Text>
-        </MenuItem>
-      ) : (
-        <>
-          <Menu.Separator borderColor="border.subtle" />
-          <Menu.ItemGroup>
-            <Menu.ItemGroupLabel>{t('widgets.gallery.itemActions.upscale.modelOnlyGroup')}</Menu.ItemGroupLabel>
-            {upscalers.map((upscaler) => (
-              <ModelOnlyUpscalerSubMenu key={upscaler.key} image={image} upscaler={upscaler} />
-            ))}
-          </Menu.ItemGroup>
-        </>
-      )}
-    </ContextSubMenu>
-  );
-};
-
-/**
- * One upscaler's one-click targets: 1.5×, 2× and its native scale, as far as its plan reaches them. An upscaler whose
- * native scale was never recorded can still run once at it, but no other factor can be planned, so those say how to
- * record it.
- */
-const ModelOnlyUpscalerSubMenu = ({ image, upscaler }: { image: GalleryImage; upscaler: SpandrelModelConfig }) => {
-  const { t } = useTranslation();
-  const factors = getModelOnlyUpscaleFactors(upscaler);
-  const nativeScale = getSpandrelNativeScale(upscaler);
-
-  return (
-    <ContextSubMenu
-      detail={
-        nativeScale === null ? undefined : t('widgets.gallery.itemActions.upscale.scaleSuffix', { scale: nativeScale })
-      }
-      label={upscaler.name}
-    >
-      {factors ? (
-        factors.map((factor) => (
-          <ModelOnlyUpscaleFactorItem
-            key={factor}
-            image={image}
-            label={t(
-              factor === nativeScale
-                ? 'widgets.gallery.itemActions.upscale.factorNative'
-                : 'widgets.gallery.itemActions.upscale.scaleSuffix',
-              { scale: factor }
-            )}
-            scale={factor === nativeScale ? 'native' : factor}
-            upscaler={upscaler}
-          />
-        ))
-      ) : (
-        <>
-          <ModelOnlyUpscaleFactorItem
-            image={image}
-            label={t('widgets.gallery.itemActions.upscale.nativeScaleUnknownFactor')}
-            scale="native"
-            upscaler={upscaler}
-          />
-          <MenuItem
-            unavailableReason={t('widgets.upscale.nativeScaleUnknown')}
-            value={`upscale-model-only-${upscaler.key}-other`}
-          >
-            <Text fontSize="md">{t('widgets.gallery.itemActions.upscale.otherFactors')}</Text>
-          </MenuItem>
-        </>
-      )}
-    </ContextSubMenu>
-  );
-};
-
-const ModelOnlyUpscaleFactorItem = ({
-  image,
-  label,
-  scale,
-  upscaler,
-}: {
-  image: GalleryImage;
-  label: string;
-  /** `'native'` runs the upscaler once, whether or not its native scale is recorded. */
-  scale: number | 'native';
-  upscaler: SpandrelModelConfig;
-}) => {
-  const { t } = useTranslation();
-  const commands = useWorkbenchCommands();
-  const projectId = useActiveProjectId();
-  const handleClick = useCallback(() => {
-    // The account the pick was made under, before the command loads.
-    const owner = captureAccountScope();
-
-    // Loaded on pick, as Invoke's upscale submission loads it: the menu is part of the editor's startup graph.
-    void import('./modelOnlyUpscale')
-      .then(({ queueModelOnlyUpscale }) =>
-        queueModelOnlyUpscale({
-          commands,
-          image: { height: image.height, image_name: image.imageName, width: image.width },
-          owner,
-          projectId,
-          scale,
-          t,
-          upscaleModel: upscaler,
-        })
-      )
-      // The command reports its own failures, so this is its chunk failing to load (a deploy replaced it, the
-      // connection dropped): the pick must not go unanswered.
-      .catch(() => {
-        if (isAccountScopeCurrent(owner)) {
-          commands.notifications.add({ kind: 'error', title: t('widgets.gallery.itemActions.upscale.loadFailed') });
-        }
-      });
-  }, [commands, image.height, image.imageName, image.width, projectId, scale, t, upscaler]);
-
-  return (
-    <Menu.Item value={`upscale-model-only-${upscaler.key}-${scale}`} onClick={handleClick}>
-      <Text fontSize="md" fontVariantNumeric="tabular-nums">
-        {label}
-      </Text>
-    </Menu.Item>
-  );
-};
-
-const ContextSubMenu = ({
-  children,
-  detail,
-  icon,
-  label,
-}: {
-  children: ReactNode;
-  /** A short value after the label, such as an upscaler's native scale. */
-  detail?: string;
-  icon?: LucideIcon;
-  label: string;
-}) => (
-  <Menu.Root positioning={MENU_POSITIONING_PROPS}>
-    <Menu.TriggerItem>
-      <HStack gap="2" minW="0" w="full">
-        {icon ? <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} /> : null}
-        <Text flex="1" fontSize="md" minW="0" truncate>
-          {label}
-        </Text>
-        {detail ? (
-          // Secondary to the label, but at the menu's secondary-text contrast: fg.subtle is too faint on dark menus.
-          <Text color="fg.muted" flexShrink={0} fontFamily="mono" fontSize="sm">
-            {detail}
-          </Text>
-        ) : null}
-        <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-      </HStack>
-    </Menu.TriggerItem>
-    <Portal>
-      <Menu.Positioner>
-        {/* Boards and upscalers can run long: every submenu grows to the available height, then scrolls. */}
-        <ScrollableMenuContent {...MENU_CONTENT_PROPS}>{children}</ScrollableMenuContent>
-      </Menu.Positioner>
-    </Portal>
-  </Menu.Root>
-);
 
 const ContextMenuItem = ({
   detail,

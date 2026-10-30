@@ -2,7 +2,8 @@ import type { GalleryImage } from '@features/gallery';
 
 import { describe, expect, it } from 'vitest';
 
-import { getImageContextMenuImages, getImageContextMenuRecallRequestKey } from './ImageContextMenu';
+import { getImageContextMenuImages } from './ImageContextMenu';
+import { getImageRecallCapabilitiesKey } from './useImageRecallCapabilities';
 
 const image: GalleryImage = {
   boardId: 'none',
@@ -31,17 +32,14 @@ describe('getImageContextMenuImages', () => {
   });
 });
 
-describe('getImageContextMenuRecallRequestKey', () => {
+describe('getImageRecallCapabilitiesKey', () => {
   it('uses stable image primitives instead of object identity', () => {
     const refreshedImage = { ...image };
 
-    expect(getImageContextMenuRecallRequestKey(image, false)).toBe(
-      getImageContextMenuRecallRequestKey(refreshedImage, false)
-    );
+    expect(getImageRecallCapabilitiesKey(image)).toBe(getImageRecallCapabilitiesKey(refreshedImage));
   });
 
-  it('does not request single-image recall for empty or bulk menu targets', () => {
-    expect(getImageContextMenuRecallRequestKey(null, false)).toBeNull();
-    expect(getImageContextMenuRecallRequestKey(image, true)).toBeNull();
+  it('requests nothing without an image', () => {
+    expect(getImageRecallCapabilitiesKey(null)).toBeNull();
   });
 });

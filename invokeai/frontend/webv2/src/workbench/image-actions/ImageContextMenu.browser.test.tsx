@@ -194,9 +194,13 @@ const pickQuickItem = async (label: string): Promise<void> => {
   await interact(() => target!.click());
 };
 
+/** An item's label: its first line, so a hint under it does not count. */
+const itemLabel = (candidate: HTMLElement): string | undefined =>
+  (candidate.querySelector('p') ?? candidate).textContent?.trim() || undefined;
+
 const getMenuItem = (label: string): HTMLElement => {
   const item = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
-    (candidate) => candidate.textContent?.trim() === label
+    (candidate) => itemLabel(candidate) === label || candidate.textContent?.trim() === label
   );
 
   if (!item) {
@@ -204,6 +208,14 @@ const getMenuItem = (label: string): HTMLElement => {
   }
 
   return item;
+};
+
+/** Items that select through zag (`onSelect`) need the item highlighted by a hover before the click. */
+const pickItem = async (label: string): Promise<void> => {
+  const target = getMenuItem(label);
+  await hoverItem(target);
+  await settleUntil(() => target.hasAttribute('data-highlighted'), `"${label}" to be highlighted`);
+  await interact(() => target.click());
 };
 
 const getOpenAlertDialog = (): HTMLElement | null =>
@@ -430,7 +442,7 @@ describe('ImageContextMenu starred state', () => {
 describe('ImageContextMenu canvas destinations', () => {
   const menuItemLabels = () =>
     Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
-      (candidate) => candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+      (candidate) => itemLabel(candidate) || candidate.getAttribute('aria-label')
     );
 
   /** Top-level menu entries in order, with separators as `—`, so a position within its group is observable. */
@@ -438,22 +450,121 @@ describe('ImageContextMenu canvas destinations', () => {
     Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"], [role="separator"]')).map((candidate) =>
       candidate.getAttribute('role') === 'separator'
         ? '—'
-        : candidate.textContent?.trim() || candidate.getAttribute('aria-label')
+        : itemLabel(candidate) || candidate.getAttribute('aria-label')
     );
-  const ADD = 'widgets.canvas.import.addToCurrentCanvas';
+  const ADD = 'widgets.gallery.itemMenu.addToCanvasAs';
   const NEW_PROJECT = 'widgets.canvas.import.newProjectFromImage';
 
-  it('leads the single-image actions group, right after Recall metadata, with the two canvas destinations', async () => {
+  it('groups the single-image menu by intent: continue working, then use and reuse, then housekeeping', async () => {
     await renderMenu(createActions(vi.fn()), [image('image-0.png')]);
     const sequence = menuSequence();
-    const recallIndex = sequence.indexOf('widgets.gallery.itemMenu.recallMetadata');
+    const workflowIndex = sequence.indexOf(LOAD_WORKFLOW);
 
-    expect(sequence.slice(recallIndex, recallIndex + 5)).toEqual([
-      'widgets.gallery.itemMenu.recallMetadata',
+    expect(sequence.slice(workflowIndex, workflowIndex + 15)).toEqual([
+      LOAD_WORKFLOW,
+      '—',
+      'widgets.preview.editOnCanvas',
+      'widgets.gallery.itemActions.upscale.label',
+      'widgets.gallery.itemMenu.sendToVideo',
       '—',
       ADD,
       NEW_PROJECT,
-      'widgets.gallery.itemActions.upscale.label',
+      '—',
+      'widgets.gallery.itemMenu.useAsReferenceImage',
+      'widgets.gallery.itemActions.useAsControl',
+      'widgets.gallery.itemMenu.useAsPromptTemplate',
+      'widgets.gallery.itemMenu.reuseFromImage',
+      '—',
+      'widgets.preview.selectForCompare',
+    ]);
+    const headings = Array.from(document.querySelectorAll('[data-scope="menu"][data-part="item-group-label"]')).map(
+      (label) => label.textContent?.trim()
+    );
+    expect(headings).toEqual(['widgets.gallery.itemMenu.continueWorking', 'widgets.gallery.itemMenu.useImageAs']);
+    // A context menu holding every group stays single-line: the step hints belong to Preview's own menus.
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.editOnCanvasHint');
+  });
+
+  it('edits the image on the current canvas as a raster layer in one step', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('image-0.png')]);
+
+    await pickItem('widgets.preview.editOnCanvas');
+
+    expect(
+      vi.mocked(actions.sendToCanvas).mock.calls.map(([images, destination]) => [images.length, destination])
+    ).toEqual([[1, 'raster']]);
+  });
+
+  it('leaves the Edit and Use groups out of the housekeeping variant, keeping the rest in order', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+          <ChakraProvider value={system}>
+            <ImageContextMenu
+              actions={createActions(vi.fn())}
+              boards={NO_BOARDS}
+              target={{ images: [image('image-0.png')], x: 20, y: 20 }}
+              variant="housekeeping"
+              onClose={vi.fn()}
+            />
+          </ChakraProvider>
+        </QueryClientProvider>
+      );
+    });
+
+    expect(
+      menuSequence().filter((entry) => entry !== null && !entry.startsWith('widgets.gallery.itemMenu.open'))
+    ).toEqual([
+      'widgets.gallery.itemMenu.copyToClipboard',
+      'widgets.gallery.itemMenu.downloadImage',
+      'widgets.preview.starImage',
+      '—',
+      LOAD_WORKFLOW,
+      'widgets.preview.selectForCompare',
+      GENERATE_PBR_MAPS,
+      '—',
+      'widgets.gallery.findInGallery',
+      'widgets.gallery.changeBoard',
+      '—',
+      'widgets.gallery.itemMenu.deleteImage',
+    ]);
+  });
+
+  it('reuses the settings from a submenu, Remix first, each gated by what the image records', async () => {
+    const actions = createActions(vi.fn());
+    actions.getImageRecallCapabilities = vi.fn(() =>
+      Promise.resolve({ ...EMPTY_IMAGE_RECALL_CAPABILITIES, remix: true, seed: true })
+    );
+    await renderMenu(actions, [image('image-0.png')]);
+    await hoverItem(getMenuItem('widgets.gallery.itemMenu.reuseFromImage'));
+    await settleUntil(
+      () => menuItemLabels().includes('widgets.gallery.itemMenu.allSettings'),
+      'the reuse submenu to open',
+      5000
+    );
+    const submenu = getMenuItem('widgets.gallery.itemMenu.allSettings').closest('[role="menu"]')!;
+    await vi.waitFor(() =>
+      expect(
+        Array.from(submenu.querySelectorAll<HTMLElement>('[role="menuitem"]')).map(
+          (entry) => `${itemLabel(entry)}${entry.getAttribute('aria-disabled') === 'true' ? ' (disabled)' : ''}`
+        )
+      ).toEqual([
+        'widgets.gallery.itemActions.recall.verbs.remix',
+        'widgets.gallery.itemMenu.allSettings (disabled)',
+        'widgets.gallery.itemActions.recall.verbs.prompts (disabled)',
+        'widgets.gallery.itemActions.recall.verbs.seed',
+        'widgets.gallery.itemActions.recall.verbs.dimensions (disabled)',
+        'widgets.gallery.itemActions.recall.verbs.clipSkip (disabled)',
+      ])
+    );
+
+    await pickItem('widgets.gallery.itemActions.recall.verbs.seed');
+    expect(vi.mocked(actions.recallImageData).mock.calls.map(([entry, kind]) => [entry.imageName, kind])).toEqual([
+      ['image-0.png', 'seed'],
     ]);
   });
 
@@ -464,6 +575,8 @@ describe('ImageContextMenu canvas destinations', () => {
     );
 
     expect(menuSequence().slice(0, 5)).toEqual(['—', ADD, NEW_PROJECT, '—', 'widgets.gallery.starSelection']);
+    // The single-image hand-offs take one image; the canvas items take the whole selection.
+    expect(menuSequence()).not.toContain('widgets.preview.editOnCanvas');
   });
 
   it.each([1, 3])('adds the %s targeted image(s) to the current canvas as the chosen layer', async (count) => {
@@ -473,7 +586,7 @@ describe('ImageContextMenu canvas destinations', () => {
 
     // A nested menu opens from a real hover on its trigger item, after zag's open delay, so the open is waited for
     // rather than slept through.
-    await hoverItem(getMenuItem('widgets.canvas.import.addToCurrentCanvas'));
+    await hoverItem(getMenuItem('widgets.gallery.itemMenu.addToCanvasAs'));
     await settleUntil(
       () => menuItemLabels().includes('widgets.canvas.import.inpaintMask'),
       'the add-to-current-canvas submenu to open',
@@ -515,7 +628,7 @@ describe('ImageContextMenu canvas destinations', () => {
     const images = Array.from({ length: count }, (_, index) => image(`image-${index}.png`));
     await renderMenu(actions, images);
 
-    await interact(() => getMenuItem('widgets.canvas.import.newProjectFromImage').click());
+    await pickItem('widgets.canvas.import.newProjectFromImage');
 
     const calls = vi.mocked(actions.createCanvasFromImages).mock.calls;
     expect(calls).toHaveLength(1);
@@ -531,7 +644,7 @@ describe('ImageContextMenu canvas destinations', () => {
     expect(sequence[sequence.indexOf('widgets.gallery.itemMenu.useAsReferenceImage') + 1]).toBe(
       'widgets.gallery.itemActions.useAsControl'
     );
-    await interact(() => getMenuItem('widgets.gallery.itemActions.useAsControl').click());
+    await pickItem('widgets.gallery.itemActions.useAsControl');
 
     expect(vi.mocked(actions.sendImageAsControl).mock.calls.map(([entry]) => entry.imageName)).toEqual(['image-0.png']);
   });
@@ -680,10 +793,10 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
     expect(document.body.textContent).not.toContain('widgets.preview.copyCurrentFrame');
     // Videos carry their own Recall Metadata submenu (parameter recall).
-    expect(document.body.textContent).toContain('widgets.gallery.itemMenu.recallMetadata');
+    expect(document.body.textContent).toContain('widgets.gallery.itemMenu.reuseFromVideo');
     expect(document.body.textContent).not.toContain('widgets.gallery.itemActions.upscale.label');
     expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.addToCanvasAs');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
@@ -766,9 +879,9 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(actions.openItemInNewTab).toHaveBeenCalledWith(primaryVideo);
     expect(actions.openItemInPreview).toHaveBeenCalledWith(primaryVideo);
     expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.copyToClipboard');
-    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.recallMetadata');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.reuseFromVideo');
     expect(document.body.textContent).not.toContain('widgets.preview.selectForCompare');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.addToCanvasAs');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
   });
 
@@ -804,7 +917,7 @@ describe('ImageContextMenu mixed-media action visibility', () => {
     expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
     expect(document.body.textContent).toContain('widgets.gallery.changeBoard');
     expect(document.body.textContent).toContain('widgets.gallery.deleteSelection');
-    expect(document.body.textContent).not.toContain('widgets.canvas.import.addToCurrentCanvas');
+    expect(document.body.textContent).not.toContain('widgets.gallery.itemMenu.addToCanvasAs');
     expect(document.body.textContent).not.toContain('widgets.canvas.import.newProjectFromImage');
     await pickQuickItem('widgets.gallery.itemMenu.openInNewTab');
     await interact(() => root?.unmount());
@@ -861,9 +974,12 @@ describe('ImageContextMenu change-board destinations', () => {
       'the change-board submenu to list its boards'
     );
 
-    return Array.from(document.querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item-group-label"]')).map(
-      (label) => label.textContent?.trim()
-    );
+    return Array.from(
+      document
+        .querySelector(`[data-value="${listedValue}"]`)!
+        .closest('[role="menu"]')!
+        .querySelectorAll<HTMLElement>('[data-scope="menu"][data-part="item-group-label"]')
+    ).map((label) => label.textContent?.trim());
   };
 
   it("groups the boards as the host lists them: another user's board apart, the caller's own under Library", async () => {
