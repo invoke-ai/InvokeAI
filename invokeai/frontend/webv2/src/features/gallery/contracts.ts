@@ -30,6 +30,7 @@ export {
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
   generatedVideoToGalleryItem,
+  getGalleryItemView,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,

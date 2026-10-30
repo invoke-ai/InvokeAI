@@ -7,6 +7,7 @@ import {
   ALL_READABLE_BOARDS_ID,
   classifyGalleryUpload,
   compareGalleryItems,
+  getGalleryItemView,
   legacyGeneratedImageToGalleryItem,
 } from '@features/gallery/core/items';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
@@ -231,12 +232,11 @@ export const useGalleryUploadAction = ({
         }
 
         const currentGalleryLocation = getCurrentGalleryLocation?.();
-        const getItemView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
         const uploadsOnBoard = currentGalleryLocation
           ? uploadedItems.filter((item) => item.boardId === currentGalleryLocation.selectedBoardId)
           : [];
         const visibleUploads = uploadsOnBoard.filter(
-          (item) => getItemView(item) === currentGalleryLocation?.galleryView
+          (item) => getGalleryItemView(item) === currentGalleryLocation?.galleryView
         );
         // Uploaded images and videos land on different tabs; when nothing landed on the one showing, switch to the
         // one that received them, so the upload is seen. A mixed upload always has some on the tab showing. A Gallery
@@ -248,10 +248,10 @@ export const useGalleryUploadAction = ({
           currentGalleryLocation.selectedBoardId === launchLocation.selectedBoardId;
         const receivingView =
           visibleUploads.length === 0 && isGalleryWhereLaunched && uploadsOnBoard[0]
-            ? getItemView(uploadsOnBoard[0])
+            ? getGalleryItemView(uploadsOnBoard[0])
             : null;
         const shownUploads = receivingView
-          ? uploadsOnBoard.filter((item) => getItemView(item) === receivingView)
+          ? uploadsOnBoard.filter((item) => getGalleryItemView(item) === receivingView)
           : visibleUploads;
         const newestShownUpload = shownUploads.reduce<GalleryItem | undefined>(
           (newest, item) =>

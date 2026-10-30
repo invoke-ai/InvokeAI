@@ -2,6 +2,7 @@ import type { GalleryItem } from '@features/gallery';
 import type { WidgetLabelProps, WorkbenchRegion } from '@workbench/widgetContracts';
 
 import { Box, HStack, Text } from '@chakra-ui/react';
+import { getGalleryItemView } from '@features/gallery/contracts';
 import {
   GalleryPickerPopover,
   type GalleryPickerAccept,
@@ -100,10 +101,12 @@ const PreviewItemPicker = ({
   const rowRef = useRef<HTMLDivElement>(null);
   const [isTooltipOpen, setIsTooltipOpen] = useState(false);
   const selectItem = useCallback((picked: GalleryItem) => gallery.selectItemInItsBoard(picked), [gallery]);
-  // Generated media lists under Images, uploads under Assets: open on the view that shows the item.
+  // Open on the item's board and the view that lists it. No view lists a Canvas-owned item, so the picker keeps the
+  // Gallery's view for it.
+  const itemView = getGalleryItemView(item);
   const openingScope = useMemo<GalleryPickerOpeningScope>(
-    () => ({ boardId: item.boardId, galleryView: item.category === 'general' ? 'images' : 'assets' }),
-    [item.boardId, item.category]
+    () => (itemView ? { boardId: item.boardId, galleryView: itemView } : { boardId: item.boardId }),
+    [item.boardId, itemView]
   );
   // The tooltip names the item only while the row hides some of it; checked when it asks to open, so a resize costs
   // no render.

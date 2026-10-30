@@ -6487,6 +6487,28 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
+  it("stamps an item-board selection with the item's view, or the shown view when no view lists the item", () => {
+    let state = createInitialWorkbenchState();
+    const stampedView = () =>
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery as { galleryView: string })
+        .galleryView;
+
+    state = workbenchReducer(state, {
+      item: { ...createGalleryImageItem('upload.png', 'board-found'), category: 'user' },
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+    expect(stampedView()).toBe('assets');
+
+    // A Canvas-owned item is in neither listing; the Gallery shows Images, so navigation stays there.
+    state = workbenchReducer(state, {
+      item: { ...createGalleryImageItem('layer.png', 'board-found'), category: 'other' },
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+    expect(stampedView()).toBe('images');
+  });
+
   it('keeps an item-board stamp through a host step while the Gallery ranks', () => {
     let state = createInitialWorkbenchState();
 

@@ -202,6 +202,14 @@ describe('PreviewWidgetLabel', () => {
     await vi.waitFor(() => expect(document.activeElement).toBe(trigger));
   });
 
+  it("opens a Canvas-owned item's picker at its board, leaving the view to the Gallery", async () => {
+    state.actionItem = { ...previewedItem, category: 'other' };
+    await render();
+
+    await userEvent.click(getTrigger());
+    await vi.waitFor(() => expect(pickerView.openingScope).toEqual({ boardId: 'board-2' }));
+  });
+
   it('opens from the keyboard and returns focus to the trigger on Escape', async () => {
     await render('right');
     const trigger = getTrigger();

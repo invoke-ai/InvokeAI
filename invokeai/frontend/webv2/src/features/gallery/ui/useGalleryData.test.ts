@@ -118,6 +118,22 @@ describe('getGalleryRecentItems', () => {
     expect(namesFor('DESC')).toEqual(['fresh.png', 'same-instant.png', 'echoed-old.png']);
   });
 
+  it('overlays each local output only on the view whose listing holds its category', () => {
+    const recentImages = [
+      asGenerated(createImage(1, { imageName: 'generated.png' })),
+      asGenerated(createImage(2, { imageCategory: 'control', imageName: 'control.png' })),
+      asGenerated(createImage(3, { imageCategory: 'other', imageName: 'canvas-layer.png' })),
+    ];
+    const namesFor = (galleryView: 'images' | 'assets') =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, galleryView }, recentImages }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('images')).toEqual(['generated.png']);
+    // Canvas-owned `other` pixels are in no listing, so the overlay never shows them as a phantom asset.
+    expect(namesFor('assets')).toEqual(['control.png']);
+  });
+
   it('hides local outputs whose media kind the listing excludes', () => {
     const recent = asGenerated(createImage(1, { imageName: 'recent-1.png' }));
     const namesFor = (mediaKind: 'image' | 'video') =>

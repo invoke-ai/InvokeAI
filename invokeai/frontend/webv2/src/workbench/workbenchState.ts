@@ -86,6 +86,8 @@ import {
   type GeneratedImageContract,
   type GeneratedVideoContract,
   generatedVideoToGalleryItem,
+  getGalleryItemView,
+  getGalleryView,
   settleGalleryValues,
 } from '@features/gallery/contracts';
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
@@ -3649,7 +3651,8 @@ const getGalleryResultSelectionValues = (
     selectedImagePage: 0,
     selectedImageQuery: {
       boardId: item.boardId,
-      galleryView: item.category === 'general' ? 'images' : 'assets',
+      // No view lists a Canvas-owned (`other`) item, so no listing can step from it: keep the one on screen.
+      galleryView: getGalleryItemView(item) ?? getGalleryView(galleryValues),
       imageOrderDir: gallerySettings.imageOrderDir,
       ...(mediaKind === item.kind ? { mediaKind } : {}),
       page: 0,
@@ -5642,7 +5645,8 @@ const reduceWorkbenchAction = (
           const selectedImageQuery = action.navigateItemBoard
             ? {
                 boardId: action.item.boardId,
-                galleryView: action.item.category === 'general' ? 'images' : 'assets',
+                // A Canvas-owned (`other`) item is in no view's listing; keep the one on screen.
+                galleryView: getGalleryItemView(action.item) ?? getGalleryView(values),
                 imageOrderDir: settings.imageOrderDir,
                 itemBoard: true,
                 page: selectedImagePage,

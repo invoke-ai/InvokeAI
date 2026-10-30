@@ -6,6 +6,7 @@ import type { GalleryBoard, GalleryView, GeneratedImageContract } from '@feature
 import {
   compareCreatedAt,
   compareGalleryItems,
+  getGalleryItemView,
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery/core/items';
@@ -173,12 +174,8 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
   }
 
   const hasMatchingBoard = filter.boardId === ALL_READABLE_BOARDS_ID || filter.boardId === item.boardId;
-  const hasMatchingCategory =
-    filter.galleryView === 'images'
-      ? item.category === 'general'
-      : item.kind === 'image' && item.category !== 'general';
 
-  return hasMatchingBoard && hasMatchingCategory;
+  return hasMatchingBoard && getGalleryItemView(item) === filter.galleryView;
 };
 
 /** Merges an already resolved recent overlay into the backend window in listing order. */

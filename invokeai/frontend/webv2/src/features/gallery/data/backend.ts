@@ -25,6 +25,7 @@ import type {
 import {
   ALL_READABLE_BOARDS_ID,
   DATE_BOARD_ID_PREFIX,
+  getGalleryViewCategories,
   isDateBoardId,
   parseGalleryItemKey,
 } from '@features/gallery/core/items';
@@ -111,9 +112,8 @@ interface ListImagesResponse {
   total: number;
 }
 
-/** Mirror backend gallery categories; canvas-owned `other` pixels belong to neither Images nor Assets. */
-const imageCategories = ['general'];
-const assetCategories = ['control', 'mask', 'user'];
+const imageCategories = getGalleryViewCategories('images');
+const assetCategories = getGalleryViewCategories('assets');
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
