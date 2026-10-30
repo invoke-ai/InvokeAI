@@ -482,6 +482,8 @@ export const getGalleryVideoMetadata = async (
 /** The workflow and graph a piece of media embeds, each as stringified JSON, when it has them. */
 export interface GalleryMediaWorkflow {
   graph: string | null;
+  /** Image inputs resolved for this output; the full source graph remains available for workflow loading. */
+  resolved_inputs?: string | null;
   workflow: string | null;
 }
 
