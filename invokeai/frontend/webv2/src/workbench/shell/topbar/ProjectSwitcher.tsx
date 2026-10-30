@@ -33,6 +33,7 @@ import {
   CheckIcon,
   CopyIcon,
   FileDownIcon,
+  FolderIcon,
   FolderOpenIcon,
   PencilIcon,
   PlusIcon,
@@ -44,7 +45,7 @@ import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { projectSwitcherStore, setProjectSwitcherOpen } from './projectSwitcherStore';
-import { HIDE_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
+import { HIDE_BELOW_PROJECT_NAME_WIDTH, SHOW_BELOW_PROJECT_NAME_WIDTH } from './topbarBreakpoints';
 import { TopbarMenuChevron } from './TopbarMenuChevron';
 
 // The dialog reads the gallery's board query, and this host sits in a boot graph the performance gates pin by source
@@ -210,6 +211,7 @@ export const ProjectSwitcher = () => {
             variant="ghost"
             onContextMenu={handleTriggerContextMenu}
           >
+            <Icon as={FolderIcon} boxSize="4" css={SHOW_BELOW_PROJECT_NAME_WIDTH} flexShrink={0} />
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
             {hasProjectNeedingAttention ? (
               <Icon as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} />

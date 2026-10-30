@@ -215,6 +215,29 @@ describe('ProjectSwitcher', () => {
     await vi.waitFor(() => expect(chevronColor()).toBe(bright));
   });
 
+  it('stands a folder icon in for the project name where the topbar is too narrow for it', async () => {
+    const trigger = document.querySelector<HTMLElement>('button[aria-label="topbar.projectSwitcher.trigger"]')!;
+    const folderIcon = trigger.querySelector<SVGElement>('svg.lucide-folder')!;
+    const name = [...trigger.children].find((child) => child.textContent === 'Prompt project')!;
+    const { innerHeight, innerWidth } = window;
+
+    try {
+      await page.viewport(900, 700);
+      await vi.waitFor(() => {
+        expect(folderIcon.checkVisibility()).toBe(true);
+        expect(name.checkVisibility()).toBe(false);
+      });
+
+      await page.viewport(1200, 700);
+      await vi.waitFor(() => {
+        expect(name.checkVisibility()).toBe(true);
+        expect(folderIcon.checkVisibility()).toBe(false);
+      });
+    } finally {
+      await page.viewport(innerWidth, innerHeight);
+    }
+  });
+
   it('flushes an immediate debounced prompt edit before reading and exporting the project', async () => {
     let exportItem: HTMLElement | undefined;
 
