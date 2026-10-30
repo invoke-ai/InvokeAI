@@ -1,5 +1,8 @@
 """Persisted PNG input records reach image inspection without changing editor restoration."""
 
+import io
+import json
+import zlib
 from collections.abc import Iterator
 from pathlib import Path
 
@@ -19,7 +22,10 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph
+from invokeai.app.services.urls.urls_default import LocalUrlService
+from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutIDValidator
 from tests.app.routers.conftest import MockApiDependencies, _auth
 
 
@@ -43,9 +49,7 @@ def persisted_inputs(
         moves.stop()
 
 
-def _save_png(
-    invoker: Invoker, storage: DiskImageFileStorage, *, workflow: str | None, resolved: bool
-) -> tuple[str, str | None]:
+def _graph_strings(resolved: bool) -> tuple[str, str | None]:
     graph = Graph(
         nodes={"math": AddInvocation(id="math", a=0, b=1), "noise": NoiseInvocation(id="noise", seed=0)},
         edges=[
@@ -60,6 +64,13 @@ def _save_png(
     runtime.nodes["math"].a = 17
     runtime.nodes["noise"].seed = 18
     resolved_json = runtime.model_dump_json() if resolved else None
+    return source_json, resolved_json
+
+
+def _save_png(
+    invoker: Invoker, storage: DiskImageFileStorage, *, workflow: str | None, resolved: bool
+) -> tuple[str, str | None]:
+    source_json, resolved_json = _graph_strings(resolved)
     services = invoker.services
     user_id = services.users.get_by_email("user1@test.com").user_id
     services.image_records.save(
@@ -84,6 +95,222 @@ def _save_png(
     # A fresh reader must recover from disk, using the record's non-flat location.
     services.image_files = DiskImageFileStorage(storage.image_root)
     return source_json, resolved_json
+
+
+@pytest.mark.parametrize("crop,resize", [(False, False), (True, False), (False, True), (True, True)])
+@pytest.mark.parametrize("override_metadata", [False, True], ids=["embedded-metadata", "form-metadata"])
+@pytest.mark.parametrize("diagnostic", ["resolved", "legacy", "malformed", "wrong-envelope"])
+def test_uploaded_png_preserves_generation_records(
+    client: TestClient,
+    mock_invoker: Invoker,
+    user1_token: str,
+    persisted_inputs: DiskImageFileStorage,
+    crop: bool,
+    resize: bool,
+    override_metadata: bool,
+    diagnostic: str,
+) -> None:
+    services = mock_invoker.services
+    services.names = SimpleNameService()
+    services.urls = LocalUrlService()
+    source_json, resolved_json = _graph_strings(True)
+    workflow_json = (
+        json.dumps(
+            {
+                "name": "Original authoring workflow",
+                "author": "",
+                "description": "",
+                "version": "1.0.0",
+                "contact": "",
+                "tags": "",
+                "notes": "Preserve whitespace as well as content",
+                "exposedFields": [],
+                "meta": {"version": "3.0.0", "category": "user"},
+                "nodes": [],
+                "edges": [],
+                "form": {"elements": {}, "rootElementId": "root"},
+            },
+            indent=2,
+        )
+        + "\n"
+    )
+    WorkflowWithoutIDValidator.validate_json(workflow_json)
+    embedded_metadata = {"seed": 18, "resolved_inputs": "user-owned", "invokeai_resolved_inputs": {"note": "keep"}}
+    form_metadata = {"seed": 99, "resolved_inputs": {"custom": True}, "invokeai_resolved_inputs": "also user-owned"}
+    incoming_inputs = {
+        "resolved": resolved_json,
+        "legacy": None,
+        "malformed": "not JSON",
+        "wrong-envelope": '{"nodes": [], "edges": []}',
+    }[diagnostic]
+    # Produce the input PNG through the real image service and writer, then upload its actual bytes.
+    user_id = services.users.get_by_email("user1@test.com").user_id
+    with Image.new("RGBA", (4, 4)) as image:
+        image.paste((12, 34, 56, 255), (1, 1, 3, 3))
+        original = services.images.create(
+            image=image,
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            user_id=user_id,
+            metadata=json.dumps(embedded_metadata),
+            workflow=workflow_json,
+            graph=source_json,
+            resolved_inputs=incoming_inputs,
+        )
+    original_record = services.image_records.get(original.image_name)
+    original_path = persisted_inputs.get_path(original.image_name, image_subfolder=original_record.image_subfolder)
+    original_png = original_path.read_bytes()
+    form = {"metadata": json.dumps(form_metadata)} if override_metadata else {}
+    if resize:
+        form["resize_to"] = '{"width": 8, "height": 6}'
+    uploaded = client.post(
+        "/api/v1/images/upload",
+        params={"image_category": "general", "is_intermediate": "false", "crop_visible": str(crop).lower()},
+        headers=_auth(user1_token),
+        files={"file": (original.image_name, original_png, "image/png")},
+        data=form,
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    image_name = uploaded.json()["image_name"]
+    assert image_name != original.image_name
+    record = services.image_records.get(image_name)
+    assert services.image_records.get_user_id(image_name) == user_id
+    assert record.has_workflow
+    expected_metadata = form_metadata if override_metadata else embedded_metadata
+    expected_inputs = resolved_json if diagnostic == "resolved" else None
+    # A new storage instance cannot serve the writer's populated Image.info cache.
+    reader = DiskImageFileStorage(persisted_inputs.image_root)
+    services.image_files = reader
+    with reader.get(image_name, image_subfolder=record.image_subfolder) as reopened:
+        assert reopened.format == "PNG"
+        assert reopened.size == ((8, 6) if resize else (2, 2) if crop else (4, 4))
+        assert json.loads(reopened.info["invokeai_metadata"]) == expected_metadata
+        assert reopened.info["invokeai_graph"] == source_json
+        assert reopened.info["invokeai_workflow"] == workflow_json
+        disk_inputs = reopened.info.get("invokeai_resolved_inputs")
+    response = client.get(f"/api/v1/images/i/{image_name}/workflow", headers=_auth(user1_token))
+    assert response.status_code == 200, response.text
+    assert response.json() == {"workflow": workflow_json, "graph": source_json, "resolved_inputs": expected_inputs}
+    assert disk_inputs == expected_inputs
+    if expected_inputs is not None:
+        inputs = json.loads(disk_inputs)
+        assert inputs["nodes"]["noise"]["seed"] == 18
+        assert inputs["nodes"]["math"]["a"] == 17
+    assert original_path.read_bytes() == original_png
+
+
+def _png_chunks(png: bytes) -> list[bytes]:
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+    chunks = []
+    offset = 8
+    while offset < len(png):
+        end = offset + 12 + int.from_bytes(png[offset : offset + 4], "big")
+        chunks.append(png[offset:end])
+        offset = end
+    assert offset == len(png)
+    assert chunks[-1][4:8] == b"IEND"
+    return chunks
+
+
+@pytest.mark.parametrize("crop", [False, True], ids=["plain", "crop"])
+def test_upload_preserves_post_idat_png_records(
+    client: TestClient,
+    mock_invoker: Invoker,
+    user1_token: str,
+    persisted_inputs: DiskImageFileStorage,
+    crop: bool,
+) -> None:
+    services = mock_invoker.services
+    services.names = SimpleNameService()
+    services.urls = LocalUrlService()
+    source, resolved = _graph_strings(True)
+    workflow = (
+        '{ "name": "Trailing text workflow", "author": "", "description": "", "version": "1.0.0", '
+        '"contact": "", "tags": "", "notes": "", "exposedFields": [], '
+        '"meta": {"version": "3.0.0", "category": "user"}, "nodes": [], "edges": [] }\n'
+    )
+    WorkflowWithoutIDValidator.validate_json(workflow)
+    metadata = '{ "seed": 18, "resolved_inputs": "user-owned" }'
+    records = {
+        "invokeai_metadata": metadata,
+        "invokeai_workflow": workflow,
+        "invokeai_graph": source,
+        "invokeai_resolved_inputs": resolved,
+    }
+    with Image.new("RGBA", (4, 4)) as image:
+        image.paste((12, 34, 56, 255), (1, 1, 3, 3))
+        persisted_inputs.save(
+            image, "post-idat.png", metadata=metadata, workflow=workflow, graph=source, resolved_inputs=resolved
+        )
+    original_path = persisted_inputs.get_path("post-idat.png")
+    chunks = _png_chunks(original_path.read_bytes())
+    text_chunks = [chunk for chunk in chunks if chunk[4:8] == b"tEXt"]
+    assert len(text_chunks) == 4
+    # Move whole tEXt chunks, retaining their payloads, lengths and CRCs after all IDATs and before IEND.
+    body = [chunk for chunk in chunks[:-1] if chunk[4:8] != b"tEXt"]
+    assert body[-1][4:8] == b"IDAT"
+    original_png = b"\x89PNG\r\n\x1a\n" + b"".join(body + text_chunks + chunks[-1:])
+    original_path.write_bytes(original_png)
+    with Image.open(io.BytesIO(original_png)) as image:
+        assert not records.keys() & image.info.keys()
+        image.verify()
+    with Image.open(io.BytesIO(original_png)) as image:
+        image.load()
+        assert image.info == records
+        assert image.getpixel((1, 1)) == (12, 34, 56, 255)
+    uploaded = client.post(
+        "/api/v1/images/upload",
+        params={"image_category": "general", "is_intermediate": "false", "crop_visible": str(crop).lower()},
+        headers=_auth(user1_token),
+        files={"file": (original_path.name, original_png, "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    name = uploaded.json()["image_name"]
+    assert name != original_path.name
+    record = services.image_records.get(name)
+    reader = DiskImageFileStorage(persisted_inputs.image_root)
+    services.image_files = reader
+    with reader.get(name, image_subfolder=record.image_subfolder) as image:
+        assert image.size == ((2, 2) if crop else (4, 4))
+        assert image.getpixel((0, 0) if crop else (1, 1)) == (12, 34, 56, 255)
+        disk_records = dict(image.info)
+    response = client.get(f"/api/v1/images/i/{name}/workflow", headers=_auth(user1_token))
+    assert response.status_code == 200, response.text
+    assert response.json() == {"workflow": workflow, "graph": source, "resolved_inputs": resolved}
+    assert disk_records == records
+    assert json.loads(disk_records["invokeai_resolved_inputs"])["nodes"]["noise"]["seed"] == 18
+    assert original_path.read_bytes() == original_png
+
+
+def test_upload_rejects_undecodable_idat_as_failed_image_read(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, persisted_inputs: DiskImageFileStorage
+) -> None:
+    mock_invoker.services.names = SimpleNameService()
+    mock_invoker.services.urls = LocalUrlService()
+    png = io.BytesIO()
+    with Image.new("RGB", (2, 2), (12, 34, 56)) as image:
+        image.save(png, "PNG")
+    chunks = _png_chunks(png.getvalue())
+    for index, chunk in enumerate(chunks):
+        if chunk[4:8] == b"IDAT":
+            payload = b"\x00" * (len(chunk) - 12)
+            data = b"IDAT" + payload
+            chunks[index] = len(payload).to_bytes(4, "big") + data + zlib.crc32(data).to_bytes(4, "big")
+    broken = b"\x89PNG\r\n\x1a\n" + b"".join(chunks)
+    # Valid container/CRCs and header, but invalid compressed pixels: Image.open alone cannot catch this.
+    with Image.open(io.BytesIO(broken)) as image:
+        image.verify()
+    with Image.open(io.BytesIO(broken)) as image, pytest.raises(OSError):
+        image.load()
+    response = client.post(
+        "/api/v1/images/upload",
+        params={"image_category": "general", "is_intermediate": "false"},
+        headers=_auth(user1_token),
+        files={"file": ("broken.png", broken, "image/png")},
+    )
+    assert response.status_code == 415, response.text
+    assert response.json() == {"detail": "Failed to read image"}
+    assert list(persisted_inputs.image_root.rglob("*.png")) == []
 
 
 @pytest.mark.parametrize("workflow", [None, '{ "name": "original workflow", "nodes": [], "edges": [] }'])

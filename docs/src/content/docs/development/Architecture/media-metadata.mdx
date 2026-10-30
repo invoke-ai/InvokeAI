@@ -1,7 +1,7 @@
 ---
 title: Media Metadata
 description: How generation metadata travels inside PNG and MP4 files, the versioned record schema, and what a recall can restore on another install.
-lastUpdated: 2026-10-29
+lastUpdated: 2026-10-30
 ---
 
 Every image and video InvokeAI produces carries its generation record **inside the file**, so a
@@ -29,8 +29,14 @@ separate resolved-input record. Values are JSON strings; saved workflow JSON ret
 Both readers feed `extract_metadata` in `invokeai/app/api/extract_metadata.py`, which owns the
 validation rules: the metadata must parse to a JSON object, the workflow must validate as a
 `WorkflowWithoutID`, and the graph must be an object with a `nodes` object and an `edges` list.
-Anything else degrades to "absent". On upload, a client-supplied `metadata` form field wins over
-the embedded copy; workflow and graph are never client-overridable.
+Anything else degrades to "absent". The image reader additionally extracts optional
+`invokeai_resolved_inputs` using the same graph envelope checks, preserving the JSON string verbatim.
+These checks accept unknown community node types and unset connected fields without loading node schemas.
+A missing or malformed resolved-input record is ignored independently of the other channels.
+On image upload, the file is fully decoded in a worker thread before reading records, including
+PNG text chunks after IDAT. Records are extracted before cropping or resizing can discard `Image.info`
+and passed explicitly to the image service for persistence. A client-supplied `metadata` form field wins
+over the embedded copy; workflow, graph, and resolved inputs are never client-overridable.
 
 When workflow JSON is absent, the image editor converts `invokeai_graph` into an editable
 workflow. Keeping the source graph preserves original `Iterate`, `If`, and `Collect` nodes
@@ -40,7 +46,8 @@ can prefer this record to display actual inputs, while `workflow` and `graph` re
 contents for editor restoration. The route applies the same image read-access and storage-maintenance
 checks to all three fields. Older PNGs return `resolved_inputs: null`; responses that omit the field
 remain valid. Videos use the shared response model's `null` default and retain their existing metadata
-behavior. Metadata extraction above retains its three-key contract. The new response field does not
+behavior. Shared metadata extraction and the MP4 reader retain their three-key contract; only the
+image reader fills the optional resolved-input field. The new response field does not
 reserve or replace any key inside user `invokeai_metadata`. No migration is needed.
 
 The resolved-input record includes ordinary ancestors, such as math nodes and a Noise node's

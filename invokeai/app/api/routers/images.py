@@ -143,10 +143,27 @@ async def upload_image(
 
     contents = await file.read()
     try:
-        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
+
+        def _read_image() -> Image.Image:
+            image = Image.open(io.BytesIO(contents))
+            # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
+            image.load()
+            return image
+
+        pil_image = await asyncio.to_thread(_read_image)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
+
+    # Read file records before pixel transforms: resizing through NumPy discards Image.info.
+    extracted_metadata = await asyncio.to_thread(
+        extract_metadata_from_image,
+        pil_image=pil_image,
+        invokeai_metadata_override=metadata,
+        invokeai_workflow_override=None,
+        invokeai_graph_override=None,
+        logger=ApiDependencies.invoker.services.logger,
+    )
 
     if crop_visible:
         try:
@@ -177,15 +194,6 @@ async def upload_image(
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
-    extracted_metadata = await asyncio.to_thread(
-        extract_metadata_from_image,
-        pil_image=pil_image,
-        invokeai_metadata_override=metadata,
-        invokeai_workflow_override=None,
-        invokeai_graph_override=None,
-        logger=ApiDependencies.invoker.services.logger,
-    )
-
     try:
         image_dto = await asyncio.to_thread(
             ApiDependencies.invoker.services.images.create,
@@ -197,6 +205,7 @@ async def upload_image(
             metadata=extracted_metadata.invokeai_metadata,
             workflow=extracted_metadata.invokeai_workflow,
             graph=extracted_metadata.invokeai_graph,
+            resolved_inputs=extracted_metadata.invokeai_resolved_inputs,
             is_intermediate=is_intermediate,
             user_id=current_user.user_id,
             project_id=project_id,
