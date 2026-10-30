@@ -240,68 +240,72 @@ class LayerPatcher:
         #
         # `patch` is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
         # tensors in place -- so whatever is done here outlives the patch and is what the cache is
-        # left holding. Both moves are undone in the `finally` below.
+        # left holding. Both moves are undone in the `finally` below, also on the early return and
+        # when a move, `get_parameters` or the weight update raises.
         original_device, original_dtype = LayerPatcher._patch_placement(patch)
-        patch.to(device=device)
-        patch.to(dtype=torch.float32)
+        try:
+            patch.to(device=device)
+            patch.to(dtype=torch.float32)
 
-        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
-        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        params_dict = patch.get_parameters(dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight)
-        if not params_dict:
-            logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
-            logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
-            return
+            # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
+            # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
+            params_dict = patch.get_parameters(
+                dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
+            )
+            if not params_dict:
+                logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
+                return
 
-        for param_name, param_weight in params_dict.items():
-            param_key = module_to_patch_key + "." + param_name
-            module_param = module_to_patch.get_parameter(param_name)
+            for param_name, param_weight in params_dict.items():
+                param_key = module_to_patch_key + "." + param_name
+                module_param = module_to_patch.get_parameter(param_name)
 
-            # Save original weight
-            original_weights.save(param_key, module_param)
+                # Save original weight
+                original_weights.save(param_key, module_param)
 
-            # Handle layers that change the shape of the original layer.
-            # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
-            # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
-            if module_param.nelement() != param_weight.nelement():
-                if isinstance(patch, FluxControlLoRALayer):
-                    # FLUX Control LoRAs intentionally expand layers - pad with zeros
-                    expanded_weight = pad_with_zeros(module_param, param_weight.shape)
-                    setattr(
-                        module_to_patch,
-                        param_name,
-                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                    )
-                    # Point at the module's live (expanded) parameter so the out-of-place weight
-                    # update below lands on the module. `expanded_weight` is a detached raw tensor;
-                    # reassigning its `.data` would not propagate to the newly-set Parameter.
-                    module_param = module_to_patch.get_parameter(param_name)
-                else:
-                    # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
-                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
-                    logger.warning(
-                        f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
-                        f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
-                        "This LoRA may be incompatible with this model architecture."
-                    )
-                    continue
+                # Handle layers that change the shape of the original layer.
+                # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
+                # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
+                if module_param.nelement() != param_weight.nelement():
+                    if isinstance(patch, FluxControlLoRALayer):
+                        # FLUX Control LoRAs intentionally expand layers - pad with zeros
+                        expanded_weight = pad_with_zeros(module_param, param_weight.shape)
+                        setattr(
+                            module_to_patch,
+                            param_name,
+                            torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                        )
+                        # Point at the module's live (expanded) parameter so the out-of-place weight
+                        # update below lands on the module. `expanded_weight` is a detached raw tensor;
+                        # reassigning its `.data` would not propagate to the newly-set Parameter.
+                        module_param = module_to_patch.get_parameter(param_name)
+                    else:
+                        # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
+                        logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                        logger.warning(
+                            f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
+                            f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
+                            "This LoRA may be incompatible with this model architecture."
+                        )
+                        continue
 
-            # Convert param_weight to the correct device and dtype, then apply to model weights.
-            param_weight_converted = param_weight.to(device=device, dtype=dtype)
-            # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
-            # are patching may be the model's canonical CPU copy, which is shared across the
-            # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
-            # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
-            # here would corrupt that shared/cached tensor — and every other device's view of it.
-            # Reassigning `.data` leaves the original tensor untouched while giving this module the
-            # patched weights, and is memory-equivalent (the in-place form already allocated the
-            # `module_param.data + param_weight_converted` temporary).
-            module_param.data = module_param.data + param_weight_converted
-
-        # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
-        # cached record's size for the rest of the process, while the cache went on billing the size
-        # it measured at `put()`.
-        patch.to(device=original_device, dtype=original_dtype)
+                # Convert param_weight to the correct device and dtype, then apply to model weights.
+                param_weight_converted = param_weight.to(device=device, dtype=dtype)
+                # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
+                # are patching may be the model's canonical CPU copy, which is shared across the
+                # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
+                # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
+                # here would corrupt that shared/cached tensor — and every other device's view of it.
+                # Reassigning `.data` leaves the original tensor untouched while giving this module the
+                # patched weights, and is memory-equivalent (the in-place form already allocated the
+                # `module_param.data + param_weight_converted` temporary).
+                module_param.data = module_param.data + param_weight_converted
+        finally:
+            # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
+            # cached record's size for the rest of the process, while the cache went on billing the size
+            # it measured at `put()`.
+            patch.to(device=original_device, dtype=original_dtype)
 
     @staticmethod
     def _patch_placement(patch: BaseLayerPatch) -> tuple[torch.device | None, torch.dtype | None]:
@@ -309,10 +313,18 @@ class LayerPatcher:
 
         Patches carry their tensors in subclass-specific attributes rather than as registered
         parameters, so this reads the first real tensor instead of relying on `nn.Module` state.
+        Wrapper patches (`MergedLayerPatch`, `SwappedHalvesLayerPatch`) hold no tensors of their own,
+        only sub-patches, alone or in a list or tuple; their `to()` delegates to those, so their
+        placement is that of the first sub-patch that has a tensor.
         """
         for value in vars(patch).values():
-            if isinstance(value, torch.Tensor):
-                return value.device, value.dtype
+            for item in value if isinstance(value, (list, tuple)) else (value,):
+                if isinstance(item, torch.Tensor):
+                    return item.device, item.dtype
+                if isinstance(item, BaseLayerPatch):
+                    placement = LayerPatcher._patch_placement(item)
+                    if placement != (None, None):
+                        return placement
         return None, None
 
     @staticmethod

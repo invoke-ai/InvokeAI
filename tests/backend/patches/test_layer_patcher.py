@@ -1,5 +1,6 @@
 import gc
 import weakref
+from typing import Callable
 
 import pytest
 import torch
@@ -11,7 +12,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -671,31 +675,60 @@ def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
     assert result.get("done") is True
 
 
-def _one_layer_patch(in_features: int, out_features: int, rank: int = 4) -> ModelPatchRaw:
-    return ModelPatchRaw(
-        layers={
-            "linear_layer_1": LoRALayer(
-                up=torch.ones(out_features, rank, dtype=torch.bfloat16),
-                mid=None,
-                down=torch.ones(rank, in_features, dtype=torch.bfloat16),
-                alpha=None,
-                bias=None,
-            )
-        }
+def _fp16_lora(in_features: int, out_features: int, rank: int = 4) -> LoRALayer:
+    # fp16 factors under a bf16 compute dtype: the sidecar path then casts them even on CPU, so a
+    # placement that is not put back is visible without a GPU.
+    return LoRALayer(
+        up=torch.ones(out_features, rank, dtype=torch.float16),
+        mid=None,
+        down=torch.ones(rank, in_features, dtype=torch.float16),
+        alpha=None,
+        bias=None,
     )
 
 
-def _placement(patch: ModelPatchRaw) -> tuple[torch.device, torch.dtype]:
-    layer = patch.layers["linear_layer_1"]
-    return layer.up.device, layer.up.dtype
+def _merged_layer(in_features: int, out_features: int) -> MergedLayerPatch:
+    half = out_features // 2
+    return MergedLayerPatch(
+        lora_layers=[_fp16_lora(in_features, half), _fp16_lora(in_features, out_features - half)],
+        ranges=[Range(0, half), Range(half, out_features)],
+    )
 
 
+def _swapped_halves_layer(in_features: int, out_features: int) -> SwappedHalvesLayerPatch:
+    return SwappedHalvesLayerPatch(_fp16_lora(in_features, out_features))
+
+
+def _innermost_loras(layer: BaseLayerPatch) -> list[LoRALayer]:
+    if isinstance(layer, MergedLayerPatch):
+        return [lora for sub_layer in layer.lora_layers for lora in _innermost_loras(sub_layer)]
+    if isinstance(layer, SwappedHalvesLayerPatch):
+        return _innermost_loras(layer.layer)
+    assert isinstance(layer, LoRALayer)
+    return [layer]
+
+
+def _placements(patch: ModelPatchRaw) -> set[tuple[torch.device, torch.dtype]]:
+    """Every (device, dtype) the patch's tensors sit on, read from the innermost LoRA factors."""
+    return {
+        (tensor.device, tensor.dtype)
+        for layer in patch.layers.values()
+        for lora in _innermost_loras(layer)
+        for tensor in (lora.up, lora.down)
+    }
+
+
+@pytest.mark.parametrize(
+    "make_layer", [_fp16_lora, _merged_layer, _swapped_halves_layer], ids=["lora", "merged", "swapped_halves"]
+)
 @pytest.mark.parametrize("force_sidecar", [False, True], ids=["direct", "sidecar"])
 @pytest.mark.parametrize(
     "device",
     ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU"))],
 )
-def test_patching_leaves_the_cached_patch_where_it_found_it(force_sidecar: bool, device: str) -> None:
+def test_patching_leaves_the_cached_patch_where_it_found_it(
+    make_layer: Callable[[int, int], BaseLayerPatch], force_sidecar: bool, device: str
+) -> None:
     """A patch is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
     tensors in place. So anything patching does to a patch's device or dtype outlives the patched
     scope, inside a record the cache is still accounting for.
@@ -707,11 +740,14 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(force_sidecar: bool,
     a RAM-pinned record -- `cur_vram_bytes()` reports zero for it and `full_unload_from_vram()`
     early-returns, so the cache could not reclaim what it could not see. At a few tens of MB that was
     invisible; at LTX-2's 8.9 GB step-distillation LoRA it is a first-order VRAM consumer.
+
+    Wrapper patches hold their tensors only in sub-patches, so their placement has to be read from
+    there too, or the restore is a no-op that strands the inner layers.
     """
     model = DummyModuleWithOneLayer(in_features=8, out_features=16, device=device, dtype=torch.bfloat16)
     apply_custom_layers_to_model(model)
-    patch = _one_layer_patch(in_features=8, out_features=16)
-    before = _placement(patch)
+    patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 16)})
+    before = _placements(patch)
     before_bytes = patch.calc_size()
 
     with LayerPatcher.apply_smart_model_patches(
@@ -719,14 +755,43 @@ def test_patching_leaves_the_cached_patch_where_it_found_it(force_sidecar: bool,
         patches=[(patch, 1.0)],
         prefix="",
         dtype=torch.bfloat16,
+        force_direct_patching=not force_sidecar,
         force_sidecar_patching=force_sidecar,
     ):
-        # The sidecar path has to keep it on the compute device while the forward needs it.
-        if force_sidecar and device != "cpu":
-            assert _placement(patch)[0].type == device
+        # The sidecar path has to keep every sub-layer on the compute device and dtype while the forward needs
+        # it. On CPU the cast is the only move, so this also keeps the restore check below from passing vacuously.
+        if force_sidecar:
+            assert {placement_device.type for placement_device, _ in _placements(patch)} == {device}
+            assert {placement_dtype for _, placement_dtype in _placements(patch)} == {torch.bfloat16}
 
-    assert _placement(patch) == before
+    assert _placements(patch) == before
     assert patch.calc_size() == before_bytes
+
+
+@pytest.mark.parametrize("make_layer", [_fp16_lora, _swapped_halves_layer], ids=["lora", "swapped_halves"])
+@pytest.mark.parametrize(
+    "device",
+    ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU"))],
+)
+def test_direct_patching_that_fails_still_returns_the_cached_patch(
+    make_layer: Callable[[int, int], BaseLayerPatch], device: str
+) -> None:
+    """Direct-patched patches are not in the sidecar restore list, so the direct path has to put the
+    patch back itself on every way out. A LoRA built for another shape raises from `get_parameters`
+    after the patch has already been moved and promoted to float32."""
+    model = DummyModuleWithOneLayer(in_features=8, out_features=16, device=device, dtype=torch.bfloat16)
+    apply_custom_layers_to_model(model)
+    # 12 output rows cannot be reshaped onto the module's 16.
+    patch = ModelPatchRaw(layers={"linear_layer_1": make_layer(8, 12)})
+    before = _placements(patch)
+
+    with pytest.raises(RuntimeError, match="is invalid for input of size"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.bfloat16, force_direct_patching=True
+        ):
+            pass
+
+    assert _placements(patch) == before
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU")
