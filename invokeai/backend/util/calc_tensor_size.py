@@ -16,3 +16,15 @@ def calc_tensor_size(t: torch.Tensor) -> int:
 def calc_tensors_size(tensors: list[torch.Tensor | None]) -> int:
     """Calculate the size of a list of tensors in bytes."""
     return sum(calc_tensor_size(t) for t in tensors if t is not None)
+
+
+def largest_module_bytes(model: torch.nn.Module) -> int:
+    """The largest module's own parameters and buffers as stored (`calc_tensor_size`, as the model cache counts them):
+    what partial loading copies to the device for one layer's forward. 0 for a model without tensors."""
+    return max(
+        (
+            sum(calc_tensor_size(t) for t in (*module.parameters(recurse=False), *module.buffers(recurse=False)))
+            for module in model.modules()
+        ),
+        default=0,
+    )
