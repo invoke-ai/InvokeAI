@@ -43,6 +43,7 @@ from invokeai.app.services.shared.graph import (
     _ExecutionScheduler,
     _GenericGraphSchedulerAdapter,
 )
+from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_materializer import UnsupportedSharedIfCollectBranchesError
 from invokeai.app.services.shared.graph_nested_iterate_planner import get_nested_iterate_sequence_depth
 from invokeai.app.services.shared.invocation_context import InvocationContextData, build_invocation_context
@@ -3384,6 +3385,66 @@ def test_literal_if_selecting_collect_of_for_output_runs_per_outer_item() -> Non
     } == {(0,): [["a", "b"]], (1,): [["c"]]}
 
 
+@pytest.mark.parametrize("condition", [True, False], ids=["true", "false"])
+@pytest.mark.parametrize("passthrough", [False, True], ids=["direct", "passthrough"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_root_condition_selects_between_nested_for_final_branches(
+    condition: bool, passthrough: bool, force_compatibility_scheduler: bool
+) -> None:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="source", first=[[["a", "b"], ["c"]], [["d"]]]),
+        IterateInvocation(id="outer"),
+        CollectionConcatInvocation(id="inner_source", first=[]),
+        IterateInvocation(id="inner"),
+        FixedCollectionTestInvocation(id="condition", value=condition),
+        IfInvocation(id="if"),
+        CollectInvocation(id="inner_collect"),
+        CollectInvocation(id="outer_collect"),
+    ]
+    edges: list[Any] = [
+        ("source", "collection", "outer", "collection"),
+        ("outer", "item", "inner_source", "first"),
+        ("inner_source", "collection", "inner", "collection"),
+        ("condition", "condition", "if", "condition"),
+        ("if", "value", "inner_collect", "item"),
+        ("inner_collect", "collection", "outer_collect", "item"),
+    ]
+    for prefix, branch in (("yes", "true_input"), ("no", "false_input")):
+        nodes += [
+            ForInvocation(id=f"{prefix}_for"),
+            MarkedAnyTypeTestInvocation(id=f"{prefix}_body", marker=f"{prefix}:"),
+            ForReturnInvocation(id=f"{prefix}_return"),
+        ]
+        edges += [
+            ("inner", "item", f"{prefix}_for", "collection"),
+            (f"{prefix}_for", "item", f"{prefix}_body", "value"),
+            (f"{prefix}_body", "value", f"{prefix}_return", "output"),
+            create_loop_linkage(f"{prefix}_for", f"{prefix}_return"),
+        ]
+        if passthrough:
+            nodes.append(AnyTypeTestInvocation(id=f"{prefix}_pass"))
+            edges += [
+                (f"{prefix}_for", "output_collection", f"{prefix}_pass", "value"),
+                (f"{prefix}_pass", "value", "if", branch),
+            ]
+        else:
+            edges.append((f"{prefix}_for", "output_collection", "if", branch))
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    marker = "yes:" if condition else "no:"
+    assert _source_values(state, "outer_collect") == {
+        (): [[[f"{marker}a", f"{marker}b"], [f"{marker}c"]], [[f"{marker}d"]]]
+    }
+    selected, rejected = ("yes", "no") if condition else ("no", "yes")
+    assert f"{selected}_for" in trace
+    assert f"{rejected}_for" not in trace
+
+
 @pytest.mark.parametrize("fail_unselected", [False, True], ids=["succeeds", "unselected-fails"])
 def test_per_item_if_does_not_run_for_output_branch_for_unselected_item(fail_unselected: bool) -> None:
     """A For whose final output is collected into one If branch runs, with its body, only for selecting items."""
@@ -3500,16 +3561,21 @@ def test_if_in_for_body_rejecting_nested_for_branch_completes(computed_condition
 
 
 @pytest.mark.parametrize(
-    ("condition", "computed_condition"),
-    [(True, True), (False, False), (False, True)],
-    ids=["computed-True", "literal-False", "computed-False"],
+    ("condition", "computed_condition", "source_data"),
+    [
+        (True, True, [["a", "b"], ["c"]]),
+        (False, False, [["a", "b"], ["c"]]),
+        (False, True, [["a", "b"], ["c"]]),
+        (False, True, []),
+    ],
+    ids=["computed-True", "literal-False", "computed-False", "computed-False-empty-source"],
 )
 def test_root_condition_if_with_for_output_branch_under_iterate_completes(
-    condition: bool, computed_condition: bool
+    condition: bool, computed_condition: bool, source_data: list[list[str]]
 ) -> None:
     """The Iterate a branch For runs under is not gated by the If, and the rejected For never runs."""
     nodes = [
-        CollectionConcatInvocation(id="src", first=[["a", "b"], ["c"]]),
+        CollectionConcatInvocation(id="src", first=source_data),
         IterateInvocation(id="iterate"),
         ForInvocation(id="for"),
         MarkedAnyTypeTestInvocation(id="body", marker="b:"),
@@ -3536,11 +3602,654 @@ def test_root_condition_if_with_for_output_branch_under_iterate_completes(
 
     trace, state = _run_to_completion(_graph_from(nodes, edges))
 
-    # Selecting the root value keeps main's single root-frame If; selected-branch cardinality is decided separately.
     expected = [["b:a", "b:b"], ["b:c"]] if condition else ["fb"]
     assert _source_values(state, "collect") == {(): expected}
     if not condition:
         assert not {"for", "body", "ret", "mid"} & set(trace)
+
+
+def test_computed_root_if_selecting_root_value_over_unselected_for_emits_one_result() -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["c"], ["d"], ["e"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="F"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            BooleanInvocation(id="condition", value=True),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("root", "value", "if", "true_input"),
+            ("for", "output_collection", "if", "false_input"),
+            ("condition", "value", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph), force_compatibility_scheduler=True)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["R"]}
+    assert trace.count("if") == 1
+    assert not {"for", "body", "ret"} & set(trace)
+
+
+def test_computed_root_if_selecting_root_value_over_empty_unselected_for_emits_one_result() -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="F"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            BooleanInvocation(id="condition", value=True),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("root", "value", "if", "true_input"),
+            ("for", "output_collection", "if", "false_input"),
+            ("condition", "value", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(GraphExecutionState(graph=graph), force_compatibility_scheduler=True)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["R"]}
+    assert trace.count("if") == 1
+    assert not {"for", "body", "ret"} & set(trace)
+
+
+def test_literal_nested_if_collect_preserves_sibling_collection_input() -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a"], ["b"]]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectionConcatInvocation(id="sibling_collection", first=["sibling"]),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("sibling_collection", "collection", "collect", "collection"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): ["sibling", ["a"]],
+        (1,): ["sibling", ["b"]],
+    }
+
+
+@pytest.mark.parametrize("computed_outer_condition", [False, True], ids=["literal-outer", "computed-outer"])
+def test_empty_literal_nested_if_collect_with_sibling_collection_completes(
+    computed_outer_condition: bool,
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectionConcatInvocation(id="sibling_collection", first=["sibling"]),
+        CollectInvocation(id="collect"),
+    ]
+    if computed_outer_condition:
+        nodes.insert(-4, BooleanInvocation(id="outer_condition", value=True))
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("sibling_collection", "collection", "collect", "collection"),
+    ]
+    if computed_outer_condition:
+        edges.insert(-3, ("outer_condition", "value", "outer", "condition"))
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["sibling"]}
+
+
+def test_literal_nested_if_collect_preserves_all_sibling_iterate_items() -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a", "b"], ["c", "d"]]),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        IterateInvocation(id="sibling_iterate"),
+        AnyTypeTestInvocation(id="sibling_value"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+        ("for", "output_collection", "sibling_iterate", "collection"),
+        ("sibling_iterate", "item", "sibling_value", "value"),
+        ("sibling_value", "value", "collect", "item"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [["a", "b"], "a", "b"],
+        (1,): [["c", "d"], "c", "d"],
+    }
+
+
+@pytest.mark.parametrize("reverse_collect_items", [False, True], ids=["first-narrow", "first-wide"])
+def test_nested_literal_if_collect_uses_union_of_item_frame_paths(reverse_collect_items: bool) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[[], ["a"]]),
+        IterateInvocation(id="outer_iterate"),
+        PolymorphicStringTestInvocation(id="inner_collection"),
+        IterateInvocation(id="inner_iterate"),
+        FixedCollectionTestInvocation(id="for_collection"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body", value="for"),
+        ForReturnInvocation(id="ret"),
+        IfInvocation(id="first_inner", condition=True),
+        AnyTypeTestInvocation(id="first_inner_fallback", value="first-inner-fallback"),
+        IfInvocation(id="first_outer", condition=True),
+        AnyTypeTestInvocation(id="first_outer_fallback", value="first-outer-fallback"),
+        IfInvocation(id="second_inner", condition=True),
+        AnyTypeTestInvocation(id="second_inner_fallback", value="second-inner-fallback"),
+        IfInvocation(id="second_outer", condition=True),
+        AnyTypeTestInvocation(id="second_outer_fallback", value="second-outer-fallback"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "outer_iterate", "collection"),
+        ("outer_iterate", "item", "inner_collection", "value"),
+        ("inner_collection", "collection", "inner_iterate", "collection"),
+        ("inner_iterate", "item", "for_collection", "value"),
+        ("for_collection", "collection", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "first_inner", "true_input"),
+        ("first_inner_fallback", "value", "first_inner", "false_input"),
+        ("first_inner", "value", "first_outer", "true_input"),
+        ("first_outer_fallback", "value", "first_outer", "false_input"),
+        ("outer_iterate", "item", "second_inner", "true_input"),
+        ("second_inner_fallback", "value", "second_inner", "false_input"),
+        ("second_inner", "value", "second_outer", "true_input"),
+        ("second_outer_fallback", "value", "second_outer", "false_input"),
+    ]
+    collect_item_edges = [
+        ("first_outer", "value", "collect", "item"),
+        ("second_outer", "value", "collect", "item"),
+    ]
+    if reverse_collect_items:
+        collect_item_edges.reverse()
+    edges.extend(collect_item_edges)
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert len(state.source_prepared_mapping["collect"]) == 2
+    assert set(_source_values(state, "collect")) == {(0,), (1, 0)}
+    assert _source_values(state, "collect") == {
+        (0,): [[]],
+        (1, 0): [["a"], [0, 1]],
+    }
+
+
+@pytest.mark.parametrize("computed_inner_condition", [False, True], ids=["literal-inner", "computed-inner"])
+@pytest.mark.parametrize("inner_condition", [False, True], ids=["inner-false", "inner-true"])
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_nested_root_if_ignores_empty_unselected_for_branch(
+    computed_inner_condition: bool,
+    inner_condition: bool,
+    source_data: list[list[str]],
+) -> None:
+    """Nested selected-branch cardinality is outside the README's direct root-If promise."""
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="inner", condition=inner_condition),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        BooleanInvocation(id="outer_condition", value=True),
+        IfInvocation(id="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer_condition", "value", "outer", "condition"),
+        ("outer", "value", "collect", "item"),
+    ]
+    if computed_inner_condition:
+        nodes.append(BooleanInvocation(id="inner_condition", value=inner_condition))
+        edges.append(("inner_condition", "value", "inner", "condition"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    if not source_data:
+        assert all(not state.source_prepared_mapping.get(node_id) for node_id in ("for", "body", "ret"))
+    if not inner_condition:
+        assert not {"for", "body", "ret"} & set(trace)
+        assert all(not state.source_prepared_mapping.get(node_id) for node_id in ("for", "body", "ret"))
+    expected = (
+        {(): []}
+        if inner_condition and not source_data
+        else {(0,): [["a"]], (1,): [["b"]]}
+        if inner_condition and computed_inner_condition
+        else {(): [["a"], ["b"]]}
+        if inner_condition
+        else {(): ["inner"]}
+    )
+    assert _source_values(state, "collect") == expected
+    if inner_condition and source_data:
+        for node_id in ("inner", "outer"):
+            assert sorted(state._get_iteration_path(exec_id) for exec_id in state.source_prepared_mapping[node_id]) == (
+                [(0,), (1,)]
+            )
+
+
+@pytest.mark.parametrize("outer_computed", [False, True], ids=["literal-outer", "computed-outer"])
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_literal_and_computed_outer_if_match_empty_nested_selection(
+    outer_computed: bool,
+    source_data: list[list[str]],
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="inner_condition", value=True),
+        IfInvocation(id="inner"),
+        AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+        IfInvocation(id="outer", condition=True),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "inner", "true_input"),
+        ("inner_fallback", "value", "inner", "false_input"),
+        ("inner_condition", "value", "inner", "condition"),
+        ("inner", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+    ]
+    if outer_computed:
+        nodes.append(BooleanInvocation(id="outer_condition", value=True))
+        edges.append(("outer_condition", "value", "outer", "condition"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+
+    assert not state.has_error(), trace
+    assert state.is_complete(), (
+        f"graph stalled after {trace}; executed={state.executed}; mappings={state.source_prepared_mapping}"
+    )
+    assert _source_values(state, "collect") == ({(): []} if not source_data else {(0,): [["a"]], (1,): [["b"]]})
+
+
+@pytest.mark.parametrize("source_data", [[], [["a"], ["b"]]], ids=["empty", "nonempty"])
+def test_three_level_computed_if_chain_preserves_for_frames(
+    source_data: list[list[str]],
+) -> None:
+    """Compatibility fallback guard; this nested selected-branch shape is outside direct root-If cardinality guarantees."""
+    nodes = [
+        CollectionConcatInvocation(id="src", first=source_data),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="body"),
+        ForReturnInvocation(id="ret"),
+        BooleanInvocation(id="deep_condition", value=True),
+        IfInvocation(id="deep"),
+        BooleanInvocation(id="middle_condition", value=True),
+        IfInvocation(id="middle"),
+        BooleanInvocation(id="outer_condition", value=True),
+        IfInvocation(id="outer"),
+        AnyTypeTestInvocation(id="deep_fallback", value="deep"),
+        AnyTypeTestInvocation(id="middle_fallback", value="middle"),
+        AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "body", "value"),
+        ("body", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "deep", "true_input"),
+        ("deep_fallback", "value", "deep", "false_input"),
+        ("deep_condition", "value", "deep", "condition"),
+        ("deep", "value", "middle", "true_input"),
+        ("middle_fallback", "value", "middle", "false_input"),
+        ("middle_condition", "value", "middle", "condition"),
+        ("middle", "value", "outer", "true_input"),
+        ("outer_fallback", "value", "outer", "false_input"),
+        ("outer_condition", "value", "outer", "condition"),
+        ("outer", "value", "collect", "item"),
+    ]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=True,
+    )
+    assert not state.has_error(), trace
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == ({(): []} if not source_data else {(0,): [["a"]], (1,): [["b"]]})
+    if source_data:
+        for node_id in ("deep", "middle", "outer"):
+            assert sorted(state._get_iteration_path(exec_id) for exec_id in state.source_prepared_mapping[node_id]) == [
+                (0,),
+                (1,),
+            ]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("for_field", ["true_input", "false_input"], ids=["true-for", "false-for"])
+def test_literal_if_skips_direct_unselected_for_final(force_compatibility_scheduler: bool, for_field: str) -> None:
+    selected_field = "false_input" if for_field == "true_input" else "true_input"
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a"], ["b"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="F"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if", condition=selected_field == "true_input"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", for_field),
+            ("fallback", "value", "if", selected_field),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["fb"]}
+    assert not {"for", "body", "ret"} & set(trace)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_nested_literal_if_under_wired_root_if_keeps_parent_iterate_frames(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a", "c"], ["c", "b"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="left_for"),
+            MarkedAnyTypeTestInvocation(id="left_body", marker="F"),
+            ForReturnInvocation(id="left_ret"),
+            ForInvocation(id="right_for"),
+            MarkedAnyTypeTestInvocation(id="right_body", marker="F"),
+            ForReturnInvocation(id="right_ret"),
+            IfInvocation(id="inner_if", condition=True),
+            MarkedAnyTypeTestInvocation(id="passthrough", marker="p:"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            BooleanInvocation(id="condition", value=True),
+            IfInvocation(id="outer_if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "left_for", "collection"),
+            ("left_for", "item", "left_body", "value"),
+            ("left_body", "value", "left_ret", "output"),
+            create_loop_linkage("left_for", "left_ret"),
+            ("iterate", "item", "right_for", "collection"),
+            ("right_for", "item", "right_body", "value"),
+            ("right_body", "value", "right_ret", "output"),
+            create_loop_linkage("right_for", "right_ret"),
+            ("left_for", "output_collection", "inner_if", "true_input"),
+            ("right_for", "output_collection", "inner_if", "false_input"),
+            ("inner_if", "value", "passthrough", "value"),
+            ("passthrough", "value", "outer_if", "true_input"),
+            ("root", "value", "outer_if", "false_input"),
+            ("condition", "value", "outer_if", "condition"),
+            ("outer_if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["p:['Fa', 'Fc']", "p:['Fc', 'Fb']"]}
+    assert trace.count("inner_if") == 2
+    assert trace.count("outer_if") == 2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_literal_if_after_final_iterate_checkpoint_completes_without_unselected_for(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a", "b"], ["c"], ["d"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="F"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            IfInvocation(id="if", condition=False),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("root", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    trace, partial = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler, stop_after=5
+    )
+    assert trace[-1] == "iterate"
+
+    resumed_trace, state = _run_graph(
+        load_execution_state(dump_execution_state(partial)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace + resumed_trace}"
+    assert _source_values(state, "collect") == {(): ["R"]}
+    assert not {"for", "body", "ret"} & set(trace + resumed_trace)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_empty_nested_iterates_and_collects_complete_through_unselected_for(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[[], [[[]], [["c", "a", "c"]]]]),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="concat1"),
+            IterateInvocation(id="it1"),
+            CollectionConcatInvocation(id="concat2"),
+            IterateInvocation(id="it2"),
+            MarkedAnyTypeTestInvocation(id="x", marker="x"),
+            CollectInvocation(id="branch_collect"),
+            MarkedAnyTypeTestInvocation(id="passthrough", marker="F:"),
+            CollectionConcatInvocation(id="empty_src", first=[]),
+            IterateInvocation(id="empty_iterate"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="for_body"),
+            ForReturnInvocation(id="for_ret"),
+            BooleanInvocation(id="condition", value=False),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "it0", "collection"),
+            ("it0", "item", "concat1", "first"),
+            ("concat1", "collection", "it1", "collection"),
+            ("it1", "item", "concat2", "first"),
+            ("concat2", "collection", "it2", "collection"),
+            ("it1", "item", "x", "value"),
+            ("x", "value", "branch_collect", "item"),
+            ("branch_collect", "collection", "passthrough", "value"),
+            ("empty_src", "collection", "empty_iterate", "collection"),
+            ("empty_iterate", "item", "for", "collection"),
+            ("for", "item", "for_body", "value"),
+            ("for_body", "value", "for_ret", "output"),
+            create_loop_linkage("for", "for_ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("passthrough", "value", "if", "false_input"),
+            ("condition", "value", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["F:[]", "F:['x[[]]', \"x[['c', 'a', 'c']]\"]"]}
+    assert "for" not in trace and "for_body" not in trace
+
+
+def test_literal_root_condition_ignores_unselected_for_output_branch_under_iterate() -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a", "b"], ["c"]]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="mid"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if", condition=False),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "mid", "value"),
+            ("mid", "value", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_to_completion(graph)
+    assert _source_values(state, "collect") == {(): ["fb"]}
+    assert not {"for", "body", "ret", "mid"} & set(trace)
 
 
 @pytest.mark.parametrize("condition", [True, False])
@@ -3573,6 +4282,176 @@ def test_literal_if_with_empty_nested_iterate_on_a_branch_has_no_frames(conditio
 
     assert _source_values(state, "collect") == {(0,): [], (1,): []}
     assert "if" not in trace
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "forced-compatibility"])
+def test_wired_root_condition_with_empty_for_parent_frame_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            ForReturnInvocation(id="ret"),
+            FixedCollectionTestInvocation(id="condition", value=True),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "item", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("condition", "condition", "if", "condition"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    trace: list[str] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        trace.append(source_id)
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"trace={trace}; executed={state.executed}; prepared={state.source_prepared_mapping}"
+    assert _source_values(state, "collect") == {(): []}
+    assert not {"if", "for", "ret", "fallback"} & set(trace)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_wired_root_condition_with_empty_for_output_through_any_node_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="for_output"),
+            ForReturnInvocation(id="ret"),
+            FixedCollectionTestInvocation(id="condition", value=True),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "output_collection", "for_output", "value"),
+            ("for_output", "value", "if", "true_input"),
+            ("for", "item", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("condition", "condition", "if", "condition"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): []}
+    assert not {"if", "for", "for_output", "ret", "fallback"} & set(trace)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_wired_per_item_condition_with_empty_for_output_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[]),
+            IterateInvocation(id="iterate"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="for_output"),
+            ForReturnInvocation(id="ret"),
+            FixedCollectionTestInvocation(id="condition"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "for", "collection"),
+            ("for", "output_collection", "for_output", "value"),
+            ("for_output", "value", "if", "true_input"),
+            ("for", "item", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("iterate", "item", "condition", "value"),
+            ("condition", "condition", "if", "condition"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): []}
+    assert trace[0] == "src"
+    assert not {"condition", "if", "for", "for_output", "ret", "fallback"} & set(trace)
+
+
+@pytest.mark.parametrize(
+    "force_compatibility_scheduler", [False, True], ids=["default-route", "forced-compatibility-route"]
+)
+def test_per_item_if_skips_direct_for_output_in_rejected_frames(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["", "x"]),
+            IterateInvocation(id="iterate"),
+            FixedCollectionTestInvocation(id="condition"),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="body"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="fallback", value="fb"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "iterate", "collection"),
+            ("iterate", "item", "condition", "value"),
+            ("condition", "condition", "if", "condition"),
+            ("condition", "collection", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+    trace: list[tuple[str, tuple[int, ...]]] = []
+    while (node := state.next()) is not None:
+        source_id = state.prepared_source_mapping[node.id]
+        iteration_path = state._get_iteration_path(node.id)
+        trace.append((source_id, iteration_path))
+        state.complete(node.id, node.invoke(Mock()))
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"execution stalled after {trace}"
+    assert _source_values(state, "if") == {(0,): "fb", (1,): [0, 1]}
+    assert _source_values(state, "collect") == {(): ["fb", [0, 1]]}
+    assert [path for source_id, path in trace if source_id == "if"] == [(0,), (1,)]
+    assert [path for source_id, path in trace if source_id == "for"] == [(1, 0), (1, 1)]
+    assert [path for source_id, path in trace if source_id == "body"] == [(1, 0), (1, 1)]
+    assert [path for source_id, path in trace if source_id == "ret"] == [(1, 0), (1, 1)]
+    assert not any(source_id in {"for", "body", "ret"} and path[:1] == (0,) for source_id, path in trace)
 
 
 def _unrelated_open_branches_graph(condition: bool, computed_condition: bool) -> Graph:
@@ -3859,6 +4738,320 @@ def _per_item_condition_with_collect_of_collects_branch_graph() -> Graph:
         ("if", "value", "collect", "item"),
     ]
     return _graph_from(nodes, edges)
+
+
+def _outer_condition_with_two_collects_graph(
+    *,
+    share_branch_axes: bool,
+    passthrough_between_collects: bool = False,
+    source_values: list[Any] | None = None,
+) -> Graph:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(
+            id="source",
+            first=source_values if source_values is not None else [[[["a"], ["b"]], [["c"]]], [], [[["d", "e"]]]],
+        ),
+    ]
+    edges: list[Any] = []
+    previous = ("source", "collection")
+    for axis_id in ("outer", "middle", "deep", "inner"):
+        nodes.append(IterateInvocation(id=axis_id))
+        edges.append((*previous, axis_id, "collection"))
+        if axis_id != "inner":
+            concat_id = f"{axis_id}_items"
+            nodes.append(CollectionConcatInvocation(id=concat_id))
+            edges.append((axis_id, "item", concat_id, "first"))
+            previous = (concat_id, "collection")
+    nodes += [
+        MarkedAnyTypeTestInvocation(id="body", marker="b:"),
+        CollectInvocation(id="inner_collect"),
+        CollectInvocation(id="middle_collect"),
+        FixedCollectionTestInvocation(id="condition"),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ]
+    edges += [
+        ("inner", "item", "body", "value"),
+        ("body", "value", "inner_collect", "item"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("if", "value", "collect", "item"),
+    ]
+    if passthrough_between_collects:
+        nodes.append(AnyTypeTestInvocation(id="collect_passthrough"))
+        edges.append(("inner_collect", "collection", "collect_passthrough", "value"))
+        edges.append(("collect_passthrough", "value", "middle_collect", "item"))
+    else:
+        edges.append(("inner_collect", "collection", "middle_collect", "item"))
+    edges.append(("middle_collect", "collection", "if", "true_input"))
+    if share_branch_axes:
+        nodes.append(MarkedAnyTypeTestInvocation(id="false_copy", marker="f:"))
+        edges += [
+            ("middle_collect", "collection", "false_copy", "value"),
+            ("false_copy", "value", "if", "false_input"),
+        ]
+    else:
+        nodes.append(AnyTypeTestInvocation(id="fallback", value="root"))
+        edges.append(("fallback", "value", "if", "false_input"))
+    return _graph_from(nodes, edges)
+
+
+def _separate_collect_branches_graph(
+    *, shape: str, unrelated_root_collect: bool, unrelated_root_collect_branch: str | None = None
+) -> Graph:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="source", first=[[["a", "b"], ["c"]], [["d"]]]),
+        IterateInvocation(id="outer"),
+        CollectionConcatInvocation(id="middle_source"),
+        IterateInvocation(id="middle"),
+        CollectionConcatInvocation(id="deep_source"),
+        IterateInvocation(id="deep"),
+        FixedCollectionTestInvocation(id="condition", value=True),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ]
+    edges: list[Any] = [
+        ("source", "collection", "outer", "collection"),
+        ("outer", "item", "middle_source", "first"),
+        ("middle_source", "collection", "middle", "collection"),
+        ("middle", "item", "deep_source", "first"),
+        ("deep_source", "collection", "deep", "collection"),
+        ("outer", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        ("if", "value", "collect", "item"),
+    ]
+    nodes += [MarkedAnyTypeTestInvocation(id="true_body", marker="true:"), CollectInvocation(id="true_collect")]
+    edges += [
+        ("deep", "item", "true_body", "value"),
+        ("true_body", "value", "true_collect", "item"),
+    ]
+    if not unrelated_root_collect and unrelated_root_collect_branch != "true_input":
+        edges.append(("true_collect", "collection", "if", "true_input"))
+    if shape == "distinct-inner-axis":
+        nodes += [
+            CollectionConcatInvocation(id="middle2_source"),
+            IterateInvocation(id="middle2"),
+            CollectionConcatInvocation(id="deep2_source"),
+            IterateInvocation(id="deep2"),
+            MarkedAnyTypeTestInvocation(id="false_body", marker="false:"),
+            CollectInvocation(id="false_collect"),
+        ]
+        edges += [
+            ("outer", "item", "middle2_source", "first"),
+            ("middle2_source", "collection", "middle2", "collection"),
+            ("middle2", "item", "deep2_source", "first"),
+            ("deep2_source", "collection", "deep2", "collection"),
+            ("deep2", "item", "false_body", "value"),
+            ("false_body", "value", "false_collect", "item"),
+        ]
+        false_source = "false_collect"
+        if not unrelated_root_collect and unrelated_root_collect_branch != "false_input":
+            edges.append((false_source, "collection", "if", "false_input"))
+    else:
+        nodes += [MarkedAnyTypeTestInvocation(id="false_body", marker="false:"), CollectInvocation(id="false_collect")]
+        edges += [
+            ("deep", "item", "false_body", "value"),
+            ("false_body", "value", "false_collect", "item"),
+        ]
+        if shape == "asymmetric":
+            nodes.append(CollectInvocation(id="false_outer_collect"))
+            edges += [
+                ("false_collect", "collection", "false_outer_collect", "item"),
+            ]
+            false_source = "false_outer_collect"
+        else:
+            false_source = "false_collect"
+        if not unrelated_root_collect and unrelated_root_collect_branch != "false_input":
+            edges.append((false_source, "collection", "if", "false_input"))
+    if unrelated_root_collect or unrelated_root_collect_branch:
+        nodes += [
+            CollectionConcatInvocation(id="unrelated_source", first=[]),
+            IterateInvocation(id="unrelated_iterate"),
+            AnyTypeTestInvocation(id="unrelated_body"),
+            CollectInvocation(id="unrelated_collect"),
+        ]
+        edges += [
+            ("unrelated_source", "collection", "unrelated_iterate", "collection"),
+            ("unrelated_iterate", "item", "unrelated_body", "value"),
+            ("unrelated_body", "value", "unrelated_collect", "item"),
+        ]
+        append_fields = (
+            {"true_input", "false_input"}
+            if unrelated_root_collect
+            else {unrelated_root_collect_branch}
+            if unrelated_root_collect_branch
+            else set()
+        )
+        for branch_field, branch_source in (("true_input", "true_collect"), ("false_input", false_source)):
+            if branch_field in append_fields:
+                append_id = f"{branch_field}_append"
+                nodes.append(CollectionConcatInvocation(id=append_id))
+                edges += [
+                    (branch_source, "collection", append_id, "first"),
+                    ("unrelated_collect", "collection", append_id, "second"),
+                    (append_id, "collection", "if", branch_field),
+                ]
+    return _graph_from(nodes, edges)
+
+
+@pytest.mark.parametrize("unrelated_root_collect", [False, True], ids=["plain", "unrelated-collect"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_if_accepts_separate_collects_retaining_matching_axes(
+    unrelated_root_collect: bool, force_compatibility_scheduler: bool
+) -> None:
+    state = GraphExecutionState(
+        graph=_separate_collect_branches_graph(shape="matching", unrelated_root_collect=unrelated_root_collect)
+    )
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [["true:a", "true:b"], ["true:c"]],
+        (1,): [["true:d"]],
+    }
+    assert trace.count("if") == 3
+    assert not any(source_id == "false_body" for source_id in trace)
+
+
+@pytest.mark.parametrize("unrelated_root_collect_branch", ["true_input", "false_input"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_if_accepts_matching_collect_axes_with_one_sided_unrelated_root_collect(
+    unrelated_root_collect_branch: str, force_compatibility_scheduler: bool
+) -> None:
+    state = GraphExecutionState(
+        graph=_separate_collect_branches_graph(
+            shape="matching", unrelated_root_collect=False, unrelated_root_collect_branch=unrelated_root_collect_branch
+        )
+    )
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [["true:a", "true:b"], ["true:c"]],
+        (1,): [["true:d"]],
+    }
+    assert trace.count("if") == 3
+    assert "unrelated_body" not in trace
+
+
+@pytest.mark.parametrize("shape", ["asymmetric", "distinct-inner-axis"], ids=["O-M-vs-O", "O-M-vs-O-M2"])
+@pytest.mark.parametrize("unrelated_root_collect", [False, True], ids=["plain", "unrelated-collect"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_if_rejects_separate_collects_with_different_axes_before_invocation(
+    shape: str, unrelated_root_collect: bool, force_compatibility_scheduler: bool
+) -> None:
+    state = GraphExecutionState(
+        graph=_separate_collect_branches_graph(shape=shape, unrelated_root_collect=unrelated_root_collect)
+    )
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    with pytest.raises(graph_if_runtime.UnsupportedIfIterationAxesError):
+        state.next()
+    assert state.executed_history == []
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+@pytest.mark.parametrize(
+    ("source_values", "expected", "if_count"),
+    [([[]], {(0,): []}, 0), ([[], []], {(0,): [], (1,): []}, 0), ([[[]], [[]]], {(0,): [[[]]], (1,): [[[]]]}, 2)],
+    ids=["empty-outer", "empty-outer-frames", "empty-deep-groups"],
+)
+def test_shared_collect_chain_completes_empty_groups(
+    force_compatibility_scheduler: bool, source_values: list[Any], expected: dict[tuple[int, ...], Any], if_count: int
+) -> None:
+    state = GraphExecutionState(
+        graph=_outer_condition_with_two_collects_graph(share_branch_axes=True, source_values=source_values)
+    )
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == expected
+    assert trace.count("if") == if_count
+    assert "false_copy" not in trace
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_if_branch_frame_axes_handles_long_passthrough_chain(force_compatibility_scheduler: bool) -> None:
+    nodes: list[Any] = [CollectionConcatInvocation(id="source", first=["x"]), IterateInvocation(id="iterate")]
+    edges: list[Any] = [("source", "collection", "iterate", "collection")]
+    previous = ("iterate", "item")
+    for index in range(1000):
+        node_id = f"pass{index}"
+        nodes.append(AnyTypeTestInvocation(id=node_id))
+        edges.append((*previous, node_id, "value"))
+        previous = (node_id, "value")
+    nodes += [
+        FixedCollectionTestInvocation(id="condition", value=True),
+        IfInvocation(id="if"),
+        CollectInvocation(id="collect"),
+    ]
+    edges += [
+        ("iterate", "item", "condition", "value"),
+        ("condition", "condition", "if", "condition"),
+        (*previous, "if", "true_input"),
+        ("if", "value", "collect", "item"),
+    ]
+    state = GraphExecutionState(graph=_graph_from(nodes, edges))
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["x"]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_per_item_if_rejects_asymmetric_collect_chain_before_invocation(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(graph=_outer_condition_with_two_collects_graph(share_branch_axes=False))
+    if force_compatibility_scheduler:
+        state._execution_scheduler = _ExecutionScheduler(state)
+
+    with pytest.raises(graph_if_runtime.UnsupportedIfIterationAxesError, match="deeper open iterator axes"):
+        state.next()
+    assert state.executed_history == []
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_per_item_if_accepts_shared_collect_chain_axes_and_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(graph=_outer_condition_with_two_collects_graph(share_branch_axes=True))
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [[["b:a"], ["b:b"]], [["b:c"]]],
+        (1,): [],
+        (2,): [[["b:d", "b:e"]]],
+    }
+    assert trace.count("if") == 3
+    assert "false_copy" not in trace
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_per_item_if_preserves_collect_axes_through_passthrough_and_completes(
+    force_compatibility_scheduler: bool,
+) -> None:
+    state = GraphExecutionState(
+        graph=_outer_condition_with_two_collects_graph(share_branch_axes=True, passthrough_between_collects=True)
+    )
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {
+        (0,): [[["b:a"], ["b:b"]], [["b:c"]]],
+        (1,): [],
+        (2,): [[["b:d", "b:e"]]],
+    }
+    assert trace.count("if") == 3
+    assert "false_copy" not in trace
 
 
 def _reopen_of_a_cross_product_graph(swap_add_inputs: bool, condition: bool = False) -> Graph:
@@ -4148,13 +5341,16 @@ def test_literal_if_selecting_axis_reopened_within_kept_outer_frames_pairs_both_
 
 @pytest.mark.parametrize(
     ("condition", "expected"),
-    [(False, [["a0", "a1"], ["a2"]]), (True, [["b0"], ["b1"], ["b2"]])],
+    [
+        (False, {(0,): [["a0", "a1"]], (1,): [["a2"]]}),
+        (True, {(0,): [["b0"]], (1,): [["b1"]], (2,): [["b2"]]}),
+    ],
     ids=["selects-a", "selects-b"],
 )
-def test_literal_if_ignores_independent_axis_reaching_it_through_unselected_for_output(
-    condition: bool, expected: list[list[str]]
+def test_literal_if_collect_groups_selected_for_final_by_parent_frame(
+    condition: bool, expected: dict[tuple[int, ...], list[list[str]]]
 ) -> None:
-    """An unselected For final output adds no frames, so the If runs once per item of the selected branch's axis."""
+    """The selected For final closes its own axis while the parent Iterate frame stays open."""
     nodes: list[Any] = [IfInvocation(id="if", condition=condition), CollectInvocation(id="collect")]
     edges: list[Any] = [("if", "value", "collect", "item")]
     for prefix, values, branch in (
@@ -4176,7 +5372,48 @@ def test_literal_if_ignores_independent_axis_reaching_it_through_unselected_for_
         ]
     _trace, state = _run_to_completion(_graph_from(nodes, edges))
 
-    assert _source_values(state, "collect") == {(): expected}
+    assert _source_values(state, "collect") == expected
+
+
+@pytest.mark.parametrize("condition_source", ["literal", "computed"], ids=["literal", "computed"])
+@pytest.mark.parametrize("condition", [True, False], ids=["true", "false"])
+@pytest.mark.parametrize("unselected_values", [[], [["u", "v"]]], ids=["empty-unselected", "non-empty-unselected"])
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["default", "compatibility"])
+def test_root_if_selection_ignores_empty_unselected_for_axis(
+    condition_source: str, condition: bool, unselected_values: list[Any], force_compatibility_scheduler: bool
+) -> None:
+    root_branch, for_branch = ("true_input", "false_input") if condition else ("false_input", "true_input")
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="source", first=unselected_values),
+        IterateInvocation(id="iterate"),
+        ForInvocation(id="for"),
+        ForReturnInvocation(id="return"),
+        AnyTypeTestInvocation(id="root", value="root"),
+        IfInvocation(id="if", **({"condition": condition} if condition_source == "literal" else {})),
+        CollectInvocation(id="collect"),
+    ]
+    edges: list[Any] = [
+        ("source", "collection", "iterate", "collection"),
+        ("iterate", "item", "for", "collection"),
+        ("for", "item", "return", "output"),
+        create_loop_linkage("for", "return"),
+        ("root", "value", "if", root_branch),
+        ("for", "output_collection", "if", for_branch),
+        ("if", "value", "collect", "item"),
+    ]
+    if condition_source == "computed":
+        nodes.append(FixedCollectionTestInvocation(id="condition", value=condition))
+        edges.append(("condition", "condition", "if", "condition"))
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+
+    assert not state.has_error(), state.errors
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert _source_values(state, "collect") == {(): ["root"]}
+    assert trace.count("if") == 1
+    assert not any(source_id in {"for", "return"} for source_id in trace)
 
 
 @pytest.mark.parametrize("condition", [True, False])
@@ -10998,16 +12235,17 @@ def test_per_item_if_preserves_unrelated_root_collect_frames(
 @pytest.mark.parametrize(
     ("conditions", "expected"),
     [
-        ([False, True, True], ["fb", [5, 6], [5, 6]]),
-        ([True, True], [[5, 6], [5, 6]]),
+        pytest.param([False, True, True], ["fb", [5, 6], [5, 6]], id="mixed-conditions"),
+        pytest.param([True, True], [[5, 6], [5, 6]], id="all-true"),
+        pytest.param([False, False, False], ["fb", "fb", "fb"], id="all-false"),
     ],
-    ids=["mixed-conditions", "all-true"],
 )
 def test_per_item_if_keeps_closed_for_output_collection(
     force_compatibility_scheduler: bool,
     conditions: list[bool],
     expected: list[Any],
 ) -> None:
+    """Root For item paths are distinct from condition frames; no selected frame means no For work."""
     graph = Graph()
     graph.add_node(CollectionConcatInvocation(id="conditions", first=conditions))
     graph.add_node(IterateInvocation(id="condition_iterate"))
@@ -11037,11 +12275,14 @@ def test_per_item_if_keeps_closed_for_output_collection(
     assert state.is_complete(), f"graph stalled after {trace}"
     output_exec_id = next(iter(state.source_prepared_mapping["output"]))
     assert state.results[output_exec_id].collection == expected
-    final_for_exec_id = max(
-        state.source_prepared_mapping["for"],
-        key=lambda exec_node_id: state.execution_graph.get_node(exec_node_id).index,
-    )
-    assert state.results[final_for_exec_id].output_collection == [5, 6]
+    if any(conditions):
+        final_for_exec_id = max(
+            state.source_prepared_mapping["for"],
+            key=lambda exec_node_id: state.execution_graph.get_node(exec_node_id).index,
+        )
+        assert state.results[final_for_exec_id].output_collection == [5, 6]
+    else:
+        assert not {"for", "body", "for_return"} & set(trace)
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
@@ -12257,3 +13498,574 @@ def test_deep_if_branch_chain_does_not_need_recursion_per_chain_node() -> None:
 
     assert state.is_complete()
     assert _collect_output(state) == [True, "fFalse"]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_root_if_waits_for_reopened_collect_axis(force_compatibility_scheduler: bool) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=["a", "b"]),
+            IterateInvocation(id="it"),
+            AnyTypeTestInvocation(id="m"),
+            CollectInvocation(id="first"),
+            IterateInvocation(id="rit"),
+            AnyTypeTestInvocation(id="rm"),
+            IfInvocation(id="if"),
+            BooleanInvocation(id="cond", value=True),
+            AnyTypeTestInvocation(id="root", value="RR"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "it", "collection"),
+            ("it", "item", "m", "value"),
+            ("m", "value", "first", "item"),
+            ("first", "collection", "rit", "collection"),
+            ("rit", "item", "rm", "value"),
+            ("rm", "value", "if", "true_input"),
+            ("root", "value", "if", "false_input"),
+            ("cond", "value", "if", "condition"),
+            ("if", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+    assert state.is_complete(), trace
+    assert _source_values(state, "collect") == {(): ["a", "b"]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+@pytest.mark.parametrize("sibling", [False, True])
+@pytest.mark.parametrize("reverse_items", [False, True])
+def test_plain_literal_if_chain_preserves_collect_items(
+    force_compatibility_scheduler: bool, sibling: bool, reverse_items: bool
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=["x", "y"]),
+        IterateInvocation(id="it"),
+        MarkedAnyTypeTestInvocation(id="m", marker="m"),
+        IfInvocation(id="if0", condition=True),
+        IfInvocation(id="if1", condition=True),
+        AnyTypeTestInvocation(id="fb0", value="R0"),
+        AnyTypeTestInvocation(id="fb1", value="R1"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "it", "collection"),
+        ("it", "item", "m", "value"),
+        ("m", "value", "if0", "true_input"),
+        ("fb0", "value", "if0", "false_input"),
+        ("if0", "value", "if1", "true_input"),
+        ("fb1", "value", "if1", "false_input"),
+    ]
+    items = [("if1", "value", "collect", "item")]
+    if sibling:
+        nodes += [
+            CollectionConcatInvocation(id="srcb", first=["p", "q", "r"]),
+            IterateInvocation(id="itb"),
+            MarkedAnyTypeTestInvocation(id="n", marker="n"),
+        ]
+        edges += [("srcb", "collection", "itb", "collection"), ("itb", "item", "n", "value")]
+        items += [("n", "value", "collect", "item")]
+    edges += list(reversed(items)) if reverse_items else items
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+    assert state.is_complete(), trace
+    values = _source_values(state, "collect")
+    assert set(values) == {()}
+    if sibling:
+        assert set(values[()][:2]) == {"mx", "np"}
+        assert set(values[()][2:4]) == {"my", "nq"}
+        assert values[()][4:] == ["nr"]
+    else:
+        assert values[()] == ["mx", "my"]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+@pytest.mark.parametrize("inner_condition", [False, True])
+@pytest.mark.parametrize("wired", [False, True])
+@pytest.mark.parametrize("collect", [False, True])
+def test_rejected_nested_if_with_shared_direct_and_for_axis_completes(
+    force_compatibility_scheduler: bool, inner_condition: bool, wired: bool, collect: bool
+) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[["a"]]),
+        IterateInvocation(id="it"),
+        AnyTypeTestInvocation(id="cm"),
+        CollectInvocation(id="col"),
+        AnyTypeTestInvocation(id="p3"),
+        ForInvocation(id="for"),
+        AnyTypeTestInvocation(id="fb"),
+        ForReturnInvocation(id="ret"),
+        AnyTypeTestInvocation(id="p8"),
+        AnyTypeTestInvocation(id="m9"),
+        IfInvocation(id="inner", condition=inner_condition),
+        IfInvocation(id="outer"),
+        BooleanInvocation(id="cond", value=True),
+    ]
+    edges = [
+        ("src", "collection", "it", "collection"),
+        ("it", "item", "cm", "value"),
+        ("cm", "value", "col", "item"),
+        ("col", "collection", "p3", "value"),
+        ("p3", "value", "outer", "true_input"),
+        ("it", "item", "for", "collection"),
+        ("for", "item", "fb", "value"),
+        ("fb", "value", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+        ("for", "output_collection", "p8", "value"),
+        ("p8", "value", "inner", "true_input"),
+        ("it", "item", "m9", "value"),
+        ("m9", "value", "inner", "false_input"),
+        ("inner", "value", "outer", "false_input"),
+        ("cond", "value", "outer", "condition"),
+    ]
+    if wired:
+        nodes += [BooleanInvocation(id="inner_cond", value=inner_condition)]
+        edges += [("inner_cond", "value", "inner", "condition")]
+    if collect:
+        nodes += [CollectInvocation(id="collect")]
+        edges += [("outer", "value", "collect", "item")]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+    assert state.is_complete(), trace
+    assert _source_values(state, "outer") == {(0,): [["a"]]}
+    if collect:
+        assert _source_values(state, "collect") == {(): [[["a"]]]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+@pytest.mark.parametrize("inner_condition", [False, True])
+def test_nested_literal_branch_validation_preserves_shared_frames(
+    force_compatibility_scheduler: bool, inner_condition: bool
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a", "b"], ["", ""]]),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="cc"),
+            IterateInvocation(id="it1"),
+            MarkedAnyTypeTestInvocation(id="m1", marker="T:"),
+            MarkedAnyTypeTestInvocation(id="m4", marker="U:"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            IfInvocation(id="inner", condition=inner_condition),
+            FixedCollectionTestInvocation(id="cond"),
+            IfInvocation(id="outer"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("src", "collection", "it0", "collection"),
+            ("it0", "item", "cc", "first"),
+            ("cc", "collection", "it1", "collection"),
+            ("it1", "item", "m1", "value"),
+            ("m1", "value", "outer", "true_input"),
+            ("it1", "item", "m4", "value"),
+            ("m4", "value", "inner", "false_input"),
+            ("root", "value", "inner", "true_input"),
+            ("inner", "value", "outer", "false_input"),
+            ("it0", "item", "cond", "value"),
+            ("cond", "condition", "outer", "condition"),
+            ("outer", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+    assert state.is_complete(), trace
+    assert _source_values(state, "collect") == {(0,): ["T:a", "T:b"], (1,): ["T:", "T:"]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
+def test_per_item_if_with_deep_literal_chain_completes(force_compatibility_scheduler: bool) -> None:
+    nodes = [
+        CollectionConcatInvocation(id="src", first=[True]),
+        IterateInvocation(id="it"),
+        AnyTypeTestInvocation(id="m"),
+        AnyTypeTestInvocation(id="root", value="R"),
+        IfInvocation(id="outer"),
+        CollectInvocation(id="collect"),
+    ]
+    edges = [
+        ("src", "collection", "it", "collection"),
+        ("it", "item", "m", "value"),
+        ("it", "item", "outer", "condition"),
+        ("root", "value", "outer", "false_input"),
+        ("outer", "value", "collect", "item"),
+    ]
+    previous = "m"
+    for index in range(600):
+        node_id = f"literal{index}"
+        nodes.append(IfInvocation(id=node_id, condition=True))
+        edges += [(previous, "value", node_id, "true_input"), ("m", "value", node_id, "false_input")]
+        previous = node_id
+    edges += [(previous, "value", "outer", "true_input")]
+    trace, state = _run_graph(
+        GraphExecutionState(graph=_graph_from(nodes, edges)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+    assert state.is_complete(), trace
+    assert _source_values(state, "collect") == {(): [True]}
+
+
+def _review_b1_nested_literal_if_collect_graph(*, inner_condition: bool | None = None) -> Graph:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[[["a"], ["b", "c"]], [["d"]]]),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="cc0"),
+            IterateInvocation(id="it1"),
+            CollectionConcatInvocation(id="cc1"),
+            IterateInvocation(id="it2"),
+            MarkedAnyTypeTestInvocation(id="t", marker="T:"),
+            FixedCollectionTestInvocation(id="cond"),
+            AnyTypeTestInvocation(id="root", value="R"),
+            IfInvocation(id="inner", condition=True),
+            CollectInvocation(id="col"),
+            MarkedAnyTypeTestInvocation(id="u", marker="U:"),
+            IfInvocation(id="outer"),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("src", "collection", "it0", "collection"),
+            ("it0", "item", "cc0", "first"),
+            ("cc0", "collection", "it1", "collection"),
+            ("it1", "item", "cc1", "first"),
+            ("cc1", "collection", "it2", "collection"),
+            ("it0", "item", "t", "value"),
+            ("t", "value", "outer", "true_input"),
+            ("it0", "item", "cond", "value"),
+            ("cond", "condition", "outer", "condition"),
+            ("root", "value", "inner", "true_input"),
+            ("it2", "item", "col", "item"),
+            ("col", "collection", "u", "value"),
+            ("u", "value", "inner", "false_input"),
+            ("inner", "value", "outer", "false_input"),
+            ("outer", "value", "out", "item"),
+        ],
+    )
+    if inner_condition is not None:
+        graph.update_node("inner", IfInvocation(id="inner"))
+        graph.add_node(BooleanInvocation(id="inner_condition", value=inner_condition))
+        graph.add_edge(create_edge("inner_condition", "value", "inner", "condition"))
+    return graph
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("inner_condition", [None, True], ids=["literal", "wired-root"])
+def test_nested_literal_if_collect_preserves_selected_outer_frames(
+    force_compatibility_scheduler: bool, inner_condition: bool | None
+) -> None:
+    state = GraphExecutionState(graph=_review_b1_nested_literal_if_collect_graph(inner_condition=inner_condition))
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), trace
+    assert _source_values(state, "out") == {(): ["T:[['a'], ['b', 'c']]", "T:[['d']]"]}
+
+
+def _review_b2_root_condition_for_final_nested_if_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="empty", first=[]),
+            IterateInvocation(id="it0"),
+            MarkedAnyTypeTestInvocation(id="m10", marker="bF:"),
+            ForInvocation(id="for", collection=["u", "v"]),
+            MarkedAnyTypeTestInvocation(id="fb8", marker="F"),
+            ForReturnInvocation(id="ret9"),
+            IfInvocation(id="iif6"),
+            BooleanInvocation(id="cond", value=False),
+            MarkedAnyTypeTestInvocation(id="p12", marker="F:"),
+            IfInvocation(id="outer", condition=False),
+            AnyTypeTestInvocation(id="root", value="R"),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("empty", "collection", "it0", "collection"),
+            ("it0", "item", "m10", "value"),
+            ("m10", "value", "iif6", "false_input"),
+            ("for", "item", "fb8", "value"),
+            ("fb8", "value", "ret9", "output"),
+            create_loop_linkage("for", "ret9"),
+            ("for", "output_collection", "iif6", "true_input"),
+            ("cond", "value", "iif6", "condition"),
+            ("iif6", "value", "p12", "value"),
+            ("p12", "value", "outer", "false_input"),
+            ("root", "value", "outer", "true_input"),
+            ("outer", "value", "out", "item"),
+        ],
+    )
+
+
+def test_static_if_frame_analysis_is_independent_of_runtime_cache_order() -> None:
+    def analyze(*, prime_runtime_selection: bool) -> Any:
+        state = GraphExecutionState(graph=_review_b2_root_condition_for_final_nested_if_graph())
+        ancestry = _IteratorAncestry(state)
+        if prime_runtime_selection:
+            state.source_prepared_mapping["iif6"] = {"iif6-exec"}
+            state._resolved_if_exec_branches["iif6-exec"] = "true_input"
+            graph_if_runtime._get_if_runtime_branch_frame_axes(state, ancestry, "iif6")
+        return graph_if_runtime._get_if_static_frame_analysis(state, ancestry, "outer")
+
+    assert analyze(prime_runtime_selection=False) == analyze(prime_runtime_selection=True)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("stop_after", [1, 2], ids=["dump-step-1", "dump-step-2"])
+def test_root_condition_for_final_nested_if_restores_cold(force_compatibility_scheduler: bool, stop_after: int) -> None:
+    graph = _review_b2_root_condition_for_final_nested_if_graph()
+    _, expected = _run_graph(
+        GraphExecutionState(graph=graph.model_copy(deep=True)),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+    _, partial = _run_graph(
+        GraphExecutionState(graph=graph),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+        stop_after=stop_after,
+    )
+    restored = load_execution_state(dump_execution_state(partial))
+
+    trace, restored = _run_graph(restored, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert restored.is_complete(), trace
+    assert _source_values(restored, "out") == _source_values(expected, "out") == {(): []}
+
+
+def _review_b3_nested_collect_selected_a_graph() -> Graph:
+    return _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[[["a"], ["b", "c"]], [[""]]]),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="cc0"),
+            IterateInvocation(id="it1"),
+            CollectionConcatInvocation(id="cc1"),
+            IterateInvocation(id="it2"),
+            FixedCollectionTestInvocation(id="cond"),
+            AnyTypeTestInvocation(id="a", value="A"),
+            AnyTypeTestInvocation(id="b", value="B"),
+            IfInvocation(id="if"),
+            IfInvocation(id="if2", condition=True),
+            MarkedAnyTypeTestInvocation(id="cm", marker="x"),
+            CollectInvocation(id="col"),
+            MarkedAnyTypeTestInvocation(id="u", marker="U:"),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("src", "collection", "it0", "collection"),
+            ("it0", "item", "cc0", "first"),
+            ("cc0", "collection", "it1", "collection"),
+            ("it1", "item", "cc1", "first"),
+            ("cc1", "collection", "it2", "collection"),
+            ("it0", "item", "cond", "value"),
+            ("cond", "condition", "if", "condition"),
+            ("a", "value", "if", "true_input"),
+            ("b", "value", "if", "false_input"),
+            ("if", "value", "if2", "true_input"),
+            ("it2", "item", "cm", "value"),
+            ("cm", "value", "col", "item"),
+            ("col", "collection", "u", "value"),
+            ("u", "value", "if2", "false_input"),
+            ("if2", "value", "out", "item"),
+        ],
+    )
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("stop_after", [2, 5, 8], ids=["dump-step-2", "dump-step-5", "dump-step-8"])
+def test_nested_collect_selected_a_survives_dump_load(force_compatibility_scheduler: bool, stop_after: int) -> None:
+    state = GraphExecutionState(graph=_review_b3_nested_collect_selected_a_graph())
+    _, partial = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler, stop_after=stop_after)
+    restored = load_execution_state(dump_execution_state(partial))
+
+    trace, restored = _run_graph(restored, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert restored.is_complete(), trace
+    assert _source_values(restored, "out") == {(): ["A", "A"]}
+
+
+def _review_b4_empty_for_if_chain_graph(chain_length: int, *, empty_collect: bool = False) -> Graph:
+    nodes: list[Any] = [IterateInvocation(id="rit"), MarkedAnyTypeTestInvocation(id="rm", marker="r")]
+    edges: list[Any] = []
+    if empty_collect:
+        nodes += [
+            CollectionConcatInvocation(id="empty_source", first=[]),
+            IterateInvocation(id="empty_iterate"),
+            CollectInvocation(id="empty_collect"),
+        ]
+        edges += [
+            ("empty_source", "collection", "empty_iterate", "collection"),
+            ("empty_iterate", "item", "empty_collect", "item"),
+            ("empty_collect", "collection", "rit", "collection"),
+        ]
+    else:
+        nodes += [
+            ForInvocation(id="for", collection=[]),
+            MarkedAnyTypeTestInvocation(id="fb", marker="f"),
+            ForReturnInvocation(id="ret"),
+        ]
+        edges += [
+            ("for", "output_collection", "rit", "collection"),
+            ("for", "item", "fb", "value"),
+            ("fb", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+        ]
+    edges.append(("rit", "item", "rm", "value"))
+    nodes.append(CollectInvocation(id="out"))
+    previous = "rm"
+    for index in range(chain_length):
+        if_node = f"rif{index}"
+        fallback = f"rr{index}"
+        nodes += [
+            IfInvocation(id=if_node),
+            BooleanInvocation(id=f"cond{index}", value=True),
+            AnyTypeTestInvocation(id=fallback, value=f"RR{index}"),
+        ]
+        edges += [
+            (f"cond{index}", "value", if_node, "condition"),
+            (previous, "value", if_node, "true_input"),
+            (fallback, "value", if_node, "false_input"),
+        ]
+        previous = if_node
+    edges.append((previous, "value", "out", "item"))
+    return _graph_from(nodes, edges)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("chain_length", [1, 2, 4], ids=["one-if", "two-if", "four-if"])
+@pytest.mark.parametrize("empty_collect", [False, True], ids=["empty-for", "empty-collect-iterate"])
+def test_empty_iterator_root_if_chain_completes_empty(
+    force_compatibility_scheduler: bool, chain_length: int, empty_collect: bool
+) -> None:
+    state = GraphExecutionState(graph=_review_b4_empty_for_if_chain_graph(chain_length, empty_collect=empty_collect))
+
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), trace
+    assert _source_values(state, "out") == {(): []}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("chain_length", [0, 1, 2, 3])
+def test_for_final_through_literal_if_chain_groups_by_parent_frame(
+    force_compatibility_scheduler: bool, chain_length: int
+) -> None:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="src", first=[["a"], ["b"]]),
+        IterateInvocation(id="it"),
+        ForInvocation(id="for"),
+        ForReturnInvocation(id="ret"),
+        CollectInvocation(id="out"),
+    ]
+    edges: list[Any] = [
+        ("src", "collection", "it", "collection"),
+        ("it", "item", "for", "collection"),
+        ("for", "item", "ret", "output"),
+        create_loop_linkage("for", "ret"),
+    ]
+    previous = "for"
+    previous_field = "output_collection"
+    for index in range(chain_length):
+        if_node = f"if{index}"
+        nodes += [
+            IfInvocation(id=if_node, condition=True),
+            AnyTypeTestInvocation(id=f"fallback{index}", value="fallback"),
+        ]
+        edges += [
+            (previous, previous_field, if_node, "true_input"),
+            (f"fallback{index}", "value", if_node, "false_input"),
+        ]
+        previous, previous_field = if_node, "value"
+    edges.append((previous, previous_field, "out", "item"))
+    graph = _graph_from(nodes, edges)
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), trace
+    assert _source_values(state, "out") == {(0,): [["a"]], (1,): [["b"]]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_if_with_dynamic_boolean_invocation_condition_groups_for_final_by_parent_frame(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[["a"], []]),
+            IterateInvocation(id="it"),
+            FixedCollectionTestInvocation(id="condition_source"),
+            BooleanInvocation(id="condition", value=True),
+            ForInvocation(id="for"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="fallback", value="fallback"),
+            IfInvocation(id="if"),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("src", "collection", "it", "collection"),
+            ("it", "item", "condition_source", "value"),
+            ("condition_source", "condition", "condition", "value"),
+            ("condition", "value", "if", "condition"),
+            ("it", "item", "for", "collection"),
+            ("for", "item", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "if", "true_input"),
+            ("fallback", "value", "if", "false_input"),
+            ("if", "value", "out", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), trace
+    assert _source_values(state, "out") == {(0,): [["a"]], (1,): ["fallback"]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_literal_if_after_wired_if_preserves_parent_for_final_frames(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="src", first=[[], ["b"]]),
+            IterateInvocation(id="it"),
+            FixedCollectionTestInvocation(id="condition_source"),
+            BooleanInvocation(id="condition", value=True),
+            ForInvocation(id="for"),
+            AnyTypeTestInvocation(id="body"),
+            ForReturnInvocation(id="ret"),
+            AnyTypeTestInvocation(id="inner_fallback", value="inner"),
+            IfInvocation(id="inner"),
+            AnyTypeTestInvocation(id="outer_fallback", value="outer"),
+            IfInvocation(id="outer", condition=True),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("src", "collection", "it", "collection"),
+            ("it", "item", "condition_source", "value"),
+            ("condition_source", "condition", "condition", "value"),
+            ("condition", "value", "inner", "condition"),
+            ("it", "item", "for", "collection"),
+            ("for", "item", "body", "value"),
+            ("body", "value", "ret", "output"),
+            create_loop_linkage("for", "ret"),
+            ("for", "output_collection", "inner", "true_input"),
+            ("inner_fallback", "value", "inner", "false_input"),
+            ("inner", "value", "outer", "true_input"),
+            ("outer_fallback", "value", "outer", "false_input"),
+            ("outer", "value", "out", "item"),
+        ],
+    )
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), trace
+    assert _source_values(state, "out") == {(0,): ["inner"], (1,): [["b"]]}
