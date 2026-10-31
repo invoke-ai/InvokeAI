@@ -87,6 +87,24 @@ beforeEach(async () => {
 });
 
 describe('loadWorkbenchSettings', () => {
+  it('defaults Invoke to the right and restores the saved placement on a fresh settings load', async () => {
+    seedBackendPreferences({});
+    expect((await store.loadWorkbenchSettings()).showInvokeButtonOnLeft).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ showInvokeButtonOnLeft: 'true' } as never).showInvokeButtonOnLeft
+    ).toBe(false);
+
+    await store.patchWorkbenchPreferences({ showInvokeButtonOnLeft: true });
+    expect(readBackendPreferences().showInvokeButtonOnLeft).toBe(true);
+
+    vi.resetModules();
+    const reloadedStore = await import('./store');
+    expect((await reloadedStore.loadWorkbenchSettings()).showInvokeButtonOnLeft).toBe(true);
+
+    await reloadedStore.patchWorkbenchPreferences({ showInvokeButtonOnLeft: false });
+    expect(readBackendPreferences().showInvokeButtonOnLeft).toBe(false);
+  });
+
   it('migrates a preference stored under a renamed theme id', async () => {
     seedBackendPreferences({ themeId: 'forest' });
 

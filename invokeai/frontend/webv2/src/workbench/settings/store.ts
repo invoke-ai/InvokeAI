@@ -71,6 +71,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   reduceMotion: false,
   scopedDefaults: {},
   selectObjectAutoProcess: false,
+  showInvokeButtonOnLeft: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   startupDestination: 'launchpad',
@@ -459,6 +460,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
       : DEFAULT_PREFERENCES.showFocusRegionHighlight,
+  showInvokeButtonOnLeft:
+    typeof preferences?.showInvokeButtonOnLeft === 'boolean'
+      ? preferences.showInvokeButtonOnLeft
+      : DEFAULT_PREFERENCES.showInvokeButtonOnLeft,
   showPromptSyntaxHighlighting:
     typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
       ? preferences.showPromptSyntaxHighlighting

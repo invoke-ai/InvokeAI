@@ -93,6 +93,7 @@ export interface WorkbenchPreferences {
   galleryDestinationNoticeShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
+  showInvokeButtonOnLeft: boolean;
   queueJobsScope: 'active-project' | 'all';
   /** What opening the app's bare URL shows; deep links, reloads and later visits to Home are never redirected. */
   startupDestination: StartupDestination;
