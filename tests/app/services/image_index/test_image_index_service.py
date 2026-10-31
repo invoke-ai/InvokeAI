@@ -102,6 +102,13 @@ def db() -> Database:
     return create_mock_sqlite_database(config=config, logger=InvokeAILogger.get_logger())
 
 
+@pytest.fixture(autouse=True)
+def isolate_index_storage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Migrations and cache retirement touch files even when the records database is in-memory.
+    monkeypatch.setattr(InvokeAIAppConfig, "root_path", property(lambda self: tmp_path))
+    monkeypatch.setattr(InvokeAIAppConfig, "db_path", property(lambda self: tmp_path / "invokeai.db"))
+
+
 @pytest.fixture
 def image_records(db: Database) -> ImageRecordStorage:
     return ImageRecordStorage(db)
@@ -1285,6 +1292,163 @@ def test_disabled_service_does_not_discard_embeddings(
         assert index_records.get_embeddings(imgs("a.png"), "stale-model-hash")[0] == imgs("a.png")
     finally:
         service.stop()
+
+
+@pytest.mark.parametrize("late_activation", [False, True], ids=["startup", "late-activation"])
+def test_activation_prunes_only_obsolete_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    late_activation: bool,
+) -> None:
+    model_id = "blake3:613228c1fd904fb8e0123456789abcdef"
+    # Literal expected writer names catch using the full hash instead of its truncated tag.
+    kept_names = ["cluster_vocab_blake3_613228c1fd904fb8e.npz", "cluster_vocab_custom_blake3_613228c1fd904fb8e.npz"]
+    stale_names = ["cluster_vocab_old.npz", "cluster_vocab_custom_old.npz"]
+    other_names = [
+        "cluster_vocab_old.npz123.tmp.npz",
+        "cluster_vocab_old.npz.random.tmp.npz",
+        "cluster_vocab_custom_old.npz.random.tmp.npz",
+        "cluster_vocab_old.npz.uppercase.TMP.NPZ",
+        "cluster_vocab_old.npz.bak",
+        "other-cache.npz",
+        "invokeai.db",
+    ]
+    preserved = {}
+    for name in kept_names + stale_names + other_names:
+        path = tmp_path / name
+        path.write_bytes(name.encode())
+        if name not in stale_names:
+            preserved[path] = path.read_bytes()
+    directory = tmp_path / "cluster_vocab_directory.npz"
+    directory.mkdir()
+    nested_cache = directory / "cluster_vocab_old.npz"
+    nested_cache.write_bytes(b"not owned by this database directory")
+
+    if late_activation:
+        service = ImageIndexService()
+        resolved = SimpleNamespace(key="encoder-key", hash=model_id)
+        model_manager = SimpleNamespace(
+            store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES
+        )
+        with patch.object(service, "_resolve_model_config", side_effect=[None, resolved]):
+            try:
+                service.start(_make_invoker(images_service, index_records, model_manager=model_manager))
+                assert all((tmp_path / name).exists() for name in stale_names)
+                service._last_activation_attempt = 0
+                assert service.try_activate()
+                assert service._worker is not None and service._worker.is_alive()
+                assert all(not (tmp_path / name).exists() for name in stale_names)
+            finally:
+                service.stop()
+    else:
+        service = ImageIndexService(encode_fn=_fake_encode, model_id=model_id)
+        try:
+            service.start(_make_invoker(images_service, index_records))
+            assert service._worker is not None and service._worker.is_alive()
+            assert all(not (tmp_path / name).exists() for name in stale_names)
+        finally:
+            service.stop()
+
+    assert all(path.read_bytes() == contents for path, contents in preserved.items())
+    assert nested_cache.read_bytes() == b"not owned by this database directory"
+
+
+def test_vocabulary_pruning_continues_after_one_file_cannot_be_deleted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    caches = {tmp_path / "cluster_vocab_old.npz", tmp_path / "cluster_vocab_custom_old.npz"}
+    for cache in caches:
+        cache.write_bytes(b"obsolete archive")
+    attempted: list[Path] = []
+    original_unlink = Path.unlink
+
+    def unlink(path: Path, *args, **kwargs) -> None:
+        if path in caches:
+            attempted.append(path)
+            if len(attempted) == 1:
+                raise PermissionError("simulated cache sharing violation")
+        original_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "unlink", unlink)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert len(attempted) == 2
+    assert attempted[0].read_bytes() == b"obsolete archive"
+    assert not attempted[1].exists()
+    assert "Could not remove stale cluster vocabulary cache" in caplog.text
+
+
+def test_vocabulary_pruning_scan_failure_does_not_prevent_indexing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    image_records: ImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    original_glob = Path.glob
+
+    def glob(path: Path, pattern: str, *args, **kwargs):
+        if path == tmp_path and pattern == "cluster_vocab_*.npz":
+            raise PermissionError("simulated unreadable cache directory")
+        return original_glob(path, pattern, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "glob", glob)
+    _save_image(image_records, "new.png")
+    service.start(_make_invoker(images_service, index_records))
+    _wait_until(lambda: index_records.get_embeddings(imgs("new.png"), MODEL_ID)[0] == imgs("new.png"))
+
+    assert "Could not prune obsolete cluster vocabulary caches" in caplog.text
+
+
+@pytest.mark.parametrize("enabled", [False, True], ids=["disabled", "missing-model"])
+def test_inactive_service_preserves_vocabulary_archives(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    enabled: bool,
+) -> None:
+    path = tmp_path / "cluster_vocab_old.npz"
+    path.write_bytes(b"preserved until a replacement model is active")
+    service = ImageIndexService()
+    model_manager = SimpleNamespace(store=SimpleNamespace(search_by_attr=lambda **kwargs: []), load=_NO_MODEL_CACHES)
+    with patch.object(service, "_resolve_model_config", return_value=None):
+        try:
+            service.start(_make_invoker(images_service, index_records, enabled=enabled, model_manager=model_manager))
+            assert path.read_bytes() == b"preserved until a replacement model is active"
+            assert service._worker is None
+        finally:
+            service.stop()
+
+
+def test_vocabulary_pruning_preserves_symlinks_and_their_targets(
+    tmp_path: Path,
+    images_service: ImageService,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+) -> None:
+    target = tmp_path / "unrelated.npz"
+    target.write_bytes(b"not a service-owned archive")
+    link = tmp_path / "cluster_vocab_link.npz"
+    try:
+        link.symlink_to(target)
+    except OSError as error:
+        pytest.skip(f"Host cannot create symlinks: {error}")
+
+    service.start(_make_invoker(images_service, index_records))
+
+    assert link.is_symlink()
+    assert target.read_bytes() == b"not a service-owned archive"
 
 
 def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
@@ -2859,6 +3023,144 @@ def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.n
     svc._model_id = MODEL_ID
 
     return svc
+
+
+@pytest.mark.parametrize("build_fails", [False, True], ids=["successful-build", "failed-build"])
+def test_vocab_requests_do_not_wait_for_an_in_flight_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, build_fails: bool
+) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    entered = threading.Event()
+    release = threading.Event()
+    request_done = threading.Event()
+    build_errors: list[Exception] = []
+    request_errors: list[Exception] = []
+    builds = 0
+
+    def _embed(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        nonlocal builds
+        builds += 1
+        entered.set()
+        if not release.wait(timeout=15):
+            raise TimeoutError("The test did not release the vocabulary encoder")
+        if build_fails:
+            raise RuntimeError("simulated encoder failure")
+        return matrix
+
+    def _build() -> None:
+        try:
+            service._build_vocab_embeddings()
+        except Exception as error:
+            build_errors.append(error)
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            request_errors.append(error)
+        finally:
+            request_done.set()
+
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _embed)
+    builder = threading.Thread(target=_build)
+    caller = threading.Thread(target=_request)
+    builder.start()
+    try:
+        assert entered.wait(timeout=5), "The worker never reached the vocabulary encoder"
+        assert service.get_vocab_build_state() == ("building", None)
+        caller.start()
+        # A hang ceiling, not a throughput budget: the encoder cannot finish
+        # until this test releases it, but the request must already be done.
+        assert request_done.wait(timeout=5), "The labels request waited for the vocabulary build"
+        assert len(request_errors) == 1
+        assert isinstance(request_errors[0], TextSearchUnavailableError)
+        assert "still being prepared" in str(request_errors[0])
+        assert not service._vocab_build_requested.is_set()
+    finally:
+        release.set()
+        builder.join(timeout=5)
+        if caller.ident is not None:
+            caller.join(timeout=5)
+
+    assert not builder.is_alive() and not caller.is_alive()
+    assert not build_errors
+    failed_at = service._vocab_failed_at
+    service._build_vocab_embeddings()
+    assert builds == 1
+    if build_fails:
+        with pytest.raises(RuntimeError, match="simulated encoder failure"):
+            service.get_vocab_embeddings()
+        assert service._vocab_failed_at == failed_at
+        assert service.get_vocab_build_state() == ("error", "simulated encoder failure")
+    else:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+        assert vocabulary == ["a cat", "a dog", "a car"]
+        assert np.array_equal(embeddings, matrix)
+        assert service.get_vocab_build_state() == ("ready", None)
+
+
+def test_a_ready_vocabulary_answers_while_another_reader_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    service._build_vocab_embeddings()
+    # Stands in for a concurrent get_vocab_embeddings / get_vocab_build_state.
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+    finally:
+        service._vocab_lock.release()
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(embeddings, matrix)
+
+    service._stop_event.set()
+    with pytest.raises(TextSearchUnavailableError, match="The image index is not running"):
+        service.get_vocab_embeddings()
+
+
+@pytest.mark.parametrize("unavailable", ["stopped", "no-model", "no-invoker"])
+def test_a_busy_vocabulary_reports_unavailability_during_shutdown(service: ImageIndexService, unavailable: str) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+    if unavailable == "stopped":
+        service._stop_event.set()
+    elif unavailable == "no-model":
+        service._model_id = None
+    else:
+        service._invoker = None
+    done = threading.Event()
+    errors: list[Exception] = []
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            errors.append(error)
+        finally:
+            done.set()
+
+    caller = threading.Thread(target=_request)
+    try:
+        with service._vocab_lock:
+            caller.start()
+            assert done.wait(timeout=5), "The unavailable index waited for the vocabulary lock"
+    finally:
+        if caller.ident is not None:
+            caller.join(timeout=5)
+    assert not caller.is_alive()
+    assert len(errors) == 1
+    assert isinstance(errors[0], TextSearchUnavailableError)
+    assert str(errors[0]) == "The image index is not running"
+    assert not service._vocab_build_requested.is_set()
 
 
 def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
