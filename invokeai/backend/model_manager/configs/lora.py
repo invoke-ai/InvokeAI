@@ -866,6 +866,24 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
+# ComfyUI's `diffusion_model.` and raw PEFT's `base_model.model.` also prefix other families' LoRAs, some of them on
+# `transformer_blocks.N` (LTX-2) or on Qwen-Image's attention names (FLUX in diffusers naming). Under these prefixes,
+# only low-rank weights on modules that Qwen-Image's dual-stream blocks alone have identify a Qwen-Image LoRA:
+# Qwen-Image-2.1 names its MLP `img_mlp.proj`, and the converter cannot group dotted LoKr keys.
+_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE = re.compile(
+    r"^(?:diffusion_model|base_model\.model)\.transformer_blocks\.\d+\.(?:img_mod|txt_mod|img_mlp\.net|txt_mlp)\."
+    r".*\.(?:lora_A|lora_B|lora_down|lora_up)\.weight$"
+)
+
+
+def _has_prefixed_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    keys = [key for key in state_dict if isinstance(key, str)]
+    # PEFT DoRA magnitudes are not mapped yet (#9558): the converter would fail on every generation.
+    if any(key.endswith(".lora_magnitude_vector") for key in keys):
+        return False
+    return any(_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in keys)
+
+
 class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
 
@@ -883,7 +901,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 "transformer.transformer_blocks.",
                 "lora_unet_transformer_blocks_",  # Kohya format
             },
-        )
+        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
             {
@@ -939,7 +957,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
-        )
+        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_krea2_keys = _has_krea2_lora_keys(state_dict)
         str_keys = [key for key in state_dict if isinstance(key, str)]
