@@ -67,17 +67,27 @@ from invokeai.backend.working_memory.platform import (
 )
 from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpec, import_estimator_modules
 
-OUT_OF_FIT = {((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6}
+OUT_OF_FIT = {
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "demand_peak"): 4,
+    (
+        (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows")),
+        "RX 9060 XT (gfx1200)",
+        "demand_peak",
+    ): 4,
+}
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term. A point that leaves the fit needs an edit here."""
+check the score-matrix term, and the real FLUX.3 Klein's forwards on both cards, which hold the 2-block lines to the
+released model from below. A point that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),
     ("denoise.flux2", (("allocator", "native"), ("conv_backend", "miopen"))),
+    ("denoise.flux3", (("allocator", "native"), ("conv_backend", "miopen"))),
 }
 """The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
-fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, which nothing
-measures yet. Shipping an entry's points and fit removes it from here."""
+fits of measured points: the Z-Image, FLUX.2 and FLUX.3 denoise on ROCm with the native allocator off Windows, which
+nothing measures yet. Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
