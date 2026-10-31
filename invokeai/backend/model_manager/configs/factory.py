@@ -229,7 +229,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
-from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_q8_cr_markers
+from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_gguf_convrot_markers
 
 logger = logging.getLogger(__name__)
 
@@ -730,20 +730,29 @@ class ModelConfigFactory:
         if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
             return
         metadata = mod.metadata()
-        if not type(config).DECODES_GGUF_Q8_CR:
+        decodes = type(config).DECODES_GGUF_CONVROT
+        if not decodes:
             # Nothing this config's loader runs decodes any of the converter's schemes, so whatever its
             # JSON says is beside the point -- parsing it first would report a detail of the scheme (a
             # marker on a tensor that is not a weight, say) in place of the reason the file is refused.
             if any(key.startswith(COMFY_QUANT_KEY_PREFIX) for key in metadata):
                 raise InvalidMatchError(
-                    f"{mod.path.name} uses ComfyUI-GGUF's own quantization (Q8_CR or similar), which this model "
-                    "type cannot load yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+                    f"{mod.path.name} uses ComfyUI-GGUF's own quantization (Q8_CR, Q4_CR or similar), which this "
+                    "model type cannot load yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
                 )
             return
         try:
-            parse_q8_cr_markers(metadata, mod.path.name)
+            markers = parse_gguf_convrot_markers(metadata, mod.path.name)
         except ValueError as e:
             raise InvalidMatchError(str(e)) from None
+        undecodable = sorted({m["format"] for m in markers.values()} - decodes)
+        if undecodable:
+            names = {"int8_tensorwise": "Q8_CR", "int4_tensorwise": "Q4_CR"}
+            kinds = " and ".join(names.get(fmt, fmt) for fmt in undecodable)
+            raise InvalidMatchError(
+                f"{mod.path.name} is a ComfyUI-GGUF convrot ({kinds}) file, which this model type cannot load "
+                "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+            )
 
     @staticmethod
     def from_dict(fields: dict[str, Any]) -> AnyModelConfig:

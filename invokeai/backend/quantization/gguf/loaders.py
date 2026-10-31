@@ -13,7 +13,12 @@ import torch
 from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX
 from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES, GGMLTensor
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
-from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT
+from invokeai.backend.quantization.int8_convrot import (
+    CONVROT_GROUP_SIZE,
+    INT4_TENSORWISE_FORMAT,
+    INT8_TENSORWISE_FORMAT,
+    marker_layout,
+)
 from invokeai.backend.util.logging import InvokeAILogger
 
 logger = InvokeAILogger.get_logger()
@@ -150,24 +155,32 @@ def _read_comfy_orig_shapes(reader: gguf.GGUFReader) -> dict[str, torch.Size]:
 
 COMFY_QUANT_KEY_PREFIX = "comfy.gguf.quant."
 
-Q8CRMode = Literal["refuse", "decode"]
+GGUFConvrotMode = Literal["refuse", "decode"]
+
+# ComfyUI-GGUF's name for its packed int4 convrot layers (`Q4_CR`), and the one backing InvokeAI decodes.
+INT4_CR_FORMAT = "int4_cr"
+INT4_CR_BACKING = "w4a4"
 
 
-def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dict[str, Any]]:
-    """Parse ComfyUI-GGUF's ``Q8_CR`` layers from a GGUF's ``comfy.gguf.quant.<weight name>`` metadata.
+def parse_gguf_convrot_markers(fields: Mapping[str, Any], source: str) -> dict[str, dict[str, Any]]:
+    """Parse ComfyUI-GGUF's convrot layers from a GGUF's ``comfy.gguf.quant.<weight name>`` metadata.
 
-    ``Q8_CR`` (github.com/molbal/ComfyUI-GGUF) is ComfyUI's ``int8_tensorwise`` + convrot scheme in a
-    GGUF container: the int8 codes are stored under GGML type ``I8`` (GGUF has no other int8 type), a
-    per-output-row F32 scale beside them as ``<weight name>_scale``, and the JSON that a safetensors
-    export keeps in ``<layer>.comfy_quant`` here lives in the metadata, as a string. ``I8`` is not a
-    GGML quantization -- ``gguf`` has no dequantizer for it -- so these layers cannot ride the
-    GGMLTensor path at all.
+    ComfyUI-GGUF (github.com/molbal/ComfyUI-GGUF) stores ComfyUI's integer convrot schemes in a GGUF
+    container, under GGML type ``I8`` -- GGUF has no other integer type -- with a per-output-row scale beside
+    them as ``<weight name>_scale``. The JSON a safetensors export keeps in ``<layer>.comfy_quant`` here lives
+    in the metadata, as a string. ``I8`` is not a GGML quantization -- ``gguf`` has no dequantizer for it --
+    so these layers cannot ride the GGMLTensor path at all. Two formats are read:
 
-    ``fields`` maps metadata keys to their string values; other keys are ignored. Returns the int8
-    markers keyed by weight name, in the form :mod:`int8_convrot` reads. Raises ``ValueError`` for
-    anything else the converter writes (``int4_cr``, the retired ``int4_pytorch``): those tensors are
-    ``I8`` too, and nothing here decodes them. Model identification turns that into the installer's
-    refusal, so a file is refused for the same reason at install and at load.
+    - ``Q8_CR``, ``int8_tensorwise``: int8 codes ``[out, in]`` and an F32 scale.
+    - ``Q4_CR``, ``int4_cr`` with ``"backing": "w4a4"``: comfy-kitchen's packed int4 layout, codes ``[out, in/2]``
+      two per byte and an F16 scale, always rotated. The JSON's ``orig_shape`` gives the unpacked shape. It
+      comes back as an ``int4_tensorwise`` marker, which is what :mod:`int8_convrot` decodes it as.
+
+    ``fields`` maps metadata keys to their string values; other keys are ignored. Returns the markers keyed by
+    weight name, in the form :mod:`int8_convrot` reads. Raises ``ValueError`` for anything else the converter
+    writes: ``int4_cr`` without the w4a4 backing (its retired W4A16 form, with group-wise scales) and the retired
+    ``int4_pytorch``. Those tensors are ``I8`` too, and nothing here decodes them. Model identification turns
+    that into the installer's refusal, so a file is refused for the same reason at install and at load.
     """
     layers: dict[str, dict[str, Any]] = {}
     for key, value in fields.items():
@@ -178,21 +191,57 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
             config = json.loads(value)
         except Exception as e:
             raise ValueError(f"{source}: GGUF metadata {key!r} is not valid quantization JSON: {e}") from None
-        if not isinstance(config, dict) or config.get("format") != INT8_TENSORWISE_FORMAT:
-            fmt = config.get("format") if isinstance(config, dict) else config
+        if not isinstance(config, dict):
+            raise ValueError(f"{source}: GGUF metadata {key!r} is not a quantization object: {config!r}")
+        fmt = config.get("format")
+        if fmt == INT8_TENSORWISE_FORMAT:
+            marker = dict(config)
+            # The converter's own loader treats `convrot` without `weight_rotated` as a file from an older
+            # converter that stored the codes unrotated, and runs it without the rotation. Un-rotating
+            # weights that were never rotated would scramble them, so follow it.
+            if marker.get("convrot") and not marker.get("weight_rotated", False):
+                marker["convrot"] = False
+                marker.pop("convrot_groupsize", None)
+        elif fmt == INT4_CR_FORMAT and config.get("backing") == INT4_CR_BACKING:
+            orig_shape = config.get("orig_shape")
+            if not (
+                isinstance(orig_shape, list)
+                and len(orig_shape) == 2
+                and all(isinstance(d, int) and not isinstance(d, bool) and d > 0 for d in orig_shape)
+                and orig_shape[1] % 2 == 0
+            ):
+                raise ValueError(f"{source}: Q4_CR tensor {weight_name!r} has no usable orig_shape ({orig_shape!r}).")
+            group_size = config.get("convrot_groupsize", CONVROT_GROUP_SIZE)
+            if not isinstance(group_size, int) or isinstance(group_size, bool) or group_size <= 0:
+                raise ValueError(
+                    f"{source}: Q4_CR tensor {weight_name!r} has no usable convrot_groupsize ({group_size!r})."
+                )
+            # The w4a4 backing is symmetric and pre-rotated by definition -- its kernel rotates the activations to
+            # match -- so the decode assumes both. A file that says otherwise would decode to a weight of the right
+            # shape and the wrong values (without the rotation a real Q4_CR layer correlates with its weights at
+            # 0.06), so it is refused instead.
+            if config.get("sym", True) is not True or config.get("weight_rotated", True) is not True:
+                raise ValueError(
+                    f"{source}: Q4_CR tensor {weight_name!r} declares sym={config.get('sym')!r}, "
+                    f"weight_rotated={config.get('weight_rotated')!r}; only symmetric, pre-rotated codes are decoded."
+                )
+            marker = {
+                "format": INT4_TENSORWISE_FORMAT,
+                "convrot": True,
+                "convrot_groupsize": group_size,
+                "orig_shape": list(orig_shape),
+            }
+        else:
+            backing = ""
+            if fmt == INT4_CR_FORMAT:
+                backing = f" with backing {config['backing']!r}" if "backing" in config else " without a backing"
             raise ValueError(
-                f"{source}: tensor {weight_name!r} uses ComfyUI-GGUF quantization {fmt!r}, which is not "
-                f"supported. Only {INT8_TENSORWISE_FORMAT!r} (Q8_CR) layers can be loaded from GGUF."
+                f"{source}: tensor {weight_name!r} uses ComfyUI-GGUF quantization {fmt!r}{backing}, which is not "
+                f"supported. Only {INT8_TENSORWISE_FORMAT!r} (Q8_CR) and {INT4_CR_FORMAT!r} with the "
+                f"{INT4_CR_BACKING!r} backing (Q4_CR) layers can be loaded from GGUF."
             )
         if not weight_name.endswith(".weight"):
-            raise ValueError(f"{source}: {INT8_TENSORWISE_FORMAT} metadata names {weight_name!r}, not a weight.")
-        marker = dict(config)
-        # The converter's own loader treats `convrot` without `weight_rotated` as a file from an older
-        # converter that stored the codes unrotated, and runs it without the rotation. Un-rotating
-        # weights that were never rotated would scramble them, so follow it.
-        if marker.get("convrot") and not marker.get("weight_rotated", False):
-            marker["convrot"] = False
-            marker.pop("convrot_groupsize", None)
+            raise ValueError(f"{source}: {fmt} metadata names {weight_name!r}, not a weight.")
         layers[weight_name] = marker
     return layers
 
@@ -217,9 +266,9 @@ def gguf_header_state_dict(path: Path, compute_dtype: torch.dtype) -> dict[str, 
     Model identification needs names, shapes and quantization types, never values, and the header holds them
     all. `gguf_sd_loader` copies every tensor out of the file -- for a 23.6 GB transformer, 22 GiB of RAM per
     probe -- to answer questions the first few MB answer. Each tensor comes back as the `GGMLTensor` the full
-    read gives, with the same packed and logical shapes; a ComfyUI-GGUF ``Q8_CR`` layer comes back as its raw
-    ``I8`` codes, without the markers a decoding read adds, since whether it is supported is decided from the
-    metadata. The reader maps the file but touches only the header.
+    read gives, with the same packed and logical shapes; a ComfyUI-GGUF ``Q8_CR`` or ``Q4_CR`` layer comes back
+    as its raw ``I8`` codes, without the markers a decoding read adds, since whether it is supported is decided
+    from the metadata. The reader maps the file but touches only the header.
     """
     with WrappedGGUFReader(path) as reader:
         orig_shapes = _read_comfy_orig_shapes(reader)
@@ -241,7 +290,7 @@ def gguf_sd_loader(
     path: Path,
     compute_dtype: torch.dtype,
     *,
-    q8_cr: Q8CRMode = "refuse",
+    convrot: GGUFConvrotMode = "refuse",
     keep: Callable[[str], bool] | None = None,
 ) -> dict[str, torch.Tensor]:
     """Read a GGUF file into a state dict of ``GGMLTensor``s, dequantized on the fly at use.
@@ -249,16 +298,17 @@ def gguf_sd_loader(
     ``keep`` selects the tensors to read by name. The rest are skipped before their data is copied, so a
     loader that uses only part of a file -- a transformer with its text connectors bundled beside it, an
     encoder with its tokenizer packed in -- does not pay RAM for the part it drops. It selects tensors
-    only: ``Q8_CR`` markers are read for the whole file, so ``"refuse"`` refuses a file even if ``keep``
+    only: convrot markers are read for the whole file, so ``"refuse"`` refuses a file even if ``keep``
     would skip every marked layer.
 
-    ``q8_cr`` says what to do with ComfyUI-GGUF ``Q8_CR`` layers (see :func:`parse_q8_cr_markers`):
+    ``convrot`` says what to do with ComfyUI-GGUF's ``Q8_CR``/``Q4_CR`` layers (see
+    :func:`parse_gguf_convrot_markers`):
 
     - ``"decode"``: their weight, scale and bias come back as plain tensors with a ``<layer>.comfy_quant``
-      marker beside them -- exactly a safetensors ``int8_tensorwise`` export, so the loader decodes both
-      containers with the same :mod:`int8_convrot` code. Only a loader that does so may ask for this.
-    - ``"refuse"``: any other loader. Raises before the tensors are read; without it the int8 codes reach
-      a plain ``nn.Linear`` and the load fails on a dtype error that names neither the file nor the format.
+      marker beside them -- exactly a safetensors ``int8_tensorwise``/``int4_tensorwise`` export, so the loader
+      decodes both containers with the same :mod:`int8_convrot` code. Only a loader that does so may ask for this.
+    - ``"refuse"``: any other loader. Raises before the tensors are read; without it the codes reach a plain
+      ``nn.Linear`` and the load fails on a dtype error that names neither the file nor the format.
       Identification refuses such files at install already, so this guards records made before it did.
 
     Model identification does not come here: it reads the header (`gguf_header_state_dict`).
@@ -267,18 +317,19 @@ def gguf_sd_loader(
         sd: dict[str, torch.Tensor] = {}
         orig_shapes = _read_comfy_orig_shapes(reader)
         quant_fields = {k: f.contents() for k, f in reader.fields.items() if k.startswith(COMFY_QUANT_KEY_PREFIX)}
-        int8_layers = parse_q8_cr_markers(quant_fields, path.name)
-        if int8_layers and q8_cr == "refuse":
+        layers = parse_gguf_convrot_markers(quant_fields, path.name)
+        if layers and convrot == "refuse":
             raise ValueError(
-                f"{path.name} holds {len(int8_layers)} ComfyUI-GGUF Q8_CR (int8 convrot) layer(s), e.g. "
-                f"{next(iter(int8_layers))!r}. Loading Q8_CR from GGUF is not supported for this model type; "
+                f"{path.name} holds {len(layers)} ComfyUI-GGUF convrot (Q8_CR or Q4_CR) layer(s), e.g. "
+                f"{next(iter(layers))!r}. Loading those from GGUF is not supported for this model type; "
                 "use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
             )
-        int8_scales = {f"{name}_scale" for name in int8_layers}
-        int8_biases = {f"{name[: -len('.weight')]}.bias" for name in int8_layers}
-        missing = sorted((int8_layers.keys() | int8_scales) - {tensor.name for tensor in reader.tensors})
+        packed = {name for name, marker in layers.items() if marker_layout(marker).packed_int4}
+        scales = {f"{name}_scale": name for name in layers}
+        biases = {f"{name[: -len('.weight')]}.bias" for name in layers}
+        missing = sorted((layers.keys() | scales.keys()) - {tensor.name for tensor in reader.tensors})
         if missing:
-            raise ValueError(f"{path.name}: Q8_CR metadata names layers the file does not hold, e.g. {missing[0]!r}.")
+            raise ValueError(f"{path.name}: convrot metadata names layers the file does not hold, e.g. {missing[0]!r}.")
 
         for tensor in reader.tensors:
             if keep is not None and not keep(tensor.name):
@@ -288,17 +339,38 @@ def gguf_sd_loader(
             # while tensors still hold references to the mapped memory.
             torch_tensor = torch.from_numpy(tensor.data.copy())
 
-            shape = _logical_shape(tensor, orig_shapes)
-
-            if tensor.name in int8_layers or tensor.name in int8_scales:
-                expected = gguf.GGMLQuantizationType.I8 if tensor.name in int8_layers else gguf.GGMLQuantizationType.F32
+            if tensor.name in layers or tensor.name in scales:
+                # Stored as written: a packed int4 weight holds half its elements, so it is checked against the
+                # quant JSON's own unpacked shape below, never reshaped to a `comfy.gguf.orig_shape` entry.
+                shape = torch.Size(tuple(int(v) for v in reversed(tensor.shape)))
+                name = scales.get(tensor.name, tensor.name)
+                is_scale = tensor.name in scales
+                expected = (
+                    gguf.GGMLQuantizationType.I8
+                    if not is_scale
+                    else gguf.GGMLQuantizationType.F16
+                    if name in packed
+                    else gguf.GGMLQuantizationType.F32
+                )
                 if tensor.tensor_type != expected:
                     raise ValueError(
-                        f"{path.name}: Q8_CR tensor {tensor.name!r} is stored as {tensor.tensor_type.name}, "
+                        f"{path.name}: convrot tensor {tensor.name!r} is stored as {tensor.tensor_type.name}, "
                         f"expected {expected.name}."
                     )
-                sd[tensor.name] = torch_tensor.reshape(shape)
+                if name in packed and not is_scale:
+                    rows, cols = layers[name]["orig_shape"]
+                    if tuple(shape) != (rows, cols // 2):
+                        raise ValueError(
+                            f"{path.name}: Q4_CR tensor {tensor.name!r} is stored as {tuple(shape)}, which does not hold "
+                            f"the packed codes of its declared ({rows}, {cols}) weight."
+                        )
+                # The int4 scale widens to fp32, the dtype `Int4ConvrotLinear` holds it in.
+                sd[tensor.name] = (
+                    torch_tensor.reshape(shape).to(torch.float32) if is_scale else torch_tensor.reshape(shape)
+                )
                 continue
+
+            shape = _logical_shape(tensor, orig_shapes)
 
             if tensor.tensor_type in TORCH_COMPATIBLE_QTYPES:
                 torch_tensor = torch_tensor.view(*shape)
@@ -308,11 +380,11 @@ def gguf_sd_loader(
                 tensor_shape=shape,
                 compute_dtype=compute_dtype,
             )
-            # An int8 layer's bias becomes a buffer of `Int8ConvrotLinear`, whose forward casts it to the
+            # A convrot layer's bias becomes a buffer of its quantized module, whose forward casts it to the
             # activation dtype -- a dtype change a GGMLTensor refuses.
-            sd[tensor.name] = ggml_tensor.get_dequantized_tensor() if tensor.name in int8_biases else ggml_tensor
+            sd[tensor.name] = ggml_tensor.get_dequantized_tensor() if tensor.name in biases else ggml_tensor
 
-        for weight_name, marker in int8_layers.items():
+        for weight_name, marker in layers.items():
             raw = json.dumps(marker).encode("utf-8")
             marker_key = f"{weight_name[: -len('.weight')]}{COMFY_QUANT_SUFFIX}"
             sd[marker_key] = torch.frombuffer(bytearray(raw), dtype=torch.uint8)

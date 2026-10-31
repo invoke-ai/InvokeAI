@@ -43,7 +43,9 @@ LoRA). For lower VRAM, use a smaller transformer build:
 | GGUF Q4_K_M (starter model) | ≈ 7 GB           | stays packed, unpacked per layer                            |
 | GGUF Q8_0 (starter model)   | ≈ 13 GB          | near-full quality                                           |
 | int8 (`int8_convrot`)       | ≈ 12.6 GiB       | stays int8 on every device, no FP8 setting needed           |
+| int4 (`convrot_w4a4`, `int4_tensorwise`) | ≈ 6.4–9.6 GiB | stays packed on every device; most builds keep some layers int8, which sets the size |
 | GGUF Q8_CR (ComfyUI-GGUF)   | ≈ 12.8 GiB       | the same int8 inside a `.gguf`, stays int8 on every device  |
+| GGUF Q4_CR (ComfyUI-GGUF)   | ≈ 7.0 GiB        | the same int4 inside a `.gguf`                              |
 | fp8 / `fp8_scaled`          | ≈ 12.6 GB        | with FP8 Storage (switched on at install) or `fp8_compute`  |
 | MXFP8                       | ≈ 24 GB          | unpacked to BF16 at load; prefer the fp8, NVFP4 or GGUF build |
 
@@ -60,7 +62,7 @@ Krea-2 needs three components:
 
 | Component               | Diffusers install       | GGUF / single-file install           |
 | ----------------------- | ----------------------- | ------------------------------------ |
-| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint (GGUF, fp8, int8, NVFP4, MXFP8) |
+| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint (GGUF, fp8, int8, int4, NVFP4, MXFP8) |
 | VAE (Qwen-Image)        | bundled                 | installed separately                 |
 | Text encoder (Qwen3-VL) | bundled                 | installed separately                 |
 
@@ -93,7 +95,7 @@ encoder closely; the remaining difference is the quantization of the encoder.
 - The `mmproj-*.gguf` file next to it holds the vision part and is not needed for text-to-image. Installing
   it is refused with a message saying so. Without the vision part, a GGUF encoder cannot encode the
   reference images of [edit LoRAs](#edit-loras-and-reference-images).
-- ComfyUI-GGUF's `Q8_CR` encoder files are refused at install; only the transformer loads from `Q8_CR`.
+- ComfyUI-GGUF's `Q8_CR` and `Q4_CR` encoder files are refused at install; only the transformer loads from them.
 - LoRAs with text-encoder layers still apply to a quantized encoder.
 
 ## Conditioning enhancers
@@ -167,7 +169,7 @@ feeding the **Style Reference** input of **Denoise - Krea-2**.
 ## LoRA
 
 Krea-2 LoRAs (diffusers PEFT format) are supported and apply to both the transformer and — where the
-LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, NVFP4) the LoRA
+LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, int4, NVFP4) the LoRA
 is applied alongside the packed weights rather than merged into them. LoRAs trained to edit an input image
 need reference images; see [Edit LoRAs](#edit-loras-and-reference-images).
 

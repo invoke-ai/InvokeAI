@@ -211,8 +211,8 @@ class ModelOnDisk:
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
                 # Shapes and quantization types from the header, like the safetensors branch: the tensor data
-                # is never read. Whether a Q8_CR file's quantization is supported is decided from its metadata
-                # by `ModelConfigFactory`, once, not per candidate.
+                # is never read. Whether a Q8_CR or Q4_CR file's quantization is supported is decided from its
+                # metadata by `ModelConfigFactory`, once, not per candidate.
                 checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
