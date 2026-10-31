@@ -64,7 +64,12 @@ def _drive(
         info.model_on_device.return_value.__enter__.return_value = (None, model)
         return info
 
-    transformer = SimpleNamespace(config=SimpleNamespace(flow_map=variant is Flux3VariantType.Klein))
+    # A module without weights, so the working-memory estimate walks an empty tree; its config is the released
+    # geometry's, which the estimate prices on.
+    transformer = torch.nn.Module()
+    transformer.config = SimpleNamespace(
+        flow_map=variant is Flux3VariantType.Klein, num_attention_heads=24, attention_head_dim=128
+    )
     vae_info, transformer_info = model_info(MagicMock()), model_info(transformer)
 
     context = MagicMock()
@@ -109,7 +114,6 @@ def _drive(
         patch.object(flux3_denoise.TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
         patch.object(flux3_denoise, "read_vae_bn_stats", return_value=(BN_MEAN, BN_STD)),
         patch.object(flux3_denoise, "get_noise_flux3", return_value=noise),
-        patch.object(flux3_denoise, "peak_dequant_transient_bytes", return_value=0),
         patch.object(flux3_denoise, "denoise", recording_denoise),
         patch.object(flux3_denoise, "RectifiedFlowInpaintExtension", _RecordingInpaintExtension),
     ):
