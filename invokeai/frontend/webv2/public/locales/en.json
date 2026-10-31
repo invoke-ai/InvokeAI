@@ -299,7 +299,9 @@
     "seedNextBatch": "Next batch: {{seed}}",
     "seedNextBatchRange": "Next batch: {{first}} → {{last}}",
     "decreaseValue": "Decrease value",
-    "increaseValue": "Increase value"
+    "increaseValue": "Increase value",
+    "on": "On",
+    "off": "Off"
   },
   "app": {
     "name": "Invoke"
@@ -2653,7 +2655,6 @@
         "appearance": "Appearance",
         "behavior": "Behavior",
         "hotkeys": "Keyboard shortcuts",
-        "project": "Project",
         "gallery": "Gallery",
         "preview": "Preview",
         "workflow": "Workflow",
@@ -6569,18 +6570,12 @@
     "showInSection": "Show in section",
     "allWidgetSettings": "All {{widget}} settings…",
     "loadFailed": "These settings could not be loaded. Try again.",
-    "instanceUnavailable": "Open a project containing this widget to edit its settings.",
-    "projectUnavailable": "Open a project to change this setting.",
     "groups": {
       "application": "Application",
-      "project": "Project",
       "widgets": "Widgets",
       "system": "System"
     },
     "scope": {
-      "preference": "Saved in your preferences",
-      "project": "Saved with this project",
-      "instance": "Saved with this widget in this project",
       "server": "Applies to the whole server",
       "install": "Saved for this install"
     },
@@ -6594,8 +6589,22 @@
       "clusterStrengthIncomplete": "Not a number yet \u2014 the clustering strength is unchanged.",
       "clusterStrengthRange": "Clustering strength must be between {{min}} and {{max}}."
     },
-    "changedFromDefault": "Changed from default",
-    "changedSetting": "{{setting}}: changed from default"
+    "defaultsNote": "Defaults for every project. A project can pin its own value.",
+    "layer": {
+      "pinnedNamed": "{{setting}}: pinned for this project",
+      "pinnedOptions": "Pinned for this project · options",
+      "changed": "Changed from Invoke default",
+      "changedNamed": "{{setting}}: changed from Invoke default",
+      "changedOptions": "Changed from Invoke default · options",
+      "thisProjectOnly": "This project only",
+      "useAsDefault": "Use as my default",
+      "useAsDefaultHint": "Every project without its own value follows it",
+      "followDefault": "Follow my default",
+      "yourDefault": "Your default: {{value}}",
+      "invokeDefault": "Invoke default: {{value}}",
+      "resetToBuiltIn": "Reset to Invoke default",
+      "automatic": "Automatic"
+    }
   },
   "intermediates": {
     "title": "Intermediates",

@@ -5,7 +5,7 @@ import { createInstance } from 'i18next';
 import { EyeIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildSettingsCatalog, getAvailableSettings, searchSettings } from './catalog';
+import { buildSettingsCatalog, getAvailableSettings, searchSettings, settingsCatalog } from './catalog';
 
 const field = (id: string, overrides: Partial<SettingDefinition> = {}): SettingDefinition =>
   ({ id, kind: 'boolean', label: id, scope: 'preference', ...overrides }) as SettingDefinition;
@@ -57,9 +57,9 @@ describe('settings catalog composition', () => {
   });
 
   it('merges application fields with their widget section while retaining field bindings and widget identity', async () => {
-    const previewSettings = contribution('preview', [field('filmstrip', { scope: 'instance' })]);
+    const previewSettings = contribution('preview', [field('filmstrip', { scope: 'project' })]);
     previewSettings.label = 'Preview preferences';
-    const projectSettings = contribution('preview', [field('antialias', { scope: 'project' })]);
+    const projectSettings = contribution('preview', [field('antialias')]);
     const preview = widget(previewSettings);
     const sections = buildSettingsCatalog([projectSettings], [preview]);
 
@@ -73,11 +73,11 @@ describe('settings catalog composition', () => {
       widgetId: 'preview',
     });
     expect(section.entries.map((entry) => entry.field)).toEqual([previewSettings.fields[0], projectSettings.fields[0]]);
-    const [instanceEntry, projectEntry] = section.entries;
-    await instanceEntry!.resource.load();
+    const [widgetEntry, applicationEntry] = section.entries;
+    await widgetEntry!.resource.load();
     expect(previewSettings.load).toHaveBeenCalledOnce();
     expect(projectSettings.load).not.toHaveBeenCalled();
-    await projectEntry!.resource.load();
+    await applicationEntry!.resource.load();
     expect(projectSettings.load).toHaveBeenCalledOnce();
   });
 
@@ -148,49 +148,38 @@ describe('settings availability', () => {
   const sections = buildSettingsCatalog(
     [
       contribution('appearance', [field('motion')]),
-      contribution('project', [field('cpuNoise', { scope: 'project' })]),
-      contribution('preview', [field('antialias', { scope: 'project' })]),
+      contribution('behavior', [field('autoSwitch')]),
+      contribution('preview', [field('antialias')]),
       contribution('server', [field('devices', { scope: 'server' })]),
     ],
-    [widget(contribution('preview', [field('filmstrip', { scope: 'instance' }), field('confirm')]))]
+    [widget(contribution('preview', [field('filmstrip', { scope: 'project' })]))]
   );
-  const shown = (availability: Parameters<typeof getAvailableSettings>[1]) =>
-    getAvailableSettings(sections, availability).map((section) => [
+  const shown = (canManageAppConfig: boolean) =>
+    getAvailableSettings(sections, { canManageAppConfig }).map((section) => [
       section.id,
       section.entries.map((entry) => entry.field.id),
     ]);
 
-  it('leaves out project and widget settings where no project is open, and sections left empty', () => {
-    expect(shown({ canManageAppConfig: true, widgetTypeIds: null })).toEqual([
+  it('keeps per-project and widget settings everywhere: they edit a pin in a project and a default outside one', () => {
+    expect(shown(true)).toEqual([
       ['appearance', ['motion']],
-      ['preview', ['confirm']],
-      ['server', ['devices']],
-    ]);
-  });
-
-  it('keeps widget settings only for widgets the open project contains', () => {
-    expect(shown({ canManageAppConfig: true, widgetTypeIds: new Set(['gallery']) })).toEqual([
-      ['appearance', ['motion']],
-      ['project', ['cpuNoise']],
-      ['preview', ['confirm', 'antialias']],
-      ['server', ['devices']],
-    ]);
-    expect(shown({ canManageAppConfig: true, widgetTypeIds: new Set(['preview']) })[2]).toEqual([
-      'preview',
-      ['filmstrip', 'confirm', 'antialias'],
-    ]);
-  });
-
-  it('keeps project settings for search where no project is open, and widget settings still out', () => {
-    expect(shown({ canManageAppConfig: true, forSearch: true, widgetTypeIds: null })).toEqual([
-      ['appearance', ['motion']],
-      ['project', ['cpuNoise']],
-      ['preview', ['confirm', 'antialias']],
+      ['behavior', ['autoSwitch']],
+      ['preview', ['filmstrip', 'antialias']],
       ['server', ['devices']],
     ]);
   });
 
   it('shows the server section only to accounts that can manage the app configuration', () => {
-    expect(shown({ canManageAppConfig: false, widgetTypeIds: null }).map(([id]) => id)).not.toContain('server');
+    expect(shown(false).map(([id]) => id)).toEqual(['appearance', 'behavior', 'preview']);
+  });
+});
+
+describe('the shipped catalog', () => {
+  it("lists the project's generation flags under Widgets, as the Generate widget's section", () => {
+    const generate = settingsCatalog.find((section) => section.id === 'generate')!;
+
+    expect(generate).toMatchObject({ group: 'widgets', widgetId: 'generate' });
+    expect(generate.entries.map((entry) => entry.field.id)).toEqual(['useCpuNoise', 'useNsfwChecker', 'useWatermark']);
+    expect(settingsCatalog.some((section) => section.id === 'generation')).toBe(false);
   });
 });

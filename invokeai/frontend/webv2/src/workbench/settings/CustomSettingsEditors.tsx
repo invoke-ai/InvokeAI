@@ -1,5 +1,5 @@
 import type { LogNamespace } from '@platform/logging/contracts';
-import type { SettingFieldProps } from '@platform/ui/settings/contracts';
+import type { SettingFieldProps, SettingLayer } from '@platform/ui/settings/contracts';
 import type { WorkbenchThemeId } from '@theme/themes';
 
 import { Box, chakra, Checkbox, Flex, HStack, Icon, SimpleGrid, Stack, Text, useSlotRecipe } from '@chakra-ui/react';
@@ -7,7 +7,7 @@ import { useCapabilities } from '@features/identity';
 import { INTERMEDIATES_SETTING_ID } from '@features/intermediates';
 import { Button } from '@platform/ui/Button';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { areLoggingPreferencesDefault, resetLoggingPreferences } from '@workbench/diagnostics/loggingPreferences';
@@ -236,6 +236,21 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     }
     return false;
   });
+  const layer = useMemo<SettingLayer | undefined>(
+    () =>
+      isModified
+        ? {
+            onResetToBuiltIn: () =>
+              void patchWorkbenchPreferences(
+                field.id === 'themeId'
+                  ? { themeId: DEFAULT_PREFERENCES.themeId }
+                  : { developerLogNamespaces: DEFAULT_PREFERENCES.developerLogNamespaces }
+              ),
+            state: 'default',
+          }
+        : undefined,
+    [field.id, isModified]
+  );
   let editor: ReactNode;
 
   switch (field.id) {
@@ -292,7 +307,7 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
           <Text color="fg" fontSize="lg" fontWeight="500">
             {resolveSettingsText(field.label, t)}
           </Text>
-          {isModified ? <ModifiedSettingIndicator label={resolveSettingsText(field.label, t)} /> : null}
+          {layer ? <SettingLayerIndicator label={resolveSettingsText(field.label, t)} layer={layer} /> : null}
         </HStack>
         {field.description ? (
           <Text color="fg.muted" fontSize="md">

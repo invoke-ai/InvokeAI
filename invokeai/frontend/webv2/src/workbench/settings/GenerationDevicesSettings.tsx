@@ -1,4 +1,5 @@
 import type { GenerationDevicesSetting } from '@features/queue/devices';
+import type { SettingLayer } from '@platform/ui/settings/contracts';
 
 import { HStack, Spinner, Stack, Switch, Text } from '@chakra-ui/react';
 import { useCapabilities } from '@features/identity';
@@ -9,9 +10,15 @@ import {
   useGenerationDevices,
 } from '@features/queue/devices';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+/**
+ * Changed from the built-in (every device). Only marked: the "Use every available accelerator" switch on the same row
+ * is the way back, and an admin's reset would be an async save that loses the dot's focus.
+ */
+const CHANGED_LAYER: SettingLayer = { state: 'default' };
 
 /** Generation devices are admin-only server configuration and take effect after restart. */
 export const GenerationDevicesSettings = () => {
@@ -94,7 +101,9 @@ export const GenerationDevicesSettings = () => {
             ? t('settings.generationDevices.singleDevice', { device: labels[options[0].device] ?? options[0].device })
             : t('settings.generationDevices.noAccelerators')}
         </Text>
-        {!isAuto ? <ModifiedSettingIndicator label={t('settings.catalog.generationDevices.label')} /> : null}
+        {!isAuto ? (
+          <SettingLayerIndicator label={t('settings.catalog.generationDevices.label')} layer={CHANGED_LAYER} />
+        ) : null}
       </HStack>
     );
   }
@@ -108,7 +117,9 @@ export const GenerationDevicesSettings = () => {
               ? t('settings.generationDevices.usingAll')
               : selectedDevices.map((device) => labels[device] ?? device).join(', ')}
           </Text>
-          {!isAuto ? <ModifiedSettingIndicator label={t('settings.catalog.generationDevices.label')} /> : null}
+          {!isAuto ? (
+            <SettingLayerIndicator label={t('settings.catalog.generationDevices.label')} layer={CHANGED_LAYER} />
+          ) : null}
         </HStack>
         <Text color="fg.muted" fontSize="md">
           {t('settings.generationDevices.adminOnly')}
@@ -123,7 +134,7 @@ export const GenerationDevicesSettings = () => {
         checked={isAuto}
         description={t('settings.generationDevices.useAllDescription')}
         label={t('settings.generationDevices.useAll')}
-        isModified={!isAuto}
+        layer={isAuto ? undefined : CHANGED_LAYER}
         onChange={toggleAuto}
       />
       {isAuto ? null : (
@@ -178,13 +189,13 @@ const DeviceSwitch = ({
   checked,
   description,
   label,
-  isModified,
+  layer,
   onChange,
 }: {
   checked: boolean;
   description?: string;
   label: string;
-  isModified?: boolean;
+  layer?: SettingLayer;
   onChange: (checked: boolean) => void;
 }) => {
   const handleCheckedChange = useCallback(
@@ -207,7 +218,7 @@ const DeviceSwitch = ({
           <Switch.Label color="fg" fontSize="lg" fontWeight="500">
             {label}
           </Switch.Label>
-          {isModified ? <ModifiedSettingIndicator label={label} /> : null}
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
         </HStack>
         {description ? (
           <Text color="fg.muted" fontSize="md">

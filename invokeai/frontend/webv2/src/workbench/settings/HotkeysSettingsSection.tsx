@@ -1,5 +1,6 @@
 import type { ListRowProps } from '@platform/ui/list/List';
 import type { ListSection } from '@platform/ui/list/listRows';
+import type { SettingLayer } from '@platform/ui/settings/contracts';
 import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
 
 import { HStack, Icon, Input, InputGroup, Kbd, Stack, Text } from '@chakra-ui/react';
@@ -7,7 +8,7 @@ import { Button, IconButton } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { List } from '@platform/ui/list/List';
 import { listRowsFromSections } from '@platform/ui/list/listRows';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import {
   firstPartyHotkeyCatalog,
   formatHotkeyForPlatform,
@@ -23,6 +24,9 @@ import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState }
 import { useTranslation } from 'react-i18next';
 
 type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
+
+/** A rebound hotkey; its row's own reset button changes it back, so the dot only marks it. */
+const CHANGED_LAYER: SettingLayer = { state: 'default' };
 
 /** The scope a binding answers in, named for the shadowing note: a widget's label, or the focused panel. */
 const SCOPE_LABEL_KEYS: Record<HotkeyCategory, string> = {
@@ -380,7 +384,7 @@ const HotkeyListRow = ({
           <Text color="fg" fontSize="lg" fontWeight="600" truncate>
             {getHotkeyTitle(hotkey)}
           </Text>
-          {isModified ? <ModifiedSettingIndicator label={getHotkeyTitle(hotkey)} /> : null}
+          {isModified ? <SettingLayerIndicator label={getHotkeyTitle(hotkey)} layer={CHANGED_LAYER} /> : null}
         </HStack>
         <Text color="fg.muted" fontSize="xs" truncate>
           {hotkey.description ?? hotkey.id}

@@ -1,4 +1,5 @@
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
+import type { Project } from '@workbench/projectContracts';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
@@ -11,9 +12,44 @@ import { useTranslation } from 'react-i18next';
 
 import type { SettingsEntry, SettingsSection } from './catalog';
 
+import { PROJECT_SETTINGS_OWNER } from './projectSettings';
 import { SettingsScopeLabel } from './SettingsScopeLabel';
 
 const FILL_PROPS = { display: 'flex', flex: '1', flexDirection: 'column', minH: '0' } as const;
+
+/**
+ * What a section's fields edit in the open project: a requested target as given, else the project and the section's
+ * widget. A requested target that is gone stays as it was, so its controls disable rather than move to another project
+ * or instance. Undefined (the user's defaults) where the project has no widget to pin to.
+ */
+const resolveSettingsTarget = (
+  project: Project,
+  section: SettingsSection,
+  requested: SettingsTarget | undefined
+): SettingsTarget | undefined => {
+  // The binding checks that an explicit instance still exists and is the section's widget.
+  if (requested && (requested.projectId !== project.id || requested.instanceId)) {
+    return requested;
+  }
+  // The project's own settings (the Generate widget's section) pin on the project, whichever widgets it has.
+  if (!section.widgetId || section.widgetId === PROJECT_SETTINGS_OWNER) {
+    return { projectId: project.id };
+  }
+  const instance = getProjectWidgetInstance(project, section.widgetId);
+  return instance ? { projectId: project.id, instanceId: instance.id } : undefined;
+};
+
+/** Whether a section's per-project fields edit the user's defaults here: no project, or no widget in it to pin to. */
+export const useEditsDefaults = (section: SettingsSection): boolean =>
+  useOptionalWorkbenchSelector(
+    (snapshot) =>
+      Boolean(
+        section.widgetId &&
+        section.widgetId !== PROJECT_SETTINGS_OWNER &&
+        !getProjectWidgetInstance(snapshot.activeProject, section.widgetId)
+      ),
+    true
+  );
 
 const LoadedSetting = ({
   entry,
@@ -38,7 +74,8 @@ const LoadedSetting = ({
       if (!element || !isRevealed) {
         return;
       }
-      const control = element.querySelector<HTMLElement>('input,button,[tabindex="0"]');
+      // The control, not the layer indicator that precedes it after the label.
+      const control = element.querySelector<HTMLElement>('input,button:not([data-setting-layer]),[tabindex="0"]');
       element.scrollIntoView({ block: 'nearest' });
       control?.focus({ preventScroll: true });
       onRevealed?.();
@@ -79,21 +116,10 @@ export const SettingsEntryView = ({
   showGroup?: boolean;
 }) => {
   const { t } = useTranslation();
-  const target = useOptionalWorkbenchSelector((snapshot) => {
-    const project = snapshot.activeProject;
-    if (requestedTarget && requestedTarget.projectId !== project.id) {
-      return null;
-    }
-    const instance = requestedTarget?.instanceId
-      ? project.widgetInstances[requestedTarget.instanceId]
-      : section.widgetId
-        ? getProjectWidgetInstance(project, section.widgetId)
-        : undefined;
-    if (entry.field.scope === 'instance' && (!instance || instance.typeId !== section.widgetId)) {
-      return null;
-    }
-    return { projectId: project.id, instanceId: instance?.id };
-  }, null);
+  const target = useOptionalWorkbenchSelector<SettingsTarget | undefined>(
+    (snapshot) => resolveSettingsTarget(snapshot.activeProject, section, requestedTarget),
+    undefined
+  );
   const reveal = useCallback(() => onReveal?.(section.id, entry.field.id), [onReveal, section.id, entry.field.id]);
   const loading = useMemo(
     () => (
@@ -103,10 +129,9 @@ export const SettingsEntryView = ({
     ),
     [t]
   );
-  const unavailable = (entry.field.scope === 'instance' || entry.field.scope === 'project') && !target;
   const scope = entry.field.scope;
   const isDestination = search && entry.field.kind === 'custom';
-  const fill = !search && !unavailable && isFillSettingsEntry(entry, surface);
+  const fill = !search && isFillSettingsEntry(entry, surface);
   const framed = !search && entry.field.kind === 'custom' && entry.field.framed === true;
   return (
     <>
@@ -129,10 +154,9 @@ export const SettingsEntryView = ({
         borderColor="border.subtle"
         {...(fill ? FILL_PROPS : undefined)}
       >
-        {unavailable || isDestination ? (
+        {isDestination ? (
           <Stack gap="2">
-            {/* Muted where it cannot be edited here: it reads as present but out of reach, not as a broken control. */}
-            <Text color={unavailable ? 'fg.muted' : undefined} fontSize="lg" fontWeight="500">
+            <Text fontSize="lg" fontWeight="500">
               {resolveSettingsText(entry.field.label, t)}
             </Text>
             {entry.field.description ? (
@@ -140,15 +164,9 @@ export const SettingsEntryView = ({
                 {resolveSettingsText(entry.field.description, t)}
               </Text>
             ) : null}
-            {unavailable ? (
-              <Text fontSize="md" color="fg.muted">
-                {t(scope === 'instance' ? 'settingsDialog.instanceUnavailable' : 'settingsDialog.projectUnavailable')}
-              </Text>
-            ) : (
-              <Button variant="outline" alignSelf="start" onClick={reveal}>
-                {t('settingsDialog.openEditor')}
-              </Button>
-            )}
+            <Button variant="outline" alignSelf="start" onClick={reveal}>
+              {t('settingsDialog.openEditor')}
+            </Button>
           </Stack>
         ) : (
           <RetryBoundary
@@ -162,7 +180,7 @@ export const SettingsEntryView = ({
                 entry={entry}
                 fill={fill}
                 isRevealed={revealEntryId === entry.field.id}
-                target={target ?? undefined}
+                target={target}
                 surface={surface}
                 onReveal={onReveal}
                 onRevealed={onRevealed}
@@ -175,7 +193,7 @@ export const SettingsEntryView = ({
             <SettingsScopeLabel scope={scope} />
           </Box>
         ) : null}
-        {search && !isDestination && !unavailable ? (
+        {search && !isDestination ? (
           <Button size="sm" variant="ghost" mt="1" onClick={reveal}>
             {t('settingsDialog.showInSection')}
           </Button>

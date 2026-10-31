@@ -11,7 +11,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { SettingsSection } from './catalog';
 
-import { isFillSettingsEntry, SettingsEntryView } from './SettingsEntryView';
+import { isFillSettingsEntry, SettingsEntryView, useEditsDefaults } from './SettingsEntryView';
 import { SettingsScopeLabel } from './SettingsScopeLabel';
 import { patchWorkbenchPreferences, useWorkbenchSettingsSelector } from './store';
 
@@ -159,18 +159,27 @@ const SettingsSectionContent = ({
   onRevealed?: () => void;
 }) => {
   const { t } = useTranslation();
+  const editsDefaults = useEditsDefaults(section);
+  const defaultsNote =
+    editsDefaults && section.entries.some((entry) => entry.field.scope === 'project') ? (
+      <Text fontSize="md" color="fg.muted">
+        {t('settingsDialog.defaultsNote')}
+      </Text>
+    ) : null;
   return (
     <Box {...(fill ? FILL_SECTION_PROPS : undefined)}>
       {!search && section.entries[0] ? (
-        <Box pt="3">
+        <Stack gap="0.5" pt="3">
+          {defaultsNote}
           <SettingsScopeLabel scope={section.entries[0].field.scope} />
-        </Box>
+        </Stack>
       ) : null}
       {search ? (
         <Stack gap="0.5" pt="5">
           <Text as="h3" fontWeight="600" fontSize="lg">
             {resolveSettingsText(section.label, t)}
           </Text>
+          {defaultsNote}
           {section.entries[0] ? <SettingsScopeLabel scope={section.entries[0].field.scope} /> : null}
         </Stack>
       ) : null}

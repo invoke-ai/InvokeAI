@@ -120,7 +120,10 @@ export const MenuItem = ({ children, disabled, unavailableReason, ...props }: Me
 export interface MenuActionItemProps {
   value: string;
   label: string;
-  /** Second line under the label, for choices whose consequences are not obvious; top-aligns the icon. */
+  /**
+   * Second line under the label, for choices whose consequences are not obvious; top-aligns the icon. It describes the
+   * item (`aria-describedby`); the item's name stays the label.
+   */
   hint?: string;
   icon?: LucideIcon;
   /** CSS color for the icon (e.g. a swatch); the theme tone otherwise. */
@@ -149,6 +152,8 @@ export const MenuActionItem = ({
   unavailableReason,
   value,
 }: MenuActionItemProps) => {
+  const labelId = useId();
+  const hintId = useId();
   const content = (
     <HStack alignItems={hint ? 'flex-start' : 'center'} gap={hint ? '2.5' : '2'} minW="0" w="full">
       {icon ? (
@@ -163,8 +168,8 @@ export const MenuActionItem = ({
       ) : null}
       {hint ? (
         <Stack flex="1" gap="0" minW="0">
-          <Text>{label}</Text>
-          <Text color="fg.subtle" fontSize="xs">
+          <Text id={labelId}>{label}</Text>
+          <Text id={hintId} color="fg.subtle" fontSize="xs">
             {hint}
           </Text>
         </Stack>
@@ -180,6 +185,8 @@ export const MenuActionItem = ({
   return (
     <MenuItem
       {...(hint ? TWO_LINE_ITEM : undefined)}
+      aria-describedby={hint ? hintId : undefined}
+      aria-labelledby={hint ? labelId : undefined}
       data-danger={tone === 'danger' ? '' : undefined}
       disabled={disabled}
       unavailableReason={unavailableReason}

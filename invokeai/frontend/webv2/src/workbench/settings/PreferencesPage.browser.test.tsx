@@ -106,27 +106,50 @@ afterEach(async () => {
 });
 
 describe('Launchpad preferences page', () => {
-  it('lists only settings that need no open project and follows the route', async () => {
+  it('lists every section, per-project ones as defaults, and follows the route', async () => {
     const router = await render('/preferences/behavior');
 
     await expect.element(detailHeading('Behavior')).toBeVisible();
     await expect.element(sectionItem('Behavior')).toHaveAttribute('aria-current', 'true');
-    for (const name of ['Appearance', 'Keyboard shortcuts', 'Gallery', 'Workflow', 'Queue', 'Developer']) {
+    for (const name of [
+      'Appearance',
+      'Keyboard shortcuts',
+      'Generate',
+      'Canvas',
+      'Gallery',
+      'Image Map',
+      'Preview',
+      'Workflow',
+      'Queue',
+      'Developer',
+    ]) {
       await expect.element(sectionItem(name)).toBeInTheDocument();
     }
-    // Project, and widget sections with no preference entries, need a project; Server needs admin rights.
-    for (const name of ['Project', 'Preview', 'Canvas', 'Server']) {
-      await expect.element(sectionItem(name)).not.toBeInTheDocument();
-    }
+    // Server needs admin rights; there is no Project group any more.
+    await expect.element(sectionItem('Server')).not.toBeInTheDocument();
+    expect(host.textContent).not.toContain('Project');
+
+    await act(() => sectionItem('Canvas').click());
+    await expect.poll(() => router.state.location.pathname).toBe('/preferences/canvas');
+    await expect.element(page.getByText(i18n.t('settingsDialog.defaultsNote'), { exact: true })).toBeVisible();
+    const grid = page.getByText(i18n.t('widgets.canvas.settings.grid'), { exact: true });
+    await expect.element(grid).toBeVisible();
+    await act(() => grid.click());
+    await expect.poll(() => getWorkbenchPreferences().scopedDefaults.canvas).toEqual({ showGrid: true });
 
     await act(() => sectionItem('Appearance').click());
     await expect.poll(() => router.state.location.pathname).toBe('/preferences/appearance');
     await expect.element(detailHeading('Appearance')).toBeVisible();
+    await expect
+      .element(page.getByText(i18n.t('settingsDialog.defaultsNote'), { exact: true }))
+      .not.toBeInTheDocument();
   });
 
   it('edits a preference through the shared settings store', async () => {
     await render('/preferences/appearance');
 
+    // The section's binding loads after the first render; clicking inside act() before then would wait on itself.
+    await expect.element(page.getByText('Reduce motion', { exact: true })).toBeVisible();
     await act(() => page.getByText('Reduce motion', { exact: true }).click());
     await expect.poll(() => getWorkbenchPreferences().reduceMotion).toBe(true);
   });
@@ -164,18 +187,30 @@ describe('Launchpad preferences page', () => {
     await expect.element(detailHeading('Behavior')).toBeVisible();
   });
 
-  it('finds project settings in search but marks them as needing an open project', async () => {
+  it('edits a per-project setting found by search as the default, and resets it to the built-in', async () => {
     await render('/preferences/appearance');
 
-    await act(() => search().fill('watermark'));
-    await expect.element(page.getByText('Invisible watermark', { exact: true })).toBeVisible();
-    await expect.element(page.getByText(i18n.t('settingsDialog.projectUnavailable'), { exact: true })).toBeVisible();
-    // Nothing to edit or reveal here: no control and no way into a section this page does not list.
-    expect(page.getByRole('checkbox', { name: 'Invisible watermark' }).query()).toBeNull();
-    expect(page.getByRole('button', { name: i18n.t('settingsDialog.showInSection'), exact: true }).query()).toBeNull();
+    await act(() => search().fill('NSFW'));
+    const toggle = page.getByRole('checkbox', { name: 'NSFW checker', exact: true });
+    await expect.element(toggle).toBeEnabled();
+    await expect.element(toggle).not.toBeChecked();
+    await act(() => page.getByText('NSFW checker', { exact: true }).click());
+    await expect.poll(() => getWorkbenchPreferences().scopedDefaults.generate).toEqual({ useNsfwChecker: true });
 
-    await act(() => search().fill(''));
-    await expect.element(sectionItem('Project')).not.toBeInTheDocument();
+    await act(() => page.getByRole('button', { name: i18n.t('settingsDialog.showInSection'), exact: true }).click());
+    await expect.element(detailHeading('Generate')).toBeVisible();
+    await expect.element(page.getByText(i18n.t('settingsDialog.defaultsNote'), { exact: true })).toBeVisible();
+    await act(() =>
+      page
+        .getByRole('button', {
+          name: i18n.t('settingsDialog.layer.changedNamed', { setting: 'NSFW checker' }),
+          exact: true,
+        })
+        .click()
+    );
+    await act(() => page.getByRole('menuitem', { name: i18n.t('settingsDialog.layer.resetToBuiltIn') }).click());
+    await expect.poll(() => getWorkbenchPreferences().scopedDefaults).toEqual({});
+    await expect.element(toggle).not.toBeChecked();
   });
 
   it('replaces a search left behind when another page asks for a setting', async () => {

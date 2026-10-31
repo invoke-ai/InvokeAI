@@ -40,6 +40,9 @@ import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 const switchControls = (): HTMLElement[] =>
   Array.from(host!.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="control"]'));
 
+const changedIndicators = (): HTMLElement[] =>
+  Array.from(host!.querySelectorAll<HTMLElement>('[aria-label$=": changed from Invoke default"]'));
+
 const TWO_GPUS = [
   { device: 'cuda:0', name: 'RTX 5090' },
   { device: 'cuda:1', name: 'RTX 4090' },
@@ -128,11 +131,18 @@ describe('GenerationDevicesSettings', () => {
 
   it('marks explicit device lists as changed and removes the marker when auto is restored', async () => {
     await render({ options: TWO_GPUS, setting: ['cuda:0', 'cuda:1'] });
-    expect(host?.querySelectorAll('[role="img"][aria-label$=": changed from default"]')).toHaveLength(1);
+    expect(changedIndicators()).toHaveLength(1);
     await render({ options: TWO_GPUS, setting: 'auto' });
-    expect(host?.querySelector('[role="img"][aria-label$=": changed from default"]')).toBeNull();
+    expect(changedIndicators()).toHaveLength(0);
     await render({ loadState: 'loading', options: TWO_GPUS, setting: ['cuda:0'] });
-    expect(host?.querySelector('[role="img"][aria-label$=": changed from default"]')).toBeNull();
+    expect(changedIndicators()).toHaveLength(0);
+  });
+
+  it('only marks a changed device list: the switch beside it is the way back', async () => {
+    await render({ options: TWO_GPUS, setting: ['cuda:0'] });
+
+    expect(changedIndicators()[0]!.getAttribute('role')).toBe('img');
+    expect(host?.querySelector('[data-setting-layer]')).toBeNull();
   });
 
   it('saves the devices in effect when auto is turned off, changing nothing else', async () => {
@@ -171,7 +181,10 @@ describe('GenerationDevicesSettings', () => {
     expect(host?.textContent).toContain('RTX 4090');
     expect(host?.textContent).toContain('Only an administrator can change which accelerators are used.');
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    expect(host?.querySelector('[role="img"][aria-label="Generation devices: changed from default"]')).not.toBeNull();
+    // Not this account's to change back: the marker explains itself and offers nothing.
+    expect(
+      host?.querySelector('[role="img"][aria-label="Generation devices: changed from Invoke default"]')
+    ).not.toBeNull();
   });
 
   it('surfaces a load failure instead of rendering empty controls', async () => {
