@@ -259,6 +259,14 @@
         "allocator": "native"
       },
       "values": {
+        "k_denoise_bf16_h3072": 346367,
+        "b_denoise_bf16_h3072": 99614720,
+        "k_denoise_fp16_h3072": 346367,
+        "b_denoise_fp16_h3072": 93323264,
+        "k_denoise_fp32_h3072": 525118,
+        "b_denoise_fp32_h3072": 587202560
+      },
+      "unmeasured_floor": {
         "k_denoise_bf16_h3072": 346030,
         "b_denoise_bf16_h3072": 1073741824,
         "k_denoise_fp16_h3072": 346030,
@@ -266,8 +274,7 @@
         "k_denoise_fp32_h3072": 346030,
         "b_denoise_fp32_h3072": 1073741824
       },
-      "legacy": true,
-      "provenance": "Legacy, not a fit. For every OS but Windows, which has its own entry: no fresh-process point measures ROCm with the native allocator yet. The constants the FLUX.3 denoise node reserved by hand: 0.33 MiB per attended token and sample, truncated to whole bytes (346030), and a 1 GiB base, the same for every dtype and for Klein and Klein Base (one width, 3072). The 0.33 bounded the driver-level demand of a real FLUX.3 Klein forward in bf16 on an RTX 4090 (Windows, native allocator, October 2026): 0.286 MB per attended token from 1 to 4 MP without references, up to 0.320 with six 1 MP references."
+      "provenance": "Every OS but Windows, which has its own entry. The FLUX.3 transformer forward's lines, bytes per attended token and sample plus a base, one per dtype (bf16, fp16, fp32) at width 3072, Klein and Klein Base alike. Radeon Pro W7900 (gfx1100, 48 GB), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL unset (fused SDPA), ROCm SDPA guard installed. Measured by scripts/calibrate_flux3_denoise_working_memory.py on 2026-10-31 per dtype: 512, 768, 1024, 1440 and 2048px with a 560-token caption, 1024 and 1440px with an 80-token one, and at 1024px one, three and (bf16, fp16) ten 1024px reference images, a batch of two and Klein Base beside Klein, and in bf16 with --mode large long sequences: 2048px with one 2048px reference (33328 tokens), 1536px with one (26160), 2048px with three 1024px references (29232) and with ten (57904); forwards on a random-init transformer of the model loader's geometry (memory does not depend on weight values) with 2 per-mode blocks per stream and 2 joint blocks, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. Plain forwards take 0.291 MiB per token in bf16 and fp16, which measured within 13 MiB of each other, and 0.440 in fp32 over a 0.48 GiB intercept; three 1024px references sit 1.07x above that line (1.08x in fp32), ten 1.08x. The 768px forward and the ten-reference one (45616 tokens) decide the bf16 and fp16 lines, the 768px forward and three references fp32's. The bf16 line reserves 1.07 to 1.16x the long sequences and at most 1.26x any forward: the 1440px one with an 80-token caption, which the native allocator served from 2229 MiB, the 560-token caption at 6% more tokens from 2685 MiB. Klein Base demanded what Klein does, and 4 blocks per stream the same as 2 at 1024px. At every shape both measured, the RX 9060 XT's native-allocator forwards on Windows demanded 35 to 45 MiB more than this card's in bf16, 74 to 84 MiB more in fp16 and 290 to 454 MiB less in fp32. Bounding their estimates from below only, out of the fit: the 4-block forward, which stands for the two other checks of its features that demanded no more (one shipped point per measurement), the math check's default-kernel forward and the released Klein's at 1024px; SDPA forced onto the math kernel at 1024px (--mode math), which the ROCm SDPA guard chunks and which took 122 MiB less than the default kernel, against the 1 GiB chunk the score term charges; and the released Klein in bf16, fully resident (--mode real), at 2048px and at 1024px with one and three references. At all four shapes the released Klein demanded what the 2-block point of the same tokens does, up to 21 MiB less: its extra depth costs nothing on this card. The floor below is declared, not fitted: where this entry prices a platform nothing is measured on (MIOpen with expandable segments or under hipMallocAsync, off Windows), each value is floored at the legacy constants the node reserved by hand, 0.33 MiB per token truncated to 346030 bytes and a 1 GiB base: the fit describes the card its points were measured on, not the platforms it stands in for."
     },
     {
       "estimator": "denoise.flux3",
@@ -293,7 +300,7 @@
         "k_denoise_fp32_h3072": 346030,
         "b_denoise_fp32_h3072": 1073741824
       },
-      "provenance": "Windows only; every other OS keeps its own entry. The FLUX.3 transformer forward's lines, bytes per attended token and sample plus a base, one per dtype (bf16, fp16, fp32) at width 3072, Klein and Klein Base alike. RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Measured by scripts/calibrate_flux3_denoise_working_memory.py on 2026-10-31 per dtype: 512, 768, 1024, 1440 and 2048px with a 560-token caption, 1024 and 1440px with an 80-token one, and at 1024px one, three and (bf16, fp16) ten 1024px reference images, a batch of two and Klein Base beside Klein, and in bf16 with --mode large long sequences: 2048px with one 2048px reference (33328 tokens), 1536px with one (26160), 2048px with three 1024px references (29232) and with ten (57904); forwards on a random-init transformer of the model loader's geometry (memory does not depend on weight values) with 2 per-mode blocks per stream and 2 joint blocks, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. Plain forwards take 0.291 MiB per token in bf16 and fp16 and 0.440 in fp32; three 1024px references sit 1.07x above that line (1.09x in fp32) and decide it in bf16 and fp16; the 768px forward decides fp32's. The ten-reference forwards (45616 and 57904 tokens) do not fit 16 GB beside their weights, so the lines are measured up to 33328 tokens; the line reserves 1.07 to 1.16x the long sequences that fit. Klein Base demanded what Klein does. A process's first forward maps ~245 MiB beyond its second (625 against 380 MiB at 512px in bf16), which the cold forward each point takes the larger of carries into the envelope. Where this entry prices a platform nothing is measured on (MIOpen under hipMallocAsync on Windows), each value is floored at the legacy constants the node reserved by hand, 0.33 MiB per token truncated to 346030 bytes and a 1 GiB base: the fit describes the card its points were measured on, not the platforms it stands in for."
+      "provenance": "Windows only; every other OS has its own entry, measured on Linux. The FLUX.3 transformer forward's lines, bytes per attended token and sample plus a base, one per dtype (bf16, fp16, fp32) at width 3072, Klein and Klein Base alike. RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:False (the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1 (fused SDPA), ROCm SDPA guard installed. Measured by scripts/calibrate_flux3_denoise_working_memory.py on 2026-10-31 per dtype: 512, 768, 1024, 1440 and 2048px with a 560-token caption, 1024 and 1440px with an 80-token one, and at 1024px one, three and (bf16, fp16) ten 1024px reference images, a batch of two and Klein Base beside Klein, and in bf16 with --mode large long sequences: 2048px with one 2048px reference (33328 tokens), 1536px with one (26160), 2048px with three 1024px references (29232) and with ten (57904); forwards on a random-init transformer of the model loader's geometry (memory does not depend on weight values) with 2 per-mode blocks per stream and 2 joint blocks, one fresh process per point with the server's runtime, demand_peak (the largest of the driver, reserved and allocated peak) of the larger of a cold and a warm forward. Fitted by scripts/working_memory/build_shipped.py: working_memory/fit.py's upper envelope of the points below, plus 5%. Plain forwards take 0.291 MiB per token in bf16 and fp16 and 0.440 in fp32; three 1024px references sit 1.07x above that line (1.09x in fp32) and decide it in bf16 and fp16; the 768px forward decides fp32's. The ten-reference forwards (45616 and 57904 tokens) do not fit 16 GB beside their weights, so the lines are measured up to 33328 tokens; the line reserves 1.07 to 1.16x the long sequences that fit. Klein Base demanded what Klein does. A process's first forward maps ~245 MiB beyond its second (625 against 380 MiB at 512px in bf16), which the cold forward each point takes the larger of carries into the envelope. Where this entry prices a platform nothing is measured on (MIOpen under hipMallocAsync on Windows), each value is floored at the legacy constants the node reserved by hand, 0.33 MiB per token truncated to 346030 bytes and a 1 GiB base: the fit describes the card its points were measured on, not the platforms it stands in for."
     },
     {
       "estimator": "denoise.flux3",
@@ -10602,6 +10609,1155 @@
       "method": "demand_peak",
       "device": "RX 9060 XT (gfx1200)",
       "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon RX 9060 XT (gfx1200), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Windows, PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=1, ROCm SDPA guard installed. The real FLUX.3 Klein (flow map) single file flux3_image_klein_sd_bf16.safetensors, loaded in bfloat16 through the model loader's conversion and fully resident. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
+      "in_fit": false
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 1024,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 1584,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 613081088,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 2304,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 2864,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1038802944,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1609248768,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 8660,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2815102976,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5300248576,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 4176,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1466613760,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 8180,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2336940032,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 4096,
+        "text_tokens": 560,
+        "tokens": 8752,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2817187840,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 12288,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5662343168,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 40960,
+        "text_tokens": 560,
+        "tokens": 45616,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 15141519360,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 2,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3014336512,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": false,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1609228288,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein Base transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 1024,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 1584,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 607481856,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 2304,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 2864,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1033211904,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1603633152,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 8660,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2809503744,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5294645248,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 4176,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1453170688,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 8180,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2323472384,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 4096,
+        "text_tokens": 560,
+        "tokens": 8752,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2811588608,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 12288,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5656752128,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 40960,
+        "text_tokens": 560,
+        "tokens": 45616,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 15135924224,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 2,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 3008729088,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": false,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "fp16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1603637248,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein Base transformer in float16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 1024,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 1584,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1251053568,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 2304,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 2864,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1990565888,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2716192768,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 8660,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4559589376,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 8338669568,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 4176,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2459971584,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 8100,
+        "reference_tokens": 0,
+        "text_tokens": 80,
+        "tokens": 8180,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4278222848,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 4096,
+        "text_tokens": 560,
+        "tokens": 8752,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4809154560,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 12288,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 9032138752,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 2,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 4690063360,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": false,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "fp32",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2716180480,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein Base transformer in float32 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1609232384,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 4 per-mode blocks per stream and 4 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
+      "in_fit": false
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 16384,
+        "text_tokens": 560,
+        "tokens": 33328,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 10006265856,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 9216,
+        "reference_tokens": 16384,
+        "text_tokens": 560,
+        "tokens": 26160,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 8521461760,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 12288,
+        "text_tokens": 560,
+        "tokens": 29232,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 8812285952,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 40960,
+        "text_tokens": 560,
+        "tokens": 57904,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 18910117888,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill."
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 4656,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 1073741824,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 1481396224,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. Random-init FLUX.3 Klein (flow map) transformer in bfloat16 with the model loader's geometry, 2 per-mode blocks per stream and 2 joint, SDPA forced onto the math kernel; memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
+      "in_fit": false
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 16384,
+        "reference_tokens": 0,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5299544064,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. The real FLUX.3 Klein (flow map) single file flux3_image_klein_sd_bf16.safetensors, loaded in bfloat16 through the model loader's conversion and fully resident. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
+      "in_fit": false
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 4096,
+        "text_tokens": 560,
+        "tokens": 8752,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 2795532288,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. The real FLUX.3 Klein (flow map) single file flux3_image_klein_sd_bf16.safetensors, loaded in bfloat16 through the model loader's conversion and fully resident. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
+      "in_fit": false
+    },
+    {
+      "estimator": "denoise.flux3",
+      "version": 1,
+      "platform": {
+        "conv_backend": "miopen",
+        "allocator": "native"
+      },
+      "features": {
+        "hidden_size": 3072,
+        "flow_map": true,
+        "image_tokens": 4096,
+        "reference_tokens": 12288,
+        "text_tokens": 560,
+        "tokens": 16944,
+        "batch_size": 1,
+        "dtype": "bf16",
+        "streamed_layer_bytes": 0,
+        "score_matrix_bytes": 0,
+        "dequant_transient_bytes": 0,
+        "fp8_cast_transient_bytes": 0
+      },
+      "measured_bytes": 5662351360,
+      "method": "demand_peak",
+      "device": "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+      "provenance": "scripts/calibrate_flux3_denoise_working_memory.py (2026-10-31): AMD Radeon Pro W7900 Dual Slot (gfx1100), torch 2.13.0+rocm10.0.0 (HIP 7.15.26333), Linux, no allocator configuration (torch reports the native allocator), MIOPEN_FIND_MODE=FAST, TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL=unset, ROCm SDPA guard installed. The real FLUX.3 Klein (flow map) single file flux3_image_klein_sd_bf16.safetensors, loaded in bfloat16 through the model loader's conversion and fully resident. A fresh process with the server's runtime, the larger demand of a cold and a warm forward; no failed allocation, allocator retry or spill.",
       "in_fit": false
     }
   ]

@@ -124,6 +124,14 @@ RX 9060 XT (ROCm on Windows): the server's default expandable segments, then the
     python scripts/calibrate_flux3_denoise_working_memory.py --out 9060xt-real.jsonl --mode real \
         --checkpoint E:/ModelStuffSSD/flux-3-image-klein-comfy/diffusion_models/flux3_image_klein_sd_bf16.safetensors
 
+Radeon Pro W7900 (ROCm on Linux): the server's default native allocator; the math check once.
+
+    python scripts/calibrate_flux3_denoise_working_memory.py --out w7900-native.jsonl --extra-blocks 4
+    python scripts/calibrate_flux3_denoise_working_memory.py --out w7900-native-large.jsonl --mode large
+    python scripts/calibrate_flux3_denoise_working_memory.py --out w7900-checks.jsonl --mode math
+    python scripts/calibrate_flux3_denoise_working_memory.py --out w7900-real.jsonl --mode real \
+        --checkpoint flux3_image_klein_sd_bf16.safetensors
+
 `--dry-run` prints the planned points without touching a device, each priced as a CPU prices it, e.g.
 
     python scripts/calibrate_flux3_denoise_working_memory.py --dry-run --mode large
@@ -180,8 +188,10 @@ LARGE_GRID = ((2048, 1, 2048), (1536, 1, 2048), (2048, 3, 1024), (2048, 10, 1024
 DTYPES = ("bfloat16", "float16", "float32")
 """The dtypes `TorchDevice.choose_bfloat16_safe_dtype` runs the transformer in."""
 FLOAT32_MAX_REFERENCES = 3
-"""The most references a float32 fit-grid forward attends to. Its activations are about twice bf16's, which the legacy
-constants price, so a skip priced with them would not keep ten references (45616 tokens) off a 24 GB card."""
+"""The most references a float32 fit-grid forward attends to. The RTX 4090's float32 lines price ten (45616 tokens) at
+19.4 GiB under `cudaMallocAsync` and 23.4 under the native allocator, which with 4.7 GiB of float32 weights at 2 blocks
+is more than its 24 GB hold, so a run there skips them. At most three (16944 tokens) keep the float32 grid the same on
+every card."""
 REAL_GRID = ((1024, 0), (2048, 0), (1024, 1), (1024, 3))
 """The real model's forwards: image side and reference count."""
 REAL_DTYPE = "bfloat16"

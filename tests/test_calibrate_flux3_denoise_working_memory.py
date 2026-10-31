@@ -66,7 +66,7 @@ def _features(point) -> dict:
 
 
 def test_the_fit_grid_runs_every_size_and_at_1024px_the_short_caption_references_batch_and_klein_base_per_dtype():
-    """float32 leaves out the ten references, whose activations the legacy price would not keep off a 24 GB card."""
+    """float32 stops at three references (`FLOAT32_MAX_REFERENCES`), which keeps its grid the same on every card."""
     points = script.plan("fit", dtypes=["bfloat16", "float32"], **(GRID | {"extra_blocks": 4}))
 
     def rows(dtype, references):

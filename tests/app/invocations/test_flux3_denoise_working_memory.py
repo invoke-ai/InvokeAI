@@ -2,12 +2,12 @@
 it replaced.
 
 The estimate prices with the lines `backend/working_memory/data/denoise.json` ships, the fit of the forwards measured
-there, which `tests/backend/working_memory/` holds it to. ROCm with the native allocator off Windows is not measured
-and still prices with the hand-set `legacy` constants the node reserved by hand, which `TestLegacyReservation` holds
-byte for byte to that formula, frozen below, plus the terms it lacked: the largest layer partial loading streams and
-an fp8-stored transformer's cast transient (`TestEstimate`). Every other platform nothing is measured on prices as a
-measured one, whose entry floors every value at those constants, and `TestUnmeasuredPlatforms` holds it to the formula
-at least. `TestMeasuredChecks` holds the estimate to the forced-math forwards the shipped points leave out.
+there, which `tests/backend/working_memory/` holds it to, plus its analytic terms (`TestEstimate`): the largest layer
+partial loading streams, a quantized build's dequantization copy and an fp8-stored transformer's cast transient, which
+no measured forward carries, and the score matrix an attention build without a fused kernel materializes, which only
+the forced-math forwards carry. Every platform nothing is measured on prices as a measured one, whose entry floors
+every value at the constants the node reserved by hand, and `TestUnmeasuredPlatforms` holds it to that formula, frozen
+below, at least. `TestMeasuredChecks` holds the estimate to the forced-math forwards the shipped points leave out.
 """
 
 import itertools
@@ -25,7 +25,6 @@ from invokeai.backend.flux3.denoise_working_memory import FLUX3_DENOISE_SPEC, es
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loaders.flux3 import _build_transformer
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Flux3ConditioningInfo
@@ -37,7 +36,6 @@ from invokeai.backend.working_memory.platform import Allocator, ConvBackend, Ope
 from tests.app.invocations.test_z_image_denoise_working_memory import ATTENTION
 from tests.backend.model_manager.load.state_dicts.flux3_klein_keys import state_dict_keys as KLEIN_KEYS
 
-MB = 1024**2
 KLEIN_HEADS = 24
 HEAD_DIM = 128
 WIDTH = KLEIN_HEADS * HEAD_DIM
@@ -153,6 +151,26 @@ class TestEstimate:
 
         assert scores == KLEIN_HEADS * batch * tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
 
+    @pytest.mark.parametrize(
+        "build, scores",
+        [
+            ("cuda", 0),
+            ("cuda-fused-backend", 0),
+            ("hip", 2**30),
+            ("mps", KLEIN_HEADS * (4096 + 560) ** 2 * SDPA_MATH_BYTES_PER_SCORE_ELEMENT),
+        ],
+    )
+    def test_the_score_term_is_what_the_attention_build_materializes(self, build, scores):
+        """No mask is passed, so torch's fused kernel builds no score matrix, and a fused diffusers backend (flash,
+        sage) never reaches torch's SDPA, which in that build would build one. Without a fused kernel it is heads x S x
+        S over the 4656-token joint sequence, 8.2 GiB, of which the ROCm guard's chunked math kernel keeps one 1 GiB
+        chunk alive at a time."""
+        attention_build = ATTENTION[build]
+        with attention_build.answers():
+            terms = _estimate(resident=True, device=attention_build.device.type).terms
+
+        assert [(term.bytes, term.included) for term in terms if term.name == "attention_scores"] == [(scores, True)]
+
     @pytest.mark.parametrize("heads, dtype", [(32, torch.bfloat16), (KLEIN_HEADS, torch.float64)])
     def test_a_dtype_or_width_without_a_line_is_refused(self, heads, dtype):
         """Pricing it on another width's or dtype's line would be a guess; the estimator says what is missing."""
@@ -205,8 +223,8 @@ class TestLine:
 
 
 # The reservation the node priced by hand before its estimate declared an `EstimatorSpec`, frozen verbatim with the
-# node's constants: `Flux3DenoiseInvocation._estimate_working_memory` and the dequant transient the node added at the
-# lock. The shipped `legacy` values reproduce it where no measured points replace them.
+# node's constants (`Flux3DenoiseInvocation._estimate_working_memory`). The shipped entries floor every value at those
+# constants where they price a platform nothing is measured on (`unmeasured_floor`).
 _LEGACY_ATTENTION_HEAD_DIM = 128
 _LEGACY_ATTENTION_HEADS = 24
 _LEGACY_BYTES_PER_TOKEN = int(0.33 * 1024**2)
@@ -226,8 +244,6 @@ def _legacy_estimate_working_memory(num_tokens: int, batch_size: int, device: to
     return estimated
 
 
-# Where the shipped entry is still `legacy`: ROCm with the native allocator on every OS but Windows.
-LEGACY_PLATFORMS = [Platform("miopen", "native", "linux"), Platform("miopen", "native", "other")]
 # Height, width: an elongated frame included.
 SIZES = [(512, 512), (784, 1040), (1024, 1024), (2048, 2048)]
 # None, one 1024px reference, one 4 MP one, three and ten 1 MP ones.
@@ -235,48 +251,6 @@ REFERENCE_TOKENS = [0, 4096, 16384, 12288, 40960]
 CAPTIONS = [80, 560, 8192]
 BATCHES = [1, 2]
 DTYPES = [torch.bfloat16, torch.float16, torch.float32]
-# A transient of 123 MiB in bf16; on the meta device, so it costs no memory.
-TRANSFORMERS = [_dense_transformer(), _int8_transformer(123 * MB // (2 * CONVROT_GROUP_SIZE * 2))]
-
-
-class TestLegacyReservation:
-    @pytest.mark.parametrize("attention_build", list(ATTENTION.values()), ids=list(ATTENTION))
-    def test_the_reservation_is_the_legacy_formula_byte_for_byte(self, attention_build):
-        """On the platforms still `legacy`: estimated on such a machine, and evaluated again there from the features
-        alone, plus the term the formula lacked that `TestEstimate` pins, the streamed largest layer. None of the
-        transformers holds a float8 weight, whose cast is the other such term."""
-        mismatches = []
-        with attention_build.answers(), patch.object(spec_module, "platform_for", return_value=LEGACY_PLATFORMS[0]):
-            grid = itertools.product(SIZES, REFERENCE_TOKENS, CAPTIONS, BATCHES, DTYPES, TRANSFORMERS)
-            for (height, width), refs, caption, batch, dtype, transformer in grid:
-                image_seq_len = (height // 16) * (width // 16)
-                expected = _legacy_estimate_working_memory(
-                    image_seq_len + refs + caption, batch, attention_build.device, dtype
-                ) + peak_dequant_transient_bytes(transformer, dtype)
-                expected += max(
-                    sum(t.nbytes for t in (*m.parameters(recurse=False), *m.buffers(recurse=False)))
-                    for m in transformer.modules()
-                )
-
-                estimate = estimate_flux3_denoise_working_memory(
-                    transformer,
-                    image_seq_len=image_seq_len,
-                    ref_image_seq_len=refs,
-                    text_seq_len=caption,
-                    batch_size=batch,
-                    device=attention_build.device,
-                    dtype=dtype,
-                )
-                reserved = [estimate.reservation_bytes] + [
-                    FLUX3_DENOISE_SPEC.evaluate(
-                        estimate.features, shipped_coefficients(FLUX3_DENOISE_SPEC, platform)
-                    ).reservation_bytes
-                    for platform in LEGACY_PLATFORMS
-                ]
-                if any(value != expected for value in reserved):
-                    mismatches.append(((height, width, refs, caption, batch, dtype), expected, reserved))
-        assert not mismatches, f"{len(mismatches)} cases differ, e.g. (case, legacy, reserved): {mismatches[:3]}"
-
 
 EVERY_PLATFORM = [
     Platform(*keys) for keys in itertools.product(get_args(ConvBackend), get_args(Allocator), get_args(OperatingSystem))
@@ -290,8 +264,10 @@ class TestUnmeasuredPlatforms:
         ids=lambda p: f"{p.conv_backend}-{p.allocator}-{p.os}",
     )
     def test_an_unmeasured_platform_reserves_the_legacy_formula_at_least(self, platform: Platform):
-        """`priced_as` prices it with a measured platform's lines; the entries it borrows floor every value at the
-        legacy constants, so it never reserves less than the node did by hand."""
+        """`priced_as` prices it with a measured platform's lines: MPS, XPU, the CPU and cuDNN with expandable segments
+        with the RTX 4090's native-allocator ones; MIOpen under `hipMallocAsync`, and off Windows with expandable
+        segments, with the native-allocator ones of its OS, the RX 9060 XT's on Windows and the W7900's elsewhere. Those
+        entries floor every value at the legacy constants, so it never reserves less than the node did by hand."""
         short = []
         with ATTENTION["cuda"].answers(), patch.object(spec_module, "platform_for", return_value=platform):
             for (height, width), refs, caption, batch, dtype in itertools.product(
@@ -438,7 +414,7 @@ class TestFlux3DenoiseRequestsWorkingMemory:
 # as the estimate priced it in that process, and the measured demands in bytes. On the RTX 4090 (native allocator) the
 # math kernel took 13.69 bytes per score element over the default one, against the 17 the term charges. On the RX 9060
 # XT (expandable segments) the ROCm SDPA guard computes math attention in chunks, so the term is one 1 GiB chunk and the
-# forward took 129 MiB more.
+# forward took 129 MiB more. The W7900's math forward ships as an out-of-fit point, which the data test holds.
 MATH_KERNEL_FORWARDS = [
     (Platform("cudnn", "native", "windows"), KLEIN_HEADS * 4656 * 4656 * 17, 1411383296, 8535408640),
     (Platform("miopen", "expandable", "windows"), 2**30, 999686144, 1134821376),

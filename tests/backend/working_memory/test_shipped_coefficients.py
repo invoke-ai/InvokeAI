@@ -75,19 +75,26 @@ OUT_OF_FIT = {
         "RX 9060 XT (gfx1200)",
         "demand_peak",
     ): 4,
+    (
+        (("allocator", "native"), ("conv_backend", "miopen")),
+        "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+        "demand_peak",
+    ): 5,
 }
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term, and the real FLUX.3 Klein's forwards on both cards, which hold the 2-block lines to the
-released model from below. A point that leaves the fit needs an edit here."""
+check the score-matrix term, and the FLUX.3 denoise's checks. Those are the real Klein's forwards on each card, which
+hold the 2-block lines to the released model from below, and on the W7900 the forced-math forward, which checks the
+score-matrix term, and the 4-block forward. That one stands for the real Klein's 1024px forward and the math check's
+default-kernel one, out-of-fit points of the same features that demanded no more: the builder ships the larger of one
+measurement (`build_shipped.point_identity`). A point that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),
     ("denoise.flux2", (("allocator", "native"), ("conv_backend", "miopen"))),
-    ("denoise.flux3", (("allocator", "native"), ("conv_backend", "miopen"))),
 }
 """The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
-fits of measured points: the Z-Image, FLUX.2 and FLUX.3 denoise on ROCm with the native allocator off Windows, which
-nothing measures yet. Shipping an entry's points and fit removes it from here."""
+fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, which nothing
+measures yet. Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
