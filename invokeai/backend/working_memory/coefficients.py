@@ -3,9 +3,10 @@
 Both ship as JSON under `data/`, read through `importlib.resources` so a wheel install finds them. A coefficient entry
 belongs to one estimator version on one measured platform, and either carries its values or borrows another entry's
 (`values_from`); a point records the features of an operation that was measured and its measured peak. A carried value
-is the fit of the points it is resolved for (`fit.py`) or a declared stand-in (`stand_ins`).
-`tests/backend/working_memory/test_shipped_coefficients.py` resolves every entry against its `EstimatorSpec`, holds
-every point to the estimate the shipped coefficients give it, and every fitted value to the fit of its points.
+is the fit of the points it is resolved for (`fit.py`), a declared stand-in (`stand_ins`), or a hand-set constant of an
+entry marked `legacy`. `tests/backend/working_memory/test_shipped_coefficients.py` resolves every entry against its
+`EstimatorSpec`, holds every point to the estimate the shipped coefficients give it, and every fitted value to the fit
+of its points.
 """
 
 import functools
@@ -50,11 +51,17 @@ class CoefficientEntry(_DataModel):
     its own values."""
     stand_ins: list[str] = []
     """Carried values that are declared conservative stand-ins rather than fits: what this platform prices a line no
-    in-fit point measures at. `provenance` says what they stand for; every other carried value is a fit."""
+    in-fit point measures at. `provenance` says what they stand for; every other carried value is a fit, unless the
+    entry is `legacy`."""
     unmeasured_floor: dict[str, float] = {}
     """Declared lower bounds, not fits: what carried values are raised to where this entry prices a platform nothing
     is measured on (see `priced_as`). A fit describes the platform its points were measured on, not the one it stands
     in for. `provenance` says where the floors come from."""
+    legacy: bool = False
+    """True for an entry whose carried values are hand-set constants, not a fit of measured points: no point decides
+    them and `fit.py` does not reproduce them, though the points of its estimator still bound its estimates. The data
+    test lists the entries that may ship such values; `scripts/working_memory/build_shipped.py` replaces them with the
+    fit of measured points once those fit every line and a fresh-process point measures each."""
     provenance: str
     """Card, torch build, method and script the values come from, and which points they were fitted on."""
 
@@ -107,9 +114,10 @@ class MeasuredPoint(_DataModel):
     """A tighter upper bound than the default 1.3, as a multiple of `measured_bytes`, for a point the estimate has to
     stay closer to. It applies whichever term decides the estimate."""
     in_fit: bool = True
-    """False for a point measured in a regime its platform does not run, kept to check another term: CUDA with the
-    math attention kernel forced, whose score matrix shares the forward with the convolutions. The fit leaves it out,
-    and it gets the lower bound only."""
+    """False for a point whose demand is not its line's alone, kept to check another term: one measured in a regime its
+    platform does not run (CUDA with the math attention kernel forced, whose score matrix shares the forward with the
+    convolutions), or one whose features carry a term on top of the line (`fit.Line.fits`), such as the score matrix a
+    build's own SDPA kernel materializes. The fit leaves it out, and it gets the lower bound only."""
 
     @model_validator(mode="after")
     def _max_ratio_needs_an_upper_bound(self) -> Self:

@@ -5,6 +5,10 @@ Z-Image shares FLUX.1's 16-channel VAE, so the FLUX-trained PiD decoder
 Z-Image latents. This node replaces the regular Z-Image VAE decode with a
 PiD super-resolution decode (4x scale, ~256×256 latent → 2048×2048 image
 by default).
+
+Z-Image normalizes its latents with the FLUX VAE constants, so the stored latent is already in the
+FLUX-normalized space the FLUX decoder was trained on (``scale * (raw - shift)``, what the upstream
+tokenizer encodes to) and goes to PiD unchanged.
 """
 
 from contextlib import ExitStack
@@ -38,20 +42,13 @@ from invokeai.backend.pid.decode import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
-# Fallback Z-Image VAE constants. PiD's pipeline_registry.py explicitly notes
-# the exact values depend on the pretrained checkpoint, so prefer reading them
-# from the VAE config at runtime (see `vae` input below) and use these only as
-# a last resort.
-_ZIMAGE_VAE_SCALING_FACTOR_FALLBACK: float = 0.3611
-_ZIMAGE_VAE_SHIFT_FACTOR_FALLBACK: float = 0.1159
-
 
 @invocation(
     "z_image_pid_decode",
     title="Latents to Image - Z-Image + PiD (4x SR)",
     tags=["latents", "image", "pid", "z-image", "upscale"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -80,8 +77,8 @@ class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     vae: VAEField | None = InputField(
         default=None,
         title="VAE",
-        description="Z-Image VAE used to read scaling_factor / shift_factor. "
-        "If omitted, the FLUX.1 fallback constants (0.3611 / 0.1159) are used.",
+        description="Not used: PiD decodes the normalized latent directly. Kept so existing workflows "
+        "that connect a VAE stay valid.",
         input=Input.Connection,
     )
     num_inference_steps: int = InputField(
@@ -105,32 +102,7 @@ class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         latents = context.tensors.load(self.latents.latents_name)
 
-        # 1) Resolve the VAE scaling/shift used to denormalise the stored
-        # Z-Image latent. PiD's pipeline_registry says these are
-        # checkpoint-specific for Z-Image, so prefer the VAE config when
-        # available and fall back to the FLUX values otherwise.
-        scaling_factor = _ZIMAGE_VAE_SCALING_FACTOR_FALLBACK
-        shift_factor = _ZIMAGE_VAE_SHIFT_FACTOR_FALLBACK
-        if self.vae is not None:
-            vae_info = context.models.load(self.vae.vae)
-            with vae_info.model_on_device() as (_, vae):
-                config = getattr(vae, "config", None)
-                if config is not None and hasattr(config, "scaling_factor"):
-                    scaling_factor = float(config.scaling_factor)
-                    shift_factor = float(getattr(config, "shift_factor", None) or 0.0)
-                else:
-                    # FluxAutoEncoder stores the constants directly on the module.
-                    scaling_factor = float(getattr(vae, "scale_factor", scaling_factor))
-                    shift_factor = float(getattr(vae, "shift_factor", shift_factor))
-            del vae_info
-            TorchDevice.empty_cache()
-        context.logger.info(
-            f"Z-Image PiD decode: latent shape={tuple(latents.shape)} dtype={latents.dtype} "
-            f"stats[min={latents.min().item():.3f} max={latents.max().item():.3f} "
-            f"mean={latents.mean().item():.3f}] using scale={scaling_factor:.4f} shift={shift_factor:.4f}"
-        )
-
-        # 2) Encode caption with Gemma-2.
+        # 1) Encode caption with Gemma-2.
         gemma_text_encoder_info = context.models.load(self.gemma2_encoder.text_encoder)
         gemma_tokenizer_info = context.models.load(self.gemma2_encoder.tokenizer)
         with ExitStack() as stack:
@@ -187,23 +159,13 @@ class ZImagePiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            # Z-Image latents come out of the diffusers pipeline normalised
-            # by the VAE constants. PiD expects the raw latent.
-            denorm_latent = latents.to(device=device, dtype=dtype) / scaling_factor + shift_factor
-            context.logger.info(
-                f"denorm_latent stats[min={denorm_latent.min().item():.3f} "
-                f"max={denorm_latent.max().item():.3f} mean={denorm_latent.mean().item():.3f} "
-                f"std={denorm_latent.float().std().item():.3f}]; "
-                f"caption_embs shape={tuple(caption_embs.shape)} "
-                f"stats[min={caption_embs.min().item():.3f} max={caption_embs.max().item():.3f} "
-                f"mean={caption_embs.mean().item():.3f} std={caption_embs.float().std().item():.3f}]"
-            )
+            latent = latents.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")
             decoder = PiDDecoder(pid_net, backbone=BaseModelType.Flux)
             x0 = decoder.decode(
-                latent=denorm_latent,
+                latent=latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(

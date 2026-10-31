@@ -1,9 +1,9 @@
 ---
 title: Stable Diffusion 1.5 / 2.x
 description: Generate images with Stable Diffusion 1.5 and legacy SD 2.x models, including inpainting models, ControlNet, T2I-Adapter, IP-Adapter reference images, LoRAs and embeddings.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-28
 sidebar:
-  order: 10
+  order: 11
 ---
 
 Stable Diffusion 1.x and 2.x are the original latent-diffusion UNet models. They are small and fast
@@ -117,8 +117,9 @@ models.
 
 ## LoRAs and embeddings
 
-- **LoRAs** for SD 1.x (and SD 2.x), including LyCORIS variants, are supported. Add them in the LoRA
-  section of the Generate panel. LoRAs made for a different model family are not applied.
+- **LoRAs** for SD 1.x (and SD 2.x), including LyCORIS variants, are supported. LoKr adapters may store
+  either Kronecker operand whole or as a factorized `_a` / `_b` pair. Add LoRAs in the LoRA section of the
+  Generate panel. LoRAs made for a different model family are not applied.
 - **Textual-inversion embeddings** are supported in the positive and negative prompts. Type `<` in a
   prompt box to pick from the compatible embeddings you have installed — for example, `EasyNegative`
   in the negative prompt.

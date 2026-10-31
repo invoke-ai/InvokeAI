@@ -77,6 +77,7 @@ describe('MODEL_BASES', () => {
       'sd-3',
       'flux',
       'flux2',
+      'flux3',
       'cogview4',
       'ernie-image',
       'qwen-image',

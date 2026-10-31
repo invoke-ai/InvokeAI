@@ -117,6 +117,7 @@ const neutralRamp = Object.fromEntries(STEPS.map((step) => [step, colorToken((th
 const categoricalPalettes = Object.fromEntries(
   Object.entries({
     aqua: '#5cc8d8',
+    azure: '#3fa9e8',
     coral: '#ff8e80',
     gold: '#f6d365',
     ice: '#b3e5fc',
