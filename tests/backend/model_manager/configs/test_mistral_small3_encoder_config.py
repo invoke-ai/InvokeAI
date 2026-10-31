@@ -230,10 +230,10 @@ def test_the_bfl_text_encoder_folder_keeps_its_variant(tmp_path: Path) -> None:
 
 
 @pytest.mark.parametrize("layout", ["llama.cpp", "hf_named_with_vision_tower"])
-def test_a_ministral_gguf_is_refused_with_what_to_install_instead(tmp_path: Path, layout: str) -> None:
-    """Refused rather than left to fall back to an unknown model: the user tried to install an
-    encoder, and the message leads with which file works. Either layout, so a repackaging that keeps
-    the vision tower cannot slip past the llama.cpp case. Both declare YaRN, as mistralai's own
+def test_a_ministral_gguf_is_refused_with_what_to_install_for_ernie_image(tmp_path: Path, layout: str) -> None:
+    """Refused rather than left to fall back to an unknown model: the user tried to install a
+    Ministral 3B, and the message says why and which file works as ERNIE-Image's encoder. Either
+    layout, so a repackaging that keeps the vision tower cannot slip past the llama.cpp case. Both declare YaRN, as mistralai's own
     Ministral 3B GGUF does, so this refusal has to win over the plain-RoPE one."""
     if layout == "llama.cpp":
         tensors, architecture = _llamacpp_tensors(*_MINISTRAL_3B), "mistral3"
@@ -245,7 +245,10 @@ def test_a_ministral_gguf_is_refused_with_what_to_install_instead(tmp_path: Path
         architecture = "ministral3"
     mod = _gguf_header(tmp_path / "ministral-3-3b.gguf", tensors, architecture, **{"rope.scaling.type": "yarn"})
 
-    with pytest.raises(InvalidMatchError, match="^Install the 'ERNIE-Image Ministral Encoder' starter model"):
+    with pytest.raises(
+        InvalidMatchError,
+        match="^Ministral 3B GGUFs are not supported: .*'ERNIE-Image Ministral Encoder' starter model",
+    ):
         MistralEncoder_GGUF_Config.from_model_on_disk(mod, {})
 
     assert ModelConfigFactory.from_model_on_disk(mod, allow_unknown=True).config is None

@@ -185,8 +185,16 @@ def _llamacpp_metadata(
     return {f"{architecture}.{key}": value for key, value in fields.items() if value is not None}
 
 
-def _write_llamacpp_gguf(path: Path, raw: dict[str, np.ndarray], architecture: str = "llama", **metadata) -> Path:
-    """`raw` as llama.cpp's converter writes it: renamed by role, query and key rows permuted."""
+def _write_llamacpp_gguf(
+    path: Path,
+    raw: dict[str, np.ndarray],
+    architecture: str = "llama",
+    unprefixed: dict[str, int] | None = None,
+    **metadata,
+) -> Path:
+    """`raw` as llama.cpp's converter writes it: renamed by role, query and key rows permuted.
+
+    `unprefixed` adds metadata keys as given, outside the architecture's prefix."""
     tensors = {"token_embd.weight": raw["embed_tokens.weight"], "output_norm.weight": raw["norm.weight"]}
     for layer in range(_P_LAYERS):
         for component, module in _LAYER_COMPONENTS.items():
@@ -196,7 +204,9 @@ def _write_llamacpp_gguf(path: Path, raw: dict[str, np.ndarray], architecture: s
             elif component == "attn_k":
                 value = _llamacpp_permute(value, _N_HEAD, _N_HEAD_KV)
             tensors[f"blk.{layer}.{component}.weight"] = value
-    return _write_gguf(path, architecture, tensors, _llamacpp_metadata(architecture, **metadata))
+    return _write_gguf(
+        path, architecture, tensors, {**_llamacpp_metadata(architecture, **metadata), **(unprefixed or {})}
+    )
 
 
 def _load(tmp_path: Path, monkeypatch, gguf_path: Path, variant=MistralVariantType.Cow, ram_cache=None):
@@ -275,6 +285,23 @@ def test_llamacpp_query_and_key_rows_load_in_transformers_order(tmp_path, monkey
             weight = getattr(layer.self_attn, projection).weight
             assert isinstance(weight, GGMLTensor)
             assert weight._ggml_quantization_type is _Q8_0
+            assert torch.equal(
+                weight.get_dequantized_tensor(), expected[f"layers.{index}.self_attn.{projection}.weight"]
+            )
+
+
+def test_a_llamacpp_gguf_repeating_the_header_as_metadata_loads(tmp_path, monkeypatch) -> None:
+    """Install reads such a file with the header-tolerant reader; the loader's metadata read must too,
+    or the architecture reads as None and a file install accepted is refused at load."""
+    raw = _raw_weights()
+    expected = _as_tensors(raw)
+    gguf_path = _write_llamacpp_gguf(tmp_path / "mistral_llamacpp.gguf", raw, unprefixed={"GGUF.kv_count": 3})
+
+    model = _load(tmp_path, monkeypatch, gguf_path, variant=MistralVariantType.Mistral24B)
+
+    for index, layer in enumerate(model.layers):
+        for projection in ("q_proj", "k_proj"):
+            weight = getattr(layer.self_attn, projection).weight
             assert torch.equal(
                 weight.get_dequantized_tensor(), expected[f"layers.{index}.self_attn.{projection}.weight"]
             )

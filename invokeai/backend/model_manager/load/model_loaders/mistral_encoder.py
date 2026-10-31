@@ -82,7 +82,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     reject_int8_layers_a_plain_fold_cannot_decode,
 )
@@ -367,19 +367,19 @@ def _read_gguf_metadata_values(path: Path, arch_keys: tuple[str, ...]) -> tuple[
     llama.cpp keys its hyperparameters by architecture -- ``llama.attention.head_count``,
     ``mistral3.attention.head_count`` -- so the prefix is known only once the file names itself.
     Returns the architecture and ``{key: value}`` for ``arch_keys``, values ``None`` where absent;
-    ``(None, {})`` if the header cannot be read. Reading every key with one ``GGUFReader`` avoids
-    re-parsing the (potentially large) header once per key.
+    ``(None, {})`` if the header cannot be read. Reading every key with one reader avoids
+    re-parsing the (potentially large) header once per key. The reader is install's own, so a file
+    install accepted (one repeating the header fields as metadata, say) reads here too.
     """
     try:
-        import gguf
-
-        reader = gguf.GGUFReader(path)
+        with WrappedGGUFReader(path) as reader:
+            fields = reader.fields
+            architecture = _decode_gguf_field(fields.get("general.architecture"))
+            if not isinstance(architecture, str):
+                return None, {}
+            return architecture, {key: _decode_gguf_field(fields.get(f"{architecture}.{key}")) for key in arch_keys}
     except Exception:
         return None, {}
-    architecture = _decode_gguf_field(reader.fields.get("general.architecture"))
-    if not isinstance(architecture, str):
-        return None, {}
-    return architecture, {key: _decode_gguf_field(reader.fields.get(f"{architecture}.{key}")) for key in arch_keys}
 
 
 def _llamacpp_head_counts(

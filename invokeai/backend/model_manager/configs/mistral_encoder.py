@@ -252,11 +252,13 @@ exactly what this file has."""
 
 
 MINISTRAL_GGUF_REFUSAL = (
-    "Install the 'ERNIE-Image Ministral Encoder' starter model (Comfy-Org's "
-    "text_encoders/ministral-3-3b.safetensors) or the text_encoder/ folder of baidu/ERNIE-Image instead. "
-    "Ministral 3B GGUFs are not supported: the GGUF loader lacks Ministral 3's YaRN RoPE and attention scaling."
+    "Ministral 3B GGUFs are not supported: the GGUF loader lacks Ministral 3's YaRN RoPE and attention scaling. "
+    "For ERNIE-Image's text encoder, install the 'ERNIE-Image Ministral Encoder' starter model (Comfy-Org's "
+    "text_encoders/ministral-3-3b.safetensors) or the text_encoder/ folder of baidu/ERNIE-Image."
 )
-"""Named so the refusal can be asserted. Remedy first: the install queue shows two lines of it.
+"""Named so the refusal can be asserted. Short, with the remedy by the second line: the install queue
+shows about two lines of it. Neutral about intent: a Ministral 3B GGUF may be meant as ERNIE-Image's
+encoder, its prompt enhancer or a plain LLM, so the remedy is scoped to the encoder.
 Raised as ``InvalidMatchError``: the file is recognized and unusable, so it must not register as an
 unknown model either."""
 
