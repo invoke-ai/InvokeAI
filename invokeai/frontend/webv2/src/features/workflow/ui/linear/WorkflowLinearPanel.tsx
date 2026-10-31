@@ -1,6 +1,10 @@
 import { Box, Flex, HStack, Icon, VisuallyHidden } from '@chakra-ui/react';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
-import { useWorkflowHostCommands, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowHostCommands,
+  useWorkflowPreferencesSelector,
+  useWorkflowProjectSelector,
+} from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Scrollable, Tabs } from '@platform/ui';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
@@ -148,10 +152,11 @@ export const WorkflowLinearPanel = () => {
 const WorkflowLinearViewContent = () => {
   const { t } = useTranslation();
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
+  const sectionGapPx = useWorkflowPreferencesSelector((preferences) => preferences.workflowFormSectionGapPx);
 
   return (
     <Scrollable flex="1" label={t('widgets.workflow.panelContent')} minH="0">
-      <LinearFormView projectGraph={projectGraph} />
+      <LinearFormView projectGraph={projectGraph} sectionGapPx={sectionGapPx} />
     </Scrollable>
   );
 };
