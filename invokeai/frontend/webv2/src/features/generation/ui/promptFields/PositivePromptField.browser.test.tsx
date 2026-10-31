@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { GenerateModelConfig } from '@features/generation/core/types';
+import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
@@ -16,6 +17,13 @@ import { afterEach, expect, it, vi } from 'vitest';
 const i18n = i18next.createInstance();
 
 await i18n.use(initReactI18next).init({ fallbackLng: 'en', lng: 'en', resources: { en: { translation: {} } } });
+
+const parseDynamicPrompts = vi.hoisted(() => vi.fn());
+
+vi.mock('@features/generation/data/promptUtilities', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  parseDynamicPrompts,
+}));
 
 vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -147,4 +155,69 @@ it('colours and weights attention syntax only while the selected model reads it'
   expect(colouredSegments()).toEqual(['a cat', '+']);
   expect(await weightCat()).toBe(true);
   await expect.poll(() => textarea().value).toBe('a cat++');
+});
+
+const DYNAMIC_PROMPTS: DynamicPromptsFieldConfig = {
+  combinatorial: true,
+  isSeedFixed: false,
+  maxPrompts: 100,
+  onChange: vi.fn(),
+  resample: true,
+  sampleSeed: 0,
+  seedBehaviour: 'per-iteration',
+};
+const PHOTO_TEMPLATE = { id: 'photo', name: 'Photo', negativePrompt: '', positivePrompt: 'photo of {prompt}' };
+
+it('shows a JSON prompt under a template whole, as it generates, and never expands its braces', async () => {
+  parseDynamicPrompts.mockResolvedValue({ error: null, prompts: ['a red cup', 'a green cup'] });
+  const layout =
+    '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a {red|green} cup"},"items":[]}';
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+
+  await act(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <DndContext>
+              <PositivePromptField
+                batchCount={2}
+                dynamicPrompts={DYNAMIC_PROMPTS}
+                heightPx={96}
+                isTemplateViewMode
+                loras={[]}
+                projectId="project-1"
+                promptTemplate={PHOTO_TEMPLATE}
+                selectedModel={undefined}
+                showSyntaxHighlighting
+                value={layout}
+                onChange={vi.fn()}
+                onResizeEnd={vi.fn()}
+                onTemplateViewModeChange={vi.fn()}
+                onUsePrompt={vi.fn()}
+              />
+            </DndContext>
+          </ChakraProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
+    );
+  });
+  // Past the dynamic prompts debounce, when a dynamic prompt would have been parsed.
+  await act(async () => {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 700);
+    });
+  });
+
+  expect(host.querySelector('textarea')?.value).toBe(layout);
+  // The merged-view overlay lines up with the textarea: no template text around the layout.
+  expect(host.querySelector('pre')?.textContent).toBe(layout);
+  const dynamicButton = [...host.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('widgets.generate.dynamicButton')
+  );
+  expect(dynamicButton).toBeDefined();
+  expect(dynamicButton?.textContent).not.toMatch(/\d/);
+  expect(parseDynamicPrompts).not.toHaveBeenCalled();
 });

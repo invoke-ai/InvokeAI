@@ -8,6 +8,7 @@ import type { AddRegionalGuidanceOptions, RegionalGuidanceInput, RegionalReferen
 
 import {
   addRegionalGuidance,
+  getLayoutDraftRejectionReason,
   getLayoutPromptRejectionReason,
   getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,
@@ -637,5 +638,113 @@ describe('getLayoutPromptRejectionReason', () => {
       })
     ).toBeNull();
     expect(getLayoutPromptRejectionReason({ base: 'z-image', prompt: '', regions: [placeable] })).toBeNull();
+  });
+});
+
+describe('getLayoutDraftRejectionReason', () => {
+  // The 1536x1024 example from the OpenMOSS prompt-enhancer skill's layout reference.
+  const draft = {
+    width: 1536,
+    height: 1024,
+    bbox_coord_space: 'abs',
+    bbox_format: 'xyxy',
+    summary: {
+      meta: ['product campaign', 'studio photography'],
+      canvas: 'single',
+      caption:
+        'A warm studio campaign for a handmade ceramic cup, with an ivory backdrop, soft side lighting and restrained dark-green typography. Keep the ceramic texture tactile and the composition calm.',
+    },
+    items: [
+      {
+        label: 'object',
+        caption:
+          'An ivory ceramic cup with a rounded handle, fine speckled glaze and a soft contact shadow, photographed at a three-quarter angle.',
+        bbox: [176, 224, 800, 864],
+      },
+      {
+        label: 'text',
+        caption:
+          'Large dark-green Chinese title in crisp, moderately heavy lettering, with generous spacing and no backing panel.',
+        text: '把日常，过成诗。',
+        bbox: [928, 272, 1408, 448],
+      },
+      {
+        label: 'text',
+        caption: 'Smaller dark-green Chinese supporting copy, comfortably legible on two lines.',
+        text: '一杯温暖\n一刻从容',
+        bbox: [928, 512, 1376, 656],
+      },
+    ],
+  };
+  const reason = (prompt: string, base = 'moss-image') =>
+    getLayoutDraftRejectionReason({ base, positivePrompt: prompt });
+
+  it('accepts a well-formed draft, bare or fenced, and leaves plain prompts and other bases alone', () => {
+    expect(reason(JSON.stringify(draft, null, 2))).toBeNull();
+    expect(reason(`  \`\`\`json\n${JSON.stringify(draft, null, 2)}\n\`\`\`\n`)).toBeNull();
+    expect(reason('a cafe with {curly} braces and "bbox_coord_space" words')).toBeNull();
+    expect(reason('{"bbox_coord_space": ', 'z-image')).toBeNull();
+  });
+
+  it('passes compiled layouts, fenced or not, with or without regions', () => {
+    const compiled = {
+      bbox_coord_space: 'abs_centralized',
+      bbox_format: 'yxyx',
+      summary: { caption: 'a cafe' },
+      items: [{ bbox: [-288, -592, 352, 32], caption: 'a cup', label: 'object' }],
+    };
+    expect(reason(JSON.stringify(compiled))).toBeNull();
+    expect(reason(JSON.stringify({ ...compiled, items: [] }))).toBeNull();
+    expect(reason(`\`\`\`json\r\n${JSON.stringify(compiled, null, 2)}\r\n\`\`\``)).toBeNull();
+    expect(reason('{"bbox_coord_space": "abs_centralized", "items": [')).toBeNull();
+  });
+
+  it('checks a draft both as authored and as the template makes it', () => {
+    const notJson =
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.';
+    const prefix = { id: 'photo', name: 'Photo', negativePrompt: '', positivePrompt: 'photo of {prompt}' };
+    const scaffold = {
+      id: 'poster',
+      name: 'Poster',
+      negativePrompt: '',
+      positivePrompt: JSON.stringify({ ...draft, summary: { ...draft.summary, caption: '{prompt}' } }),
+    };
+    const withTemplate = (positivePrompt: string, promptTemplate: typeof prefix) =>
+      getLayoutDraftRejectionReason({ base: 'moss-image', positivePrompt, promptTemplate });
+
+    expect(withTemplate('{"bbox_coord_space": "abs", "items": [', prefix)).toBe(notJson);
+    expect(withTemplate('a "neon" sign', scaffold)).toBe(notJson);
+    expect(withTemplate('a neon sign', scaffold)).toBeNull();
+    expect(withTemplate(JSON.stringify(draft), prefix)).toBeNull();
+  });
+
+  it('refuses a draft in a box format the layout node does not compile', () => {
+    expect(reason(JSON.stringify({ ...draft, bbox_format: 'xywh' }))).toBe(
+      'The MOSS-Image layout draft in the prompt uses a bbox_format other than xyxy. Run Expand Prompt again or fix it.'
+    );
+  });
+
+  it('refuses a draft that does not parse', () => {
+    expect(reason('```json\n{"bbox_coord_space": "abs", "items": [\n```')).toBe(
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.'
+    );
+  });
+
+  it('refuses a draft missing what the layout node starts from', () => {
+    const message =
+      'The MOSS-Image layout draft in the prompt needs a summary with a caption, at least one item, and a numeric width and height. Run Expand Prompt again or fix it.';
+    const { summary: _summary, ...withoutSummary } = draft;
+    for (const broken of [
+      withoutSummary,
+      { ...draft, summary: 'a cafe' },
+      { ...draft, summary: null },
+      { ...draft, summary: { ...draft.summary, caption: ' ' } },
+      { ...draft, items: [] },
+      { ...draft, items: {} },
+      { ...draft, width: '1536' },
+      { ...draft, height: null },
+    ]) {
+      expect(reason(JSON.stringify(broken))).toBe(message);
+    }
   });
 });
