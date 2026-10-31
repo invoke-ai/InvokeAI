@@ -24231,6 +24231,7 @@ export type components = {
          *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
          *         custom_nodes_dir: Path to directory for custom nodes.
          *         style_presets_dir: Path to directory for style presets.
+         *         prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
          *         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
          *         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
          *         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
@@ -24505,6 +24506,13 @@ export type components = {
              * @default style_presets
              */
             style_presets_dir?: string;
+            /**
+             * Prompt Files Dir
+             * Format: path
+             * @description Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
+             * @default prompt_files
+             */
+            prompt_files_dir?: string;
             /**
              * Workflow Thumbnails Dir
              * Format: path
@@ -42292,7 +42300,16 @@ export type components = {
         };
         /**
          * Prompts from File
-         * @description Loads prompts from a text file
+         * @description Loads prompts from a text file.
+         *
+         *     The file is read from the InvokeAI prompt files directory (`prompt_files_dir`, by default
+         *     `<root>/prompt_files`). `file_path` is relative to that directory - absolute paths and path
+         *     traversal are rejected - so the node can only read prompt lists an operator has deliberately
+         *     placed there.
+         *
+         *     In multi-user mode the node is restricted to administrators: the directory is shared by every
+         *     account, so letting one account read from it would hand it another account's prompt lists.
+         *     Non-admin users should use wildcards, which are stored per account.
          */
         PromptsFromFileInvocation: {
             /**
@@ -42309,12 +42326,12 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
              * File Path
-             * @description Path to prompt text file
+             * @description Path to prompt text file, relative to the InvokeAI prompt files directory
              * @default null
              */
             file_path?: string | null;
