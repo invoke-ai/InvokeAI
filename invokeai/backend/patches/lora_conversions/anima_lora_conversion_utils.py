@@ -185,6 +185,48 @@ _PEFT_EXTRA_SUFFIXES = [
 ]
 
 
+_DIFFUSERS_NON_BLOCK_KEY_MAP = {
+    "patch_embed.proj": "x_embedder.proj.1",
+    "time_embed.t_embedder.linear_1": "t_embedder.1.linear_1",
+    "time_embed.t_embedder.linear_2": "t_embedder.1.linear_2",
+    "norm_out.linear_1": "final_layer.adaln_modulation.1",
+    "norm_out.linear_2": "final_layer.adaln_modulation.2",
+    "proj_out": "final_layer.linear",
+}
+
+_DIFFUSERS_BLOCK_KEY_MAP = {
+    "attn1.to_q": "self_attn.q_proj",
+    "attn1.to_k": "self_attn.k_proj",
+    "attn1.to_v": "self_attn.v_proj",
+    "attn1.to_out.0": "self_attn.output_proj",
+    "attn2.to_q": "cross_attn.q_proj",
+    "attn2.to_k": "cross_attn.k_proj",
+    "attn2.to_v": "cross_attn.v_proj",
+    "attn2.to_out.0": "cross_attn.output_proj",
+    "ff.net.0.proj": "mlp.layer1",
+    "ff.net.2": "mlp.layer2",
+    "norm1.linear_1": "adaln_modulation_self_attn.1",
+    "norm1.linear_2": "adaln_modulation_self_attn.2",
+    "norm2.linear_1": "adaln_modulation_cross_attn.1",
+    "norm2.linear_2": "adaln_modulation_cross_attn.2",
+    "norm3.linear_1": "adaln_modulation_mlp.1",
+    "norm3.linear_2": "adaln_modulation_mlp.2",
+}
+
+_DIFFUSERS_BLOCK_KEY_RE = re.compile(r"^transformer_blocks\.(\d+)\.(.+)$")
+
+
+def _convert_diffusers_transformer_key(key: str) -> str:
+    if mapped := _DIFFUSERS_NON_BLOCK_KEY_MAP.get(key):
+        return mapped
+    if match := _DIFFUSERS_BLOCK_KEY_RE.match(key):
+        block, suffix = match.groups()
+        if mapped := _DIFFUSERS_BLOCK_KEY_MAP.get(suffix):
+            return f"blocks.{block}.{mapped}"
+        raise ValueError(f"Unsupported diffusers Anima LoRA layer: {key}")
+    return key
+
+
 def _group_keys_by_layer(
     state_dict: Dict[str, torch.Tensor],
     extra_suffixes: list[str] | None = None,
@@ -299,6 +341,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if not is_text_encoder:
                 for prefix in [
                     "base_model.model.transformer.",
+                    "base_model.model.",
                     "transformer.",
                     "diffusion_model.",
                 ]:
@@ -309,7 +352,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if is_text_encoder:
                 final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
             else:
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{_convert_diffusers_transformer_key(clean_key)}"
 
             layer = _make_layer_patch(values)
             layers[final_key] = layer
