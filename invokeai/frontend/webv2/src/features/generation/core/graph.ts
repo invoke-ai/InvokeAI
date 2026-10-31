@@ -1822,7 +1822,7 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+  const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
     ideogram4_mu: settings.ideogram4Mu ?? undefined,
@@ -1833,6 +1833,8 @@ const buildIdeogram4Graph = (
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  // Record the caption the encoder saw; the positive prompt alone does not show regions or palette.
+  addEdge(graph, captionBuilder, 'value', metadata, 'ideogram4_caption');
 
   return graph;
 };

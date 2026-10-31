@@ -11,6 +11,7 @@ import type {
   CanvasLayerContract,
   CanvasNodeContract,
   CanvasRasterLayerContractV2,
+  CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/api';
 import type { InvocationRoute } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
@@ -43,7 +44,14 @@ vi.mock('./settings/store', async (importOriginal) => {
   };
 });
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
 
 import {
   areInvocationRouteInputsEqual,
@@ -596,51 +604,164 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(modelsLoadingRoute.validationReasons).toEqual([]);
   });
 
-  it('blocks MOSS-Image layout regions around a blank prompt before anything uploads', () => {
-    const mossModel: MainModelConfig = {
-      base: 'moss-image',
+  describe('layout regions', () => {
+    const layoutModel = (base: 'moss-image' | 'ideogram-4', name: string): MainModelConfig => ({
+      base,
       format: 'diffusers',
-      key: 'moss-model',
-      name: 'MOSS-Image',
+      key: `${base}-model`,
+      name,
       type: 'main',
+    });
+    const mossModel = layoutModel('moss-image', 'MOSS-Image');
+    const ideogramModel = layoutModel('ideogram-4', 'Ideogram 4');
+    // The frame sits away from the document origin, so bounds must be compared in document space.
+    const frame = { height: 512, width: 512, x: 256, y: 128 };
+    /** A captioned region whose 64×64 mask bitmap starts at the layer's position. */
+    const region = (
+      id: string,
+      position: { x: number; y: number },
+      overrides: Partial<CanvasRegionalGuidanceLayerContract> = {}
+    ): CanvasRegionalGuidanceLayerContract => ({
+      autoNegative: false,
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: { height: 64, imageName: `${id}.png`, width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
+      name: id,
+      negativePrompt: null,
+      opacity: 1,
+      positivePrompt: 'a shop sign',
+      referenceImages: [],
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, ...position },
+      type: 'regional_guidance',
+      ...overrides,
+    });
+    const inputFor = (
+      model: MainModelConfig,
+      overrides: Partial<GenerateWidgetValues>,
+      layers: CanvasRegionalGuidanceLayerContract[],
+      sourceId: InvocationRoute['sourceId'] = 'canvas'
+    ) => {
+      const project = getActiveProject(createGenerateValues(model, overrides));
+      return getInvocationRouteInput({
+        ...project,
+        canvas: {
+          ...project.canvas,
+          document: {
+            ...project.canvas.document,
+            bbox: frame,
+            stacks: { ...project.canvas.document.stacks, regional_guidance: layers },
+          },
+        },
+        invocation: { ...project.invocation, sourceId },
+      });
     };
-    const region = (overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
-      ({
-        autoNegative: false,
-        blendMode: 'normal',
-        id: 'region-1',
-        isEnabled: true,
-        isLocked: false,
-        mask: { bitmap: { height: 64, imageName: 'mask.png', width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
-        name: 'Region 1',
-        negativePrompt: null,
-        opacity: 1,
-        positivePrompt: 'a shop sign',
-        referenceImages: [],
-        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-        type: 'regional_guidance',
-        ...overrides,
-      }) as CanvasLayerContract;
-    const reasonsFor = (overrides: Partial<GenerateWidgetValues>, layers: CanvasLayerContract[]) =>
+    const reasonsFor = (
+      model: MainModelConfig,
+      overrides: Partial<GenerateWidgetValues>,
+      layers: CanvasRegionalGuidanceLayerContract[]
+    ) =>
       resolveInvocationRouteInput(
-        canvasInputFor({ generateValues: createGenerateValues(mossModel, overrides), layers }),
+        { ...inputFor(model, overrides, layers), mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
         'global',
         canvasRoute
       ).validationReasons;
+    const blankPromptReason = (label: string) =>
+      `${label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
 
-    expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
-      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
-    ]);
-    // A prompt template supplies the prompt the layout is built around.
-    const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
-    expect(reasonsFor({ positivePrompt: '', promptTemplate: template }, [region()])).toEqual([]);
-    // Regions that never reach the layout leave a blank prompt alone.
-    const unplaced = [
-      region({ id: 'empty', mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
-      region({ id: 'uncaptioned', positivePrompt: null }),
-      region({ id: 'disabled', isEnabled: false }),
-    ];
-    expect(reasonsFor({ positivePrompt: '' }, unplaced)).toEqual([]);
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('blocks a region inside the frame around a blank prompt before anything uploads: %s', (model, label) => {
+      expect(reasonsFor(model, { positivePrompt: ' ' }, [region('inside', { x: 300, y: 200 })])).toEqual([
+        blankPromptReason(label),
+      ]);
+      // A prompt template supplies the prompt the layout is built around.
+      const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
+      expect(
+        reasonsFor(model, { positivePrompt: '', promptTemplate: template }, [region('inside', { x: 300, y: 200 })])
+      ).toEqual([]);
+    });
+
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('leaves a blank prompt alone for regions that never reach the layout: %s', (model) => {
+      expect(
+        reasonsFor(model, { positivePrompt: '' }, [
+          // Entirely outside the frame, and touching its left edge (x 192..256).
+          region('outside', { x: 0, y: 0 }),
+          region('touching', { x: 192, y: 200 }),
+          region('empty', { x: 300, y: 200 }, { mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
+          region('uncaptioned', { x: 300, y: 200 }, { positivePrompt: null }),
+          region('disabled', { x: 300, y: 200 }, { isEnabled: false }),
+        ])
+      ).toEqual([]);
+    });
+
+    it('measures each mask in document space, with its offset and transform', () => {
+      const blocks = (layer: CanvasRegionalGuidanceLayerContract) =>
+        reasonsFor(ideogramModel, { positivePrompt: '' }, [layer]).length > 0;
+
+      // Partly inside: x 230..294 crosses the frame's left edge at 256.
+      expect(blocks(region('partial', { x: 230, y: 200 }))).toBe(true);
+      // The bitmap offset moves the mask from the origin into the frame.
+      const offsetMask = { bitmap: { height: 64, imageName: 'offset.png', width: 64 }, offset: { x: 300, y: 200 } };
+      expect(
+        blocks(region('offset', { x: 0, y: 0 }, { mask: { ...offsetMask, fill: { color: '#0f0', style: 'solid' } } }))
+      ).toBe(true);
+      // Scaled 4× from x 0 it ends on the frame's edge at 256; 5× reaches 320.
+      expect(
+        blocks(region('scaled-4', { x: 0, y: 200 }, { transform: { rotation: 0, scaleX: 4, scaleY: 1, x: 0, y: 200 } }))
+      ).toBe(false);
+      expect(
+        blocks(region('scaled-5', { x: 0, y: 200 }, { transform: { rotation: 0, scaleX: 5, scaleY: 1, x: 0, y: 200 } }))
+      ).toBe(true);
+    });
+
+    it('measures on a Canvas route only, whatever the model, keeping the input stable', () => {
+      const inside = [region('inside', { x: 300, y: 200 })];
+
+      expect(inputFor(ideogramModel, {}, inside).canvasRegionalLayersInFrame.map((layer) => layer.id)).toEqual([
+        'inside',
+      ]);
+      expect(inputFor(animaModel, {}, inside).canvasRegionalLayersInFrame.map((layer) => layer.id)).toEqual(['inside']);
+      expect(inputFor(ideogramModel, {}, inside, 'generate').canvasRegionalLayersInFrame).toEqual([]);
+
+      const project = getActiveProject(createGenerateValues(ideogramModel));
+      const withRegions = {
+        ...project,
+        canvas: {
+          ...project.canvas,
+          document: {
+            ...project.canvas.document,
+            bbox: frame,
+            stacks: { ...project.canvas.document.stacks, regional_guidance: inside },
+          },
+        },
+        invocation: { ...project.invocation, sourceId: 'canvas' as const },
+      };
+      // Recomputing over the same document yields an equal input, so the stable selector keeps its identity.
+      expect(
+        areInvocationRouteInputsEqual(getInvocationRouteInput(withRegions), getInvocationRouteInput(withRegions))
+      ).toBe(true);
+    });
+
+    it('blocks a blank prompt when the capability table arrives after the route input', () => {
+      // The project loads first: no base has regional support yet. The file's seed hooks restore the table after.
+      resetArchitectureCapabilities();
+      const input = inputFor(ideogramModel, { positivePrompt: '' }, [region('inside', { x: 300, y: 200 })]);
+      setArchitectureCapabilities(architectureCapabilitiesFixture);
+
+      expect(
+        resolveInvocationRouteInput(
+          { ...input, mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
+          'global',
+          canvasRoute
+        ).validationReasons
+      ).toEqual([blankPromptReason('Ideogram 4')]);
+    });
   });
 
   it('treats the layer stack identity as part of the route input', () => {
