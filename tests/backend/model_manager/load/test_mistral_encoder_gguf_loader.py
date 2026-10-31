@@ -17,6 +17,7 @@ The GGUFs are real and their matrices genuinely Q8_0, so the weights arrive as t
 wrappers the loader has to cope with.
 """
 
+import gc
 from pathlib import Path
 from unittest.mock import MagicMock, call, create_autospec
 
@@ -64,6 +65,15 @@ _LAYER_COMPONENTS = {
     "attn_norm": "input_layernorm",
     "ffn_norm": "post_attention_layernorm",
 }
+
+
+@pytest.fixture(autouse=True)
+def _collect_only_this_tests_objects():
+    """Closing a GGUF reader runs gc.collect(), which walks the worker's whole heap. Freezing what existed
+    before the test leaves each collection to the test's own objects."""
+    gc.freeze()
+    yield
+    gc.unfreeze()
 
 
 def _llamacpp_permute(weights: np.ndarray, n_head: int, n_head_kv: int | None) -> np.ndarray:
@@ -267,8 +277,15 @@ def test_the_embedding_is_materialized_and_its_copy_reserved(tmp_path, monkeypat
     assert ram_cache.make_room.call_args_list == [call(PEAK_COPIES * _VOCAB * _HIDDEN * torch.float32.itemsize)]
 
 
-@pytest.mark.parametrize("architecture", ["llama", "mistral3"])
-def test_llamacpp_query_and_key_rows_load_in_transformers_order(tmp_path, monkeypatch, architecture: str) -> None:
+@pytest.mark.parametrize(
+    "architecture, metadata",
+    # A declared "none" scaling is plain RoPE, not a reason to refuse.
+    [("llama", {}), ("mistral3", {}), ("mistral3", {"rope.scaling.type": "none"})],
+    ids=["llama", "mistral3", "mistral3-none-scaling"],
+)
+def test_llamacpp_query_and_key_rows_load_in_transformers_order(
+    tmp_path, monkeypatch, architecture: str, metadata: dict
+) -> None:
     """Both names llama.cpp writes Mistral Small 3 under, with the metadata under each one's prefix.
 
     Values rows too: llama.cpp leaves them in order, and regrouping them with the others would be
@@ -276,7 +293,7 @@ def test_llamacpp_query_and_key_rows_load_in_transformers_order(tmp_path, monkey
     """
     raw = _raw_weights()
     expected = _as_tensors(raw)
-    gguf_path = _write_llamacpp_gguf(tmp_path / "mistral_llamacpp.gguf", raw, architecture)
+    gguf_path = _write_llamacpp_gguf(tmp_path / "mistral_llamacpp.gguf", raw, architecture, **metadata)
 
     model = _load(tmp_path, monkeypatch, gguf_path, variant=MistralVariantType.Mistral24B)
 
@@ -379,6 +396,8 @@ def test_an_hf_named_gguf_is_loaded_in_the_order_it_is_stored(tmp_path, monkeypa
         ("mistral3", {"rope.scaling.type": "yarn", "rope.scaling.factor": 16.0}, "rope.scaling.type='yarn'"),
         # A YaRN parameter without a declared scaling type is refused just the same.
         ("llama", {"rope.scaling.yarn_log_multiplier": 1.0}, "llama.rope.scaling.yarn_log_multiplier=1.0"),
+        # Llama 4-style attention temperature, also numeric only.
+        ("mistral3", {"attention.temperature_scale": 0.5}, "mistral3.attention.temperature_scale=0.5"),
     ],
 )
 def test_a_llamacpp_gguf_the_rows_cannot_be_trusted_for_is_refused(

@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-28
+lastUpdated: 2026-10-31
 sidebar:
   order: 3
 ---
@@ -20,8 +20,9 @@ speeds are on each family's own page.
 - – no such build exists
 
 How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model,
-with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of MiniMax H3. Others are
-recognized by their layer names and fail, or misbehave, only when they load.
+with the reason only in the server log: the Diffusers layout of LTX-2, the GGUF builds of MiniMax H3, and llama.cpp
+GGUFs of Mistral Small 3's shape that declare scaled RoPE or an attention temperature, such as Devstral Small 2.
+Others are recognized by their layer names and fail, or misbehave, only when they load.
 
 ## Main models
 

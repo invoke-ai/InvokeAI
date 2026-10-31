@@ -5,13 +5,14 @@ narrower MLP; Qwen3-14B has the width and depth under another llama.cpp architec
 a Mistral the GGUF loader cannot build. Each would install, load cleanly and condition FLUX.2 with
 the wrong model.
 
-GGUF fixtures are headers only -- shapes and string metadata, in the identification suite's stripped
-form -- because the real tensors run to gigabytes and identification never reads them. Real stripped
-headers of unsloth's llama.cpp build (``llama``) and gguf-org's cow build live in
-``tests/model_identification/stripped_models``. One real file, at a scaled-down geometry, checks that the
-install's header read sees what those fixtures hold.
+GGUF fixtures are headers only -- shapes and metadata, in the identification suite's stripped form --
+because the real tensors run to gigabytes and identification never reads them. Real stripped headers of
+llama.cpp builds under both architecture names (unsloth's ``llama``, a newer ``mistral3``) and of gguf-org's
+cow build live in ``tests/model_identification/stripped_models``. One real file, at a scaled-down geometry,
+checks that the install's header read sees what those fixtures hold.
 """
 
+import gc
 import json
 from pathlib import Path
 
@@ -37,6 +38,15 @@ _TEKKEN_VOCAB = 131072
 _MISTRAL_SMALL_3 = (5120, 40, 32768)
 _MISTRAL_NEMO = (5120, 40, 14336)
 _MINISTRAL_3B = (3072, 26, 9216)
+
+
+@pytest.fixture(autouse=True)
+def _collect_only_this_tests_objects():
+    """Closing a GGUF reader runs gc.collect(), which walks the worker's whole heap -- over a second per test
+    late in a session. Freezing what existed before the test leaves each collection to the test's own objects."""
+    gc.freeze()
+    yield
+    gc.unfreeze()
 
 
 def _ggml(rows: int, cols: int) -> GGMLTensor:
@@ -78,10 +88,14 @@ def _gguf_header(
     return StrippedModelOnDisk(path)
 
 
-def test_a_llamacpp_mistral_small_3_is_accepted_under_its_newer_architecture_name(tmp_path: Path) -> None:
-    """Current llama.cpp writes Mistral Small 3 as ``mistral3``; older builds such as unsloth's say
-    ``llama`` (a real stripped header covers that one)."""
-    mod = _gguf_header(tmp_path / "mistral-small-3.gguf", _llamacpp_tensors(*_MISTRAL_SMALL_3), "mistral3")
+def test_a_declared_none_rope_scaling_is_plain_rope(tmp_path: Path) -> None:
+    """``rope.scaling.type = "none"`` is how a converter spells unscaled RoPE, so it does not refuse the file."""
+    mod = _gguf_header(
+        tmp_path / "mistral-small-3.gguf",
+        _llamacpp_tensors(*_MISTRAL_SMALL_3),
+        "mistral3",
+        **{"rope.scaling.type": "none"},
+    )
 
     config = ModelConfigFactory.from_model_on_disk(mod, allow_unknown=False).config
 
@@ -101,12 +115,15 @@ def _shrink_mistral_small_3(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mistral_encoder, "_MISTRAL_3_MIN_VOCAB_SIZE", _TINY_VOCAB)
 
 
-def _write_real_llamacpp_gguf(path: Path, architecture: str, **strings: str) -> Path:
+def _write_real_llamacpp_gguf(path: Path, architecture: str, **metadata: str | float) -> Path:
     """A real llama.cpp-named GGUF at the shrunk geometry and the cow build's 30 layers, matrices Q8_0.
-    ``strings`` are further string metadata, keyed under the architecture's prefix."""
+    ``metadata`` are further string or float32 fields, keyed under the architecture's prefix."""
     writer = gguf.GGUFWriter(str(path), architecture)
-    for key, value in strings.items():
-        writer.add_string(f"{architecture}.{key}", value)
+    for key, value in metadata.items():
+        if isinstance(value, str):
+            writer.add_string(f"{architecture}.{key}", value)
+        else:
+            writer.add_float32(f"{architecture}.{key}", value)
     shapes = {"token_embd.weight": (_TINY_VOCAB, _TINY_HIDDEN), "blk.0.ffn_gate.weight": (_TINY_MLP, _TINY_HIDDEN)}
     shapes |= {f"blk.{layer}.attn_q.weight": (_TINY_HIDDEN, _TINY_HIDDEN) for layer in range(30)}
     rng = np.random.default_rng(0)
@@ -139,18 +156,27 @@ def test_a_real_gguf_is_identified_from_its_header_as_its_stripped_fixture_is(tm
 
 @pytest.mark.usefixtures("_shrink_mistral_small_3")
 @pytest.mark.parametrize(
-    ("architecture", "strings", "reason"),
-    [("qwen3", {}, "architecture"), ("mistral3", {"rope.scaling.type": "yarn"}, "'yarn' RoPE scaling")],
-    ids=["another-architecture", "yarn"],
+    ("architecture", "metadata", "reason"),
+    [
+        ("qwen3", {}, "architecture"),
+        ("mistral3", {"rope.scaling.type": "yarn"}, "mistral3.rope.scaling.type='yarn'"),
+        # Numeric fields alone, no scaling type: what the loader refuses, identification refuses too.
+        ("mistral3", {"attention.temperature_scale": 0.5}, "mistral3.attention.temperature_scale=0.5"),
+        ("llama", {"rope.scaling.factor": 16.0}, "llama.rope.scaling.factor=16.0"),
+    ],
+    ids=["another-architecture", "yarn", "attention-temperature", "scaling-factor-without-type"],
 )
 def test_a_real_gguf_is_refused_by_the_metadata_its_header_carries(
-    tmp_path: Path, architecture: str, strings: dict[str, str], reason: str
+    tmp_path: Path, architecture: str, metadata: dict[str, str | float], reason: str
 ) -> None:
-    """The tensors of the file accepted above, so only the header's metadata can refuse it."""
-    path = _write_real_llamacpp_gguf(tmp_path / "other.gguf", architecture, **strings)
+    """The tensors of the file accepted above, so only the header's metadata can refuse it -- and a fixture
+    stripped from the file keeps that metadata, numbers included, so it is refused the same way."""
+    path = _write_real_llamacpp_gguf(tmp_path / "other.gguf", architecture, **metadata)
+    stripped = create_stripped_model(path, tmp_path / "stripped")
 
-    with pytest.raises(NotAMatchError, match=reason):
-        MistralEncoder_GGUF_Config.from_model_on_disk(ModelOnDisk(path), {})
+    for mod in (ModelOnDisk(path), StrippedModelOnDisk(stripped.path / path.name)):
+        with pytest.raises(NotAMatchError, match=reason):
+            MistralEncoder_GGUF_Config.from_model_on_disk(mod, {})
 
 
 @pytest.mark.parametrize("architecture", ["qwen3", None])
@@ -162,21 +188,6 @@ def test_a_llamacpp_gguf_of_another_architecture_is_not_a_mistral_encoder(
     mod = _gguf_header(tmp_path / "other.gguf", _llamacpp_tensors(*_MISTRAL_SMALL_3), architecture)
 
     with pytest.raises(NotAMatchError, match="architecture"):
-        MistralEncoder_GGUF_Config.from_model_on_disk(mod, {})
-
-
-def test_a_yarn_scaled_model_of_mistral_small_3s_shape_is_not_a_mistral_encoder(tmp_path: Path) -> None:
-    """Devstral Small 2: a ``mistral3`` llama.cpp build at Mistral Small 3's exact geometry, MLP
-    included, but with YaRN RoPE. The loader builds plain RoPE, so it would encode at the wrong
-    frequencies; it is a different model, so it installs as unknown rather than being refused."""
-    mod = _gguf_header(
-        tmp_path / "devstral-small-2.gguf",
-        _llamacpp_tensors(*_MISTRAL_SMALL_3),
-        "mistral3",
-        **{"rope.scaling.type": "yarn"},
-    )
-
-    with pytest.raises(NotAMatchError, match="'yarn' RoPE scaling"):
         MistralEncoder_GGUF_Config.from_model_on_disk(mod, {})
 
 

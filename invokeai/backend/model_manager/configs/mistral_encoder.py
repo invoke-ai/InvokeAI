@@ -1,4 +1,5 @@
 import json
+from collections.abc import Mapping
 from typing import Any, Literal, Self
 
 from pydantic import Field
@@ -52,6 +53,44 @@ LLAMACPP_MISTRAL_ARCHITECTURES = ("llama", "mistral3")
 any other architecture is a different model whatever its shapes -- Qwen3-14B shares Mistral Small 3's
 width and depth and clears the vocabulary floor. The loader keys on the same set: these converters
 reorder the query and key rows it puts back, and Qwen's do not."""
+
+# What llama.cpp records about RoPE that Mistral Small 3 does not use: scaled RoPE (YaRN for Ministral 3 and
+# Devstral Small 2) and the Llama 4-style position-dependent attention temperature, each under the file's
+# architecture prefix. llama.cpp's `mistral3.py` writes the YaRN and temperature keys only for Ministral 3.
+_UNSUPPORTED_ROPE_KEYS = (
+    "rope.scaling.type",
+    "rope.scaling.factor",
+    "rope.scaling.original_context_length",
+    "rope.scaling.yarn_beta_fast",
+    "rope.scaling.yarn_beta_slow",
+    "rope.scaling.yarn_log_multiplier",
+    "attention.temperature_scale",
+)
+
+
+def unsupported_rope_refusal(metadata: Mapping[str, Any]) -> str | None:
+    """Why a GGUF's metadata (``ModelOnDisk.metadata()``) rules out Mistral Small 3's plain RoPE, or ``None``.
+
+    Identification refuses such a file, and the loader refuses records installed before it did: the
+    alternative is an encoder that loads cleanly at Mistral Small 3's geometry and encodes at the wrong
+    frequencies. Any one key counts, a YaRN factor without a declared scaling type included.
+    """
+    architecture = metadata.get("general.architecture")
+    if not isinstance(architecture, str):
+        return None
+    declared = [
+        f"{architecture}.{key}={value!r}"
+        for key in _UNSUPPORTED_ROPE_KEYS
+        if (value := metadata.get(f"{architecture}.{key}")) is not None
+        and not (key == "rope.scaling.type" and value == "none")
+    ]
+    if not declared:
+        return None
+    return (
+        f"declares {', '.join(declared)}: scaled RoPE or attention temperature, which Mistral Small 3 does not "
+        "use, so this is a different model"
+    )
+
 
 # Minimum vocab size to accept as a FLUX.2 Mistral encoder. Mistral Small 3's
 # Tekken vocab is 131072 (shared by the 30-layer cow build). This gates out
@@ -472,12 +511,8 @@ class MistralEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError(_unrecognized_geometry(state_dict))
 
         # Mistral Small 3 runs plain RoPE. A scaled one at the same geometry -- Devstral Small 2 declares
-        # YaRN -- is another model, and the loader would run it at the wrong frequencies.
-        rope_scaling = metadata.get(f"{architecture}.rope.scaling.type") if architecture else None
-        if rope_scaling not in (None, "none"):
-            raise NotAMatchError(
-                f"declares {rope_scaling!r} RoPE scaling ({architecture}.rope.scaling.type); Mistral Small 3 "
-                "uses plain RoPE, so this is a different model"
-            )
+        # YaRN -- is another model.
+        if refusal := unsupported_rope_refusal(metadata):
+            raise NotAMatchError(refusal)
 
         return cls(variant=variant, **override_fields)

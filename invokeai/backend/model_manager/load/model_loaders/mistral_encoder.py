@@ -42,6 +42,7 @@ from invokeai.backend.model_manager.configs.mistral_encoder import (
     MistralEncoder_Checkpoint_Config,
     MistralEncoder_Diffusers_Config,
     MistralEncoder_GGUF_Config,
+    unsupported_rope_refusal,
 )
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
@@ -50,6 +51,7 @@ from invokeai.backend.model_manager.load.load_default import (
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -82,7 +84,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     warn_on_unattached_scales,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     reject_int8_layers_a_plain_fold_cannot_decode,
 )
@@ -336,62 +338,16 @@ def _build_ministral3_config(
     )
 
 
-def _decode_gguf_field(field: Any) -> Any | None:
-    """Decode a single GGUFReader field to a Python scalar, or ``None``."""
-    if field is None:
-        return None
-    try:
-        # GGUFReader exposes scalar fields under `.contents()` in recent gguf releases.
-        # Fall back to parts decoding for older versions.
-        if hasattr(field, "contents"):
-            return field.contents()
-    except Exception:
-        pass
-    import struct
-
-    try:
-        if field.types[0].name in ("FLOAT32",):
-            return struct.unpack("<f", bytes(field.parts[-1]))[0]
-        if field.types[0].name in ("FLOAT64",):
-            return struct.unpack("<d", bytes(field.parts[-1]))[0]
-        if field.types[0].name in ("UINT32", "UINT64", "INT32", "INT64", "UINT16"):
-            return int.from_bytes(bytes(field.parts[-1]), "little")
-    except Exception:
-        return None
-    return None
-
-
-def _read_gguf_metadata_values(path: Path, arch_keys: tuple[str, ...]) -> tuple[str | None, dict[str, Any]]:
-    """Read ``general.architecture`` and the named fields under that architecture's prefix, in one reader pass.
-
-    llama.cpp keys its hyperparameters by architecture -- ``llama.attention.head_count``,
-    ``mistral3.attention.head_count`` -- so the prefix is known only once the file names itself.
-    Returns the architecture and ``{key: value}`` for ``arch_keys``, values ``None`` where absent;
-    ``(None, {})`` if the header cannot be read. Reading every key with one reader avoids
-    re-parsing the (potentially large) header once per key. The reader is install's own, so a file
-    install accepted (one repeating the header fields as metadata, say) reads here too.
-    """
-    try:
-        with WrappedGGUFReader(path) as reader:
-            fields = reader.fields
-            architecture = _decode_gguf_field(fields.get("general.architecture"))
-            if not isinstance(architecture, str):
-                return None, {}
-            return architecture, {key: _decode_gguf_field(fields.get(f"{architecture}.{key}")) for key in arch_keys}
-    except Exception:
-        return None, {}
-
-
 def _llamacpp_head_counts(
-    sd: dict[str, Any], gguf_meta: dict[str, Any], architecture: str, file_name: str
+    sd: dict[str, Any], metadata: Mapping[str, Any], architecture: str, file_name: str
 ) -> tuple[int, int]:
     """The head counts llama.cpp regrouped the query and key rows by, checked against layer 0's projections.
 
     Read from the metadata: the regrouping runs per head, and the row counts give a head count only
     through an assumed head width.
     """
-    n_head = gguf_meta.get("attention.head_count")
-    n_head_kv = gguf_meta.get("attention.head_count_kv")
+    n_head = metadata.get(f"{architecture}.attention.head_count")
+    n_head_kv = metadata.get(f"{architecture}.attention.head_count_kv")
     if not isinstance(n_head, int) or not isinstance(n_head_kv, int):
         missing = [
             f"{architecture}.attention.{name}"
@@ -402,7 +358,7 @@ def _llamacpp_head_counts(
             f"{file_name} is a llama.cpp GGUF without {' or '.join(missing)}, so its attention rows cannot be "
             "put back in order."
         )
-    key_length = gguf_meta.get("attention.key_length")
+    key_length = metadata.get(f"{architecture}.attention.key_length")
     head_dim = key_length if isinstance(key_length, int) else _COW_HEAD_DIM
     q_proj = sd.get("model.layers.0.self_attn.q_proj.weight")
     k_proj = sd.get("model.layers.0.self_attn.k_proj.weight")
@@ -414,38 +370,6 @@ def _llamacpp_head_counts(
             f"{_COW_HEAD_DIM}-wide heads."
         )
     return n_head, n_head_kv
-
-
-# What llama.cpp records about RoPE that a plain `MistralModel` does not apply: scaled RoPE (YaRN for
-# Ministral 3 and Devstral Small 2) and the Llama 4-style position-dependent attention temperature.
-_UNSUPPORTED_ROPE_KEYS = (
-    "rope.scaling.type",
-    "rope.scaling.factor",
-    "rope.scaling.original_context_length",
-    "rope.scaling.yarn_beta_fast",
-    "rope.scaling.yarn_beta_slow",
-    "rope.scaling.yarn_log_multiplier",
-    "attention.temperature_scale",
-)
-
-
-def _refuse_unsupported_rope(gguf_meta: dict[str, Any], architecture: str | None, file_name: str) -> None:
-    """Refuse a GGUF whose metadata asks for RoPE the built model would not run.
-
-    Identification refuses these at install; this covers records made before it did. They would load
-    cleanly at Mistral Small 3's geometry and encode at the wrong frequencies.
-    """
-    declared = {
-        key: value
-        for key in _UNSUPPORTED_ROPE_KEYS
-        if (value := gguf_meta.get(key)) is not None and not (key == "rope.scaling.type" and value == "none")
-    }
-    if declared:
-        fields = ", ".join(f"{architecture}.{key}={value!r}" for key, value in declared.items())
-        raise ValueError(
-            f"{file_name} declares {fields}: scaled RoPE or attention temperature, which this loader's plain "
-            "MistralModel does not apply. It is not Mistral Small 3."
-        )
 
 
 def _refuse_unless_mistral_small_3_mlp(sd: dict[str, Any], file_name: str) -> None:
@@ -1443,28 +1367,23 @@ class MistralEncoderGGUFLoader(ModelLoader):
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
 
         model_path = Path(config.path)
-        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
 
         # Hyperparameters live under the file's own architecture prefix. Falling back silently is OK for
         # RoPE and context: `_build_mistral_config` defaults to BFL's Mistral Small 3.2 values when they are None.
-        architecture, gguf_meta = _read_gguf_metadata_values(
-            model_path,
-            (
-                "attention.head_count",
-                "attention.head_count_kv",
-                "attention.key_length",
-                "rope.freq_base",
-                "context_length",
-                *_UNSUPPORTED_ROPE_KEYS,
-            ),
-        )
-        _refuse_unsupported_rope(gguf_meta, architecture, model_path.name)
-        rope_raw = gguf_meta.get("rope.freq_base")
+        # Read as identification reads it, with install's header-tolerant reader, and before the weights, so a
+        # record this refuses fails without reading the whole file into RAM first.
+        metadata = ModelOnDisk(model_path).metadata()
+        architecture = metadata.get("general.architecture")
+        if refusal := unsupported_rope_refusal(metadata):
+            raise ValueError(f"{model_path.name} {refusal}.")
+        rope_raw = metadata.get(f"{architecture}.rope.freq_base")
         rope_theta = float(rope_raw) if isinstance(rope_raw, (int, float)) else None
-        ctx_raw = gguf_meta.get("context_length")
+        ctx_raw = metadata.get(f"{architecture}.context_length")
         max_pos = int(ctx_raw) if isinstance(ctx_raw, (int, float)) else None
         if rope_theta is not None:
             logger.info(f"GGUF metadata: rope_theta={rope_theta}, max_position={max_pos}")
+
+        sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
 
         # llama.cpp stores layers as `blk.N.*`. Normalize to transformers' `model.layers.N.*` if needed;
         # `_strip_known_prefixes` and `_convert_for_bare_mistral_model` below adapt that to MistralModel.
@@ -1478,7 +1397,7 @@ class MistralEncoderGGUFLoader(ModelLoader):
                 )
             logger.info("Detected llama.cpp GGUF format, converting keys to transformers format")
             sd = convert_llamacpp_decoder_keys(sd)
-            n_head, n_head_kv = _llamacpp_head_counts(sd, gguf_meta, architecture, model_path.name)
+            n_head, n_head_kv = _llamacpp_head_counts(sd, metadata, architecture, model_path.name)
             undo_llamacpp_qk_permutation(sd, n_head, n_head_kv)
 
         sd = _strip_known_prefixes(sd)
