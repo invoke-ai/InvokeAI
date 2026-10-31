@@ -1,7 +1,7 @@
 ---
 title: Advanced Prompt Syntax
-description: Fine control over prompts — attention weighting, blending and conjunctions for SD 1.5, SD 2.x and SDXL, and the advanced dynamic prompt syntax for multiple choices, weights, variables and comments.
-lastUpdated: 2026-10-15
+description: Fine control over prompts — attention weighting for SD and Anima models, blending and conjunctions for SD models, and advanced dynamic prompt syntax.
+lastUpdated: 2026-10-27
 sidebar:
   order: 3
 ---
@@ -10,10 +10,10 @@ Most prompts need nothing more than plain text, perhaps with a [prompt template]
 
 ## Attention weighting
 
-Attention weighting makes parts of the prompt count for more or less than the rest. It uses Compel syntax, which applies to **SD 1.5, SD 2.x and SDXL**. Newer model families, including FLUX, Z-Image, CogView4 and Qwen Image, do not use it, and the symbols are passed to the model as ordinary text.
+Attention weighting makes parts of the prompt count for more or less than the rest. **SD 1.5, SD 2.x and SDXL** use Compel. **Anima** accepts the attention-weight forms shown below and applies the weights to its own text conditioning; it does not run its text encoder through Compel. Other model families, including FLUX, Z-Image, CogView4 and Qwen Image, pass these symbols to the model as ordinary text.
 
 :::note[Compatibility note]
-  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5, SD 2.x and SDXL. The prompt field colors weights, groups and embeddings only while one of those models is selected; with any other model, or none, they appear as plain text.
+  If a weighted prompt seems to be ignored, check which model you are using. Anima supports the attention-weight forms, but not Compel's `.blend()` or `.and()` functions or embeddings. Its prompt field highlights supported groups and weights. Unsupported method names stay plain, while attention inside their arguments still works. SD 1.5, SD 2.x and SDXL also highlight their supported embeddings and prompt functions.
 :::
 
 | Syntax | Effect |
@@ -53,15 +53,32 @@ Use numeric weights when you want precise control instead of repeated plus or mi
 
 Groups can be nested, and the weights combine. In `(portrait with (blue eyes)1.3)1.1`, the outer group strengthens the whole phrase, and `blue eyes` gets even more emphasis.
 
+### Anima attention weights
+
+Anima supports Compel-style word suffixes (`hair+`, `hair--`), neutral and weighted nested groups (`(long hair)2`, `((hair)+)0.5`), and double-quoted targets (`"red blue"2`, `"red (blue)2"+`). You can also write `hair.attend(2)`, `(long hair).attend(++)`, or `"red blue" .attend (--)`. Spaces are allowed around the explicit `.attend` call; an ordinary numeric or symbolic suffix must directly follow its target.
+
+Nested weights multiply: in `"red (blue)2"+`, red has weight `1.1` and blue has weight `2.2`. Opposite signs also multiply: `(hair-)+` has weight `0.99`. `1` is neutral; `0` clears the affected adapter vectors. Numeric attention is unsigned, and both each local weight and every composed weight must be finite and at most `65504`. Very large weights can destabilize generation. Anima applies weighting after its text encoders rather than using Compel's CLIP conditioning algorithm.
+
+Parentheses group text without an explicit weight. Escape parentheses and double quotes as `\(cosplay\)` and `\"` to keep them literal. Escaped signs such as `hair\+` are neutral. Compel's syntactic escapes `\+`, `\-`, `\.`, `\=`, and `\,` keep their backslash in the encoder text; escaped parentheses and quotes lose it. An unclosed enclosing group such as `((red)2` stays literal, including its apparent inner weight.
+
+Within double quotes, `\n`, `\t` and `\r` decode to whitespace before attention is parsed: `"cat\ndog+"2` weights cat by `2` and dog by `2.2`. The editor and keyboard edits preserve the authored escape spelling. Extra preceding backslashes remain literal, and `\v` stays literal. Mixing `\f` with words makes a quoted target malformed, so it stays neutral literal source. Outside quotes, these backslash-letter sequences stay literal.
+
+Fragment boundaries follow Compel's context-sensitive attention grammar. At top level, `a(b)2` and `foo.bar+` stay literal; inside `(a(b)2)` or `(foo.bar+)2`, the inner attention is active. Parsed adjacent fragments are separated by a space when no authored ASCII whitespace separates them: `red+(blue)2` becomes `red blue`, `(red)2_blue` becomes `red _blue`, and `(foo.bar+)2` becomes `foo . bar`. Commas also separate parsed fragments: `red,blue+` becomes `red, blue`, while `(red)2,blue` becomes `red , blue`. Authored whitespace, including newlines, is retained rather than normalized. Prompts without parsed attention, grouping, or decoded escapes keep their exact text. Nonbreaking spaces, em spaces and U+0085 belong to the same bare fragment rather than creating an ASCII word boundary.
+
+Anima does not execute `.and()`, `.blend()`, `.swap()` or embeddings. Method punctuation stays literal, but supported attention in their arguments remains active, including incomplete calls while typing: `.and(dog+)` still weights `dog`. A method's leading dot is retained after a numeric suffix, so `(cat)2.and(dog+)` weights cat by `2` and dog by `1.1` without executing `.and()`.
+
+The Anima model card uses ComfyUI's `(chibi:2)` form. In InvokeAI write `(chibi)2`: `(chibi:2)` is neutral grouping and sends `chibi:2` to the encoder.
+
 ### Adjusting weights with the keyboard
 
-In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents. The shortcut works while an SD 1.5, SD 2.x or SDXL model is selected; with any other model the keys keep their usual text-editing behavior.
+In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents. The shortcut works with SD 1.5, SD 2.x, SDXL and Anima; with other models the keys keep their usual text-editing behavior. For Anima, punctuation within a Compel-style word such as `blue-green` or `hair!` remains part of that word.
 
 - A selection inside a group changes only the selected words. A selection crossing a group boundary changes the selected words on both sides.
 - Symbolic weights move one `+` or `-` step. Numeric weights change by `0.1` of effective attention, including inherited group weights.
 - The numeric attention preference controls new weights; existing group weights keep their style.
-- Adjacent content with matching weights merges, and the adjusted content stays selected for the next keypress.
-- Inside prompt functions, the shortcut adjusts prompt arguments and preserves function parameters. Use **Ctrl+Z** to undo a weight change.
+- For SD models, adjacent content with matching weights merges. Anima edits preserve unselected source punctuation, escapes, method calls and effective weights. The adjusted content stays selected for the next keypress.
+- Selecting an Anima group delimiter changes the whole group. With differing numeric descendant weights, each selected effective weight changes by `0.1`. Whole zero-weight groups can increase to `0.1`; a partial edit under zero stays unchanged when the other weights cannot be preserved. An edit that would change literal text, produce a negative numeric weight or exceed the weight bounds also stays unchanged.
+- For SD prompt functions, the shortcut adjusts prompt arguments and preserves function parameters. For Anima, supported attention in literal method arguments can be adjusted too. Use **Ctrl+Z** to undo a weight change.
 
 ### Blending with `.blend()`
 

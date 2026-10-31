@@ -35,6 +35,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Qwen3EncoderField, Qwen35EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.prompt_weighting import parse_prompt_attention, tokenize_t5_with_weights
 from invokeai.backend.anima.semantic_connector import QWEN35_LAYER_INDICES
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
@@ -66,7 +67,7 @@ QWEN3_5_MAX_SEQ_LEN = 1024
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.5.0",
+    version="1.6.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -78,7 +79,12 @@ class AnimaTextEncoderInvocation(BaseInvocation):
     LLM Adapter inside the Anima transformer during denoising.
     """
 
-    prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
+    prompt: str = InputField(
+        description="Text prompt to encode. Anima attention uses Compel-style forms such as (long hair)2 and hair+. "
+        "Parentheses group text; escape them with backslashes to keep them literal. "
+        "The ComfyUI form (long hair:2) applies no weight; the encoder receives long hair:2.",
+        ui_component=UIComponent.Textarea,
+    )
     qwen3_encoder: Qwen3EncoderField = InputField(
         title="Qwen3 Encoder",
         description=FieldDescriptions.qwen3_encoder,
@@ -132,9 +138,9 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             - qwen3_embeds: Shape (max_seq_len, 1024) — includes all positions (including padding)
               to preserve full sequence context for the LLM Adapter.
             - t5xxl_ids: Shape (seq_len,) — T5-XXL token IDs (unpadded).
-            - t5xxl_weights: None (uniform weights for now).
+            - t5xxl_weights: Shape (seq_len,) for weighted prompts, or None for uniform weights.
         """
-        prompt = self.prompt
+        prompt, weighted_ranges = parse_prompt_attention(self.prompt)
 
         # --- Step 1: Encode with Qwen3 0.6B ---
         text_encoder_info = context.models.load(self.qwen3_encoder.text_encoder)
@@ -225,16 +231,11 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         # --- Step 2: Tokenize with bundled T5-XXL tokenizer (IDs only, no model) ---
         context.util.signal_progress("Tokenizing with T5-XXL")
         t5_tokenizer = load_bundled_t5_tokenizer()
-        t5_tokens = t5_tokenizer(
-            prompt,
-            padding=False,
-            truncation=True,
-            max_length=T5_MAX_SEQ_LEN,
-            return_tensors="pt",
+        t5xxl_ids, t5xxl_weights = tokenize_t5_with_weights(
+            t5_tokenizer, prompt, weighted_ranges, max_length=T5_MAX_SEQ_LEN
         )
-        t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
-        return qwen3_embeds, t5xxl_ids, None
+        return qwen3_embeds, t5xxl_ids, t5xxl_weights
 
     def _encode_qwen3_5(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
         """Encode the prompt with Qwen3.5 the way Anima-3.8B's reference encoder does.
@@ -251,7 +252,8 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             if not isinstance(tokenizer, PreTrainedTokenizerBase):
                 raise TypeError(f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}.")
             # No template, no special tokens -- the prompt's tokens as they are.
-            token_ids = tokenizer.encode(self.prompt, add_special_tokens=False)
+            prompt, _ = parse_prompt_attention(self.prompt)
+            token_ids = tokenizer.encode(prompt, add_special_tokens=False)
             pad_token_id = tokenizer.pad_token_id
         if len(token_ids) > QWEN3_5_MAX_SEQ_LEN:
             logger.warning(f"Prompt was truncated to {QWEN3_5_MAX_SEQ_LEN} tokens for the Qwen3.5 encoder.")

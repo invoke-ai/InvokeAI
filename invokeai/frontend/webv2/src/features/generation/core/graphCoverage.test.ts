@@ -26,7 +26,7 @@ import {
   SHAPE_OVERRIDES,
   tunedSettingsFor,
 } from './graphCoverage.testing';
-import { COMPEL_NODE_TYPES, supportsPromptAttentionSyntax } from './prompt/compel';
+import { COMPEL_NODE_TYPES, getPromptSyntaxProfile, supportsPromptAttentionSyntax } from './prompt/compel';
 import { REFINER_DENOISE_NODE_ID } from './sdxlRefinerGraph';
 
 const compileForShape = (
@@ -147,14 +147,16 @@ describe('generate graph coverage', () => {
     );
   });
 
-  // The prompt editor highlights and weights attention syntax by this capability; only Compel reads it.
+  // Attention offered by the prompt editor must have a corresponding encoder in each compiled graph.
   it.each(generateGraphCases)(
-    'encodes $label prompts with Compel exactly when attention syntax is offered',
+    'encodes $label prompts with attention exactly when the editor offers it',
     ({ base, shape }) => {
       const { graph } = compileForShape(base, shape);
       const usesCompel = Object.values(graph.nodes).some((node) => COMPEL_NODE_TYPES.has(node.type));
+      const usesAnima = Object.values(graph.nodes).some((node) => node.type === 'anima_text_encoder');
 
-      expect(usesCompel).toBe(supportsPromptAttentionSyntax(base));
+      expect(usesCompel || usesAnima).toBe(supportsPromptAttentionSyntax(base));
+      expect(usesCompel).toBe(getPromptSyntaxProfile(base) === 'compel');
     }
   );
 

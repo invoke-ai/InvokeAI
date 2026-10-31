@@ -1,6 +1,13 @@
-import type { PromptAstNode, PromptAttention, PromptRange } from './ast';
+import type { AnimaPart, PromptAstNode, PromptAttention, PromptRange } from './ast';
+import type { PromptSyntaxProfile } from './compel';
 
-import { parsePrompt, serializePromptWithSelection } from './ast';
+import {
+  ANIMA_MAX_WEIGHT,
+  parseAnimaPrompt,
+  parsePrompt,
+  serializePromptAttention,
+  serializePromptWithSelection,
+} from './ast';
 
 export type PromptAttentionDirection = 'increment' | 'decrement';
 
@@ -200,7 +207,7 @@ const unifyEqualWeights = (leaves: WeightedLeaf[]): void => {
 
 const wrapRun = (children: PromptAstNode[], attention: PromptAttention, selected: boolean): PromptAstNode => {
   const child = children.length === 1 ? children[0] : undefined;
-  if (typeof attention === 'string' && (child?.type === 'word' || child?.type === 'group')) {
+  if (typeof attention === 'string' && (child?.type === 'group' || child?.type === 'word')) {
     return { ...child, attention, isSelection: selected || undefined };
   }
   return { type: 'group', attention, children, range: GENERATED_RANGE, isSelection: selected || undefined };
@@ -324,12 +331,216 @@ const adjustNodes = (
   return { nodes: groupWeightedLeaves(leaves), modified: true };
 };
 
+interface AnimaTarget {
+  part: AnimaPart;
+  inherited: Weight;
+  effective: Weight;
+  parent?: AnimaTarget;
+  leafCount: number;
+}
+
+/** Change only selected source spans; ancestors and unsupported call punctuation keep their original spelling. */
+const adjustAnimaAttention = (
+  prompt: string,
+  selection: PromptRange,
+  direction: PromptAttentionDirection,
+  preferNumeric: boolean
+): PromptAttentionAdjustment => {
+  const unchanged = { prompt, selectionStart: selection.start, selectionEnd: selection.end };
+  const parsed = parseAnimaPrompt(prompt);
+  const leaves: AnimaTarget[] = [];
+  const groups: AnimaTarget[] = [];
+  const hierarchy: AnimaTarget[] = [];
+  const callMarkers: PromptRange[] = [];
+  const tasks = parsed.nodes
+    .map((part) => ({ part, inherited: NEUTRAL, parent: undefined as AnimaTarget | undefined }))
+    .reverse();
+  while (tasks.length) {
+    const { part, inherited, parent } = tasks.pop()!;
+    const effective = inheritWeight(inherited, part.attention);
+    const target: AnimaTarget = { part, inherited, effective, parent, leafCount: 0 };
+    const nextParent = part.delimiter ? target : parent;
+    if (part.delimiter) {
+      groups.push(target);
+      hierarchy.push(target);
+    }
+    if (part.glue && part.text?.trim()) {
+      callMarkers.push(part.range);
+      target.leafCount = 1;
+      hierarchy.push(target);
+    }
+    if (part.text !== undefined && !part.glue && part.text.length) {
+      leaves.push(target);
+      target.leafCount = 1;
+      hierarchy.push(target);
+    }
+    for (let child = part.children.length - 1; child >= 0; child--) {
+      tasks.push({ part: part.children[child]!, inherited: effective, parent: nextParent });
+    }
+  }
+  for (let index = hierarchy.length - 1; index >= 0; index--) {
+    const target = hierarchy[index]!;
+    if (target.parent) {
+      target.parent.leafCount += target.leafCount;
+    }
+  }
+  const collapsed = selection.start === selection.end;
+  if (collapsed && callMarkers.some(({ start, end }) => start <= selection.start && end > selection.start)) {
+    return unchanged;
+  }
+  // At an adjacent suffix/word boundary, content beginning at the caret wins.
+  const starting = collapsed ? leaves.find(({ part }) => part.range.start === selection.start) : undefined;
+  const delimiter = starting
+    ? undefined
+    : ((collapsed ? groups.find(({ part }) => part.range.start === selection.start) : undefined) ??
+      groups.find(({ part }) => {
+        if (!overlaps(selection, part.range) || selection.end > part.range.end || selection.start < part.range.start) {
+          return false;
+        }
+        if (selection.start === part.range.start && selection.end === part.range.end) {
+          return true;
+        }
+        return collapsed
+          ? selection.start < part.contentRange.start || selection.start >= part.contentRange.end
+          : selection.end <= part.contentRange.start || selection.start >= part.contentRange.end;
+      }));
+  let targets = starting
+    ? [starting]
+    : delimiter
+      ? hierarchy.filter(
+          ({ part }) =>
+            (part.delimiter || !part.glue) &&
+            part.range.start >= delimiter.part.range.start &&
+            part.range.end <= delimiter.part.range.end
+        )
+      : leaves.filter(({ part }) => overlaps(selection, part.range));
+  if (collapsed && !starting && !delimiter && targets.length > 1) {
+    targets = [targets.at(-1)!];
+  }
+  // A single-content group can carry the edit itself (also lets (cat)0 increase).
+  targets = delimiter
+    ? targets
+    : targets.map((target) => {
+        if (target.part.delimiter) {
+          return target;
+        }
+        let relativeWeight = target.part.weight;
+        for (let ancestor = target.parent; ancestor; ancestor = ancestor.parent) {
+          // Ancestor content counts cannot decrease as the walk moves outwards.
+          if (ancestor.leafCount !== 1) {
+            break;
+          }
+          if (ancestor.inherited.value !== 0 && relativeWeight === 1) {
+            return ancestor;
+          }
+          relativeWeight *= ancestor.part.weight;
+        }
+        return target;
+      });
+  const edits: { start: number; end: number; value: string; numericBoundary: string }[] = [];
+  // A whole-group edit steps each effective base before deriving child factors.
+  // This also steps literal method punctuation without rewriting its source.
+  const adjustedGroups = new Map<AnimaTarget, Weight>();
+  for (const target of targets) {
+    const { part, effective } = target;
+    const inherited =
+      delimiter && target.parent ? (adjustedGroups.get(target.parent) ?? target.inherited) : target.inherited;
+    // All selected targets must succeed; skipping one can leave already-edited ancestors changing its weight.
+    const stepped = stepWeight(effective, direction, preferNumeric);
+    if (stepped.value < 0 || stepped.value > ANIMA_MAX_WEIGHT || !Number.isFinite(stepped.value)) {
+      return unchanged;
+    }
+    if (delimiter && part.delimiter) {
+      adjustedGroups.set(target, stepped);
+    }
+    if (inherited.value === 0) {
+      // A zero ancestor satisfies a requested zero, but cannot represent any nonzero descendant.
+      if (stepped.value !== 0) {
+        return unchanged;
+      }
+      continue;
+    }
+    const relativeSteps = stepped.steps !== null && inherited.steps !== null ? stepped.steps - inherited.steps : null;
+    const symbolic =
+      relativeSteps !== null &&
+      (relativeSteps === 0 || inherited.steps === 0 || Math.sign(relativeSteps) === Math.sign(inherited.steps!));
+    const local = symbolic ? symbolicValue(relativeSteps!) : roundWeight(stepped.value / inherited.value);
+    if (!Number.isFinite(local) || local < 0 || local > ANIMA_MAX_WEIGHT) {
+      return unchanged;
+    }
+    if (local === part.weight) {
+      continue;
+    }
+    const attention = symbolic ? (relativeSteps! > 0 ? '+' : '-').repeat(Math.abs(relativeSteps!)) : local;
+    const suffix = serializePromptAttention(local === 1 ? undefined : attention);
+    if (part.delimiter) {
+      edits.push({
+        start: part.contentRange.end + 1,
+        end: part.range.end,
+        value: suffix,
+        numericBoundary: serializePromptAttention(local),
+      });
+      continue;
+    }
+    const content = prompt.slice(part.range.start, part.contentRange.end);
+    const value = typeof attention === 'string' || local === 1 ? content + suffix : `(${content})${suffix}`;
+    edits.push({
+      start: part.range.start,
+      end: part.range.end,
+      value,
+      numericBoundary: `(${content})${serializePromptAttention(local)}`,
+    });
+  }
+  if (!edits.length) {
+    return unchanged;
+  }
+  edits.sort((a, b) => a.start - b.start);
+  for (const useNumericBoundary of [false, true]) {
+    let output = '';
+    let cursor = 0;
+    let selectionStart = -1;
+    let selectionEnd = -1;
+    for (const edit of edits) {
+      output += prompt.slice(cursor, edit.start);
+      if (selectionStart < 0) {
+        selectionStart = output.length;
+      }
+      output += useNumericBoundary ? edit.numericBoundary : edit.value;
+      selectionEnd = output.length;
+      cursor = edit.end;
+    }
+    output += prompt.slice(cursor);
+    // Removing a suffix may merge adjacent fragments or bind a literal sign.
+    // An explicit numeric boundary preserves neutral fragments in those cases.
+    try {
+      if (parseAnimaPrompt(output).text === parsed.text) {
+        return {
+          prompt: output,
+          selectionStart: delimiter ? delimiter.part.range.start : selectionStart,
+          selectionEnd: delimiter
+            ? delimiter.part.range.end +
+              edits.reduce(
+                (delta, edit) =>
+                  delta + (useNumericBoundary ? edit.numericBoundary : edit.value).length - (edit.end - edit.start),
+                0
+              )
+            : selectionEnd,
+        };
+      }
+    } catch {
+      // Both local and composed bounds are checked by the shared parse.
+    }
+  }
+  return unchanged;
+};
+
 export const adjustPromptAttention = (
   prompt: string,
   selectionStart: number,
   selectionEnd: number,
   direction: PromptAttentionDirection,
-  preferNumericAttentionStyle = false
+  preferNumericAttentionStyle = false,
+  syntaxProfile: Exclude<PromptSyntaxProfile, 'none'> = 'compel'
 ): PromptAttentionAdjustment => {
   const unchanged = { prompt, selectionStart, selectionEnd };
   try {
@@ -337,8 +548,14 @@ export const adjustPromptAttention = (
       start: Math.max(0, Math.min(prompt.length, selectionStart, selectionEnd)),
       end: Math.min(prompt.length, Math.max(0, selectionStart, selectionEnd)),
     };
+    if (syntaxProfile === 'anima') {
+      return adjustAnimaAttention(prompt, selection, direction, preferNumericAttentionStyle);
+    }
     const result = adjustNodes(parsePrompt(prompt), selection, direction, preferNumericAttentionStyle);
-    return result.modified ? serializePromptWithSelection(result.nodes, prompt) : unchanged;
+    if (!result.modified) {
+      return unchanged;
+    }
+    return serializePromptWithSelection(result.nodes, prompt);
   } catch {
     // Prompts are edited while incomplete, and pathological nesting must not break typing.
     return unchanged;

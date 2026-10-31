@@ -3,6 +3,7 @@ import type { GenerateModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { parseAnimaPrompt } from '@features/generation/core/prompt/ast';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -89,37 +90,40 @@ it('keeps positive prompt actions enabled when stale view mode has no active tem
   expect(host.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.imageToPrompt"]')?.disabled).toBe(false);
 });
 
+const renderPromptModel = (selectedModel: GenerateModelConfig, value = 'a cat+') =>
+  act(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <DndContext>
+              <PositivePromptField
+                heightPx={96}
+                loras={[]}
+                projectId="project-1"
+                selectedModel={selectedModel}
+                showSyntaxHighlighting
+                value={value}
+                onChange={vi.fn()}
+                onResizeEnd={vi.fn()}
+                onUsePrompt={vi.fn()}
+              />
+            </DndContext>
+          </ChakraProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
+    );
+  });
+
 it('colours and weights attention syntax only while the selected model reads it', async () => {
   const sdxl: GenerateModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+  const anima: GenerateModelConfig = { base: 'anima', key: 'anima', name: 'Anima', type: 'main' };
   const krea: GenerateModelConfig = { base: 'krea-2', key: 'krea', name: 'Krea-2 Turbo', type: 'main' };
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  const render = (selectedModel: GenerateModelConfig) =>
-    act(() => {
-      root?.render(
-        <I18nextProvider i18n={i18n}>
-          <QueryClientProvider client={new QueryClient()}>
-            <ChakraProvider value={system}>
-              <DndContext>
-                <PositivePromptField
-                  heightPx={96}
-                  loras={[]}
-                  projectId="project-1"
-                  selectedModel={selectedModel}
-                  showSyntaxHighlighting
-                  value="a cat+"
-                  onChange={vi.fn()}
-                  onResizeEnd={vi.fn()}
-                  onUsePrompt={vi.fn()}
-                />
-              </DndContext>
-            </ChakraProvider>
-          </QueryClientProvider>
-        </I18nextProvider>
-      );
-    });
+  const render = renderPromptModel;
   const textarea = () => host!.querySelector('textarea')!;
   const colouredSegments = () => [...host!.querySelectorAll('pre span')].map((span) => span.textContent);
   /** Select "cat" and run the weighting command the Ctrl+Up hotkey runs. */
@@ -147,4 +151,84 @@ it('colours and weights attention syntax only while the selected model reads it'
   expect(colouredSegments()).toEqual(['a cat', '+']);
   expect(await weightCat()).toBe(true);
   await expect.poll(() => textarea().value).toBe('a cat++');
+
+  await render(anima);
+  expect(textarea().getAttribute('data-prompt-syntax-profile')).toBe('anima');
+  expect(colouredSegments()).toEqual(['a cat', '++']);
+  expect(await weightCat()).toBe(true);
+  await expect.poll(() => textarea().value).toBe('a cat+++');
+});
+
+it.each([
+  ['((red, blue).and() cat)2', 'red', 2.1, 'blue', 2],
+  ['(cat)2next', 'next', 1.1, 'cat', 2],
+  ['foo\\(bar\\)+ cat', 'cat', 1.1, 'foo(bar)', 1.1],
+  ['.and(dog+', 'dog', 1.21, '.and(', 1],
+] as const)(
+  'keeps Anima attention semantics through the browser hotkey: %s',
+  async (prompt, target, expected, other, otherWeight) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, prompt);
+    const input = host.querySelector('textarea')!;
+    const caret = prompt.indexOf(target) + (target === 'next' ? 0 : 1);
+    input.focus();
+    input.setSelectionRange(caret, caret);
+    await act(() => {
+      expect(adjustFocusedPromptAttention('increment', false)).toBe(true);
+    });
+    await expect.poll(() => input.value).not.toBe(prompt);
+    const parsed = parseAnimaPrompt(input.value);
+    expect(parsed.text).toBe(parseAnimaPrompt(prompt).text);
+    for (const [word, weight] of [
+      [target, expected],
+      [other, otherWeight],
+    ] as const) {
+      const index = parsed.text.indexOf(word);
+      expect(parsed.ranges.find(({ start, end }) => start <= index && end > index)?.weight).toBeCloseTo(weight, 10);
+    }
+    expect(host.querySelector('pre')?.textContent).toContain(input.value);
+  }
+);
+
+it.each(['(cat (dog)2)0.1', '(cat (dog)65504)0.5'])(
+  'keeps the input and caret unchanged when an Anima group hotkey cannot adjust every descendant: %s',
+  async (prompt) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, prompt);
+    const input = host.querySelector('textarea')!;
+    const onInput = vi.fn();
+    input.addEventListener('input', onInput);
+    input.focus();
+    input.setSelectionRange(0, 0);
+
+    await act(() => {
+      expect(adjustFocusedPromptAttention('decrement', false)).toBe(false);
+    });
+
+    expect(input.value).toBe(prompt);
+    expect(input.selectionStart).toBe(0);
+    expect(input.selectionEnd).toBe(0);
+    expect(document.activeElement).toBe(input);
+    expect(onInput).not.toHaveBeenCalled();
+  }
+);
+
+it('allows the Anima group hotkey when all descendants can reach zero', async () => {
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await renderPromptModel({ base: 'anima', key: 'anima', name: 'Anima', type: 'main' }, '(cat (dog)1)0.1');
+  const input = host.querySelector('textarea')!;
+  input.focus();
+  input.setSelectionRange(0, 0);
+
+  await act(() => {
+    expect(adjustFocusedPromptAttention('decrement', false)).toBe(true);
+  });
+
+  await expect.poll(() => input.value).toBe('(cat (dog)1)0');
 });

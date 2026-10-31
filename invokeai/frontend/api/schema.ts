@@ -5858,7 +5858,7 @@ export type components = {
             use_cache?: boolean;
             /**
              * Prompt
-             * @description Text prompt to encode.
+             * @description Text prompt to encode. Anima attention uses Compel-style forms such as (long hair)2 and hair+. Parentheses group text; escape them with backslashes to keep them literal. The ComfyUI form (long hair:2) applies no weight; the encoder receives long hair:2.
              * @default null
              */
             prompt?: string | null;

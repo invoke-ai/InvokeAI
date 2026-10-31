@@ -20,11 +20,7 @@ import {
   VisuallyHidden,
 } from '@chakra-ui/react';
 import { PromptTextarea } from '@features/generation/components';
-import {
-  getLayoutRegionIssue,
-  getRegionalGuidanceSupport,
-  supportsPromptAttentionSyntax,
-} from '@features/generation/graph';
+import { getLayoutRegionIssue, getPromptSyntaxProfile, getRegionalGuidanceSupport } from '@features/generation/graph';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -94,7 +90,8 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const positivePrompt = positiveDraft ?? layer.positivePrompt ?? '';
   const negativePrompt = negativeDraft ?? layer.negativePrompt ?? '';
 
-  const attentionSyntax = supportsPromptAttentionSyntax(base) ? 'edit' : 'none';
+  const syntaxProfile = getPromptSyntaxProfile(base);
+  const attentionSyntax = syntaxProfile === 'none' ? 'none' : 'edit';
   const fill = layer.mask.fill;
   // Resolve support inside the capability selector to update memoized answers. Distinguish unavailable policy from
   // unsupported models.
@@ -324,6 +321,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           aria-describedby={layoutIssue === 'missing_prompt' ? promptIssueId : undefined}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
           attentionSyntax={attentionSyntax}
+          syntaxProfile={syntaxProfile}
           defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
@@ -365,6 +363,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           <PromptTextarea
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
             attentionSyntax={attentionSyntax}
+            syntaxProfile={syntaxProfile}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}

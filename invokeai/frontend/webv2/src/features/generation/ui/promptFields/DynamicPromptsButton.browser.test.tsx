@@ -62,6 +62,7 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
             batchCount={2}
             config={config}
             highlightExpandedPrompts
+            syntaxProfile="compel"
             positivePrompt={prompt}
             showSyntaxHighlighting
             onInsertText={vi.fn()}

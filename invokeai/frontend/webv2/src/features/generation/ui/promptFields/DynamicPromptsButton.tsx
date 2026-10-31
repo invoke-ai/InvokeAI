@@ -1,3 +1,4 @@
+import type { PromptSyntaxProfile } from '@features/generation/core/prompt/compel';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { Popover, Portal, Stack, Text } from '@chakra-ui/react';
@@ -26,6 +27,7 @@ interface DynamicPromptsButtonProps {
   showSyntaxHighlighting: boolean;
   /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
   highlightExpandedPrompts: boolean;
+  syntaxProfile: PromptSyntaxProfile;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -34,6 +36,7 @@ export const DynamicPromptsButton = ({
   batchCount,
   config,
   highlightExpandedPrompts,
+  syntaxProfile,
   onInsertText,
   onUsePrompt,
   positivePrompt,
@@ -136,6 +139,7 @@ export const DynamicPromptsButton = ({
                       config={config}
                       expansion={expansion}
                       showSyntaxHighlighting={highlightExpandedPrompts}
+                      syntaxProfile={syntaxProfile}
                       onUsePrompt={handleUsePrompt}
                     />
                   ) : (
