@@ -10,6 +10,7 @@ hold within 1.3x are listed in `bounds.UPPER_BOUND_EXCEPTIONS`; the out-of-fit o
 """
 
 import collections
+import dataclasses
 import itertools
 import platform as stdlib_platform
 import re
@@ -45,7 +46,7 @@ from invokeai.backend.working_memory.coefficients import (
     shipped_data,
 )
 from invokeai.backend.working_memory.counters import backend_for
-from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fingerprint import environment_for
 from invokeai.backend.working_memory.fit import (
     capping_spans,
@@ -67,17 +68,25 @@ from invokeai.backend.working_memory.platform import (
 )
 from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpec, import_estimator_modules
 
-OUT_OF_FIT = {((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6}
+OUT_OF_FIT = {
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16,
+    ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15,
+}
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term. A point that leaves the fit needs an edit here."""
+check the score-matrix term, and the Krea-2 denoise checks: under both allocators its 3 reference K/V-cache windows and
+12 forwards with 1024- and 2048-token captions, and a 4-block forward under the native one. A point that leaves the fit
+needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),
     ("denoise.flux2", (("allocator", "native"), ("conv_backend", "miopen"))),
+    ("denoise.krea2", (("allocator", "native"), ("conv_backend", "miopen"))),
+    ("denoise.krea2", (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows"))),
 }
 """The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
-fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, which nothing
-measures yet. Shipping an entry's points and fit removes it from here."""
+fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, and the Krea-2
+denoise on ROCm, which nothing measures yet. Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
@@ -526,6 +535,29 @@ def test_an_unmeasured_platform_raises_a_value_to_its_floor_and_a_measured_one_d
     on_mps = resolve_coefficients(data, spec, replace(CUDNN, conv_backend="mps"), origin="test")
     assert dict(on_mps.values) == {"k": 8.0, "j": 5.0}
     assert on_mps.source == "test:conv_backend=mps (priced as conv_backend=cudnn, floored)"
+
+
+def _line_terms(features, values):
+    return (WorkingMemoryTerm.fitted("line", "k", 1, values),)
+
+
+def test_legacy_or_floored_values_reserve_the_legacy_formula_and_fitted_ones_do_not() -> None:
+    """An estimator shaped unlike the formula it replaced declares that formula; it prices only where the values are
+    a `legacy` entry's or raised to their floors on a platform nothing measures, and the estimate reserves the larger."""
+    spec = dataclasses.replace(_spec("test.lender"), terms=_line_terms, legacy_formula=lambda features, values: 100.0)
+    fitted = _data(_entry(spec.id, values={"k": 7.0}, floor={"k": 8.0}))
+    legacy = _data(_entry(spec.id, values={"k": 9.0}).model_copy(update={"legacy": True}))
+    unfloored = _data(_entry(spec.id, values={"k": 7.0}))
+    mps = replace(CUDNN, conv_backend="mps")
+
+    def reserved(data, platform) -> int:
+        resolved = resolve_coefficients(data, spec, platform, origin="test")
+        return spec.evaluate({}, resolved).reservation_bytes
+
+    assert (reserved(fitted, CUDNN), reserved(fitted, mps)) == (7, 100)
+    assert (reserved(legacy, CUDNN), reserved(legacy, mps)) == (100, 100)
+    assert reserved(unfloored, mps) == 7
+    assert _spec("test.lender").evaluate({}, resolve_coefficients(legacy, spec, CUDNN, "test")).terms == ()
 
 
 @pytest.mark.parametrize(

@@ -21,10 +21,12 @@ from invokeai.app.invocations.krea2.krea2_denoise import (
     Krea2DenoiseInvocation,
     requires_sidecar_patching,
 )
-from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, TransformerField
+from invokeai.backend.krea2 import denoise_working_memory as _ESTIMATOR_MODULE
 from invokeai.backend.krea2.sampling_utils import build_sigmas, pack_latents, unpack_latents
 from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
@@ -334,6 +336,10 @@ class _Transformer:
             "transformer_blocks.1.attn.processor": object(),
         }
         self.installed_processors = None
+        # The working-memory estimate reads the block layers' streamed copies and transients here, and the
+        # attention geometry from the config.
+        self.transformer_blocks = torch.nn.ModuleList()
+        self.config = KREA2_CONFIG
 
     def set_attn_processor(self, processor) -> None:
         # The real Krea2Transformer2DModel exposes this; denoise swaps in a memory-efficient attention processor.
@@ -366,6 +372,10 @@ class _Transformer:
         return (torch.zeros_like(hidden_states),)
 
 
+KREA2_CONFIG = SimpleNamespace(num_attention_heads=48, num_key_value_heads=12, attention_head_dim=128)
+"""The attention geometry of the Krea-2 transformer's config."""
+
+
 class _TransformerInfo:
     def __init__(self, transformer: _Transformer) -> None:
         self.transformer = transformer
@@ -381,7 +391,7 @@ class _TransformerInfo:
 
     @contextmanager
     def model_on_device(self, **kwargs):
-        self.working_mem_bytes = kwargs.get("working_mem_bytes")
+        self.working_memory = kwargs["working_memory"]
         yield ({}, self.transformer)
 
 
@@ -694,6 +704,8 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
 
     class _PositionIdChecker:
         attn_processors = {"transformer_blocks.0.attn.processor": object()}
+        transformer_blocks = torch.nn.ModuleList()
+        config = KREA2_CONFIG
 
         def set_attn_processor(self, processor) -> None:
             pass
@@ -903,66 +915,72 @@ def test_run_diffusion_still_honors_an_explicit_positive_shift(monkeypatch, tmp_
     assert captured == [pytest.approx(1.8)]
 
 
-def test_estimate_working_memory_stays_within_a_24gb_card_at_high_res() -> None:
-    # Regression: with SDPA attention the footprint is ~linear with a small per-token constant. The previous
-    # ~2.6 MiB/token figure demanded ~36 GB at 2560x1440 (14400 tokens), exceeding a 24 GB card, so the cache
-    # offloaded the transformer itself to RAM and the forward pass hung. The estimate plus a fully-resident
-    # ~12.2 GB fp8 transformer must comfortably fit a 24 GB card so the encoder (not the transformer) is what
-    # gets evicted.
-    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
-    GB = 1024**3
-    transformer_bytes = int(12.3 * GB)  # Krea-2-Turbo fp8
+def _working_memory(monkeypatch, tmp_path, invocation, transformer=None, context=None, models=None):
+    """The estimate the node hands the transformer's lock. `models` are what loading another model's key gives."""
+    transformer = transformer if transformer is not None else _Transformer()
+    info = _TransformerInfo(transformer)
+    context = context if context is not None else _runtime_context(tmp_path, transformer)
+    context.models.load = lambda identifier: (models or {}).get(identifier.key, info)
+    _patch_runtime(monkeypatch)
+    invocation._run_diffusion(context)
+    return info.working_memory
 
-    # 2560x1440 -> (2560/16) x (1440/16) = 160 x 90 = 14400 image tokens.
-    est_hi = inv._estimate_working_memory(
-        image_seq_len=14400, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+
+@pytest.mark.parametrize(("negative_text_seq_len", "text_tokens"), [(1, 2), (2, 2), (5, 5)])
+def test_the_lock_prices_the_longer_cfg_caption(monkeypatch, tmp_path, negative_text_seq_len, text_tokens) -> None:
+    """The conditional and unconditional passes run one after the other: the longer of the two captions counts, the
+    2-token positive one or the negative one. Without CFG the negative caption is never loaded."""
+    context = _runtime_context(tmp_path, _Transformer(), negative_text_seq_len=negative_text_seq_len)
+    with_cfg = _working_memory(monkeypatch, tmp_path, _runtime_invocation(cfg_scale=4.0), context=context)
+    context = _runtime_context(tmp_path, _Transformer(), negative_text_seq_len=negative_text_seq_len)
+    without_cfg = _working_memory(monkeypatch, tmp_path, _runtime_invocation(cfg_scale=1.0), context=context)
+
+    assert with_cfg.estimator == "denoise.krea2"
+    assert (with_cfg.features["text_tokens"], with_cfg.features["cfg"]) == (text_tokens, True)
+    assert (without_cfg.features["text_tokens"], without_cfg.features["cfg"]) == (2, False)
+
+
+def test_the_lock_prices_the_loras_at_their_file_size(monkeypatch, tmp_path) -> None:
+    """A patched LoRA adds about its own size: 0.03 GiB measured +0.02 GiB, 0.21 GiB +0.22 GiB on an RTX 4090."""
+    sizes = {"lora-a": 30 * 2**20, "lora-b": 210 * 2**20}
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.transformer = TransformerField(
+        transformer=_model_identifier(),
+        loras=[
+            LoRAField(
+                lora=ModelIdentifierField(key=key, hash=key, name=key, base=BaseModelType.Krea2, type=ModelType.LoRA),
+                weight=1.0,
+            )
+            for key in sizes
+        ],
     )
-    assert est_hi + transformer_bytes < 24 * GB
-
-    # 1280x720 -> 80 x 45 = 3600 image tokens.
-    est_lo = inv._estimate_working_memory(
-        image_seq_len=3600, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+    context = _runtime_context(tmp_path, _Transformer())
+    transformer_config = context.models.get_config(None)
+    context.models.get_config = lambda identifier: (
+        SimpleNamespace(file_size=sizes[identifier.key]) if identifier.key in sizes else transformer_config
     )
-    assert est_lo + transformer_bytes < 24 * GB
+    patches = {key: SimpleNamespace(model=ModelPatchRaw(layers={})) for key in sizes}
 
-    # Monotonic in tokens, and a non-trivial (multi-GB) reservation so eviction is actually triggered.
-    assert est_hi > est_lo
-    assert est_lo > 1 * GB
+    estimate = _working_memory(monkeypatch, tmp_path, invocation, context=context, models=patches)
 
-
-def test_estimate_working_memory_accounts_for_the_longest_text_conditioning() -> None:
-    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
-
-    short_text = inv._estimate_working_memory(
-        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
-    )
-    long_positive = inv._estimate_working_memory(
-        image_seq_len=3600, positive_text_seq_len=256, negative_text_seq_len=32, do_cfg=True, num_loras=0
-    )
-    long_negative = inv._estimate_working_memory(
-        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=256, do_cfg=True, num_loras=0
-    )
-
-    assert long_positive > short_text
-    assert long_negative == long_positive
+    assert (estimate.features["lora_count"], estimate.features["lora_bytes"]) == (2, sum(sizes.values()))
+    assert {term.name: term.bytes for term in estimate.terms}["lora_patches"] == sum(sizes.values())
 
 
-def test_estimate_working_memory_accounts_for_regional_attention_masks() -> None:
-    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
-
-    without_regional_masks = inv._estimate_working_memory(
-        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
-    )
-    with_regional_masks = inv._estimate_working_memory(
-        image_seq_len=3600,
-        positive_text_seq_len=64,
-        negative_text_seq_len=32,
-        do_cfg=True,
-        num_loras=0,
-        regional_attention_mask_bytes=1234,
+def test_a_loaded_lora_that_is_no_patch_is_refused_before_the_lock(monkeypatch, tmp_path) -> None:
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.transformer = TransformerField(
+        transformer=_model_identifier(),
+        loras=[
+            LoRAField(
+                lora=ModelIdentifierField(key="x", hash="x", name="x", base=BaseModelType.Krea2, type=ModelType.LoRA),
+                weight=1.0,
+            )
+        ],
     )
 
-    assert with_regional_masks == without_regional_masks + 1234
+    with pytest.raises(TypeError, match="Expected ModelPatchRaw for LoRA 'x'"):
+        _working_memory(monkeypatch, tmp_path, invocation, models={"x": SimpleNamespace(model=object())})
 
 
 def _style_reference_field(
@@ -1157,83 +1175,16 @@ def test_run_diffusion_still_runs_a_style_reference_at_a_small_strength(monkeypa
     assert Krea2StyleReferenceMode.CAPTURE in transformer.style_modes
 
 
-def test_estimate_working_memory_accounts_for_the_style_reference_kv_cache() -> None:
-    inv = Krea2DenoiseInvocation.model_construct()
-    kwargs = {
-        "image_seq_len": 3600,
-        "positive_text_seq_len": 64,
-        "negative_text_seq_len": None,
-        "do_cfg": False,
-        "num_loras": 0,
-    }
-    baseline = inv._estimate_working_memory(**kwargs)
-    with_style = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=1_000_000)
+def test_the_lock_prices_the_style_references_captured_kv(monkeypatch, tmp_path) -> None:
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.style_reference = _style_reference_field()
 
-    # The cache is an exact, known size, so it is added after the activation multiplier, not scaled by it.
-    assert with_style == int(baseline * 1.35) + 1_000_000
+    estimate = _working_memory(monkeypatch, tmp_path, invocation)
 
-
-def test_estimate_working_memory_covers_the_measured_style_reference_overhead() -> None:
-    # Measured at 1024x1024 / 8 steps / cfg 1.0: peak VRAM rose ~1.6 GiB over the unstyled run. The
-    # estimate has to stay above that, or the model cache offloads the transformer to RAM and the forward
-    # crawls over PCIe instead of failing outright.
-    inv = Krea2DenoiseInvocation.model_construct()
-    kwargs = {
-        "image_seq_len": 4096,
-        "positive_text_seq_len": 512,
-        "negative_text_seq_len": None,
-        "do_cfg": False,
-        "num_loras": 0,
-    }
-    style_bytes = 21 * 2 * 12 * 4096 * 128 * 2
-    delta = inv._estimate_working_memory(**kwargs, style_reference_kv_bytes=style_bytes) - inv._estimate_working_memory(
-        **kwargs
-    )
-
-    assert delta > int(1.6 * 1024**3)
-
-
-def test_estimate_working_memory_with_style_reference_stays_within_a_24gb_card_at_1024() -> None:
-    # 1024x1024 with the default 7-27 band: 4096 image tokens and ~0.5 GiB of retained reference K/V on
-    # top of a ~12B bf16 model. This is the resolution style reference is expected to be used at.
-    inv = Krea2DenoiseInvocation.model_construct()
-    style_bytes = 21 * 2 * 12 * 4096 * 128 * 2
-    assert style_bytes < int(0.55 * 1024**3)
-
-    estimated = inv._estimate_working_memory(
-        image_seq_len=4096,
-        positive_text_seq_len=512,
-        negative_text_seq_len=None,
-        do_cfg=False,
-        num_loras=0,
-        style_reference_kv_bytes=style_bytes,
-    )
-
-    model_bytes = 12 * 1024**3
-    assert estimated + model_bytes < 24 * 1024**3
-
-
-def test_estimate_working_memory_reports_that_style_reference_does_not_fit_24gb_at_1440p() -> None:
-    """Documents a real limit rather than papering over it.
-
-    At 2560x1440 the baseline activation estimate is already ~10 GiB; the reference pass and its ~1.7 GiB
-    of retained K/V push the total past what a 24 GB card can hold alongside a ~12B bf16 model. The
-    estimate must say so honestly -- under-reporting would make the model cache offload the transformer to
-    RAM and run the forward over PCIe, which looks like a hang rather than an error.
-    """
-    inv = Krea2DenoiseInvocation.model_construct()
-    style_bytes = 21 * 2 * 12 * 14400 * 128 * 2
-
-    estimated = inv._estimate_working_memory(
-        image_seq_len=14400,
-        positive_text_seq_len=512,
-        negative_text_seq_len=512,
-        do_cfg=True,
-        num_loras=0,
-        style_reference_kv_bytes=style_bytes,
-    )
-
-    assert estimated + 12 * 1024**3 > 24 * 1024**3
+    # Two styled blocks, one key and one value each, 12 K/V heads of 128 over the one target token, in fp32.
+    assert estimate.features["style_kv_bytes"] == 2 * 2 * 12 * 1 * 128 * 4
+    # The reference pass reuses the 2-token positive caption.
+    assert estimate.features["style_text_tokens"] == 2
 
 
 def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:
@@ -1279,31 +1230,26 @@ class TestTheInt8DequantTransientReachesTheReservation:
     which is the regression worth catching here rather than in the helper's own unit test.
     """
 
-    def _reservation_for(self, monkeypatch, tmp_path, transformer: _Transformer) -> int:
-        info = _TransformerInfo(transformer)
-        context = _runtime_context(tmp_path, transformer)
-        context.models.load = lambda _identifier: info
-        _patch_runtime(monkeypatch)
-        _runtime_invocation(cfg_scale=1.0)._run_diffusion(context)
-        return info.working_mem_bytes
-
-    def test_an_int8_model_reserves_the_transient_on_top_of_the_activations(self, monkeypatch, tmp_path) -> None:
-        dense = _Transformer()
+    def test_an_int8_model_reserves_the_transient_of_its_block_layer(self, monkeypatch, tmp_path) -> None:
         quantized = _Transformer()
         layer = Int8ConvrotLinear(
             weight=torch.zeros(1024, 512, dtype=torch.int8),
             weight_scale=torch.ones(1024, 1),
             convrot=False,
         )
-        quantized.modules = lambda: iter((quantized, layer))
+        quantized.transformer_blocks = torch.nn.ModuleList([layer])
+        quantized.modules = lambda: quantized.transformer_blocks.modules()
 
-        dense_bytes = self._reservation_for(monkeypatch, tmp_path, dense)
-        quantized_bytes = self._reservation_for(monkeypatch, tmp_path, quantized)
+        estimate = _working_memory(monkeypatch, tmp_path, _runtime_invocation(cfg_scale=1.0), transformer=quantized)
 
         # `_patch_runtime` pins the compute dtype to float32, which is what the node passes on.
-        transient = peak_dequant_transient_bytes(quantized, torch.float32)
+        transient = peak_dequant_transient_bytes(layer, torch.float32)
+        terms = {term.name: term.bytes for term in estimate.terms}
         assert transient > 0
-        assert quantized_bytes == dense_bytes + transient
+        assert terms["dequant_transient"] == transient
+        # The node cannot know the cache will load the transformer whole: the layer's int8 weight and float32 scale
+        # are reserved for streaming.
+        assert terms["streamed_layer"] == 1024 * 512 + 1024 * 4
 
 
 class TestTheAttentionScoreMatrixReachesTheReservation:
@@ -1314,10 +1260,7 @@ class TestTheAttentionScoreMatrixReachesTheReservation:
     def _reservation_for(
         self, monkeypatch, tmp_path, score_bytes: int, invocation=None, **context_kwargs
     ) -> tuple[int, list[dict], _Transformer]:
-        import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
-
         transformer = _Transformer()
-        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
         info = _TransformerInfo(transformer)
         context = _runtime_context(tmp_path, transformer, **context_kwargs)
         context.models.load = lambda _identifier: info
@@ -1328,9 +1271,9 @@ class TestTheAttentionScoreMatrixReachesTheReservation:
             asked.append(kwargs)
             return score_bytes
 
-        monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+        monkeypatch.setattr(_ESTIMATOR_MODULE, "sdpa_score_matrix_bytes", score_matrix_bytes)
         (invocation or _runtime_invocation(cfg_scale=1.0))._run_diffusion(context)
-        return info.working_mem_bytes, asked, transformer
+        return info.working_memory.reservation_bytes, asked, transformer
 
     def test_the_score_matrix_is_reserved_for_the_attended_sequence(self, monkeypatch, tmp_path) -> None:
         fused_bytes, _, _ = self._reservation_for(monkeypatch, tmp_path, score_bytes=0)
@@ -1574,16 +1517,12 @@ def test_run_diffusion_reserves_memory_for_the_reference_tokens(monkeypatch, tmp
 
     asked_seq_lens: list[int] = []
 
-    def reservation(reference_latents) -> int:
+    def working_memory(reference_latents):
         transformer = _Transformer()
-        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
-        info = _TransformerInfo(transformer)
         context = _reference_context(tmp_path, transformer, positive_references=len(reference_latents or []))
-        context.models.load = lambda _identifier: info
         invocation = _runtime_invocation(cfg_scale=1.0)
         invocation.reference_latents = reference_latents
-        invocation._run_diffusion(context)
-        return info.working_mem_bytes
+        return _working_memory(monkeypatch, tmp_path, invocation, transformer=transformer, context=context)
 
     def score_matrix_bytes(**kwargs) -> int:
         asked_seq_lens.append(kwargs["seq_len"])
@@ -1593,13 +1532,21 @@ def test_run_diffusion_reserves_memory_for_the_reference_tokens(monkeypatch, tmp
     monkeypatch.setattr(
         denoise_module, "forward_with_references", lambda _model, hidden_states, *_args: torch.zeros_like(hidden_states)
     )
-    monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+    monkeypatch.setattr(_ESTIMATOR_MODULE, "sdpa_score_matrix_bytes", score_matrix_bytes)
 
-    without_references = reservation(None)
-    with_references = reservation(_references("ref-a", "ref-b"))
+    without_references = working_memory(None)
+    with_references = working_memory(_references("ref-a", "ref-b"))
 
-    # Every reference token is an image token to every block; 0.5 MiB per token is the estimate's own rate.
-    assert with_references - without_references == _REFERENCE_TOKENS * int(0.5 * 1024**2)
+    # Every reference token is an image token to every block: on the line, beside 2 text tokens and 1 target token.
+    assert (without_references.features["reference_tokens"], without_references.features["tokens"]) == (0, 3)
+    assert (with_references.features["reference_tokens"], with_references.features["tokens"]) == (
+        _REFERENCE_TOKENS,
+        3 + _REFERENCE_TOKENS,
+    )
+    assert (with_references.features["cached_reference_tokens"], with_references.features["reference_kv_bytes"]) == (
+        0,
+        0,
+    )
     # The attention the score matrix is priced for spans text + target + references.
     assert asked_seq_lens == [2 + 1, 2 + 1 + _REFERENCE_TOKENS]
 
@@ -1890,17 +1837,14 @@ def test_references_refuse_a_subclass_with_its_own_processors(reference_kv_cache
 def test_the_reference_kv_cache_reserves_its_cache_instead_of_per_step_tokens(monkeypatch, tmp_path) -> None:
     import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
 
-    def reservation(reference_latents, kv_cache: bool) -> int:
+    def working_memory(reference_latents, kv_cache: bool):
         transformer = _Transformer()
-        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
-        info = _TransformerInfo(transformer)
+        transformer.transformer_blocks = torch.nn.ModuleList(torch.nn.Identity() for _ in range(28))
         context = _reference_context(tmp_path, transformer, positive_references=len(reference_latents or []))
-        context.models.load = lambda _identifier: info
         invocation = _runtime_invocation(cfg_scale=1.0)
         invocation.reference_latents = reference_latents
         invocation.reference_kv_cache = kv_cache
-        invocation._run_diffusion(context)
-        return info.working_mem_bytes
+        return _working_memory(monkeypatch, tmp_path, invocation, transformer=transformer, context=context)
 
     asked_seq_lens: list[int] = []
 
@@ -1911,15 +1855,19 @@ def test_the_reference_kv_cache_reserves_its_cache_instead_of_per_step_tokens(mo
     _patch_runtime(monkeypatch)
     # The stub transformer has no blocks to cache; the precompute itself is covered with a real model above.
     monkeypatch.setattr(denoise_module, "precompute_reference_kv", lambda *_args: None)
-    monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+    monkeypatch.setattr(_ESTIMATOR_MODULE, "sdpa_score_matrix_bytes", score_matrix_bytes)
 
-    without_references = reservation(None, kv_cache=True)
-    cached = reservation(_references("ref-a", "ref-b"), kv_cache=True)
+    without_references = working_memory(None, kv_cache=True)
+    cached = working_memory(_references("ref-a", "ref-b"), kv_cache=True)
 
-    # Krea-2 defaults where the stub config is silent: 28 blocks, 12 K/V heads; fp32 under the patched runtime.
+    # The references leave the step's sequence of 2 text tokens and 1 target token, which is no shorter than theirs.
+    assert (cached.features["reference_tokens"], cached.features["cached_reference_tokens"]) == (0, _REFERENCE_TOKENS)
+    assert cached.features["tokens"] == without_references.features["tokens"] == 3
+    # 28 blocks of 12 K/V heads retained, one block's references expanded to 48 heads; fp32 under the patched runtime.
     retained = 28 * 2 * 12 * 128 * _REFERENCE_TOKENS * 4
     widest_append = 2 * 48 * 128 * _REFERENCE_TOKENS * 4
-    assert cached - without_references == retained + widest_append
+    assert cached.features["reference_kv_bytes"] == retained + widest_append
+    assert without_references.features["reference_kv_bytes"] == 0
     # Scores: S = 2 text + 1 target queries over S + 3 reference keys is the larger area (18 > 3 * 3), priced as
     # the smallest square that holds it.
     step, references = 2 + 1, _REFERENCE_TOKENS

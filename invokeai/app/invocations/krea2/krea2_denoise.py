@@ -25,7 +25,7 @@ from invokeai.app.invocations.fields import (
     WithBoard,
     WithMetadata,
 )
-from invokeai.app.invocations.model import TransformerField
+from invokeai.app.invocations.model import LoRAField, TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.krea2.attention import (
@@ -33,11 +33,11 @@ from invokeai.backend.krea2.attention import (
     build_krea2_attention_processors,
     resolve_krea2_sdpa_backends,
 )
+from invokeai.backend.krea2.denoise_working_memory import estimate_krea2_denoise_working_memory
 from invokeai.backend.krea2.reference_edit import (
     Krea2ReferenceKVCache,
     forward_with_references,
     precompute_reference_kv,
-    reference_kv_cache_bytes,
 )
 from invokeai.backend.krea2.regional_prompting import (
     Krea2RegionalPromptingExtension,
@@ -53,23 +53,18 @@ from invokeai.backend.krea2.sampling_utils import (
     prepare_reference_position_ids,
     unpack_latents,
 )
-from invokeai.backend.krea2.style_reference import KREA2_NUM_BLOCKS
-from invokeai.backend.krea2.style_reference_extension import (
-    KREA2_HEAD_DIM,
-    KREA2_NUM_KV_HEADS,
-    Krea2StyleReferenceExtension,
-)
+from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
 from invokeai.backend.krea2.text_encoding import KREA2_MAX_REFERENCE_IMAGES
+from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.sage_attention import sage_attention_scope
@@ -665,63 +660,31 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_config = context.models.get_config(self.transformer.transformer)
         num_train_timesteps = scheduler.config.num_train_timesteps
 
-        # Estimate the peak working memory (activations) the transformer forward needs and ask the model
-        # cache to keep that much VRAM free. The cache offloads as much of the (resident) model to RAM as
-        # required to honor this — only consequential at higher resolutions, where the activation footprint
-        # over text+image tokens grows enough that a fully-resident ~12B model would otherwise leave no
-        # headroom. Without this hint the cache reserves only the small default working memory and places
-        # the model before LoRA patches are applied, so a model+LoRA combination that just fits the base
-        # forward OOMs once the LoRA's extra activations are added.
-        regional_attention_mask_bytes = self._regional_attention_mask_bytes(
-            pos_extension, neg_extension, inference_dtype
-        )
-        # Joint references are image tokens to every block and count in full toward the activations. Cached ones
-        # only run in the one reference-only pass, and their K/V stay resident for the whole loop.
-        estimated_working_memory = self._estimate_working_memory(
-            image_seq_len=image_seq_len + (0 if cache_references else reference_seq_len),
-            positive_text_seq_len=pos_prompt_embeds.shape[1],
-            negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
-            do_cfg=do_cfg,
-            num_loras=len(self.transformer.loras),
-            regional_attention_mask_bytes=regional_attention_mask_bytes,
-            style_reference_kv_bytes=(
-                style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0
-            ),
-            reference_precompute_seq_len=reference_seq_len if cache_references else 0,
-            reference_kv_bytes=(
-                self._reference_kv_cache_bytes(transformer_info.model, reference_seq_len, inference_dtype)
-                if cache_references
-                else 0
-            ),
-        )
-        # The activation estimate assumes a fused kernel. Where the build has none for this attention -- ROCm on
-        # Windows, MPS -- the score matrix is built as well (chunked on ROCm, see `install_rocm_sdpa_guard`).
-        step_seq_len = image_seq_len + max(
-            pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0
-        )
-        if cache_references:
-            # Each pass's S queries see S + R keys, and the one reference-only pass is R x R. The helper prices a
-            # square, so it gets the side of the larger area, rounded up.
-            score_area = max(step_seq_len * (step_seq_len + reference_seq_len), reference_seq_len**2)
-            score_seq_len = math.isqrt(score_area - 1) + 1
-        else:
-            score_seq_len = step_seq_len + reference_seq_len
-        estimated_working_memory += self._attention_score_bytes(
+        # The transformer's lock reserves what the whole denoise needs beside the weights: the forward, the cached
+        # reference or style K/V, regional masks and the LoRA patches applied under it.
+        working_memory = estimate_krea2_denoise_working_memory(
             transformer_info.model,
-            seq_len=score_seq_len,
-            has_attn_mask=regional_attention_mask_bytes > 0,
+            image_seq_len=image_seq_len,
+            text_seq_len=max(
+                pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0
+            ),
+            style_text_seq_len=style_ref_prompt_embeds.shape[1] if style_ref_prompt_embeds is not None else 0,
+            reference_seq_len=reference_seq_len,
+            cache_references=cache_references,
+            cfg=do_cfg,
+            loras=[
+                (self._load_lora(context, lora).model, context.models.get_config(lora.lora).file_size)
+                for lora in self.transformer.loras
+            ],
+            regional_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension, inference_dtype),
+            style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
             dtype=inference_dtype,
         )
-        # An int8_tensorwise or GGUF build stores its linears quantized and materializes the dequantized
-        # weight per forward call. That transient is alive alongside the activations above,
-        # so it is added rather than compared -- and it is invisible to an activation estimate, which
-        # is how a model that loaded comfortably OOMs in its first step. Zero for any other format.
-        estimated_working_memory += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
+                transformer_info.model_on_device(working_memory=working_memory)
             )
 
             # Whether LoRA has to go on as a sidecar. Asked of the loaded module tree rather than the
@@ -955,19 +918,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return cache
 
     @staticmethod
-    def _reference_kv_cache_bytes(transformer: object, reference_seq_len: int, dtype: torch.dtype) -> int:
-        """Size of the edit-reference K/V cache, from the loaded model's config (Krea-2 defaults where absent)."""
-        config = getattr(transformer, "config", None)
-        return reference_kv_cache_bytes(
-            num_layers=getattr(config, "num_layers", KREA2_NUM_BLOCKS),
-            num_heads=getattr(config, "num_attention_heads", 48),
-            num_kv_heads=getattr(config, "num_key_value_heads", KREA2_NUM_KV_HEADS),
-            head_dim=getattr(config, "attention_head_dim", KREA2_HEAD_DIM),
-            reference_seq_len=reference_seq_len,
-            element_size=torch.empty((), dtype=dtype).element_size(),
-        )
-
-    @staticmethod
     def _clear_attention_state(state: Krea2RegionalPromptingState) -> None:
         """Drop every tensor the shared attention state retains. Override alongside the state object."""
         state.set_attention_mask(None)
@@ -1003,91 +953,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         peak_attention_bias_bytes *= attention_dtype_bytes
         return final_mask_bytes + peak_build_scratch_bytes + peak_attention_bias_bytes
 
-    @staticmethod
-    def _attention_score_bytes(
-        transformer: object, seq_len: int, has_attn_mask: bool, device: torch.device, dtype: torch.dtype
-    ) -> int:
-        """The score matrix the main blocks' joint attention materializes, where it does (0 on a fused kernel).
-
-        One call is alive at a time: the blocks run in sequence, and so do the conditional and unconditional passes.
-        The K/V heads are expanded to the query heads before the call unless a fused kernel takes them grouped
-        (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the loaded
-        model's config. The probe answers for the process-wide policy the call runs under (`attention_backend: math`
-        included), so forcing the math kernel through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
-        """
-        config = getattr(transformer, "config", None)
-        num_heads = getattr(config, "num_attention_heads", None)
-        head_dim = getattr(config, "attention_head_dim", None)
-        if not isinstance(num_heads, int) or not isinstance(head_dim, int):
-            return 0
-        return sdpa_score_matrix_bytes(
-            device=device,
-            dtype=dtype,
-            num_heads=num_heads,
-            head_dim=head_dim,
-            seq_len=seq_len,
-            has_attn_mask=has_attn_mask,
-        )
-
-    def _estimate_working_memory(
-        self,
-        image_seq_len: int,
-        positive_text_seq_len: int,
-        negative_text_seq_len: int | None,
-        do_cfg: bool,
-        num_loras: int,
-        regional_attention_mask_bytes: int = 0,
-        style_reference_kv_bytes: int = 0,
-        reference_precompute_seq_len: int = 0,
-        reference_kv_bytes: int = 0,
-    ) -> int:
-        """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
-
-        Without regional prompting, Krea-2's attention runs through SDPA / flash without materializing
-        attention scores, so the baseline activation footprint scales ~linearly with the image token count
-        with a *small* per-token constant. Regional bool masks and SDPA's dtype-sized additive bias are added
-        separately through ``regional_attention_mask_bytes``. The previous ~2.6 MiB/token baseline assumed
-        materialized O(seq^2) scores and massively over-estimated: at 2560x1440 (14400 tokens) it demanded
-        ~36 GB, which exceeds a 24 GB card, so the cache offloaded the *transformer itself* to RAM and the
-        forward pass ran from system memory over PCIe — no OOM, but effectively hung (no step in minutes).
-
-        The per-token constant below is a safe upper bound on the measured SDPA activation footprint of the
-        Krea-2-Turbo MMDiT in bf16 (residual stream + one block's attention/SwiGLU intermediates), leaving
-        several GB of margin. Conditional and unconditional passes run sequentially, so peak memory depends
-        on the longer text sequence rather than their sum. A fixed base covers resolution-independent overhead
-        (transient fp8->bf16 layerwise weight casts and allocator/reserved-memory slack). LoRA sidecar
-        patches add a small extra activation branch per patched layer, so we add a per-LoRA margin.
-        """
-        GB = 1024**3
-        MB = 1024**2
-        per_token_bytes = int(0.5 * MB)
-        text_seq_len = max(positive_text_seq_len, negative_text_seq_len or 0)
-        # The edit-reference K/V precompute runs the references alone, before the loop; its peak is the larger
-        # one when the references outnumber the per-step tokens.
-        estimated = max(image_seq_len + text_seq_len, reference_precompute_seq_len) * per_token_bytes
-        estimated += int(1.5 * GB)
-        if do_cfg:
-            # Conditional/unconditional passes are sequential, but the larger combined sequence and extra
-            # transient buffers warrant a modest bump.
-            estimated = int(estimated * 1.1)
-        estimated += regional_attention_mask_bytes
-        if style_reference_kv_bytes > 0:
-            # The captured reference K/V stay resident for the whole target pass: two tensors per styled
-            # block, at the pre-expansion KV head count (12, not 48 — see style_reference.py). ~0.5 GiB at
-            # 1024x1024, ~1.7 GiB at 2560x1440. On top of that the styled attention runs with a key
-            # sequence of S + image_seq_len, and the reference forward briefly holds its own activations.
-            # Measured at 1024x1024 (8 steps, cfg 1.0): peak VRAM rises ~1.6 GiB over the unstyled run, of
-            # which ~0.5 GiB is the cache itself — so the activation term needs ~35%, not the 20% the
-            # arithmetic alone suggested. The captured K/V are an exact, known size, so they are added
-            # after the multiplier rather than scaled by it.
-            estimated = int(estimated * 1.35)
-            estimated += style_reference_kv_bytes
-        # The cached reference K/V are an exact size and stay resident through the loop, like the style cache.
-        estimated += reference_kv_bytes
-        if num_loras > 0:
-            estimated += int(0.5 * num_loras * GB)
-        return estimated
-
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:
             context.util.sd_step_callback(state, BaseModelType.Krea2)
@@ -1096,9 +961,12 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         for lora in self.transformer.loras:
-            lora_info = context.models.load(lora.lora)
-            if not isinstance(lora_info.model, ModelPatchRaw):
-                raise TypeError(
-                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
-                )
+            lora_info = self._load_lora(context, lora)
             yield (lora_info.model, lora.weight, lora_info.model_in_ram())
+
+    @staticmethod
+    def _load_lora(context: InvocationContext, lora: LoRAField) -> LoadedModel:
+        lora_info = context.models.load(lora.lora)
+        if not isinstance(lora_info.model, ModelPatchRaw):
+            raise TypeError(f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}.")
+        return lora_info
