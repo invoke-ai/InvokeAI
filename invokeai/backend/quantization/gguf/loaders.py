@@ -163,11 +163,11 @@ def parse_q8_cr_markers(fields: Mapping[str, Any], source: str) -> dict[str, dic
     GGML quantization -- ``gguf`` has no dequantizer for it -- so these layers cannot ride the
     GGMLTensor path at all.
 
-    ``fields`` maps metadata keys to their string values; other keys are ignored. Returns the int8
-    markers keyed by weight name, in the form :mod:`int8_convrot` reads. Raises ``ValueError`` for
-    anything else the converter writes (``int4_cr``, the retired ``int4_pytorch``): those tensors are
-    ``I8`` too, and nothing here decodes them. Model identification turns that into the installer's
-    refusal, so a file is refused for the same reason at install and at load.
+    ``fields`` maps metadata keys to their values: the file's whole metadata at install, its prefixed fields
+    at load. Keys without the prefix are ignored. Returns the int8 markers keyed by weight name, in the form
+    :mod:`int8_convrot` reads. Raises ``ValueError`` for anything else the converter writes (``int4_cr``, the
+    retired ``int4_pytorch``): those tensors are ``I8`` too, and nothing here decodes them. Model identification
+    turns that into the installer's refusal, so a file is refused for the same reason at install and at load.
     """
     layers: dict[str, dict[str, Any]] = {}
     for key, value in fields.items():
