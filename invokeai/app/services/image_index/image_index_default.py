@@ -63,6 +63,10 @@ def _is_cpu_override(override: Optional[str]) -> bool:
 # How long the worker sleeps between generation-idle checks and empty-queue polls.
 _POLL_SECONDS = 1.0
 
+# Retained decoded search matrices only, not metadata, in-flight builds or caller-held arrays.
+# Roughly the previous two-entry envelope at 100k x 768 float32 values per entry.
+_SEARCH_CACHE_MAX_BYTES = 600 * 1024**2
+
 # An image is retried this many times before being marked permanently failed. This bounds
 # per-image badness only — a corrupt file, an unreadable image, an embedding that cannot be
 # normalized. Failures of the machinery (the encoder, the database) never consume this budget;
@@ -352,6 +356,7 @@ class ImageIndexService(ImageIndexServiceBase):
         # scope_hash -> (items, matrix): the accessible embedding matrix for
         # similarity search, so repeated queries skip re-reading BLOBs.
         self._search_cache: dict[str, tuple[list[IndexedItem], np.ndarray]] = {}
+        self._search_cache_bytes = 0
         self._search_cache_lock = threading.Lock()
         # (vocabulary, embeddings) for cluster labeling; RAM + disk cached.
         self._vocab_cache: Optional[tuple[list[str], np.ndarray]] = None
@@ -706,9 +711,8 @@ class ImageIndexService(ImageIndexServiceBase):
             if not items:
                 return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)
 
-            # Memory math: one entry is N x dim float32 (~300 MB at 100k x 768),
-            # so the LRU holds two entries and evicts oldest-first rather than
-            # clearing wholesale. Keys self-invalidate: any change to the
+            # Small scopes can share the byte budget without evicting each other just
+            # because there are more than two. Keys self-invalidate: any change to the
             # accessible set changes the scope hash.
             cache_key = scope_hash(self._model_id, items)
             with self._search_cache_lock:
@@ -722,10 +726,20 @@ class ImageIndexService(ImageIndexServiceBase):
                 # transiently builds a duplicate, which beats serializing every
                 # search behind a multi-second BLOB read.
                 cached = records.get_embeddings(items, self._model_id)
-                with self._search_cache_lock:
-                    while len(self._search_cache) >= 2:
-                        self._search_cache.pop(next(iter(self._search_cache)))
-                    self._search_cache[cache_key] = cached
+                matrix_bytes = cached[1].nbytes
+                # An oversized result is still usable by this request. Empty results must
+                # not accumulate scope keys that cost nothing against the byte budget.
+                if 0 < matrix_bytes <= _SEARCH_CACHE_MAX_BYTES:
+                    with self._search_cache_lock:
+                        # Another miss for this scope may have filled it while we read BLOBs.
+                        previous = self._search_cache.pop(cache_key, None)
+                        if previous is not None:
+                            self._search_cache_bytes -= previous[1].nbytes
+                        while self._search_cache_bytes + matrix_bytes > _SEARCH_CACHE_MAX_BYTES:
+                            _, matrix = self._search_cache.pop(next(iter(self._search_cache)))
+                            self._search_cache_bytes -= matrix.nbytes
+                        self._search_cache[cache_key] = cached
+                        self._search_cache_bytes += matrix_bytes
 
             return cached
 
@@ -1010,6 +1024,7 @@ class ImageIndexService(ImageIndexServiceBase):
         self._vocab_invalidate_requested.clear()
         with self._search_cache_lock:
             self._search_cache.clear()
+            self._search_cache_bytes = 0
         with self._projection_lock:
             self._projection_requests.clear()
             self._failed_projection_scopes.clear()
