@@ -70,8 +70,8 @@ from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpe
 
 OUT_OF_FIT = {
     ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
-    ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16,
-    ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15,
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16 + 40,
+    ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15 + 40,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA RTX 6000 Ada Generation", "demand_peak"): 12,
     (
         (("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")),
@@ -92,8 +92,10 @@ OUT_OF_FIT = {
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
 check the score-matrix term, and the Krea-2 denoise checks: on each of the four platforms its 3 reference K/V-cache
 windows and 12 forwards with 1024- and 2048-token captions, and a 4-block forward under CUDA's native allocator and
-ROCm's expandable segments; and an RTX 6000 Ada's 12 caption forwards on Linux under each CUDA allocator, which check
-the caption excess only. A point that leaves the fit needs an edit here."""
+ROCm's expandable segments; an RTX 6000 Ada's 12 caption forwards on Linux under each CUDA allocator, which check
+the caption excess only; and the RTX 4090's 40 SageAttention forwards under each CUDA allocator (the fit, large,
+K/V-cache and caption grids in bf16 and fp16), which check that the SDPA lines cover a SageAttention denoise. A point
+that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),

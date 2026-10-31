@@ -57,16 +57,18 @@ def point_line(
     provenance: str,
     windows: Sequence["FreshWindow"],
     raw: Mapping[str, Any],
+    reasons: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """The output line of a measured point: a `point`, or `invalid` with the reasons of its windows.
+    """The output line of a measured point: a `point`, or `invalid` with the reasons of its windows and `reasons`.
 
     `common` holds the `MeasuredPoint` fields the measurement does not decide: estimator, version, platform, features
-    and device. `windows` are the point's fresh windows, cold first; `raw` the point's other facts.
+    and device. `windows` are the point's fresh windows, cold first; `raw` the point's other facts; `reasons` why the
+    script's own checks void the point where its windows' readings do not.
     """
     from invokeai.backend.working_memory.measurement import measured_bytes_and_method, point_reasons
     from invokeai.backend.working_memory.spec import import_estimator_modules
 
-    reasons = point_reasons(windows)
+    reasons = [*point_reasons(windows), *reasons]
     line = {"status": "invalid" if reasons else "point", "fit": point.fit, "point": dataclasses.asdict(point), **common}
     raw = {**raw, **dict(zip(("cold", "warm"), map(dataclasses.asdict, windows), strict=False))}
     if reasons:

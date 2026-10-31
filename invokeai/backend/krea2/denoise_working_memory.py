@@ -12,8 +12,11 @@ names the CUDA (`cudnn`) or ROCm (`miopen`) stack it runs on.
 
 That line is `denoise_<dtype>` over the attended tokens (`_line`), and only the plain forward fits it, joint references
 included: every analytic term below comes to zero, and no attention mask is passed. `_line` reads that off the terms
-themselves, so a term added here takes the forwards it prices out of the fit. The spec does not opt in to user
-calibration (`EstimatorSpec.user_calibrated`): the lines are the shipped fit's alone.
+themselves, so a term added here takes the forwards it prices out of the fit. The lines are PyTorch SDPA's: a forward
+measured with SageAttention (`attention_backend: sage`) carries `ATTENTION_BACKEND_FEATURE`, which the estimate never
+emits, as it prices SageAttention as SDPA. `_line` refuses it, so such a point checks the estimate from below and never
+joins, or merges with, an SDPA point. The spec does not opt in to user calibration (`EstimatorSpec.user_calibrated`):
+the lines are the shipped fit's alone.
 
 The lines are fitted per platform and dtype on fresh-process points of `scripts/calibrate_krea2_working_memory.py`
 (their provenance is in the data): an RTX 4090 with the native allocator and with `cudaMallocAsync`, bf16, fp16 and
@@ -31,6 +34,17 @@ slope in bf16 and fp16 over a larger base (0.30 MiB per token plus 494 and 522 M
 plus 407 and 435 MiB, and with them 4 blocks measured the same as 2 too (the native allocator ran no 4-block forward).
 The card did not drive the desktop: per-process demand is the same, but WDDM paging on a card that also carries the
 desktop is not measured.
+
+SageAttention is priced on the SDPA lines: it needs about what SDPA needs. The RTX 4090 ran the fit grid, the large
+grid, the K/V-cache and the caption checks with it (`--attention sage`, SageAttention 2.2.0 serving every block's
+attention), in bf16 and fp16 under both CUDA allocators on Windows, 40 forwards each. 34 of them have an SDPA point of
+the same forward: under the native allocator they demanded 1.000 to 1.003 times it; under `cudaMallocAsync` 0.98 to
+1.18 times, the top at 1024 px with a 512-token caption, where the cold forward, which includes SageAttention's check of
+its first result, read 1.20 times the warm one. The other 6, the large and K/V-cache forwards in fp16 (SDPA ran those
+in bf16 only), read what their bf16 twins did under the native allocator and up to 2.1% less under `cudaMallocAsync`.
+The estimate covers all 80, 1.05 to 1.54 times under the native allocator and 1.05 to 1.52 times under
+`cudaMallocAsync`. They ship as out-of-fit checks: they bound the estimate from below and fit no line. SageAttention is
+not measured on Linux, on another GPU or with 4 blocks; masked attention (regional prompting) stays on SDPA under it.
 
 A caption token reserves more than an image token, while allocated memory grows alike for both: 0.73 to 0.95 against
 0.30 MiB per token in bf16 and fp16 under the native allocator, 1.2 to 2.2 against 0.50 in fp32 (the 77- against the
@@ -126,9 +140,9 @@ Known and not priced: on a dense bf16 or fp16 build a LoRA on a resident layer i
 loop, which takes about 8 bytes per element of the largest patched layer (~1.7 GiB for `time_mod_proj`). It never
 coincides with the block activations, and the `device_working_mem_gb` floor of every reservation covers it.
 
-Not measured: Sage attention, flash attention (Linux), ROCm off Windows, the real model on ROCm, int8 and bf16 builds
-of the real model, regional prompting, CFG with captions of unequal length, and the patch types that are no
-`LoRALayer`.
+Not measured: SageAttention anywhere but on the RTX 4090 under Windows, flash attention (Linux), ROCm off Windows, the
+real model on ROCm, int8 and bf16 builds of the real model, regional prompting, CFG with captions of unequal length,
+and the patch types that are no `LoRALayer`.
 """
 
 import math
@@ -170,17 +184,22 @@ _RESIDUAL_BYTES_PER_ELEMENT: Final = torch.float32.itemsize
 _DTYPE_NAMES: Final[Mapping[torch.dtype, str]] = {torch.bfloat16: "bf16", torch.float16: "fp16", torch.float32: "fp32"}
 """The dtypes `TorchDevice.choose_bfloat16_safe_dtype` runs the transformer in."""
 _COEFFICIENTS: Final = frozenset(f"{part}_denoise_{dtype}" for part in ("k", "b") for dtype in _DTYPE_NAMES.values())
+ATTENTION_BACKEND_FEATURE: Final = "attention_backend"
+"""The feature a measured point names the attention backend with where it is not PyTorch SDPA: `sage`. Absent from the
+estimate's own features and from every SDPA point (see the module docstring)."""
 
 
 def _line(features: Mapping[str, FeatureValue]) -> Optional[Line]:
     """The forward's line, `denoise_<dtype>` over the attended tokens. Only the plain forward fits it, joint references
-    included: no attention mask, and every analytic term of `_terms` zero (see the module docstring). The label names
-    what puts a forward off the line: the mask, and each analytic term that is not zero, in bytes. A dtype without a
-    line names none."""
+    included: no attention mask, every analytic term of `_terms` zero and PyTorch SDPA's attention (see the module
+    docstring). The label names what puts a forward off the line: the mask, each analytic term that is not zero, in
+    bytes, and another attention backend. A dtype without a line names none."""
     dtype, tokens = features.get("dtype"), features.get("tokens")
     if not isinstance(dtype, str) or f"k_denoise_{dtype}" not in _COEFFICIENTS or not isinstance(tokens, int):
         return None
     off_line = off_line_reasons(_terms, features, _COEFFICIENTS)
+    if ATTENTION_BACKEND_FEATURE in features:
+        off_line.append(f"{ATTENTION_BACKEND_FEATURE}={features[ATTENTION_BACKEND_FEATURE]}")
     references, cached = features.get("reference_tokens"), features.get("cached_reference_tokens")
     shape = "+".join(
         (

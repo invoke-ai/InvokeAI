@@ -56,6 +56,35 @@ forward, the K/V-cache windows and the long captions, are marked `"fit": false`,
 where the line admits its features: on a build whose SDPA kernel materializes the score matrix, the fit grid's forwards
 carry a score term on top of the line, so they measure that term rather than the line, as a check does.
 
+SageAttention
+-------------
+`--attention sage` measures every point with SageAttention serving the transformer blocks' attention, as a server with
+`attention_backend: sage` runs the denoise: the measuring process installs it after the server's runtime, as that
+setting does at the server's start (`apply_monkeypatches`), and each measured transformer step runs inside
+`sage_attention_scope`, which the node enters once its reference K/V precompute is done, so the precompute stays on
+PyTorch SDPA here too. The cold forward then includes SageAttention's check of its first result against SDPA, as the
+first SageAttention generation after a server start does. It needs the `sageattention` package (2.2.0 or newer) and
+Triton, refused before anything runs where either is missing, an NVIDIA GPU of compute capability 8.0 or newer, and
+half precision: the dtypes default to bfloat16 and float16, and float32, which SageAttention never serves, is refused.
+So is a Krea-2 SDPA override (`INVOKE_KREA2_SDPA_BACKEND`), under which the node enters no SageAttention scope, and
+`--extra-blocks`: out of the fit, that forward would have the features of the fit grid's at 1024px, and the builder
+keeps only the larger of two points with the same features.
+
+A SageAttention point proves that SageAttention served it, from the scopes' usage counters (`SageAttentionUsage`):
+at least one measured step, every transformer block's attention in each step on SageAttention, and no call on PyTorch
+SDPA but those too short for SageAttention by design (the text fusion's, over the text layers and the caption), which
+fall back in the server alike. A point where it fell back for any other reason (its out-of-memory fallback, an
+ineligible shape, a failed kernel) is `invalid`, with the reasons, and stays out of the file. The counts are in
+`raw.sage_usage`.
+
+A SageAttention point carries the feature `attention_backend: sage` (`ATTENTION_BACKEND_FEATURE` in
+`invokeai/backend/krea2/denoise_working_memory.py`), which no estimate and no SDPA point carries. The estimator's line
+refuses it, so the point is never `in_fit` and the builder fits no SDPA line on it; and its features differ from those
+of the SDPA point of the same forward, so the builder never takes one for the other. It ships as an out-of-fit point
+the estimate has to cover, which is what such a run asks: whether the SDPA lines cover a SageAttention denoise. The
+RTX 4090's points under both CUDA allocators ship so (see `denoise_working_memory`'s docstring for what they found).
+The summary prints what the shipped estimate reserves against each point.
+
 What this does not measure: GGUF, fp8-stored and int8 builds, LoRAs and CFG pairs run the same forward, plus analytic
 terms the estimate adds (the dequantization and fp8 cast transients, the LoRA patches); CFG runs its passes one after
 the other. A family E2E calibration run on real models
@@ -112,15 +141,37 @@ all three under the native allocator. The card did not drive the desktop.
     python scripts/calibrate_krea2_working_memory.py --out 9060xt-native.jsonl --mode captions \
         --alloc-conf expandable_segments:False
 
+RTX 4090 with SageAttention: the native allocator, then `cudaMallocAsync`; each in the fit, large, kv and captions
+modes, all in bfloat16 and float16.
+
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-native.jsonl --attention sage
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-native.jsonl --attention sage --mode large \
+        --dtypes bfloat16,float16
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-native.jsonl --attention sage --mode kv \
+        --dtypes bfloat16,float16
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-native.jsonl --attention sage --mode captions
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-async.jsonl --attention sage \
+        --alloc-conf backend:cudaMallocAsync
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-async.jsonl --attention sage --mode large \
+        --dtypes bfloat16,float16 --alloc-conf backend:cudaMallocAsync
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-async.jsonl --attention sage --mode kv \
+        --dtypes bfloat16,float16 --alloc-conf backend:cudaMallocAsync
+    python scripts/calibrate_krea2_working_memory.py --out 4090-sage-async.jsonl --attention sage --mode captions \
+        --alloc-conf backend:cudaMallocAsync
+
 `--dry-run` prints the planned points without touching a device, each priced as a CPU prices it.
 """
 
 import argparse
 import dataclasses
 import datetime
+import os
 import sys
-from collections.abc import Callable, Mapping, Sequence
+from collections import Counter
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from contextlib import AbstractContextManager, contextmanager, nullcontext
 from dataclasses import dataclass
+from importlib.util import find_spec
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -132,7 +183,9 @@ if TYPE_CHECKING:
     import torch
 
     from invokeai.backend.krea2.reference_edit import Krea2ReferenceKVCache
+    from invokeai.backend.util.sage_attention import SageAttentionUsage
     from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
+    from invokeai.backend.working_memory.measurement import FreshWindow
 
 GIB = 2**30
 MIB = 2**20
@@ -149,11 +202,18 @@ LARGE_GRID = ((2048, 1), (2048, 3), (1536, 3))
 KV_GRID = ((1024, 1), (1024, 3), (2048, 1))
 """The K/V-cache checks: image side and the number of `--reference-px` references."""
 DTYPES = ("bfloat16", "float16", "float32")
+SAGE_DTYPES = ("bfloat16", "float16")
+"""The dtypes SageAttention serves; it leaves float32 attention to PyTorch SDPA."""
+SAGE_PACKAGES = ("sageattention", "triton")
+KREA2_SDPA_BACKEND_ENV_VAR = "INVOKE_KREA2_SDPA_BACKEND"
+"""`krea2.attention.KREA2_SDPA_BACKEND_ENV_VAR`, under which the node enters no SageAttention scope. Not imported from
+there: that imports torch, which the driving process must not before the run's runtime setup."""
 TIMESTEP = 0.5
 LOGGER_NAME = "calibrate_krea2_working_memory"
 
 Kind = Literal["fit", "blocks", "kv", "caption"]
 Mode = Literal["fit", "large", "kv", "captions"]
+Attention = Literal["sdpa", "sage"]
 
 
 @dataclass(frozen=True)
@@ -171,6 +231,8 @@ class Point:
     references: int = 0
     """How many square references of `reference_px` the denoise conditions on."""
     reference_px: int = REFERENCE_PX
+    attention: Attention = "sdpa"
+    """`sage` to run the transformer steps with SageAttention, as `attention_backend: sage` does."""
 
     @property
     def fit(self) -> bool:
@@ -195,9 +257,10 @@ def plan(
     extra_blocks: int,
     long_captions: Sequence[int] = (),
     long_caption_sizes: Sequence[int] = (),
+    attention: Attention = "sdpa",
 ) -> list[Point]:
     """The forwards a run measures, in order: per dtype, the fit grid, the large grid, the K/V-cache or the
-    long-caption checks."""
+    long-caption checks, each with `attention`."""
     points: list[Point] = []
     for dtype in dtypes:
         if mode == "captions":
@@ -216,7 +279,7 @@ def plan(
         points += [Point("fit", CHECK_PX, text_tokens, dtype, blocks, n, reference_px) for n in references if n]
     if mode == "fit" and extra_blocks:
         points.append(Point("blocks", CHECK_PX, text_tokens, dtypes[0], extra_blocks))
-    return points
+    return [dataclasses.replace(point, attention=attention) for point in points]
 
 
 def grid_side(px: int) -> int:
@@ -240,9 +303,15 @@ def provenance(point: Point, facts: Mapping[str, Any], date: str) -> str:
         if point.cache_references
         else ""
     )
+    sage = (
+        f" with SageAttention {facts['sageattention']} serving the steps (attention_backend: sage)"
+        if point.attention == "sage"
+        else ""
+    )
     return (
         f"scripts/calibrate_krea2_working_memory.py ({date}): {fresh_points.runtime_provenance(facts)}. Random-init "
-        f"Krea-2 transformer with the default geometry, {blocks}, the denoise node's attention processors{regime}; "
+        f"Krea-2 transformer with the default geometry, {blocks}, the denoise node's attention processors"
+        f"{sage}{regime}; "
         "memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a "
         "cold and a warm forward; no failed allocation, allocator retry or spill."
     )
@@ -279,6 +348,68 @@ def _estimate(point: Point, transformer: "torch.nn.Module", device: "torch.devic
     )
 
 
+def recorded_features(point: Point, estimate: "WorkingMemoryEstimate") -> dict[str, Any]:
+    """The features a point records: the estimate's, plus the attention backend where it is not PyTorch SDPA, which
+    keeps a SageAttention point off the SDPA line and apart from the SDPA point of the same forward."""
+    from invokeai.backend.krea2.denoise_working_memory import ATTENTION_BACKEND_FEATURE
+
+    sage = {ATTENTION_BACKEND_FEATURE: point.attention} if point.attention == "sage" else {}
+    return dict(estimate.features) | sage
+
+
+class SageRecorder:
+    """The SageAttention scopes of a point's measured transformer steps, one per step, and whether they prove that
+    SageAttention served the point. The node enters one scope around its whole loop; one per step tells the same, as a
+    fallback in any of them voids the point."""
+
+    def __init__(self) -> None:
+        self.usages: list[SageAttentionUsage] = []
+
+    @contextmanager
+    def scope(self) -> Iterator[None]:
+        from invokeai.backend.util.sage_attention import sage_attention_scope
+
+        with sage_attention_scope() as usage:
+            self.usages.append(usage)
+            yield
+
+    def reasons(self, blocks: int) -> list[str]:
+        """Why the steps measured no SageAttention denoise of `blocks` blocks: no step ran in a scope, calls fell back
+        to PyTorch SDPA, by reason, or a step had fewer calls served than its blocks make. Only `short` calls fall back
+        by design: the text fusion's, over the text layers and the caption. Within a step, a block's call is never
+        `short` while a caption long enough for SageAttention makes up the count, since the block attends over that
+        caption and the image."""
+        if not self.usages:
+            return ["sage scoped no transformer step"]
+        fell_back: Counter[str] = Counter()
+        for usage in self.usages:
+            fell_back.update(usage.fell_back)
+        reasons = [
+            f"sage fell back: {reason}={count}" for reason, count in fell_back.most_common() if reason != "short"
+        ]
+        unserved = sum(usage.served < blocks for usage in self.usages)
+        if unserved:
+            reasons.append(
+                f"sage served fewer than {blocks} block attentions in {unserved} of {len(self.usages)} steps"
+            )
+        return reasons
+
+
+def _install_sage() -> str:
+    """Install SageAttention as `attention_backend: sage` does after the rest of the server's runtime; its version.
+    Leaves where it does not install."""
+    from importlib.metadata import version
+
+    from invokeai.backend.util.sage_attention import install_sage_attention
+
+    if not install_sage_attention():
+        raise SystemExit(
+            "--attention sage: SageAttention did not install (it needs CUDA, a GPU of compute capability 8.0 or newer "
+            "and sageattention 2.2.0 or newer with Triton; its warning on stderr names what is missing)"
+        )
+    return version("sageattention")
+
+
 def _weight_bytes(transformer: "torch.nn.Module", dtype: "torch.dtype") -> int:
     return sum(param.numel() for param in transformer.parameters()) * dtype.itemsize
 
@@ -296,9 +427,14 @@ def install_processors(transformer: "torch.nn.Module", point: Point) -> "Krea2Re
 
 
 def forward(
-    point: Point, transformer: "torch.nn.Module", cache: "Krea2ReferenceKVCache | None", device: "torch.device"
+    point: Point,
+    transformer: "torch.nn.Module",
+    cache: "Krea2ReferenceKVCache | None",
+    device: "torch.device",
+    step_scope: Callable[[], AbstractContextManager[None]] = nullcontext,
 ) -> Callable[[], object]:
-    """The operation a point measures, with the inputs the node hands the transformer, allocated now."""
+    """The operation a point measures, with the inputs the node hands the transformer, allocated now. Each transformer
+    step runs inside `step_scope`, as the node runs its loop; the references' K/V precompute runs before it."""
     import torch
 
     from invokeai.backend.krea2.reference_edit import forward_with_references, precompute_reference_kv
@@ -320,21 +456,27 @@ def forward(
     references = torch.randn(1, reference_tokens(point), IN_CHANNELS, device=device, dtype=dtype)
 
     def step(position_ids: "torch.Tensor") -> object:
-        return transformer(
-            hidden_states=hidden_states,
-            encoder_hidden_states=caption,
-            encoder_attention_mask=None,
-            timestep=timestep,
-            position_ids=position_ids,
-            return_dict=False,
-        )
+        with step_scope():
+            return transformer(
+                hidden_states=hidden_states,
+                encoder_hidden_states=caption,
+                encoder_attention_mask=None,
+                timestep=timestep,
+                position_ids=position_ids,
+                return_dict=False,
+            )
 
     position_ids = prepare_position_ids(point.text_tokens, side, side, device)
     if not point.references:
         return lambda: step(position_ids)
     if cache is None:
         joint_ids = prepare_position_ids_with_references(point.text_tokens, side, side, grids, device)
-        return lambda: forward_with_references(transformer, hidden_states, caption, timestep, joint_ids, references)
+
+        def joint_step() -> object:
+            with step_scope():
+                return forward_with_references(transformer, hidden_states, caption, timestep, joint_ids, references)
+
+        return joint_step
 
     reference_ids = prepare_reference_position_ids(grids, device)
 
@@ -362,17 +504,21 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
     if device.type != "cuda":
         raise SystemExit(f"Needs a CUDA or ROCm device; this process would run on {device}.")
     dtype = getattr(torch, point.dtype)
+    recorder = SageRecorder() if point.attention == "sage" else None
+    sage_version = _install_sage() if recorder is not None else None
 
     with torch.inference_mode():
         transformer = _transformer(point.blocks)
         estimate = _estimate(point, transformer, device)
         platform = platform_for(device)
         facts = fresh_points.runtime_facts(device, platform.os, denoise_working_memory.__file__)
+        if sage_version is not None:
+            facts["sageattention"] = sage_version
         common = {
             "estimator": estimate.estimator,
             "version": estimate.version,
             "platform": dataclasses.asdict(platform),
-            "features": dict(estimate.features),
+            "features": recorded_features(point, estimate),
             "device": facts["device"],
         }
         weights = _weight_bytes(transformer, dtype)
@@ -393,21 +539,48 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
             torch.nn.init.normal_(param, std=0.02)
         transformer.eval()
         cache = install_processors(transformer, point)
-        windows = measure_cold_and_warm(device, forward(point, transformer, cache, device))
+        step_scope = recorder.scope if recorder is not None else nullcontext
+        windows = measure_cold_and_warm(device, forward(point, transformer, cache, device, step_scope))
     date = datetime.date.today().isoformat()
-    return fresh_points.point_line(
-        point, common=common, provenance=provenance(point, facts, date), windows=windows, raw=raw
+    return measured_line(
+        point, recorder, common=common, provenance=provenance(point, facts, date), windows=windows, raw=raw
     )
 
 
-_COLUMNS = f"{'kind':>7} {'dtype':>8} {'blocks':>6} {'px':>5} {'text':>5} {'refs':>4} {'ref px':>6} {'tokens':>7}"
+def measured_line(
+    point: Point,
+    recorder: SageRecorder | None,
+    *,
+    common: Mapping[str, Any],
+    provenance: str,
+    windows: Sequence["FreshWindow"],
+    raw: Mapping[str, Any],
+) -> dict[str, Any]:
+    """The output line of a measured point (`fresh_points.point_line`). With SageAttention it is `invalid` where the
+    steps `recorder` scoped prove no SageAttention denoise, and `raw.sage_usage` holds each step's counts."""
+    reasons: Sequence[str] = ()
+    if recorder is not None:
+        usage = [
+            {"served": step.served, "fell_back": dict(step.fell_back), "memory_short": step.memory_short}
+            for step in recorder.usages
+        ]
+        raw = {**raw, "sage_usage": usage}
+        reasons = recorder.reasons(point.blocks)
+    return fresh_points.point_line(
+        point, common=common, provenance=provenance, windows=windows, raw=raw, reasons=reasons
+    )
+
+
+_COLUMNS = (
+    f"{'kind':>7} {'attn':>4} {'dtype':>8} {'blocks':>6} {'px':>5} {'text':>5} {'refs':>4} {'ref px':>6} {'tokens':>7}"
+)
 
 
 def _grid(point: Mapping[str, Any]) -> str:
     refs = point["references"]
     return (
-        f"{point['kind']:>7} {point['dtype']:>8} {point['blocks']:>6} {point['px']:>5} {point['text_tokens']:>5} "
-        f"{refs:>4} {point['reference_px'] if refs else '':>6}"
+        f"{point['kind']:>7} {point['attention']:>4} {point['dtype']:>8} {point['blocks']:>6} {point['px']:>5} "
+        f"{point['text_tokens']:>5} {refs:>4} {point['reference_px'] if refs else '':>6}"
     )
 
 
@@ -418,7 +591,8 @@ def _head(line: Mapping[str, Any]) -> str:
 
 def _summarize(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None:
     """Per dtype, the slope of the plain forwards with the long caption from the smallest to the largest, and where
-    every other point lies against it; per K/V-cache window, what the estimate reserves for it."""
+    every other point lies against it; per point out of the fit (a check, a SageAttention forward), what the estimate
+    reserves for it."""
     measured = [line for line in lines if line["status"] == "point"]
     fit = [line for line in measured if line["in_fit"]]
     for dtype in dict.fromkeys(line["point"]["dtype"] for line in fit):
@@ -444,11 +618,12 @@ def _summarize(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None:
                 f"references: {line['measured_bytes'] / GIB:.3f} GiB at {tokens} tokens, "
                 f"{line['measured_bytes'] / (base + slope * tokens):.3f}x the line"
             )
-    for line in (line for line in measured if line["point"]["kind"] in ("kv", "blocks", "caption")):
+    for line in (line for line in measured if not line["in_fit"]):
+        point = line["point"]
         reserved = line["raw"]["reservation_bytes"]
         print(
-            f"{line['point']['kind']} {line['point']['dtype']}, {line['point']['px']}px, {line['point']['text_tokens']} "
-            f"text, {line['point']['references']} references, {line['point']['blocks']} blocks: "
+            f"{point['kind']} {point['attention']} {point['dtype']}, {point['px']}px, {point['text_tokens']} text, "
+            f"{point['references']} references, {point['blocks']} blocks: "
             f"{line['measured_bytes'] / GIB:.3f} GiB; the shipped "
             f"estimate reserves {reserved / GIB:.3f} GiB ({reserved / line['measured_bytes']:.3f}x)"
         )
@@ -514,7 +689,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--mode", choices=("fit", "large", "kv", "captions"), default="fit", help="Default: fit.")
     parser.add_argument("--out", type=Path, help="The JSON-lines file the lines are appended to. Required to measure.")
-    parser.add_argument("--dtypes", type=_dtypes, help="Default: all three in fit mode, bfloat16 otherwise.")
+    parser.add_argument(
+        "--dtypes",
+        type=_dtypes,
+        help="Default: every dtype in the fit and captions modes, bfloat16 otherwise. SageAttention: no float32.",
+    )
     parser.add_argument("--sizes", type=_sizes, default="512,768,1024,1536,2048", help="The fit grid's sizes, px.")
     parser.add_argument("--text-tokens", type=int, default=512, help="The caption at every size. Default 512.")
     parser.add_argument("--short-text-tokens", type=int, default=77, help="The text-slope caption. Default 77.")
@@ -540,6 +719,12 @@ def main() -> None:
         default="",
         help="The allocator configuration, as the server's pytorch_cuda_alloc_conf. Empty: the platform's default.",
     )
+    parser.add_argument(
+        "--attention",
+        choices=("sdpa", "sage"),
+        default="sdpa",
+        help="sage: SageAttention serves the transformer steps, as attention_backend: sage does. Default: sdpa.",
+    )
     parser.add_argument("--force", action="store_true", help="Run points predicted not to fit free device memory.")
     parser.add_argument("--dry-run", action="store_true", help="Print the planned points without touching a device.")
     parser.add_argument("--single", help=argparse.SUPPRESS)
@@ -547,9 +732,17 @@ def main() -> None:
 
     if args.single is not None:
         fresh_points.measure_in_this_process(args.single, point_type=Point, measure=_measure, logger_name=LOGGER_NAME)
+    every_dtype = SAGE_DTYPES if args.attention == "sage" else DTYPES
+    if args.dtypes and not set(args.dtypes) <= set(every_dtype):
+        parser.error(f"--attention sage measures half precision only: {', '.join(SAGE_DTYPES)}")
+    if args.attention == "sage" and args.extra_blocks:
+        parser.error(
+            "--attention sage takes no --extra-blocks: out of the fit, that forward has the features of the fit grid's "
+            "at 1024px, and the builder would keep only the larger of the two"
+        )
     points = plan(
         args.mode,
-        dtypes=args.dtypes or (list(DTYPES) if args.mode in ("fit", "captions") else ["bfloat16"]),
+        dtypes=args.dtypes or (list(every_dtype) if args.mode in ("fit", "captions") else ["bfloat16"]),
         sizes=args.sizes,
         text_tokens=args.text_tokens,
         short_text_tokens=args.short_text_tokens,
@@ -560,6 +753,7 @@ def main() -> None:
         extra_blocks=args.extra_blocks,
         long_captions=args.long_captions,
         long_caption_sizes=args.long_caption_sizes,
+        attention=args.attention,
     )
     if args.dry_run:
         _print_plan(points)
@@ -567,6 +761,12 @@ def main() -> None:
     if args.out is None:
         parser.error("--out is required to measure")
     fresh_points.check_alloc_conf(parser, args.alloc_conf)
+    if args.attention == "sage":
+        missing = [name for name in SAGE_PACKAGES if find_spec(name) is None]
+        if missing:
+            parser.error(f"--attention sage needs {' and '.join(missing)}, which this environment does not have")
+        if os.environ.get(KREA2_SDPA_BACKEND_ENV_VAR, "").strip():
+            parser.error(f"--attention sage: the denoise node runs no SageAttention under {KREA2_SDPA_BACKEND_ENV_VAR}")
     lines = fresh_points.measure_points(
         points,
         script=Path(__file__).resolve(),
