@@ -11,6 +11,7 @@ import copy
 import hashlib
 import ipaddress
 import json
+import logging
 import shutil
 import subprocess
 import urllib.parse
@@ -20,13 +21,19 @@ from pathlib import Path
 from typing import Any
 
 from scripts.family_e2e.manifest import TOOL_CHECKOUT, ResolvedCase
-from scripts.family_e2e.server import spawn_in_job, terminate
+from scripts.family_e2e.server import TerminationError, spawn_in_job, terminate
+
+logger = logging.getLogger("family_e2e")
 
 EXPORT_VERSION = 1
 WEBV2_DIR = TOOL_CHECKOUT / "invokeai" / "frontend" / "webv2"
 EXPORT_TIMEOUT_S = 600
 EXPORT_REQUEST_FILE = "export-request.json"
 """In the exporter's work directory; holds every model config of the server, paths included."""
+IDEOGRAM4_DENOISE = "ideogram4_denoise"
+# The step count of each Ideogram 4 sampler preset (PRESETS in invokeai/backend/ideogram4/sampler_configs.py). The tool
+# imports no invokeai code, which would pull in torch; a test keeps the two in step.
+IDEOGRAM4_PRESET_STEPS = {"V4_QUALITY_48": 48, "V4_DEFAULT_20": 20, "V4_TURBO_12": 12}
 # Hosts that name a machine only on its own network.
 LOCAL_HOST_SUFFIXES = (".local", ".localhost")
 
@@ -41,9 +48,11 @@ class PreparedGraph:
     """The `batch` body for enqueue_batch."""
     graph_hash: str
     model_keys: frozenset[str]
-    """Keys of every model identifier in the graph (main model, components, LoRAs, control models)."""
+    """Keys of every model the graph names (main model, components, LoRAs, control models; `graph_model_keys`)."""
     components: dict[str, str]
     """The exporter's resolved component choice, for provenance."""
+    step_counts: dict[str, int]
+    """The denoise step count of each node that states the one it runs (`denoise_step_counts`), by node id."""
 
 
 def build_export_request(
@@ -117,7 +126,11 @@ def run_pnpm_exporter(request: dict[str, Any], work_dir: Path) -> dict[str, Any]
         raise ExportError(f"pnpm graphs:export did not finish within {EXPORT_TIMEOUT_S}s") from None
     finally:
         # A finished communicate() has reaped pnpm already; children it left behind still hold its group's id.
-        terminate(process, job)
+        try:
+            terminate(process, job)
+        except TerminationError as e:
+            # A lingering exporter process touches no scratch root; what pnpm answered stands.
+            logger.warning("the graph exporter's processes did not all exit: %s", e)
     if process.returncode != 0 or not response_path.is_file():
         output = (stderr or stdout).decode("utf-8", errors="replace")
         raise ExportError(f"pnpm graphs:export exited with {process.returncode}:\n{output[-4000:]}")
@@ -128,9 +141,11 @@ def run_pnpm_exporter(request: dict[str, Any], work_dir: Path) -> dict[str, Any]
 
 
 def model_identifiers(value: Any) -> Iterator[dict[str, Any]]:
-    """Every model identifier in a graph: a ModelIdentifierField {"key", "hash", "name", "base", "type", ...}.
+    """Every model config anywhere in a value: a mapping with a string key, a base and a type, such as a graph's
+    ModelIdentifierField {"key", "hash", "name", "base", "type", ...} or an export request's model list.
 
-    The webv2 builders put the model's whole config there, path and source included.
+    The webv2 builders put the model's whole config in a graph's identifiers, path and source included. Broad on
+    purpose: the bundle scrubs every config this finds. `graph_model_keys` is the server's narrower reading.
     """
     if isinstance(value, dict):
         if isinstance(value.get("key"), str) and "base" in value and "type" in value:
@@ -140,6 +155,29 @@ def model_identifiers(value: Any) -> Iterator[dict[str, Any]]:
     elif isinstance(value, list):
         for item in value:
             yield from model_identifiers(item)
+
+
+def graph_model_keys(graph: dict[str, Any]) -> frozenset[str]:
+    """The keys of the models a graph names, as the server finds them (`graph_model_identifiers`): a mapping in a
+    node's field, or nested in one, with a string key, hash, name, base and type, without looking inside it. The
+    calibrate route takes the identity of exactly these models."""
+    keys: set[str] = set()
+
+    def visit(value: Any) -> None:
+        if isinstance(value, dict):
+            if all(isinstance(value.get(fact), str) for fact in ("key", "hash", "name", "base", "type")):
+                keys.add(value["key"])
+            else:
+                for item in value.values():
+                    visit(item)
+        elif isinstance(value, list):
+            for item in value:
+                visit(item)
+
+    for node in graph["nodes"].values():
+        for value in node.values():
+            visit(value)
+    return frozenset(keys)
 
 
 def is_public_url(value: object) -> bool:
@@ -176,6 +214,25 @@ def shareable_source(config: dict[str, Any]) -> str | None:
     return None
 
 
+def denoise_step_counts(graph: dict[str, Any]) -> dict[str, int]:
+    """The number of steps each node of the graph runs over its whole schedule, by node id, where the node states it.
+
+    That is its `steps` or `num_steps` field. An Ideogram 4 denoise node without `steps` runs its sampler preset's
+    count instead. A node that denoises a window of its schedule (`denoising_start` above 0 or `denoising_end` below 1,
+    as img2img or an SDXL refiner hand-over does) runs a part of it that each family cuts differently: it states none.
+    """
+    counts: dict[str, int] = {}
+    for node_id, node in graph["nodes"].items():
+        if node.get("denoising_start", 0) > 0 or node.get("denoising_end", 1) < 1:
+            continue
+        steps = node.get("steps", node.get("num_steps"))
+        if steps is None and node.get("type") == IDEOGRAM4_DENOISE:
+            steps = IDEOGRAM4_PRESET_STEPS.get(node.get("sampler_preset"))
+        if type(steps) is int and steps > 0:
+            counts[node_id] = steps
+    return counts
+
+
 def _replace_strings(value: Any, replacements: dict[str, str]) -> Any:
     if isinstance(value, str):
         return replacements.get(value, value)
@@ -201,8 +258,9 @@ def prepare_batch(batch: dict[str, Any], components: dict[str, str], input_ids: 
     return PreparedGraph(
         batch=batch,
         graph_hash=hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
-        model_keys=frozenset(identifier["key"] for identifier in model_identifiers(batch["graph"])),
+        model_keys=graph_model_keys(batch["graph"]),
         components=components,
+        step_counts=denoise_step_counts(batch["graph"]),
     )
 
 

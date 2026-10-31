@@ -23,6 +23,7 @@ from scripts.family_e2e.records import (
     Record,
     load_records,
     load_run_info,
+    remaining_steps,
     write_run_info,
 )
 
@@ -253,7 +254,7 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
                 base="fake",
                 type="main",
                 format="checkpoint",
-                variant=None,
+                variant="normal",
                 hash="blake3:fakehash",
                 source=None,
             )
@@ -272,7 +273,29 @@ def test_run_survives_a_server_crash_retries_foreign_load_and_resumes(
     assert [(r.kind, r.rep, r.attempt) for r in resumed] == [("warmup", 0, 3), ("measure", 1, 1)]
     assert all(r.valid_timing and r.valid_memory for r in resumed)
     assert resumed[0].graph_hash == records[0].graph_hash
-    assert runner.remaining_steps(info.plan, load_records(run_dir)) == []
+    assert remaining_steps(info.plan, load_records(run_dir)) == []
+
+
+def test_the_time_per_step_counts_the_steps_of_the_compiled_graph_not_the_manifests(
+    setup: tuple[Path, Path], isolated_runner: None
+) -> None:
+    # The manifest asks for 4 steps; the compiled denoise node runs 8, as an Ideogram 4 node runs its preset's. Frames
+    # at k/8 fit no count of 4: trusted, the 8 give the time per step; inferred, a fake step far below two throttle
+    # intervals gives none.
+    manifest_path, _ = setup
+    gpu = FakeGpu()
+
+    def export(request: dict, work_dir: Path) -> dict:
+        graph = _graph()
+        graph["nodes"]["denoise"]["steps"] = 8
+        batch = {"graph": graph, "data": [], "origin": "test", "destination": "test"}
+        return {"version": 1, "cases": [{"id": request["cases"][0]["id"], "batch": batch, "components": {}}]}
+
+    run_dir = runner.new_run(manifest_path, [], [])
+    assert runner.run(run_dir, gpu_factory=lambda _: gpu.gpu(), export=export) == 0
+
+    measures = [r for r in load_records(run_dir) if r.kind == "measure"]
+    assert measures and all(r.timing.per_step_s is not None for r in measures)
 
 
 def test_a_run_stopped_between_steps_ends_before_the_next_step_and_stays_stopped(

@@ -23,6 +23,13 @@ RUN_ID = re.compile(r"^\d{8}-\d{6}-(?P<profile>.+)$")
 # Windows refuses os.replace while another process (e.g. `status`) holds the target open; such reads are brief.
 REPLACE_ATTEMPTS = 20
 REPLACE_RETRY_DELAY_S = 0.05
+MAX_ATTEMPTS = 3
+# A case whose steps crashed the server this often is given up; its remaining steps count as final.
+MAX_SERVER_CRASHES = 2
+# Reasons that make a run repeat (up to MAX_ATTEMPTS records per step); the generation itself was fine.
+FOREIGN_GPU_LOAD = "foreign GPU load"
+FOREIGN_QUEUE_ITEM = "foreign queue item"
+SERVER_CRASHED = "server crashed"
 
 Kind = Literal["warmup", "measure"]
 Expect = Literal["unchanged", "changed"]
@@ -95,6 +102,13 @@ class Residency(_Model):
     percent: float
 
 
+class CalibrationSubmission(_Model):
+    """How a calibration run's step reached the server: the run the calibrate route created for it."""
+
+    run_id: str
+    device_class_id: str
+
+
 class Record(_Model):
     record_id: str
     """`<case_key>.<arm>.<kind>.<rep>.<attempt>`."""
@@ -128,6 +142,8 @@ class Record(_Model):
     valid_memory: bool
     valid_psnr: bool
     invalid_reasons: list[str]
+    calibration: CalibrationSubmission | None = None
+    """Set for a step of a calibration run that the server accepted."""
 
 
 class Environment(_Model):
@@ -183,6 +199,22 @@ class ModelIdentity(_Model):
     network, or a URL that may carry a token."""
 
 
+class CalibrationExport(_Model):
+    """A calibration store saved from one server lifetime of a calibration run."""
+
+    lifetime: int
+    """Counts the run's server lifetimes that saved a store, from 1. Each lifetime has its own scratch store."""
+    device_class_id: str
+    export: str
+    """calibration/<run_id>-<lifetime>-<device_class_id>.json: the store file byte for byte."""
+    status: str | None
+    """calibration/<run_id>-<lifetime>-status.json, the server's calibration status; None for a `store_file` copy."""
+    source: Literal["api", "store_file"]
+    """`api`: GET working_memory/export at the end of the lifetime. `store_file`: copied from the scratch root after the
+    server died or was stopped, which leaves no server to ask."""
+    saved_at: str
+
+
 class RunInfo(_Model):
     run_id: str
     profile: str
@@ -201,6 +233,9 @@ class RunInfo(_Model):
     """Keyed by case_key."""
     case_models: dict[str, list[ModelIdentity]] = {}
     """Keyed by case_key: the models its graph uses, main model first. Absent in runs written before the field."""
+    calibrate: bool = False
+    """Steps go through the working-memory calibrate route instead of enqueue_batch."""
+    calibration_exports: list[CalibrationExport] = []
 
 
 class Reference(_Model):
@@ -315,3 +350,44 @@ def run_id_profile(run_id: str) -> str | None:
     """The profile part of a run id, or None for a name that is no run id."""
     match = RUN_ID.match(run_id)
     return match["profile"] if match else None
+
+
+# Step finality, shared by the runner (what is left to run) and the report (what a verdict may rest on).
+def step_id(step: PlannedStep | Record) -> tuple[str, str, str, int]:
+    return (step.case_key, step.arm, step.kind, step.rep)
+
+
+def needs_retry(record: Record) -> bool:
+    """Whether foreign load spoiled a completed run. A calibration step is not repeated: the server keeps every window
+    it measured, and the builder of shipped data takes the largest."""
+    return (
+        record.status == "completed"
+        and record.calibration is None
+        and any(reason.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for reason in record.invalid_reasons)
+    )
+
+
+def crashed_server(record: Record) -> bool:
+    return any(reason.startswith(SERVER_CRASHED) for reason in record.invalid_reasons)
+
+
+def remaining_steps(plan: list[PlannedStep], records: list[Record]) -> list[PlannedStep]:
+    """Planned steps without a final record, in plan order.
+
+    A step is final when its last record completed and needs no retry, or when its retries are used up. Every step of
+    a case key whose steps crashed the server MAX_SERVER_CRASHES times is final too, so a crashing case cannot keep a
+    run (or its resumes) restarting the server forever.
+    """
+    attempts: dict[tuple[str, str, str, int], list[Record]] = {}
+    crashes: dict[str, int] = {}
+    for record in records:
+        attempts.setdefault(step_id(record), []).append(record)
+        crashes[record.case_key] = crashes.get(record.case_key, 0) + crashed_server(record)
+    remaining = []
+    for step in plan:
+        own = sorted(attempts.get(step_id(step), []), key=lambda r: r.attempt)
+        last = own[-1] if own else None
+        done = last is not None and last.status == "completed" and (not needs_retry(last) or len(own) >= MAX_ATTEMPTS)
+        if not done and crashes.get(step.case_key, 0) < MAX_SERVER_CRASHES:
+            remaining.append(step)
+    return remaining

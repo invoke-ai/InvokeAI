@@ -16,6 +16,7 @@ from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
+from invokeai.backend.working_memory.fit import convolution_line
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
@@ -119,8 +120,10 @@ def _vae_mid_block_score_matrix_bytes(
 # for it: a line in the output's pixel count per operation and the dtype it runs in, `k_<operation>_<dtype>`
 # bytes per pixel plus `b_<operation>_<dtype>` bytes the process pays whatever the size, shipped per convolution
 # backend and allocator (`platform_for`). The values ship in `backend/working_memory/data/vae.json` with the points
-# they are fitted on (`backend/working_memory/fit.py`); `scripts/calibrate_flux2_working_memory.py --only vae`
-# measures a build against them.
+# they are fitted on (`backend/working_memory/fit.py`): calibration runs in a running server measure them on a card,
+# and `scripts/working_memory/build_shipped.py` turns their exports into shipped points. Every spec here declares that
+# line (`fit.convolution_line`) and opts in to user calibration (`user_calibrated`), so a calibration run's decode
+# windows refit these lines per device.
 #
 # None of the three scales out of the line. The demand does not follow the element size: on MIOpen fp16 needs about a
 # third of what bf16 does, and on both backends fp32 needs less per value byte than bf16. The allocator matters as
@@ -150,7 +153,7 @@ def _convolution_coefficients(*dtypes: str) -> frozenset[str]:
     )
 
 
-def _dtype_name(dtype: torch.dtype) -> str:
+def dtype_name(dtype: torch.dtype) -> str:
     name = _DTYPE_NAMES.get(dtype)
     if name is None:
         raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
@@ -266,6 +269,8 @@ VAE_SD_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_sd_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -326,7 +331,7 @@ def estimate_vae_working_memory_sd15_sdxl(
         "height": height,
         "width": width,
         "tile": tile_size,
-        "dtype": _dtype_name(run_dtype),
+        "dtype": dtype_name(run_dtype),
         "vae_class": "AutoencoderKL" if isinstance(vae, AutoencoderKL) else "AutoencoderTiny",
         "upcast_weight_bytes": _upcast_weight_bytes(vae, run_dtype),
     }
@@ -356,7 +361,7 @@ def _single_pass_features(
         "operation": operation,
         "height": height,
         "width": width,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(height, width, dtype, device=device),
     }
 
@@ -375,6 +380,8 @@ VAE_COGVIEW4_SPEC = register(
         coefficients=_convolution_coefficients("bf16"),
         platform_keys=_PLATFORM_KEYS,
         terms=_cogview4_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -396,7 +403,7 @@ def estimate_vae_working_memory_cogview4(
         "operation": operation,
         "height": latent_scale_factor_for_operation * image_tensor.shape[-2],
         "width": latent_scale_factor_for_operation * image_tensor.shape[-1],
-        "dtype": _dtype_name(_compute_dtype(vae)),
+        "dtype": dtype_name(_compute_dtype(vae)),
     }
     return _estimate(VAE_COGVIEW4_SPEC, features, device)
 
@@ -492,6 +499,8 @@ VAE_FLUX_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_flux_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -544,7 +553,7 @@ def estimate_vae_working_memory_flux(
         "operation": operation,
         "height": out_h,
         "width": out_w,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "tile": tile,
         "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(score_h, score_w, dtype, device=device),
     }
@@ -590,8 +599,32 @@ VAE_FLUX2_SPEC = register(
         coefficients=_convolution_coefficients("bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_flux2_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
+
+
+def flux2_vae_attention_materializes(image_tensor: torch.Tensor, vae: AutoencoderKLFlux2, device: torch.device) -> bool:
+    """Whether encoding ``image_tensor`` untiled would materialize the FLUX.2 VAE mid-block's score matrix.
+
+    False on CUDA, where a fused SDPA kernel takes the 512-wide head and the encode stays linear in area; true
+    on ROCm and MPS (see ``estimate_vae_working_memory_flux2``), where the matrix grows with the square of the
+    pixel count and only a tiled encode stays bounded.
+    """
+    seq_len = (image_tensor.shape[-2] // _FLUX2_VAE_SPATIAL_COMPRESSION) * (
+        image_tensor.shape[-1] // _FLUX2_VAE_SPATIAL_COMPRESSION
+    )
+    return (
+        sdpa_score_matrix_bytes(
+            device=device,
+            dtype=next(vae.parameters()).dtype,
+            num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
+            head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
+            seq_len=seq_len,
+        )
+        > 0
+    )
 
 
 def estimate_vae_working_memory_flux2(
@@ -668,7 +701,7 @@ def estimate_vae_working_memory_flux2(
         "width": out_w,
         "tile": tile,
         "batch_size": batch_size,
-        "dtype": _dtype_name(dtype),
+        "dtype": dtype_name(dtype),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,
@@ -1184,6 +1217,8 @@ VAE_SD3_SPEC = register(
         coefficients=_convolution_coefficients("fp16", "bf16", "fp32"),
         platform_keys=_PLATFORM_KEYS,
         terms=_single_pass_terms,
+        line=convolution_line,
+        user_calibrated=True,
     )
 )
 
@@ -1201,3 +1236,31 @@ def estimate_vae_working_memory_sd3(
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
     return _estimate(VAE_SD3_SPEC, _single_pass_features(operation, image_tensor, vae, device), device)
+
+
+def estimate_untiled_vae_decode(
+    estimator: str, height: int, width: int, dtype: str, device: torch.device
+) -> WorkingMemoryEstimate:
+    """The estimate an untiled single-image decode of `height` x `width` output pixels in `dtype` gets from the decode
+    node that prices with `estimator`, on `device`: the features each estimator builds from its VAE, without one.
+
+    For planning sizes before anything is loaded (a calibration plan). The SD1/SDXL VAE is priced as one already in
+    `dtype`, so without the growth of an in-place cast, which a first fp32 decode after an fp16 one adds on top.
+    """
+    torch_dtype = {name: candidate for candidate, name in _DTYPE_NAMES.items()}.get(dtype)
+    if torch_dtype is None:
+        raise ValueError(f"No VAE working-memory coefficients are measured for {dtype}.")
+    features: dict[str, FeatureValue] = {"operation": "decode", "height": height, "width": width, "dtype": dtype}
+    if estimator == VAE_COGVIEW4_SPEC.id:
+        return _estimate(VAE_COGVIEW4_SPEC, features, device)
+    features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(height, width, torch_dtype, device=device)
+    if estimator == VAE_SD3_SPEC.id:
+        return _estimate(VAE_SD3_SPEC, features, device)
+    if estimator == VAE_FLUX_SPEC.id:
+        return _estimate(VAE_FLUX_SPEC, features | {"tile": None}, device)
+    if estimator == VAE_FLUX2_SPEC.id:
+        return _estimate(VAE_FLUX2_SPEC, features | {"tile": None, "batch_size": 1}, device)
+    if estimator == VAE_SD_SPEC.id:
+        sd_features = features | {"tile": None, "vae_class": "AutoencoderKL", "upcast_weight_bytes": 0}
+        return _estimate(VAE_SD_SPEC, sd_features, device)
+    raise ValueError(f"No untiled decode is priced by working-memory estimator '{estimator}'.")

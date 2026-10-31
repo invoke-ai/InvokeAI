@@ -226,6 +226,23 @@ describe('graph export', () => {
     });
   });
 
+  // The working-memory calibration planner (`default_vae`) restates this: it sizes each case for the VAE that decodes.
+  it("decodes with the main model's default VAE, which a pick replaces where the model has a VAE slot", () => {
+    const withDefaultVae = (key: string, vaeKey: string) => [
+      ...MODELS.map((entry) => (entry.key === key ? { ...entry, default_settings: { vae: vaeKey } } : entry)),
+      model('flux-vae-b', 'flux', 'vae', { format: 'checkpoint' }),
+    ];
+    const { batch } = exportOne(sdxlCase('sdxl-default-vae'), withDefaultVae('sdxl', 'sdxl-vae'));
+    const zImage = { ...sdxlCase('z-image'), model_key: 'z-image-gguf' };
+    const zImageModels = withDefaultVae('z-image-gguf', 'flux-vae-b');
+
+    expect(nodesOfType(batch.graph, 'vae_loader').map((node) => (node.vae_model as { key: string }).key)).toEqual([
+      'sdxl-vae',
+    ]);
+    expect(exportOne(zImage, zImageModels).components.vae).toBe('flux-vae-b');
+    expect(exportOne({ ...zImage, components: { vae: 'flux-vae' } }, zImageModels).components.vae).toBe('flux-vae');
+  });
+
   it('rejects an installed component the slot does not offer', () => {
     const [result] = exportGraphs(
       request([sdxlCase('z-image', { components: { qwen3EncoderModel: 'qwen3-8b' }, model_key: 'z-image-gguf' })])

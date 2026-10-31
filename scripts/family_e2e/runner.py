@@ -9,8 +9,21 @@ every case key with measures left, because the new server starts with a cold mod
 
 `stop` and the runner agree through run.json under the run lock (`run_lock`): the runner names itself in the heartbeat
 before anything else (`register_runner`), and `stop` marks the run stopped before it reads the heartbeat. So `stop`
-either finds the runner and kills it, or the runner finds the run stopped and leaves it untouched. The runner checks
-again before every server and every step (`ensure_running`), and never overwrites a status other than `running`.
+either finds the runner and kills it, or the runner finds the run stopped and leaves it untouched. The same holds for
+every server: the runner checks the status, spawns the server and records its launcher in the heartbeat under one hold
+of the run lock (`_Session.server_registration`), so a server spawned before the mark is in the heartbeat `stop` reads,
+and none is spawned after it. The runner checks again before every server and every step (`ensure_running`), and
+never overwrites a status other than `running`.
+
+A lifetime's scratch root goes only once every process of its server has exited; a server whose kill fails or that
+outlives it keeps the root and its heartbeat entries, and the run fails (`_Session.serve_once`).
+
+A calibration run also checks that the server can calibrate, submits each step through the working-memory calibrate
+route, and saves the lifetime's calibration store before the scratch root goes (`calibration.py`). It records the
+store under the run lock and keeps whatever status run.json has (`save_calibration`), so a runner the stop has not
+killed yet still saves its store. A store that cannot be saved fails the run (or leaves a stop a stop) and keeps the
+root that holds it; the next `resume` saves a store an earlier runner left in a root before anything rebuilds it, once
+that runner's server is stopped (it may still write the store), and refuses to go on when that save fails.
 """
 
 from __future__ import annotations
@@ -24,7 +37,7 @@ import logging
 import os
 import sys
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -34,7 +47,7 @@ from typing import Any, BinaryIO, Protocol
 import psutil
 from PIL import Image
 
-from scripts.family_e2e import gpu_memory, nvml_memory
+from scripts.family_e2e import calibration, gpu_memory, nvml_memory
 from scripts.family_e2e.client import (
     ApiError,
     EventRecorder,
@@ -62,6 +75,11 @@ from scripts.family_e2e.manifest import (
     resolve_cases,
 )
 from scripts.family_e2e.records import (
+    FOREIGN_GPU_LOAD,
+    FOREIGN_QUEUE_ITEM,
+    MAX_ATTEMPTS,
+    SERVER_CRASHED,
+    CalibrationExport,
     Environment,
     ForeignProcess,
     Memory,
@@ -74,6 +92,9 @@ from scripts.family_e2e.records import (
     append_record,
     load_records,
     load_run_info,
+    needs_retry,
+    remaining_steps,
+    step_id,
     write_bytes_atomic,
     write_run_info,
 )
@@ -82,6 +103,7 @@ from scripts.family_e2e.residency import ResidencyTracker, parse_log
 from scripts.family_e2e.server import (
     ServerError,
     ServerProcess,
+    TerminationError,
     build_scratch_root,
     free_port,
     git_state,
@@ -98,7 +120,8 @@ logger = logging.getLogger("family_e2e")
 
 HEARTBEAT_FILE = "heartbeat.json"
 RUN_LOCK_FILE = "run.lock"
-# Holders keep the run lock for one read and one write of a small JSON file.
+# Holders keep the run lock for one read and one write of a small JSON file, a calibration run's store files, or the
+# spawn of a server process (not its startup; a spawn that could not be recorded also waits there for its kill).
 RUN_LOCK_TIMEOUT_S = 30.0
 RUN_LOCK_POLL_S = 0.01
 # A started runner registers once its interpreter has imported the tool, which takes seconds on a busy machine.
@@ -107,14 +130,14 @@ REGISTER_POLL_S = 0.05
 # The heartbeat entries that identify the server's processes. The launcher (the process the runner started, which
 # leads the server's process group on POSIX) comes first: its tree and group take the serving process along.
 SERVER_ROLES = ("server_launcher", "server")
+# Further processes of a server that outlived the runner's kill, e.g. a worker in its group, or a launcher whose
+# recording failed: a list of identities in the heartbeat.
+SERVER_SURVIVORS = "server_survivors"
 EXPORT_DIR = "export"
 """The graph exporter's work directory in the run directory."""
 HEARTBEAT_INTERVAL_S = 30.0
 # Machine-wide, not per data directory: two data directories can share a GPU.
 LOCK_DIR = Path(os.environ.get("LOCALAPPDATA") or Path.home() / ".cache") / "invokeai-family-e2e" / "locks"
-MAX_ATTEMPTS = 3
-# A case whose steps crashed the server this often is given up; its remaining steps count as final.
-MAX_SERVER_CRASHES = 2
 # Windows Subsystem for Linux names its kernel so; NVML there runs on the Windows driver (WDDM).
 WSL_KERNEL_RELEASE = Path("/proc/sys/kernel/osrelease")
 QUEUE_DRAIN_TIMEOUT_S = 600.0
@@ -128,10 +151,6 @@ FOREIGN_BYTES = GIB
 FOREIGN_GROWTH_BYTES = 256 * MIB
 SHARED_GROWTH_BYTES = 256 * MIB
 CANCEL_WAIT_S = 120.0
-# Reasons that make a run repeat (up to MAX_ATTEMPTS records per step); the generation itself was fine.
-FOREIGN_GPU_LOAD = "foreign GPU load"
-FOREIGN_QUEUE_ITEM = "foreign queue item"
-SERVER_CRASHED = "server crashed"
 
 
 class RunnerError(RuntimeError):
@@ -222,42 +241,6 @@ def file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _step_id(step: PlannedStep | Record) -> tuple[str, str, str, int]:
-    return (step.case_key, step.arm, step.kind, step.rep)
-
-
-def needs_retry(record: Record) -> bool:
-    return record.status == "completed" and any(
-        reason.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for reason in record.invalid_reasons
-    )
-
-
-def crashed_server(record: Record) -> bool:
-    return any(reason.startswith(SERVER_CRASHED) for reason in record.invalid_reasons)
-
-
-def remaining_steps(plan: list[PlannedStep], records: list[Record]) -> list[PlannedStep]:
-    """Planned steps without a final record, in plan order.
-
-    A step is final when its last record completed and needs no retry, or when its retries are used up. Every step of
-    a case key whose steps crashed the server MAX_SERVER_CRASHES times is final too, so a crashing case cannot keep a
-    run (or its resumes) restarting the server forever.
-    """
-    attempts: dict[tuple[str, str, str, int], list[Record]] = {}
-    crashes: dict[str, int] = {}
-    for record in records:
-        attempts.setdefault(_step_id(record), []).append(record)
-        crashes[record.case_key] = crashes.get(record.case_key, 0) + crashed_server(record)
-    remaining = []
-    for step in plan:
-        own = sorted(attempts.get(_step_id(step), []), key=lambda r: r.attempt)
-        last = own[-1] if own else None
-        done = last is not None and last.status == "completed" and (not needs_retry(last) or len(own) >= MAX_ATTEMPTS)
-        if not done and crashes.get(step.case_key, 0) < MAX_SERVER_CRASHES:
-            remaining.append(step)
-    return remaining
-
-
 @contextmanager
 def gpu_lock(adapter: gpu_memory.Adapter) -> Iterator[None]:
     """Holds `LOCK_DIR/<adapter key>.lock` so a second runner on the same GPU fails fast."""
@@ -276,9 +259,10 @@ def gpu_lock(adapter: gpu_memory.Adapter) -> Iterator[None]:
 
 @contextmanager
 def run_lock(run_dir: Path) -> Iterator[None]:
-    """Holds `<run_dir>/run.lock`, which orders status changes of run.json and the runner's registration between the
-    runner, `stop` and `resume`. Waits while another process holds it; the operating system releases the lock of a
-    killed holder."""
+    """Holds `<run_dir>/run.lock`, which orders status changes of run.json, the runner's registration and the spawn
+    of its servers between the runner, `stop` and `resume`. Waits while another process holds it; the operating system
+    releases the lock of a killed holder. The lock's handle is not inheritable, so a server spawned under it does not
+    keep it."""
     with open(run_dir / RUN_LOCK_FILE, "a+b") as f:
         deadline = time.monotonic() + RUN_LOCK_TIMEOUT_S
         while True:
@@ -327,11 +311,16 @@ def _identified(identity: list[float] | None) -> psutil.Process | None:
 
 
 def _running(process: psutil.Process) -> bool:
-    """Whether a process still runs: a zombie has exited and holds no memory, files or port any more."""
+    """Whether a process still runs: a zombie has exited and holds no memory, files or port any more.
+
+    A live pid whose state this process may not read counts as running: its exit has not been seen.
+    """
     try:
         return process.is_running() and process.status() != psutil.STATUS_ZOMBIE
-    except psutil.Error:
+    except psutil.NoSuchProcess:  # ZombieProcess too
         return False
+    except psutil.AccessDenied:
+        return True
 
 
 def is_alive(identity: list[float] | None) -> bool:
@@ -351,7 +340,7 @@ def _led_group(process: psutil.Process) -> list[int]:
     return living_members(process.pid)
 
 
-def _still_running(identity: list[float] | None) -> list[int]:
+def still_running(identity: list[float] | None) -> list[int]:
     """The pids that still run of the process named by `identity`: itself unless it is a zombie, and the living
     members of the group it leads."""
     process = _identified(identity)
@@ -361,8 +350,8 @@ def _still_running(identity: list[float] | None) -> list[int]:
 
 
 def kill_identified(identity: list[float] | None) -> bool:
-    """Kills what still runs of the process named by [pid, create time] and its descendants, and waits until it has
-    exited. Returns whether anything ran.
+    """Kills what still runs of the process named by [pid, create time] and its descendants, and waits up to
+    KILL_WAIT_S until it has exited. Returns whether anything ran, not whether it exited: `kill_recorded` checks that.
 
     Descendants come from psutil, which drops processes older than their supposed parent; a raw parent-pid walk
     (taskkill /T) can follow a reused pid into an unrelated tree. On POSIX the groups that processes of the tree lead
@@ -400,16 +389,31 @@ def kill_identified(identity: list[float] | None) -> bool:
     return True
 
 
+def kill_recorded(processes: Sequence[tuple[str, list[float] | None]]) -> tuple[list[tuple[str, int]], str]:
+    """Kills the processes given as (role, identity), in that order, then checks that each has exited.
+
+    Returns the roles and pids of the processes that ran, and what still runs, per pid with the cause; empty once all
+    exited. A process stuck in the GPU driver outlives SIGKILL until it leaves the kernel, and another user's refuses it.
+    """
+    ran: list[tuple[str, int]] = []
+    refused: dict[int, str] = {}
+    for role, identity in processes:
+        try:
+            if kill_identified(identity):
+                ran.append((role, int(identity[0])))
+        except psutil.Error as e:
+            refused[int(identity[0])] = f"the kill was refused: {type(e).__name__} {e}"
+    left = {int(identity[0]): running for _, identity in processes if (running := still_running(identity))}
+    waited = f"{KILL_WAIT_S:g}s after the kill"
+    survivors = ", ".join(
+        f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
+        for pid, running in left.items()
+    )
+    return ran, survivors
+
+
 def scratch_root(data_dir: Path, run_id: str, arm: str) -> Path:
     return data_dir / "scratch-roots" / f"{run_id}-{arm}"
-
-
-def remove_scratch_roots(data_dir: Path, info: RunInfo) -> list[str]:
-    """Deletes the scratch roots of the run's arms; returns the paths that could not be deleted."""
-    leftovers: list[str] = []
-    for arm in sorted({DEFAULT_ARM, *info.environments}):
-        leftovers.extend(remove_tree(scratch_root(data_dir, info.run_id, arm)))
-    return leftovers
 
 
 def read_heartbeat(run_dir: Path) -> dict[str, Any]:
@@ -446,6 +450,17 @@ def finish_run(run_dir: Path, status: str) -> bool:
             return False
         write_run_info(run_dir, info.model_copy(update={"status": status, "finished_at": now_iso()}))
         return True
+
+
+def save_calibration(run_dir: Path, stores: calibration.Stores, status: bytes | None = None) -> list[CalibrationExport]:
+    """Saves a lifetime's calibration stores into the run: from the export routes with their status, or the store files
+    of a scratch root (no status). Under the run lock on run.json as it is then: the stores belong to the run whatever
+    its status, and a status `stop` set meanwhile stays."""
+    if not stores:
+        return []
+    with run_lock(run_dir):
+        info = load_run_info(run_dir)
+        return calibration.save(run_dir, info, stores, status)
 
 
 def register_runner(run_dir: Path) -> None:
@@ -494,6 +509,12 @@ def wait_for_runner(run_dir: Path, spawned_pid: int, previous: list[float] | Non
         time.sleep(REGISTER_POLL_S)
 
 
+def recorded_server(heartbeat: dict[str, Any]) -> list[tuple[str, list[float] | None]]:
+    """The server processes a heartbeat names, as (role, identity): launcher, serving process, and survivors."""
+    survivors = [(SERVER_SURVIVORS, identity) for identity in heartbeat.get(SERVER_SURVIVORS) or []]
+    return [(role, heartbeat.get(role)) for role in SERVER_ROLES] + survivors
+
+
 def stop_surviving_server(run_dir: Path) -> None:
     """Stops a server that an earlier runner of the run left running, before anything replaces what identifies it.
 
@@ -502,27 +523,19 @@ def stop_surviving_server(run_dir: Path) -> None:
     while a recorded server process cannot be stopped this refuses, before the heartbeat or a scratch root changes.
     Call it under the GPU lock: a live runner of the run would hold it, so the recorded server is no live runner's.
     """
-    heartbeat = read_heartbeat(run_dir)
-    survivors = {
-        int(heartbeat[role][0]): heartbeat[role] for role in SERVER_ROLES if _still_running(heartbeat.get(role))
-    }
-    refused: dict[int, str] = {}
-    for pid, identity in survivors.items():
-        running = ", ".join(str(p) for p in _still_running(identity))
-        logger.warning("an earlier runner of this run left its server running (pid %d: %s); stopping it", pid, running)
-        try:
-            kill_identified(identity)
-        except psutil.Error as e:
-            refused[pid] = f"the kill was refused: {type(e).__name__} {e}"
-    left = {pid: running for pid, identity in survivors.items() if (running := _still_running(identity))}
+    processes = recorded_server(read_heartbeat(run_dir))
+    for _, identity in processes:
+        if identity is not None and (running := still_running(identity)):
+            pids = ", ".join(str(p) for p in running)
+            logger.warning(
+                "an earlier runner of this run left its server running (pid %d: %s); stopping it",
+                int(identity[0]),
+                pids,
+            )
+    _, left = kill_recorded(processes)
     if left:
-        waited = f"{KILL_WAIT_S:g}s after the kill"
-        details = ", ".join(
-            f"pid {pid} ({refused.get(pid, waited)}; still running: {', '.join(str(p) for p in running)})"
-            for pid, running in left.items()
-        )
         raise RunnerError(
-            f"the server an earlier runner left running cannot be stopped: {details}. heartbeat.json and the scratch "
+            f"the server an earlier runner left running cannot be stopped: {left}. heartbeat.json and the scratch "
             f"roots stay as they are; end it, e.g. with `python -m scripts.family_e2e stop {run_dir}`, then resume"
         )
 
@@ -666,8 +679,9 @@ def build_memory(
     )
 
 
-def new_run(manifest_path: Path, families: list[str], case_ids: list[str]) -> Path:
-    """Creates the run directory and its run.json with the expanded plan."""
+def new_run(manifest_path: Path, families: list[str], case_ids: list[str], calibrate: bool = False) -> Path:
+    """Creates the run directory and its run.json with the expanded plan. A calibration run submits its steps through
+    the working-memory calibrate route (`calibration.py`)."""
     manifest = load_manifest(manifest_path)
     cases = resolve_cases(manifest, families, case_ids)
     run_id = f"{datetime.now():%Y%m%d-%H%M%S}-{manifest.profile}"
@@ -689,6 +703,7 @@ def new_run(manifest_path: Path, families: list[str], case_ids: list[str]) -> Pa
         plan=plan_steps(cases, manifest.defaults.warmup, manifest.defaults.repeats),
         case_thresholds={case.case_key: case.thresholds for case in cases},
         graph_hashes={},
+        calibrate=calibrate,
     )
     write_run_info(run_dir, info)
     return run_dir
@@ -749,8 +764,18 @@ class _Session:
         self.records = load_records(run_dir)
         self.tracker = ResidencyTracker()
         self.server: ServerProcess | None = None
+        # Recorded once at the spawn: a pid read again later could belong to a process that reused it.
+        self.launcher: list[float] | None = None
         self.step_label = "starting"
         self.last_beat = 0.0
+        # Per server lifetime: the device classes its calibration runs were created for, and whether their stores
+        # were saved through the export route.
+        self.device_class_ids: set[str] = set()
+        self.store_saved = False
+        # Further processes of this lifetime's server that outlived terminate's wait, and why a kill failed without
+        # naming any; both are cleared only once their exit is confirmed (`holds_server`).
+        self.server_survivors: list[list[float]] = []
+        self.unidentified = ""
         all_cases = {case.case_key: case for case in resolve_cases(manifest)}
         self.cases = {step.case_key: all_cases[step.case_key] for step in self.info.plan}
 
@@ -759,13 +784,50 @@ class _Session:
             self.step_label = step_label
         data = {
             "runner": process_identity(os.getpid()),
-            "server": process_identity(self.server.pid) if self.server else None,
-            "server_launcher": process_identity(self.server.process.pid) if self.server else None,
+            "server": self.server_identity(),
+            "server_launcher": self.launcher,
+            SERVER_SURVIVORS: self.server_survivors,
             "step": self.step_label,
             "updated_at": now_iso(),
         }
         write_bytes_atomic(self.run_dir / HEARTBEAT_FILE, json.dumps(data, indent=2).encode("utf-8"))
         self.last_beat = time.perf_counter()
+
+    def server_identity(self) -> list[float] | None:
+        # The create time captured with the serving process, as for the launcher.
+        return [self.server.pid, self.server.serving.create_time()] if self.server else None
+
+    def stop_server(self) -> str:
+        """Kills this lifetime's server and returns what of it may still run; empty once every process of it is
+        confirmed gone: the launcher and serving process the heartbeat names, and each that outlived terminate's wait,
+        checked again, as `stop` checks them. Until then the session keeps their identities (`holds_server`)."""
+        if self.server is not None:
+            try:
+                self.server.stop()
+            except TerminationError as e:
+                self.add_survivors(e)
+        processes = [
+            ("server_launcher", self.launcher),
+            ("server", self.server_identity()),
+            *((SERVER_SURVIVORS, identity) for identity in self.server_survivors),
+        ]
+        _, running = kill_recorded(processes)
+        self.server_survivors = [identity for identity in self.server_survivors if still_running(identity)]
+        survivors = "; ".join(s for s in (self.unidentified, running) if s)
+        if not survivors:
+            self.server, self.launcher = None, None
+        return survivors
+
+    def add_survivors(self, error: TerminationError) -> None:
+        known = {int(identity[0]) for identity in self.server_survivors}
+        self.server_survivors += [identity for identity in error.survivors if int(identity[0]) not in known]
+        if not error.survivors:
+            self.unidentified = str(error)
+
+    @property
+    def holds_server(self) -> bool:
+        """Whether a process of this lifetime's server may still run, i.e. its exit has not been confirmed."""
+        return bool(self.server or self.launcher or self.server_survivors or self.unidentified)
 
     def tick(self) -> None:
         if time.perf_counter() - self.last_beat >= HEARTBEAT_INTERVAL_S:
@@ -773,6 +835,8 @@ class _Session:
 
     def run(self) -> None:
         self.heartbeat("preflight")
+        if self.info.calibrate:
+            self.recover_stores()
         todo = remaining_steps(self.info.plan, self.records)
         if not todo:
             logger.info("every planned step has a final record")
@@ -784,36 +848,117 @@ class _Session:
                 return
             todo = remaining_steps(self.info.plan, self.records)
 
+    def recover_stores(self) -> None:
+        """Saves the calibration store an earlier runner left in a scratch root, as `stop` does: one whose save failed,
+        or one a hard kill left. The next server lifetime would rebuild the root over it."""
+        for arm in sorted({DEFAULT_ARM, *self.info.environments}):
+            root = scratch_root(self.manifest.data_dir, self.info.run_id, arm)
+            if not root.exists():
+                continue
+            try:
+                exports = self.save_calibration(calibration.read_store_files(root))
+            except OSError as e:
+                raise RunnerError(
+                    f"could not save the calibration store an earlier server left in {root} ({e}); not resuming, as "
+                    "the next server's scratch root would replace it. Fix the cause or move the store away first"
+                ) from e
+            for export in exports:
+                logger.info("saved the calibration store %s left in %s", export.export, root)
+            leftovers = remove_tree(root)
+            if leftovers:
+                logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
+
     def serve_once(self, todo: list[PlannedStep]) -> bool:
-        """One server lifetime over `todo`. Returns True when the server crashed in a step."""
+        """One server lifetime over `todo`. Returns True when the server crashed in a step.
+
+        The lifetime's calibration store is copied and its scratch root removed only once every process of its server
+        has exited. A server whose kill fails or that outlives it keeps both, and the heartbeat keeps naming it for
+        `stop` and `resume`, which stop it before they touch the root; the run fails (a stop stays a stop).
+        """
         root = scratch_root(self.manifest.data_dir, self.info.run_id, self.arm)
         log_path = self.run_dir / f"server-{self.arm}.log"
+        self.device_class_ids, self.store_saved = set(), False
+        stopping = False
+        survivors = "its stop did not finish"
         try:
             pin = device_env(self.gpu.adapter, self.manifest.server.env)
             build_scratch_root(self.manifest.server.template_root, root, log_path, free_port(), bool(pin))
             self.heartbeat("starting the server")
-            self.server = launch_server(
-                self.manifest.server,
-                root,
-                log_path,
-                self.run_dir / f"server-{self.arm}.console.log",
-                pin,
-            )
             try:
+                self.server = launch_server(
+                    self.manifest.server,
+                    root,
+                    log_path,
+                    self.run_dir / f"server-{self.arm}.console.log",
+                    pin,
+                    registration=self.server_registration(),
+                )
                 self.heartbeat("server ready")
                 self.serve(self.server, todo)
             except ServerCrashed as e:
                 logger.error("%s; starting a new server", e)
                 return True
+            except TerminationError as e:
+                # A launch that failed could not kill its server. If recording its launcher failed, only this names it.
+                self.add_survivors(e)
+                raise
             finally:
-                self.server.stop()
-                self.server = None
+                # A launch that failed has stopped its server itself, unless it raised TerminationError.
+                survivors = self.stop_server()
+        except (KeyboardInterrupt, RunStopped):
+            stopping = True
+            raise
         finally:
-            # stop() returns once the server tree has exited, so its database files are closed by now.
-            leftovers = remove_tree(root)
-            if leftovers:
-                logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
+            # Derived from what is cleared only on a confirmed exit: an interrupted stop keeps the root too.
+            kept = self.holds_server
+            if kept:
+                # Names every process that may still run, for `stop` and `resume`.
+                self.heartbeat()
+                message = (
+                    f"the server may still run after its kill ({survivors}); kept the scratch root {root}, and "
+                    "heartbeat.json names its processes. End them, then `stop` or `resume`"
+                )
+                if not stopping:
+                    raise RunnerError(message)
+                logger.error(message)
+            elif self.info.calibrate and not self.store_saved:
+                # Every process of the server has exited, so its database files are closed by now.
+                try:
+                    self.save_calibration(calibration.read_store_files(root))
+                except OSError as e:
+                    # The root holds the only copy of the lifetime's windows; `recover_stores` saves it on `resume`.
+                    kept = True
+                    message = (
+                        f"could not save the calibration store ({e}); kept the scratch root {root} with it. Fix the "
+                        "cause and `resume`, which saves it first"
+                    )
+                    if not stopping:
+                        raise RunnerError(message) from e
+                    # A stop stays a stop (an interrupt ends the run stopped, RunStopped keeps `stop`'s mark); the save
+                    # error is logged.
+                    logger.error(message)
+            if not kept:
+                leftovers = remove_tree(root)
+                if leftovers:
+                    logger.warning("could not remove the scratch root %s: %s", root, ", ".join(leftovers))
         return False
+
+    @contextmanager
+    def server_registration(self) -> Iterator[Callable[[int], None]]:
+        """Where `launch_server` spawns the server: under the run lock, and only while the run is still running.
+
+        `stop` marks the run stopped under the same lock before it reads the heartbeat, so a server is either in that
+        heartbeat (the launcher's identity is recorded before the lock is released) or never spawned. Without it, a
+        server spawned between `stop`'s capture of the runner's tree and the kill would be in neither on POSIX, where
+        it runs in a session of its own, and `stop` would remove the scratch root it still uses.
+        """
+        with run_lock(self.run_dir):
+            _raise_unless_running(self.run_dir)
+            yield self.server_spawned
+
+    def server_spawned(self, pid: int) -> None:
+        self.launcher = process_identity(pid)
+        self.heartbeat()
 
     def serve(self, server: ServerProcess, todo: list[PlannedStep]) -> None:
         client = InvokeClient(server.base_url)
@@ -821,6 +966,8 @@ class _Session:
         recorder.connect()
         try:
             runtime_config = self.record_environment(server, client)
+            if self.info.calibrate:
+                calibration.check_available(client)
             models = client.get("/api/v2/models/")["models"]
             capabilities = client.get("/api/v2/models/capabilities")
             configs = {model["key"]: model for model in models}
@@ -849,6 +996,9 @@ class _Session:
                         if not adapter_checked and record.status == "completed":
                             self.check_server_on_adapter(server)
                             adapter_checked = True
+            if self.device_class_ids:
+                self.save_calibration(*calibration.fetch_exports(client, self.device_class_ids))
+                self.store_saved = True
         finally:
             recorder.close()
 
@@ -892,6 +1042,12 @@ class _Session:
         self.info.environments[self.arm] = environment
         self.save_info()
         return runtime_config
+
+    def save_calibration(self, stores: calibration.Stores, status: bytes | None = None) -> list[CalibrationExport]:
+        exports = save_calibration(self.run_dir, stores, status)
+        # save_info writes self.info whole.
+        self.info.calibration_exports.extend(exports)
+        return exports
 
     def save_info(self) -> None:
         """Writes the session's run.json while the run is still running; `stop` owns it otherwise."""
@@ -1025,7 +1181,7 @@ class _Session:
 
         Raises ServerCrashed, after storing the step's error record, when the server died during the step.
         """
-        attempts = [r for r in self.records if _step_id(r) == _step_id(step)]
+        attempts = [r for r in self.records if step_id(r) == step_id(step)]
         while True:
             ensure_running(self.run_dir)
             attempt = max((r.attempt for r in attempts), default=0) + 1
@@ -1080,7 +1236,7 @@ class _Session:
         }
 
     def error_record(self, step: PlannedStep, error: str) -> Record:
-        attempt = max((r.attempt for r in self.records if _step_id(r) == _step_id(step)), default=0) + 1
+        attempt = max((r.attempt for r in self.records if step_id(r) == step_id(step)), default=0) + 1
         fields = self.base_record(step, attempt, graph_hash="", fp8=False)
         fields.update(error=error, invalid_reasons=[error])
         return Record(**fields)
@@ -1113,7 +1269,17 @@ class _Session:
             log_offset = server.log_size()
             mark = recorder.mark()
             t_enqueue = time.perf_counter()
-            item_id = client.enqueue(graph.batch)
+            if self.info.calibrate:
+                try:
+                    item_id, fields["calibration"] = calibration.submit(
+                        client, self.cases[step.case_key].spec.model, graph.batch, self.info.case_models[step.case_key]
+                    )
+                except calibration.CaseRefused as e:
+                    fields.update(error=str(e), invalid_reasons=[str(e)])
+                    return Record(**fields)
+                self.device_class_ids.add(fields["calibration"].device_class_id)
+            else:
+                item_id = client.enqueue(graph.batch)
             fields["queue_item_id"] = item_id
             try:
                 item, t_done = wait_for_item(
@@ -1133,10 +1299,7 @@ class _Session:
 
         status = item["status"]
         fields["status"] = status
-        # Only img2img starts inside the schedule, at a step count each family derives differently.
-        case = self.cases[step.case_key]
-        expected_steps = None if case.spec.mode == "img2img" else case.spec.steps
-        timing = build_timing(recorder.since(mark), item_id, t_enqueue, t_done, item, expected_steps)
+        timing = build_timing(recorder.since(mark), item_id, t_enqueue, t_done, item, graph.step_counts)
         residency, residency_reasons = self.tracker.observe(parse_log(server.read_log(log_offset)), graph.model_keys)
         foreign = foreign_processes(usage_before, usage_after, own={server.pid, server.process.pid})
         trace_path = f"traces/{fields['record_id']}.csv.gz"
@@ -1168,6 +1331,9 @@ class _Session:
         if foreign:
             reasons.append(f"{FOREIGN_GPU_LOAD}: {_describe(foreign)}")
         if any(r.startswith((FOREIGN_GPU_LOAD, FOREIGN_QUEUE_ITEM)) for r in reasons):
+            valid_timing = valid_memory = False
+        if self.info.calibrate:
+            reasons.append(calibration.PROBE_REASON)
             valid_timing = valid_memory = False
         fields.update(
             valid_timing=valid_timing, valid_memory=valid_memory, valid_psnr=valid_psnr, invalid_reasons=reasons

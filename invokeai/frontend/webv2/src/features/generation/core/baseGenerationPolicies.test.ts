@@ -1898,6 +1898,19 @@ describe('Anima inpaint adapter slot', () => {
   });
 });
 
+describe('FLUX.3 policies', () => {
+  const KLEIN_CFG_REASON = 'FLUX.3 Klein samples without CFG. Set CFG Scale to 1, or use FLUX.3 Klein Base for CFG.';
+
+  it('blocks CFG on the step-distilled Klein and allows it on Klein Base', () => {
+    const klein = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein' });
+    const kleinBase = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein_base' });
+
+    expect(getGenerationValidationReasons(klein, createSettings(klein))).toEqual([]);
+    expect(getGenerationValidationReasons(klein, createSettings(klein, { cfgScale: 2 }))).toContain(KLEIN_CFG_REASON);
+    expect(getGenerationValidationReasons(kleinBase, createSettings(kleinBase, { cfgScale: 3.5 }))).toEqual([]);
+  });
+});
+
 describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
   const qwen35Encoder = (variant: string): ComponentModelConfig => ({
     base: 'any',

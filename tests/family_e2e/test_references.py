@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.family_e2e.records import Record, append_record, write_run_info
+from scripts.family_e2e.records import Record, append_record, load_run_info, write_run_info
 from scripts.family_e2e.references import AcceptError, accept, load_reference
 from tests.family_e2e.test_records import MB, make_record, make_run_info, write_png
 
@@ -56,6 +56,16 @@ def test_accept_refuses_runs_with_ab_arms(tmp_path: Path) -> None:
     run_dir = _run(tmp_path, records, arms=("A", "B"))
 
     with pytest.raises(AcceptError, match="arms A, B"):
+        accept(tmp_path, run_dir, None)
+    assert not (tmp_path / "references").exists()
+
+
+def test_accept_refuses_a_calibration_run(tmp_path: Path) -> None:
+    """The probe changes time and VRAM, so a calibration run's results never become references."""
+    run_dir = _run(tmp_path, [make_record(CASE, rep=0)])
+    write_run_info(run_dir, load_run_info(run_dir).model_copy(update={"calibrate": True}))
+
+    with pytest.raises(AcceptError, match="is a calibration run"):
         accept(tmp_path, run_dir, None)
     assert not (tmp_path / "references").exists()
 

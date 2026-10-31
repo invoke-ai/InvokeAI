@@ -9,12 +9,14 @@ import pytest
 
 from scripts.family_e2e.__main__ import main
 from scripts.family_e2e.records import (
+    FOREIGN_GPU_LOAD,
     Environment,
     ModelIdentity,
     Record,
     Residency,
     Thresholds,
     append_record,
+    load_run_info,
     write_run_info,
 )
 from scripts.family_e2e.references import accept
@@ -176,10 +178,57 @@ def test_failed_generation_is_an_error(tmp_path: Path) -> None:
     assert f"- ERROR {CASE}: {CASE}.default.measure.0.0: error: CUDA out of memory" in _attention(result)
 
 
-def test_a_step_that_failed_and_then_succeeded_on_resume_is_judged_by_its_final_attempt(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("last_measure", "status", "reason"),
+    [
+        ("missing", "INCOMPLETE", "1 of 3 planned measures did not finish (rep 2)"),
+        # Foreign load spoiled its only attempt: the runner repeats it, so it is no final measurement yet.
+        ("awaits its retry", "INCOMPLETE", "1 of 3 planned measures did not finish (rep 2)"),
+        ("canceled", "ERROR", f"{CASE}.default.measure.2.0: canceled: no error message"),
+    ],
+)
+def test_a_case_whose_planned_measures_did_not_all_complete_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], last_measure: str, status: str, reason: str
+) -> None:
+    # The measures that completed match the reference; the plan's third one did not run, awaits its retry, or was
+    # canceled.
+    accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST)), None)
+    records = _case_records(SECOND)[:-1]
+    if last_measure == "canceled":
+        records.append(make_record(CASE, rep=2, run_id=SECOND, status="canceled", image=False))
+    elif last_measure == "awaits its retry":
+        spoiled = {"valid_timing": False, "valid_memory": False, "invalid_reasons": [f"{FOREIGN_GPU_LOAD}: pid 4"]}
+        records.append(make_record(CASE, rep=2, run_id=SECOND, **spoiled))
+    run_dir = _write_run(tmp_path, SECOND, records)
+
+    assert main(["report", str(run_dir)]) == 1
+
+    assert "1 failures" in capsys.readouterr().out
+    assert f"- {status} {CASE}: {reason}" in (run_dir / "summary.md").read_text(encoding="utf-8").splitlines()
+
+
+def test_a_planned_case_the_run_never_reached_is_incomplete(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST)), None)
+    run_dir = _write_run(tmp_path, SECOND, _case_records(SECOND), status="stopped")
+    # The plan also holds a case the stopped run never reached; it has no record at all.
+    info = make_run_info(SECOND, profile=PROFILE, case_keys=(CASE, OTHER_CASE), status="stopped")
+    write_run_info(run_dir, info)
+
+    assert main(["report", str(run_dir)]) == 1
+
+    assert "1 failures" in capsys.readouterr().out
+    summary = (run_dir / "summary.md").read_text(encoding="utf-8").splitlines()
+    assert f"- INCOMPLETE {OTHER_CASE}: 3 of 3 planned measures did not finish (rep 0, 1, 2)" in summary
+    assert f"| {CASE} | PASS |" in "\n".join(summary)
+
+
+@pytest.mark.parametrize(("status", "error"), [("error", "server died"), ("canceled", None)])
+def test_a_step_that_failed_and_then_succeeded_on_resume_is_judged_by_its_final_attempt(
+    tmp_path: Path, status: str, error: str | None
+) -> None:
     accept(tmp_path, _write_run(tmp_path, FIRST, _case_records(FIRST)), None)
     records = _case_records(SECOND)
-    crashed = make_record(CASE, rep=0, attempt=0, run_id=SECOND, status="error", image=False, error="server died")
+    crashed = make_record(CASE, rep=0, attempt=0, run_id=SECOND, status=status, image=False, error=error)
     resumed = records[1].model_copy(update={"attempt": 1, "record_id": f"{CASE}.default.measure.0.1"})
     resumed = resumed.model_copy(update={"image_path": f"images/{resumed.record_id}.png"})
     run_dir = _write_run(tmp_path, SECOND, [records[0], crashed, resumed, *records[2:]])
@@ -188,7 +237,8 @@ def test_a_step_that_failed_and_then_succeeded_on_resume_is_judged_by_its_final_
 
     assert result.failures == 0
     assert _summary(result)[CASE][0] == "PASS"
-    assert f"- FLAG {CASE}: earlier attempt {CASE}.default.measure.0.0 error: server died" in _attention(result)
+    flag = f"- FLAG {CASE}: earlier attempt {CASE}.default.measure.0.0 {status}: {error or 'no error message'}"
+    assert flag in _attention(result)
 
 
 def test_case_without_valid_measurements_is_invalid_with_reasons(tmp_path: Path) -> None:
@@ -212,7 +262,7 @@ def test_partial_residency_marks_time_and_vram_invalid_but_keeps_the_psnr_verdic
     ]
     shape = {"valid_timing": False, "valid_memory": False, "valid_psnr": True, "invalid_reasons": reasons}
     records = [make_record(CASE, "warmup", run_id=FIRST, **shape)]
-    records += [make_record(CASE, rep=rep, run_id=FIRST, **shape) for rep in range(2)]
+    records += [make_record(CASE, rep=rep, run_id=FIRST, **shape) for rep in range(3)]
     run_dir = _write_run(tmp_path, FIRST, records)
 
     result = write_report(tmp_path, run_dir)
@@ -224,7 +274,7 @@ def test_partial_residency_marks_time_and_vram_invalid_but_keeps_the_psnr_verdic
     assert "1 NO-REFERENCE, 0 with outliers, 1 with invalid metrics." in summary
     attention = _attention(result)
     for reason in reasons:
-        assert f"- INVALID METRICS {CASE}: time and VRAM invalid: {reason} (2 of 2 measured)" in attention
+        assert f"- INVALID METRICS {CASE}: time and VRAM invalid: {reason} (3 of 3 measured)" in attention
     assert f'title="{reasons[0]}; {reasons[1]}">invalid</td>' in result.report_html.read_text(encoding="utf-8")
 
 
@@ -344,6 +394,22 @@ def test_previous_run_is_the_latest_earlier_one_of_the_profile_with_the_case(tmp
     assert not any(run_id in report for run_id in ("20261002-", "20261004-"))
 
 
+def test_a_calibration_run_is_never_the_previous_run(tmp_path: Path) -> None:
+    """The probe changes time and VRAM, so a calibration run in between is passed over."""
+    current = "20261003-000000-rtx4090"
+    _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
+    calibration = _write_run(
+        tmp_path, "20261002-000000-rtx4090", _case_records("20261002-000000-rtx4090", totals=(5.0,) * 3)
+    )
+    write_run_info(calibration, load_run_info(calibration).model_copy(update={"calibrate": True}))
+    run_dir = _write_run(tmp_path, current, _case_records(current))
+
+    result = write_report(tmp_path, run_dir)
+
+    assert _summary(result)[CASE][4] == "**-50.0%**"
+    assert "20261002-000000-rtx4090" not in result.report_html.read_text(encoding="utf-8")
+
+
 def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one_is_noted(tmp_path: Path) -> None:
     current = "20261003-000000-rtx4090"
     _write_run(tmp_path, "20261001-000000-rtx4090", _case_records("20261001-000000-rtx4090", totals=(20.0,) * 3))
@@ -351,7 +417,7 @@ def test_runs_of_other_profiles_are_never_read_but_an_unreadable_run_of_this_one
     # starts like this run's.
     for run_id in ("20261002-000000-rtx4090-vae", "20261002-060000-rtx4090"):
         (tmp_path / "runs" / run_id).mkdir()
-        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"calibrate": False}))
+        (tmp_path / "runs" / run_id / "run.json").write_text(json.dumps({"field_of_a_later_tool": False}))
     run_dir = _write_run(tmp_path, current, _case_records(current))
 
     result = write_report(tmp_path, run_dir)

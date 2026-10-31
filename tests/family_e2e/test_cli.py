@@ -16,6 +16,7 @@ from scripts.family_e2e.__main__ import UsageError, _resolve_run, main
 from scripts.family_e2e.gpu_memory import Adapter
 from scripts.family_e2e.records import RUN_INFO_FILE, RunInfo, load_run_info, write_run_info
 from scripts.family_e2e.runner import HEARTBEAT_FILE, now_iso, process_identity
+from tests.family_e2e.test_records import make_run_info
 
 REPO_ROOT = Path(__file__).parents[2]
 CHILD_TIMEOUT_S = 60.0
@@ -156,6 +157,73 @@ def test_stop_kills_the_runner_tree_but_no_process_whose_pid_was_reused(
         unrelated.kill()
         unrelated.wait()
         runner_process.wait()
+
+
+def test_stop_saves_the_calibration_store_its_killed_server_left(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No runner left a heartbeat to wait for.
+    monkeypatch.setattr(cli, "STOP_HEARTBEAT_WAIT_S", 0.0)
+    run_id = "20261017-000000-box"
+    run_dir = tmp_path / "data" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    write_run_info(
+        run_dir, make_run_info(run_id, profile="box", status="running").model_copy(update={"calibrate": True})
+    )
+    store_dir = tmp_path / "data" / "scratch-roots" / f"{run_id}-default" / "databases" / "working_memory"
+    store_dir.mkdir(parents=True)
+    store = b'{"schema_version": 1, "points": ["window"]}'
+    (store_dir / "0123456789abcdef.json").write_bytes(store)
+    (store_dir / "0123456789abcdef.json.lock").write_bytes(b"")
+
+    assert main(["stop", str(run_dir)]) == 0
+
+    info = load_run_info(run_dir)
+    # Saved under the mark `stop` set first, which stays.
+    assert info.status == "stopped"
+    assert [(e.lifetime, e.source, e.device_class_id, e.status) for e in info.calibration_exports] == [
+        (1, "store_file", "0123456789abcdef", None)
+    ]
+    assert (run_dir / info.calibration_exports[0].export).read_bytes() == store
+    assert not store_dir.exists()
+
+
+def test_a_stop_that_cannot_save_the_store_marks_the_run_stopped_and_keeps_the_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "STOP_HEARTBEAT_WAIT_S", 0.0)
+    run_id = "20261017-000000-box"
+    run_dir = tmp_path / "data" / "runs" / run_id
+    run_dir.mkdir(parents=True)
+    write_run_info(
+        run_dir,
+        make_run_info(run_id, profile="box", status="running", arms=("default", "patched")).model_copy(
+            update={"calibrate": True}
+        ),
+    )
+    roots = tmp_path / "data" / "scratch-roots"
+    kept_root = roots / f"{run_id}-default"
+    store_file = kept_root / "databases" / "working_memory" / "0123456789abcdef.json"
+    store_file.parent.mkdir(parents=True)
+    store = b'{"schema_version": 1, "points": ["window"]}'
+    store_file.write_bytes(store)
+    # The other arm's server had recorded no store yet; with nothing to save, its root goes.
+    (roots / f"{run_id}-patched" / "databases").mkdir(parents=True)
+    # A file where the run's calibration/ directory goes: the copy raises, as on a full disk.
+    (run_dir / "calibration").write_text("")
+
+    assert main(["stop", str(run_dir)]) == 2
+
+    info = load_run_info(run_dir)
+    assert (info.status, info.calibration_exports) == ("stopped", [])
+    assert info.finished_at is not None
+    captured = capsys.readouterr()
+    assert f"{run_id} stopped; continue with" in captured.out
+    assert "could not save the calibration store" in captured.err
+    assert f"kept the scratch root {kept_root} with it" in captured.err
+    # The only copy of the lifetime's windows, for `resume` to save.
+    assert store_file.read_bytes() == store
+    assert not (roots / f"{run_id}-patched").exists()
 
 
 @pytest.mark.platform_independent

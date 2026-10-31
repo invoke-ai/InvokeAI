@@ -36,12 +36,14 @@ from scripts.family_e2e.metrics import (
 from scripts.family_e2e.records import (
     Environment,
     ModelIdentity,
+    PlannedStep,
     Record,
     Reference,
     RunInfo,
     Thresholds,
     load_records,
     load_run_info,
+    remaining_steps,
     run_id_profile,
     write_bytes_atomic,
 )
@@ -66,9 +68,10 @@ RUNTIME_CONFIG_KEYS = (
 )
 
 # CHANGED: a case expected to change differs from its reference. BASELINE: its reference comes from this run, so
-# there is nothing to compare against. Neither is a failure.
-Status = Literal["PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INVALID", "NO-REFERENCE"]
-STATUSES: tuple[Status, ...] = ("PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INVALID", "NO-REFERENCE")
+# there is nothing to compare against. Neither is a failure. INCOMPLETE: a planned measure is not final.
+Status = Literal["PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INCOMPLETE", "INVALID", "NO-REFERENCE"]
+STATUSES: tuple[Status, ...] = ("PASS", "CHANGED", "BASELINE", "FAIL", "ERROR", "INCOMPLETE", "INVALID", "NO-REFERENCE")
+FAILURES: tuple[Status, ...] = ("FAIL", "ERROR", "INCOMPLETE")
 Unit = Literal["s", "bytes"]
 
 
@@ -77,7 +80,7 @@ class RenderedReport:
     html: str
     summary: str
     failures: int
-    """Cases with status FAIL or ERROR."""
+    """Cases with status FAIL, ERROR or INCOMPLETE."""
     outliers: int
     """Cases with at least one outlier against the reference or the previous run."""
     invalid: int
@@ -159,18 +162,28 @@ def render_report(
     of date, e.g. for a run whose runner died.
     """
     context = _Context(
-        data_dir, run_dir, info, _History(data_dir, info), _ImageCache(scrubber.text), diff_dir, scrubber
+        data_dir,
+        run_dir,
+        info,
+        _History(data_dir, info),
+        _ImageCache(scrubber.text),
+        diff_dir,
+        scrubber,
+        remaining_steps(info.plan, records),
     )
     cases = [
         _evaluate_safely(context, arm, case_key, case_records)
         for (arm, case_key), case_records in _group(info, records).items()
     ]
     notes = [scrubber.text(note) for note in context.history.notes]
+    if info.calibrate:
+        exports = ", ".join(export.export for export in info.calibration_exports) or "none saved"
+        notes.insert(0, f"Calibration run: time and VRAM are not rated. Store exports: {exports}.")
     run_status = status or info.status
     return RenderedReport(
         html=_render_html(context, cases, notes, href, run_status),
         summary=_render_summary(info, cases, notes, run_status),
-        failures=sum(case.status in ("FAIL", "ERROR") for case in cases),
+        failures=sum(case.status in FAILURES for case in cases),
         outliers=sum(case.has_outliers for case in cases),
         invalid=sum(case.status == "INVALID" or bool(case.invalid_metrics) for case in cases),
         changed=sum(case.status == "CHANGED" for case in cases),
@@ -239,7 +252,7 @@ class _History:
         """The latest earlier normal run with completed measured records of `case_key`."""
         for run_dir in self._candidates:
             run = self._load(run_dir)
-            if run is None:
+            if run is None or run.info.calibrate:
                 continue
             case_records = [r for r in run.records if r.case_key == case_key and r.arm == DEFAULT_ARM]
             records = [r for r in _final_records(case_records) if r.kind == "measure" and r.status == "completed"]
@@ -290,6 +303,8 @@ class _Context:
     images: _ImageCache
     diff_dir: Path
     scrubber: Scrubber
+    remaining: list[PlannedStep]
+    """The run's planned steps without a final record, as the runner counts them (`remaining_steps`)."""
 
 
 def _node_types(run_dir: Path, case_key: str) -> dict[str, str]:
@@ -467,7 +482,10 @@ def _evaluate(context: _Context, case: _Case, records: list[Record]) -> None:
             row.psnr_previous = _psnr_or_problem(image, previous_image)
         case.rows.append(row)
 
-    _set_status(case, final, thresholds, reference_problem, info.run_id)
+    own = (case.arm, case.case_key, "measure")
+    planned = sum((s.arm, s.case_key, s.kind) == own for s in info.plan)
+    unfinished = [s.rep for s in context.remaining if (s.arm, s.case_key, s.kind) == own]
+    _set_status(case, final, unfinished, planned, thresholds, reference_problem, info.run_id)
     _compare_metrics(case, context.run_dir, final, previous, thresholds)
     _set_change_flags(context, case, previous)
     _add_images(case, context, reference_image, previous, previous_image)
@@ -485,13 +503,21 @@ def _psnr_or_problem(image: np.ndarray | str, other: np.ndarray | str | None) ->
 
 
 def _set_status(
-    case: _Case, final: list[Record], thresholds: Thresholds | None, reference_problem: str | None, run_id: str
+    case: _Case,
+    final: list[Record],
+    unfinished: list[int],
+    planned: int,
+    thresholds: Thresholds | None,
+    reference_problem: str | None,
+    run_id: str,
 ) -> None:
     """Judges each step by its final attempt; a failure that a later attempt recovered from stays visible as a flag.
 
-    Errors, invalid runs and a missing reference come first. A reference set from this run gives BASELINE. Then the
-    minimum PSNR against the reference decides: below the threshold is FAIL, or CHANGED for a case expected to change,
-    which fails when it matches instead.
+    `unfinished` lists the reps of the `planned` measures the runner would still run: without a record, or awaiting a
+    retry. Errors (a final step that did not complete), unfinished measures, invalid runs and a missing reference come
+    first. A reference set from this run gives BASELINE.
+    Then the minimum PSNR against the reference decides: below the threshold is FAIL, or CHANGED for a case expected to
+    change, which fails when it matches instead.
     """
     rated = [row for row in case.rows if row.rated]
     values = [row.psnr_reference for row in rated if isinstance(row.psnr_reference, float)]
@@ -499,9 +525,14 @@ def _set_status(
     case.flags += [
         f"earlier attempt {row.record.record_id} {row.record.status}: {row.record.error or 'no error message'}"
         for row in case.rows
-        if not row.final and row.record.status in ("failed", "error")
+        if not row.final and row.record.status != "completed"
     ]
-    errored = [r for r in final if r.status in ("failed", "error")]
+    errored = [r for r in final if r.status != "completed"]
+    absent = (
+        [f"{len(unfinished)} of {planned} planned measures did not finish (rep {', '.join(map(str, unfinished))})"]
+        if unfinished
+        else []
+    )
     wrong_size = [
         r
         for r in final
@@ -513,7 +544,10 @@ def _set_status(
 
     if errored:
         case.status = "ERROR"
-        case.reasons += [f"{r.record_id}: {r.status}: {r.error or 'no error message'}" for r in errored]
+        case.reasons += [f"{r.record_id}: {r.status}: {r.error or 'no error message'}" for r in errored] + absent
+    elif unfinished:
+        case.status = "INCOMPLETE"
+        case.reasons += absent
     elif wrong_size:
         case.status = "FAIL"
         case.reasons += [
@@ -848,7 +882,7 @@ h4 { font-size: 13px; margin: 20px 0 6px; color: var(--muted); text-transform: u
 .badge { display: inline-block; padding: 1px 9px; border-radius: 999px; font-size: 12px; font-weight: 600;
   white-space: nowrap; }
 .s-PASS { background: var(--pass-bg); color: var(--pass-fg); }
-.s-FAIL, .s-ERROR { background: var(--fail-bg); color: var(--fail-fg); }
+.s-FAIL, .s-ERROR, .s-INCOMPLETE { background: var(--fail-bg); color: var(--fail-fg); }
 .s-INVALID { background: var(--invalid-bg); color: var(--invalid-fg); }
 .s-NO-REFERENCE { background: var(--noref-bg); color: var(--noref-fg); }
 .s-CHANGED { background: var(--changed-bg); color: var(--changed-fg); }
@@ -912,7 +946,7 @@ def _render_html(
         f'<div class="counts">{count_badges or "<span class=muted>no cases</span>"}</div></header>',
     ]
     if run_status != "completed":
-        notes = [f"The run is {run_status}; cases it did not reach show as INVALID.", *notes]
+        notes = [f"The run is {run_status}; cases it did not finish show as INCOMPLETE.", *notes]
     if notes:
         parts.append('<ul class="notes">' + "".join(f"<li>{_e(note)}</li>" for note in notes) + "</ul>")
     parts.append(_environment_html(info))

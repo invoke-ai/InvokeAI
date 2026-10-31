@@ -2858,6 +2858,144 @@ def _vocab_build_service(tmp_path, monkeypatch: pytest.MonkeyPatch, matrix: np.n
     return svc
 
 
+@pytest.mark.parametrize("build_fails", [False, True], ids=["successful-build", "failed-build"])
+def test_vocab_requests_do_not_wait_for_an_in_flight_build(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, build_fails: bool
+) -> None:
+    from invokeai.app.services.image_index import cluster_labels
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    entered = threading.Event()
+    release = threading.Event()
+    request_done = threading.Event()
+    build_errors: list[Exception] = []
+    request_errors: list[Exception] = []
+    builds = 0
+
+    def _embed(embed_fn: Callable[[list[str]], np.ndarray], phrases: list[str]) -> np.ndarray:
+        nonlocal builds
+        builds += 1
+        entered.set()
+        if not release.wait(timeout=15):
+            raise TimeoutError("The test did not release the vocabulary encoder")
+        if build_fails:
+            raise RuntimeError("simulated encoder failure")
+        return matrix
+
+    def _build() -> None:
+        try:
+            service._build_vocab_embeddings()
+        except Exception as error:
+            build_errors.append(error)
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            request_errors.append(error)
+        finally:
+            request_done.set()
+
+    monkeypatch.setattr(cluster_labels, "ensemble_phrase_embeddings", _embed)
+    builder = threading.Thread(target=_build)
+    caller = threading.Thread(target=_request)
+    builder.start()
+    try:
+        assert entered.wait(timeout=5), "The worker never reached the vocabulary encoder"
+        assert service.get_vocab_build_state() == ("building", None)
+        caller.start()
+        # A hang ceiling, not a throughput budget: the encoder cannot finish
+        # until this test releases it, but the request must already be done.
+        assert request_done.wait(timeout=5), "The labels request waited for the vocabulary build"
+        assert len(request_errors) == 1
+        assert isinstance(request_errors[0], TextSearchUnavailableError)
+        assert "still being prepared" in str(request_errors[0])
+        assert not service._vocab_build_requested.is_set()
+    finally:
+        release.set()
+        builder.join(timeout=5)
+        if caller.ident is not None:
+            caller.join(timeout=5)
+
+    assert not builder.is_alive() and not caller.is_alive()
+    assert not build_errors
+    failed_at = service._vocab_failed_at
+    service._build_vocab_embeddings()
+    assert builds == 1
+    if build_fails:
+        with pytest.raises(RuntimeError, match="simulated encoder failure"):
+            service.get_vocab_embeddings()
+        assert service._vocab_failed_at == failed_at
+        assert service.get_vocab_build_state() == ("error", "simulated encoder failure")
+    else:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+        assert vocabulary == ["a cat", "a dog", "a car"]
+        assert np.array_equal(embeddings, matrix)
+        assert service.get_vocab_build_state() == ("ready", None)
+
+
+def test_a_ready_vocabulary_answers_while_another_reader_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    service._build_vocab_embeddings()
+    # Stands in for a concurrent get_vocab_embeddings / get_vocab_build_state.
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+    finally:
+        service._vocab_lock.release()
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(embeddings, matrix)
+
+    service._stop_event.set()
+    with pytest.raises(TextSearchUnavailableError, match="The image index is not running"):
+        service.get_vocab_embeddings()
+
+
+@pytest.mark.parametrize("unavailable", ["stopped", "no-model", "no-invoker"])
+def test_a_busy_vocabulary_reports_unavailability_during_shutdown(service: ImageIndexService, unavailable: str) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    service._invoker = SimpleNamespace()  # type: ignore[assignment]
+    service._model_id = MODEL_ID
+    if unavailable == "stopped":
+        service._stop_event.set()
+    elif unavailable == "no-model":
+        service._model_id = None
+    else:
+        service._invoker = None
+    done = threading.Event()
+    errors: list[Exception] = []
+
+    def _request() -> None:
+        try:
+            service.get_vocab_embeddings()
+        except Exception as error:
+            errors.append(error)
+        finally:
+            done.set()
+
+    caller = threading.Thread(target=_request)
+    try:
+        with service._vocab_lock:
+            caller.start()
+            assert done.wait(timeout=5), "The unavailable index waited for the vocabulary lock"
+    finally:
+        if caller.ident is not None:
+            caller.join(timeout=5)
+    assert not caller.is_alive()
+    assert len(errors) == 1
+    assert isinstance(errors[0], TextSearchUnavailableError)
+    assert str(errors[0]) == "The image index is not running"
+    assert not service._vocab_build_requested.is_set()
+
+
 def test_the_vocabulary_cache_reaches_disk_under_its_final_name(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
     # np.savez appends `.npz` to a path that lacks it, so a staging name ending
     # in `.tmp` produced `.tmp.npz` on disk and the rename that followed looked

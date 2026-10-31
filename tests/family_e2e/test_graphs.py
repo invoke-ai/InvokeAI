@@ -1,6 +1,12 @@
 import pytest
 
-from scripts.family_e2e.graphs import build_export_request, output_image_name, prepare_batch, shareable_source
+from scripts.family_e2e.graphs import (
+    IDEOGRAM4_PRESET_STEPS,
+    build_export_request,
+    output_image_name,
+    prepare_batch,
+    shareable_source,
+)
 from scripts.family_e2e.manifest import CaseSpec, ResolvedCase
 from scripts.family_e2e.records import Thresholds
 
@@ -19,6 +25,22 @@ def _batch(image_name: str = "upload-1.png", seed: int = 1234, reverse: bool = F
         nodes = {k: dict(reversed(v.items())) for k, v in reversed(nodes.items())}
     data = [[{"node_path": "noise", "field_name": "seed", "items": [seed]}]]
     return {"graph": {"id": "g", "nodes": nodes, "edges": []}, "data": data, "origin": "o", "destination": "gallery"}
+
+
+def test_the_model_keys_are_the_models_the_server_finds_in_the_nodes() -> None:
+    """What the calibrate route takes the identities of: identifiers in node fields, nested ones included."""
+    batch = _batch()
+    nodes = batch["graph"]["nodes"]
+    nodes["metadata"] = {"id": "metadata", "type": "core_metadata", "model": MAIN, "t5_encoder": {**LORA, "key": "enc"}}
+    # Neither counts on the server: a mapping without a hash, and a config inside an identifier.
+    nodes["other"] = {
+        "id": "other",
+        "type": "other",
+        "value": {"key": "no-hash", "name": "No hash", "base": "sdxl", "type": "main"},
+        "loaded": {**MAIN, "key": "outer", "source_config": {**LORA, "key": "inner"}},
+    }
+
+    assert prepare_batch(batch, {}, {}).model_keys == {"main-key", "lora-key", "enc", "outer"}
 
 
 def test_prepare_disables_the_cache_on_every_node_and_runs_once() -> None:
@@ -144,3 +166,36 @@ def test_a_source_is_shareable_when_it_names_the_model_for_anyone(
     source: str, source_type: str, shareable: bool
 ) -> None:
     assert shareable_source({"source": source, "source_type": source_type}) == (source if shareable else None)
+
+
+def test_each_denoise_node_states_the_step_count_it_runs_over_its_whole_schedule() -> None:
+    nodes = {
+        # Ideogram 4 runs its sampler preset's count unless it sets `steps`; the case's steps do not reach it.
+        "ideogram": {"id": "ideogram", "type": "ideogram4_denoise", "sampler_preset": "V4_TURBO_12"},
+        "ideogram_steps": {
+            "id": "ideogram_steps",
+            "type": "ideogram4_denoise",
+            "sampler_preset": "V4_TURBO_12",
+            "steps": 30,
+        },
+        "flux2": {"id": "flux2", "type": "flux2_denoise", "num_steps": 4, "denoising_start": 0, "denoising_end": 1},
+        "z_image": {"id": "z_image", "type": "z_image_denoise", "steps": 8},
+        # A window of the schedule runs a part of it that each family cuts differently.
+        "img2img": {
+            "id": "img2img",
+            "type": "flux2_denoise",
+            "num_steps": 4,
+            "denoising_start": 0.3,
+            "denoising_end": 1,
+        },
+        "sdxl_base": {"id": "sdxl_base", "type": "denoise_latents", "steps": 30, "denoising_end": 0.8},
+        "output": {"id": "output", "type": "l2i", "is_intermediate": False},
+    }
+    prepared = prepare_batch({"graph": {"id": "g", "nodes": nodes, "edges": []}, "data": []}, {}, {})
+    assert prepared.step_counts == {"ideogram": 12, "ideogram_steps": 30, "flux2": 4, "z_image": 8}
+
+
+def test_the_ideogram_preset_step_counts_are_the_servers() -> None:
+    from invokeai.backend.ideogram4.sampler_configs import PRESETS
+
+    assert IDEOGRAM4_PRESET_STEPS == {name: preset.num_steps for name, preset in PRESETS.items()}

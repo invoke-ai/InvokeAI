@@ -33,15 +33,18 @@ class MemoryProgressPreviews(ProgressPreviewsBase):
         self._lock = Lock()
         self._items: dict[int, _ItemPreview] = {}
 
-    def reserve_revision(self, item_id: int, session_id: str, percentage: float | None) -> int | None:
+    def reserve_revision(
+        self, item_id: int, session_id: str, percentage: float | None, min_interval_s: float | None = None
+    ) -> int | None:
         now = self._clock()
+        interval = self._min_interval_s if min_interval_s is None else max(self._min_interval_s, min_interval_s)
         with self._lock:
             item = self._items.get(item_id)
             if item is None or item.session_id != session_id:
                 item = _ItemPreview(session_id=session_id)
                 self._items[item_id] = item
             is_final = percentage is None or percentage >= 1.0
-            if not is_final and item.last_emitted_at is not None and now - item.last_emitted_at < self._min_interval_s:
+            if not is_final and item.last_emitted_at is not None and now - item.last_emitted_at < interval:
                 return None
             item.revision += 1
             item.last_emitted_at = now
