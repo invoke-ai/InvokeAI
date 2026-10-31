@@ -136,9 +136,15 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',
+  // The settings store and the project sync share the account session lookup at boot on both routes; alone it costs
+  // each a startup request.
+  '/workbench/projects/session.ts',
   '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
   '/workbench/settings/launchpad.tsx',
+  // The settings store, the project file codec and the editor's reducers share the layered-settings table; alone it
+  // costs each route a startup request.
+  '/workbench/settings/projectSettings.ts',
   '/workbench/settings/settingsSearchShortcut.ts',
 ] as const;
 
@@ -206,6 +212,37 @@ const EDITOR_BOOT_SHARED_MODULES = [
   // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
   // costs a boot request.
   '/platform/react/useModifierHeld.ts',
+] as const;
+
+// Editor runtime the workbench store reaches: the editor boots it, and the settings field bindings (lazy on both
+// routes) reach it through the same store, while the Launchpad palette does not. Without the group Rolldown splits it
+// by importer set, costing the editor boot one request per piece.
+const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  '/features/generation/core/projectPromptDraft.ts',
+  '/features/generation/core/prompt/compel.ts',
+  '/features/queue/core/deviceLabels.ts',
+  '/features/queue/core/graphInputMedia.ts',
+  '/features/queue/data/activeProgressTargetStore.ts',
+  '/features/queue/data/progressImageStore.ts',
+  '/features/queue/data/progressStore.ts',
+  '/features/queue/data/realtimeRuntime.ts',
+  '/features/queue/publicApi.ts',
+  '/features/queue/runtime.ts',
+  '/features/queue/runtime/cancelRequests.ts',
+  '/features/queue/runtime/coordinator.ts',
+  '/features/queue/runtime/receiptAcknowledgements.ts',
+  '/features/queue/ui/useDeviceLabel.ts',
+  '/features/upscale/core/settings.ts',
+  '/features/upscale/ui/UpscaleUiContext.tsx',
+  '/features/video/core/dimensions.ts',
+  '/features/video/core/settings.ts',
+  '/features/video/core/videoPolicies.ts',
+  '/features/video/core/widgetValues.ts',
+  '/features/video/ui/VideoUiContext.tsx',
+  '/features/workflow/core/buildGraph.ts',
+  '/features/workflow/core/formFieldSettings.ts',
+  '/platform/react/draftRegistry.ts',
+  '/platform/react/useDebouncedValue.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -488,6 +525,12 @@ export default defineConfig({
               name: 'editor-boot-shared',
               priority: 30,
               test: (id) => matchesAnySuffix(id, EDITOR_BOOT_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'workbench-runtime-shared',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKBENCH_RUNTIME_SHARED_MODULES),
             },
             {
               includeDependenciesRecursively: false,
