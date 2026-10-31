@@ -136,7 +136,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
                   {job.error_reason}
                 </Badge>
               ) : null}
-              <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
+              <Text color="fg" fontSize="xs" overflowWrap="anywhere">
                 {job.error}
               </Text>
             </HStack>

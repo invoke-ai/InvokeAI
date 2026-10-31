@@ -28,7 +28,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.krea2.attention import (
     Krea2RegionalPromptingState,
     build_krea2_attention_processors,
@@ -70,7 +69,6 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
-from invokeai.backend.util import sdpa_scope
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -96,10 +94,6 @@ class _Krea2StepBenchmark:
         self._label = label
         self._step_ms: list[float] = []
         self._step_started_at = 0.0
-        # A window that did not own the process-global backend selection ran under someone else's
-        # policy. For an exclusive override that voids the measurement, so the summary has to say it
-        # rather than print a label for a kernel that may not have run.
-        self._foreign_windows_at_start = sdpa_scope.foreign_window_entries()
         # Reset here, immediately before the loop, so the reported peak is the loop's and not the
         # model load's.
         torch.cuda.reset_peak_memory_stats(device)
@@ -127,12 +121,6 @@ class _Krea2StepBenchmark:
         # The first step absorbs kernel selection and allocator warmup -- on a cold cuDNN run it has
         # been seen at 2606 ms against a 1451 ms steady mean -- so it is reported, not averaged in.
         steady = self._step_ms[1:] or self._step_ms
-        foreign = sdpa_scope.foreign_window_entries() - self._foreign_windows_at_start
-        if foreign:
-            logger.warning(
-                f"Krea-2 SDPA benchmark [{self._label}]: {foreign} attention window(s) ran under another "
-                "session's backend policy, so these timings are not a measurement of the requested kernel."
-            )
         logger.info(
             f"Krea-2 SDPA benchmark [{self._label}]: {len(self._step_ms)} steps | "
             f"first {first_ms:.0f} ms | "
@@ -734,13 +722,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # is how a model that loaded comfortably OOMs in its first step. Zero for any other format.
         estimated_working_memory += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
-        # Once per device per process, and from here rather than from startup: the probe allocates,
-        # so on the boot path it would create a CUDA context on an idle server -- and on `cuda:0`,
-        # which need not be a device this session ever uses. Before the model is locked, because it
-        # ends with `empty_cache()` and dropping the allocator's blocks is cheap now and expensive
-        # once the transformer is resident.
-        log_attention_backends(logger, device)
-
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(working_mem_bytes=estimated_working_memory)
@@ -792,8 +773,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     reference_kv,
                 )
 
-            # An INVOKE_KREA2_SDPA_BACKEND override pins one PyTorch kernel to measure it; SageAttention must not
-            # serve those calls instead.
+            # An INVOKE_KREA2_SDPA_BACKEND override measures PyTorch's kernels -- one pinned kernel, or the
+            # process-wide order for `default` -- so SageAttention must not serve those calls instead.
             if resolve_krea2_sdpa_backends().override is None:
                 exit_stack.enter_context(sage_attention_scope())
 
@@ -1032,10 +1013,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         """The score matrix the main blocks' joint attention materializes, where it does (0 on a fused kernel).
 
         One call is alive at a time: the blocks run in sequence, and so do the conditional and unconditional passes.
-        The K/V heads are expanded to the query heads before the call on any build without a fused grouped-query
-        kernel (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the
-        loaded model's config. The probe answers for torch's default policy, so forcing the math kernel through the
-        `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
+        The K/V heads are expanded to the query heads before the call unless a fused kernel takes them grouped
+        (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the loaded
+        model's config. The probe answers for the process-wide policy the call runs under (`attention_backend: math`
+        included), so forcing the math kernel through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
         """
         config = getattr(transformer, "config", None)
         num_heads = getattr(config, "num_attention_heads", None)

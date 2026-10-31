@@ -528,8 +528,8 @@ def flux2_entry(denoising_start: float) -> tuple[float, list[str]]:
         # float32 noise: the node works in bfloat16, which would keep three digits of the entry sigma.
         stack.enter_context(patch.object(node, "_prepare_noise_tensor", return_value=torch.ones(1, 32, 8, 8)))
         stack.enter_context(patch.object(node, "_prep_inpaint_mask", capture))
-        # The first call after the scheduler is decided.
-        stack.enter_context(patch.object(node, "_estimate_working_memory", side_effect=_Stop))
+        # Where the node prices its working memory: after the scheduler is decided, before the transformer runs.
+        stack.enter_context(patch(f"{FLUX2_MODULE}.estimate_flux2_denoise_working_memory", side_effect=_Stop))
         with pytest.raises(_Stop):
             node._run_diffusion(context)
 

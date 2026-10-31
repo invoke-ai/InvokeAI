@@ -27,7 +27,7 @@ from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRe
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.util import devices
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.working_memory import counters, probe
+from invokeai.backend.working_memory import counters, measurement, probe
 from invokeai.backend.working_memory.counters import CounterReading, Method
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.probe import MeasuredWindow, ProbeScope, calibration_scope
@@ -48,6 +48,8 @@ class FakeDevice:
         self.allocated = 0
         self.cached = 0
         self.retained = 0
+        self.outside = 0
+        """What the driver counts beyond the allocator's blocks: library workspaces, kernel modules."""
         self.peak_reserved = 0
         self.peak_allocated = 0
         self.num_ooms = 0
@@ -107,7 +109,7 @@ class FakeDevice:
             peak_allocated=self.peak_allocated,
             num_ooms=self.num_ooms,
             num_alloc_retries=self.num_alloc_retries,
-            driver=self.reserved + self.retained if self.has_driver else None,
+            driver=self.reserved + self.retained + self.outside if self.has_driver else None,
             peak_driver=None,
             paged=paged,
             device_used=None if self.device_used_by_others is None else self.reserved + self.device_used_by_others,
@@ -306,7 +308,7 @@ def device(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakeDevice]:
     # The fake allocator observes releases ahead of the probe, which registers when a scope opens.
     monkeypatch.setattr(devices, "EMPTY_CACHE_OBSERVERS", [fake])
     monkeypatch.setattr(counters, "DeviceCounters", device_counters)
-    monkeypatch.setattr(probe, "SPILL_SETTLE_S", 0.0)
+    monkeypatch.setattr(measurement, "SPILL_SETTLE_S", 0.0)
     yield fake
     assert all(c.closed for c in opened), "every window's counters are closed, so no sampler outlives it"
     assert probe.armed is False
@@ -937,6 +939,23 @@ def test_a_driver_that_keeps_a_retained_pool_reads_below_reserved_and_reserved_d
     (window,) = scope.windows
     assert window.driver is not None and window.driver.delta == 4 * GIB
     assert window.demand_bytes == 6 * GIB
+
+
+def test_memory_outside_torchs_allocator_decides_the_demand_through_the_drivers_figure(device: FakeDevice):
+    """On HIP the first operation of a process maps ~300 MiB beyond the reserved peak, and library workspaces and
+    kernel modules are the driver's alone everywhere: torch's counters never see them."""
+    cache = FakeCache(device)
+
+    with _scope() as scope:
+        with _model(cache, "vae").model_on_device(working_memory=_estimate()):
+            device.alloc(1 * GIB)
+            device.free(1 * GIB)
+            device.outside += 300 * MIB
+
+    (window,) = scope.windows
+    assert window.reserved is not None and window.reserved.delta == 1 * GIB
+    assert window.driver is not None and window.driver.delta == 1 * GIB + 300 * MIB
+    assert window.demand_bytes == 1 * GIB + 300 * MIB
 
 
 def test_without_a_driver_reading_the_window_rests_on_torch_and_is_unverified(device: FakeDevice):
