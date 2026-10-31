@@ -332,7 +332,7 @@ export const ManagerQueueErrorDetail = ({ message, reason }: { message: string; 
         {reason}
       </Badge>
     ) : null}
-    <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
+    <Text color="fg" fontSize="xs" overflowWrap="anywhere">
       {message}
     </Text>
   </HStack>

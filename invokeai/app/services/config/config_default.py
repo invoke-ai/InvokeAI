@@ -100,6 +100,7 @@ class InvokeAIAppConfig(BaseSettings):
         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
         style_presets_dir: Path to directory for style presets.
+        prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
@@ -221,6 +222,7 @@ class InvokeAIAppConfig(BaseSettings):
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
+    prompt_files_dir:              Path = Field(default=Path("prompt_files"), description="Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
     # LOGGING
@@ -512,6 +514,11 @@ class InvokeAIAppConfig(BaseSettings):
         return self._resolve(self.style_presets_dir)
 
     @property
+    def prompt_files_path(self) -> Path:
+        """Path to the prompt list files directory, resolved to an absolute path."""
+        return self._resolve(self.prompt_files_dir)
+
+    @property
     def workflow_thumbnails_path(self) -> Path:
         """Path to the workflow thumbnails directory, resolved to an absolute path.."""
         return self._resolve(self.workflow_thumbnails_dir)
@@ -759,6 +766,26 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
 
 
+def ensure_prompt_files_dir(prompt_files_path: Path) -> None:
+    prompt_files_readme_path = prompt_files_path / "README.txt"
+
+    try:
+        prompt_files_path.mkdir(parents=True, exist_ok=True)
+        if not prompt_files_readme_path.exists():
+            with open(prompt_files_readme_path, "wt", encoding="utf-8") as f:
+                f.write(
+                    "Prompt list files for the InvokeAI 'Prompts from File' node.\n\n"
+                    "Place UTF-8 text files, one prompt per line, in this folder (or subfolders).\n"
+                    "The node's file_path input is relative to this folder: a file saved as\n"
+                    "'lists/fantasy.txt' here is addressed as 'lists/fantasy.txt'.\n\n"
+                    "The node cannot read files outside this folder. In multi-user mode it is\n"
+                    "restricted to administrators, because this folder is shared by all accounts -\n"
+                    "non-admins should use wildcards, which are per-account, instead.\n"
+                )
+    except OSError:
+        logger.warning("Unable to initialize prompt files directory at %s", prompt_files_path, exc_info=True)
+
+
 def load_config_from_root(root: Path) -> InvokeAIAppConfig:
     """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
     for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
@@ -849,6 +876,7 @@ def get_config() -> InvokeAIAppConfig:
         default_config.write_file(config.config_file_path, as_example=False)
 
     ensure_fonts_dir(config.fonts_path)
+    ensure_prompt_files_dir(config.prompt_files_path)
 
     api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
     if api_keys_from_file:

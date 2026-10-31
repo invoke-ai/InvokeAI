@@ -51,7 +51,7 @@ describe('mixed-media gallery translations', () => {
       })
     ).toBe('1 image uploaded to Clips.');
     expect(instance.t('widgets.gallery.uploadFailedCount', { count: 1 })).toBe('1 file failed.');
-    expect(instance.t('widgets.gallery.uploadSplit')).toBe('Images appear in Uploads; videos appear in Media.');
+    expect(instance.t('widgets.gallery.uploadSplit')).toBe('Images and videos appear in Uploads.');
     expect(
       instance.t('widgets.gallery.deleteBoardMediaFailed', {
         media: formatGalleryMediaCounts(t, { images: 1, videos: 2 }),

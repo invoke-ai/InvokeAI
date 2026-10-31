@@ -4,6 +4,7 @@ import torch
 
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import (
     FLUX_LORA_CLIP_PREFIX,
@@ -303,6 +304,10 @@ def lora_layers_from_flux_diffusers_grouped_state_dict(
 
     # Final layer.
     add_lora_layer_if_present("proj_out", "final_layer.linear")
+    # The modulation output halves are (scale, shift) in diffusers and (shift, scale) in BFL.
+    if "norm_out.linear" in grouped_state_dict:
+        values = get_lora_layer_values(grouped_state_dict.pop("norm_out.linear"))
+        layers["final_layer.adaLN_modulation.1"] = SwappedHalvesLayerPatch(any_lora_layer_from_state_dict(values))
 
     # Assert that all keys were processed.
     assert len(grouped_state_dict) == 0

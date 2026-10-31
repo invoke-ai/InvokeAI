@@ -23,7 +23,11 @@ import {
   isReferenceImageSupported,
   withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
-import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
+import {
+  generatedImageToReferenceImage,
+  getEffectiveReferenceImage,
+  getReferenceImagePromptTags,
+} from '@features/generation/core/referenceImage';
 import {
   clampDimension,
   deriveAspectRatioId,
@@ -75,6 +79,10 @@ export const GenerateReferenceImagesContent = ({
     disabled: !isSupported,
     id: 'generate-reference-images',
   });
+  const promptTags = useMemo(
+    () => getReferenceImagePromptTags(selectedModel?.base, referenceImages),
+    [referenceImages, selectedModel?.base]
+  );
 
   /** Adds what fits and returns how many that was, as the commit counted the free slots. */
   const appendReferenceImages = useCallback(
@@ -366,6 +374,7 @@ export const GenerateReferenceImagesContent = ({
               onPatch={patchReferenceImage}
               onRemove={removeReferenceImage}
               onUseSize={applyReferenceImageSize}
+              promptTag={promptTags.get(referenceImage.id)}
             />
           ))}
         </Stack>

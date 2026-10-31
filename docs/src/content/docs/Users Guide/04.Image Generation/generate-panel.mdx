@@ -68,7 +68,7 @@ Some families add their own controls to the Render section:
 
 A negative prompt lists what you do *not* want in the image, such as *blurry, watermark, extra fingers*. Models that support one show a **+ Negative prompt…** button under the prompt; click it to open the box, and click **Turn off negative prompt** to hide it again without losing the text.
 
-Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1, Krea-2 and MOSS-Image, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
+Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1, Krea-2, FLUX.3 Klein Base and MOSS-Image, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
 
 ### Refiner
 
@@ -132,6 +132,7 @@ What a reference does, and what options it has, depends on the model family:
 | **Anima** (not Anima-3.8B) | An Anima IP-Adapter carries a character's appearance (hair, outfit, accessories) into the image. Up to four references (experimental); images of one character combine well, different characters blend. | **Strength** (0 to 2; 0 turns it off), per reference. Under **Advanced**: the IP-Adapter model and the **Active steps** range. |
 | **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
 | **FLUX.2, Qwen Image Edit, Qwen-Image-2.1** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
+| **FLUX.3** | As FLUX.2, with up to ten references. The prompt names them by the tag on each card, such as `<ref_image_0>`; click the tag to copy it. | None. |
 | **Krea-2** | **Style**: one reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content. **Edit**: up to three references for an edit LoRA, such as a pose skeleton or a depth map, read in card order. See [Krea-2 style reference](/users-guide/models/local-models/krea-2/#style-reference) and [edit LoRAs](/users-guide/models/local-models/krea-2/#edit-loras-and-reference-images). | **Mode**: **Style** or **Edit**. **Style strength** (0–2; 0 turns the reference off) for Style. |
 
 Reference images require an extra model for SD 1.5, SDXL, FLUX.1 and Anima (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
