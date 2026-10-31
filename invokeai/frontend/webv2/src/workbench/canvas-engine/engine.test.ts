@@ -16153,6 +16153,9 @@ describe('beginTransform', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const h = strokeThenTransform({ uploadImage: () => Promise.reject(new Error('offline')) });
+      // Both waits share a wall-clock bound, not a step count: each hash settles off the fake clock, so on a loaded
+      // machine a step count can run out while a digest is still queued. It stays under the test timeout below.
+      const deadline = performance.now() + 20_000;
       // Advances the fake clock, then yields to real I/O: hashing the encoded pixels settles outside the clock.
       const advance = async (ms: number) => {
         await vi.advanceTimersByTimeAsync(ms);
@@ -16174,7 +16177,7 @@ describe('beginTransform', () => {
           .then(() => {
             flush.settled = true;
           });
-        for (let step = 0; step < 200 && !flush.settled; step += 1) {
+        while (!flush.settled && performance.now() < deadline) {
           await advance(250);
         }
         expect(flush.settled).toBe(true);
@@ -16185,7 +16188,7 @@ describe('beginTransform', () => {
       expect(h.refusals).toEqual([]);
 
       // The store retries on its own backoff until its consecutive-failure limit stops it.
-      for (let step = 0; step < 300 && h.engine.interaction.get('pendingTransformLayerId'); step += 1) {
+      while (h.engine.interaction.get('pendingTransformLayerId') && performance.now() < deadline) {
         await advance(1000);
       }
       expect(h.engine.interaction.get('pendingTransformLayerId')).toBeNull();
@@ -16194,7 +16197,7 @@ describe('beginTransform', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
+  }, 30_000);
 });
 
 describe('transform session', () => {
