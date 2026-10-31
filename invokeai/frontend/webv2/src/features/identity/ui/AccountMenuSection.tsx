@@ -3,17 +3,19 @@ import { logoutSession, useAuthSession } from '@features/identity/session';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useNavigate } from '@tanstack/react-router';
 import { LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ProfileDialog } from './ProfileDialog';
 
-/** Embed account actions directly in host menus to avoid nested popovers; render nothing in single-user mode. */
-export const AccountMenuSection = () => {
+/**
+ * Embed account actions directly in host menus to avoid nested popovers; render nothing in single-user mode. The host
+ * renders {@link AccountProfileDialog} outside its menu: menu content unmounts on close, and would take the dialog along.
+ */
+export const AccountMenuSection = ({ onOpenProfile }: { onOpenProfile: () => void }) => {
   const { t } = useTranslation();
   const session = useAuthSession();
   const navigate = useNavigate();
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
 
   const openUserManagement = useCallback(() => {
     void navigate({ to: '/users' });
@@ -22,9 +24,6 @@ export const AccountMenuSection = () => {
   const signOut = useCallback(() => {
     void logoutSession();
   }, []);
-
-  const openProfile = useCallback(() => setIsProfileOpen(true), []);
-  const closeProfile = useCallback(() => setIsProfileOpen(false), []);
 
   if (!session.multiuserEnabled || session.user === null) {
     return null;
@@ -53,7 +52,7 @@ export const AccountMenuSection = () => {
           ) : null}
         </HStack>
       </Box>
-      <Menu.Item value="account" onClick={openProfile}>
+      <Menu.Item value="account" onClick={onOpenProfile}>
         <Icon as={UserRoundCogIcon} boxSize="3.5" />
         <Menu.ItemText>{t('auth.accountSettings')}</Menu.ItemText>
       </Menu.Item>
@@ -67,9 +66,28 @@ export const AccountMenuSection = () => {
         <Icon as={LogOutIcon} boxSize="3.5" />
         <Menu.ItemText>{t('auth.signOut')}</Menu.ItemText>
       </Menu.Item>
-      <ProfileDialog isOpen={isProfileOpen} user={user} onClose={closeProfile} />
     </>
   );
+};
+
+/** Account settings for the signed-in user, opened from {@link AccountMenuSection}; nothing once signed out. */
+export const AccountProfileDialog = ({
+  finalFocusEl,
+  isOpen,
+  onClose,
+}: {
+  /** The menu's trigger: the item that opened the dialog is gone once the menu closes. */
+  finalFocusEl: () => HTMLElement | null;
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
+  const session = useAuthSession();
+
+  if (!session.multiuserEnabled || session.user === null) {
+    return null;
+  }
+
+  return <ProfileDialog finalFocusEl={finalFocusEl} isOpen={isOpen} user={session.user} onClose={onClose} />;
 };
 
 /** True when {@link AccountMenuSection} has anything to render. */

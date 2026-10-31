@@ -19,7 +19,7 @@ const custom = (
   id: string,
   label: string,
   scope: SettingDefinition['scope'] = 'preference',
-  options: { fill?: boolean } = {}
+  options: { fill?: boolean; framed?: boolean } = {}
 ): SettingDefinition => ({
   id,
   label: text(`${id}.label`, label),
@@ -63,9 +63,21 @@ export const appearanceSettings = section('appearance', 'Appearance', [
   },
 ]);
 export const behaviorSettings = section('behavior', 'Behavior', [
-  preference('autoSwitchInvocationRoute', 'Auto-switch Invoke route'),
+  {
+    id: 'startupDestination',
+    label: text('startupDestination.label', 'On startup, open'),
+    description: text('startupDestination.description'),
+    keywords: 'launch start open resume recent project launchpad home',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'launchpad', label: text('options.launchpad', 'Launchpad') },
+      { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
+    ],
+  },
+  preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
-  preference('enableModelDescriptions', 'Show model descriptions', 'models'),
+  preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),
   preference('preferNumericAttentionStyle', 'Prefer numeric attention style', 'generate prompt editor'),
   preference('showPromptSyntaxHighlighting', 'Highlight prompt syntax', 'generate prompt editor'),
@@ -158,8 +170,12 @@ export const serverSettings = section('server', 'Server', [
 ]);
 export const workspaceSettings = section('workspace', 'Data & workspace', [
   custom('workspaceActions', 'Data & workspace', 'none'),
+  {
+    ...custom('clearSavedData', 'Clear saved data', 'none', { framed: true }),
+    keywords: 'delete reset erase wipe projects',
+  },
 ]);
-export const aboutSettings = section('about', 'About', [custom('about', 'About InvokeAI', 'none')]);
+export const aboutSettings = section('about', 'About', [custom('about', 'About Invoke', 'none')]);
 
 export const applicationSettingsContributions = [
   appearanceSettings,

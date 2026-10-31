@@ -38,7 +38,9 @@ Undo history is not saved. It lasts only while the project is open in your brows
 
 ## Starting a project
 
-The **Home** page is the first thing you see when Invoke opens. It shows the project you edited most recently under **Pick up where you left off**, a row of **Recent projects**, and tiles for starting something new.
+The **Home** page is the first thing you see when Invoke opens. It shows the project you edited most recently under **Pick up where you left off**, a row of **Recent projects** with your pinned projects first, and tiles for starting something new. If your projects cannot be loaded, Home and **Projects** say so with a **Retry** button instead of showing an empty library.
+
+To skip Home, set **On startup, open** to **Most recent project** in Settings (**Behavior**). Invoke then reopens the projects you had open, or the project you edited last if you had none open. A link to a specific page still opens that page. While it opens them, the loading screen offers **Stay on the Launchpad**. If that work did not finish opening the last time Invoke started, Invoke opens the Launchpad instead, once, and says why, so a project that fails to open never traps every launch.
 
 To create a project, click **New project**. The arrow beside it (**Choose how to start**) offers starting points that open the project with a layout suited to the task:
 
@@ -62,9 +64,9 @@ The name of the active project appears in the top bar. Click it, or press <kbd>C
 - **Recent**: up to five other projects you edited lately.
 - **New project** and **Open project**, which lists every saved project that is not already open.
 
-<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing project details and commands, the open project, recent projects, New project and Open project." width={420} />
+<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing the active project's commands, the open project, recent projects, New project and Open project." width={420} />
 
-The switcher also carries commands for the active project: **Rename…**, **Details**, **Export**, **Close** and **Delete project…**. **Details** opens the **Project** widget, which shows the project's name, when it was last saved and whether it is in sync with the server.
+The switcher also carries commands for the active project: **Rename…**, **Copy project ID**, **Export**, **Close** and **Delete project…**. **Copy project ID** puts the project's ID on the clipboard.
 
 The shortcut works even while you are typing in a prompt box. You can rebind it in the hotkey settings, where it is called **Open project switcher**.
 
@@ -78,7 +80,7 @@ Boards belong to projects. Every project has an **Inbox**, created with it, wher
 
 The gallery's board list is grouped by this: first the open project's boards, headed by the project's name, with **Inbox** pinned at the top; then **Library**, with **Uncategorized** pinned at the top for media that is on no board. Each group has its own **+** button, so where a new board goes is decided by which one you press.
 
-New results go to whichever board is selected in the gallery, so you can send a batch somewhere else when you want to. To send them to one board while you browse others, choose **Auto-add to this board** from that board's menu; see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes). When a project is first created, imported or duplicated, its Inbox is selected. If you choose a date view instead of a specific board, results still go to the Inbox. After that, the project remembers your choice of destination.
+New results go to the project's Inbox until you choose another board under **Saving to** in the Gallery header, so browsing other boards never moves them; turn on **Follow the selected board** there to send them to whichever board you view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes). When a project is first created, imported or duplicated, its Inbox is selected. The project remembers your choice of destination.
 
 The destination is fixed when you press **Invoke**. Switching to a different project or board while a job runs does not redirect its results.
 
@@ -90,7 +92,7 @@ See [the gallery](/users-guide/gallery/introduction/) for more about boards.
 
 ## Saving and syncing
 
-Changes save to the server automatically, about half a second after you stop making them. If the connection drops, your browser keeps the unsaved changes and Invoke retries until the save goes through. The Project widget and the workflow toolbar show the current state, for example **Project saved to the server** or **Saving project…**.
+Changes save to the server automatically, about half a second after you stop making them. If the connection drops, your browser keeps the unsaved changes and Invoke retries until the save goes through. The **Autosave** status in the status bar shows the current state, for example **Saved** or **Saving…**; hover over it for when the project last saved and which open projects need attention. The workflow toolbar shows it too, for example **Project saved to the server** or **Saving project…**.
 
 Because projects live on the server, the same project can be open in two browser tabs or on two computers. If both change it before either has saved, Invoke shows a **Project changed elsewhere** banner and lets you decide:
 
@@ -129,8 +131,8 @@ Right-click a project, or use its **Actions** button, for **Open**, **Pin**, **R
 
 - The project's canvas, workflows, layout and settings are deleted.
 - Its Inbox is deleted too, but **the images and videos on it are kept**: they move to **Uncategorized** in the gallery.
-- If the project has other boards, the dialog asks what to do with them: **keep them in the Library**, with everything on them, or **delete them too**, in which case their media also moves to Uncategorized. Deleting a project never empties your gallery.
-- A project that is still generating cannot be deleted until its runs finish.
+- If the project has other boards, the dialog asks what to do with them: **keep them in the Library**, with everything on them, or **also delete them**, which removes only the board folders: their images and videos move to Uncategorized. Deleting a project never deletes an image.
+- A project that is still generating cannot be deleted until its runs finish. The notice that says so offers the queue (or, on the Launchpad, the project) so you can wait for them or cancel them.
 
 If you only want to tidy the switcher, **Close** the project instead of deleting it.
 
@@ -172,4 +174,4 @@ In the Workflow Library dialog, **This project** lists the project's own workflo
 - **Invoke needs the server to open projects.** If it cannot reach the server, a **Projects are temporarily unavailable** screen offers to retry and to export any unsaved work your browser is holding.
 - **Newer projects need a newer Invoke.** A project saved by a newer version of Invoke shows **Requires a newer Invoke** and cannot be opened until you upgrade. Some features raise this requirement for good: once a project has had a Noise, Texture, Clarity or Dehaze adjustment on the canvas, versions of Invoke without those adjustments refuse to open it, even after you remove the adjustment.
 - **Size limits.** A project file can be up to 2 GB, with up to 20,000 files. Export reports a project that is too large to package.
-- **Clear saved data…** under **Data & workspace** in Settings deletes *all* of your projects and settings at once, and cannot be undone.
+- **Clear saved data…**, in its own warning area under **Data & workspace** in Settings, deletes *all* of your projects and settings at once, and cannot be undone. Its confirmation says how many projects go, links to **Projects** so you can export the ones you want first, and asks you to type **DELETE**. Images and videos are kept: project boards move to the Library and Inbox items to Uncategorized.

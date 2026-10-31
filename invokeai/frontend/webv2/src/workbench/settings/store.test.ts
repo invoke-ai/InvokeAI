@@ -419,6 +419,19 @@ describe('normalizeWorkbenchPreferences workflow library', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences canvas tool memory', () => {
+  it('keeps only the known tools, each a plain record, and an already-valid record as is', () => {
+    const valid = { brush: { size: 12 }, text: { fontSize: 40 } };
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: valid }).canvasToolMemory).toBe(valid);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        canvasToolMemory: { brush: { size: 12 }, eraser: 'wide', junk: { a: 1 }, shape: [1] } as never,
+      }).canvasToolMemory
+    ).toEqual({ brush: { size: 12 } });
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: [] as never }).canvasToolMemory).toEqual({});
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);
@@ -530,6 +543,20 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all' }).queueJobsScope).toBe('all');
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'all-projects' }).queueJobsScope).toBe('all');
     expect(store.normalizeWorkbenchPreferences({ queueJobsScope: 'current-project' }).queueJobsScope).toBe('all');
+  });
+});
+
+describe('normalizeWorkbenchPreferences startup destination', () => {
+  it('opens the Launchpad unless the most recent project was chosen', () => {
+    expect(store.normalizeWorkbenchPreferences({}).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'recentProject' }).startupDestination).toBe(
+      'recentProject'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'launchpad' }).startupDestination).toBe(
+      'launchpad'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'project' }).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: true }).startupDestination).toBe('launchpad');
   });
 });
 

@@ -57,6 +57,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       (snapshot) => selector(snapshot.activeProject),
       shallowEqual
     ),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchInternalStore: () => store,
   useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),

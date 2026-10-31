@@ -12,7 +12,7 @@ import type {
   CanvasNodeContract,
   CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/api';
-import type { InvocationRoute } from '@workbench/invocationContracts';
+import type { InvocationRoute, InvocationValidationReason } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
 import { galleryKeys } from '@features/gallery/queries';
@@ -31,6 +31,10 @@ vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompt
 
 // Remembered control-model picks, which readiness reads imperatively from the account preferences.
 const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string, string> }));
+
+/** A route reason as text: Generate issues carry their English beside the locale key. */
+const reasonText = (reason: InvocationValidationReason) =>
+  typeof reason === 'object' && 'generationIssue' in reason ? reason.generationIssue.message : reason;
 
 vi.mock('./settings/store', async (importOriginal) => {
   const actual = await importOriginal<typeof settingsStoreModule>();
@@ -152,7 +156,9 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(missingComponentsRoute.sourceValid).toBe(false);
-    expect(missingComponentsRoute.validationReasons).toContain('Generate needs a Qwen3 Encoder for Anima models.');
+    expect(missingComponentsRoute.validationReasons.map(reasonText)).toContain(
+      'Generate needs a Qwen3 Encoder for Anima models.'
+    );
 
     const validRoute = resolveInvocationRoute(
       getActiveProject(createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae }))
@@ -170,7 +176,9 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.');
+    expect(route.validationReasons.map(reasonText)).toContain(
+      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+    );
   });
 
   it('invalidates FLUX.2 generation when dimensions are not on the required 16px grid', () => {
@@ -181,14 +189,16 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate height must be a multiple of 16.');
+    expect(route.validationReasons.map(reasonText)).toContain('Height must be a multiple of 16.');
   });
 
   it('invalidates external providers without a registered invocation node', () => {
     const route = resolveInvocationRoute(getActiveProject(createGenerateValues(unknownExternalModel)));
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain("No invocation node registered for external provider 'future-provider'.");
+    expect(route.validationReasons.map(reasonText)).toContain(
+      "No invocation node registered for external provider 'future-provider'."
+    );
   });
 });
 
@@ -238,12 +248,12 @@ describe('resolveInvocationRoute — upscale source', () => {
     const withoutWidget = { ...input, mountedWidgetIds: input.mountedWidgetIds.filter((id) => id !== 'upscale') };
     const missingTile = upscaleModels.filter((model) => model.key !== 'tile-upscale');
 
-    expect(resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons).toContain(
-      'The Upscale widget is not mounted in this project.'
-    );
-    expect(resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons).toContain(
-      'SDXL Tile ControlNet is no longer installed.'
-    );
+    expect(
+      resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons.map(reasonText)
+    ).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'upscale' } });
+    expect(
+      resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons.map(reasonText)
+    ).toContain('SDXL Tile ControlNet is no longer installed.');
   });
 
   it('rejects a main-model base the widget has no builder for', () => {
@@ -255,7 +265,7 @@ describe('resolveInvocationRoute — upscale source', () => {
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain(
+    expect(result.validationReasons.map(reasonText)).toContain(
       'Upscale supports only SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 or Qwen Image main models.'
     );
   });
@@ -270,7 +280,7 @@ describe('resolveInvocationRoute — upscale source', () => {
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain(
+    expect(result.validationReasons.map(reasonText)).toContain(
       'The Tile ControlNet must match the main model base and be a Tile or Union model.'
     );
   });
@@ -339,7 +349,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     const input = canvasInputFor({ generateValues: createGenerateValues(model) });
     expect(resolveInvocationRouteInput(input, 'global', canvasRoute).sourceValid).toBe(true);
     expect(
-      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons
+      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons.map(
+        reasonText
+      )
     ).toContain('Unknown External Provider does not support text-to-image generation.');
   });
 
@@ -371,8 +383,8 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasInputFor({ generateValues, bbox: { width: 1025, height: 512 } }),
         'global',
         canvasRoute
-      ).validationReasons
-    ).toContain('Unknown External Provider supports a maximum size of 1024×1024.');
+      ).validationReasons.map(reasonText)
+    ).toContain('Unknown External Provider supports at most 1024×1024.');
   });
 
   it('validates a fixed-size provider against the size it is asked for, not the frame', () => {
@@ -505,7 +517,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Canvas generation frame must have a positive area.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'emptyCanvasFrame' } });
   });
 
   it('reuses the generate model validation reasons', () => {
@@ -516,7 +528,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate needs a Qwen3 Encoder for Anima models.');
+    expect(route.validationReasons.map(reasonText)).toContain('Generate needs a Qwen3 Encoder for Anima models.');
   });
 
   it('invalidates when the canvas widget is not mounted', () => {
@@ -527,7 +539,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'canvas' } });
   });
 
   it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
@@ -833,6 +845,29 @@ describe('submitResolvedInvocation', () => {
     expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
   });
 
+  it('dispatches the prompt as typed, with no round trip, while dynamic prompts are off', () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { dynamicPromptsEnabled: false, positivePrompt: 'wall painted #ff0000 {a|b}' })
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+
   // Expansion failures must not submit literal dynamic syntax.
   describe('when a prompt cannot be expanded', () => {
     const submitDynamicPrompt = () => {
@@ -862,9 +897,12 @@ describe('submitResolvedInvocation', () => {
 
       await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(1));
       expect(submitResolved).not.toHaveBeenCalled();
+      // No server reason came back, so the notice says the server could not be reached.
       expect(store.getSnapshot().notifications[0]).toMatchObject({
         kind: 'error',
+        messageKey: 'topbar.invoke.expansionUnreachable',
         title: 'The prompt could not be expanded',
+        titleKey: 'topbar.invoke.expansionFailed',
       });
     });
 
@@ -925,9 +963,7 @@ describe('resolveInvocationRoute — video destination compatibility', () => {
     const blocked = resolveInvocationRouteInput(input, 'global', canvasRoute);
 
     expect(blocked.destinationValid).toBe(false);
-    expect(blocked.validationReasons).toContain(
-      'Video results can only be sent to the Gallery. Switch the destination to Gallery.'
-    );
+    expect(blocked.validationReasons).toContainEqual({ routeIssue: { kind: 'videoNeedsGallery' } });
 
     expect(
       resolveInvocationRouteInput(input, 'global', { ...canvasRoute, destination: 'gallery' }).destinationValid

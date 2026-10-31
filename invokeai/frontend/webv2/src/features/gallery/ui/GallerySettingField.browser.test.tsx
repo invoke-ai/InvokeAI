@@ -25,7 +25,7 @@ vi.mock('react-i18next', () => ({
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const STALE_TARGET = { projectId: 'old-project' };
-const PICKED_BOARD_VALUES = { selectedBoardId: 'picked' };
+const LEGACY_FOLLOW_VALUES = { autoAddBoardId: 'follow', selectedBoardId: 'picked' };
 const NO_VALUES = {};
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -118,19 +118,15 @@ describe('Gallery settings contribution bindings', () => {
     expect(host?.querySelector('output')?.textContent).toContain('"middleClickOpensInNewTab":true');
   });
 
-  it('pins the current destination when results stop following the selected board', async () => {
-    await act(() => root?.render(<Harness id="followSelectedBoard" initialValues={PICKED_BOARD_VALUES} />));
+  it("follows the selected board only once turned on, reading an earlier build's stored follow as off", async () => {
+    await act(() => root?.render(<Harness id="followSelectedBoard" initialValues={LEGACY_FOLLOW_VALUES} />));
     const toggle = host?.querySelector<HTMLInputElement>('[data-surface="quick"] input');
 
-    expect(toggle?.checked).toBe(true);
-    await act(() => toggle?.click());
-
     expect(toggle?.checked).toBe(false);
-    expect(host?.querySelector('output')?.textContent).toContain('"autoAddBoardId":"picked"');
-
     await act(() => toggle?.click());
 
-    expect(host?.querySelector('output')?.textContent).toContain('"autoAddBoardId":"follow"');
+    expect(toggle?.checked).toBe(true);
+    expect(host?.querySelector('output')?.textContent).toContain('"followSelectedBoard":true');
   });
 
   it('disables edits for a target belonging to another project', async () => {

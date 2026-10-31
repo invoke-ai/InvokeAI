@@ -80,6 +80,9 @@ const staleProject = (): Project => {
           document: { ...document, stacks: stacksFrom([regionalWith('snap', generated('snap.png', ''))]) },
           id: 'snapshot-1',
           name: 'Snapshot',
+          stagedImages: [
+            { ...generated('kept.png', ''), placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 } },
+          ],
         },
       ],
       stagingArea: {
@@ -141,6 +144,11 @@ describe('rebuildProjectMediaUrls', () => {
     ).toMatchObject({
       imageUrl: 'https://here/images/snap.png/full',
       thumbnailUrl: 'https://here/images/snap.png/thumb',
+    });
+    // A restore point's staged results, blanked by an import, come back with this deployment's URLs.
+    expect(rebuilt.canvas.snapshots[0]!.stagedImages?.[0]).toMatchObject({
+      imageUrl: 'https://here/images/kept.png/full',
+      thumbnailUrl: 'https://here/images/kept.png/thumb',
     });
     expect(JSON.stringify(rebuilt)).not.toContain('localhost:9090');
   });

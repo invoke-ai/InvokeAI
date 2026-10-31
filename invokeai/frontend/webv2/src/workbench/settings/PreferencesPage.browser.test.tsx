@@ -164,6 +164,20 @@ describe('Launchpad preferences page', () => {
     await expect.element(detailHeading('Behavior')).toBeVisible();
   });
 
+  it('finds project settings in search but marks them as needing an open project', async () => {
+    await render('/preferences/appearance');
+
+    await act(() => search().fill('watermark'));
+    await expect.element(page.getByText('Invisible watermark', { exact: true })).toBeVisible();
+    await expect.element(page.getByText(i18n.t('settingsDialog.projectUnavailable'), { exact: true })).toBeVisible();
+    // Nothing to edit or reveal here: no control and no way into a section this page does not list.
+    expect(page.getByRole('checkbox', { name: 'Invisible watermark' }).query()).toBeNull();
+    expect(page.getByRole('button', { name: i18n.t('settingsDialog.showInSection'), exact: true }).query()).toBeNull();
+
+    await act(() => search().fill(''));
+    await expect.element(sectionItem('Project')).not.toBeInTheDocument();
+  });
+
   it('replaces a search left behind when another page asks for a setting', async () => {
     const router = await render('/preferences/appearance');
     await act(() => search().fill('motion'));

@@ -62,8 +62,10 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
       } else {
         commands.notifications.add({
           kind: 'info',
-          message: 'The linked project does not exist on this account — it may have been deleted.',
+          message: 'The linked project does not exist on this account. It may have been deleted.',
+          messageKey: 'projects.notFoundDescription',
           title: 'Project not found',
+          titleKey: 'projects.notFound',
         });
       }
     });

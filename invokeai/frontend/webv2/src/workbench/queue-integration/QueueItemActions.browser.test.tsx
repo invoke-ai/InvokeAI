@@ -52,14 +52,14 @@ afterEach(async () => {
   host.remove();
 });
 
-const render = async () => {
+const render = async (shown: QueueItemReadModel = item) => {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
         <QueryClientProvider client={client}>
-          <QueueItemActions item={item} />
+          <QueueItemActions item={shown} />
         </QueryClientProvider>
       </ChakraProvider>
     )
@@ -70,14 +70,14 @@ const button = (label: string) =>
   [...document.querySelectorAll('button')].find((candidate) => candidate.textContent?.includes(label));
 const dialogText = () => document.querySelector('[role="dialog"]')?.textContent ?? '';
 
-describe('QueueItemActions View JSON', () => {
+describe('QueueItemActions details', () => {
   it('reads the saved execution data only when opened, and offers a retry when the read fails', async () => {
     readDetail.mockRejectedValueOnce(new Error('Queue item 9 not found'));
     await render();
 
     expect(readDetail).not.toHaveBeenCalled();
 
-    await act(() => button('common.viewJson')!.click());
+    await act(() => button('widgets.queue.viewError')!.click());
 
     await vi.waitFor(() => expect(dialogText()).toContain('widgets.queue.detailLoadFailed'));
     expect(document.querySelector('[role="dialog"] [role="alert"]')?.textContent).toContain('Queue item 9 not found');
@@ -95,11 +95,37 @@ describe('QueueItemActions View JSON', () => {
     expect(readDetail).toHaveBeenCalledTimes(2);
   });
 
+  it('opens a failed item on its error, with the traceback as text rather than inside the JSON', async () => {
+    readDetail.mockResolvedValue(detail(null));
+    await render();
+
+    await act(() => button('widgets.queue.viewError')!.click());
+
+    await vi.waitFor(() => expect(dialogText()).toContain('Traceback…'));
+    const selected = document.querySelector('[role="dialog"] [role="tab"][aria-selected="true"]');
+    expect(selected?.textContent).toBe('widgets.queue.detailViews.error');
+    expect(dialogText()).toContain('OutOfMemoryError');
+    expect(dialogText()).toContain('Out of memory');
+    expect(document.querySelector('[role="region"][aria-label="widgets.queue.tracebackLabel"]')).not.toBeNull();
+  });
+
+  it('opens a finished item on its saved data, offering no Error view without an error', async () => {
+    readDetail.mockResolvedValue({ ...detail(null), errorMessage: null, errorTraceback: null, errorType: null });
+    await render({ ...item, status: 'completed' });
+
+    await act(() => button('common.viewJson')!.click());
+
+    await vi.waitFor(() => expect(dialogText()).toContain('widgets.queue.detailViews.graph'));
+    const selected = document.querySelector('[role="dialog"] [role="tab"][aria-selected="true"]');
+    expect(selected?.textContent).toBe('widgets.queue.detailViews.item');
+    expect(dialogText()).not.toContain('widgets.queue.detailViews.error');
+  });
+
   it('adds a Workflow view when the batch embedded one', async () => {
     readDetail.mockResolvedValue(detail({ name: 'Upscale' }));
     await render();
 
-    await act(() => button('common.viewJson')!.click());
+    await act(() => button('widgets.queue.viewError')!.click());
 
     await vi.waitFor(() => expect(dialogText()).toContain('widgets.queue.detailViews.workflow'));
   });

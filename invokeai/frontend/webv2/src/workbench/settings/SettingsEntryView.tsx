@@ -107,6 +107,7 @@ export const SettingsEntryView = ({
   const scope = entry.field.scope;
   const isDestination = search && entry.field.kind === 'custom';
   const fill = !search && !unavailable && isFillSettingsEntry(entry, surface);
+  const framed = !search && entry.field.kind === 'custom' && entry.field.framed === true;
   return (
     <>
       {showGroup && entry.field.group ? (
@@ -124,13 +125,14 @@ export const SettingsEntryView = ({
       <Box
         data-setting-id={entry.field.id}
         py={surface === 'quick' ? '1.5' : '4'}
-        borderBottomWidth={fill ? '0' : '1px'}
+        borderBottomWidth={fill || framed ? '0' : '1px'}
         borderColor="border.subtle"
         {...(fill ? FILL_PROPS : undefined)}
       >
         {unavailable || isDestination ? (
           <Stack gap="2">
-            <Text fontSize="lg" fontWeight="500">
+            {/* Muted where it cannot be edited here: it reads as present but out of reach, not as a broken control. */}
+            <Text color={unavailable ? 'fg.muted' : undefined} fontSize="lg" fontWeight="500">
               {resolveSettingsText(entry.field.label, t)}
             </Text>
             {entry.field.description ? (
@@ -173,7 +175,7 @@ export const SettingsEntryView = ({
             <SettingsScopeLabel scope={scope} />
           </Box>
         ) : null}
-        {search && !isDestination ? (
+        {search && !isDestination && !unavailable ? (
           <Button size="sm" variant="ghost" mt="1" onClick={reveal}>
             {t('settingsDialog.showInSection')}
           </Button>

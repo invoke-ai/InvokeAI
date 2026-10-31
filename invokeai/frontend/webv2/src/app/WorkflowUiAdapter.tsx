@@ -5,8 +5,8 @@ import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/react';
-import { getAuthSession, subscribeAuthSession } from '@features/identity';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getAuthSession, getCapabilities, subscribeAuthSession } from '@features/identity';
+import { ensureModelsLoaded, openModelManager, useModelsSelector } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
@@ -26,6 +26,7 @@ import {
   createInvocationRouteInputSelector,
   formatRoute,
   isInvocationRouteValid,
+  localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
@@ -154,14 +155,16 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           availabilityModels
         );
 
+        const message = route.validationMessage;
+
         return {
           canInvoke: isInvocationRouteValid(route) && !isPreparing,
           label: formatRoute(route),
           validationMessage: isPreparing
             ? t('topbar.invoke.preparing')
-            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
-              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
-              : route.validationMessage,
+            : message === undefined
+              ? undefined
+              : localizeInvocationValidationReason(message, t),
         };
       },
       invoke: async (sourceId) => {
@@ -264,7 +267,10 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     () =>
       createProjectedExternalStore({
         source: { getSnapshot: getAuthSession, subscribe: subscribeAuthSession },
-        select: (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
+        select: (session) => ({
+          canManageNodes: getCapabilities(session).canManageNodes,
+          canUseCache: !session.multiuserEnabled || session.user?.is_admin === true,
+        }),
         isEqual: shallowEqual,
       }),
     []
@@ -300,12 +306,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         subscribeOrigin: nodeExecutionStore.subscribeOrigin,
       },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
-      // Lazy-load manager filter state to preserve editor bundle boundaries; seed it before hash navigation.
-      openAddModels: (query) => {
-        void import('@features/models/launchpad').then(({ requestAddModelsSearch }) => {
-          requestAddModelsSearch(query);
-          window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`;
-        });
+      openAddModels: (query) => openModelManager({ projectId: queries.getSnapshot().activeProject.id, search: query }),
+      openNodesManager: () => {
+        window.location.hash = '#/nodes';
       },
       performance: {
         mark: (name, source) => markWorkbenchPerf(name, source),

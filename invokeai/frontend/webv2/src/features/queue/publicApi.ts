@@ -13,6 +13,7 @@ import { queueBackend } from './data/httpRealtimeQueueBackend';
 import { queueItemDetailOptions, queueReadModelOptions } from './data/queries';
 import { createQueueRealtimeRuntime } from './data/realtimeRuntime';
 import { createQueueRuntime } from './runtime';
+import { queueCancelRequests } from './runtime/cancelRequests';
 import { createQueueReceiptAcknowledgements, type QueueReceiptStorePort } from './runtime/receiptAcknowledgements';
 
 export const createProductionQueueReceiptAcknowledgements = (store: QueueReceiptStorePort, isActive: () => boolean) =>
@@ -82,6 +83,7 @@ export const createProductionQueueRuntime = ({
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
+    cancelRequests: queueCancelRequests,
     destinations,
     ensureProjectPersisted,
     ensureTemplatesLoaded,

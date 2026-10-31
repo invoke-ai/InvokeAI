@@ -73,7 +73,6 @@ const createHarness = (
     canEdit: true,
     floating: false,
     gesture: false,
-    interactionLocked: false,
     tool: 'brush' as ToolId,
   };
   const calls = {
@@ -99,7 +98,6 @@ const createHarness = (
     hasFloatingSelection: () => state.floating,
     invalidate: vi.fn(),
     isGestureActive: () => state.gesture,
-    isInteractionLocked: () => state.interactionLocked,
     peekCacheRect: (layerId) => caches.peek(layerId)?.rect,
     pending: { get: () => pending, set: (value) => (pending = value) },
     reportRefusal: calls.reportRefusal,
@@ -341,7 +339,6 @@ describe('TransformEditingController.request', () => {
   });
 
   it.each([
-    ['interaction is locked', (s: HarnessState) => (s.interactionLocked = true)],
     ['a gesture runs', (s: HarnessState) => (s.gesture = true)],
     ['a float is live', (s: HarnessState) => (s.floating = true)],
     ['document edits are locked', (s: HarnessState) => (s.canEdit = false)],

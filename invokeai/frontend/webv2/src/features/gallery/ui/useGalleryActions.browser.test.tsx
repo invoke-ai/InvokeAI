@@ -1,10 +1,11 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryUiAdapter } from '@features/gallery/react';
 
-import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
+import { getGallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
+import { toaster } from '@platform/ui/toaster';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, type ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -28,6 +29,8 @@ const mocks = vi.hoisted(() => ({
   invalidateGalleryBoardDestinations: vi.fn(),
   notificationsAdd: vi.fn(),
   notificationsReportError: vi.fn(),
+  notificationsUndoable: vi.fn(),
+  projectGalleryValues: vi.fn((_projectId: string): Record<string, unknown> | null => null),
   patchGalleryBoardCaches: vi.fn((..._args: unknown[]) => vi.fn()),
   updateGalleryBoard: vi.fn(),
   uploadGalleryImage: vi.fn(),
@@ -52,29 +55,27 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.boardArchivePreparing': `Preparing an image archive of "${String(values?.name)}". ${String(
           values?.count
         )} video will be omitted.`,
-        'widgets.gallery.deleteBoardMediaOutcome': `Deleted ${String(values?.images)} and ${String(
-          values?.videos
-        )}; ${String(values?.failedImages)} and ${String(values?.failedVideos)} failed.`,
-        'widgets.gallery.deleteBoardMoveOutcome': `Moved ${String(values?.images)} and ${String(
-          values?.videos
-        )} to Uncategorized.`,
+        'widgets.gallery.deleteBoardInProgress': `Deleting board "${String(values?.name)}" and its media…`,
+        'widgets.gallery.deleteBoardMediaDeleted': `Deleted ${String(values?.media)}.`,
+        'widgets.gallery.deleteBoardMediaFailed': `${String(values?.media)} could not be deleted.`,
+        'widgets.gallery.deleteBoardMoveOutcome': `Moved ${String(values?.media)} to Uncategorized.`,
         'widgets.gallery.deleteBoardPartialTitle': `Deleted board "${String(values?.name)}" with partial media cleanup`,
         'widgets.gallery.deleteBoardSuccessTitle': `Deleted board "${String(values?.name)}"`,
         'widgets.gallery.downloadReady': 'Download ready',
-        'widgets.gallery.imageCount': `${String(values?.count)} images`,
+        'widgets.gallery.imageCount': `${String(values?.count)} ${values?.count === 1 ? 'image' : 'images'}`,
+        'widgets.gallery.mediaCountsTwo': `${String(values?.first)} and ${String(values?.second)}`,
         'widgets.gallery.preparingDownload': 'Preparing download',
         'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
         'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
-        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Media.',
-        'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
-          values?.board
-        )}. ${String(values?.failed)} failed.`,
+        'widgets.gallery.uploadFailedCount': `${String(values?.count)} failed.`,
+        'widgets.gallery.uploadSplit': 'Images appear in Uploads; videos appear in Media.',
+        'widgets.gallery.uploadSummary': `${String(values?.media)} uploaded to ${String(values?.board)}.`,
         'widgets.gallery.uploadSuccessTitle': `Uploaded ${String(values?.count)} files`,
         'widgets.gallery.uploadUnsupported':
           'No supported media files to upload (PNG, JPEG, or WebP images; video files; or audio files).',
         'widgets.gallery.uncategorized': 'Uncategorized',
-        'widgets.gallery.videoCount': `${String(values?.count)} videos`,
+        'widgets.gallery.videoCount': `${String(values?.count)} ${values?.count === 1 ? 'video' : 'videos'}`,
       };
 
       return messages[key] ?? key;
@@ -206,6 +207,7 @@ const adapter: GalleryUiAdapter = {
   galleryValues: {},
   generateValues: {},
   getItemLabel: () => Promise.resolve(null),
+  getProjectGalleryValues: (projectId: string) => mocks.projectGalleryValues(projectId),
   liveFollowEnabled: false,
   progressSessions: [],
   pinnedProgressSessionId: null,
@@ -214,6 +216,7 @@ const adapter: GalleryUiAdapter = {
   notifications: {
     add: (...args: unknown[]) => mocks.notificationsAdd(...args),
     reportError: (...args: unknown[]) => mocks.notificationsReportError(...args),
+    undoable: (...args: unknown[]) => mocks.notificationsUndoable(...args),
   },
   projectId: 'project-1',
   projectName: 'Project',
@@ -257,6 +260,7 @@ const renderProbe = async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.projectGalleryValues.mockReset().mockReturnValue(null);
   mocks.canAddToCachedGalleryBoard.mockImplementation((boardId: string) => boardId === 'board-1');
   mocks.ensureGalleryBoardDestinations.mockReturnValue(null);
   mocks.getCachedGalleryBoard.mockReturnValue(undefined);
@@ -298,9 +302,70 @@ describe('deleteBoard', () => {
     expect(reconcileDeletedBoardOutcome).toHaveBeenCalledWith(outcome);
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: 'Moved 1 images and 1 videos to Uncategorized.',
+      message: 'Moved 1 image and 1 video to Uncategorized.',
       title: 'Deleted board "Board 1"',
     });
+  });
+
+  it('says nothing about media an empty board did not have', async () => {
+    mocks.deleteGalleryBoard.mockResolvedValue({
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: [],
+      deletedVideoNames: [],
+      failedImageNames: [],
+      failedVideoNames: [],
+    });
+
+    await act(async () => {
+      await actionsRef.current?.deleteBoard('board-1', false);
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'success',
+      message: undefined,
+      title: 'Deleted board "Board 1"',
+    });
+  });
+
+  it('shows a media deletion under way until its outcome replaces it, and records only the kinds deleted', async () => {
+    const create = vi.spyOn(toaster, 'create');
+    const dismiss = vi.spyOn(toaster, 'dismiss');
+    let resolveDelete: (outcome: unknown) => void = () => undefined;
+    mocks.deleteGalleryBoard.mockReturnValue(
+      new Promise((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+
+    let deletion!: Promise<void> | undefined;
+    await act(() => {
+      deletion = actionsRef.current?.deleteBoard('board-1', true);
+    });
+
+    expect(create).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ title: 'Deleting board "Board 1" and its media…', type: 'loading' })
+    );
+    expect(dismiss).not.toHaveBeenCalled();
+
+    resolveDelete({
+      boardId: 'board-1',
+      deletedBoardImageNames: [],
+      deletedBoardVideoNames: [],
+      deletedImageNames: ['one.png', 'two.png'],
+      deletedVideoNames: [],
+      failedImageNames: [],
+      failedVideoNames: [],
+    });
+    await act(() => deletion);
+
+    expect(dismiss).toHaveBeenCalledExactlyOnceWith(create.mock.results[0]?.value);
+    expect(mocks.notificationsAdd.mock.calls).toEqual([
+      [{ kind: 'success', message: 'Deleted 2 images.', title: 'Deleted board "Board 1"' }],
+    ]);
+    create.mockRestore();
+    dismiss.mockRestore();
   });
 
   it('reports authoritative deleted and failed image/video outcomes', async () => {
@@ -320,7 +385,7 @@ describe('deleteBoard', () => {
 
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: 'Deleted 2 images and 1 videos; 1 images and 1 videos failed.',
+      message: 'Deleted 2 images and 1 video. 1 image and 1 video could not be deleted.',
       title: 'Deleted board "Board 1" with partial media cleanup',
     });
   });
@@ -419,11 +484,11 @@ describe('optimistic board updates', () => {
     });
 
     expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
-    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
 
     // Reflect both optimistic steps in the live gallery the failure path reads.
     selectedBoardId = 'none';
-    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    galleryValues = { autoAddBoardId: null };
     await renderProbe();
     rejectUpdate(new Error('move failed'));
     await act(() => move);
@@ -455,7 +520,7 @@ describe('optimistic board updates', () => {
     await act(() => move);
 
     expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
-    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
   });
 
   it('keeps the selection and auto-add on a board that stays in sight', async () => {
@@ -499,6 +564,100 @@ describe('optimistic board updates', () => {
     expect(selectBoard.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.updateGalleryBoard.mock.invocationCallOrder[0] ?? 0
     );
+  });
+
+  /** Archives the viewed auto-add board and returns its toast's Undo, run until the unarchive request settles. */
+  const archiveViewedAutoAddBoard = async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+    await act(async () => {
+      await actionsRef.current?.archiveBoard('board-1', true);
+    });
+    const [, { onUndo }] = mocks.notificationsUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+
+    return async () => {
+      const requests = mocks.updateGalleryBoard.mock.calls.length;
+      await act(async () => {
+        onUndo();
+        await vi.waitFor(() => expect(mocks.updateGalleryBoard.mock.calls.length).toBe(requests + 1));
+        await mocks.updateGalleryBoard.mock.results.at(-1)?.value?.catch(() => undefined);
+      });
+    };
+  };
+
+  it('reports an archive with an Undo that brings the board back and, unchosen since, its results and selection', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    expect(mocks.notificationsUndoable).toHaveBeenCalledExactlyOnceWith('widgets.gallery.boardArchived', {
+      onUndo: expect.any(Function),
+    });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+
+    // The archiving project, by its id, still sends results to the default and shows Uncategorized.
+    mocks.projectGalleryValues.mockImplementation((projectId) =>
+      projectId === 'project-1' ? { selectedBoardId: 'none' } : null
+    );
+    await undo();
+
+    expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { archived: false }, expect.anything());
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' }, 'project-1');
+    expect(selectBoard).toHaveBeenLastCalledWith('board-1');
+    // Unarchiving is not itself undone.
+    expect(mocks.notificationsUndoable).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['its project closed', null],
+    [
+      'its project chose another destination and board since',
+      { autoAddBoardId: 'board-3', selectedBoardId: 'board-3' },
+    ],
+  ])('leaves the destination and selection alone when the archive is undone after %s', async (_case, values) => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockReturnValue(values);
+    await undo();
+
+    expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { archived: false }, expect.anything());
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+  });
+
+  it('restores nothing when the server refuses to unarchive the board', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockReturnValue({ selectedBoardId: 'none' });
+    mocks.updateGalleryBoard.mockRejectedValueOnce(new Error('unarchive failed'));
+    await undo();
+
+    // Results keep going to the default rather than to a board that is still archived.
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+  });
+
+  it('restores the destination but selects nothing once another project is open', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockImplementation((projectId) =>
+      projectId === 'project-1' ? { selectedBoardId: 'none' } : null
+    );
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <GalleryUiProvider adapter={{ ...adapter, galleryValues, projectId: 'project-2' }}>
+            <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId="none" />
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      );
+    });
+    await undo();
+
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' }, 'project-1');
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
   });
 
   it('restores the archived board selection on failure only while still on Uncategorized', async () => {
@@ -666,10 +825,10 @@ describe('archiving the auto-add board', () => {
     await renderProbe();
     const { archive, reject } = await archiveFailingLater();
 
-    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
 
     // Reflect the optimistic step in the live gallery the failure path reads.
-    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    galleryValues = { autoAddBoardId: null };
     await renderProbe();
     reject();
     await act(() => archive);
@@ -687,7 +846,7 @@ describe('archiving the auto-add board', () => {
     reject();
     await act(() => archive);
 
-    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
   });
 });
 
@@ -934,7 +1093,7 @@ describe('mixed gallery upload', () => {
     expect(mocks.notificationsAdd).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Media.',
+      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Uploads; videos appear in Media.',
       title: 'Uploaded 4 of 5 files',
     });
   });

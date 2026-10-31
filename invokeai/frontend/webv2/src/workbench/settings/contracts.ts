@@ -15,6 +15,9 @@ export type WorkflowLibrarySortId = 'updated' | 'opened' | 'created' | 'name';
 /** How workflow thumbnails fill their 3:2 box: cropped to fill it, or letterboxed to fit whole. */
 export type WorkflowLibraryThumbnailFit = 'cover' | 'contain';
 
+/** What a launch of the app's bare URL opens: the Launchpad, or the most recent project. */
+export type StartupDestination = 'launchpad' | 'recentProject';
+
 /**
  * Export document generation settings with the project; personal editor choices belong in {@link
  * WorkbenchPreferences} so imports cannot overwrite them.
@@ -71,9 +74,13 @@ export interface WorkbenchPreferences {
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;
   confirmImageDeletion: boolean;
+  /** The note that browsing a board no longer changes where new results go was shown; once per account. */
+  galleryDestinationNoticeShown: boolean;
   /** Auto-switch the Invoke source/destination to match the surface being edited; locks always win. */
   autoSwitchInvocationRoute: boolean;
   queueJobsScope: 'active-project' | 'all';
+  /** What opening the app's bare URL shows; deep links, reloads and later visits to Home are never redirected. */
+  startupDestination: StartupDestination;
   language: WorkbenchLanguage;
   enableInformationalPopovers: boolean;
   enableModelDescriptions: boolean;
@@ -129,11 +136,19 @@ export interface WorkbenchPreferences {
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */
   generatePresets: StoredGeneratePreset[];
+  /** Whether a new Generate preset keeps the prompts too: the save dialog's last choice. Not shown in Settings. */
+  generatePresetsIncludePrompts: boolean;
   /**
    * The last control model picked per main-model base and control type (`${base}:${controlType}` → model key);
    * control layers left on automatic use it. Not shown in Settings.
    */
   controlModelMemory: Record<string, string>;
+  /**
+   * Canvas brush, eraser, shape and text options, restored whenever a canvas engine starts. Canvas owns its shape and
+   * normalizes it on every read (`canvas-operations/toolMemory.ts`); here it is only a plain object. Not shown in
+   * Settings.
+   */
+  canvasToolMemory: Readonly<Record<string, unknown>>;
 }
 
 export type SettingsSectionId = string;

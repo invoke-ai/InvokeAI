@@ -1,7 +1,7 @@
 ---
 title: Prompting Guide
 description: Write prompts that work, then go further with prompt templates, dynamic prompts and wildcards.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-28
 sidebar:
   order: 2
 ---
@@ -144,7 +144,7 @@ Click **Templates** in the positive prompt's toolbar. The popover lists the temp
 
 Each row shows the template's preview image, its name and its prompt text. Type in **Search templates** to filter by name or prompt text, and click a template to apply it.
 
-While a template is applied, the toolbar button shows its name and a tag with the name appears under the positive prompt. To stop using the template, click the tag's close button (**Stop using this template**).
+While a template is applied, the **Templates** button shows its name; hover it for the full name. To stop using the template, open the popover and click **Stop using** followed by the template's name, at its bottom.
 
 Applying a template never changes the text in your prompt box. The template is combined with your prompt when you press **Invoke**, so you can switch templates, or remove one, without losing what you wrote.
 
@@ -168,7 +168,7 @@ a red fox in the snow. photography. f/2.8 macro photo, bokeh, photorealism
 
 While a template is applied, an eye button in the prompt toolbar (**Show the merged prompt**) shows the prompt exactly as it will be sent, with the template's words distinguished from yours. The prompt boxes are read-only in this view. Click the text, or the button again (**Back to editing your prompt**), to return to editing.
 
-<Image src={templateMerged} alt="The merged prompt view: the prompt &quot;a red fox in the snow&quot; followed by the Photography (General) template's words, with the template's negative prompt below and the template tag under the prompt." width={480} />
+<Image src={templateMerged} alt="The merged prompt view: the prompt &quot;a red fox in the snow&quot; followed by the Photography (General) template's words, with the template's negative prompt below." width={480} />
 
 ### Built-in templates
 
@@ -190,7 +190,7 @@ Click **New template** at the top of the popover. The editor has four fields:
 * **Negative** — optional negative text, which may also contain `{prompt}`.
 * **Preview image** — an optional thumbnail for the list. Pick an image from the gallery, upload a file or drag one in.
 
-Click **Save** to store the template. To change or remove one of your templates later, use the pencil and trash buttons on its row. Deleting a template cannot be undone. If you delete, or someone else deletes, a template you are currently using, it keeps shaping your prompt until you stop using it.
+Click **Save** to store the template. To change or remove one of your templates later, use the pencil and trash buttons on its row. Deleting a template cannot be undone. If you delete, or someone else deletes, a template you are currently using, it keeps shaping your prompt until you stop using it. The **Templates** button dims its name, and the popover notes that it was deleted.
 
 To reuse the prompt of an image you like, right-click it in the Gallery or Preview and choose **Use as Prompt Template**. The New template editor opens with the image's positive and negative prompts filled in. Replace the part that describes the subject with `{prompt}`, name the template and save it.
 
@@ -233,13 +233,13 @@ gives `a red balloon`, `a red kite`, `a green balloon` and `a green kite`. Group
 
 ### Previewing and generating
 
-Click **Dynamic** in the prompt toolbar to open the Dynamic Prompts popover. When the prompt contains dynamic syntax, the button shows how many prompts it expands into.
+Click **Dynamic** in the prompt toolbar to open the Dynamic prompts popover. When the prompt contains dynamic syntax, the button shows how many prompts it expands into. **Use dynamic prompts** at the top of the popover switches expansion off for the project, so the prompt is used exactly as typed; **Dynamic** then reads **Off**.
 
 The **Preview** tab lists the expanded prompts, numbered and highlighted, and shows the total as *prompts × iterations → generations*. The Invoke button's tooltip shows the same count. Only the first 200 prompts are listed; the rest are summarized as *and N more*.
 
-Click a prompt in the list (**Use this prompt**) to replace your prompt with that one variation, for example to refine it on its own. If a template is applied, it is folded into the chosen prompt and the template itself is removed, since its words are now part of your prompt.
+Click a prompt in the list to replace your prompt with that one variation, for example to refine it on its own. If a template is applied, it is folded into the chosen prompt and the template itself is removed, since its words are now part of your prompt.
 
-If the prompt cannot be expanded, for example because a brace is not closed or a wildcard has no values, the Preview tab shows the error and Invoke is blocked until you fix it.
+If the prompt cannot be expanded, for example because a brace is not closed or a wildcard has no values, the Preview tab and a note under the prompt show the error, and Invoke is blocked until you fix it or turn dynamic prompts off. When the server could not be reached, the note offers **Retry**.
 
 <Steps>
 

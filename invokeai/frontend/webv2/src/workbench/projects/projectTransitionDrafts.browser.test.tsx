@@ -1,4 +1,3 @@
-/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GenerationUiAdapter } from '@features/generation/react';
 import type { Project, ProjectLoadResult } from '@workbench/projectContracts';
 
@@ -19,6 +18,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type * as libraryModule from './library';
 import type { ProjectPushOutcome } from './projectFlush';
 
 import { serializeProjectDocumentV3Json } from './projectDocument';
@@ -35,7 +36,15 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
   useNavigate: () => vi.fn(),
 }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: vi.fn() }) }));
-vi.mock('./library', () => ({ deleteLibraryProject: vi.fn(), refreshProjectLibrary: vi.fn() }));
+vi.mock('./library', async (importOriginal) => {
+  const { describeProjectDeletionFailure, ProjectDeletionRefusedError } = await importOriginal<typeof libraryModule>();
+  return {
+    describeProjectDeletionFailure,
+    ProjectDeletionRefusedError,
+    deleteLibraryProject: vi.fn(),
+    refreshProjectLibrary: vi.fn(),
+  };
+});
 // The real aggregate store behind the provider hooks these components read; persistence is the only double.
 vi.mock('@workbench/WorkbenchContext', async () => {
   const { useSyncExternalStore } = await import('react');

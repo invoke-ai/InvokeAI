@@ -61,7 +61,7 @@ let widgetProps: WidgetViewProps;
 beforeEach(async () => {
   accountLifecycle.activate('settings-target-test');
   await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
-  await Promise.all([settingsDialogResource.load(), import('./WidgetQuickSettings')]);
+  await settingsDialogResource.load();
   const state = createInitialWorkbenchState();
   const project = state.projects[0]!;
   const canvas = project.widgetInstances.canvas!;
@@ -102,6 +102,11 @@ it('edits another widget through global search while retaining the originating C
     )
   );
   await act(() => page.getByRole('button', { name: 'Canvas settings', exact: true }).click());
+  // The quick settings suspend on first open and then push the dialog button down. A click that starts on the button
+  // during the fallback releases over a settings row instead, so it never activates the button.
+  await expect
+    .element(page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true }))
+    .toBeVisible();
   await act(() =>
     page
       .getByRole('button', { name: i18n.t('settingsDialog.allWidgetSettings', { widget: 'Canvas' }), exact: true })

@@ -12,6 +12,7 @@ import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProv
 import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   getVideoSpanPlaybackState,
@@ -77,6 +78,14 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
 
     return target ? getProjectWidgetValues(target, 'video') : {};
   }, [projectId, queries]);
+  const notify = useNotify();
+  const notifications = useMemo<VideoUiAdapter['notifications']>(
+    () => ({
+      info: (title) => notify.info(title),
+      undoable: (title, notice) => notify.undoable(title, { ...notice, projectId }),
+    }),
+    [notify, projectId]
+  );
   const reportError = useCallback<VideoUiAdapter['reportError']>(
     (message) => commands.notifications.reportError({ area: 'video', message, namespace: 'generation' }),
     [commands]
@@ -127,6 +136,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       ...project,
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
@@ -139,6 +149,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       project,

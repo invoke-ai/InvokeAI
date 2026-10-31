@@ -1,14 +1,12 @@
 import { Flex, Stack } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasActiveTool, useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import {
   OPERATION_PRESENTATION_ADAPTERS,
   TOOL_PRESENTATION_ADAPTERS,
 } from '@workbench/widgets/canvas/tool-presentation/toolAdapters';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,9 +23,6 @@ const OPERATION_TITLE_KEYS = {
 export const PropertiesPane = () => {
   const { t } = useTranslation();
   const engine = useCanvasEngine();
-  const isSurfaceInteractionLocked = useActiveProjectSelector((project) =>
-    isCanvasInteractionLocked(project.canvas, project.queue.items)
-  );
 
   if (!engine) {
     return (
@@ -39,18 +34,12 @@ export const PropertiesPane = () => {
 
   return (
     <Scrollable h="full">
-      <ConnectedProperties engine={engine} isSurfaceInteractionLocked={isSurfaceInteractionLocked} />
+      <ConnectedProperties engine={engine} />
     </Scrollable>
   );
 };
 
-const ConnectedProperties = ({
-  engine,
-  isSurfaceInteractionLocked,
-}: {
-  engine: CanvasEngineHandle;
-  isSurfaceInteractionLocked: boolean;
-}) => {
+const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const operation = useCanvasOperation(engine);
@@ -58,7 +47,7 @@ const ConnectedProperties = ({
   const tool = TOOL_PRESENTATION_ADAPTERS[activeTool];
   const toolName = t(`widgets.canvas.tools.${tool.id}`);
   const Preview = tool.preview;
-  const regionProps = { engine, isSurfaceInteractionLocked };
+  const regionProps = { engine };
   // The pane has ONE sticky footer: a running operation's, else the tool
   // form's; the operation always wins because the tool section is inert then.
   const Footer = running ? running.footer : tool.footer;
@@ -89,12 +78,12 @@ const ConnectedProperties = ({
       {tool.groups.length > 0 || Preview ? (
         <PropertiesSection
           ref={toolSection}
-          disabled={isSurfaceInteractionLocked || running !== null}
+          disabled={running !== null}
           subtitle={toolName}
           title={t('widgets.properties.sections.tool')}
         >
           {tool.paintsLeaf && !running ? <GroupSelectedNotice /> : null}
-          {Preview ? <Preview engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} /> : null}
+          {Preview ? <Preview engine={engine} /> : null}
           {tool.groups.map((group) => (
             // Keyed by GROUP id, not tool id: tools sharing a group keep its
             // DOM (and collapse state) alive across the tool switch.
@@ -104,7 +93,7 @@ const ConnectedProperties = ({
           ))}
         </PropertiesSection>
       ) : null}
-      <LayerSection disabled={isSurfaceInteractionLocked || running !== null} />
+      <LayerSection disabled={running !== null} />
       {Footer ? (
         <Flex
           bg="bg.panel"
@@ -115,7 +104,7 @@ const ConnectedProperties = ({
           px="3"
           py="1.5"
         >
-          <Footer engine={engine} isExternalInteractionLocked={isSurfaceInteractionLocked} />
+          <Footer engine={engine} />
         </Flex>
       ) : null}
     </Stack>

@@ -18,8 +18,9 @@ export const gallerySettingsContribution: SettingsContribution = {
     {
       id: 'thumbnailFit',
       kind: 'select',
-      label: (t) => t('widgets.gallery.settingsThumbnails'),
+      label: (t) => t('widgets.gallery.thumbnailShape'),
       group: (t) => t('widgets.gallery.settingsThumbnails'),
+      keywords: 'square aspect shape crop fit',
       options: [
         { value: 'square', label: (t) => t('widgets.gallery.thumbnailFitSquare') },
         { value: 'aspect', label: (t) => t('widgets.gallery.thumbnailFitAspect') },
@@ -53,8 +54,9 @@ export const gallerySettingsContribution: SettingsContribution = {
     {
       id: 'paginationMode',
       kind: 'select',
-      label: (t) => t('widgets.gallery.pagination'),
+      label: (t) => t('widgets.gallery.paginationMode'),
       group: (t) => t('widgets.gallery.pagination'),
+      keywords: 'infinite scroll pages pagination',
       options: [
         { value: 'infinite', label: (t) => t('widgets.gallery.infinite') },
         { value: 'paginated', label: (t) => t('common.pages') },
@@ -76,6 +78,7 @@ export const gallerySettingsContribution: SettingsContribution = {
       id: 'followSelectedBoard',
       kind: 'boolean',
       label: (t) => t('widgets.gallery.followSelectedBoard'),
+      description: (t) => t('widgets.gallery.followSelectedBoardDescription'),
       group: (t) => t('widgets.gallery.destination'),
       keywords: 'auto add board destination results workflow',
       scope: 'instance',

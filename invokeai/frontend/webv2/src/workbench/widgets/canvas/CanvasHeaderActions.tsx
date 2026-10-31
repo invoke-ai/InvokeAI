@@ -1,64 +1,87 @@
-import type { Rect } from '@workbench/canvas-engine/api';
+import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
+import type { CanvasGallerySaveRegion, CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, HStack, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, Checkbox, HStack, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { Group } from '@platform/ui/Group';
-import { MenuContent } from '@platform/ui/Menu';
-import { Tooltip } from '@platform/ui/Tooltip';
-import { getCanvasEngine } from '@workbench/canvas-operations/api';
+import { MenuActionItem, MenuContent, MenuHeadingGroup, type MenuActionItemProps } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { getBaseRasterContentBounds, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { getCanvasEngine, isBlankCanvasDocument } from '@workbench/canvas-operations/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
+import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
+import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   BugIcon,
-  CheckIcon,
   ChevronDownIcon,
   DatabaseIcon,
-  FilePlusIcon,
   FullscreenIcon,
-  MaximizeIcon,
   Redo2Icon,
   SaveIcon,
+  ScanIcon,
   Trash2Icon,
   Undo2Icon,
+  ZoomInIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasHeaderCommandContext } from './canvasHeaderCommands';
 import type { ResolvedCanvasSettings } from './canvasSettings';
 
 import { useModelGridSize } from './bboxGrid';
+import { CreateFromBboxMenuItems } from './CanvasCreateFromBboxSubmenu';
 import {
   applyFitBbox,
   CANVAS_HEADER_HOTKEYS,
-  confirmNewCanvas as confirmNewCanvasDocument,
   executeCanvasHeaderCommand,
   zoomAtViewportCentre,
 } from './canvasHeaderCommands';
+import { getInFlightCanvasItems } from './canvasRestorePoints';
 import { CANVAS_SNAP_TO_GRID_KEY, canvasSettingsEqual, resolveCanvasSettings } from './canvasSettings';
-import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
+import {
+  useCanvasCanRedo,
+  useCanvasCanUndo,
+  useCanvasDocumentEditingLocked,
+  useCanvasRedoLabel,
+  useCanvasUndoLabel,
+  useCanvasZoom,
+} from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
 import { FitFrameToMasksIcon } from './frameIcons';
 import { readCanvasCompositingSettings } from './invoke/canvasCompositing';
+import { findCanvasSurface } from './surfaceFocus';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useClearCanvas } from './useCanvasRecovery';
+import { useCreateFromBbox } from './useCreateFromBbox';
 import { reportStructuralCommit } from './useStructuralCommit';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';
 
 type CanvasHeaderEngine = Pick<
   CanvasEngineHandle,
-  'diagnostics' | 'document' | 'exports' | 'history' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'viewport'
+  | 'diagnostics'
+  | 'document'
+  | 'exports'
+  | 'history'
+  | 'interaction'
+  | 'layers'
+  | 'lifecycle'
+  | 'projectId'
+  | 'tools'
+  | 'viewport'
 >;
 
 const ZOOM_OPTIONS = zoomMenuOptions();
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
+const ZOOM_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /** Reads the persisted, default-applied canvas settings for the active project. */
 const selectCanvasSettings = (project: Project): ResolvedCanvasSettings =>
@@ -79,16 +102,18 @@ const selectModelVariant = (project: Project): string | null => {
   return typeof values?.model?.variant === 'string' ? values.model.variant : null;
 };
 
-export const CanvasHeaderActions = ({ runtime }: WidgetViewProps) => {
+export const CanvasHeaderActions = ({ instance, runtime }: WidgetViewProps) => {
   const engine = useCanvasEngine();
-  return engine ? <CanvasHeaderActionsInner engine={engine} runtime={runtime} /> : null;
+  return engine ? <CanvasHeaderActionsInner engine={engine} instanceId={instance.id} runtime={runtime} /> : null;
 };
 
 const CanvasHeaderActionsInner = ({
   engine,
+  instanceId,
   runtime,
 }: {
   engine: CanvasHeaderEngine;
+  instanceId: string;
   runtime: WidgetViewProps['runtime'];
 }) => {
   const { t } = useTranslation();
@@ -97,8 +122,25 @@ const CanvasHeaderActionsInner = ({
   const zoomLabel = formatZoomPercent(zoom);
   const canUndo = useCanvasCanUndo(engine);
   const canRedo = useCanvasCanRedo(engine);
+  const undoLabel = useCanvasUndoLabel(engine);
+  const redoLabel = useCanvasRedoLabel(engine);
+  const undoText = undoLabel
+    ? t('widgets.canvas.controls.undoStep', { label: undoLabel })
+    : t('widgets.canvas.controls.undo');
+  const redoText = redoLabel
+    ? t('widgets.canvas.controls.redoStep', { label: redoLabel })
+    : t('widgets.canvas.controls.redo');
   const editingLocked = useCanvasDocumentEditingLocked(engine);
-  const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { describeDestination, isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
+  const { createFromBbox, isCreating } = useCreateFromBbox(engine);
+  const saveMenuIds = useTooltipTriggerIds();
+  const zoomMenuIds = useTooltipTriggerIds();
+  const frameMenuIds = useTooltipTriggerIds();
+  const frameLabel = t('widgets.canvas.controls.frame');
+  const lockReason = editingLocked ? t('widgets.canvas.controls.operationRunning') : undefined;
+  const saveLabel = isSaving
+    ? t('widgets.canvas.controls.savingToGallery')
+    : t('widgets.canvas.contextMenu.saveToGallery');
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const modelBase = useActiveProjectSelector(selectModelBase);
   const modelVariant = useActiveProjectSelector(selectModelVariant);
@@ -106,12 +148,26 @@ const CanvasHeaderActionsInner = ({
   const maskBlur = useActiveProjectSelector(selectMaskBlur);
 
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
+  const [stopGenerations, setStopGenerations] = useState(true);
   const closeNewCanvas = useCallback(() => setIsNewCanvasOpen(false), []);
   const openNewCanvas = useCallback(() => {
     if (!editingLocked) {
+      setStopGenerations(true);
       setIsNewCanvasOpen(true);
     }
-  }, [editingLocked]);
+  }, [editingLocked, setStopGenerations]);
+  const onStopGenerationsChange = useCallback(
+    (details: { checked: boolean | 'indeterminate' }) => setStopGenerations(details.checked === true),
+    []
+  );
+  const clearCanvas = useClearCanvas();
+  const layerCount = getDocumentLeaves(document).length;
+  const stagedCount = useActiveProjectSelector((project) => project.canvas.stagingArea.pendingImages.length);
+  // Nothing to bring back: Clear keeps no restore point, so the dialog does not promise one.
+  const isBlank = stagedCount === 0 && isBlankCanvasDocument(document);
+  const inFlightCount = useActiveProjectSelector(
+    (project) => getInFlightCanvasItems(project.canvas, project.queue.items).length
+  );
 
   const setZoom = (value: number) => zoomAtViewportCentre(engine, value);
 
@@ -138,9 +194,58 @@ const CanvasHeaderActionsInner = ({
 
   const applyFit = (rect: Rect | null, refit: boolean) => applyFitBbox(commandContext(), rect, refit);
 
+  // Select the Frame tool, then hand focus to the surface once the menu has returned it to the trigger.
+  const editFrame = () => {
+    engine.tools.setTool('bbox');
+    requestAnimationFrame(() => findCanvasSurface(instanceId)?.focus({ preventScroll: true }));
+  };
+
+  // The save destination is only certain at save time; the menu names it as resolved when it opens.
+  const [destination, setDestination] = useState<{ label: string | null; projectId: string } | null>(null);
+  const destinationRequest = useRef(0);
+  const onSaveMenuOpenChange = (details: { open: boolean }) => {
+    if (!details.open) {
+      return;
+    }
+    const request = ++destinationRequest.current;
+    const projectId = engine.projectId;
+    void describeDestination().then((label) => {
+      if (destinationRequest.current === request) {
+        setDestination({ label, projectId });
+      }
+    });
+  };
+  const destinationLabel = destination?.projectId === engine.projectId ? destination.label : null;
+
+  const clearBody = useMemo(
+    () => (
+      <Stack gap="2">
+        <Text>{t('widgets.canvas.controls.clearConfirmLayers', { count: layerCount })}</Text>
+        {stagedCount > 0 ? (
+          <Text>{t('widgets.canvas.controls.clearConfirmStaged', { count: stagedCount })}</Text>
+        ) : null}
+        {isBlank ? null : <Text>{t('widgets.canvas.controls.clearConfirmRestore')}</Text>}
+        {inFlightCount > 0 ? (
+          <>
+            <Text>{t('widgets.canvas.controls.clearConfirmInFlight', { count: inFlightCount })}</Text>
+            <Checkbox.Root checked={stopGenerations} size="sm" onCheckedChange={onStopGenerationsChange}>
+              <Checkbox.HiddenInput />
+              <Checkbox.Control>
+                <Checkbox.Indicator />
+              </Checkbox.Control>
+              <Checkbox.Label>{t('widgets.canvas.controls.clearConfirmStop', { count: inFlightCount })}</Checkbox.Label>
+            </Checkbox.Root>
+          </>
+        ) : null}
+      </Stack>
+    ),
+    [inFlightCount, isBlank, layerCount, onStopGenerationsChange, stagedCount, stopGenerations, t]
+  );
+
+  // The lock is the second gate behind the dialog: an operation that started while it was open owns the document.
   const confirmNewCanvas = useCallback(
-    () => confirmNewCanvasDocument({ document, editingLocked, engine }),
-    [document, editingLocked, engine]
+    () => (editingLocked ? undefined : clearCanvas(stopGenerations && inFlightCount > 0)),
+    [clearCanvas, editingLocked, inFlightCount, stopGenerations]
   );
 
   // Register catalog commands once while useEffectEvent reads current fit rects/dialog openers; new-session uses
@@ -164,78 +269,104 @@ const CanvasHeaderActionsInner = ({
 
   return (
     <HStack gap="0.5">
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Menu.Trigger asChild>
-          <IconButton
-            aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
-            minW="4rem"
-            px="2"
-            size="sm"
-            variant="ghost"
-          >
-            <HStack gap="1">
-              <Text fontVariantNumeric="tabular-nums">{zoomLabel}</Text>
+      <Menu.Root ids={zoomMenuIds} positioning={ZOOM_MENU_POSITIONING}>
+        <Tooltip content={t('widgets.canvas.controls.zoom')} ids={zoomMenuIds}>
+          <Menu.Trigger asChild>
+            <Button
+              aria-label={t('widgets.canvas.controls.zoomLevel', { zoom: zoomLabel })}
+              color="fg.muted"
+              fontVariantNumeric="tabular-nums"
+              size="sm"
+              variant="ghost"
+            >
+              <ZoomInIcon aria-hidden />
+              {/* Wide enough for "500%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
+              <Text fontSize="md" minW="6ch" textAlign="center">
+                {zoomLabel}
+              </Text>
               <ChevronDownIcon size={12} />
-            </HStack>
-          </IconButton>
-        </Menu.Trigger>
+            </Button>
+          </Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="7rem" py="1">
+            <MenuContent minW="9rem">
+              <MenuActionItem
+                label={t('widgets.canvas.controls.fitToView')}
+                value="fit"
+                onSelect={() => engine.viewport.fitToView()}
+              />
               {ZOOM_OPTIONS.map((option) => (
-                <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
-                  <CheckIcon size={12} opacity={zoomLabel === option.label ? 1 : 0} />
-                  <Menu.ItemText>{option.label}</Menu.ItemText>
-                </Menu.Item>
+                <MenuActionItem
+                  key={option.value}
+                  disabled={zoomLabel === option.label}
+                  label={option.label}
+                  value={`zoom-${option.label}`}
+                  onSelect={() => setZoom(option.value)}
+                />
               ))}
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
 
-      <Tooltip content={t('widgets.canvas.controls.fitToView')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitToView')}
-          color="fg.muted"
-          size="sm"
-          variant="ghost"
-          onClick={() => engine.viewport.fitToView()}
-        >
-          <MaximizeIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip content={t('widgets.canvas.controls.fitBboxToLayers')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitBboxToLayers')}
-          color="fg.muted"
-          disabled={editingLocked || !fitLayersRect}
-          size="sm"
-          variant="ghost"
-          onClick={() => applyFit(fitLayersRect, true)}
-        >
-          <FullscreenIcon />
-        </IconButton>
-      </Tooltip>
-
-      <Tooltip content={t('widgets.canvas.controls.fitBboxToMasks')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.fitBboxToMasks')}
-          color="fg.muted"
-          disabled={editingLocked || !fitMasksRect}
-          size="sm"
-          variant="ghost"
-          onClick={() => applyFit(fitMasksRect, false)}
-        >
-          <FitFrameToMasksIcon />
-        </IconButton>
-      </Tooltip>
+      <Menu.Root ids={frameMenuIds} lazyMount positioning={ZOOM_MENU_POSITIONING} unmountOnExit>
+        <Tooltip content={frameLabel} ids={frameMenuIds}>
+          <Menu.Trigger asChild>
+            <Button aria-label={frameLabel} color="fg.muted" size="sm" variant="ghost">
+              <ScanIcon aria-hidden />
+              <ChevronDownIcon size={12} />
+            </Button>
+          </Menu.Trigger>
+        </Tooltip>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="15rem" py="1">
+              <MenuActionItem
+                icon={ScanIcon}
+                label={t('widgets.canvas.controls.editFrame')}
+                value="edit-frame"
+                onSelect={editFrame}
+              />
+              <Menu.Separator />
+              <CommandMenuItem
+                commandId="canvas.fitBboxToLayers"
+                disabled={editingLocked || !fitLayersRect}
+                icon={FullscreenIcon}
+                label={t('widgets.canvas.controls.fitBboxToLayers')}
+                value="fit-layers"
+                onSelect={() => applyFit(fitLayersRect, true)}
+              />
+              <CommandMenuItem
+                commandId="canvas.fitBboxToMasks"
+                disabled={editingLocked || !fitMasksRect}
+                icon={FitFrameToMasksIcon}
+                label={t('widgets.canvas.controls.fitBboxToMasks')}
+                value="fit-masks"
+                onSelect={() => applyFit(fitMasksRect, false)}
+              />
+              <Menu.Separator />
+              <MenuHeadingGroup
+                label={t('widgets.canvas.controls.useFrameAs')}
+                trailing={t('widgets.canvas.controls.useFrameAsNote')}
+              >
+                {/* The context menu's Create from frame items; one composite runs at a time. */}
+                <CreateFromBboxMenuItems
+                  disabled={isSaving || isCreating}
+                  unavailableReason={lockReason}
+                  onCreate={(target: CreateFromBboxDestination) => void createFromBbox(target)}
+                />
+              </MenuHeadingGroup>
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
 
       <HeaderDivider />
 
-      <Tooltip content={t('widgets.canvas.commands.undo')}>
+      <Tooltip content={undoText}>
         <IconButton
-          aria-label={t('widgets.canvas.commands.undo')}
+          aria-label={undoText}
           color="fg.muted"
           disabled={editingLocked || !canUndo}
           size="sm"
@@ -246,9 +377,9 @@ const CanvasHeaderActionsInner = ({
         </IconButton>
       </Tooltip>
 
-      <Tooltip content={t('widgets.canvas.commands.redo')}>
+      <Tooltip content={redoText}>
         <IconButton
-          aria-label={t('widgets.canvas.commands.redo')}
+          aria-label={redoText}
           color="fg.muted"
           disabled={editingLocked || !canRedo}
           size="sm"
@@ -261,64 +392,58 @@ const CanvasHeaderActionsInner = ({
 
       <HeaderDivider />
 
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Group attached css={SPLIT_GROUP_CSS}>
-          <Tooltip content={t('widgets.canvas.contextMenu.saveCanvasToGallery')}>
-            <IconButton
-              aria-label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
-              color="fg.muted"
-              disabled={editingLocked || isSaving}
-              size="sm"
-              variant="ghost"
-              onClick={() => void saveToGallery('canvas')}
-            >
-              {isSaving ? <Spinner /> : <SaveIcon />}
-            </IconButton>
-          </Tooltip>
+      <Menu.Root
+        ids={saveMenuIds}
+        lazyMount
+        positioning={MENU_POSITIONING}
+        unmountOnExit
+        onOpenChange={onSaveMenuOpenChange}
+      >
+        <Tooltip content={saveLabel} ids={saveMenuIds}>
           <Menu.Trigger asChild>
-            <IconButton
-              aria-label={t('widgets.canvas.controls.moreSaveOptions')}
+            <Button
+              aria-busy={isSaving || undefined}
+              aria-label={saveLabel}
               color="fg.muted"
-              disabled={editingLocked || isSaving}
-              minW="0"
+              disabled={editingLocked || isSaving || isCreating}
               size="sm"
               variant="ghost"
-              w="6"
             >
+              {isSaving ? <Spinner boxSize="3.5" /> : <SaveIcon aria-hidden />}
               <ChevronDownIcon size={12} />
-            </IconButton>
+            </Button>
           </Menu.Trigger>
-        </Group>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
-            <MenuContent minW="11rem" py="1">
-              <Menu.Item value="save-bbox" onClick={() => void saveToGallery('bbox')}>
-                <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText>{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
-              </Menu.Item>
+            <MenuContent minW="15rem" py="1">
+              <SaveMenuItems
+                board={destinationLabel}
+                document={document}
+                onSave={(region: CanvasGallerySaveRegion) => void saveToGallery(region)}
+              />
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
 
-      <Tooltip content={t('widgets.canvas.controls.clearCanvas')}>
-        <IconButton
-          aria-label={t('widgets.canvas.controls.clearCanvas')}
-          color="fg.muted"
-          disabled={editingLocked}
-          size="sm"
-          variant="ghost"
-          onClick={openNewCanvas}
-        >
-          <FilePlusIcon />
-        </IconButton>
-      </Tooltip>
+      <IconButton
+        aria-label={t('widgets.canvas.controls.clearCanvas')}
+        color="fg.muted"
+        size="sm"
+        tooltip={t('widgets.canvas.controls.clearCanvas')}
+        unavailableReason={editingLocked ? t('widgets.canvas.controls.operationRunning') : undefined}
+        variant="ghost"
+        onClick={openNewCanvas}
+      >
+        <Trash2Icon />
+      </IconButton>
 
       <ConfirmDialog
-        body={t('widgets.canvas.controls.newCanvasConfirm')}
+        body={clearBody}
         confirmLabel={t('widgets.canvas.controls.clearCanvas')}
         isOpen={isNewCanvasOpen}
-        title={t('widgets.canvas.controls.clearCanvas')}
+        title={t('widgets.canvas.controls.clearCanvasTitle')}
         onClose={closeNewCanvas}
         onConfirm={confirmNewCanvas}
       />
@@ -326,11 +451,71 @@ const CanvasHeaderActionsInner = ({
   );
 };
 
-/** A thin vertical rule separating header-action groups (matching legacy's dividers). */
-// Ghost buttons have no border to collapse, and the attached overlap would
-// leave the save button under 24px of unobscured target.
-const SPLIT_GROUP_CSS = { '& > *:not(:last-child)': { marginEnd: 0 } } as const;
+/** A menu item trailed by its command's effective first binding, remaps included, as keycaps. */
+const CommandMenuItem = ({ commandId, ...item }: Omit<MenuActionItemProps, 'shortcut'> & { commandId: string }) => {
+  const parts = useShortcutBinding(commandId)?.parts;
+  // The binding's parts are a fresh array on every read; their serialized form is the stable key.
+  const partsKey = parts ? JSON.stringify(parts) : null;
+  const shortcut = useMemo(
+    () => (partsKey ? <ShortcutKeycaps parts={JSON.parse(partsKey) as string[]} /> : undefined),
+    [partsKey]
+  );
+  return <MenuActionItem {...item} shortcut={shortcut} />;
+};
 
+/** "{w} × {h} · {board}", dropping whichever part is unknown; undefined when neither is. */
+const describeSave = (
+  t: (key: string, options?: Record<string, unknown>) => string,
+  size: { height: number; width: number } | null,
+  board: string | null
+): string | undefined => {
+  if (size && board) {
+    return t('widgets.canvas.controls.saveHint', { ...size, board });
+  }
+  if (size) {
+    return t('widgets.canvas.controls.saveHintSize', size);
+  }
+  return board ?? undefined;
+};
+
+/**
+ * The frame save, then the whole canvas, each saying what it would save and where. Mounted only while the menu is
+ * open, so the canvas content bounds (the rect the canvas save exports) are planned then, not on every edit.
+ */
+const SaveMenuItems = ({
+  board,
+  document,
+  onSave,
+}: {
+  board: string | null;
+  document: CanvasDocumentContractV3;
+  onSave: (region: CanvasGallerySaveRegion) => void;
+}) => {
+  const { t } = useTranslation();
+  const content = useMemo(() => getBaseRasterContentBounds(document), [document]);
+  const frameSize = { height: Math.round(document.bbox.height), width: Math.round(document.bbox.width) };
+
+  return (
+    <>
+      <MenuActionItem
+        hint={describeSave(t, frameSize, board)}
+        icon={SaveIcon}
+        label={t('widgets.canvas.contextMenu.saveBboxToGallery')}
+        value="save-bbox"
+        onSelect={() => onSave('bbox')}
+      />
+      <MenuActionItem
+        hint={describeSave(t, content ? { height: content.height, width: content.width } : null, board)}
+        icon={SaveIcon}
+        label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
+        value="save-canvas"
+        onSelect={() => onSave('canvas')}
+      />
+    </>
+  );
+};
+
+/** A thin vertical rule separating header-action groups (matching legacy's dividers). */
 const HeaderDivider = () => <Box bg="border.subtle" flexShrink={0} h="4" mx="1" w="1px" />;
 
 /** Diagnostics use an existing engine; opening settings must never acquire a canvas engine lease. */
@@ -343,7 +528,6 @@ export const CanvasSettingsActions = (_props: WidgetViewProps) => {
 const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) => {
   const { t } = useTranslation();
   const shiftHeld = useModifierHeld('Shift');
-  const editingLocked = useCanvasDocumentEditingLocked(engine);
   if (!shiftHeld) {
     return null;
   }
@@ -359,15 +543,6 @@ const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) 
       <Button variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
         <BugIcon />
         {t('widgets.canvas.settings.logDebugInfo')}
-      </Button>
-      <Button
-        disabled={editingLocked}
-        variant="ghost"
-        justifyContent="start"
-        onClick={() => engine.history.clearHistory()}
-      >
-        <Trash2Icon />
-        {t('widgets.canvas.settings.clearHistory')}
       </Button>
     </Stack>
   );

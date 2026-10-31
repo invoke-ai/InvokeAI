@@ -6,6 +6,7 @@ import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { getDefaultVideoSettings } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -140,7 +141,10 @@ vi.mock('@features/generation/components', async (importOriginal) => ({
   NegativePromptField: () => null,
   PositivePromptField: () => null,
 }));
-vi.mock('@platform/ui/toaster', () => ({ toaster: { create: notify } }));
+vi.mock('@platform/ui/toaster', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toaster: { create: notify },
+}));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkbenchPreferenceSelector: () => false,
@@ -150,6 +154,7 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchQueries: () => store.queries,
 }));
@@ -259,8 +264,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    const confirmedList =
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim), the last frame, and 1 LoRA.';
+    // The LTX-2 LoRA is not lost: it stays listed, badged and off, for the next LTX-2 model.
+    const confirmedList = 'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and the last frame.';
     expect(dialog()?.textContent).toContain(confirmedList);
     expect(dialog()?.textContent).toContain(
       'It also adjusts Target Resolution and Advanced guidance to fit this model.'
@@ -300,7 +305,7 @@ describe('video model switch confirmation', () => {
     }
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key }, weight: 0.75 }],
       model: { key: wanT2v.key },
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at dusk',
@@ -348,9 +353,7 @@ describe('video model switch confirmation', () => {
       })
     );
 
-    expect(dialog()?.textContent).toContain(
-      'Switching to Wan 2.2 T2V removes: the initial video (with its trim) and 2 LoRAs.'
-    );
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes: the initial video (with its trim).');
 
     await act(async () => {
       await userEvent.click(dialogButton('Switch model'));
@@ -358,7 +361,7 @@ describe('video model switch confirmation', () => {
 
     expect(stored()).toMatchObject({
       lastFrameImage: null,
-      loras: [],
+      loras: [{ model: { key: inkWash.key } }, { model: { key: filmGrain.key } }],
       modelKey: wanT2v.key,
       positivePrompt: 'a harbor at night',
       sourceVideo: null,
@@ -409,7 +412,7 @@ describe('video model switch confirmation', () => {
     expect(new Set(pickerIds).size).toBe(1);
   });
 
-  it('commits a pending LoRA weight to the current model before judging the switch', async () => {
+  it('commits a pending LoRA weight to the current model before switching', async () => {
     await render();
     await nudgeLoraWeight();
 
@@ -417,8 +420,8 @@ describe('video model switch confirmation', () => {
 
     await choose(wanT2v.key);
 
-    // Committed on LTX-2 Dev, before the dialog asked about dropping it.
-    expect(dialog()?.textContent).toContain('1 LoRA');
+    // Committed on LTX-2 Dev, before the dialog asked about the switch.
+    expect(dialog()?.textContent).toContain('Switching to Wan 2.2 T2V removes');
     expect(stored()).toMatchObject({ loras: [{ weight: 0.8 }], modelKey: ltxDev.key });
 
     await act(async () => {
@@ -462,5 +465,40 @@ describe('video model switch confirmation', () => {
 
     expect(stored().modelKey).toBe(wanT2v.key);
     await vi.waitFor(() => expect(document.activeElement).toBe(modelSelect()));
+  });
+});
+
+describe('video model field without a model', () => {
+  // The picker's install action reads the library itself; the field's message has to agree with it.
+  const renderEmpty = () =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <GenerationUiProvider adapter={generationAdapter}>
+                <VideoUiAdapterProvider>
+                  <VideoWidgetView />
+                </VideoUiAdapterProvider>
+              </GenerationUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      )
+    );
+
+  afterEach(() => setModelsSnapshotForTests({ error: null, models: [], status: 'idle' }));
+
+  it('says none is installed rather than asking for a choice the picker cannot offer', async () => {
+    modelStore.set([]);
+    setModelsSnapshotForTests({ error: null, models: [], status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('No Wan 2.2, LTX-2 or MiniMax H3 model is installed.');
+
+    setModelsSnapshotForTests({ error: null, models: catalog as never, status: 'loaded' });
+    await renderEmpty();
+
+    expect(host.textContent).toContain('Select a Wan 2.2, LTX-2 or MiniMax H3 model.');
   });
 });

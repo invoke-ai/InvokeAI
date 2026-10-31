@@ -19,8 +19,11 @@ export type SettingDefinition = SettingBase &
     | { kind: 'boolean' }
     | { kind: 'select'; options: readonly { label: SettingsText; value: string }[] }
     | { kind: 'number' | 'slider'; min: number; max: number; step?: number }
-    /** `fill`: the editor owns its scrolling and takes the dialog body's full height. */
-    | { kind: 'custom'; fill?: boolean }
+    /**
+     * `fill`: the editor owns its scrolling and takes the dialog body's full height. `framed`: the editor draws its own
+     * frame (a bordered card), so the entry adds no divider under it.
+     */
+    | { kind: 'custom'; fill?: boolean; framed?: boolean }
   );
 
 export interface SettingsTarget {

@@ -32,7 +32,7 @@ afterEach(async () => {
 });
 
 describe('focus region highlight', () => {
-  it('lays the highlight over the borders beside the region', async () => {
+  const renderRegion = async (controller = createTestFocusController()) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -40,21 +40,94 @@ describe('focus region highlight', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider controller={createTestFocusController()}>
+          <FocusRegionProvider controller={controller}>
             <FocusableRegion />
           </FocusRegionProvider>
         </ChakraProvider>
       );
     });
 
-    const region = host.querySelector<HTMLElement>('[data-testid="focus-region"]');
-    expect(region).not.toBeNull();
+    return host.querySelector<HTMLElement>('[data-testid="focus-region"]');
+  };
 
-    await act(() => region?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+  it('focuses the center before anything is pressed or focused', async () => {
+    const controller = createTestFocusController();
+    const region = await renderRegion(controller);
 
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(region?.getAttribute('data-highlighted')).toBe('true');
-    const highlight = getComputedStyle(region!, '::after');
-    expect([highlight.top, highlight.right, highlight.bottom, highlight.left]).toEqual(['0px', '-1px', '0px', '-1px']);
+  });
+});
+
+/** Side panels built like the docked frames: the divider sits at the panel's center-facing edge, inside its frame. */
+const PanelRow = () => {
+  const divider = (testId: string) => <Box data-testid={testId} flexShrink="0" w="1px" />;
+
+  return (
+    <Box display="flex" h="40" w="640px">
+      <Box data-testid="left" display="flex" flexShrink="0" w="150.4px" {...useFocusRegionProps('left')}>
+        <Box flex="1" />
+        {divider('left-divider')}
+      </Box>
+      <Box data-testid="center" flex="1" minW="0" {...useFocusRegionProps('center')} />
+      <Box data-testid="right" display="flex" flexShrink="0" w="170.7px" {...useFocusRegionProps('right')}>
+        {divider('right-divider')}
+        <Box flex="1" />
+      </Box>
+    </Box>
+  );
+};
+
+/**
+ * Where a highlight's 1px stroke on one side starts and which way it grows, in CSS px. A border grows into the
+ * `::after` box and an outline away from it, so this is the edge the browser snaps the stroke from.
+ */
+const strokeOn = (region: HTMLElement, side: 'left' | 'right') => {
+  const rect = region.getBoundingClientRect();
+  const after = getComputedStyle(region, '::after');
+  const inset = Number.parseFloat(after[side]);
+  const anchor = side === 'left' ? rect.left + inset : rect.right - inset;
+  const outlineWidth = Number.parseFloat(after.outlineWidth);
+  const isOutline = after.outlineStyle !== 'none' && outlineWidth > 0;
+  const width = isOutline
+    ? outlineWidth
+    : Number.parseFloat(side === 'left' ? after.borderLeftWidth : after.borderRightWidth);
+  const growsRight = side === 'left' ? !isOutline : isOutline;
+
+  return { anchor, column: growsRight ? [anchor, anchor + width] : [anchor - width, anchor], growsRight };
+};
+
+describe('focus region highlights of neighbouring regions', () => {
+  it('draws a shared divider on one column, snapped from the same edge by both neighbours', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <FocusRegionProvider controller={createTestFocusController()}>
+            <PanelRow />
+          </FocusRegionProvider>
+        </ChakraProvider>
+      );
+    });
+    const byTestId = (testId: string) => host!.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!;
+    const dividerColumn = (testId: string) => {
+      const rect = byTestId(testId).getBoundingClientRect();
+      return [rect.left, rect.right];
+    };
+
+    // Equal columns alone are not enough: strokes anchored on opposite edges of a divider land on different device
+    // pixels whenever fractional zoom rounds that divider to two of them.
+    const left = strokeOn(byTestId('left'), 'right');
+    const centerFromLeft = strokeOn(byTestId('center'), 'left');
+    expect(left).toEqual(centerFromLeft);
+    expect(left.column).toEqual(dividerColumn('left-divider'));
+
+    const centerFromRight = strokeOn(byTestId('center'), 'right');
+    const right = strokeOn(byTestId('right'), 'left');
+    expect(right).toEqual(centerFromRight);
+    expect(right.column).toEqual(dividerColumn('right-divider'));
   });
 });
 
@@ -406,13 +479,14 @@ describe('workbench focus across regions and floating windows', () => {
 
     // The project switches before the window ever shows. Returning to it must not resurrect the old focus.
     projectId = 'project-2';
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     await act(() => controller.clear());
     projectId = 'project-1';
     await rerender(true);
     await frames(4);
 
-    expect(controller.getTarget()).toBeNull();
+    // The left region press is forgotten: the center holds focus, and neither this region nor the window is outlined.
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(highlighted()).toEqual({ region: 'false', window: 'false' });
     expect(document.activeElement).toBe(opener);
   });
@@ -425,7 +499,7 @@ describe('workbench focus across regions and floating windows', () => {
     // Docked or removed, with nothing else focused since.
     isWindowFloating = false;
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
   });
 
   it('abandons a pending focus move when the user presses somewhere else first', async () => {

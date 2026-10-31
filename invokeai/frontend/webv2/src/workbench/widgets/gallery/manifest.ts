@@ -14,6 +14,7 @@ export const galleryWidgetManifest: WidgetManifest = {
   load: () =>
     import('@features/gallery/widget').then((module) => ({
       footer: module.GalleryWidgetFooter,
+      headerActions: module.GalleryWidgetHeaderActions,
       headerLabel: module.GalleryWidgetLabel,
       view: module.GalleryWidgetView,
     })),

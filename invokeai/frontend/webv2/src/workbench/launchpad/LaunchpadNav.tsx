@@ -1,8 +1,9 @@
 import type { SystemStyleObject } from '@chakra-ui/react';
 import type { LucideIcon } from 'lucide-react';
 
-import { Icon, Separator, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Icon, Separator, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
 import { Link } from '@tanstack/react-router';
@@ -58,12 +59,22 @@ const GROUP_LABEL_SX: SystemStyleObject = {
   px: '2',
   textTransform: 'uppercase',
 };
+/**
+ * The rail's groups stack in the scroll content, which fills the viewport so the footer's auto margin pins it to the
+ * bottom. Open projects shrink to their floor before the content outgrows the viewport and the rail scrolls. The
+ * padding lives inside the viewport so edge focus rings stay visible; scroll padding does the same for an entry that
+ * focus scrolls to an edge.
+ */
+const NAV_CONTENT_BASE = { display: 'flex', flexDirection: 'column', minH: 'full' } as const;
 /** Space between rail groups; headings carry no top padding of their own. */
-const NAV_SX: SystemStyleObject = { '& > section ~ section': { pt: '2' } };
+const NAV_CONTENT_PROPS = { ...NAV_CONTENT_BASE, css: { '& > section ~ section': { pt: '2' } }, p: '2' } as const;
 /** Without headings, a hairline separates the icon groups. */
-const COMPACT_NAV_SX: SystemStyleObject = {
-  '& > section ~ section': { borderTopWidth: '1px', mt: '1.5', pt: '1.5' },
-};
+const COMPACT_NAV_CONTENT_PROPS = {
+  ...NAV_CONTENT_BASE,
+  css: { '& > section ~ section': { borderTopWidth: '1px', mt: '1.5', pt: '1.5' } },
+  p: '1.5',
+} as const;
+const NAV_VIEWPORT_PROPS = { scrollPaddingY: '1' } as const;
 
 /** Rail entries match the settings dialog's navigation items: ghost buttons, subtle for the current page. */
 const NAV_ITEM_PROPS = { justifyContent: 'start', size: 'lg', w: 'full' } as const;
@@ -173,48 +184,50 @@ export const LaunchpadNav = ({ activeId, items }: { activeId: string; items: Lau
   const compact = useSyncExternalStore(subscribeCompact, getCompact);
 
   return (
-    <Stack
+    // The landmark wraps the scroll area: Zag gives the area's root a presentation role.
+    <Box
       aria-label={t('launchpad.sectionsLabel')}
       as="nav"
       borderColor="border.subtle"
       borderEndWidth="1px"
-      css={compact ? COMPACT_NAV_SX : NAV_SX}
       flexShrink={0}
-      gap="0"
       h="full"
       minH="0"
-      overflowY="auto"
-      p={compact ? '1.5' : '2'}
       w={compact ? undefined : '56'}
     >
-      {items.length > 1 ? (
-        <NavGroup
-          activeId={activeId}
-          compact={compact}
-          group="workspace"
-          items={workspaceItems}
-          showLabel={showGroupLabels}
-        />
-      ) : null}
-      <OpenProjectsNavSection compact={compact} headingCss={GROUP_LABEL_SX} itemProps={NAV_ITEM_PROPS} />
-      {items.length > 1 && manageItems.length > 0 ? (
-        <NavGroup
-          activeId={activeId}
-          compact={compact}
-          group="manage"
-          items={manageItems}
-          showLabel={showGroupLabels}
-        />
-      ) : null}
+      <Scrollable
+        contentProps={compact ? COMPACT_NAV_CONTENT_PROPS : NAV_CONTENT_PROPS}
+        viewportProps={NAV_VIEWPORT_PROPS}
+      >
+        {items.length > 1 ? (
+          <NavGroup
+            activeId={activeId}
+            compact={compact}
+            group="workspace"
+            items={workspaceItems}
+            showLabel={showGroupLabels}
+          />
+        ) : null}
+        <OpenProjectsNavSection compact={compact} headingCss={GROUP_LABEL_SX} itemProps={NAV_ITEM_PROPS} />
+        {items.length > 1 && manageItems.length > 0 ? (
+          <NavGroup
+            activeId={activeId}
+            compact={compact}
+            group="manage"
+            items={manageItems}
+            showLabel={showGroupLabels}
+          />
+        ) : null}
 
-      <Stack gap="0.5" mt="auto" pt="2">
-        {compact ? <Separator mb="1.5" /> : null}
-        {footerItems.map((item) => (
-          <NavLink key={item.id} compact={compact} isActive={item.id === activeId} item={item} />
-        ))}
-        <WhatsNewButton compact={compact} />
-        <HelpMenu compact={compact} />
-      </Stack>
-    </Stack>
+        <Stack gap="0.5" mt="auto" pt="2">
+          {compact ? <Separator mb="1.5" /> : null}
+          {footerItems.map((item) => (
+            <NavLink key={item.id} compact={compact} isActive={item.id === activeId} item={item} />
+          ))}
+          <WhatsNewButton compact={compact} />
+          <HelpMenu compact={compact} />
+        </Stack>
+      </Scrollable>
+    </Box>
   );
 };

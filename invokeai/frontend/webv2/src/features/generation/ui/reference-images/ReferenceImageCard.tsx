@@ -13,6 +13,7 @@ import { isStrengthOnlyIPAdapterBase } from '@features/generation/core/baseGener
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { GenerateIssueNotes } from '@features/generation/ui/shared/GenerateIssues';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
 import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
@@ -35,6 +36,8 @@ type ModelBackedConfig = Extract<
   GenerateReferenceImageConfig,
   { type: 'ip_adapter' | 'flux_redux' | 'flux_kontext_reference_image' }
 >;
+
+const ISSUE_NOTES_CSS = { '&:not(:empty)': { pb: '2' } };
 
 const THUMBNAIL_ACTIONS_CSS = {
   '&:focus-within .reference-image-actions, &:hover .reference-image-actions': {
@@ -85,7 +88,10 @@ const ReferenceImageCardBase = ({
   const config = referenceImage.config;
   const isEnabled = referenceImage.isEnabled;
   const selectedBase = selectedModel?.base;
-  const title = `${t('widgets.generate.referenceImage')} #${index + 1}`;
+  const title = t('widgets.generate.referenceImageNumbered', { index: index + 1 });
+  const collapseLabel = isCollapsed
+    ? t('widgets.generate.expandReferenceImage')
+    : t('widgets.generate.collapseReferenceImage');
   const toggleLabel = isEnabled
     ? t('widgets.generate.disableReferenceImage')
     : t('widgets.generate.enableReferenceImage');
@@ -208,23 +214,17 @@ const ReferenceImageCardBase = ({
               <Icon as={ArrowDownIcon} />
             </IconButton>
           </Tooltip>
-          <IconButton
-            aria-label={
-              isCollapsed ? t('widgets.generate.expandReferenceImage') : t('widgets.generate.collapseReferenceImage')
-            }
-            color="fg.muted"
-            size="sm"
-            variant="ghost"
-            onClick={toggleCollapsed}
-          >
-            <Box
-              asChild
-              transform={isCollapsed ? 'rotate(-90deg)' : undefined}
-              transition="transform var(--wb-motion-duration-slow)"
-            >
-              <ChevronDownIcon size="14" />
-            </Box>
-          </IconButton>
+          <Tooltip content={collapseLabel}>
+            <IconButton aria-label={collapseLabel} color="fg.muted" size="sm" variant="ghost" onClick={toggleCollapsed}>
+              <Box
+                asChild
+                transform={isCollapsed ? 'rotate(-90deg)' : undefined}
+                transition="transform var(--wb-motion-duration-slow)"
+              >
+                <ChevronDownIcon size="14" />
+              </Box>
+            </IconButton>
+          </Tooltip>
           <Tooltip content={t('widgets.generate.removeReferenceImage')}>
             <IconButton
               aria-label={t('widgets.generate.removeReferenceImage')}
@@ -239,6 +239,11 @@ const ReferenceImageCardBase = ({
           </Tooltip>
         </HStack>
       </HStack>
+
+      {/* Shown collapsed too: a reference that blocks Invoke says so on its own card. */}
+      <Box css={ISSUE_NOTES_CSS} px="2">
+        <GenerateIssueNotes field="referenceImage" referenceImageId={referenceImage.id} section="guidance" />
+      </Box>
 
       {isCollapsed ? null : (
         <HStack align="flex-start" gap="3" pb="2" px="2">

@@ -23,15 +23,16 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
-import { MenuContent } from '@platform/ui/Menu';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
+import { useShortcutLabel } from '@workbench/hotkeys/useShortcutBinding';
 import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { findLayoutPresetWorkingCopy } from '@workbench/layoutPresetSnapshots';
+import { CUE_WIDTH, HIDDEN_SCROLLBAR_CSS, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightIcon,
@@ -53,14 +54,17 @@ import { resolveLayoutPresetIcon } from './layoutPresetIcons';
 import { openLayoutPresetDelete, openLayoutPresetEdit, openLayoutPresetManager } from './layoutPresetManagerStore';
 import { HIDE_BELOW_PRESET_LABEL_WIDTH } from './topbarBreakpoints';
 import { useActiveLayoutPresetId, useLayoutDrift, useUnsavedInactiveLayoutPresetIds } from './useLayoutDrift';
-import { useTopbarShortcut } from './useTopbarShortcut';
 
 const PRESET_MENU_ATTRIBUTE = 'data-preset-menu';
 const TAB_FILL_TRANSITION =
   'background var(--chakra-durations-faster) ease, border-color var(--chakra-durations-faster) ease, color var(--chakra-durations-faster) ease';
-const PRESET_SCROLL_CSS = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' } as const;
 const PRESET_TAB_KEYS_BLOCKED_DURING_DRAG = new Set(['ArrowDown', 'ArrowLeft', 'ArrowRight', 'End', 'Home']);
 const DND_MODIFIERS = [restrictToHorizontalAxis, restrictToParentElement];
+/** Counts the presets past the end, and keeps the active one in view when the strip narrows or the preset changes. */
+const PRESET_OVERFLOW_OPTIONS = {
+  itemSelector: '[role="tab"]',
+  keepInViewSelector: '[role="tab"][aria-selected="true"]',
+};
 const KEYBOARD_SENSOR_OPTIONS = {
   coordinateGetter: sortableKeyboardCoordinates,
   keyboardCodes: { cancel: ['Escape'], end: ['Space', 'Tab'], start: ['Space'] },
@@ -124,6 +128,8 @@ export const LayoutPresetStrip = () => {
     () => ({ screenReaderInstructions: { draggable: t('topbar.presets.reorderInstructions') } }),
     [t]
   );
+  // Presets past the strip's width say so at its ends, like the center's chrome rows.
+  const { attach: attachScroller, hiddenEdges, scrollTo } = useOverflowEdges(PRESET_OVERFLOW_OPTIONS);
   const sensors = useSensors(
     useSensor(MouseSensor, MOUSE_SENSOR_OPTIONS),
     useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS),
@@ -211,62 +217,90 @@ export const LayoutPresetStrip = () => {
   return (
     <>
       <HStack gap="1" justify="center" maxW="min(36vw, 44rem)" minW="0">
-        <Box css={PRESET_SCROLL_CSS} data-layout-preset-scroll="" maxW="full" minW="0" overflowX="auto">
-          <DndContext
-            accessibility={dndAccessibility}
-            autoScroll={false}
-            collisionDetection={closestCenter}
-            modifiers={DND_MODIFIERS}
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
+        {/* The cues' positioning context; the scroller fills it. */}
+        <Box maxW="full" minW="0" position="relative">
+          <Box
+            ref={attachScroller}
+            css={HIDDEN_SCROLLBAR_CSS}
+            data-layout-preset-scroll=""
+            isolation="isolate"
+            maxW="full"
+            minW="0"
+            overflowX="auto"
+            overscrollBehaviorX="contain"
+            // Focus and keep-in-view scroll a tab clear of the cues, not merely onto the strip's edge.
+            scrollPaddingInline={CUE_WIDTH}
           >
-            <Tabs.Root
-              ids={tabIds}
-              minW="max-content"
-              size="lg"
-              value={selectedPresetId}
-              variant="subtle"
-              onValueChange={handleValueChange}
+            <DndContext
+              accessibility={dndAccessibility}
+              autoScroll={false}
+              collisionDetection={closestCenter}
+              modifiers={DND_MODIFIERS}
+              sensors={sensors}
+              onDragEnd={handleDragEnd}
             >
-              {/* The name belongs on the tablist, not the root — the root is a plain
+              <Tabs.Root
+                ids={tabIds}
+                minW="max-content"
+                size="lg"
+                value={selectedPresetId}
+                variant="subtle"
+                onValueChange={handleValueChange}
+              >
+                {/* The name belongs on the tablist, not the root — the root is a plain
                   container and carries no role for it to name. */}
-              <SortableContext items={presetIds} strategy={horizontalListSortingStrategy}>
-                {/* One tip for the strip, shown on unsaved presets: it follows focus and the pointer from tab to tab.
+                <SortableContext items={presetIds} strategy={horizontalListSortingStrategy}>
+                  {/* One tip for the strip, shown on unsaved presets: it follows focus and the pointer from tab to tab.
                     Not closed by scrolling: an arrow-key switch re-lays out the workbench, whose panels restore their
                     scroll positions, and the tab itself never scrolls out from under the tip. */}
-                <TooltipGroup.Root
-                  closeOnScroll={false}
-                  content={t('topbar.presets.unsavedLayoutChanges')}
-                  getTriggerId={tabIds.trigger}
-                  isEnabled={isPresetUnsaved}
-                >
-                  <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
-                    {presets.map((preset) => (
-                      <PresetTab
-                        key={preset.id}
-                        isActive={preset.id === selectedPresetId}
-                        isUnsaved={isPresetUnsaved(preset.id)}
-                        preset={preset}
-                        workingArrangement={
-                          preset.id === activePresetId
-                            ? undefined
-                            : findLayoutPresetWorkingCopy(presetWorkingLayouts, preset.id)
-                        }
-                        onOpenMenu={openMenu}
-                        onRequest={requestPreset}
-                      />
-                    ))}
-                  </Tabs.List>
-                </TooltipGroup.Root>
-              </SortableContext>
-              {/* Provide aria-controls targets describing the shared dock outside this component. */}
-              {presets.map((preset) => (
-                <Tabs.Content key={preset.id} value={preset.id} asChild>
-                  <VisuallyHidden>{`${preset.label} layout`}</VisuallyHidden>
-                </Tabs.Content>
-              ))}
-            </Tabs.Root>
-          </DndContext>
+                  <TooltipGroup.Root
+                    closeOnScroll={false}
+                    content={t('topbar.presets.unsavedLayoutChanges')}
+                    getTriggerId={tabIds.trigger}
+                    isEnabled={isPresetUnsaved}
+                  >
+                    <Tabs.List aria-label={t('topbar.presets.layoutPreset')} gap="0.5">
+                      {presets.map((preset) => (
+                        <PresetTab
+                          key={preset.id}
+                          isActive={preset.id === selectedPresetId}
+                          isUnsaved={isPresetUnsaved(preset.id)}
+                          preset={preset}
+                          workingArrangement={
+                            preset.id === activePresetId
+                              ? undefined
+                              : findLayoutPresetWorkingCopy(presetWorkingLayouts, preset.id)
+                          }
+                          onOpenMenu={openMenu}
+                          onRequest={requestPreset}
+                        />
+                      ))}
+                    </Tabs.List>
+                  </TooltipGroup.Root>
+                </SortableContext>
+                {/* Provide aria-controls targets describing the shared dock outside this component. Pinned to the
+                    row's start: at its place in the flow, the shown panel would lie past the tabs and give the row
+                    overflow that hides nothing. */}
+                {presets.map((preset) => (
+                  <Tabs.Content key={preset.id} value={preset.id} asChild>
+                    <VisuallyHidden insetInlineStart="0" top="0">{`${preset.label} layout`}</VisuallyHidden>
+                  </Tabs.Content>
+                ))}
+              </Tabs.Root>
+            </DndContext>
+          </Box>
+          {hiddenEdges.start ? (
+            <OverflowCue edge="start" label={t('common.scrollToStart')} onScrollTo={scrollTo} />
+          ) : null}
+          {hiddenEdges.end ? (
+            <OverflowCue
+              ariaLabel={t('topbar.presets.moreAvailable', { count: hiddenEdges.endCount })}
+              count={hiddenEdges.endCount}
+              edge="end"
+              label={t('topbar.presets.more')}
+              onScrollTo={scrollTo}
+            />
+          ) : null}
         </Box>
 
         <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
@@ -526,7 +560,7 @@ const PresetMenu = ({
 }) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
-  const saveShortcut = useTopbarShortcut('app.saveLayoutPreset');
+  const saveShortcut = useShortcutLabel('app.saveLayoutPreset');
   const { preset } = target;
   const isCustom = preset.isBuiltIn !== true;
 
@@ -573,54 +607,46 @@ const PresetMenu = ({
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="16rem">
-            <HStack justify="space-between" px="3" py="2">
-              <MiddleTruncate fontSize="md" fontWeight="700" text={preset.label} />
-              {isUnsaved ? (
-                <Text color="fg.muted" fontSize="xs" flexShrink={0}>
-                  {t('topbar.presets.unsaved')}
-                </Text>
-              ) : null}
-            </HStack>
-            <Menu.Separator />
-
-            {isActive ? null : (
-              <Menu.Item value="apply-preset" onClick={apply}>
-                <Icon as={ArrowRightIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.presets.switch')}</Menu.ItemText>
-              </Menu.Item>
-            )}
-
-            {/* An inactive preset with a working copy here saves or reverts without switching to it. */}
-            {isActive || isUnsaved ? (
-              <>
-                {isUnsaved ? (
-                  <Menu.Item value="revert-layout" onClick={revert}>
-                    <Icon as={RotateCcwIcon} boxSize="3.5" />
-                    <Menu.ItemText>{t('topbar.presets.revert')}</Menu.ItemText>
-                  </Menu.Item>
-                ) : null}
-                <Menu.Item value="save-layout" onClick={save}>
-                  <Icon as={SaveIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
-                  {isActive && saveShortcut ? (
-                    <Text color="fg.subtle" fontSize="xs" ms="auto">
-                      {saveShortcut}
-                    </Text>
-                  ) : null}
+            <MenuHeadingGroup label={preset.label} trailing={isUnsaved ? t('topbar.presets.unsaved') : null}>
+              {isActive ? null : (
+                <Menu.Item value="apply-preset" onClick={apply}>
+                  <Icon as={ArrowRightIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.switch')}</Menu.ItemText>
                 </Menu.Item>
-              </>
-            ) : null}
+              )}
 
-            <Menu.Item value="edit-preset" onClick={edit}>
-              <Icon as={PencilIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
-            </Menu.Item>
-            {isCustom ? (
-              <Menu.Item data-danger="" value="delete-preset" onClick={remove}>
-                <Icon as={Trash2Icon} boxSize="3.5" />
-                <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
+              {/* An inactive preset with a working copy here saves or reverts without switching to it. */}
+              {isActive || isUnsaved ? (
+                <>
+                  {isUnsaved ? (
+                    <Menu.Item value="revert-layout" onClick={revert}>
+                      <Icon as={RotateCcwIcon} boxSize="3.5" />
+                      <Menu.ItemText>{t('topbar.presets.revert')}</Menu.ItemText>
+                    </Menu.Item>
+                  ) : null}
+                  <Menu.Item value="save-layout" onClick={save}>
+                    <Icon as={SaveIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
+                    {isActive && saveShortcut ? (
+                      <Text color="fg.subtle" fontSize="xs" ms="auto">
+                        {saveShortcut}
+                      </Text>
+                    ) : null}
+                  </Menu.Item>
+                </>
+              ) : null}
+
+              <Menu.Item value="edit-preset" onClick={edit}>
+                <Icon as={PencilIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('topbar.presets.editWithEllipsis')}</Menu.ItemText>
               </Menu.Item>
-            ) : null}
+              {isCustom ? (
+                <Menu.Item data-danger="" value="delete-preset" onClick={remove}>
+                  <Icon as={Trash2Icon} boxSize="3.5" />
+                  <Menu.ItemText>{t('topbar.presets.deleteWithEllipsis')}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
+            </MenuHeadingGroup>
 
             <Menu.Separator />
             <Menu.Item value="manage-presets" onClick={manage}>

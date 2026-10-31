@@ -48,7 +48,8 @@ const TWO_GPUS = [
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
   lng: 'en',
-  resources: { en: { translation: { settingsDialog: { changedSetting: '{{setting}} differs from its default' } } } },
+  interpolation: { escapeValue: false },
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
 });
 
 let host: HTMLDivElement | null = null;
@@ -127,11 +128,11 @@ describe('GenerationDevicesSettings', () => {
 
   it('marks explicit device lists as changed and removes the marker when auto is restored', async () => {
     await render({ options: TWO_GPUS, setting: ['cuda:0', 'cuda:1'] });
-    expect(host?.querySelectorAll('[role="img"][aria-label$="differs from its default"]')).toHaveLength(1);
+    expect(host?.querySelectorAll('[role="img"][aria-label$=": changed from default"]')).toHaveLength(1);
     await render({ options: TWO_GPUS, setting: 'auto' });
-    expect(host?.querySelector('[role="img"][aria-label$="differs from its default"]')).toBeNull();
+    expect(host?.querySelector('[role="img"][aria-label$=": changed from default"]')).toBeNull();
     await render({ loadState: 'loading', options: TWO_GPUS, setting: ['cuda:0'] });
-    expect(host?.querySelector('[role="img"][aria-label$="differs from its default"]')).toBeNull();
+    expect(host?.querySelector('[role="img"][aria-label$=": changed from default"]')).toBeNull();
   });
 
   it('saves the devices in effect when auto is turned off, changing nothing else', async () => {
@@ -146,11 +147,11 @@ describe('GenerationDevicesSettings', () => {
   it('shows the restart notice only after a change is saved', async () => {
     await render({ options: TWO_GPUS, setting: 'auto' });
 
-    expect(host?.textContent).not.toContain('Restart InvokeAI');
+    expect(host?.textContent).not.toContain('Restart Invoke');
 
     await act(() => userEvent.click(switchControls()[0]!));
 
-    expect(host?.textContent).toContain('Restart InvokeAI for changes to take effect.');
+    expect(host?.textContent).toContain('Restart Invoke for changes to take effect.');
   });
 
   it('refuses to deselect the last GPU rather than letting the server 422', async () => {
@@ -170,9 +171,7 @@ describe('GenerationDevicesSettings', () => {
     expect(host?.textContent).toContain('RTX 4090');
     expect(host?.textContent).toContain('Only an administrator can change which accelerators are used.');
     expect(host?.querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
-    expect(
-      host?.querySelector('[role="img"][aria-label="Generation devices differs from its default"]')
-    ).not.toBeNull();
+    expect(host?.querySelector('[role="img"][aria-label="Generation devices: changed from default"]')).not.toBeNull();
   });
 
   it('surfaces a load failure instead of rendering empty controls', async () => {

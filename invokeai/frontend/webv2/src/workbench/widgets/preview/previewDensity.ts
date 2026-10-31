@@ -31,18 +31,30 @@ export const getPreviewDensity = ({
   return widthPx >= PREVIEW_FULL_MIN_WIDTH_PX ? 'full' : 'compact';
 };
 
-/** Observe root width with a cleaned-up ref callback; update state only when its density bucket changes. */
+/**
+ * Observe root width with a cleaned-up ref callback; update state only when its density bucket changes.
+ * `onMeasure` (stable for the hook's lifetime) receives every measured density, so chrome outside the view follows it,
+ * and null when the root detaches, so that chrome stops following a view that is gone.
+ */
 export const usePreviewDensity = (
-  region: WorkbenchRegion
+  region: WorkbenchRegion,
+  onMeasure?: (density: PreviewDensity | null) => void
 ): { density: PreviewDensity; rootRef: Ref<HTMLDivElement> } => {
   const [density, setDensity] = useState<PreviewDensity>(isRailRegion(region) ? 'compact' : 'full');
   const regionRef = useRef(region);
   useLayoutEffect(() => {
     regionRef.current = region;
   }, [region]);
-  const applyMeasuredWidth = useCallback((widthPx: number) => {
-    setDensity(getPreviewDensity({ region: regionRef.current, widthPx }));
-  }, []);
+  const [handleMeasure] = useState(() => onMeasure);
+  const applyMeasuredWidth = useCallback(
+    (widthPx: number) => {
+      const measured = getPreviewDensity({ region: regionRef.current, widthPx });
+
+      setDensity(measured);
+      handleMeasure?.(measured);
+    },
+    [handleMeasure]
+  );
   const [rootRef] = useState(() => (node: HTMLDivElement | null) => {
     if (!node) {
       return;
@@ -58,7 +70,10 @@ export const usePreviewDensity = (
 
     observer.observe(node);
 
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      handleMeasure?.(null);
+    };
   });
 
   return { density, rootRef };

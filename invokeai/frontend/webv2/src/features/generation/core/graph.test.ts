@@ -582,7 +582,7 @@ describe('compileGenerateGraph', () => {
   });
 
   it('rejects dimensions that are not on the selected model family grid', () => {
-    expect(() => compile(flux2Model, { height: 888 })).toThrow('Generate height must be a multiple of 16.');
+    expect(() => compile(flux2Model, { height: 888 })).toThrow('Height must be a multiple of 16.');
   });
 
   it('builds an Anima graph with required components', () => {
@@ -718,7 +718,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('Reference Image #1 is not supported by anima model.');
+      ).toThrow('cannot use reference image 1');
     });
   });
 
@@ -1801,7 +1801,7 @@ describe('PiD decode', () => {
 
   it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
     // Reject unsupported PiD rather than silently use ordinary decode.
-    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/does not support PiD/);
   });
 
   it('requires both PiD models before compiling', () => {

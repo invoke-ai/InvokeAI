@@ -49,6 +49,7 @@ export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
   autoSwitchInvocationRoute: true,
+  canvasToolMemory: {},
   confirmImageDeletion: true,
   controlModelMemory: {},
   customHotkeys: {},
@@ -60,7 +61,9 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
   exportIncludesWorkspace: true,
+  galleryDestinationNoticeShown: false,
   generatePresets: [],
+  generatePresetsIncludePrompts: true,
   generateSectionsOpen: {},
   highContrast: false,
   installInPlace: true,
@@ -77,6 +80,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
+  startupDestination: 'launchpad',
   themeId: DEFAULT_THEME_ID,
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
@@ -275,6 +279,29 @@ const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sk
 const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
 const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
 
+const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
+const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
+
+/**
+ * Keeps only the known tools' plain records, so the synced blob cannot grow with stray keys. An already-valid record
+ * comes back as is, keeping its identity across unrelated preference patches.
+ */
+const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string, unknown>> => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.canvasToolMemory;
+  }
+  const keys = Object.keys(value);
+  if (keys.every((key) => (CANVAS_TOOL_MEMORY_KEYS as readonly string[]).includes(key) && isPlainRecord(value[key]))) {
+    return value;
+  }
+  return Object.fromEntries(
+    CANVAS_TOOL_MEMORY_KEYS.flatMap((key) => (isPlainRecord(value[key]) ? [[key, value[key]]] : []))
+  );
+};
+
 /**
  * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
  * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
@@ -321,6 +348,7 @@ type WorkbenchPreferencesInput = Omit<
   | 'launchpadProjectsSort'
   | 'launchpadProjectsView'
   | 'queueJobsScope'
+  | 'startupDestination'
   | 'workflowEdgeStyle'
   | 'workflowLibrarySort'
   | 'workflowLibraryThumbnailFit'
@@ -328,6 +356,7 @@ type WorkbenchPreferencesInput = Omit<
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
+  startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
   workflowLibrarySort?: unknown;
   workflowLibraryThumbnailFit?: unknown;
@@ -338,6 +367,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'
       ? preferences.autoSwitchInvocationRoute
       : DEFAULT_PREFERENCES.autoSwitchInvocationRoute,
+  canvasToolMemory: normalizeCanvasToolMemoryRecord(preferences?.canvasToolMemory),
   confirmImageDeletion:
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
@@ -373,6 +403,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.exportIncludesWorkspace
       : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
+  generatePresetsIncludePrompts: preferences?.generatePresetsIncludePrompts !== false,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
   installInPlace:
     typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
@@ -408,6 +439,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.alphaNoticeAcknowledged === 'boolean'
       ? preferences.alphaNoticeAcknowledged
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
+  galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
   selectObjectAutoProcess:
@@ -422,6 +454,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
+  startupDestination:
+    preferences?.startupDestination === 'launchpad' || preferences?.startupDestination === 'recentProject'
+      ? preferences.startupDestination
+      : DEFAULT_PREFERENCES.startupDestination,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
   whatsNewSeenVersion:
     typeof preferences?.whatsNewSeenVersion === 'string'
@@ -690,6 +726,9 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 ): Selected => useWorkbenchSettingsSelector((snapshot) => selector(snapshot.preferences), isEqual);
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
+
+/** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
+export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
 
 /** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {

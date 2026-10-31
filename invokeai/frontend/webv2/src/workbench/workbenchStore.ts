@@ -149,6 +149,15 @@ const createCommands = (
           selectionPage,
         })
       ),
+      /** Select an image or video picked outside the Gallery's listing; Preview navigates within the item's own board. */
+      selectItemInItsBoard: command(
+        'selectGalleryItem',
+        (item: ActionPayload<'selectGalleryItem'>['item'], projectId?: string) => ({
+          item,
+          navigateItemBoard: true,
+          projectId,
+        })
+      ),
       setCompareItem: command(
         'setGalleryCompareImage',
         (image: ActionPayload<'setGalleryCompareImage'>['image'], projectId?: string) => ({ image, projectId })
@@ -273,6 +282,10 @@ const createCommands = (
         'removePromptFromHistory',
         (prompt: ActionPayload<'removePromptFromHistory'>['prompt'], projectId?: string) => ({ projectId, prompt })
       ),
+      restorePromptHistory: command(
+        'restorePromptHistory',
+        (items: ActionPayload<'restorePromptHistory'>['items'], projectId: string) => ({ items, projectId })
+      ),
       setBatchCount: command('setGenerateBatchCount', (batchCount: number, projectId?: string) => ({
         batchCount,
         projectId,
@@ -353,6 +366,12 @@ const createCommands = (
         })
       ),
       reset: command('resetActiveLayout'),
+      /** Steps the project's layout back (the active project by default), or back to before one step's change. */
+      undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
+        ...(projectId === undefined ? {} : { projectId }),
+        ...(throughEntryId === undefined ? {} : { throughEntryId }),
+      })),
+      redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
       /** Discards the named preset's unsaved arrangement in the active project. */
       revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
         presetId,
@@ -384,7 +403,14 @@ const createCommands = (
     notifications: {
       add: command('recordNotice'),
       clear: command('clearNotifications'),
+      dismiss: command('dismissNotification', (notificationId: string) => ({ notificationId })),
+      withdrawRetry: command('withdrawNotificationRetry', (itemIds: readonly number[]) => ({ itemIds })),
       markAllRead: command('markAllNotificationsRead'),
+      markRead: command('markNotificationsRead', (notificationIds: readonly string[]) => ({ notificationIds })),
+      restore: command(
+        'restoreNotifications',
+        (notifications: ActionPayload<'restoreNotifications'>['notifications']) => ({ notifications })
+      ),
       recordWidgetFailure: command(
         'recordWidgetFailure',
         (failure: ActionPayload<'recordWidgetFailure'>['failure']) => ({ failure })
@@ -454,13 +480,11 @@ const createCommands = (
         (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
           projectId,
           queueItemId,
-          ...(notice ? { notice } : {}),
+          ...(notice !== undefined ? { notice } : {}),
         })
       ),
-      cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
-      cancelAllExceptCurrent: command(
-        'cancelAllQueueItemsExceptCurrent',
-        (projectId?: string, currentQueueItemId?: string | null) => ({ currentQueueItemId, projectId })
+      cancelUnsubmitted: command('cancelUnsubmittedQueueItems', (projectId?: string) =>
+        projectId === undefined ? {} : { projectId }
       ),
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),

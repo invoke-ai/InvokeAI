@@ -1,5 +1,5 @@
 import type { MainModelConfig } from '@features/generation/core/types';
-import type { GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
+import type { GeneratePresetRecord, GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
@@ -25,8 +25,12 @@ await i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           generate: {
-            presetSettingsCleared: 'Settings cleared by preset',
-            presetSettingsClearedDescription: 'Cleared: {{labels}}.',
+            presetApplied: 'Applied preset {{name}}',
+            presetDeleted: 'Deleted preset {{name}}',
+            presetIncludePrompts: 'Include prompts',
+            savePresetAction: 'Save',
+            savePresetTitle: 'Save preset',
+            switchChanges: { size: 'Size set to {{width}}×{{height}}.' },
           },
         },
       },
@@ -42,8 +46,9 @@ let root: Root | null = null;
 const ADAPTER = {
   generateValues: { getSnapshot: () => ({}), subscribe: () => () => {} },
   models: { catalog: [] },
-  notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn() },
+  notifications: { error: vi.fn(), info: vi.fn(), reportError: vi.fn(), undoable: vi.fn() },
   presets: {
+    includePrompts: true,
     presets: [
       { id: 'preset-1', label: 'Portrait', values: {} },
       { id: 'preset-2', label: 'Landscape', values: {} },
@@ -98,66 +103,245 @@ afterEach(async () => {
 });
 
 describe('GeneratePresetsPopover', () => {
+  const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
+  const openPresets = () =>
+    act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
+  const clickPreset = (label: string) =>
+    act(() =>
+      [...document.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent === label)!.click()
+    );
+
   it.each(['omitted', 'null'] as const)(
-    'clears an active refiner when applying a preset with %s refiner and names it in the clearing notice',
+    'applies a preset with %s refiner at once and offers an Undo that brings the refiner back',
     async (slot) => {
-      const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
       const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'Refiner', type: 'main' };
-      const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model) };
+      const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model), steps: 12 };
       if (slot === 'omitted') {
         delete olderPreset.refinerModel;
       }
-      const patchGenerateSettings = vi.fn();
-      const info = vi.fn();
+      const undoable = vi.fn();
+      const values = {
+        current: { ...olderPreset, model, refinerModel: refiner, steps: 30 } as Record<string, unknown>,
+      };
+      const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => {
+        values.current = { ...values.current, ...patch };
+      });
       const adapter = {
         ...ADAPTER,
-        generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
+        generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
         models: { ...ADAPTER.models, catalog: [model, refiner] },
         presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
-        notifications: { ...ADAPTER.notifications, info },
-        settings: { ...ADAPTER.settings, patchGenerateSettings },
+        notifications: { ...ADAPTER.notifications, undoable },
+        settings: { ...ADAPTER.settings, patchGenerateSettings, readGenerateValues: () => values.current },
       } as unknown as GenerationUiAdapter;
-      const currentValues = { ...olderPreset, model, refinerModel: refiner };
       await renderAdapter(adapter);
-      await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
-      const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-        (button) => button.textContent === 'Older preset'
-      );
-      await act(() => presetButton!.click());
+      await openPresets();
+      await clickPreset('Older preset');
 
-      expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ refinerModel: null }), 'project-1');
-      expect(info).toHaveBeenCalledWith('Settings cleared by preset', 'Cleared: Refiner.');
+      expect(patchGenerateSettings).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ refinerModel: null, steps: 12 }),
+        'project-1'
+      );
+      expect(undoable).toHaveBeenCalledExactlyOnceWith('Applied preset Older preset', {
+        onUndo: expect.any(Function),
+        projectId: 'project-1',
+        supersedes: 'generate-settings:project-1',
+      });
+
+      undoable.mock.calls[0]![1].onUndo();
+
+      expect(patchGenerateSettings).toHaveBeenLastCalledWith({ refinerModel: refiner, steps: 30 }, 'project-1');
     }
   );
 
+  it('keeps settings newer than a preset, and an Undo leaves a template chosen after applying it', async () => {
+    const olderPreset: Record<string, unknown> = { ...getDefaultGenerateSettings(model), steps: 12 };
+    delete olderPreset.dynamicPromptsEnabled;
+    const template = { id: 'cinematic', name: 'Cinematic', negativePrompt: '', positivePrompt: '{prompt}, 35mm' };
+    const undoable = vi.fn();
+    const values = {
+      current: {
+        ...getDefaultGenerateSettings(model),
+        dynamicPromptsEnabled: false,
+        model,
+        promptTemplate: template,
+        steps: 30,
+      } as Record<string, unknown>,
+    };
+    const patchGenerateSettings = vi.fn((patch: Record<string, unknown>) => {
+      values.current = { ...values.current, ...patch };
+    });
+    const adapter = {
+      ...ADAPTER,
+      generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
+      models: { ...ADAPTER.models, catalog: [model] },
+      presets: { ...ADAPTER.presets, presets: [{ id: 'older', label: 'Older preset', values: olderPreset }] },
+      notifications: { ...ADAPTER.notifications, undoable },
+      settings: { ...ADAPTER.settings, patchGenerateSettings, readGenerateValues: () => values.current },
+    } as unknown as GenerationUiAdapter;
+    await renderAdapter(adapter);
+    await openPresets();
+    await clickPreset('Older preset');
+
+    expect(values.current).toMatchObject({ dynamicPromptsEnabled: false, promptTemplate: null, steps: 12 });
+
+    const later = { ...template, id: 'noir', name: 'Noir' };
+    values.current = { ...values.current, promptTemplate: later };
+    undoable.mock.calls[0]![1].onUndo();
+
+    expect(values.current).toMatchObject({ dynamicPromptsEnabled: false, promptTemplate: later, steps: 30 });
+  });
+
   it('names the size a preset moved to when its stored size does not fit the model', async () => {
-    const model: MainModelConfig = { base: 'sdxl', key: 'sdxl', name: 'SDXL', type: 'main' };
     // 1028 is off SDXL's 8 px grid, as a preset saved from a hosted model's size can be.
     const preset = { ...getDefaultGenerateSettings(model), height: 1024, width: 1028 };
     // The current size differs from the preset's, so the preset is not shown as active.
     const currentValues = { ...preset, model, width: 1024 };
-    const info = vi.fn();
+    const undoable = vi.fn();
     const patchGenerateSettings = vi.fn();
     const adapter = {
       ...ADAPTER,
       generateValues: { getSnapshot: () => currentValues, subscribe: () => () => {} },
       models: { ...ADAPTER.models, catalog: [model] },
       presets: { ...ADAPTER.presets, presets: [{ id: 'off-grid', label: 'Off grid', values: preset }] },
-      notifications: { ...ADAPTER.notifications, info },
+      notifications: { ...ADAPTER.notifications, undoable },
       settings: { ...ADAPTER.settings, patchGenerateSettings },
     } as unknown as GenerationUiAdapter;
     await renderAdapter(adapter);
-    await act(() => userEvent.click(document.querySelector<HTMLElement>('[aria-label="widgets.generate.presets"]')!));
-    const presetButton = [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === 'Off grid'
-    );
-    await act(() => presetButton!.click());
+    await openPresets();
+    await clickPreset('Off grid');
 
     expect(patchGenerateSettings).toHaveBeenCalledWith(expect.objectContaining({ width: 1032 }), 'project-1');
-    expect(info).toHaveBeenCalledWith(
-      'widgets.generate.dimensionsAdjusted',
-      'widgets.generate.dimensionsAdjustedDescription'
+    expect(undoable).toHaveBeenCalledWith(
+      'Applied preset Off grid',
+      expect.objectContaining({ message: 'Size set to 1032×1024.' })
     );
+  });
+
+  it('saves a preset without prompts when asked, remembers the choice, and keeps the prompts it is applied over', async () => {
+    const save = vi.fn();
+    const setIncludePrompts = vi.fn();
+    const patchGenerateSettings = vi.fn();
+    const saved = { ...getDefaultGenerateSettings(model), positivePrompt: 'a castle', steps: 12 };
+    const values = { current: { ...saved, model } as Record<string, unknown> };
+    const adapter = {
+      ...ADAPTER,
+      generateValues: { getSnapshot: () => values.current, subscribe: () => () => {} },
+      models: { ...ADAPTER.models, catalog: [model] },
+      presets: { ...ADAPTER.presets, presets: [], save, setIncludePrompts },
+      settings: { ...ADAPTER.settings, patchGenerateSettings },
+    } as unknown as GenerationUiAdapter;
+    await renderAdapter(adapter);
+    await openPresets();
+    await act(() =>
+      userEvent.click([...document.querySelectorAll('button')].find((b) => b.textContent === 'Save preset')!)
+    );
+    await expect.poll(() => modalDialog()?.getAttribute('data-state')).toBe('open');
+
+    const includePrompts = modalDialog()!.querySelector<HTMLInputElement>('input[type="checkbox"]')!;
+    expect(includePrompts.checked).toBe(true);
+    await act(() =>
+      userEvent.click(modalDialog()!.querySelector<HTMLElement>('[data-scope="checkbox"][data-part="control"]')!)
+    );
+    expect(includePrompts.checked).toBe(false);
+    await act(() => userEvent.type(renameInput()!, 'Settings only{Enter}'));
+
+    expect(save).toHaveBeenCalledOnce();
+    const [label, presetValues] = save.mock.calls[0]! as [string, Record<string, unknown>];
+    expect(label).toBe('Settings only');
+    expect(presetValues).not.toHaveProperty('positivePrompt');
+    expect(presetValues).toMatchObject({ steps: 12 });
+    expect(setIncludePrompts).toHaveBeenCalledExactlyOnceWith(false);
+    // The dialog closes onto the presets trigger, not the page.
+    await expect.poll(() => document.activeElement?.getAttribute('aria-label')).toBe('widgets.generate.presets');
+
+    values.current = { ...saved, model, positivePrompt: 'a lighthouse', steps: 30 };
+    await renderAdapter({
+      ...adapter,
+      presets: { ...adapter.presets, presets: [{ id: 'saved', label: 'Settings only', values: presetValues }] },
+    } as unknown as GenerationUiAdapter);
+    await expect.poll(() => modalDialog()).toBeNull();
+    await openPresets();
+    await clickPreset('Settings only');
+
+    expect(patchGenerateSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ positivePrompt: 'a lighthouse', steps: 12 }),
+      'project-1'
+    );
+  });
+
+  it('deletes a preset at once, and its Undo puts it back where it was, active again while the settings match', async () => {
+    const portrait = { ...getDefaultGenerateSettings(model), steps: 12 };
+    const stored = {
+      current: [
+        { id: 'preset-1', label: 'Landscape', values: { ...portrait, steps: 40 } },
+        { id: 'preset-2', label: 'Portrait', values: portrait },
+        { id: 'preset-3', label: 'Square', values: { ...portrait, steps: 20 } },
+      ] as GeneratePresetRecord[],
+    };
+    const undoable = vi.fn();
+    const buildAdapter = () =>
+      ({
+        ...ADAPTER,
+        generateValues: { getSnapshot: () => ({ ...portrait, model }), subscribe: () => () => {} },
+        models: { ...ADAPTER.models, catalog: [model] },
+        notifications: { ...ADAPTER.notifications, undoable },
+        presets: {
+          ...ADAPTER.presets,
+          presets: stored.current,
+          remove: (id: string) => {
+            stored.current = stored.current.filter((preset) => preset.id !== id);
+          },
+          restore: (preset: GeneratePresetRecord, index: number) => {
+            stored.current = [...stored.current.slice(0, index), preset, ...stored.current.slice(index)];
+          },
+        },
+      }) as unknown as GenerationUiAdapter;
+    // The trigger names the active preset after the section label.
+    const trigger = () => document.querySelector<HTMLElement>('[aria-label^="widgets.generate.presets"]')!;
+    const triggerLabel = () => trigger().getAttribute('aria-label');
+    const rowLabels = () =>
+      [...document.querySelectorAll('[data-scope="popover"][data-part="content"] button[type="button"]')]
+        .map((button) => button.textContent)
+        .filter((label) => label === 'Landscape' || label === 'Portrait' || label === 'Square');
+    await renderAdapter(buildAdapter());
+    expect(triggerLabel()).toBe('widgets.generate.presets · Portrait');
+    await act(() => userEvent.click(trigger()));
+
+    /** Untranslated, every row's delete button shares one label; rows keep catalog order. */
+    const deleteButtons = () => [
+      ...document.querySelectorAll<HTMLElement>('[aria-label="widgets.generate.deletePresetNamed"]'),
+    ];
+    const deleteRow = async (index: number) => {
+      await act(() => userEvent.click(deleteButtons()[index]!));
+      await renderAdapter(buildAdapter());
+    };
+    const [, , squareDelete] = deleteButtons();
+    await deleteRow(1);
+
+    // No confirmation: the preset is gone at once, and focus moves to the next row's delete button.
+    expect(modalDialog()).toBeNull();
+    expect(rowLabels()).toEqual(['Landscape', 'Square']);
+    expect(document.activeElement).toBe(squareDelete);
+    expect(triggerLabel()).toBe('widgets.generate.presets');
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('Deleted preset Portrait', { onUndo: expect.any(Function) });
+
+    await act(() => undoable.mock.calls[0]![1].onUndo());
+    await renderAdapter(buildAdapter());
+
+    expect(rowLabels()).toEqual(['Landscape', 'Portrait', 'Square']);
+    expect(triggerLabel()).toBe('widgets.generate.presets · Portrait');
+
+    // Deleting the last row moves focus to the previous row; deleting the only row, to the popover itself.
+    const [landscapeDelete] = deleteButtons();
+    await deleteRow(2);
+    await deleteRow(1);
+    expect(rowLabels()).toEqual(['Landscape']);
+    expect(document.activeElement).toBe(landscapeDelete);
+
+    await deleteRow(0);
+    expect(rowLabels()).toEqual([]);
+    expect(document.activeElement).toBe(document.querySelector('[data-scope="popover"][data-part="content"]'));
   });
 
   it('animates the rename dialog out instead of unmounting it on close', async () => {

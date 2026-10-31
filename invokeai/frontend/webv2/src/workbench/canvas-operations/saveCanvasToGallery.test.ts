@@ -57,7 +57,8 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
     seed: 123,
     ...generateOverrides,
   };
-  gallery.state.values = { ...gallery.state.values, selectedBoardId: boardId };
+  // Following the selected board, so the board under test is where saves go.
+  gallery.state.values = { ...gallery.state.values, followSelectedBoard: true, selectedBoardId: boardId };
 
   return project;
 };
@@ -223,7 +224,12 @@ describe('saveCanvasToGallery', () => {
     const project = createProject();
     const gallery = getProjectWidgetInstance(project, 'gallery')!;
 
-    gallery.state.values = { ...gallery.state.values, projectBoardId: 'project-board', selectedBoardId };
+    gallery.state.values = {
+      ...gallery.state.values,
+      followSelectedBoard: true,
+      projectBoardId: 'project-board',
+      selectedBoardId,
+    };
 
     await saveCanvasToGallery({
       engine: harness.engine,

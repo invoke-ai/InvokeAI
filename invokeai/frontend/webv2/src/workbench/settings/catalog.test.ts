@@ -181,6 +181,15 @@ describe('settings availability', () => {
     ]);
   });
 
+  it('keeps project settings for search where no project is open, and widget settings still out', () => {
+    expect(shown({ canManageAppConfig: true, forSearch: true, widgetTypeIds: null })).toEqual([
+      ['appearance', ['motion']],
+      ['project', ['cpuNoise']],
+      ['preview', ['confirm', 'antialias']],
+      ['server', ['devices']],
+    ]);
+  });
+
   it('shows the server section only to accounts that can manage the app configuration', () => {
     expect(shown({ canManageAppConfig: false, widgetTypeIds: null }).map(([id]) => id)).not.toContain('server');
   });

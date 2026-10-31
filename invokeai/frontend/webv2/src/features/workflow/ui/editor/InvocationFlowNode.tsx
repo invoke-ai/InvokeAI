@@ -19,7 +19,11 @@ import {
   type WorkflowNodeOutcome,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
-import { useWorkflowNodeExecutionState } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useOpenNodesManager,
+  useWorkflowCapabilitiesSelector,
+  useWorkflowNodeExecutionState,
+} from '@features/workflow/ui/WorkflowUiContext';
 import {
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   cloneWorkflowFieldDefault,
@@ -37,6 +41,7 @@ import {
   isWorkflowFieldValueDefault,
 } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
@@ -931,6 +936,26 @@ const getTemplatelessNodeMessage = (
         ? t('nodes.unknownNodeType')
         : t('nodes.unknownNodeTypeOnBackend', { type: documentNode.data.type });
 
+/**
+ * Where a node type this backend lacks can come from: the Nodes Manager installs node packs, for an account that may;
+ * anyone else is told who can.
+ */
+const MissingNodeTypeAction = () => {
+  const { t } = useTranslation();
+  const canManageNodes = useWorkflowCapabilitiesSelector((capabilities) => capabilities.canManageNodes);
+  const openNodesManager = useOpenNodesManager();
+
+  return canManageNodes ? (
+    <Button alignSelf="flex-start" className="nodrag" mt="1.5" size="xs" variant="outline" onClick={openNodesManager}>
+      {t('nodes.openNodesManager')}
+    </Button>
+  ) : (
+    <Text color="fg.subtle" fontSize="xs">
+      {t('nodes.unknownNodeTypeAskAdmin')}
+    </Text>
+  );
+};
+
 const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const { t } = useTranslation();
   const node = data.documentNode;
@@ -1009,6 +1034,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
                 {getTemplatelessNodeMessage(t, data, false)}
               </Text>
             ) : null}
+            {isMissing ? <MissingNodeTypeAction /> : null}
           </Stack>
         </HStack>
       </NodeShell>
