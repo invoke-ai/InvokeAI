@@ -148,8 +148,14 @@ const stopThumbnailRouteCommand: BrowserCommand<[]> = async ({ context, sessionI
   await stopThumbnailRoute(context, sessionId);
 };
 
+/**
+ * Without the dev proxy, `/api` requests fail the way they do in CI. Proxied to a developer's running backend, their
+ * responses arrive late and change what tests render: a menu row inserted mid-click moves the clicked item.
+ */
+const { proxy: _devBackendProxy, ...server } = viteConfig.server ?? {};
+
 export default mergeConfig(
-  viteConfig,
+  { ...viteConfig, server },
   defineConfig({
     define: {
       __CANVAS_GOLDEN_UPDATE__: process.env.CANVAS_GOLDEN_UPDATE === '1',
