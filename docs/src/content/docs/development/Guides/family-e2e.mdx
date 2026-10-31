@@ -13,7 +13,7 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
    - The tool refuses while the database file is open in any process (Windows only), or while anything listens on the template's configured port. Either means its server is still running.
    - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
    - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
-   - Every other path setting points back at the template root as an absolute path, so models, custom nodes, prompt files and memory settings are the template's own.
+   - Every other path setting points back at the template root as an absolute path, so models, custom nodes and memory settings are the template's own.
    - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
    - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
 2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
@@ -194,8 +194,7 @@ The scratch server uses the template root's models directory, model caches, lega
 - Install claims (`*.invokeai_install_active`) of processes that no longer run are removed.
 - Missing model files are reported in the log.
 - `configs/` receives the legacy model configs of the server's code when they differ.
-- `fonts/README.txt` is written when missing.
-- `prompt_files/README.txt` is written when missing.
+- `fonts/README.txt` and `prompt_files/README.txt` are written when missing.
 - Models a node fetches on first use are cached in `models/.download_cache`.
 
 The server would also finish an incomplete install, but the model would then be registered in the scratch database only. So `start` and `resume` refuse while the models directory holds a `tmpinstall_*` entry: finish or cancel that install in the dev server first.
@@ -215,7 +214,7 @@ Database migrations of a newer `code_dir` run against the scratch database only.
 - Time per step comes from the preview frames, which the server throttles to one per 0.1 s; a step's number is read from its progress percentage.
   - The step count comes from the compiled denoise node: its `steps` or `num_steps` field, which for most families is the case's `steps`. An Ideogram 4 node without `steps` runs its sampler preset's count.
   - A node that denoises a window of its schedule (`denoising_start` above 0 or `denoising_end` below 1, as img2img and an SDXL refiner hand-over do) starts or stops at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
-- Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts are not expanded: a prompt with their syntax is rejected unless `settings.dynamicPromptsEnabled` is `false`, which sends it as typed. Canvas rasterization, video and upscale graphs are not covered.
+- Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts, canvas rasterization, video and upscale graphs are not covered.
 - A bundle finds other paths in free text by their drive letter, or as POSIX paths of two or more components that start after a space, a quote or a bracket. Such a path, and a path below the home directory, keeps what follows a space in one of its directory names; a POSIX path at the root (`/x`) or right after `:` stays. A UNC path in free text stays as it is. An `extra_env` credential shorter than 8 characters is redacted in `run.json` only.
 - A calibration run measures the windows of estimated model operations only, inside a running server: they are not a fresh process's first operation, as the `demand_peak` points are.
 - AMD GPUs on Linux and A/B runs of two checkouts are not available yet.
