@@ -1023,6 +1023,7 @@ class ImageIndexService(ImageIndexServiceBase):
         discarded = invoker.services.image_index_records.delete_embeddings_for_other_models(self._model_id)
         if discarded:
             invoker.services.logger.info(f"Discarded {discarded} embeddings computed by a previously-configured model")
+        self._prune_vocab_caches()
 
         if not self._callbacks_registered:
             invoker.services.images.on_changed(self._on_image_changed)
@@ -1037,6 +1038,30 @@ class ImageIndexService(ImageIndexServiceBase):
         self._stop_event.clear()
         self._worker = threading.Thread(target=self._worker_loop, name="image_index_worker", daemon=True)
         self._worker.start()
+
+    def _prune_vocab_caches(self) -> None:
+        """Retire obsolete vocabulary archives under the index's one-current-model policy."""
+        assert self._invoker is not None and self._model_id is not None
+        cache_dir = self._invoker.services.configuration.db_path.parent
+        model_tag = self._model_id.replace(":", "_")[:24]
+        current = {cache_dir / f"cluster_vocab_{model_tag}.npz", cache_dir / f"cluster_vocab_custom_{model_tag}.npz"}
+        try:
+            for cache_path in cache_dir.glob("cluster_vocab_*.npz"):
+                # Both writer generations use .tmp.npz; these may still be open
+                # in another instance and are not obsolete published archives.
+                if cache_path in current or cache_path.name.lower().endswith(".tmp.npz"):
+                    continue
+                try:
+                    if cache_path.is_symlink() or not cache_path.is_file():
+                        continue
+                    cache_path.unlink(missing_ok=True)
+                except OSError:
+                    self._invoker.services.logger.warning(
+                        f"Could not remove stale cluster vocabulary cache at {cache_path}", exc_info=True
+                    )
+        except OSError:
+            # Cache maintenance must not prevent startup or a late encoder swap.
+            self._invoker.services.logger.warning("Could not prune obsolete cluster vocabulary caches", exc_info=True)
 
     def stop(self, invoker: Optional["Invoker"] = None) -> None:
         # Under the lock so a map request cannot be midway through starting a
