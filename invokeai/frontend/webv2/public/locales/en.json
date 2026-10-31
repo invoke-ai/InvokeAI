@@ -2533,15 +2533,15 @@
       },
       "useCpuNoise": {
         "label": "Use CPU noise",
-        "description": "Use CPU noise generation for deterministic legacy-compatible outputs."
+        "description": "Use CPU noise for deterministic, legacy-compatible outputs. Applies to every generation in this project, Canvas and Upscale included."
       },
       "useNsfwChecker": {
         "label": "NSFW checker",
-        "description": "Blur Generate and Canvas results the checker flags as explicit before they are saved."
+        "description": "Blur results the checker flags as explicit before they are saved. Applies to every Generate and Canvas generation in this project."
       },
       "useWatermark": {
         "label": "Invisible watermark",
-        "description": "Stamp an invisible watermark into every Generate and Canvas result."
+        "description": "Stamp an invisible watermark into every result. Applies to every Generate and Canvas generation in this project."
       },
       "confirmImageDeletion": {
         "label": "Confirm image deletion",
