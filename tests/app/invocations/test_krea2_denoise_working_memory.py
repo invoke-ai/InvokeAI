@@ -236,7 +236,7 @@ class TestEstimate:
         assert not KREA2_DENOISE_SPEC.line(styled).fits
 
     @pytest.mark.parametrize(
-        ("dtype", "per_token"), [(torch.bfloat16, 0.34), (torch.float16, 0.34), (torch.float32, 0.52)]
+        ("dtype", "per_token"), [(torch.bfloat16, 0.34), (torch.float16, 0.34), (torch.float32, 0.74)]
     )
     def test_caption_tokens_beyond_the_fit_grids_512_reserve_their_measured_excess(self, dtype, per_token) -> None:
         """Up to 512 caption tokens the line covers a caption's excess over an image token; beyond, each adds the

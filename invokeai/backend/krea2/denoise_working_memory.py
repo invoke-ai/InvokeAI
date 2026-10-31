@@ -38,15 +38,19 @@ A caption token reserves more than an image token, while allocated memory grows 
 short caption reserves up to 1.35 times what it demands (`bounds.UPPER_BOUND_EXCEPTIONS`). Beyond 512, which regional
 prompting reaches by concatenating its captions, each caption token adds `_CAPTION_EXCESS_BYTES_PER_TOKEN` on top of
 the line. The caption checks measure it (`--mode captions`: 1024- and 2048-token captions at 4096 and 9216 image tokens,
-every dtype, on every measured platform, out of the fit): the line alone falls short at 2048 tokens, by up to 16%
-(down to 0.84 times the demand). The term is the most a check demanded per caption token beyond 512 above the line's
-slope, over every measured platform, times the 1.3 that bounds a fitted term (`bounds.MAX_OVER_RESERVATION`), rounded
-up to the next 0.01 MiB. CUDA's native allocator sets it: 0.26 MiB in bf16 and fp16 (1024 px, 2048 tokens) gives
-0.34 MiB, 0.39 MiB in fp32 (1536 px, 2048 tokens) gives 0.52 MiB; the RX 9060 XT demanded at most 0.25 and 0.37 MiB.
-The estimate covers every check, 1.05 to 1.54 times in bf16 and fp16 and 1.03 to 1.61 times in fp32 under CUDA's
-native allocator, 1.21 to 1.50 and 1.11 to 1.27 times under `cudaMallocAsync`, 1.05 to 1.46 and 1.03 to 1.58 times
-under ROCm's native allocator, 1.17 to 1.43 and 1.25 to 1.37 times with expandable segments. On the RTX 4090 each group's
-largest ratio falls on a forward the line alone already covers 1.10 to 1.47 times.
+every dtype, on every measured platform, out of the fit), as do the same checks on Linux on an RTX 6000 Ada (the 4090's
+AD102 chip) under both CUDA allocators, shipped without its fit-grid points: the line alone falls short at 2048
+tokens, by up to 23% (down to 0.77 times the demand). The term is the most a check demanded per caption token beyond
+512 above the line's slope, over every shipped caption check, times the 1.3 that bounds a fitted term
+(`bounds.MAX_OVER_RESERVATION`), rounded up to the next 0.01 MiB. In bf16 and fp16 CUDA's native allocator sets it:
+0.26 MiB (1024 px, 2048 tokens) gives 0.34 MiB. In fp32 the RTX 6000 Ada under `cudaMallocAsync` does: 0.56 MiB
+(1024 px, 2048 tokens) gives 0.74 MiB; CUDA's native allocator demanded at most 0.39 MiB, the RTX 4090 under
+`cudaMallocAsync` 0.24 and the RX 9060 XT 0.37. The estimate covers every check, 1.05 to 1.54 times in bf16 and fp16
+and 1.08 to 1.67 times in fp32 under CUDA's native allocator (both cards measured the same), 1.21 to 1.50 and 1.14 to
+1.34 times under `cudaMallocAsync` on the RTX 4090 and 1.17 to 1.50 and 1.07 to 1.40 times on the RTX 6000 Ada, 1.05 to
+1.46 and 1.08 to 1.63 times under ROCm's native allocator, 1.17 to 1.43 and 1.33 to 1.45 times with expandable
+segments. On the RTX 4090 each group's largest ratio falls on a forward the line alone already covers 1.09 to 1.47
+times.
 
 Cross-checks in a running server on the RTX 4090 under the native allocator with an ~84-token prompt, not shipped as
 points: the estimate reserved 1.22 to 1.66 times what the real 28-block model grew the reserved peak by over the
@@ -154,7 +158,7 @@ FITTED_CAPTION_TOKENS: Final = 512
 _CAPTION_EXCESS_BYTES_PER_TOKEN: Final[Mapping[str, int]] = {
     "bf16": int(0.34 * _MIB),
     "fp16": int(0.34 * _MIB),
-    "fp32": int(0.52 * _MIB),
+    "fp32": int(0.74 * _MIB),
 }
 """Per caption token beyond `FITTED_CAPTION_TOKENS`: the caption checks' largest demand above the line's slope, times
 `bounds.MAX_OVER_RESERVATION`, rounded up to the next 0.01 MiB (see the module docstring)."""
