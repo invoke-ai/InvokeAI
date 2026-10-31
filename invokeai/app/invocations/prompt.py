@@ -1,14 +1,19 @@
-from os.path import exists
-from typing import Optional, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
-from pydantic import field_validator
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, invocation
 from invokeai.app.invocations.fields import InputField, UIComponent
 from invokeai.app.invocations.primitives import StringCollectionOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
+from invokeai.app.util.path_safety import resolve_contained_path
+
+if TYPE_CHECKING:
+    from invokeai.app.services.invocation_services import InvocationServices
+
+_PROMPT_FILES_DIR_HINT = "the prompt files directory (`prompt_files_dir`, default `<root>/prompt_files`)"
 
 
 @invocation(
@@ -51,12 +56,26 @@ class DynamicPromptInvocation(BaseInvocation):
     title="Prompts from File",
     tags=["prompt", "file"],
     category="prompt",
-    version="1.0.2",
+    # 2.0.0: `file_path` is now relative to the configured prompt files directory and cannot
+    # address anything outside it. Absolute paths, which earlier versions accepted, are refused.
+    # Major, so the editor does not carry an old `file_path` over as if it were still valid.
+    version="2.0.0",
+    use_cache=False,
 )
 class PromptsFromFileInvocation(BaseInvocation):
-    """Loads prompts from a text file"""
+    """Loads prompts from a text file.
 
-    file_path: str = InputField(description="Path to prompt text file")
+    The file is read from the InvokeAI prompt files directory (`prompt_files_dir`, by default
+    `<root>/prompt_files`). `file_path` is relative to that directory - absolute paths and path
+    traversal are rejected - so the node can only read prompt lists an operator has deliberately
+    placed there.
+
+    In multi-user mode the node is restricted to administrators: the directory is shared by every
+    account, so letting one account read from it would hand it another account's prompt lists.
+    Non-admin users should use wildcards, which are stored per account.
+    """
+
+    file_path: str = InputField(description="Path to prompt text file, relative to the InvokeAI prompt files directory")
     pre_prompt: Optional[str] = InputField(
         default=None,
         description="String to prepend to each prompt",
@@ -70,15 +89,48 @@ class PromptsFromFileInvocation(BaseInvocation):
     start_line: int = InputField(default=1, ge=1, description="Line in the file to start start from")
     max_prompts: int = InputField(default=1, ge=0, description="Max lines to read from file (0=all)")
 
-    @field_validator("file_path")
-    def file_path_exists(cls, v):
-        if not exists(v):
-            raise ValueError(FileNotFoundError)
-        return v
+    def _resolve_file_path(self, context: InvocationContext) -> Path:
+        """Resolves `file_path` inside the prompt files directory, after checking the caller may read it.
+
+        Deliberately *not* a pydantic validator. A validator runs while the enqueue request body is
+        being parsed, which means every failure - including "that file does not exist" - is answered
+        as a 422 before anything is queued, turning the node into a filesystem probe that leaves no
+        queue item behind. Resolving here instead makes a bad path fail as an error on the caller's
+        own queue item, the same as any other invocation failure.
+        """
+        config = context._services.configuration
+
+        if config.multiuser:
+            # The prompt files directory is shared by every account, so reading from it is an admin
+            # capability. `call_saved_workflow` gates on the queueing user the same way.
+            queue_user_id = context._data.queue_item.user_id
+            user = context._services.users.get(queue_user_id)
+            if not (user and user.is_admin):
+                raise ValueError(
+                    "The 'Prompts from File' node is restricted to administrators in multi-user mode. "
+                    "Use wildcards instead - they are stored per account."
+                )
+
+        # Errors name the setting, not the resolved path: the absolute path is server-side detail, and
+        # echoing it back would describe the host's layout to whoever enqueued the graph.
+        try:
+            resolved = resolve_contained_path(config.prompt_files_path, self.file_path)
+        except ValueError as e:
+            raise ValueError(
+                f"Invalid prompt file path: {e} 'file_path' must be relative to {_PROMPT_FILES_DIR_HINT}."
+            ) from e
+
+        if not resolved.is_file():
+            raise ValueError(
+                f"No prompt file '{self.file_path}' in {_PROMPT_FILES_DIR_HINT}. "
+                "Place prompt list files there to use them with this node."
+            )
+
+        return resolved
 
     def promptsFromFile(
         self,
-        file_path: str,
+        file_path: Union[str, Path],
         pre_prompt: Union[str, None],
         post_prompt: Union[str, None],
         start_line: int,
@@ -97,9 +149,15 @@ class PromptsFromFileInvocation(BaseInvocation):
                     break
         return prompts
 
+    def invoke_internal(self, context: InvocationContext, services: "InvocationServices") -> BaseInvocationOutput:
+        # Never use the invocation cache: the admin gate lives in invoke() and cache keys carry no user
+        # identity, so a hit would hand an admin's read to anyone (and the file can change under the key).
+        self._validate_invoke_fields()
+        return self.invoke(context)
+
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         prompts = self.promptsFromFile(
-            self.file_path,
+            self._resolve_file_path(context),
             self.pre_prompt,
             self.post_prompt,
             self.start_line,

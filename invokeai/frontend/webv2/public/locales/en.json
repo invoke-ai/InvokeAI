@@ -5286,7 +5286,7 @@
       "uploadFailed": "No files uploaded. {{failed}} failed.",
       "uploadMediaToBoard": "Upload media to {{name}}",
       "uploadPartialTitle": "Uploaded {{succeeded}} of {{total}} files",
-      "uploadSplit": "Images appear in Uploads; videos appear in Media.",
+      "uploadSplit": "Images and videos appear in Uploads.",
       "uploadSuccessTitle_one": "Uploaded {{count}} file",
       "uploadSuccessTitle_other": "Uploaded {{count}} files",
       "uploadSummary": "{{images}} and {{videos}} uploaded to {{board}}. {{failed}} failed.",
