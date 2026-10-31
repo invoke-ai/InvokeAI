@@ -13,7 +13,7 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
-import { getLayoutPromptRejectionReason } from '@features/generation/graph';
+import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
   describeGenerationIssue,
@@ -248,11 +248,20 @@ const getGenerateSnapshotValidationReasons = (
     return [{ generationIssue: NO_GENERATE_MODEL_ISSUE }];
   }
 
+  const layoutDraftReason = getLayoutDraftRejectionReason({
+    base: values.model.base,
+    positivePrompt: values.positivePrompt,
+    promptTemplate: values.promptTemplate,
+  });
+
   // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
-  return getGenerateInvocationIssues(values, {
-    ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
-    ...(models ? { models } : {}),
-  }).map((generationIssue) => ({ generationIssue }));
+  return [
+    ...getGenerateInvocationIssues(values, {
+      ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
+      ...(models ? { models } : {}),
+    }).map((generationIssue) => ({ generationIssue })),
+    ...(layoutDraftReason === null ? [] : [layoutDraftReason]),
+  ];
 };
 
 export const isResultDestinationAvailable = (destination: ResultDestination): boolean =>

@@ -1,7 +1,7 @@
 ---
 title: ERNIE-Image
 description: Generate images with Baidu's ERNIE-Image and ERNIE-Image Turbo, from the Diffusers pipelines, the single-file transformers or GGUF.
-lastUpdated: 2026-10-09
+lastUpdated: 2026-10-21
 sidebar:
   order: 3
 ---
@@ -66,8 +66,8 @@ ERNIE-Image Turbo (8 steps): the Q4_K_M transformer holds 4.8 GB instead of 15.3
 from 23.6 GB to 17.8 GB, and an image takes 11.0 s against 11.6 s for the Diffusers pipeline.
 Other GGUF conversions with the same layout
 (for example vantagewithai's) install as well. Quantized safetensors single files (fp8, int8) are not
-supported, and neither is a GGUF build of the Ministral 3B encoder, so the encoder stays the 7.7 GB
-safetensors file.
+supported. A GGUF build of the Ministral 3B encoder is refused at install with a message naming the file to use
+instead, so the encoder stays the 7.7 GB safetensors file.
 
 When a single-file ERNIE-Image model is selected, the **Components** section next to the model asks for:
 

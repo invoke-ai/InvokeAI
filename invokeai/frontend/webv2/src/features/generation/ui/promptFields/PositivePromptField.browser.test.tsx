@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig } from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
@@ -198,15 +199,27 @@ const DYNAMIC_PROMPTS: DynamicPromptsFieldConfig = {
   seedBehaviour: 'per-iteration',
 };
 
+const PHOTO_TEMPLATE = { id: 'photo', name: 'Photo', negativePrompt: '', positivePrompt: 'photo of {prompt}' };
+
 const renderField = async ({
+  batchCount,
   dynamicPrompts = null,
+  isTemplateViewMode,
   onChange = vi.fn(),
+  onTemplateViewModeChange,
   onUsePrompt = vi.fn(),
+  promptTemplate,
+  showSyntaxHighlighting = false,
   value,
 }: {
+  batchCount?: number;
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
+  isTemplateViewMode?: boolean;
   onChange?: (value: string) => void;
+  onTemplateViewModeChange?: (isTemplateViewMode: boolean) => void;
   onUsePrompt?: (prompt: { negativePrompt: string | null; positivePrompt: string }) => void;
+  promptTemplate?: PromptTemplateSnapshot;
+  showSyntaxHighlighting?: boolean;
   value: string;
 }) => {
   host = document.createElement('div');
@@ -220,15 +233,19 @@ const renderField = async ({
           <ChakraProvider value={system}>
             <DndContext>
               <PositivePromptField
+                batchCount={batchCount}
                 dynamicPrompts={dynamicPrompts}
                 heightPx={96}
+                isTemplateViewMode={isTemplateViewMode}
                 loras={[]}
                 projectId="project-1"
+                promptTemplate={promptTemplate}
                 selectedModel={undefined}
-                showSyntaxHighlighting={false}
+                showSyntaxHighlighting={showSyntaxHighlighting}
                 value={value}
                 onChange={onChange}
                 onResizeEnd={vi.fn()}
+                onTemplateViewModeChange={onTemplateViewModeChange}
                 onUsePrompt={onUsePrompt}
               />
             </DndContext>
@@ -339,4 +356,36 @@ describe('the dynamic prompts notice under the prompt', () => {
     await vi.waitFor(() => expect(notice()).toBe(''));
     expect(parseDynamicPrompts).toHaveBeenCalledTimes(2);
   });
+});
+
+it('shows a JSON prompt under a template whole, as it generates, and never expands its braces', async () => {
+  parseDynamicPrompts.mockReset();
+  parseDynamicPrompts.mockResolvedValue({ error: null, prompts: ['a red cup', 'a green cup'] });
+  const layout =
+    '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a {red|green} cup"},"items":[]}';
+
+  await renderField({
+    batchCount: 2,
+    dynamicPrompts: DYNAMIC_PROMPTS,
+    isTemplateViewMode: true,
+    promptTemplate: PHOTO_TEMPLATE,
+    showSyntaxHighlighting: true,
+    value: layout,
+  });
+  // Past the dynamic prompts debounce, when a dynamic prompt would have been parsed.
+  await act(async () => {
+    await new Promise((resolve) => {
+      window.setTimeout(resolve, 700);
+    });
+  });
+
+  expect(textarea().value).toBe(layout);
+  // The merged-view overlay lines up with the textarea: no template text around the layout.
+  expect(host!.querySelector('pre')?.textContent).toBe(layout);
+  const dynamicButton = [...host!.querySelectorAll('button')].find((button) =>
+    button.textContent?.includes('widgets.generate.dynamicButton')
+  );
+  expect(dynamicButton).toBeDefined();
+  expect(dynamicButton?.textContent).not.toMatch(/\d/);
+  expect(parseDynamicPrompts).not.toHaveBeenCalled();
 });

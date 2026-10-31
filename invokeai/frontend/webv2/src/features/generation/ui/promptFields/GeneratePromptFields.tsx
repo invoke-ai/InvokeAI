@@ -5,7 +5,7 @@ import type { GenerateModelConfig, GenerateSettings } from '@features/generation
 import type { PromptTemplateChange } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 
 import { Stack } from '@chakra-ui/react';
-import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
+import { getImageExpandPromptSuggestion, getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
 import { type GenerateDraft, pickGenerateSettings } from '@features/generation/ui/generateDebounce';
@@ -255,11 +255,14 @@ export const GeneratePromptFields = ({
     [onCommitImmediate, settings.expandPromptModelKey, settings.imageToPromptModelKey]
   );
 
+  const expandPromptSuggestion = useMemo(() => getImageExpandPromptSuggestion(selectedModel), [selectedModel]);
+
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
         batchCount={batchCount}
         dynamicPrompts={dynamicPrompts}
+        expandPromptSuggestion={expandPromptSuggestion}
         heightPx={promptValues.positivePromptHeightPx}
         value={promptValues.positivePrompt}
         loras={settings.loras}

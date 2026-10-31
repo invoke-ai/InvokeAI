@@ -5,7 +5,7 @@ import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
 import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
-import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
+import { getEffectivePositivePrompt, getPositivePromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
@@ -205,7 +205,7 @@ export const PositivePromptField = ({
 
   // Merge against the live draft so expansion counts do not lag behind debounce.
   const effectivePositivePrompt = useMemo(
-    () => (promptTemplate ? applyPromptTemplate(promptTemplate.positivePrompt, draftValue) : draftValue),
+    () => getEffectivePositivePrompt(draftValue, promptTemplate),
     [draftValue, promptTemplate]
   );
 
@@ -286,7 +286,7 @@ export const PositivePromptField = ({
   const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
   const templateChunks = useMemo(
-    () => (isViewingMerged ? getPromptTemplateChunks(draftValue, promptTemplate.positivePrompt) : null),
+    () => (isViewingMerged ? getPositivePromptTemplateChunks(draftValue, promptTemplate) : null),
     [draftValue, isViewingMerged, promptTemplate]
   );
 

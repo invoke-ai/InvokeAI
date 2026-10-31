@@ -28,6 +28,7 @@ import {
   Text,
 } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
+import { isModelFromRepo } from '@features/generation/core/baseGenerationPolicies';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
@@ -679,7 +680,9 @@ const ExpandPromptButton = ({
   const [excludedImageName, setExcludedImageName] = useState<string | null>(null);
   const textLlmModels = models.filter((model) => model.type === 'text_llm');
   const suggestedModelKey = suggestion?.modelSource
-    ? (textLlmModels.find((model) => model.source === suggestion.modelSource)?.key ?? null)
+    ? (textLlmModels.find((model) =>
+        isModelFromRepo(typeof model.source === 'string' ? model.source : null, suggestion.modelSource ?? '')
+      )?.key ?? null)
     : null;
   const onSaveModelKey = savedPromptModels?.onChange;
   const saveModelKey = useMemo(
@@ -692,6 +695,11 @@ const ExpandPromptButton = ({
     savedKey: savedPromptModels?.expandPromptModelKey,
     suggestedKey: suggestedModelKey,
   });
+  const suggestedModel = textLlmModels.find((model) => model.key === suggestedModelKey) ?? null;
+  const handleUseSuggestedModel = useCallback(
+    () => handleModelChange(suggestedModel),
+    [handleModelChange, suggestedModel]
+  );
   const suggestedImage = suggestion?.image ?? null;
   const canReadImages = selectedModel?.supports_images === true;
   const isImageIncluded = suggestedImage !== null && excludedImageName !== suggestedImage.image_name;
@@ -796,6 +804,23 @@ const ExpandPromptButton = ({
                         </Text>
                         <OpenModelManagerButton modelType="text_llm" />
                       </>
+                    ) : null}
+                    {suggestedModel && selectedModel?.key !== suggestedModel.key ? (
+                      <HStack gap="2">
+                        <Text color="fg.subtle" fontSize="md">
+                          {t('widgets.generate.expandSuggestedModelAvailable', { model: suggestedModel.name })}
+                        </Text>
+                        <Button
+                          aria-label={t('widgets.generate.expandUseSuggestedModelLabel', {
+                            model: suggestedModel.name,
+                          })}
+                          size="xs"
+                          variant="outline"
+                          onClick={handleUseSuggestedModel}
+                        >
+                          {t('widgets.generate.expandUseSuggestedModel')}
+                        </Button>
+                      </HStack>
                     ) : null}
                     <SystemPromptsField
                       catalog={systemPrompts}

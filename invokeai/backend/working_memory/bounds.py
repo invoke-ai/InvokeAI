@@ -46,10 +46,15 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
         "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
         "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
+        "denoise.flux3-cudnn,native-denoise-bf16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,native-denoise-fp16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-bf16-h3072-4096+560tok-b2-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-1024+560tok-RTX4090-demand_peak": 1.32,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
-instead. All are the native allocator, never expandable segments or `cudaMallocAsync`:
+instead. All but the FLUX.3 ones are the native allocator, never expandable segments or `cudaMallocAsync`:
 
 - The VAE points are MIOpen on Windows, where the demand is concave in the size: first-run driver spikes at small sizes
   and a second run reserving up to 1.6x the first at large ones, so a line that covers every point cannot stay within
@@ -57,7 +62,14 @@ instead. All are the native allocator, never expandable segments or `cudaMallocA
 - The FLUX.2 denoise points are the Klein 4B width at 1440px with a 77-token caption, 8177 tokens, on both cards: the
   native allocator served them from 1676 MiB (RTX 4090) and 1879 MiB (RX 9060 XT), while the 512-token caption at
   8612 tokens took 2382 and 2577 MiB. The line has to cover the latter. Under `cudaMallocAsync` and expandable
-  segments the two lie on one line."""
+  segments the two lie on one line.
+- The FLUX.3 denoise points are forwards without reference images on the RTX 4090, one of them a batch of two, that
+  the reference points put 1.302 to 1.320x under their line: references cost more per token than the image and the
+  caption (up to 8% under the native allocator, 12% under `cudaMallocAsync`; see `flux3/denoise_working_memory.py`), and
+  the line has to cover the reference forwards. Under the native allocator
+  the 1440px forward with an 80-token caption (8180 tokens, 2060 MiB, against 2516 MiB for the 560-token caption at 8660
+  tokens) in bf16 and fp16, under `cudaMallocAsync` a batch of two at 1024px in bf16 and, in fp32, the 512px forward
+  and the 1440px one with an 80-token caption."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:

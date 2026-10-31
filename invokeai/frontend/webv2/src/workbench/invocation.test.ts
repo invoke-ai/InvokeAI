@@ -200,6 +200,41 @@ describe('resolveInvocationRoute', () => {
       "No invocation node registered for external provider 'future-provider'."
     );
   });
+
+  it('blocks a MOSS-Image layout draft that a prompt template hides or breaks', () => {
+    const mossModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const reasonsFor = (positivePrompt: string, templatePrompt: string) =>
+      resolveInvocationRoute(
+        getActiveProject(
+          createGenerateValues(mossModel, {
+            positivePrompt,
+            promptTemplate: { id: 't', name: 'Template', negativePrompt: '', positivePrompt: templatePrompt },
+          })
+        )
+      ).validationReasons;
+    const notJson = [
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+    ];
+    const scaffold =
+      '{"width":1024,"height":1024,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"{prompt}"},"items":[{"label":"object","caption":"a sign","bbox":[0,0,512,512]}]}';
+
+    // A prefix hides a truncated draft from the authored prompt alone...
+    expect(
+      reasonsFor(
+        '{"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[',
+        'photo of {prompt}'
+      )
+    ).toEqual(notJson);
+    // ...and a template that is a draft breaks around an unescaped quote in a plain prompt.
+    expect(reasonsFor('a "neon" sign', scaffold)).toEqual(notJson);
+    expect(reasonsFor('a neon sign', scaffold)).toEqual([]);
+  });
 });
 
 describe('resolveInvocationRoute — upscale source', () => {
@@ -640,6 +675,9 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasRoute
       ).validationReasons;
 
+    expect(reasonsFor({ positivePrompt: '```json\n{"bbox_coord_space": "abs",\n```' }, [])).toEqual([
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+    ]);
     expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
       'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
     ]);

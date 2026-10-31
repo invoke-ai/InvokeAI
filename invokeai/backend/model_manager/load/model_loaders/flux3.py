@@ -12,6 +12,7 @@ Submodel map of a Diffusers folder (subfolder == ``SubModelType`` value, except 
 Single-file and GGUF builds are only the transformer, in Black Forest Labs' key layout.
 """
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Optional
 
@@ -59,6 +60,38 @@ def _build_transformer(state_dict: dict) -> torch.nn.Module:
     model_config = flux3_transformer_config(state_dict)
     with accelerate.init_empty_weights():
         return Flux3Transformer2DModel(**model_config)
+
+
+def flux3_transformer_from_native(
+    sd: dict, dtype: torch.dtype, reserve: Optional[Callable[[int], None]] = None
+) -> torch.nn.Module:
+    """The transformer of a native single-file FLUX.3 state dict in `dtype`, on the device its tensors are on, the QK
+    norms in float32. Empties `sd`. `reserve` asks the RAM cache for room before the cast, as `reserve_for_load` does;
+    None asks nothing, for a caller that loads outside the cache (the working-memory calibration script)."""
+    sd = CheckpointPrefix.detect(sd).strip(sd)
+    # Identification refuses quantized builds already; this catches a record made before it did.
+    reject_quantized_side_channel(sd, "a FLUX.3 single-file checkpoint")
+
+    model = _build_transformer(sd)
+    sd = convert_flux3_native_to_diffusers(sd)
+    skip_patterns = _model_declared_skip_patterns(model)
+    if reserve is not None:
+        reserve_for_load(
+            reserve,
+            sd,
+            dtype,
+            keep_fp8=False,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers={},
+            nvfp4_payloads={},
+        )
+    cast_state_dict(sd, dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
+    load_state_dict_ignoring_extras(model, sd, source="FLUX.3 single-file checkpoint", assign=True, allow_missing=True)
+    reject_incomplete_load(model, what="FLUX.3 single-file checkpoint")
+    sd.clear()
+    _keep_qk_norms_in_fp32(model)
+    return model
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Flux3, type=ModelType.Main, format=ModelFormat.Diffusers)
@@ -133,31 +166,7 @@ class Flux3CheckpointModel(ModelLoader):
         from safetensors.torch import load_file
 
         model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
-        sd = load_file(Path(config.path))
-        sd = CheckpointPrefix.detect(sd).strip(sd)
-        # Identification refuses quantized builds already; this catches a record made before it did.
-        reject_quantized_side_channel(sd, "a FLUX.3 single-file checkpoint")
-
-        model = _build_transformer(sd)
-        sd = convert_flux3_native_to_diffusers(sd)
-        skip_patterns = _model_declared_skip_patterns(model)
-        reserve_for_load(
-            self._ram_cache.make_room,
-            sd,
-            model_dtype,
-            keep_fp8=False,
-            model=model,
-            skip_patterns=skip_patterns,
-            fp8_layers={},
-            nvfp4_payloads={},
-        )
-        cast_state_dict(sd, model_dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
-        load_state_dict_ignoring_extras(
-            model, sd, source="FLUX.3 single-file checkpoint", assign=True, allow_missing=True
-        )
-        reject_incomplete_load(model, what="FLUX.3 single-file checkpoint")
-        sd.clear()
-        _keep_qk_norms_in_fp32(model)
+        model = flux3_transformer_from_native(load_file(Path(config.path)), model_dtype, self._ram_cache.make_room)
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
 
 
