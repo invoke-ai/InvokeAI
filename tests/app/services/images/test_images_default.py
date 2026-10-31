@@ -10,11 +10,18 @@ import os
 import stat
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
+from invokeai.app.api.extract_metadata import extract_metadata_from_image
+from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.invocations.collections import CollectionConcatInvocation
+from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_common import (
     ImageFileDeleteException,
@@ -33,9 +40,19 @@ from invokeai.app.services.image_records.image_records_default import ImageRecor
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.database.startup import init_database
+from invokeai.app.services.shared.graph import (
+    CollectInvocation,
+    Edge,
+    EdgeConnection,
+    Graph,
+    GraphExecutionState,
+    IterateInvocation,
+)
+from invokeai.app.services.shared.invocation_context import ImagesInterface
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.test_nodes import AnyTypeTestInvocation
 
 
 @pytest.fixture
@@ -101,6 +118,147 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage
     service = ImageService()
     service.start(invoker)
     return service, records, storage
+
+
+@pytest.mark.parametrize(
+    ("boundary", "output", "expected_values"),
+    [
+        pytest.param(IterateInvocation(id="boundary", collection=[17, 18]), "item", [17, 18], id="iterate"),
+        pytest.param(
+            IfInvocation(id="boundary", condition=True, true_input=17, false_input=90), "value", [17], id="if-true"
+        ),
+        pytest.param(
+            IfInvocation(id="boundary", condition=False, true_input=17, false_input=90), "value", [90], id="if-false"
+        ),
+        pytest.param(CollectInvocation(id="boundary", collection=[17, 18]), "collection", [[17, 18]], id="collect"),
+    ],
+)
+def test_image_save_graph_only_restores_source_and_persists_separate_resolved_inputs(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+    boundary: BaseInvocation,
+    output: str,
+    expected_values: list[object],
+) -> None:
+    graph = Graph(
+        nodes={
+            "boundary": boundary,
+            "active": AnyTypeTestInvocation(id="active"),
+            "future": AnyTypeTestInvocation(id="future"),
+        },
+        edges=[
+            Edge(
+                source=EdgeConnection(node_id="boundary", field=output),
+                destination=EdgeConnection(node_id="active", field="value"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="active", field="value"),
+                destination=EdgeConnection(node_id="future", field="value"),
+            ),
+        ],
+    )
+    if isinstance(boundary, (IterateInvocation, CollectInvocation)):
+        graph.add_node(CollectionConcatInvocation(id="source", first=[17, 18]))
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id="source", field="collection"),
+                destination=EdgeConnection(node_id="boundary", field="collection"),
+            )
+        )
+    else:
+        graph.add_node(AddInvocation(id="true", a=16, b=1))
+        graph.add_node(AddInvocation(id="false", a=89, b=1))
+        for name in ("true", "false"):
+            graph.add_edge(
+                Edge(
+                    source=EdgeConnection(node_id=name, field="value"),
+                    destination=EdgeConnection(node_id="boundary", field=f"{name}_input"),
+                )
+            )
+    source_json = graph.model_dump_json()
+    session = GraphExecutionState(graph=graph)
+    service, records, storage = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    data = SimpleNamespace(
+        queue_item=SimpleNamespace(
+            user_id=None,
+            project_id=None,
+            session_id=None,
+            session=session,
+            workflow=None,
+            root_item_id=None,
+            _workflow_json_loaded=False,
+            _workflow_json_snapshot=None,
+        ),
+        invocation=None,
+    )
+    images = ImagesInterface(services, data, MagicMock())
+    metadata = MetadataField.model_validate({"invokeai_resolved_inputs": {"user": "保留"}, "seed": 123})
+    metadata_json = metadata.model_dump_json()
+    saved: list[tuple[str, str, object]] = []
+    for _ in range(12):
+        node = session.next()
+        if node is None:
+            break
+        data.invocation = node
+        if session.prepared_source_mapping[node.id] == "active":
+            name = f"{len(saved)}.png"
+            services.names.create_image_name.return_value = name
+            execution_json = session.execution_graph.model_dump_json()
+            with Image.new("RGB", (2, 2), (12, 34, 56)) as image:
+                images.save(image, metadata=metadata)
+            assert session.execution_graph.model_dump_json() == execution_json
+            saved.append((name, node.id, node.value))
+        session.complete(node.id, node.invoke(MagicMock()))
+    else:
+        pytest.fail("Boundary graph did not finish")
+    assert session.is_complete()
+    assert [value for _, _, value in saved] == expected_values
+    assert graph.model_dump_json() == session.graph.model_dump_json() == source_json
+    assert metadata.model_dump_json() == metadata_json
+
+    reader = DiskImageFileStorage(storage.image_root)
+    for name, node_id, value in saved:
+        with reader.get(name) as reopened:
+            assert (reopened.format, reopened.size, reopened.getpixel((0, 0))) == ("PNG", (2, 2), (12, 34, 56))
+            extracted = extract_metadata_from_image(reopened, None, None, None, services.logger)
+            assert extracted.invokeai_workflow is None
+            # This is exactly the graph returned to executeLoadMediaWorkflow's graph-only fallback.
+            assert reader.get_graph(name) == extracted.invokeai_graph == source_json
+            restored = Graph.model_validate_json(extracted.invokeai_graph)
+            assert restored.model_dump() == graph.model_dump()  # Includes boundary nodes and all original edges.
+            assert extracted.invokeai_metadata == metadata_json
+            assert records.get(name).has_workflow
+            assert records.get_metadata(name).model_dump_json() == metadata_json
+            resolved = Graph.model_validate_json(reopened.info["invokeai_resolved_inputs"])
+            assert set(resolved.nodes) == {node_id}
+            assert resolved.edges == []
+            assert resolved.nodes[node_id].value == value
+
+
+def test_create_without_resolved_inputs_preserves_legacy_png_channels(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    metadata = '{ "seed": 123, "invokeai_resolved_inputs": "user-owned" }'
+    graph = '{ "nodes": {}, "edges": [] }'
+    with Image.new("RGB", (2, 2)) as image:
+        dto = service.create(
+            image,
+            ResourceOrigin.EXTERNAL,
+            ImageCategory.GENERAL,
+            metadata=metadata,
+            graph=graph,
+        )
+    reader = DiskImageFileStorage(storage.image_root)
+    with reader.get(dto.image_name) as reopened:
+        assert "invokeai_resolved_inputs" not in reopened.info
+        assert reopened.info["invokeai_metadata"] == metadata
+        assert reopened.info["invokeai_graph"] == graph
+        assert "invokeai_workflow" not in reopened.info
+    assert records.get(dto.image_name).has_workflow
+    assert records.get_metadata(dto.image_name).root["invokeai_resolved_inputs"] == "user-owned"
 
 
 def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(

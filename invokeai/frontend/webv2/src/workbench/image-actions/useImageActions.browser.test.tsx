@@ -53,8 +53,11 @@ const mocks = vi.hoisted(() => ({
   imageResolveMany: vi.fn((..._args: unknown[]) => Promise.resolve([])),
   importGalleryImagesToCanvas: vi.fn(),
   isActiveProject: vi.fn(),
-  imageWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
-    Promise.resolve({ graph: null, workflow: null })
+  imageWorkflow: vi.fn(
+    (
+      ..._args: unknown[]
+    ): Promise<{ graph: string | null; resolved_inputs?: string | null; workflow: string | null }> =>
+      Promise.resolve({ graph: null, workflow: null })
   ),
   requestWorkflowDocumentLoad: vi.fn(),
   submitUtilityGraph: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('not submitted'))),
@@ -356,6 +359,33 @@ beforeEach(() => {
           },
           IntegerOutput: {
             properties: { type: { default: 'integer_output' }, value: { type: 'integer', field_kind: 'output' } },
+          },
+          IterateInvocation: {
+            class: 'invocation',
+            properties: {
+              type: { default: 'iterate' },
+              collection: { type: 'array', items: { type: 'integer' }, input: 'any', field_kind: 'input' },
+            },
+            output: { $ref: '#/components/schemas/IterateOutput' },
+            version: '1.0.0',
+          },
+          IterateOutput: {
+            properties: { type: { default: 'iterate_output' }, item: { type: 'integer', field_kind: 'output' } },
+          },
+          CollectInvocation: {
+            class: 'invocation',
+            properties: {
+              type: { default: 'collect' },
+              item: { type: 'integer', input: 'connection', field_kind: 'input' },
+            },
+            output: { $ref: '#/components/schemas/CollectOutput' },
+            version: '1.0.0',
+          },
+          CollectOutput: {
+            properties: {
+              type: { default: 'collect_output' },
+              collection: { type: 'array', items: { type: 'integer' }, field_kind: 'output' },
+            },
           },
         },
       },
@@ -684,6 +714,7 @@ describe('load workflow from image', () => {
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({
       graph: 'invalid graph ignored when an authored workflow exists',
+      resolved_inputs: '{"nodes":{"seed":{"id":"seed","type":"integer","value":18}},"edges":[]}',
       workflow: JSON.stringify({ name: 'Embedded', nodes: [] }),
     });
 
@@ -702,12 +733,23 @@ describe('load workflow from image', () => {
     expect(mocks.getInvocationTemplatesSnapshot).not.toHaveBeenCalled();
   });
 
-  it('loads the stored generation graph when the image has no authored workflow', async () => {
+  it('loads the full source generation graph even when resolved inputs are available', async () => {
     mocks.getInvocationTemplatesSnapshot.mockReturnValueOnce({ error: null, status: 'idle', templates: {} });
     mocks.imageWorkflow.mockResolvedValueOnce({
       graph: JSON.stringify({
         id: 'generated',
-        nodes: { seed: { id: 'seed', type: 'integer', value: 42 } },
+        nodes: {
+          seed: { id: 'seed', type: 'integer', value: 42 },
+          iterator: { id: 'iterator', type: 'iterate', collection: [17, 18] },
+          collector: { id: 'collector', type: 'collect' },
+        },
+        edges: [
+          { source: { node_id: 'iterator', field: 'item' }, destination: { node_id: 'collector', field: 'item' } },
+        ],
+      }),
+      resolved_inputs: JSON.stringify({
+        id: 'resolved',
+        nodes: { seed: { id: 'seed', type: 'integer', value: 18 } },
         edges: [],
       }),
       workflow: null,
@@ -727,6 +769,22 @@ describe('load workflow from image', () => {
               type: 'integer',
               inputs: { value: expect.objectContaining({ value: 42 }) },
             }),
+          }),
+          expect.objectContaining({
+            id: 'iterator',
+            data: expect.objectContaining({
+              type: 'iterate',
+              inputs: { collection: expect.objectContaining({ value: [17, 18] }) },
+            }),
+          }),
+          expect.objectContaining({ id: 'collector', data: expect.objectContaining({ type: 'collect' }) }),
+        ],
+        edges: [
+          expect.objectContaining({
+            source: 'iterator',
+            sourceHandle: 'item',
+            target: 'collector',
+            targetHandle: 'item',
           }),
         ],
       }),

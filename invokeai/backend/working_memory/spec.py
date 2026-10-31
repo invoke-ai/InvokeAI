@@ -19,6 +19,7 @@ ESTIMATOR_MODULES: Final = (
     "invokeai.backend.moss_image.working_memory",
     "invokeai.backend.util.vae_working_memory",
     "invokeai.backend.z_image.denoise_working_memory",
+    "invokeai.backend.flux2.denoise_working_memory",
 )
 """Every module that registers an `EstimatorSpec`. The registry holds only the specs of modules imported so far, so a
 caller that needs all of them imports these (`import_estimator_modules`); `tests/backend/working_memory/` fails on a
@@ -46,7 +47,7 @@ class EstimatorSpec:
     line: LineFunction = field(compare=False, repr=False)
     """The line an operation's features price on, their size on it, and whether a measurement of them fits it: the
     AutoencoderKL convolution line in output pixels for every VAE estimator (`fit.convolution_line`), one in attended
-    tokens for the Z-Image denoise. Declared by every estimator, so a new one cannot inherit another's line, and with it
+    tokens for each denoise estimator. Declared by every estimator, so a new one cannot inherit another's line, and with it
     which of its measurements join a fit."""
     user_calibrated: bool = False
     """Whether a user's calibration moves this estimator: its windows fit user lines, its estimates read them, the
