@@ -1142,3 +1142,23 @@ def test_naming_the_igpu_beside_a_radeon_on_windows_rocm_is_refused():
 )
 def test_an_explicit_device_is_kept_unless_it_is_that_igpu(integrated_map, requested, platform, hip):
     assert _explicit_cuda_devices(integrated_map, requested, platform, hip) == [torch.device(requested[0])]
+
+
+# ===== choose_krea2_transformer_dtype ============
+
+
+@pytest.mark.parametrize("precision", ["auto", "float16", "bfloat16"])
+def test_choose_krea2_transformer_dtype_runs_gguf_on_mps_in_float32(monkeypatch, precision):
+    monkeypatch.setattr(get_config(), "precision", precision)
+    assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=True, device=torch.device("mps")) is torch.float32
+
+
+@pytest.mark.parametrize(("is_gguf", "device_type"), [(False, "mps"), (True, "cpu"), (True, "cuda"), (False, "cuda")])
+@pytest.mark.parametrize("precision", ["auto", "float16", "float32"])
+def test_choose_krea2_transformer_dtype_otherwise_ignores_precision(monkeypatch, is_gguf, device_type, precision):
+    """The loader and denoise both ask this; precision must not split them (Krea-2 text encoding ignores it too)."""
+    monkeypatch.setattr(get_config(), "precision", precision)
+    device = torch.device(device_type)
+    with patch.object(TorchDevice, "choose_bfloat16_safe_dtype", return_value=torch.bfloat16) as mock_safe:
+        assert TorchDevice.choose_krea2_transformer_dtype(is_gguf=is_gguf, device=device) is torch.bfloat16
+    mock_safe.assert_called_once_with(device)

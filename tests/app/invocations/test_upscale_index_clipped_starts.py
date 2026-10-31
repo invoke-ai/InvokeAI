@@ -40,7 +40,13 @@ from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDeno
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
-from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux2VariantType, Krea2VariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import (
+    BaseModelType,
+    Flux2VariantType,
+    Krea2VariantType,
+    ModelFormat,
+    ModelType,
+)
 
 FIXTURE = (
     Path(__file__).parents[3]
@@ -288,7 +294,9 @@ def krea2_entry(case: dict) -> tuple[list[float], float]:
 
     context = MagicMock()
     context.tensors.load.return_value = torch.zeros(1, 16, 8, 8)
-    context.models.get_config.return_value = SimpleNamespace(variant=Krea2VariantType(case["variant"]))
+    context.models.get_config.return_value = SimpleNamespace(
+        format=ModelFormat.Diffusers, variant=Krea2VariantType(case["variant"])
+    )
     context.models.get_absolute_path.return_value = Path("no-such-krea2-model")
     # A text-only prompt: encoded with no reference images, as the node has no reference latents.
     context.conditioning.load.return_value = SimpleNamespace(conditionings=[SimpleNamespace(num_reference_images=0)])
