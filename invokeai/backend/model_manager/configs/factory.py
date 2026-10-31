@@ -91,6 +91,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Anima_Config,
     Main_Checkpoint_ErnieImage_Config,
     Main_Checkpoint_Flux2_Config,
+    Main_Checkpoint_Flux3_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_Ideogram4_Config,
     Main_Checkpoint_Krea2_Config,
@@ -108,6 +109,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_ErnieImage_Config,
     Main_Diffusers_Flux2_Config,
+    Main_Diffusers_Flux3_Config,
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_Krea2_Config,
@@ -126,6 +128,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_GGUF_Anima_Config,
     Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
+    Main_GGUF_Flux3_Config,
     Main_GGUF_FLUX_Config,
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
@@ -373,6 +376,7 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
     """Return whether a root config names a class/model type provided by our model libraries."""
     import diffusers
     import transformers
+    from diffusers import ModularPipeline
     from diffusers.models.modeling_utils import ModelMixin
     from diffusers.pipelines.pipeline_utils import DiffusionPipeline
     from transformers import PretrainedConfig, PreTrainedModel
@@ -395,8 +399,9 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
     if config_name in ("model_index.json", "modular_model_index.json"):
         class_name = config.get("_class_name")
         # Non-str _class_name (e.g. a list) must read as "not a marker", not TypeError on the set lookup.
+        # A modular_model_index.json names a ModularPipeline, which does not derive from DiffusionPipeline.
         return (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS) or has_model_export(
-            diffusers, class_name, (DiffusionPipeline,)
+            diffusers, class_name, (DiffusionPipeline, ModularPipeline)
         )
 
     class_name = config.get("_class_name")
@@ -435,6 +440,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
+        Annotated[Main_Diffusers_Flux3_Config, Main_Diffusers_Flux3_Config.get_tag()],
         Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
         Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
@@ -454,6 +460,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_ErnieImage_Config, Main_Checkpoint_ErnieImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Ideogram4_Config, Main_Checkpoint_Ideogram4_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
+        Annotated[Main_Checkpoint_Flux3_Config, Main_Checkpoint_Flux3_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
@@ -469,6 +476,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
+        Annotated[Main_GGUF_Flux3_Config, Main_GGUF_Flux3_Config.get_tag()],
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
         Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
