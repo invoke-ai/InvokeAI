@@ -250,7 +250,10 @@ def test_a_real_forward_prices_the_features_of_the_2_block_point_of_its_shape(tm
 @pytest.mark.parametrize("flow_map", [True, False], ids=["klein", "klein-base"])
 def test_a_real_checkpoint_loads_through_the_loaders_conversion(tmp_path: Path, flow_map: bool) -> None:
     """A tiny model in BFL's layout comes back as the model it was written from, in float32 so the CPU runs it, with
-    the geometry the meta transformer read off its header."""
+    the geometry the meta transformer read off its header.
+
+    The weights must match exactly; the forward only closely. The loaded weights are views into the file's buffer at
+    offsets its header length sets, and Linux CPU BLAS rounds misaligned operands differently in the last bits."""
     reference = tiny_flux3_model(flow_map=flow_map)
     path = tmp_path / "tiny.safetensors"
     save_file(to_native(reference), str(path))
@@ -262,7 +265,11 @@ def test_a_real_checkpoint_loads_through_the_loaders_conversion(tmp_path: Path, 
     assert {name: p.shape for name, p in meta.named_parameters()} == {
         name: p.shape for name, p in loaded.named_parameters()
     }
-    assert torch.equal(tiny_forward(loaded, flow_map), tiny_forward(reference, flow_map))
+    loaded_weights, reference_weights = loaded.state_dict(), reference.state_dict()
+    assert loaded_weights.keys() == reference_weights.keys()
+    assert [name for name, value in reference_weights.items() if not torch.equal(loaded_weights[name], value)] == []
+    # The forward catches a config the weights do not carry, such as the flow-map wiring or the rotary axes.
+    torch.testing.assert_close(tiny_forward(loaded, flow_map), tiny_forward(reference, flow_map))
 
 
 def _reading(**values) -> CounterReading:
