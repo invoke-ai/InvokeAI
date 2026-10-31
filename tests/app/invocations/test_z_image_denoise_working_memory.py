@@ -7,7 +7,7 @@ of failing: 7.7 GB of it, and a 185 s denoise, on an RX 9060 XT.
 
 The estimate prices with the lines `backend/working_memory/data/denoise.json` ships, the fit of the plain forwards
 measured there, which `tests/backend/working_memory/` holds it to. `TestMeasuredChecks` holds it to what those points
-leave out: a ControlNet adapter's hints and a forced math kernel's score matrix, measured by
+leave out: a ControlNet's hints and a forced math kernel's score matrix, measured by
 `scripts/calibrate_z_image_working_memory.py` beside the plain forward of the same run.
 
 ROCm with the native allocator off Windows is not measured and still prices with the hand-set `legacy` constants,
@@ -37,6 +37,7 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.z_image.z_image_control import ZImageControlField, ZImageControlInvocation
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
@@ -53,7 +54,6 @@ from invokeai.backend.z_image.denoise_working_memory import (
 )
 from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
 from invokeai.backend.z_image.text_conditioning import ZImageRegionalTextConditioning
-from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 
 MB = 1024**2
 
@@ -164,10 +164,11 @@ class TestMaterializedScoreMatrix:
 RTX_4090_NATIVE = Platform("cudnn", "native", "windows")
 RX_9060_XT_EXPANDABLE = Platform("miopen", "expandable", "windows")
 
-# ControlNet forwards at 1024px with a 512-token caption, measured demand in bytes. 15 blocks: `--mode control`
-# (2026-10-18) beside the plain forward of the same run, 19.50 hint-sized tensors more on the RTX 4090 (19.26 in fp32)
-# and 18.37 on the RX 9060 XT, against the n + 4 = 19 charged. 1 and 6 blocks: the RTX 4090's peak reserved bytes of the
-# script's first runs, 110 and 200 MiB over its plain forward then.
+# ControlNet forwards at 1024px with a 512-token caption, measured demand in bytes, on the ControlNet adapter's own
+# forward, which passed a padding mask; the denoise now runs its ControlNets through the hooks (`HOOKED_CONTROL_FORWARDS`).
+# 15 blocks: `--mode control` (2026-10-18) beside the plain forward of the same run, 19.50 hint-sized tensors more on the
+# RTX 4090 (19.26 in fp32) and 18.37 on the RX 9060 XT, against the n + 4 = 19 charged. 1 and 6 blocks: the RTX 4090's
+# peak reserved bytes of the script's first runs, 110 and 200 MiB over its plain forward then.
 CONTROL_FORWARDS = [
     (RTX_4090_NATIVE, "bf16", 15, 1767899136),
     (RTX_4090_NATIVE, "fp16", 15, 1767899136),
@@ -177,15 +178,26 @@ CONTROL_FORWARDS = [
     (RTX_4090_NATIVE, "bf16", 1, 1122 * MB),
     (RTX_4090_NATIVE, "bf16", 6, 1212 * MB),
 ]
+# The published layouts on the hooked forward, bf16 at 1024px with a 512-token caption on the RTX 4090: peak reserved
+# bytes by the script's earlier method, rounded up from the GiB it printed. 1.78 hint-sized tensors over its plain
+# forward for 1.0, 0.89 for 2.1 Lite, 11.61 for 2.0 and 11.56 for 2.1, against the n + 4 charged.
+HOOKED_CONTROL_FORWARDS = [
+    ("1.0", 6, 1073 * MB),
+    ("2.1 Lite", 3, 1043 * MB),
+    ("2.0", 15, 1405 * MB),
+    ("2.1", 15, 1403 * MB),
+]
 # The RTX 4090's forwards with SDPA forced onto the math kernel at 1024px (`--mode math`, 2026-10-18): the whole score
 # matrix materializes, which CUDA does not chunk.
 MATH_KERNEL_FORWARDS = [("bf16", 10116661248), ("fp16", 10116661248), ("fp32", 10081009664)]
 
 
-def _forward_features(dtype: str, control_blocks: int = 0, score_matrix_bytes: int = 0) -> dict:
-    """A 1024px forward with a 512-token caption as the estimator records it; a ControlNet forward passes a mask."""
+def _forward_features(
+    dtype: str, control_blocks: int = 0, score_matrix_bytes: int = 0, has_attention_mask: bool = False
+) -> dict:
+    """A 1024px forward with a 512-token caption as the estimator records it."""
     return {"image_tokens": 4096, "text_tokens": 512, "tokens": 4608, "dtype": dtype, "control_blocks": control_blocks,
-            "has_attention_mask": control_blocks > 0, "regional_bias_bytes": 0, "score_matrix_bytes": score_matrix_bytes,
+            "has_attention_mask": has_attention_mask, "regional_bias_bytes": 0, "score_matrix_bytes": score_matrix_bytes,
             "lora_count": 0, "dequant_transient_bytes": 0, "fp8_cast_transient_bytes": 0}  # fmt: skip
 
 
@@ -201,9 +213,17 @@ class TestMeasuredChecks:
     def test_a_control_forward_is_covered_by_the_line_and_its_hints(self, platform, dtype, control_blocks, measured):
         """Within the 1.3x a shipped point holds its estimate to: every byte reserved beyond need is transformer
         offloaded to RAM and run over PCIe."""
-        estimate = _shipped_reservation(_forward_features(dtype, control_blocks), platform)
+        estimate = _shipped_reservation(_forward_features(dtype, control_blocks, has_attention_mask=True), platform)
 
         assert measured <= estimate <= 1.3 * measured
+
+    @pytest.mark.parametrize("layout, control_blocks, measured", HOOKED_CONTROL_FORWARDS)
+    def test_a_hooked_control_forward_is_covered_by_the_line_and_its_hints(self, layout, control_blocks, measured):
+        """The hooked forward keeps fewer hints alive than the adapter's did, so n + 4 bounds every layout. Every byte
+        reserved beyond need is transformer offloaded to RAM and run over PCIe."""
+        estimate = _shipped_reservation(_forward_features("bf16", control_blocks), RTX_4090_NATIVE)
+
+        assert measured <= estimate <= measured + 2 * 1024**3
 
     @pytest.mark.parametrize("dtype, measured", MATH_KERNEL_FORWARDS)
     def test_a_math_kernel_forward_is_covered_by_the_line_and_its_score_matrix(self, dtype, measured):
@@ -464,22 +484,27 @@ class TestNodeReservation:
 
         control = None
         control_info = MagicMock()
+        order: list[str] = []
         if control_blocks is None:
             transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
         else:
-            # Past the transformer's lock, up to the adapter's.
-            transformer_info.model_on_device = MagicMock(return_value=nullcontext((None, transformer)))
+
+            def lock_transformer(**_kwargs):
+                order.append("transformer lock")
+                return nullcontext((None, transformer))
+
+            # Past the transformer's lock, up to the control's.
+            transformer_info.model_on_device = MagicMock(side_effect=lock_transformer)
             control = ZImageControlField.model_construct(
                 control_model=MagicMock(), image_name="control", **(control_tiling or {})
             )
-            control_info.model = MagicMock(spec=ZImageControlAdapter)
+            control_info.model = MagicMock(spec=ZImageFunControl)
             control_info.model.control_layers = [torch.nn.Identity()] * control_blocks
-            if control_tiling is None:
-                control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
-            else:
-                # Past the adapter's lock too, up to the control image's encode.
-                control_info.model.config = {"control_in_dim": 33}
-                control_info.model_on_device = MagicMock(return_value=nullcontext((None, control_info.model)))
+            control_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
+
+        def encode(**_kwargs):
+            order.append("encode")
+            return torch.zeros(1, 16, 32, 32)
 
         caption_tokens = {"pos": POSITIVE_TOKENS, "neg": negative_tokens}
         context = MagicMock()
@@ -538,7 +563,7 @@ class TestNodeReservation:
                 )
             )
             control_encode = stack.enter_context(
-                patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=_StopBeforeLoad)
+                patch.object(ZImageImageToLatentsInvocation, "vae_encode", side_effect=encode)
             )
             if regional_mask is not None:
                 regional = ZImageRegionalPromptingExtension(
@@ -558,10 +583,11 @@ class TestNodeReservation:
             reserved=transformer_info.model_on_device.call_args.kwargs["working_memory"],
             estimated_for=estimate.call_args.args,
             estimate=estimate.call_args.kwargs,
-            adapter_reserved=(
+            control_reserved=(
                 control_info.model_on_device.call_args.kwargs.get("working_mem_bytes") if control is not None else None
             ),
             control_encode=control_encode.call_args.kwargs if control_encode.called else None,
+            order=order,
         )
 
     def test_the_transformer_reserves_the_estimate_for_its_sequence(self):
@@ -591,15 +617,23 @@ class TestNodeReservation:
         assert run.estimate["regional_attn_mask"] is mask
         assert run.estimate["has_attention_mask"] is True
 
-    def test_a_control_adapter_reaches_the_estimate_and_keeps_the_reservation(self):
-        """The adapter's block count sizes the hints and its forward always passes a padding mask. It is locked after
-        the transformer, which can then no longer be offloaded -- so it must ask for the same working memory, or its
-        weights fill the room kept for the forward."""
+    def test_a_control_reaches_the_estimate_and_keeps_the_reservation(self):
+        """The control's block count sizes the hints; its blocks take the base blocks' arguments, so it adds no
+        attention mask. It is locked after the transformer, which can then no longer be offloaded -- so it must ask for
+        the same working memory, or its weights fill the room kept for the forward."""
         run = self._run(control_blocks=15)
 
-        assert (run.estimate["control_blocks"], run.estimate["has_attention_mask"]) == (15, True)
+        assert (run.estimate["control_blocks"], run.estimate["has_attention_mask"]) == (15, False)
         assert run.reserved is ESTIMATE
-        assert run.adapter_reserved == ESTIMATE.reservation_bytes
+        assert run.control_reserved == ESTIMATE.reservation_bytes
+
+    def test_the_control_image_is_encoded_before_the_transformer_is_locked(self):
+        """So the VAE does not have to fit beside a transformer the cache can no longer offload. The encode takes the
+        mode of the VAE's distribution, as VideoX-Fun encodes control images: a sample would add noise of its own."""
+        run = self._run(control_blocks=15)
+
+        assert run.order == ["encode", "transformer lock"]
+        assert run.control_encode["deterministic"] is True
 
     def test_the_control_fields_tiling_reaches_the_control_encode(self):
         """The control image is encoded at generation size. For an upscale that is the enlarged frame, whose untiled

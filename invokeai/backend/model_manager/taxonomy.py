@@ -48,6 +48,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     Flux2 = "flux2"
     """Indicates the model is associated with FLUX.2 model architecture, including FLUX.2 Klein and FLUX.2 [dev]."""
+    Flux3 = "flux3"
+    """Indicates the model is associated with the FLUX.3 Image architecture, including FLUX.3 Image Klein and its
+    Base model."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -114,6 +117,7 @@ class ModelType(str, Enum):
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
     LTX2DurationHead = "ltx2_duration_head"
+    TinyAutoencoder = "tiny_autoencoder"
     Unknown = "unknown"
 
 
@@ -187,6 +191,21 @@ class Flux2VariantType(str, Enum):
 
     Dev = "dev"
     """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+
+
+class Flux3VariantType(str, Enum):
+    """FLUX.3 Image variants, by how the transformer is sampled.
+
+    The values carry a ``flux3_`` prefix: variant strings are resolved without their base, and ``klein_*``
+    already belongs to FLUX.2."""
+
+    Klein = "flux3_klein"
+    """FLUX.3 Image Klein, the step-distilled checkpoint. Its transformer is a flow map: every step is also told
+    the timestep it jumps to, it samples in 16 steps and takes no classifier-free guidance."""
+
+    KleinBase = "flux3_klein_base"
+    """FLUX.3 Image Klein Base, the undistilled checkpoint: 50 steps with classifier-free guidance and a negative
+    prompt. Black Forest Labs publishes it for fine-tuning and LoRA training."""
 
 
 class ZImageVariantType(str, Enum):
@@ -491,6 +510,7 @@ AnyVariant: TypeAlias = Union[
     ClipVariantType,
     FluxVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     ZImageVariantType,
     QwenImageVariantType,
     WanVariantType,
@@ -511,6 +531,7 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
@@ -530,6 +551,7 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType

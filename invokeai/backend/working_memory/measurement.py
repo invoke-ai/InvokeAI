@@ -21,11 +21,12 @@ A window is invalid when its readings show that
 Two kinds of window take these definitions. The in-server probe's (`probe`) follow an operation through co-locks, nested
 windows and releases, in segments, and have reasons of their own. A *fresh window* (`measure`) is one operation alone:
 the calibration scripts measure their points that way, each in a fresh process with the server's runtime
-(`invokeai.app.run_app.apply_server_runtime`).
+(`invokeai.app.run_app.apply_server_runtime`). Such a point is a cold and a warm window of the same operation
+(`measure_cold_and_warm`), and its bytes are the larger of the two (`measured_bytes_and_method`).
 """
 
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final, Literal, Optional
 
@@ -181,3 +182,42 @@ def measure(device: torch.device, operation: Callable[[], object]) -> FreshWindo
         return fresh_window(first, final, oom=oom, spill=spill)
     finally:
         device_counters.close()
+
+
+FreshPointMethod = Literal["demand_peak", "reserved_peak"]
+"""The `MeasuredPoint.method` of a fresh-process point."""
+
+
+def measure_cold_and_warm(device: torch.device, operation: Callable[[], object]) -> tuple[FreshWindow, ...]:
+    """A fresh-process point's windows: `operation` measured twice (`measure`), cold and then warm.
+
+    The first run after a load is a real peak in a server (kernel modules, library workspaces), and so is a later one,
+    which can demand more: a warm Z-Image forward under `cudaMallocAsync` read 800 MiB against its cold run's 720. A
+    cold run that ran out of memory ends the point, whose warm run would measure what the failure left behind.
+    """
+    cold = measure(device, operation)
+    if "oom" in cold.reasons:
+        return (cold,)
+    return (cold, measure(device, operation))
+
+
+def point_reasons(windows: Sequence[FreshWindow]) -> list[ReadingReason]:
+    """Why a fresh-process point is invalid: its windows' reasons, each once, in order. Empty for a valid point."""
+    return list(dict.fromkeys(reason for window in windows for reason in window.reasons))
+
+
+def measured_bytes_and_method(windows: Sequence[FreshWindow]) -> tuple[int, FreshPointMethod]:
+    """A valid fresh-process point's bytes and `MeasuredPoint.method`, from its windows (`measure_cold_and_warm`).
+
+    The largest of each window's figure: its demand where it read the driver, otherwise the growth of torch's counters
+    alone. A window without the driver's figure does not discard another's, which on ROCm maps a few hundred MiB above
+    torch's reserve on a first forward. The method names what the largest was read from: `demand_peak` for a demand,
+    `reserved_peak` for torch's counters.
+    """
+    figures: list[tuple[int, FreshPointMethod]] = []
+    for window in windows:
+        if window.driver is not None and window.demand is not None:
+            figures.append((window.demand, "demand_peak"))
+        else:
+            figures += [(delta, "reserved_peak") for delta in (window.reserved, window.allocated) if delta is not None]
+    return max(figures, key=lambda figure: figure[0])

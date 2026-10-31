@@ -182,3 +182,110 @@ def test_is_contained_filename_rejects_posix_escapes_on_posix(monkeypatch: pytes
 def test_is_contained_filename_is_is_plain_filename_on_windows(monkeypatch: pytest.MonkeyPatch, name: str):
     monkeypatch.setattr(path_safety, "_ON_WINDOWS", True)
     assert is_contained_filename(name) == is_plain_filename(name)
+
+
+# Relative paths that must never resolve inside the root. Separately from the single-name cases above, these are
+# the shapes a *path*-taking input receives: traversal, absolute and drive-qualified payloads, and the backslash
+# spellings that only escape on Windows but must be refused on posix too so a posix test run cannot report all
+# clear on a payload that works against Windows deployments.
+UNCONTAINED_PATHS = [
+    "..",
+    "../secret.txt",
+    "../../../../etc/passwd",
+    "sub/../../secret.txt",
+    "/etc/passwd",
+    "/proc/self/environ",
+    "//srv/share/file",
+    "..\\secret.txt",
+    "sub\\..\\..\\secret.txt",
+    "C:\\Windows\\win.ini",
+    "C:relative",
+    "\\\\?\\C:\\Windows\\win.ini",
+    "\\\\server\\share\\f.txt",
+    "",
+    "nul\x00byte.txt",
+    "sub/nul\x00byte.txt",
+]
+
+CONTAINED_PATHS = [
+    "prompts.txt",
+    "./prompts.txt",
+    "lists/fantasy.txt",
+    "lists/sub/deep.txt",
+    # Backslashes are read as separators, so this addresses the same file as the forward-slash spelling.
+    "lists\\fantasy.txt",
+    "..leading.dots.txt",
+]
+
+
+class TestResolveContainedPath:
+    @pytest.mark.parametrize("candidate", UNCONTAINED_PATHS)
+    def test_rejects_uncontained(self, tmp_path, candidate):
+        root = tmp_path / "root"
+        root.mkdir()
+        with pytest.raises(ValueError):
+            path_safety.resolve_contained_path(root, candidate)
+
+    @pytest.mark.parametrize("candidate", CONTAINED_PATHS)
+    def test_accepts_contained(self, tmp_path, candidate):
+        root = tmp_path / "root"
+        root.mkdir()
+        resolved = path_safety.resolve_contained_path(root, candidate)
+        assert resolved == root.resolve() or root.resolve() in resolved.parents
+
+    # Legal posix filenames an operator may already have on disk; the portable is_plain_filename would refuse them.
+    @pytest.mark.parametrize("candidate", ["aux.txt", "notes:1.txt", "lists/aux.txt"])
+    def test_accepts_existing_posix_names_on_posix(self, tmp_path, monkeypatch: pytest.MonkeyPatch, candidate):
+        monkeypatch.setattr(path_safety, "_ON_WINDOWS", False)
+        root = tmp_path / "root"
+        root.mkdir()
+        assert path_safety.resolve_contained_path(root, candidate) == (root / candidate).resolve()
+
+    def test_does_not_require_existence(self, tmp_path):
+        """Callers that create the directory (save_image_to_file) resolve before it exists."""
+        root = tmp_path / "root"
+        root.mkdir()
+        assert path_safety.resolve_contained_path(root, "not/yet/there") == (root / "not/yet/there").resolve()
+
+    def test_rejects_symlink_escaping_root(self, tmp_path):
+        """The check no amount of string inspection can make: a symlink inside the root pointing out of it."""
+        root = tmp_path / "root"
+        root.mkdir()
+        secret = tmp_path / "secret.txt"
+        secret.write_text("SECRET")
+        (root / "escape.txt").symlink_to(secret)
+
+        with pytest.raises(ValueError, match="stay within"):
+            path_safety.resolve_contained_path(root, "escape.txt")
+
+    def test_rejects_symlinked_directory_escaping_root(self, tmp_path):
+        root = tmp_path / "root"
+        root.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (outside / "secret.txt").write_text("SECRET")
+        (root / "link").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(ValueError, match="stay within"):
+            path_safety.resolve_contained_path(root, "link/secret.txt")
+
+    def test_allows_symlink_staying_inside_root(self, tmp_path):
+        root = tmp_path / "root"
+        root.mkdir()
+        (root / "real.txt").write_text("ok")
+        (root / "alias.txt").symlink_to(root / "real.txt")
+
+        assert path_safety.resolve_contained_path(root, "alias.txt") == (root / "real.txt").resolve()
+
+    def test_root_itself_is_contained(self, tmp_path):
+        root = tmp_path / "root"
+        root.mkdir()
+        assert path_safety.resolve_contained_path(root, ".") == root.resolve()
+
+    def test_sibling_directory_sharing_a_prefix_is_rejected(self, tmp_path):
+        """`<tmp>/root-evil` must not pass as contained by `<tmp>/root` on a string prefix match."""
+        root = tmp_path / "root"
+        root.mkdir()
+        (tmp_path / "root-evil").mkdir()
+        with pytest.raises(ValueError):
+            path_safety.resolve_contained_path(root, "../root-evil/f.txt")
