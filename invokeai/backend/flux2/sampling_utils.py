@@ -57,36 +57,6 @@ def get_noise_flux2(
     ).to(device=device, dtype=dtype)
 
 
-def get_flux2_bn_stats(vae: torch.nn.Module) -> tuple[torch.Tensor, torch.Tensor] | None:
-    """Extract the latent BatchNorm statistics from a FLUX.2 VAE.
-
-    The FLUX.2 VAE normalizes the patchified 128-channel latent with a BatchNorm that has
-    affine=False, so there are no learnable weight/bias: y = (x - mean) / std, x = y * std + mean.
-
-    Returns:
-        (bn_mean, bn_std) of shape (128,), or None if the VAE has no initialized BN layer.
-    """
-    # Eval mode keeps a forward pass from updating the running statistics.
-    vae.eval()
-
-    # The BN layer sits at different locations depending on the model format.
-    bn_layer = None
-    if hasattr(vae, "bn"):
-        bn_layer = vae.bn
-    elif hasattr(vae, "batch_norm"):
-        bn_layer = vae.batch_norm
-    elif hasattr(vae, "encoder") and hasattr(vae.encoder, "bn"):
-        bn_layer = vae.encoder.bn
-
-    if bn_layer is None or bn_layer.running_mean is None or bn_layer.running_var is None:
-        return None
-
-    bn_mean = bn_layer.running_mean.clone()
-    bn_eps = bn_layer.eps if hasattr(bn_layer, "eps") else 1e-4  # BFL uses 1e-4
-    bn_std = torch.sqrt(bn_layer.running_var.clone() + bn_eps)
-    return bn_mean, bn_std
-
-
 def pack_flux2(x: torch.Tensor) -> torch.Tensor:
     """Pack latent image to flattened array of patch embeddings for FLUX.2.
 

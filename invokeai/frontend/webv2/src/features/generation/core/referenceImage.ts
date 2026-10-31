@@ -1,6 +1,11 @@
 import type { GeneratedImageContract } from '@features/gallery';
 
-import type { CroppableImageWithDims, ImageWithDims } from './types';
+import type {
+  CroppableImageWithDims,
+  GenerateReferenceImage,
+  GenerateReferenceImageConfig,
+  ImageWithDims,
+} from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
@@ -183,6 +188,37 @@ export const applyReferenceImageCrop = (
 export const clearReferenceImageCrop = (image: CroppableImageWithDims): CroppableImageWithDims => ({
   original: { image: cloneImageWithDims(image.original.image) },
 });
+
+/** The references of one type that reach the graph, in conditioning order: enabled cards that hold an image. */
+export const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig['type']>(
+  referenceImages: readonly GenerateReferenceImage[],
+  type: T
+): Array<GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> }> =>
+  referenceImages.filter(
+    (
+      referenceImage
+    ): referenceImage is GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> } =>
+      referenceImage.isEnabled && referenceImage.config.type === type && referenceImage.config.image !== null
+  );
+
+const NO_PROMPT_TAGS: ReadonlyMap<string, string> = new Map();
+
+/**
+ * Tags a FLUX.3 prompt uses to name each reference, keyed by reference id. The model numbers its references by
+ * their 0-based position in the denoiser input, so disabled and empty cards take no number.
+ */
+export const getReferenceImagePromptTags = (
+  base: string | undefined,
+  referenceImages: readonly GenerateReferenceImage[]
+): ReadonlyMap<string, string> =>
+  base === 'flux3'
+    ? new Map(
+        getEnabledReferenceImages(referenceImages, 'flux2_reference_image').map((referenceImage, index) => [
+          referenceImage.id,
+          `<ref_image_${index}>`,
+        ])
+      )
+    : NO_PROMPT_TAGS;
 
 // ---- Crop-box geometry for the reference image crop editor -------------------------------------------------------
 // Boxes are percentages of the original image, so an aspect ratio (width / height in pixels) becomes a width% per
