@@ -464,12 +464,12 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 describe('submitResolvedInvocation without dynamic prompts', () => {
   seedArchitectureCapabilities();
 
-  const submitGenerate = async (prepend?: boolean) => {
+  const submitGenerate = async (prepend?: boolean, positivePrompt = 'a cat') => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const project = getActiveProject(
       workbenchReducer(createInitialWorkbenchState(), {
         type: 'setGenerateSettings',
-        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt },
       })
     );
     const route = resolveInvocationRoute(project, 'global', {
@@ -507,6 +507,19 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
     // No expansion took this path.
     expect(front.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
     expect(back.mock.calls[0]?.[0]).not.toHaveProperty('prepend');
+  });
+
+  it('dispatches a JSON prompt literally, without expanding its braces', async () => {
+    const draft =
+      '```json\n{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[{"label":"object","caption":"a cup","bbox":[0,0,10,10]}]}\n```';
+    const compiled =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a poster"},"items":[]}';
+    for (const prompt of [draft, compiled]) {
+      const submitted = await submitGenerate(undefined, prompt);
+      expect(submitted).toHaveBeenCalledTimes(1);
+      expect(submitted.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+      submitted.mockRestore();
+    }
   });
 
   it('keeps Invoke Front on a Workflow dispatch', async () => {
