@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-21
+lastUpdated: 2026-10-31
 sidebar:
   order: 3
 ---
@@ -20,8 +20,9 @@ speeds are on each family's own page.
 - – no such build exists
 
 How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model,
-with the reason only in the server log: the Diffusers layout of LTX-2 and the GGUF builds of LTX-2, MiniMax H3 and the
-Ministral 3B encoder. Others are recognized by their layer names and fail, or misbehave, only when they load.
+with the reason only in the server log: the Diffusers layout of LTX-2, the GGUF builds of MiniMax H3, and llama.cpp
+GGUFs of Mistral Small 3's shape that declare scaled RoPE or an attention temperature, such as Devstral Small 2.
+Others are recognized by their layer names and fail, or misbehave, only when they load.
 
 ## Main models
 
@@ -31,27 +32,30 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
+| [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | R | R | R | – | ✓ | – | – |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) | ✓ | ✓ | ✓ | ✓ | R | – | ✓ | ✗ | ✗ |
-| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ | ✗ |
+| [Anima](/users-guide/models/local-models/anima/) | – | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✗ | ✗ |
 | [Krea-2](/users-guide/models/local-models/krea-2/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ | ✗ |
 | [Ideogram 4](/users-guide/models/local-models/ideogram4/) | ✓ | ✓ | ✓ | ✓ | R | ✓ | ✓ | ✗ | inside the Diffusers folder |
-| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✗ | ✗ | ✗ |
+| [ERNIE-Image](/users-guide/models/local-models/ernie-image/) | ✓ | ✓ | L | L | L | ✗ | ✓ | ✗ | ✗ |
+| [MOSS-Image](/users-guide/models/local-models/moss-image/) | ✓ | ✓ | R | R | R | R | R | ✗ | ✗ |
 | [Wan 2.2](/users-guide/video-generation/wan-22/) | ✓ | ✓ | ✓ | L | L | L | ✓ | ✗ | ✗ |
-| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✗ | ✗ | ✗ |
+| [LTX-2](/users-guide/video-generation/ltx-2/) (2.5 only) | official layout ✓, Diffusers layout ✗ | ✓ | L | ✓ | ✓ | ✗ | ✓ | ✗ | ✗ |
 | [MiniMax H3](/users-guide/video-generation/minimax-h3/) | ✓ | ✓ | L | ✓ | L | ✗ | ✗ | ✗ | ✗ |
 
 - **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds; on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
   runs them on the int8 tensor cores. **nvfp4** and **fp8 scaled** mean ComfyUI's
   checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. For Qwen-Image-2.1,
-  torchao exports such as unsloth's FP8 build are refused at install.
+  torchao exports such as unsloth's FP8 build are refused at install. MOSS-Image refuses every quantized
+  transformer at install, unscaled fp8 included.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
   for Krea-2 only; for every other model with GGUF support the install fails.
-- LTX-2.0/2.3 files fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control and VACE single files and
-  GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers folder is not detected and
-  is not supported either.
+- LTX-2.0/2.3 files, GGUF builds included, fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control
+  and VACE single files and GGUFs are not recognized as Wan 2.2 and install as unknown models; a Wan 2.1 Diffusers
+  folder is not detected and is not supported either.
 
 ## Text encoders
 
@@ -60,14 +64,15 @@ Ministral 3B encoder. Others are recognized by their layer names and fail, or mi
 | T5-XXL | FLUX.1, SD 3 | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✓ (and bitsandbytes int8) |
 | CLIP-L / CLIP-G | SD, SDXL, FLUX.1, SD 3 | ✓ | ✓ | R | R | – | ✗ | CLIP-L inside a FLUX.1 SDNQ pipeline |
 | Qwen3 0.6B / 4B / 8B | Z-Image (4B), FLUX.2 Klein (4B, 8B), Anima (0.6B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Qwen3-VL 4B / 8B | Krea-2, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
+| Qwen3-VL 4B / 8B | Krea-2, FLUX.3, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
 | Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
+| Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | L | L | L | ✗ | ✗ |
 | Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
-| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | ✗ | ✗ |
+| Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
 | Gemma-2 2B | PiD decoders | ✓ | ✗ | ✗ | ✗ | ✗ | ✓ | ✗ |
-| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✗ | ✗ |
+| Gemma-4 12B | LTX-2 | ✓ (bf16 or int8) | ✗ | L | in the folder | L | ✓ (LTX-2.5 conversions) | ✗ |
 | UMT5 | Wan 2.2 | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 
 The single-file CLIP builds are ComfyUI's `clip_l` and `clip_g`, as used by FLUX.1 and SD 3. SD and SDXL take their
@@ -76,15 +81,22 @@ CLIP encoders from the main model only, so a separate CLIP file does not change 
 FLUX.1 takes CLIP-L only.
 
 The Qwen3-VL GGUF encoder is the language model only; a separate `mmproj` vision file is refused, and split
-multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs only as a folder: its
-`config.json` and tokenizer files next to exactly one weight file, bf16 or int8. A standalone `.safetensors` file is
-not recognized.
+multi-part GGUFs have to be joined before installing. The Gemma-4 encoder installs as a folder (its `config.json`
+and tokenizer files next to exactly one weight file, bf16 or int8) or as a GGUF conversion of the LTX-2.5 encoder
+that packs its tokenizer and config in, such as elix3r's or Rootport's. Google's stock Gemma-4-12B GGUF fails to
+install with a message, since LTX-2 needs the Lightricks-tuned weights; its `mmproj` file is not recognized. A
+standalone `.safetensors` file is not recognized.
+
+The Qwen3.5 4B and 9B install as the same encoder type but are not interchangeable: Anima-3.8B takes only
+the 4B and MOSS-Image only the 9B, and each refuses the other. A 9B file must hold the whole language model:
+of a sharded export, the first shard is refused at install with a message and the others install as unknown
+models. Install the whole MOSS-Image Diffusers folder or a merged single file instead.
 
 ## VAEs
 
 | VAE | Single file | Diffusers | Used by |
 |---|---|---|---|
-| SD 1.x, SDXL, SD 3, FLUX.1, FLUX.2 | ✓ | ✓ | its own family; FLUX.1's also by Z-Image, FLUX.2's also by Ideogram 4 and ERNIE-Image |
+| SD 1.x, SDXL, SD 3, FLUX.1, FLUX.2 | ✓ | ✓ | its own family; FLUX.1's also by Z-Image, FLUX.2's also by FLUX.3, Ideogram 4, ERNIE-Image and MOSS-Image |
 | SD 2.x | ✓ | ✗ | SD 2.x |
 | Wan (16 and 48 channels) | ✓ | ✓ | Wan 2.2; the Wan 2.1 VAE also by Anima |
 | Qwen-Image | ✓ | ✗ | Qwen-Image, Krea-2 |
@@ -95,6 +107,35 @@ Quantized VAE files (fp8, int8, nvfp4) are not supported; use the unquantized VA
 Qwen-Image-2.1, Wan, Anima and Ideogram 4 VAEs fail with a message when they load. The FLUX.1 and SD 1.x / SDXL single-file VAEs do
 not check, so a quantized file there fails with an unclear error or decodes incorrectly.
 
+## Preview decoders (Tiny AutoEncoders)
+
+Tiny AutoEncoders render [live denoising previews](/users-guide/image-generation/advanced-topics/tiny-autoencoder-previews/)
+and nothing else. Each one is a single file, a `.safetensors`, `.pth` or `.pt`.
+
+| Tiny AutoEncoder | File | Installs under | Previews for |
+|---|---|---|---|
+| TAESD | `taesd_decoder.safetensors` | SD 1.x | SD 1.x, SD 2.x |
+| TAESDXL | `taesdxl_decoder.safetensors` | SDXL | SDXL, SDXL Refiner |
+| TAESD3 | `diffusion_pytorch_model.safetensors` from `madebyollin/taesd3` | SD 3 | SD 3 |
+| TAEF1 | `diffusion_pytorch_model.safetensors` from `madebyollin/taef1` | FLUX.1 | FLUX.1, Z-Image |
+| TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, FLUX.3, ERNIE-Image |
+| TAEQI2.1 | `taeqi2_1.safetensors` | Qwen-Image-2.1 | Qwen-Image-2.1 |
+
+Both published layouts load: the decoder-only files (the `*_decoder.safetensors` files above, and the
+`*_decoder.pth` files ComfyUI keeps in `models/vae_approx/`) and the files that hold encoder and decoder together
+(`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`).
+
+TAESD and TAESDXL read the same 4-channel latents with the same network, and so do TAESD3 and TAEF1 with
+16 channels. For these four the file name, its folder name or the download source has to name the TAE (`taesd`,
+`taesdxl`, `taesd3` or `taef1`); a file that names none of them is refused (**R**). The starter models set the base
+themselves.
+
+- **R:** the "tinier" TAEQI2.1 (`taeqi2_1_tinier`); the message asks for `taeqi2_1.safetensors` instead.
+- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder and the TAEHV video decoders
+  (`taew2_1`, `taew2_2`, `taeltx_2`). They install as unknown models.
+- A Diffusers `AutoencoderTiny` folder (for example the `madebyollin/taesdxl` repository as a whole) installs as a
+  VAE and is not used for previews. Install the single file instead.
+
 ## LoRAs and adapters
 
 | Family | LoRA | ControlNet | Other adapters |
@@ -103,9 +144,16 @@ not check, so a quantized file there fails with an unclear error or decodes inco
 | SDXL | ✓ (LyCORIS, Diffusers, OMI) | ✓ | IP-Adapter, T2I-Adapter, textual inversion |
 | FLUX.1 | ✓ (LyCORIS, Diffusers, OMI) | ✓ | Control LoRA, IP-Adapter, Redux |
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
-| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint), Anima (ControlNet-LLLite) | |
+| Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
+| Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
-| SD 3, CogView4, Ideogram 4, ERNIE-Image, Qwen-Image-2.1 | ✗ | ✗ | |
+| SD 3, CogView4, FLUX.3, Ideogram 4, ERNIE-Image, MOSS-Image | ✗ | ✗ | |
+
+FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
+Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
+
+For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
+factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
-Qwen-Image (v1 and v1.5, bf16 and int8 builds).
+Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.

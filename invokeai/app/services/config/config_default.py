@@ -28,7 +28,7 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
-ATTENTION_BACKEND = Literal["auto", "sage"]
+ATTENTION_BACKEND = Literal["auto", "sage", "cudnn", "flash", "efficient", "math"]
 NOISE_DTYPE = Literal["float32", "float16"]
 ROCM_AOTRITON = Literal["auto", "on", "off"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
@@ -100,6 +100,7 @@ class InvokeAIAppConfig(BaseSettings):
         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
         custom_nodes_dir: Path to directory for custom nodes.
         style_presets_dir: Path to directory for style presets.
+        prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
@@ -135,9 +136,10 @@ class InvokeAIAppConfig(BaseSettings):
         noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`
         wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.
         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
+        tiny_autoencoder_previews: Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
         attention_slice_size: Slice size, valid when attention_type=="sliced".<br>Valid values: `auto`, `balanced`, `max`, `1`, `2`, `3`, `4`, `5`, `6`, `7`, `8`
-        attention_backend: Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.<br>Valid values: `auto`, `sage`
+        attention_backend: Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.<br>Valid values: `auto`, `sage`, `cudnn`, `flash`, `efficient`, `math`
         force_tiled_decode: Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.
         auto_tiled_decode: Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.
         pil_compress_level: The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.
@@ -220,6 +222,7 @@ class InvokeAIAppConfig(BaseSettings):
     image_subfolder_strategy: IMAGE_SUBFOLDER_STRATEGY = Field(default="flat", description="Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.")
     custom_nodes_dir:              Path = Field(default=Path("nodes"),      description="Path to directory for custom nodes.")
     style_presets_dir:      Path = Field(default=Path("style_presets"),      description="Path to directory for style presets.")
+    prompt_files_dir:              Path = Field(default=Path("prompt_files"), description="Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.")
     workflow_thumbnails_dir: Path = Field(default=Path("workflow_thumbnails"), description="Path to directory for workflow thumbnails.")
 
     # LOGGING
@@ -271,9 +274,10 @@ class InvokeAIAppConfig(BaseSettings):
     noise_dtype:            NOISE_DTYPE = Field(default="float32",          description="The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.")
     wan_memory_optimization:       bool = Field(default=False,              description="Enable experimental Wan memory optimizations at the cost of slower generation.")
     pid_memory_optimization:       bool = Field(default=False,              description="Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.")
+    tiny_autoencoder_previews:     bool = Field(default=False,              description="Render denoising previews with an installed Tiny AutoEncoder instead of the linear latent projection. Install the matching Tiny AutoEncoder starter model; families without one keep linear previews. A preview costs about 25 ms and 0.65 GB of transient VRAM on an RTX 4090; not recommended on CPU-only installs, where one takes about 2 s.")
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")
     attention_slice_size: ATTENTION_SLICE_SIZE = Field(default="auto",      description='Slice size, valid when attention_type=="sliced".')
-    attention_backend: ATTENTION_BACKEND = Field(default="auto",       description="Attention kernel for the attention inside diffusion models. `auto` lets PyTorch choose among its exact SDPA kernels and never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA.")
+    attention_backend: ATTENTION_BACKEND = Field(default="auto",       description="Attention kernel for the attention inside diffusion models. `auto` uses PyTorch's exact SDPA kernels ranked flash, cuDNN, memory-efficient, math, taking the first one the GPU and build support for each call; it never selects a quantized one. `sage` uses SageAttention 2 for the models listed in the SageAttention docs: faster, most at high resolutions and for video, but quantized, so images differ slightly from `auto` at the same seed. SageAttention is installed separately and needs an NVIDIA GPU with compute capability 8.0 or newer; masked attention, text encoders and VAEs keep PyTorch SDPA. `cudnn`, `flash`, `efficient` and `math` rank that PyTorch kernel first for all attention on CUDA and ROCm GPUs, ahead of the `auto` order. That is never exclusive: a call the kernel cannot serve runs on the next kernel, and the log reports that once per node type and reason (not for the PiD decoder, whose attention is ranked the same but not reported). `math` materializes the full attention score matrix, so it is slow and needs much more memory, which the working-memory estimates of most model families do not reserve, so generations can run out of memory; it is meant for debugging. Images can differ slightly between kernels.")
     force_tiled_decode:            bool = Field(default=False,              description="Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, FLUX.2, Z-Image, Qwen-Image and Qwen-Image-2.1 VAE nodes, the Anima encode, the Z-Image control encode and the Krea-2 style reference; other model families ignore it.")
     auto_tiled_decode:             bool = Field(default=True,               description="Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, FLUX.2, Z-Image, Qwen-Image, Qwen-Image-2.1, Krea-2 and Wan decodes, and Qwen-Image-2.1 encodes). Turn off to decode untiled unless tiling is requested; the FLUX.1, FLUX.2 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.")
     pil_compress_level:             int = Field(default=1,                  description="The compress_level setting of PIL.Image.save(), used for PNG encoding. All settings are lossless. 0 = no compression, 1 = fastest with slightly larger filesize, 9 = slowest with smallest filesize. 1 is typically the best setting.")
@@ -508,6 +512,11 @@ class InvokeAIAppConfig(BaseSettings):
     def style_presets_path(self) -> Path:
         """Path to the style presets directory, resolved to an absolute path.."""
         return self._resolve(self.style_presets_dir)
+
+    @property
+    def prompt_files_path(self) -> Path:
+        """Path to the prompt list files directory, resolved to an absolute path."""
+        return self._resolve(self.prompt_files_dir)
 
     @property
     def workflow_thumbnails_path(self) -> Path:
@@ -757,6 +766,26 @@ def ensure_fonts_dir(fonts_path: Path) -> None:
         logger.warning("Unable to initialize fonts directory at %s", fonts_path, exc_info=True)
 
 
+def ensure_prompt_files_dir(prompt_files_path: Path) -> None:
+    prompt_files_readme_path = prompt_files_path / "README.txt"
+
+    try:
+        prompt_files_path.mkdir(parents=True, exist_ok=True)
+        if not prompt_files_readme_path.exists():
+            with open(prompt_files_readme_path, "wt", encoding="utf-8") as f:
+                f.write(
+                    "Prompt list files for the InvokeAI 'Prompts from File' node.\n\n"
+                    "Place UTF-8 text files, one prompt per line, in this folder (or subfolders).\n"
+                    "The node's file_path input is relative to this folder: a file saved as\n"
+                    "'lists/fantasy.txt' here is addressed as 'lists/fantasy.txt'.\n\n"
+                    "The node cannot read files outside this folder. In multi-user mode it is\n"
+                    "restricted to administrators, because this folder is shared by all accounts -\n"
+                    "non-admins should use wildcards, which are per-account, instead.\n"
+                )
+    except OSError:
+        logger.warning("Unable to initialize prompt files directory at %s", prompt_files_path, exc_info=True)
+
+
 def load_config_from_root(root: Path) -> InvokeAIAppConfig:
     """The config of the install at `root`, from the environment and its `invokeai.yaml` as `get_config` reads them,
     for the maintenance scripts. Unlike `get_config` it writes no example or default config file and copies no
@@ -847,6 +876,7 @@ def get_config() -> InvokeAIAppConfig:
         default_config.write_file(config.config_file_path, as_example=False)
 
     ensure_fonts_dir(config.fonts_path)
+    ensure_prompt_files_dir(config.prompt_files_path)
 
     api_keys_from_file = load_external_api_keys(config.api_keys_file_path)
     if api_keys_from_file:

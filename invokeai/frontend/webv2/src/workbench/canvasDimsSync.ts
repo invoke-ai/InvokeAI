@@ -122,6 +122,48 @@ export const reconcileCanvasDims = ({
   return { kind: 'none' };
 };
 
+/** The frame resized to `size` around its centre; the position rounds to whole pixels. */
+export const resizeBboxAroundCentre = (bbox: Bbox, size: Pick<Bbox, 'height' | 'width'>): Bbox => ({
+  height: size.height,
+  width: size.width,
+  // `+ 0` folds the -0 that rounding a small negative offset yields.
+  x: Math.round(bbox.x + (bbox.width - size.width) / 2) + 0,
+  y: Math.round(bbox.y + (bbox.height - size.height) / 2) + 0,
+});
+
+/**
+ * Applies a Generate size reset. On a project generating into the canvas, the frame then keeps its centre rather than
+ * its top-left: the patch lands first, the sync resizes the frame at its top-left as for any size edit, and the centred
+ * frame replaces that in the same turn. The patch is a person's edit like any other; the frame writes are `system`, so
+ * canvas history records none of them.
+ */
+export const resetGenerateDims = (
+  store: Pick<CanvasDimsSyncStore, 'commands' | 'getState'>,
+  values: Parameters<WorkbenchCommands['generation']['patchSettings']>[0],
+  projectId?: string
+): void => {
+  const findProject = () => {
+    const state = store.getState();
+    const targetId = projectId ?? state.activeProjectId;
+    return state.projects.find((candidate) => candidate.id === targetId);
+  };
+  const before = findProject();
+  const anchor = before?.invocation.sourceId === 'canvas' ? before.canvas.document.bbox : null;
+
+  store.commands.generation.patchSettings(values, projectId);
+
+  const after = findProject();
+  if (!anchor || !after || after.invocation.sourceId !== 'canvas') {
+    return;
+  }
+  // The sync has snapped the frame to the model grid; centre that size rather than the raw values.
+  const current = after.canvas.document.bbox;
+  const centred = resizeBboxAroundCentre(anchor, current);
+  if (centred.x !== current.x || centred.y !== current.y) {
+    store.commands.canvas.apply(after.id, { bbox: centred, type: 'setCanvasBbox' }, 'system');
+  }
+};
+
 /** The minimal workbench store surface the sync depends on. */
 export interface CanvasDimsSyncStore {
   commands: {

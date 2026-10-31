@@ -198,6 +198,30 @@ describe('addControlLayers — controlnet on flux', () => {
   });
 });
 
+describe('addControlLayers — FLUX InstantX Union mode', () => {
+  it('sets instantx_control_mode on a FLUX controlnet layer that carries one, mode 0 included', () => {
+    const graph = run({
+      base: 'flux',
+      layers: [
+        layer({ id: 'depth', instantxControlMode: 2, model: model('flux') }),
+        layer({ id: 'canny', instantxControlMode: 0, model: model('flux') }),
+        layer({ id: 'dedicated', instantxControlMode: null, model: model('flux') }),
+      ],
+    });
+
+    expect(graph.nodes['control_net_depth']?.instantx_control_mode).toBe(2);
+    expect(graph.nodes['control_net_canny']?.instantx_control_mode).toBe(0);
+    expect(graph.nodes['control_net_dedicated']).not.toHaveProperty('instantx_control_mode');
+  });
+
+  it('never sets it outside FLUX, even when a layer carries one', () => {
+    const graph = run({ base: 'sdxl', layers: [layer({ instantxControlMode: 2, model: model('sdxl') })] });
+
+    expect(graph.nodes['control_net_layer1']?.type).toBe('controlnet');
+    expect(graph.nodes['control_net_layer1']).not.toHaveProperty('instantx_control_mode');
+  });
+});
+
 describe('addControlLayers — t2i_adapter on sdxl', () => {
   it('creates a t2i_adapter node with exact fields and wires collector to denoise.t2i_adapter', () => {
     const m = model('sdxl', 't2i_adapter');
@@ -448,6 +472,38 @@ describe('addControlLayers — Qwen-Image control', () => {
       { field: 'image', node_id: 'qwen_image_control_mask_Q1' },
     ]);
   });
+
+  it('hands an InstantX union the control image alone, as the canvas inpaints', () => {
+    const graph = run({
+      base: 'qwen-image',
+      inpaint,
+      layers: [qwenLayer('Q1', { modelControlArchitecture: 'instantx_union' })],
+    });
+
+    expect(graph.nodes.qwen_image_control_Q1).toEqual({
+      begin_step_percent: 0,
+      control_context_scale: 0.85,
+      control_model: union,
+      end_step_percent: 1,
+      id: 'qwen_image_control_Q1',
+      image: { image_name: 'Q1.png' },
+      is_intermediate: true,
+      type: 'qwen_image_control',
+      use_cache: true,
+    });
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'qwen_image_control_Q1']);
+    expect(graph.edges.map((edge) => edge.destination)).toEqual([{ field: 'control', node_id: 'denoise_latents' }]);
+  });
+
+  it.each(['fun_union', null, undefined] as const)(
+    'hands a Fun union (record says %s) the inpainted region as well',
+    (modelControlArchitecture) => {
+      const graph = run({ base: 'qwen-image', inpaint, layers: [qwenLayer('Q1', { modelControlArchitecture })] });
+
+      expect(graph.nodes.qwen_image_control_Q1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
+      expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_mask')).toHaveLength(1);
+    }
+  );
 
   it('leaves the inpaint inputs to the kinds that condition on the region', () => {
     const graph = run({

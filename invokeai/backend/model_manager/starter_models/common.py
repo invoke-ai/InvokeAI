@@ -8,6 +8,12 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
 )
 
+TINY_AUTOENCODER_NOTE = (
+    "Tiny AutoEncoder by madebyollin (MIT). Used only for live denoise previews when "
+    "`tiny_autoencoder_previews: true` is set in invokeai.yaml."
+)
+"""Closes the description of every Tiny AutoEncoder starter, one per family module."""
+
 # This is CLIP-ViT-H-14-laion2B-s32B-b79K
 ip_adapter_sd_image_encoder = StarterModel(
     name="IP Adapter SD1.5 Image Encoder",
@@ -194,6 +200,17 @@ siglip = StarterModel(
     type=ModelType.SigLIP,
 )
 
+# Dependency-only (like the IP-Adapter encoders above): not listed in STARTER_MODELS. Nothing but the
+# Anima IP-Adapter uses it, which declares it as a dependency, and `anima_ip_adapter` installs it on
+# first use when the adapter came from elsewhere.
+siglip2_base_512 = StarterModel(
+    name="SigLIP2 - google/siglip2-base-patch16-512",
+    base=BaseModelType.Any,
+    source="google/siglip2-base-patch16-512",
+    description="A SigLIP2 image encoder (used by the Anima IP-Adapter). ~1.5GB",
+    type=ModelType.SigLIP,
+)
+
 # region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",
@@ -287,7 +304,7 @@ flux2_dev_comfy_mistral_fp8 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP8)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp8.safetensors",
-    description="Comfy-Org FP8 of BFL's 30-layer cow-mistral3-small. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
+    description="Comfy-Org FP8 of the 30-layer cow build of Mistral Small 3.2. Best quality/size for prompt adherence; embeds Tekken tokenizer (no HF fetch needed). ~18GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -295,7 +312,7 @@ flux2_dev_comfy_mistral_bf16 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy BF16)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_bf16.safetensors",
-    description="Comfy-Org BF16 of BFL's 30-layer cow-mistral3-small. Reference precision; embeds Tekken tokenizer. ~35.6GB",
+    description="Comfy-Org BF16 of the 30-layer cow build of Mistral Small 3.2. Reference precision; embeds Tekken tokenizer. ~35.6GB",
     type=ModelType.MistralEncoder,
 )
 
@@ -303,17 +320,18 @@ flux2_dev_comfy_mistral_fp4 = StarterModel(
     name="FLUX.2 [dev] Mistral Encoder (Comfy FP4 mixed)",
     base=BaseModelType.Any,
     source="https://huggingface.co/Comfy-Org/flux2-dev/resolve/main/split_files/text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors",
-    description="Comfy-Org FP4-mixed of BFL's 30-layer cow-mistral3-small; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
+    description="Comfy-Org FP4-mixed of the 30-layer cow build of Mistral Small 3.2; embeds Tekken tokenizer. Its nvfp4 layers stay packed, up to about 14.7GB once loaded. ~12.3GB download",
     type=ModelType.MistralEncoder,
 )
 
-# gguf-org cow GGUF variants (30-layer cow, llama.cpp packaging, also embed Tekken).
+# gguf-org cow GGUFs: the 30-layer cow build in a GGUF container, with transformers tensor names and
+# order under architecture `cow` rather than llama.cpp's conversion; they embed Tekken too.
 # Lower memory footprint than the Comfy safetensors but slightly lower fidelity.
 flux2_dev_cow_mistral_q4 = StarterModel(
     name="FLUX.2 [dev] cow Mistral Encoder (GGUF Q4)",
     base=BaseModelType.Any,
     source="https://huggingface.co/gguf-org/flux2-dev-gguf/resolve/main/cow-mistral3-small-q4_0.gguf",
-    description="cow-mistral3-small Q4_0 — 30-layer cow distillation BFL trained against. ~11.6GB",
+    description="cow-mistral3-small Q4_0 — the first 30 layers of Mistral Small 3, all FLUX.2 [dev] reads. ~11.6GB",
     type=ModelType.MistralEncoder,
     format=ModelFormat.GGUFQuantized,
 )
@@ -370,8 +388,8 @@ qwen3_vl_encoder_4b = StarterModel(
     name="Qwen3-VL 4B Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen3-VL-4B-Instruct",
-    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
-    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2 and FLUX.3, in HuggingFace folder "
+    "layout (includes tokenizer). Use with single-file / GGUF Krea-2 and FLUX.3 transformers. (~8GB)",
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.Qwen3VLEncoder,
 )

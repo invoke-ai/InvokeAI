@@ -594,6 +594,18 @@ const seedModel = ({ key, name, ...fields }) => ({
   ...fields,
 });
 
+/** A control adapter seed keyed and named by its install name; a ControlNet unless `fields` says otherwise. */
+const controlSeed = (name, base, preprocessor, fields = {}) => ({
+  record: seedModel({
+    base,
+    default_settings: preprocessor === null ? null : { preprocessor },
+    key: `seed-${name}`,
+    name,
+    type: 'controlnet',
+    ...fields,
+  }),
+});
+
 /**
  * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
  * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
@@ -651,6 +663,36 @@ export const MODEL_SEED_SETS = Object.freeze({
         type: 'spandrel_image_to_image',
       }),
     },
+  ],
+  // SDXL control models for the control-layer panel: two depth models naming their preprocessor in the legacy and
+  // the node form, a pose model, a Union model, one whose purpose nothing names, and a T2I-Adapter.
+  'control-sdxl': [
+    controlSeed('controlnet-depth-sdxl-1.0', 'sdxl', 'depth_anything_image_processor'),
+    controlSeed('controlnet-zoe-depth-sdxl', 'sdxl', 'depth_anything_depth_estimation'),
+    controlSeed('thibaud-openpose-sdxl', 'sdxl', 'dw_openpose_image_processor'),
+    controlSeed('xinsir-controlnet-union-sdxl-promax', 'sdxl', null),
+    controlSeed('my-sdxl-control', 'sdxl', null),
+    controlSeed('t2i-adapter-canny-sdxl-1.0', 'sdxl', 'canny_image_processor', {
+      format: 'diffusers',
+      type: 't2i_adapter',
+    }),
+  ],
+  // A FLUX dev main with a depth Control LoRA and a Union ControlNet.
+  'control-flux': [
+    {
+      record: seedModel({
+        base: 'flux',
+        key: 'seed-flux-dev',
+        name: 'FLUX.1 dev',
+        type: 'main',
+        variant: 'dev',
+      }),
+    },
+    controlSeed('flux-depth-control-lora', 'flux', 'depth_anything_image_processor', {
+      format: 'lycoris',
+      type: 'control_lora',
+    }),
+    controlSeed('flux-controlnet-union-pro', 'flux', null),
   ],
 });
 

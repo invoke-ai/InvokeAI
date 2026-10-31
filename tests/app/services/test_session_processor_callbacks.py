@@ -25,7 +25,7 @@ def test_after_run_node_callback_receives_control_node_inputs(monkeypatch: pytes
     context_data = []
 
     services = SimpleNamespace(
-        configuration=SimpleNamespace(node_cache_size=0),
+        configuration=SimpleNamespace(node_cache_size=0, multiuser=False),
         progress_previews=MemoryProgressPreviews(),
         events=Mock(),
         logger=Mock(),

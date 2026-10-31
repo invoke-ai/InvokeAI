@@ -26,15 +26,18 @@ export {
   getControlAdapterMinWeight,
   getControlModelUnusableReason,
   getControlValidationReason,
-  getSuggestedControlKind,
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './core/canvas/controlValidation';
 export {
+  getLayoutDraftRejectionReason,
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   isRegionalGuidanceSupportedForBase,
   type RegionalGuidanceInput,
+  type RegionalLayoutKind,
   type RegionalReferenceImageInput,
 } from './core/canvas/addRegionalGuidance';
 export type { ControlLayerGraphInput } from './core/canvas/addControlLayers';

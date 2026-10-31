@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-31
 sidebar:
   order: 5
 ---
@@ -15,7 +15,7 @@ install:
 | **Klein 4B** | Qwen3 4B | Distilled for **4 steps** |
 | **Klein 9B** | Qwen3 8B | Distilled for **4 steps** |
 | **Klein 4B Base** / **Klein 9B Base** | Qwen3 4B / Qwen3 8B | Undistilled foundation models; **28 steps** |
-| **FLUX.2 [dev]** | Mistral Small 3.1 | 32B guidance-distilled transformer; **28 steps**; non-commercial license |
+| **FLUX.2 [dev]** | Mistral Small 3.2 | 32B guidance-distilled transformer; **28 steps**; non-commercial license |
 
 Every variant can take reference images for image editing (see [Reference images](#reference-images)).
 
@@ -103,7 +103,11 @@ fp8 weights instead of expanding them.
 The GGUF transformers need a separate Mistral encoder. Q3_K_M and Q4_K_M install the GGUF Q4 encoder, the
 larger quants the GGUF Q8 encoder. Other encoder starters are the Comfy-Org builds — *FP8* (~18 GB, best
 quality for its size), *BF16* (~35.6 GB) and *FP4 mixed* (~12.3 GB download) — and a GGUF *IQ4_XS* build
-(~11.1 GB).
+(~11.1 GB). llama.cpp conversions of Mistral Small 3.2, such as unsloth's or bartowski's GGUFs, are the same
+encoder; 3.0 and 3.1 GGUFs load too, but they are different weights. These files carry no Tekken tokenizer, so
+their first load fetches it from the gated `black-forest-labs/FLUX.2-dev` repository (see below). A GGUF of the
+same shape that declares scaled RoPE or an attention temperature, such as Devstral Small 2, is a different model
+and installs as unknown.
 
 :::caution[License and access]
 FLUX.2 [dev] is released under a non-commercial license. Some Black Forest Labs repositories are gated on
@@ -186,7 +190,11 @@ happens.
 FLUX.2 LoRAs are labelled with the variant they were trained for, and the Generate tab only offers LoRAs
 that match the selected model's variant. LoRAs patch the transformer and, where they include text-encoder
 layers, the Qwen3 or Mistral encoder. In workflows use **Apply LoRA - Flux2 Klein** or **Apply LoRA -
-FLUX.2 [dev]** (and their *Collection* versions).
+FLUX.2 [dev]** (and their *Collection* versions). Supported layouts include LyCORIS, Diffusers/PEFT and
+ComfyUI/OneTrainer PEFT files whose module names start with `diffusion_model.`. Per-layer `.alpha` values in
+these `diffusion_model.` files set the LoRA scale.
+LyCORIS LoKr and LoHA files are supported in BFL and kohya layouts; each LoKr operand may be stored whole
+or as a factorized `_a` / `_b` pair.
 
 ## PiD super-resolution decode
 

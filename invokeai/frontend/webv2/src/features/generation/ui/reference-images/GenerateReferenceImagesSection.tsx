@@ -16,12 +16,17 @@ import { GalleryPickerPopover } from '@features/gallery/picker';
 import { isGalleryImageDragData, useGalleryImageDroppable } from '@features/gallery/utility';
 import {
   createReferenceImageId,
-  getDefaultReferenceImageConfig,
   getGenerationDimensions,
   getMaxReferenceImages,
+  getMissingReferenceImageFormat,
   isReferenceImageSupported,
+  withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
-import { generatedImageToReferenceImage, getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
+import {
+  generatedImageToReferenceImage,
+  getEffectiveReferenceImage,
+  getReferenceImagePromptTags,
+} from '@features/generation/core/referenceImage';
 import { clampDimension, deriveAspectRatioId, moveReferenceImage } from '@features/generation/core/settings';
 import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { Button, DropTargetOverlay, DropZone } from '@platform/ui';
@@ -32,6 +37,8 @@ import { useTranslation } from 'react-i18next';
 import { ReferenceImageCard } from './ReferenceImageCard';
 
 const UPLOAD_ZONE_HOVER_STYLES = { bg: 'bg.muted', color: 'fg' };
+/** Display names for the formats the backend can require of reference-image models. */
+const MODEL_FORMAT_LABELS: Record<string, string> = { diffusers: 'Diffusers' };
 const IMAGE_ONLY = ['image'] as const;
 
 interface GenerateReferenceImagesContentProps {
@@ -50,8 +57,9 @@ export const GenerateReferenceImagesContent = ({
   selectedModel,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
-  const { gallery } = useGenerationUi();
+  const { gallery, models: modelUi } = useGenerationUi();
   const isSupported = isReferenceImageSupported(selectedModel);
+  const missingFormat = getMissingReferenceImageFormat(selectedModel);
   const maxReferenceImages = getMaxReferenceImages(selectedModel);
   const canAdd = referenceImages.length < maxReferenceImages;
   const { acceptsActiveDrag, isOver, setNodeRef } = useGalleryImageDroppable({
@@ -60,6 +68,10 @@ export const GenerateReferenceImagesContent = ({
     id: 'generate-reference-images',
   });
   const referenceImageCount = referenceImages.length;
+  const promptTags = useMemo(
+    () => getReferenceImagePromptTags(selectedModel?.base, referenceImages),
+    [referenceImages, selectedModel?.base]
+  );
 
   const appendReferenceImages = useCallback(
     (images: GenerateReferenceImageAsset[]) => {
@@ -75,14 +87,12 @@ export const GenerateReferenceImagesContent = ({
 
         return {
           ...currentSettings,
-          referenceImages: [
-            ...currentSettings.referenceImages,
-            ...images.slice(0, remaining).map((image, index) => ({
-              config: getDefaultReferenceImageConfig(selectedModel, models, image),
-              id: ids[index] ?? createReferenceImageId(),
-              isEnabled: true,
-            })),
-          ],
+          referenceImages: withAddedReferenceImages(
+            selectedModel,
+            models,
+            currentSettings.referenceImages,
+            images.slice(0, remaining).map((image, index) => ({ id: ids[index] ?? createReferenceImageId(), image }))
+          ),
         };
       });
     },
@@ -194,8 +204,21 @@ export const GenerateReferenceImagesContent = ({
     },
   });
 
+  // A model that only lacks the right format says which one would take references.
+  const unsupportedMessage =
+    selectedModel && missingFormat
+      ? t('widgets.generate.referenceImagesNeedFormat', {
+          base: modelUi.getBaseLabel(selectedModel.base),
+          format: MODEL_FORMAT_LABELS[missingFormat] ?? missingFormat,
+        })
+      : t('widgets.generate.referenceImagesUnsupported');
+
   if (!isSupported && referenceImageCount === 0) {
-    return null;
+    return missingFormat ? (
+      <Text color="fg.muted" fontSize="xs">
+        {unsupportedMessage}
+      </Text>
+    ) : null;
   }
 
   // Unsupported-model references remain read-only with removal as recovery.
@@ -203,7 +226,7 @@ export const GenerateReferenceImagesContent = ({
     return (
       <HStack gap="2" justify="space-between">
         <Text color="fg.muted" fontSize="xs" minW="0">
-          {t('widgets.generate.referenceImagesUnsupported')}
+          {unsupportedMessage}
         </Text>
         <Button colorPalette="red" flexShrink="0" variant="outline" onClick={clearReferenceImages}>
           {t('widgets.generate.clearReferenceImages')}
@@ -269,6 +292,7 @@ export const GenerateReferenceImagesContent = ({
               onPatch={patchReferenceImage}
               onRemove={removeReferenceImage}
               onUseSize={applyReferenceImageSize}
+              promptTag={promptTags.get(referenceImage.id)}
             />
           ))}
         </Stack>

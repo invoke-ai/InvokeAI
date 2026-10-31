@@ -22,10 +22,26 @@ import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as settingsStoreModule from './settings/store';
+
 // Dynamic prompt expansion is the only transport `submitResolvedInvocation` touches.
 const parseDynamicPromptsMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts: parseDynamicPromptsMock }));
+
+// Remembered control-model picks, which readiness reads imperatively from the account preferences.
+const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string, string> }));
+
+vi.mock('./settings/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof settingsStoreModule>();
+  return {
+    ...actual,
+    getWorkbenchPreferences: () => ({
+      ...actual.getWorkbenchPreferences(),
+      controlModelMemory: preferences.controlModelMemory,
+    }),
+  };
+});
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 
@@ -173,6 +189,41 @@ describe('resolveInvocationRoute', () => {
 
     expect(route.sourceValid).toBe(false);
     expect(route.validationReasons).toContain("No invocation node registered for external provider 'future-provider'.");
+  });
+
+  it('blocks a MOSS-Image layout draft that a prompt template hides or breaks', () => {
+    const mossModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const reasonsFor = (positivePrompt: string, templatePrompt: string) =>
+      resolveInvocationRoute(
+        getActiveProject(
+          createGenerateValues(mossModel, {
+            positivePrompt,
+            promptTemplate: { id: 't', name: 'Template', negativePrompt: '', positivePrompt: templatePrompt },
+          })
+        )
+      ).validationReasons;
+    const notJson = [
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+    ];
+    const scaffold =
+      '{"width":1024,"height":1024,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"{prompt}"},"items":[{"label":"object","caption":"a sign","bbox":[0,0,512,512]}]}';
+
+    // A prefix hides a truncated draft from the authored prompt alone...
+    expect(
+      reasonsFor(
+        '{"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[',
+        'photo of {prompt}'
+      )
+    ).toEqual(notJson);
+    // ...and a template that is a draft breaks around an unescaped quote in a plain prompt.
+    expect(reasonsFor('a "neon" sign', scaffold)).toEqual(notJson);
+    expect(reasonsFor('a neon sign', scaffold)).toEqual([]);
   });
 });
 
@@ -514,9 +565,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
   });
 
-  it('blocks a content-bearing control layer with no model once models are loaded', () => {
+  it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
     const route = resolveInvocationRouteInput(
-      canvasInputFor({ layers: [modellessControlLayer()] }),
+      canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] }),
       'global',
       canvasRoute,
       loadedModels
@@ -526,12 +577,41 @@ describe('resolveInvocationRoute — canvas source', () => {
     // Kept structured so the shell words it from the locale.
     expect(route.validationReasons).toContainEqual({
       controlLayerIssue: {
-        code: 'missing_model',
+        code: 'no_control_models',
         layerId: expect.any(String),
         layerName: 'Control Layer 1',
-        suggestedKind: null,
       },
     });
+  });
+
+  it('does not block on a content-bearing layer with neither a type nor a model', () => {
+    const route = resolveInvocationRouteInput(
+      canvasInputFor({ layers: [modellessControlLayer()] }),
+      'global',
+      canvasRoute,
+      loadedModels
+    );
+
+    expect(route.validationReasons).toEqual([]);
+  });
+
+  it('re-evaluates a choice between control models against the remembered pick', () => {
+    const lllite = (key: string) =>
+      ({ base: 'anima', cond_in_channels: 3, key, name: key, type: 'controlnet' }) as unknown as ModelConfig;
+    const models = [...loadedModels, lllite('anima-depth-a'), lllite('anima-depth-b')];
+    const input = canvasInputFor({ layers: [{ ...modellessControlLayer(), controlType: 'depth', detection: null }] });
+    const codes = () =>
+      resolveInvocationRouteInput(input, 'global', canvasRoute, models).validationReasons.map((reason) =>
+        typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.code : reason
+      );
+
+    try {
+      expect(codes()).toEqual(['choose_model']);
+      preferences.controlModelMemory = { 'anima:depth': 'anima-depth-b' };
+      expect(codes()).toEqual([]);
+    } finally {
+      preferences.controlModelMemory = {};
+    }
   });
 
   it('does not block content-less control layers or check layers before models load', () => {
@@ -549,6 +629,56 @@ describe('resolveInvocationRoute — canvas source', () => {
       canvasRoute
     );
     expect(modelsLoadingRoute.validationReasons).toEqual([]);
+  });
+
+  it('blocks MOSS-Image layout regions around a blank prompt before anything uploads', () => {
+    const mossModel: MainModelConfig = {
+      base: 'moss-image',
+      format: 'diffusers',
+      key: 'moss-model',
+      name: 'MOSS-Image',
+      type: 'main',
+    };
+    const region = (overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
+      ({
+        autoNegative: false,
+        blendMode: 'normal',
+        id: 'region-1',
+        isEnabled: true,
+        isLocked: false,
+        mask: { bitmap: { height: 64, imageName: 'mask.png', width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
+        name: 'Region 1',
+        negativePrompt: null,
+        opacity: 1,
+        positivePrompt: 'a shop sign',
+        referenceImages: [],
+        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+        type: 'regional_guidance',
+        ...overrides,
+      }) as CanvasLayerContract;
+    const reasonsFor = (overrides: Partial<GenerateWidgetValues>, layers: CanvasLayerContract[]) =>
+      resolveInvocationRouteInput(
+        canvasInputFor({ generateValues: createGenerateValues(mossModel, overrides), layers }),
+        'global',
+        canvasRoute
+      ).validationReasons;
+
+    expect(reasonsFor({ positivePrompt: '```json\n{"bbox_coord_space": "abs",\n```' }, [])).toEqual([
+      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+    ]);
+    expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
+      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
+    ]);
+    // A prompt template supplies the prompt the layout is built around.
+    const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
+    expect(reasonsFor({ positivePrompt: '', promptTemplate: template }, [region()])).toEqual([]);
+    // Regions that never reach the layout leave a blank prompt alone.
+    const unplaced = [
+      region({ id: 'empty', mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
+      region({ id: 'uncaptioned', positivePrompt: null }),
+      region({ id: 'disabled', isEnabled: false }),
+    ];
+    expect(reasonsFor({ positivePrompt: '' }, unplaced)).toEqual([]);
   });
 
   it('treats the layer stack identity as part of the route input', () => {
