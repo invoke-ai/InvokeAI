@@ -125,6 +125,8 @@ export interface GalleryUiAdapter {
    * saved only after its first debounced flush. Absent for hosts without a workbench, which never create in one.
    */
   ensureProjectOnServer?: () => Promise<void>;
+  /** Deleting a board with its media keeps starred items, which move to Uncategorized. */
+  protectStarredMedia: boolean;
   /**
    * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
    * board because a board menu can offer this for any project's board, not only the open one.

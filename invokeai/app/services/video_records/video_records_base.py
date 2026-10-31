@@ -87,6 +87,14 @@ class VideoRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def delete_many_keeping_starred(self, video_names: list[str]) -> list[str]:
+        """Deletes the named video records that are not starred, on one transaction with the starred check.
+
+        Returns the names kept because they are starred, including ones starred after the caller last looked.
+        """
+        pass
+
+    @abstractmethod
     def save(
         self,
         video_name: str,
