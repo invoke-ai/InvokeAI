@@ -17,6 +17,7 @@ TermsFunction = Callable[[Mapping[str, FeatureValue], Mapping[str, float]], tupl
 
 ESTIMATOR_MODULES: Final = (
     "invokeai.backend.moss_image.working_memory",
+    "invokeai.backend.qwen_image_2_1.vae",
     "invokeai.backend.util.vae_working_memory",
     "invokeai.backend.z_image.denoise_working_memory",
     "invokeai.backend.flux2.denoise_working_memory",

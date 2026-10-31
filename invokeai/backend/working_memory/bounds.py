@@ -46,6 +46,7 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
         "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
         "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-1536x1536-tile1024-AMDRadeonPROW7900-reserved_peak": 1.45,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
@@ -57,7 +58,10 @@ instead. All are the native allocator, never expandable segments or `cudaMallocA
 - The FLUX.2 denoise points are the Klein 4B width at 1440px with a 77-token caption, 8177 tokens, on both cards: the
   native allocator served them from 1676 MiB (RTX 4090) and 1879 MiB (RX 9060 XT), while the 512-token caption at
   8612 tokens took 2382 and 2577 MiB. The line has to cover the latter. Under `cudaMallocAsync` and expandable
-  segments the two lie on one line."""
+  segments the two lie on one line.
+- The Qwen-Image-2.1 point is a 1536px frame in 1024px tiles on MIOpen: it measures what an untiled 1024px decode does
+  (12.1 KB per pixel), while the decode line is the envelope of the steeper sizes past 1.5 Mpx (14.5 KB per pixel), and
+  the tiled estimate must stay above the 512px and 768px tiles, which cost more per pixel."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
