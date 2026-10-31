@@ -23,6 +23,14 @@ geometry with 2 blocks; 4 blocks measured the same as 2. bf16 and fp16 take the 
 times theirs under the native allocator and 1.89 times under `cudaMallocAsync`. Under the native allocator joint
 references lie on the line of the plain forwards; under `cudaMallocAsync` a warm forward with one reference read 18%
 above its cold one and holds the line up. CUDA on Linux reuses these lines, as the Z-Image and FLUX.2 entries do.
+An RX 9060 XT (ROCm 10 on Windows, AOTriton's fused SDPA) measured the same grid with expandable segments and with the
+native allocator, each an entry for Windows alone, joint sequences up to 29184 tokens in bf16 and fp16 too. fp32 runs
+up to 22016 tokens with expandable segments and 16896 under the native allocator: its longer sequences were skipped,
+as the shipped line plus the weights prices them beyond the card's ~14.9 GiB free. Its native allocator takes CUDA's
+slope in bf16 and fp16 over a larger base (0.30 MiB per token plus 494 and 522 MiB); expandable segments take 0.20 MiB
+plus 407 and 435 MiB, and with them 4 blocks measured the same as 2 too (the native allocator ran no 4-block forward).
+The card did not drive the desktop: per-process demand is the same, but WDDM paging on a card that also carries the
+desktop is not measured.
 
 A caption token reserves more than an image token, while allocated memory grows alike for both: 0.73 to 0.95 against
 0.30 MiB per token in bf16 and fp16 under the native allocator, 1.2 to 2.2 against 0.50 in fp32 (the 77- against the
@@ -30,13 +38,15 @@ A caption token reserves more than an image token, while allocated memory grows 
 short caption reserves up to 1.35 times what it demands (`bounds.UPPER_BOUND_EXCEPTIONS`). Beyond 512, which regional
 prompting reaches by concatenating its captions, each caption token adds `_CAPTION_EXCESS_BYTES_PER_TOKEN` on top of
 the line. The caption checks measure it (`--mode captions`: 1024- and 2048-token captions at 4096 and 9216 image tokens,
-every dtype, both allocators, out of the fit): the line alone falls short at 2048 tokens, by up to 16% (0.84 to 0.95
-times the demand). The term is the most a check demanded per caption token beyond 512 above the line's slope, over
-both allocators, times the 1.3 that bounds a fitted term (`bounds.MAX_OVER_RESERVATION`), rounded up to the next
-0.01 MiB: 0.26 MiB in bf16 and fp16 (1024 px, 2048 tokens) gives 0.34 MiB, 0.39 MiB in fp32 (1536 px, 2048 tokens) gives
-0.52 MiB. The estimate covers every check, 1.05 to 1.54 times in bf16 and fp16 and 1.03 to 1.61 times in fp32 under
-the native allocator, 1.21 to 1.50 and 1.11 to 1.27 times under `cudaMallocAsync`. Each group's largest ratio falls on
-a forward the line alone already covers 1.10 to 1.47 times.
+every dtype, on every measured platform, out of the fit): the line alone falls short at 2048 tokens, by up to 16%
+(down to 0.84 times the demand). The term is the most a check demanded per caption token beyond 512 above the line's
+slope, over every measured platform, times the 1.3 that bounds a fitted term (`bounds.MAX_OVER_RESERVATION`), rounded
+up to the next 0.01 MiB. CUDA's native allocator sets it: 0.26 MiB in bf16 and fp16 (1024 px, 2048 tokens) gives
+0.34 MiB, 0.39 MiB in fp32 (1536 px, 2048 tokens) gives 0.52 MiB; the RX 9060 XT demanded at most 0.25 and 0.37 MiB.
+The estimate covers every check, 1.05 to 1.54 times in bf16 and fp16 and 1.03 to 1.61 times in fp32 under CUDA's
+native allocator, 1.21 to 1.50 and 1.11 to 1.27 times under `cudaMallocAsync`, 1.05 to 1.46 and 1.03 to 1.58 times
+under ROCm's native allocator, 1.17 to 1.43 and 1.25 to 1.37 times with expandable segments. On the RTX 4090 each group's
+largest ratio falls on a forward the line alone already covers 1.10 to 1.47 times.
 
 Cross-checks in a running server on the RTX 4090 under the native allocator with an ~84-token prompt, not shipped as
 points: the estimate reserved 1.22 to 1.66 times what the real 28-block model grew the reserved peak by over the
@@ -47,13 +57,14 @@ partially (the cache told the card has 11.76 GiB, GGUF Q4_K_M at 1152x1536 with 
 GiB resident), the model grew the reserved peak by 2.37 GiB against an estimate of 3.30 GiB (1.39 times), with no
 out-of-memory; the device peaked at 10.85 to 10.86 of the 11.76 GiB, 0.3 GiB of simulated foreign use included.
 
-ROCm is not measured, and neither is any other platform but these two. Their entries price with the formula the node
-reserved by hand before the lines were measured (`_legacy_formula`, declared as `EstimatorSpec.legacy_formula`): 0.5 MiB
-per attended token and a 1.5 GiB base for every dtype, times 1.1 with CFG and 1.35 with a style reference, plus the
-whole model's largest dequantization transient and half a GiB per LoRA, with the terms it lacked on top. On the RTX 4090
-those constants reserved 2.3 to 2.9 times what the real model demanded. ROCm's entries are `legacy`; every other platform
-nothing measures is priced as a measured one (`priced_as`), and the two entries those borrow, CUDA's and ROCm's with the
-native allocator, floor their values at the legacy constants (`unmeasured_floor`), which prices that formula there too.
+ROCm with the native allocator off Windows is not measured, and neither is any platform but these four. They price with
+the formula the node reserved by hand before the lines were measured (`_legacy_formula`, declared as
+`EstimatorSpec.legacy_formula`): 0.5 MiB per attended token and a 1.5 GiB base for every dtype, times 1.1 with CFG and
+1.35 with a style reference, plus the whole model's largest dequantization transient and half a GiB per LoRA, with the
+terms it lacked on top. On the RTX 4090 those constants reserved 2.3 to 2.9 times what the real model demanded. ROCm's
+entry with the native allocator for every OS but Windows is `legacy`; every other platform nothing measures is priced as
+a measured one (`priced_as`), and the entries those borrow, CUDA's and ROCm's with the native allocator (Windows' and
+the other OSes'), floor their values at the legacy constants (`unmeasured_floor`), which prices that formula there too.
 Either way the reservation is the larger of the formula and the terms below.
 
 A forward has two phases that never peak together. The blocks run over the whole sequence, and every term of the
@@ -111,8 +122,9 @@ Known and not priced: on a dense bf16 or fp16 build a LoRA on a resident layer i
 loop, which takes about 8 bytes per element of the largest patched layer (~1.7 GiB for `time_mod_proj`). It never
 coincides with the block activations, and the `device_working_mem_gb` floor of every reservation covers it.
 
-Not measured: Sage attention, flash attention (Linux), ROCm, int8 and bf16 builds of the real model, regional prompting,
-CFG with captions of unequal length, and the patch types that are no `LoRALayer`.
+Not measured: Sage attention, flash attention (Linux), ROCm off Windows, the real model on ROCm, int8 and bf16 builds
+of the real model, regional prompting, CFG with captions of unequal length, and the patch types that are no
+`LoRALayer`.
 """
 
 import math

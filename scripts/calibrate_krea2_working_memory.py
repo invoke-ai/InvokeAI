@@ -72,9 +72,11 @@ The other keys are the script's, which the builder ignores: `fit`, `point` (the 
 counter deltas, the prediction and the runtime facts). An invalid, skipped or failed forward is no point: it shows in
 the table on stdout, with its reasons, and stays out of the file.
 
-The CUDA entries are fitted on an RTX 4090's points; ROCm's are `legacy` until points replace them. The builder fits
-an entry once its points fit every dtype's line, so a run that is to replace one measures all three dtypes. A point
-names the card as torch does (`NVIDIA GeForce RTX 4090`), and so do the shipped Krea-2 points.
+The CUDA entries are fitted on an RTX 4090's points, the ROCm entries on Windows (expandable segments and the native
+allocator) on an RX 9060 XT's. ROCm with the native allocator off Windows is `legacy` until points replace it. The
+builder fits an entry once its points fit every dtype's line, so a run that is to replace one measures all three
+dtypes. A point names the card as torch does (`NVIDIA GeForce RTX 4090`, `AMD Radeon RX 9060 XT (gfx1200)`), and so do
+the shipped Krea-2 points.
 
 Usage
 -----
@@ -92,8 +94,23 @@ RTX 4090 (CUDA): the native allocator, then `cudaMallocAsync`; each in the fit, 
     python scripts/calibrate_krea2_working_memory.py --out 4090-async.jsonl --mode captions \
         --alloc-conf backend:cudaMallocAsync
 
-RX 9060 XT (ROCm on Windows): the same, with the server's default expandable segments, then
-`--alloc-conf expandable_segments:False`.
+RX 9060 XT (ROCm on Windows): the server's default expandable segments, then the native allocator; each in the fit,
+large (in every dtype), kv and captions modes, priced with the shipped Windows lines. On 16 GB the pricing skips the
+long fp32 sequences that need more than the card has free: 2048px with three references with expandable segments,
+all three under the native allocator. The card did not drive the desktop.
+
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-expandable.jsonl --extra-blocks 4
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-expandable.jsonl --mode large \
+        --dtypes bfloat16,float16,float32
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-expandable.jsonl --mode kv
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-expandable.jsonl --mode captions
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-native.jsonl --alloc-conf expandable_segments:False
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-native.jsonl --mode large \
+        --dtypes bfloat16,float16,float32 --alloc-conf expandable_segments:False
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-native.jsonl --mode kv \
+        --alloc-conf expandable_segments:False
+    python scripts/calibrate_krea2_working_memory.py --out 9060xt-native.jsonl --mode captions \
+        --alloc-conf expandable_segments:False
 
 `--dry-run` prints the planned points without touching a device, each priced as a CPU prices it.
 """

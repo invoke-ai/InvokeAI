@@ -2,10 +2,10 @@
 
 The terms are evaluated with coefficients of the tests' own where they test the estimator's structure, so those hold
 whatever `backend/working_memory/data/denoise.json` ships; `tests/backend/working_memory/` holds the shipped values to
-their points. ROCm is not measured and prices with the hand-set formula the node reserved before the lines were
-measured, which `TestLegacyReservation` holds byte for byte to that formula, frozen below; every other platform nothing
-measures reserves that formula at least (`TestUnmeasuredPlatforms`). What the node hands the estimate and
-`model_on_device()` is pinned in `tests/app/invocations/test_krea2_denoise.py`.
+their points. ROCm with the native allocator off Windows is not measured and prices with the hand-set formula the node
+reserved before the lines were measured, which `TestLegacyReservation` holds byte for byte to that formula, frozen
+below; every other platform nothing measures reserves that formula at least (`TestUnmeasuredPlatforms`). What the
+node hands the estimate and `model_on_device()` is pinned in `tests/app/invocations/test_krea2_denoise.py`.
 """
 
 import itertools
@@ -343,9 +343,7 @@ def _legacy_estimate_working_memory(
     return estimated
 
 
-LEGACY_PLATFORMS = [Platform("miopen", "native", os) for os in get_args(OperatingSystem)] + [
-    Platform("miopen", "expandable", "windows")
-]
+LEGACY_PLATFORMS = [Platform("miopen", "native", os) for os in get_args(OperatingSystem) if os != "windows"]
 TRANSFORMERS = [
     _transformer(torch.nn.Identity(), torch.nn.Identity()),
     _transformer(_int8(256), _int8(256), time_mod_proj=_int8(768)),

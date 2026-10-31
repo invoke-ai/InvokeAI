@@ -72,21 +72,30 @@ OUT_OF_FIT = {
     ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16,
     ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15,
+    (
+        (("allocator", "native"), ("conv_backend", "miopen"), ("os", "windows")),
+        "AMD Radeon RX 9060 XT (gfx1200)",
+        "demand_peak",
+    ): 15,
+    (
+        (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows")),
+        "AMD Radeon RX 9060 XT (gfx1200)",
+        "demand_peak",
+    ): 16,
 }
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term, and the Krea-2 denoise checks: under both allocators its 3 reference K/V-cache windows and
-12 forwards with 1024- and 2048-token captions, and a 4-block forward under the native one. A point that leaves the fit
-needs an edit here."""
+check the score-matrix term, and the Krea-2 denoise checks: on each of the four platforms its 3 reference K/V-cache
+windows and 12 forwards with 1024- and 2048-token captions, and a 4-block forward under CUDA's native allocator and
+ROCm's expandable segments. A point that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),
     ("denoise.flux2", (("allocator", "native"), ("conv_backend", "miopen"))),
     ("denoise.krea2", (("allocator", "native"), ("conv_backend", "miopen"))),
-    ("denoise.krea2", (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows"))),
 }
 """The entries, by estimator and platform keys, that carry hand-set constants (`CoefficientEntry.legacy`) rather than
-fits of measured points: the Z-Image and FLUX.2 denoise on ROCm with the native allocator off Windows, and the Krea-2
-denoise on ROCm, which nothing measures yet. Shipping an entry's points and fit removes it from here."""
+fits of measured points: the Z-Image, FLUX.2 and Krea-2 denoise on ROCm with the native allocator off Windows, which
+nothing measures yet. Shipping an entry's points and fit removes it from here."""
 
 # Imported deliberately rather than relying on whichever modules ran first: a spec missing from the registry is a spec
 # whose data nobody checks.
