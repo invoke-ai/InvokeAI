@@ -2956,11 +2956,16 @@ def test_overlapping_vocabulary_writers_cannot_modify_a_published_cache(
         context = open(file, "wb") if isinstance(file, (str, Path)) else nullcontext(file)
         with context as handle:
             opened.set()
-            assert second_published.wait(10), "The second writer did not finish"
-            save(handle, **arrays)
-            handle.flush()
-            first_written.set()
-            assert finish_first.wait(10), "The first writer was not released"
+            # Production swallows exceptions raised here, so record them.
+            try:
+                assert second_published.wait(10), "The second writer did not finish"
+                save(handle, **arrays)
+                handle.flush()
+                first_written.set()
+                assert finish_first.wait(10), "The first writer was not released"
+            except AssertionError as error:
+                errors.append(error)
+                raise
 
     def _build_first() -> None:
         try:

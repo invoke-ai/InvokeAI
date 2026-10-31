@@ -624,10 +624,9 @@ class ImageIndexService(ImageIndexServiceBase):
             # With the exception, not just the path. The caller caches the
             # matrix in RAM either way, so a write failure costs
             # nothing until the next restart and is invisible until someone
-            # goes looking at startup times. The `.tmp` bug above survived
-            # because this line said only that something had gone wrong,
-            # never what — the FileNotFoundError it swallowed names the
-            # missing staging file outright.
+            # goes looking at startup times. A past bug left the cache never
+            # reaching disk, unnoticed because this warning said only that
+            # something had failed, never what.
             self._invoker.services.logger.warning(
                 f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
             )
