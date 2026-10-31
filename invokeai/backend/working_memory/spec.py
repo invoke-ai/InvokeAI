@@ -2,7 +2,7 @@ import importlib
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import Final
+from typing import Final, Optional
 
 import torch
 
@@ -14,12 +14,15 @@ from invokeai.backend.working_memory.platform import platform_for
 
 TermsFunction = Callable[[Mapping[str, FeatureValue], Mapping[str, float]], tuple[WorkingMemoryTerm, ...]]
 """An estimator's pure part: its features and its coefficient values in, its terms out."""
+LegacyFormula = Callable[[Mapping[str, FeatureValue], Mapping[str, float]], float]
+"""A hand-set formula an estimator replaced, in bytes, priced with the same features and coefficient values."""
 
 ESTIMATOR_MODULES: Final = (
     "invokeai.backend.moss_image.working_memory",
     "invokeai.backend.util.vae_working_memory",
     "invokeai.backend.z_image.denoise_working_memory",
     "invokeai.backend.flux2.denoise_working_memory",
+    "invokeai.backend.krea2.denoise_working_memory",
 )
 """Every module that registers an `EstimatorSpec`. The registry holds only the specs of modules imported so far, so a
 caller that needs all of them imports these (`import_estimator_modules`); `tests/backend/working_memory/` fails on a
@@ -49,6 +52,12 @@ class EstimatorSpec:
     AutoencoderKL convolution line in output pixels for every VAE estimator (`fit.convolution_line`), one in attended
     tokens for each denoise estimator. Declared by every estimator, so a new one cannot inherit another's line, and with it
     which of its measurements join a fit."""
+    legacy_formula: Optional[LegacyFormula] = field(default=None, compare=False, repr=False)
+    """For an estimator whose terms are shaped unlike the hand-set formula they replaced, so that a `legacy` entry's
+    constants alone do not reproduce it: that formula. Where the values are legacy-priced
+    (`ResolvedCoefficients.legacy_priced`: a `legacy` entry, or an unmeasured platform raised to its floors), the estimate
+    reserves at least what it gives, as a term `legacy_formula` on top of the others. Fitted values on a measured
+    platform never read it. An estimator whose terms reproduce the formula from the legacy constants declares none."""
     user_calibrated: bool = False
     """Whether a user's calibration moves this estimator: its windows fit user lines, its estimates read them, the
     calibration summary shows its lines, and what its windows found held outside torch sizes the calibration plan
@@ -74,11 +83,16 @@ class EstimatorSpec:
         self, features: Mapping[str, FeatureValue], coefficients: ResolvedCoefficients
     ) -> WorkingMemoryEstimate:
         """The estimate for `features` with the given coefficients."""
+        terms = self.terms(features, coefficients.values)
+        if coefficients.legacy_priced and self.legacy_formula is not None:
+            priced = sum(term.bytes for term in terms if term.included)
+            formula = self.legacy_formula(features, coefficients.values)
+            terms = (*terms, WorkingMemoryTerm("legacy_formula", max(0.0, formula - priced), True))
         return WorkingMemoryEstimate(
             estimator=self.id,
             version=self.version,
             features=features,
-            terms=self.terms(features, coefficients.values),
+            terms=terms,
             source=coefficients.source,
         )
 
