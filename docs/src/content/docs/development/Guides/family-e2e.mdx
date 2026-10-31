@@ -13,7 +13,7 @@ It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, wher
    - The tool refuses while the database file is open in any process (Windows only), or while anything listens on the template's configured port. Either means its server is still running.
    - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
    - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
-   - Every other path setting points back at the template root as an absolute path, so models, custom nodes and memory settings are the template's own.
+   - Every other path setting points back at the template root as an absolute path, so models, custom nodes, prompt files and memory settings are the template's own.
    - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
    - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
 2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
@@ -188,13 +188,14 @@ A run's record can be complete and still unfit for some comparisons. Each invali
 
 ## Shared paths
 
-The scratch server uses the template root's models directory, model caches, legacy model configs, custom fonts and custom nodes. Its startup touches them as starting the template's own server would:
+The scratch server uses the template root's models directory, model caches, legacy model configs, custom fonts, custom nodes and prompt files. Its startup touches them as starting the template's own server would:
 
 - `models/README.txt` is written.
 - Install claims (`*.invokeai_install_active`) of processes that no longer run are removed.
 - Missing model files are reported in the log.
 - `configs/` receives the legacy model configs of the server's code when they differ.
 - `fonts/README.txt` is written when missing.
+- `prompt_files/README.txt` is written when missing.
 - Models a node fetches on first use are cached in `models/.download_cache`.
 
 The server would also finish an incomplete install, but the model would then be registered in the scratch database only. So `start` and `resume` refuse while the models directory holds a `tmpinstall_*` entry: finish or cancel that install in the dev server first.
