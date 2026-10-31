@@ -3,10 +3,12 @@ import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@fe
 import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
+import { galleryBoardStarredCountOptions } from '@features/gallery/data/queries';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -23,6 +25,7 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
+import { useOptionalGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -44,6 +47,7 @@ export const GalleryBoardMenu = ({
 }) => {
   const { t } = useTranslation();
   const { actions, boardSharing = false, gallery } = useGalleryWidget();
+  const protectStarredMedia = useOptionalGalleryUi()?.protectStarredMedia ?? false;
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -256,6 +260,7 @@ export const GalleryBoardMenu = ({
                       videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
                     })}
                   </Text>
+                  {protectStarredMedia && deleteTarget && <BoardStarredNotice boardId={deleteTarget.id} />}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
@@ -274,6 +279,25 @@ export const GalleryBoardMenu = ({
         </Portal>
       </Dialog.Root>
     </>
+  );
+};
+
+/**
+ * Says how many starred items a "Delete Board and Media" keeps. The status region stays mounted so the notice is
+ * announced when it arrives; it is empty while the count loads or when there is nothing to keep.
+ */
+const BoardStarredNotice = ({ boardId }: { boardId: string }) => {
+  const { t } = useTranslation();
+  const { data: starredCount, isError } = useQuery(galleryBoardStarredCountOptions(boardId));
+
+  return (
+    <Text color="fg.warning" fontSize="xs" role="status">
+      {isError
+        ? t('widgets.gallery.deleteBoardStarredNoticeUnknown')
+        : starredCount
+          ? t('widgets.gallery.deleteBoardStarredNotice', { count: starredCount })
+          : null}
+    </Text>
   );
 };
 

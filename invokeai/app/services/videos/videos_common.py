@@ -44,6 +44,10 @@ class VideoResultWithAffectedBoards(BaseModel):
 class DeleteVideosResult(VideoResultWithAffectedBoards):
     deleted_videos: list[str] = Field(description="The names of the videos that were deleted")
     failed_videos: list[str] = Field(description="The names of videos that were not deleted")
+    starred_skipped: list[str] = Field(
+        default_factory=list,
+        description="The names of starred videos that were skipped because deletion protection was enabled",
+    )
 
 
 class StarredVideosResult(VideoResultWithAffectedBoards):
