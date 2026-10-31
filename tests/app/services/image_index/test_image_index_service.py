@@ -2936,6 +2936,28 @@ def test_vocab_requests_do_not_wait_for_an_in_flight_build(
         assert service.get_vocab_build_state() == ("ready", None)
 
 
+def test_a_ready_vocabulary_answers_while_another_reader_holds_the_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
+
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    service._build_vocab_embeddings()
+    # Stands in for a concurrent get_vocab_embeddings / get_vocab_build_state.
+    assert service._vocab_lock.acquire(blocking=False)
+    try:
+        vocabulary, embeddings = service.get_vocab_embeddings()
+    finally:
+        service._vocab_lock.release()
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(embeddings, matrix)
+
+    service._stop_event.set()
+    with pytest.raises(TextSearchUnavailableError, match="The image index is not running"):
+        service.get_vocab_embeddings()
+
+
 @pytest.mark.parametrize("unavailable", ["stopped", "no-model", "no-invoker"])
 def test_a_busy_vocabulary_reports_unavailability_during_shutdown(service: ImageIndexService, unavailable: str) -> None:
     from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError
