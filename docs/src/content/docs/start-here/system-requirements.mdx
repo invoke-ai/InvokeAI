@@ -2,7 +2,7 @@
 title: Hardware Requirements
 sidebar:
   order: 1
-lastUpdated: 2026-07-14
+lastUpdated: 2026-10-18
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
@@ -31,11 +31,13 @@ The requirements below are rough guidelines for best performance. GPUs with less
 | FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB | Download totals: NF4 ~12GB, int8 ~18GB, bf16 ~33GB. The int8 transformer is 11.5GB resident on any supported GPU, so it streams on a 10GB card |
 | FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
 | FLUX.2 Klein 9B | 1024x1024 | Nvidia 30xx+ | 12GB | 32GB | int8 transformer ~9.5GB on any supported GPU; FP8 checkpoints stay about as small with FP8 Storage, which installation switches on. The Qwen3 8B encoder is 15GB (int8 7.6GB) and streams on a 12GB card |
+| FLUX.3 Klein | 1024x1024 | Nvidia 30xx+ | 12GB | 32GB | Transformer bf16 10.3GB, GGUF Q8_0 5.6GB, Q4_K_M 3.1GB, plus the Qwen3-VL 4B encoder (8.5GB bf16). Diffusers ~20GB; single files and GGUFs need a standalone FLUX.2 VAE + Qwen3-VL encoder. Each 1MP reference image adds about as much working memory as the image itself |
 | Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K / NVFP4 / int8 8GB (int8 ~6GB resident); Q8/BF16 16GB+ |
 | Krea-2 (Turbo / Raw) | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 16GB+; NVFP4 or GGUF Q4_K transformer ~7GB, plus the Qwen3-VL encoder (8.5GB bf16, ~2.8GB as GGUF Q4_K), int8 transformer 12.6GB. Diffusers ~26GB; single files need a standalone VAE + Qwen3-VL encoder (GGUF encoder ~2.8GB) |
 | Ideogram 4 | 1024x1024 | Nvidia 30xx+ | 24GB | 32GB | Two transformers resident at once. nf4 build fits 24GB (CUDA only); single-file fp8 or int8 pair ~17.5GB, GGUF Q4_0 pair ~11GB, plus the Qwen3-VL 8B encoder. See [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
 | Qwen-Image-2.1 | 1024x1024 | Nvidia 30xx+ | 16GB | 32GB | GGUF Q4_K_M transformer ~4GB, bf16 ~14GB, plus the Qwen3-VL 8B encoder (~10GB fp8). Diffusers ~31GB. See [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) |
 | ERNIE-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Single-file transformer ~16GB (GGUF Q4_K_M ~5.0GB, Q8_0 ~8.7GB) plus the Ministral 3B encoder ~7.7GB |
+| MOSS-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Transformer 10.2GB (5.3GB with FP8 Storage) plus the Qwen3.5 9B encoder 16.8GB, which do not fit 24GB together, so Invoke swaps them. ~70s per 1024x1024 image on an RTX 4090. Diffusers ~27GB. See [MOSS-Image](/users-guide/models/local-models/moss-image/) |
 | Wan 2.2 A14B (T2V/I2V) | 1280x720 | Nvidia 30xx+ | 12GB | 32GB | Dual-expert MoE; Q4_K_M 12GB; Q8 18GB+; Diffusers requires 32GB+ |
 | Wan 2.2 TI2V-5B | 1280x720 | Nvidia 20xx+ | 8GB | 16GB | Single transformer; Q4_K_M 6GB+; Q8 8GB+; Diffusers 12GB+ |
 

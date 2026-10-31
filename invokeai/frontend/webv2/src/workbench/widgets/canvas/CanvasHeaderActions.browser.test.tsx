@@ -1,3 +1,4 @@
+import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
@@ -73,7 +74,7 @@ interface Registration {
 }
 
 /** A painted layer, so a cleared document differs from the one it replaced. */
-const paintedLayer = {
+const paintedLayer: CanvasLayerContract = {
   blendMode: 'normal' as const,
   id: 'painted',
   isEnabled: true,
@@ -86,14 +87,17 @@ const paintedLayer = {
 };
 
 /**
- * Renders the actions on a fresh project, whose canvas is empty unless `withLayer`, recording the commands and
- * hotkeys they register.
+ * Renders the actions on a fresh project holding `layers` (none by default) and the canvas widget values
+ * `canvasValues`, recording the commands and hotkeys they register.
  */
-const renderActions = async ({ withLayer = false }: { withLayer?: boolean } = {}) => {
+const renderActions = async ({
+  canvasValues,
+  layers = [],
+}: { canvasValues?: Record<string, unknown>; layers?: CanvasLayerContract[] } = {}) => {
   const initial = createInitialWorkbenchState();
   const base = initial.projects[0]!;
   const store = createWorkbenchStore(
-    withLayer
+    layers.length > 0
       ? {
           ...initial,
           projects: [
@@ -101,13 +105,16 @@ const renderActions = async ({ withLayer = false }: { withLayer?: boolean } = {}
               ...base,
               canvas: {
                 ...base.canvas,
-                document: { ...base.canvas.document, stacks: stacksFrom([paintedLayer]) },
+                document: { ...base.canvas.document, stacks: stacksFrom(layers) },
               },
             },
           ],
         }
       : initial
   );
+  if (canvasValues) {
+    store.commands.widgets.patchValues('canvas', canvasValues);
+  }
   const projectId = store.getState().activeProjectId;
   harness.store = store;
   harness.engine = createCanvasEngine({
@@ -168,7 +175,7 @@ describe('CanvasHeaderActions clear canvas', () => {
   });
 
   it('replaces the document once confirmed, layers and all', async () => {
-    const { store } = await renderActions({ withLayer: true });
+    const { store } = await renderActions({ layers: [paintedLayer] });
     const before = store.getState().projects[0]!.canvas.documentRevision;
     expect(store.getState().projects[0]!.canvas.document.stacks.raster).toHaveLength(1);
 
@@ -199,5 +206,29 @@ describe('CanvasHeaderActions clear canvas', () => {
     await act(() => commands.find((command) => command.id === 'canvas.newSession')!.handler!());
 
     await expect.element(confirmDialog()).toBeVisible();
+  });
+});
+
+describe('CanvasHeaderActions fit frame to masks', () => {
+  it("pads the masks by the project's mask blur plus 8 before snapping outward to the grid", async () => {
+    const mask: CanvasLayerContract = {
+      blendMode: 'normal',
+      id: 'mask',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: { height: 40, imageName: 'mask.png', width: 40 }, fill: { color: '#e07575', style: 'diagonal' } },
+      name: 'Mask',
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 100 },
+      type: 'inpaint_mask',
+    };
+    const { store } = await renderActions({ canvasValues: { maskBlur: 40, snapToGrid: true }, layers: [mask] });
+
+    await page.getByRole('button', { exact: true, name: 'Fit frame to masks' }).click();
+
+    // Blur 40 pads 48: 52..188, on the default 8 px grid 48..192. The default blur 16 would give 72..168.
+    await expect
+      .poll(() => store.getState().projects[0]!.canvas.document.bbox)
+      .toEqual({ height: 144, width: 144, x: 48, y: 48 });
   });
 });

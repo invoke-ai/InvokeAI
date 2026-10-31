@@ -2,6 +2,7 @@
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { ModelConfig } from '@features/models';
 
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 
@@ -40,6 +41,13 @@ export interface ControlLayerGraphInput {
   controlMode: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced' | null;
   /** The resolved model's `cond_in_channels`; required to validate an Anima ControlNet-LLLite layer. */
   modelCondInChannels?: number | null;
+  /**
+   * The resolved model's `control_architecture` (Qwen-Image ControlNets). `instantx_union` takes the control image
+   * only; a Fun union, or a record written before the field existed, also takes the inpainted region.
+   */
+  modelControlArchitecture?: ModelConfig['control_architecture'] | null;
+  /** FLUX InstantX Union only: the mode for the layer's control type; other models and bases ignore it. */
+  instantxControlMode?: number | null;
 }
 
 /** Kind support is separate from control-mode/model compatibility. */
@@ -84,14 +92,16 @@ export interface AddControlLayersOptions {
   layers: readonly ControlLayerGraphInput[];
   /**
    * Present when the canvas compiles in inpaint or outpaint mode. The Qwen-Image and FLUX.2 control nodes also
-   * condition on the inpainted region and take them; the other kinds ignore them.
+   * condition on the inpainted region and take them, except an InstantX Qwen-Image union; the other kinds ignore
+   * them.
    */
   inpaint?: CanvasInpaintSources;
 }
 
 /**
  * The Fun-ControlNet-Union nodes (`qwen_image_control`, `flux2_control`): the control image, plus the region being
- * regenerated when the canvas inpaints or outpaints, wired straight to the denoise's single `control` field.
+ * regenerated when the canvas inpaints or outpaints (not for an InstantX Qwen-Image union, which conditions on the
+ * control image alone), wired straight to the denoise's single `control` field.
  * Validation admits one per generation, so there is no collector.
  */
 const addFunUnionControl = (
@@ -110,9 +120,10 @@ const addFunUnionControl = (
     image: { image_name: layer.imageName },
     type,
   });
-  if (inpaint) {
-    // The union's inpainting condition. The canvas mask is white = keep and the node wants white = regenerate,
-    // so `img_lerp` 255 → 0 inverts it first, as the Anima inpaint adapter does.
+  if (inpaint && layer.modelControlArchitecture !== 'instantx_union') {
+    // The Fun union's inpainting condition; InstantX's Qwen-Image union has no input for one. The canvas mask is
+    // white = keep and the node wants white = regenerate, so `img_lerp` 255 → 0 inverts it first, as the Anima
+    // inpaint adapter does.
     const invertMask = addNode(graph, {
       id: `${type}_mask_${layer.id}`,
       max: 0,
@@ -195,8 +206,12 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         image: { image_name: layer.imageName },
         resize_mode: 'just_resize',
         type: controlNetNodeType(base),
-        // FLUX ControlNet has no control_mode; SD-family carries it.
-        ...(base === 'flux' ? {} : { control_mode: layer.controlMode ?? 'balanced' }),
+        // FLUX ControlNet has no control_mode; SD-family carries it. A FLUX union model takes its InstantX mode.
+        ...(base === 'flux'
+          ? typeof layer.instantxControlMode === 'number'
+            ? { instantx_control_mode: layer.instantxControlMode }
+            : {}
+          : { control_mode: layer.controlMode ?? 'balanced' }),
       });
       addEdge(graph, node, 'control', ensureControlNetCollector(), 'item');
     } else if (layer.kind === 't2i_adapter') {

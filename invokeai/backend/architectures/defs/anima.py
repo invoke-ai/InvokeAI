@@ -25,7 +25,12 @@ register(
                 scheduler="euler", steps=40, cfg_scale=6.0, width=1024, height=1024
             ),
             None: MainModelDefaultSettings(scheduler="euler", steps=35, cfg_scale=4.5, width=1024, height=1024),
-        }
+        },
+        # Anima Turbo shares the base model's architecture and config, so its name is the only signal. Its model
+        # card: CFG 1 and 8-12 steps, with Euler among the samplers it names as good for Turbo.
+        by_name_hint={
+            "turbo": MainModelDefaultSettings(scheduler="euler", steps=10, cfg_scale=1.0, width=1024, height=1024)
+        },
     ),
     ModalityFacet(frozenset({"txt2img", "img2img", "inpaint", "outpaint"}), metadata_slug="anima"),
     FeaturesFacet(
@@ -41,6 +46,13 @@ register(
         # `anima_lllite` into `anima_denoise.control_lllite`. Only 3-channel (control image) adapters drive a
         # control layer; 4-channel inpainting adapters need the inpaint mask and are not control layers.
         control_kinds=frozenset({"anima_lllite"}),
+        # One `anima_ip_adapter` per image into `anima_denoise.ip_adapter`. Images sharing an adapter are attended
+        # together (their tokens concatenated); experimental, since the only published adapter was trained on single
+        # images, on the 28-block Anima. The variant gate offers it on every Qwen3 model, so also on Anima-2.9B
+        # (40 blocks), where it runs through the untested depth mapping of `block_layout`; Anima-3.8B (Qwen3.5) is
+        # excluded.
+        max_reference_images=4,
+        reference_images_require_variant=AnimaVariantType.Qwen3.value,
     ),
     VaeFacet(
         frozenset(

@@ -7,9 +7,11 @@ from typing import (
 from pydantic import BaseModel, Field
 from typing_extensions import Any
 
+from invokeai.backend.anima.ip_adapter import validate_anima_ip_adapter
 from invokeai.backend.flux.ip_adapter.state_dict_utils import is_state_dict_xlabs_ip_adapter
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -189,3 +191,33 @@ class IPAdapter_Checkpoint_SDXL_Config(IPAdapter_Checkpoint_Config_Base, Config_
 
 class IPAdapter_Checkpoint_FLUX_Config(IPAdapter_Checkpoint_Config_Base, Config_Base):
     base: Literal[BaseModelType.Flux] = Field(default=BaseModelType.Flux)
+
+
+# The LuciferTC SigLIP2 IP-Adapter: per-block image key/value projections (SigLIP2-base tokens, 768 wide, into Anima's
+# 2048-wide attention) and a per-block timestep gate, plus a bundled PEFT LoRA under `lora.`. Its keys share no prefix
+# with the generic IP-Adapter checkpoints above, nor with the Anima/Wan LoRA probes (those need a `diffusion_model.`,
+# `transformer.` or `base_model.model.transformer.` prefix, or Kohya `lora_unet_` keys).
+_ANIMA_IP_ADAPTER_MARKER_SHAPES = {
+    "blocks.0.ip_k_proj.weight": (2048, 768),
+    "blocks.0.adaln_ip.1.weight": (2048, 2048),
+}
+
+
+class IPAdapter_Checkpoint_Anima_Config(IPAdapter_Checkpoint_Config_Base, Config_Base):
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+
+    @classmethod
+    def _validate_looks_like_ip_adapter(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        for key, shape in _ANIMA_IP_ADAPTER_MARKER_SHAPES.items():
+            tensor = state_dict.get(key)
+            if tensor is None or tuple(tensor.shape) != shape:
+                raise NotAMatchError(f"model does not match Anima IP Adapter heuristics ({key})")
+        try:
+            validate_anima_ip_adapter(state_dict.keys(), mod.metadata())
+        except ValueError as e:
+            raise InvalidMatchError(str(e)) from None
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        return BaseModelType.Anima

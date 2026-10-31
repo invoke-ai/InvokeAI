@@ -12,8 +12,10 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
+  getEffectivePrompts,
   getGenerationModelAvailabilityReasons,
   getGenerationValidationReasons,
   isExternalTextOnlyCanvasModel,
@@ -38,8 +40,13 @@ import {
 } from '@workbench/canvas-engine/api';
 import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
-import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
+import {
+  createControlLayerCheckContext,
+  describeControlLayerIssue,
+  getBlockingControlLayerIssues,
+} from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
+import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 
 export interface InvocationSourceMeta {
@@ -287,7 +294,7 @@ export const resolveInvocationRouteInput = (
   const sourceId = route.sourceId;
   const destination = route.destination;
   const sourceWidgetId = sourceWidgetIds[sourceId];
-  // Route-rendering surfaces subscribe to templates because readiness reads them imperatively.
+  // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
       ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
@@ -348,16 +355,26 @@ export const resolveInvocationRouteInput = (
           );
         }
       }
-    } else if (models) {
+    } else if (values && isSupportedGenerateModel(values.model)) {
       // Wait for models before validating local adapters to avoid false missing-model errors.
-      if (values && isSupportedGenerateModel(values.model)) {
+      if (models) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({
+            context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
             layers: input.canvasLayers,
             mainModel: values.model,
             models,
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
+      }
+      // Before anything uploads; a region whose mask misses the frame still counts here.
+      const layoutPromptReason = getLayoutPromptRejectionReason({
+        base: values.model.base,
+        prompt: getEffectivePrompts(values).positivePrompt,
+        regions: input.canvasLayers.filter(isCompositableRegionalGuidanceLayer),
+      });
+      if (layoutPromptReason) {
+        validationReasons.push(layoutPromptReason);
       }
     }
   }

@@ -56,7 +56,7 @@ export interface FilterOperationCoordinatorDeps {
 }
 
 export interface FilterOperationCoordinator {
-  start(layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult;
+  start(layerId: string): StartFilterOperationResult;
   updateDraft(draft: LayerFilterSettings): CanvasOperationMutationResult;
   setAutoProcess(value: boolean): CanvasOperationMutationResult;
   process(): Promise<CanvasOperationActionResult>;
@@ -90,12 +90,9 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
     deps.stores.filterSession.set(null);
   };
 
-  const start = (layerId: string, recommendedFilterType?: string | null): StartFilterOperationResult => {
+  const start = (layerId: string): StartFilterOperationResult => {
     if (deps.isInteractionLocked()) {
       return 'locked';
-    }
-    if (recommendedFilterType && deps.controller.getSnapshot().status !== 'idle') {
-      return 'not-ready';
     }
     const document = deps.getDocument();
     const leaf = lookupDocumentLeaf(document, layerId);
@@ -103,11 +100,9 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
     if (!document || !leaf || !layer) {
       return 'missing';
     }
-    if (layer.type !== 'raster' && layer.type !== 'control') {
+    // Control layers derive their map through detection; Filter (and its save-as-control copy) is raster-only.
+    if (layer.type !== 'raster') {
       return 'unsupported';
-    }
-    if (recommendedFilterType && layer.filter) {
-      return 'not-ready';
     }
     if (!leaf.contributionEnabled) {
       return 'disabled';
@@ -119,8 +114,7 @@ export const createFilterOperationCoordinator = (deps: FilterOperationCoordinato
     if (!guard) {
       return 'not-ready';
     }
-    const initialType =
-      layer.filter?.type ?? recommendedFilterType ?? readLastUsedFilterType() ?? DEFAULT_CONTROL_FILTER_TYPE;
+    const initialType = layer.filter?.type ?? readLastUsedFilterType() ?? DEFAULT_CONTROL_FILTER_TYPE;
     const initialFilter = layer.filter ? structuredClone(layer.filter) : null;
     const definition = getFilterDefinition(initialType);
     const draft = initialFilter ?? {

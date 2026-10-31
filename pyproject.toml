@@ -37,7 +37,7 @@ dependencies = [
   "bitsandbytes; sys_platform!='darwin' and (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "bitsandbytes>=0.50.1; sys_platform == 'win32' and platform_machine == 'ARM64'",   # 0.50.1 added the CUDA 13.4 win_arm64 build for RTX Spark
   "compel>=2.4.0,<3",
-  "diffusers[torch]==0.41.0",
+  "diffusers[torch]==0.42.1",
   "gguf",
   # Not on Windows ARM64: the only win_arm64 mediapipe wheel (0.10.35+) is the Tasks-API build without the
   # legacy `solutions` API the face preprocessor and Face Tools use; those nodes report the platform when run.
@@ -48,7 +48,7 @@ dependencies = [
   "tiktoken==0.13.0; sys_platform == 'win32' and platform_machine == 'ARM64'",   # mistral-common dependency; self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "numpy<2.0.0; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "numpy>=2.3,<2.4; sys_platform == 'win32' and platform_machine == 'ARM64'",   # first win_arm64 wheels are 2.3; <2.4 is mistral-common's cap on 3.12
-  "onnx==1.21.0",
+  "onnx==1.22.0",
   "onnxruntime==1.19.2; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "onnxruntime>=1.24.2; sys_platform == 'win32' and platform_machine == 'ARM64'",   # CPU execution provider only; no GPU build exists for win_arm64
   "opencv-contrib-python; (sys_platform != 'win32' or platform_machine != 'ARM64')",
@@ -124,7 +124,7 @@ dependencies = [
   "fonttools[woff]; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "fonttools; sys_platform == 'win32' and platform_machine == 'ARM64'",   # [woff] needs brotli, which has no win_arm64 wheel; woff2 fonts are skipped there
   "picklescan",
-  "pillow>=12.3.0",
+  "pillow>=13.0.0",
   "prompt-toolkit",
   "pypatchmatch",
   "PyJWT>=2.15.0",
@@ -655,6 +655,7 @@ markers = [
   "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
   "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
   "platform_independent: The outcome cannot depend on the operating system for the same dependency set: import-graph boundaries in a fresh interpreter, static source scans, deterministic counts and shapes. Windows CI, which installs the linux dependency set, deselects them.",
+  "ffmpeg: Runs an ffmpeg binary or loads the libav libraries. The windows-cpu CI job, whose Server Core runner cannot load them, deselects them; windows-ffmpeg runs only these.",
 ]
 # A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
 filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
@@ -710,6 +711,9 @@ select = ["B", "C", "E", "F", "W", "I", "TID"]
 "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py" = ["B905"]
 "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py" = ["B905"]
 "invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
+# Vendored from OpenMOSS-Team/MOSS-Image-Base (see invokeai/backend/moss_image/__init__.py). Upstream's
+# import order is kept so that a diff against upstream shows nothing but the code removed locally.
+"invokeai/backend/moss_image/pipeline_moss_image.py" = ["I001"]
 
 [tool.ruff.format]
 # The vendored MiniMax-H3 files are kept byte-identical to upstream diffusers (modulo the
@@ -726,6 +730,8 @@ exclude = [
   "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py",
   "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py",
   "invokeai/backend/minimax_h3/scheduling_minimax_h3.py",
+  # Vendored MOSS-Image model code, kept identical to upstream (see invokeai/backend/moss_image/__init__.py).
+  "invokeai/backend/moss_image/pipeline_moss_image.py",
 ]
 
 [tool.ruff.lint.flake8-tidy-imports]
