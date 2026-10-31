@@ -38,11 +38,14 @@ both allocators, times the 1.3 that bounds a fitted term (`bounds.MAX_OVER_RESER
 the native allocator, 1.21 to 1.50 and 1.11 to 1.27 times under `cudaMallocAsync`. Each group's largest ratio falls on
 a forward the line alone already covers 1.10 to 1.47 times.
 
-Cross-checks in a running server on the RTX 4090 under the native allocator, not shipped as points: the real 28-block
-model fully resident (GGUF Q4_K_M and fp8-stored, 1152x1536 to 2048 px, with and without joint references) reserved
-1.1 to 1.4 times less than its estimate. Loaded partially (the cache told the card has 11.76 GiB, GGUF Q4_K_M at
-1152x1536 with two LoRAs, 6.3 to 6.9 of its weights' GiB resident), it grew the reserved peak by 2.37 GiB over the
-lock, which the estimate covered 1.39 times, with no out-of-memory and the device peak at 10.84 GiB.
+Cross-checks in a running server on the RTX 4090 under the native allocator with an ~84-token prompt, not shipped as
+points: the estimate reserved 1.22 to 1.66 times what the real 28-block model grew the reserved peak by over the
+transformer lock, GGUF Q4_K_M fully resident (1024 to 2048 px, with and without LoRAs, CFG, joint references and the
+reference K/V cache) and fp8-stored (partly resident in that run, 1.27 to 1.40 times). The top end falls at 1536 px, at
+1536x2048 and at 1152x1536 with one joint reference, where the warm server's allocator reserved below the line. Loaded
+partially (the cache told the card has 11.76 GiB, GGUF Q4_K_M at 1152x1536 with two LoRAs, 6.3 to 6.9 of its weights'
+GiB resident), the model grew the reserved peak by 2.37 GiB against an estimate of 3.30 GiB (1.39 times), with no
+out-of-memory; the device peaked at 10.85 to 10.86 of the 11.76 GiB, 0.3 GiB of simulated foreign use included.
 
 ROCm is not measured, and neither is any other platform but these two. Their entries price with the formula the node
 reserved by hand before the lines were measured (`_legacy_formula`, declared as `EstimatorSpec.legacy_formula`): 0.5 MiB
