@@ -4,9 +4,10 @@ import type { ProjectWorkflowCollection } from '@workbench/projectWorkflows';
 import { stripInfiniteWindowAnchor, stripSessionScopedGallerySearch } from '@features/gallery/contracts';
 import { migrateProjectGraphToCollection, normalizeProjectWorkflowCollection } from '@workbench/projectWorkflows';
 
+import { PROJECT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
+
 /** Keep document codecs reducer-free; load rehydration lazily. */
 
-export const PROJECT_DOCUMENT_SCHEMA_VERSION = 3;
 export const PROJECT_DOCUMENT_MAX_BYTES = 32 * 1024 * 1024;
 
 export type ProjectDocumentV3 = Omit<

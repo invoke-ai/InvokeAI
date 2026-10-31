@@ -1,4 +1,5 @@
 import type {
+  GeneratePromptSubmission,
   QueuePromptSeedBehaviour,
   QueueSeedStep,
   QueueWorkflowBatchDatum,
@@ -43,6 +44,8 @@ interface QueueEnqueueRequestBase {
   batchCount: number;
   destination: QueueResultDestination;
   graph: QueueBackendGraph;
+  /** Ask the backend to run the batch ahead of the user's other pending work (Invoke Front). */
+  prepend?: boolean;
   projectId: string;
   sourceQueueItemId: string;
 }
@@ -56,23 +59,7 @@ export interface QueueEnqueueWorkflowRequest extends QueueEnqueueRequestBase {
   batchData?: QueueWorkflowBatchDatum[][];
 }
 
-export interface QueueEnqueueGenerateRequest extends QueueEnqueueRequestBase {
-  negativePrompt: string;
-  negativePromptNodeId: string;
-  positivePrompt: string;
-  positivePromptNodeId: string;
-  /**
-   * Prompts to submit as a batch dimension, already expanded by the caller.
-   * Absent or empty submits `positivePrompt` verbatim.
-   */
-  positivePrompts?: string[];
-  seed: number;
-  seedBehaviour?: QueuePromptSeedBehaviour;
-  seedNodeId: string;
-  seedStep: QueueSeedStep;
-  /** Legacy recovery maps the old random toggle to seedStep and preserves its expansion rules. */
-  legacySeedPlan?: true;
-}
+export interface QueueEnqueueGenerateRequest extends QueueEnqueueRequestBase, GeneratePromptSubmission {}
 
 export interface QueueEnqueueResult {
   batchId?: string;
@@ -189,6 +176,8 @@ export interface QueueItemReadModel {
   fieldValues?: QueueNodeFieldValue[] | null;
   id: number;
   origin?: string | null;
+  /** The workflow-call parent this item runs for; null or absent on root items. */
+  parentItemId?: number | null;
   resultImageNames: string[];
   retriedFromItemId?: number | null;
   sessionId: string;
@@ -198,6 +187,26 @@ export interface QueueItemReadModel {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userId?: string;
+}
+
+/**
+ * The saved execution data of one queue item, read on demand for diagnostics. It carries the session graph the
+ * backend actually ran, its per-node results and the embedded workflow, which the live read model leaves out.
+ */
+export interface QueueItemDetailReadModel {
+  errorMessage: string | null;
+  errorTraceback: string | null;
+  errorType: string | null;
+  /** The compiled graph the session executed; empty when the backend redacted another user's item. */
+  graph: Record<string, unknown>;
+  id: number;
+  priority: number | null;
+  /** Node results keyed by executed node id; empty until the session produced output. */
+  results: Record<string, unknown>;
+  sessionId: string;
+  status: QueueItemStatus;
+  /** The workflow embedded with the batch, when one was submitted. */
+  workflow: Record<string, unknown> | null;
 }
 
 export interface QueueCounts {
@@ -281,13 +290,19 @@ export interface QueueResultVideoOptions extends QueueResultImageOptions {
 
 /** User-facing Queue commands; transport and adapter details stay private. */
 export interface QueueFeatureCommands {
+  /** Cancels every unfinished item of one batch; resolves with how many the backend canceled. */
+  cancelBatch(batchId: string): Promise<number>;
   cancelCurrentItem(): Promise<void>;
   cancelItem(itemId: number): Promise<void>;
   cancelScopedItems(scope?: QueueQueryScope, options?: { keepCurrent?: boolean }): Promise<void>;
   clearFailedItems(scope?: QueueQueryScope): Promise<void>;
+  /** Removes completed, canceled and failed items; pending and running work is kept. */
+  clearFinishedItems(scope?: QueueQueryScope): Promise<void>;
   clearItems(scope?: QueueQueryScope): Promise<void>;
   pauseProcessor(): Promise<void>;
   resumeProcessor(): Promise<void>;
+  /** Re-queues failed or canceled root items from their saved sessions; resolves with the ids actually retried. */
+  retryItems(itemIds: number[]): Promise<number[]>;
 }
 
 /** Own command transport and realtime events together so runtimes do not assemble HTTP/socket plumbing. */
@@ -306,8 +321,22 @@ export interface QueueProgressPreviewPayload {
   image: { width: number; height: number; dataURL: string } | null;
 }
 
+/** Who stages a retried item's results, as the server agreed it across every browser and tab of the account. */
+export type QueueItemDeliveryClaim =
+  | { kind: 'claimed' | 'delivered' | 'released' }
+  | { kind: 'held'; retryInMs: number };
+
 export interface QueueBackendPort extends QueueFeatureCommands {
   acknowledgeEnqueue?(projectId: string, sourceQueueItemId: string): Promise<void>;
+  /**
+   * Claim, confirm or release the delivery of an item's results. A claim is held until its claimant confirms or
+   * releases it, or until it expires; an item once confirmed is delivered for good.
+   */
+  claimItemDelivery(
+    itemId: number,
+    action: 'claim' | 'confirm' | 'release',
+    claimant: string
+  ): Promise<QueueItemDeliveryClaim>;
   getEnqueueReceipt?(projectId: string, sourceQueueItemId: string): Promise<QueueEnqueueResult | null>;
   /** The latest preview frame of each of the user's running items (`GET queue/{id}/previews`). */
   readProgressPreviews?(signal?: AbortSignal): Promise<QueueProgressPreviewPayload[]>;
@@ -338,7 +367,9 @@ export interface QueueBackendPort extends QueueFeatureCommands {
   readItemsById(itemIds: number[], signal?: AbortSignal): Promise<QueueItemReadModel[]>;
   readNext(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readStatus(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueStatusReadModel>;
-  retryItems(itemIds: number[]): Promise<unknown>;
+  /** The saved execution data of one item, read on demand. */
+  readItemDetail(itemId: number, signal?: AbortSignal): Promise<QueueItemDetailReadModel>;
+  retryItems(itemIds: number[]): Promise<number[]>;
   emit(event: string, payload: unknown): void;
   on(event: string, handler: (payload: never) => void): () => void;
   onConnectionChange(handler: (status: QueueConnectionStatus, error?: string) => void): () => void;

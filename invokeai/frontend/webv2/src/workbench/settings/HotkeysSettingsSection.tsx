@@ -84,7 +84,9 @@ const canScopesOverlap = (left: HotkeyDefinition, right: HotkeyDefinition): bool
   }
 
   if (left.scope.kind === 'widget' && right.scope.kind === 'widget') {
-    return left.scope.typeId === right.scope.typeId;
+    const rightTypeIds = right.scope.typeIds;
+
+    return left.scope.typeIds.some((typeId) => rightTypeIds.includes(typeId));
   }
 
   if (left.scope.kind === 'instance' && right.scope.kind === 'instance') {

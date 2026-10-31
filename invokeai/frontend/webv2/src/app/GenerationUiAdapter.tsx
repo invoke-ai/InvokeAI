@@ -3,8 +3,12 @@ import type { QueueItem, QueueItemReadModel } from '@features/queue/contracts';
 import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
 import type { ReactNode } from 'react';
 
-import { getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
-import { invalidateGallery } from '@features/gallery/queries';
+import { getGalleryAutoAddBoardId, getSelectedGalleryImageFromValues } from '@features/gallery/contracts';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  invalidateGallery,
+} from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
@@ -28,6 +32,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
+import { resetGenerateDims } from '@workbench/canvasDimsSync';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   getWorkbenchPreferences,
@@ -232,13 +237,31 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     (imageName) => findGalleryItem({ kind: 'image', name: imageName }),
     [findGalleryItem]
   );
+  // Save to Uploads lands where new results do: the auto-add board, judged against the listing of every readable
+  // board, ensured as the upload starts so an archived or revoked board is decided from a listing, not for want of
+  // one, and no listing is read while nothing uploads; a board the listing refuses falls back to the project's inbox.
+  // The board is read from the project before anything is awaited, so a later change cannot redirect an upload
+  // already under way.
+  const getUploadBoardId = useCallback<GenerationUiAdapter['gallery']['getUploadBoardId']>(async () => {
+    const galleryValues = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    const pendingListing = ensureGalleryBoardDestinations(queryClient);
+
+    if (pendingListing) {
+      await pendingListing;
+    }
+
+    return (
+      getGalleryAutoAddBoardId(galleryValues, (boardId) => canAddToCachedGalleryBoard(boardId, queryClient)) ?? 'none'
+    );
+  }, [queryClient, store]);
   const galleryGroup = useMemo<GenerationUiAdapter['gallery']>(
     () => ({
       findImage,
+      getUploadBoardId,
       selectedImage: selectedGalleryImage,
       touchImages: () => void invalidateGallery(queryClient),
     }),
-    [findImage, queryClient, selectedGalleryImage]
+    [findImage, getUploadBoardId, queryClient, selectedGalleryImage]
   );
   const openInModelManager = useOpenModelInManager();
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(
@@ -286,8 +309,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [generation, promptHistoryItems]
   );
   const settingsGroup = useMemo<GenerationUiAdapter['settings']>(
-    () => ({ patchGenerateSettings: generation.patchSettings }),
-    [generation]
+    () => ({
+      patchGenerateSettings: generation.patchSettings,
+      resetDimensions: (values, projectId) => resetGenerateDims(store, values, projectId),
+    }),
+    [generation, store]
   );
   const { canManagePromptTemplates, canManageSharedSystemPrompts } = useCapabilities();
   const capabilitiesGroup = useMemo<GenerationUiAdapter['capabilities']>(

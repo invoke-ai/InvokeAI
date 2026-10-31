@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  fetchImageMapPoints: vi.fn(),
   getAuthSession: vi.fn(() => ({ user: null }) as { user: { user_id: string } | null }),
   onConnectionChange: vi.fn(),
   refreshImageMapPoints: vi.fn(),
@@ -16,15 +17,26 @@ vi.mock('@platform/transport/socketHub', () => ({
   },
 }));
 
+// A media-kind change refreshes through the store's own (unmocked) refresh, which reads points here.
+vi.mock('@workbench/image-map/api', () => ({
+  fetchImageMapClusterLabels: vi.fn(),
+  fetchImageMapPoints: mocks.fetchImageMapPoints,
+  fetchImageMapStatus: vi.fn(() => new Promise(() => {})),
+}));
+
 vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
   const original = (await importOriginal()) as object;
 
   return { ...original, refreshImageMapPoints: mocks.refreshImageMapPoints };
 });
 
-import { imageMapStore } from '@workbench/image-map/imageMapStore';
+import type { GalleryMediaFilter } from '@features/gallery/contracts';
+
+import { attachImageMapViewer, imageMapStore, setImageMapMediaKind } from '@workbench/image-map/imageMapStore';
 
 import { attachImageMapDataRuntime } from './ImageMapDataRuntime';
+
+const BOTH_KINDS = { getMediaFilter: (): GalleryMediaFilter => 'all', subscribe: () => () => {} };
 
 const getHandler = (event: string): ((payload?: unknown) => void) => {
   const call = mocks.socketOn.mock.calls.find(([name]) => name === event);
@@ -34,7 +46,24 @@ const getHandler = (event: string): ((payload?: unknown) => void) => {
 };
 
 describe('attachImageMapDataRuntime', () => {
+  afterEach(() => {
+    // Back to both kinds while idle, so the reset itself fetches nothing.
+    imageMapStore.patchSnapshot({ loadState: 'idle' });
+    setImageMapMediaKind(undefined);
+  });
+
   beforeEach(() => {
+    mocks.fetchImageMapPoints.mockReset().mockResolvedValue({
+      clusterEps: null,
+      modelId: null,
+      modelName: null,
+      pointCount: 0,
+      points: [],
+      stale: false,
+      state: 'empty',
+      updatedAt: null,
+      visibleHash: null,
+    });
     mocks.socketOn.mockReset().mockReturnValue(() => {});
     mocks.onConnectionChange.mockReset().mockReturnValue(() => {});
     mocks.refreshImageMapPoints.mockReset();
@@ -53,7 +82,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('refreshes on projection-ready only after the map has been loaded once', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     onReady();
@@ -67,7 +96,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('stores index progress counts from status events', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
     getHandler('image_index_status')({ embedded: 3, failed: 1, pending: 2, total: 5 });
 
@@ -76,7 +105,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('defaults the given-up count for a server that predates the field', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
     getHandler('image_index_status')({ embedded: 3, pending: 2, total: 5 });
 
@@ -85,7 +114,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('leaves a failed canvas alone instead of remounting it once per event', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
     // Refresh must not repeatedly clear a WebGL failure and remount the broken plot during backfill.
     imageMapStore.patchSnapshot({ loadState: 'loaded', renderError: 'The map failed to render.' });
@@ -103,7 +132,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('does not queue a duplicate fetch for an event during the first load', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
 
     // Ignore ordinary pokes during first loading to avoid duplicate full fetches; newly embedded items may wait
     // for a later event/manual refresh.
@@ -115,7 +144,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('refetches for a projection ready during the first load', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     // Queue one rerun when recompute overtakes its triggering fetch so stale points and mismatched labels do not
@@ -128,7 +157,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('refetches for a projection ready after a failed load', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     // loadState 'error' with no fetch in flight (the first load failed): the
@@ -142,7 +171,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('still ignores a foreign projection ready during the first load', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     mocks.getAuthSession.mockReturnValue({ user: { user_id: 'me' } });
@@ -155,7 +184,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('leaves a failed canvas alone for a projection ready during the first load', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     // A retry in flight after a WebGL failure: the canvas stays failed until
@@ -169,7 +198,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('ignores a projection recomputed for a different user', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onReady = getHandler('image_map_projection_ready');
 
     mocks.getAuthSession.mockReturnValue({ user: { user_id: 'me' } });
@@ -191,7 +220,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('refreshes a loaded map when a status event reports the index quiescent', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onStatus = getHandler('image_index_status');
 
     // Not yet loaded: counts are stored but nothing refetches.
@@ -210,7 +239,7 @@ describe('attachImageMapDataRuntime', () => {
   });
 
   it('refreshes a loaded map on the per-user index-updated poke', () => {
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onUpdated = getHandler('image_index_updated');
 
     onUpdated({ user_id: 'u1' });
@@ -229,7 +258,7 @@ describe('attachImageMapDataRuntime', () => {
     mocks.socketOn.mockReturnValue(detachSocket);
     mocks.onConnectionChange.mockReturnValue(detachConnection);
 
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onConnection = mocks.onConnectionChange.mock.calls[0][0];
 
     imageMapStore.patchSnapshot({ loadState: 'error' });
@@ -251,7 +280,7 @@ describe('attachImageMapDataRuntime', () => {
     imageMapStore.patchSnapshot({ loadState: 'loaded' });
 
     // Treat synchronous connection replay as baseline, not reconnect, on editor remount.
-    const detach = attachImageMapDataRuntime();
+    const detach = attachImageMapDataRuntime(BOTH_KINDS);
     const onConnection = mocks.onConnectionChange.mock.calls[0][0];
 
     onConnection('connected');
@@ -263,5 +292,43 @@ describe('attachImageMapDataRuntime', () => {
     expect(mocks.refreshImageMapPoints).toHaveBeenCalledTimes(1);
 
     detach();
+  });
+  it('refetches a loaded map exactly once per change of the shared media filter', async () => {
+    const listeners = new Set<() => void>();
+    let mediaFilter: GalleryMediaFilter = 'all';
+    const notify = () => listeners.forEach((listener) => listener());
+    const detachViewer = attachImageMapViewer();
+    imageMapStore.patchSnapshot({ loadState: 'loaded' });
+
+    const detach = attachImageMapDataRuntime({
+      getMediaFilter: () => mediaFilter,
+      subscribe: (listener) => {
+        listeners.add(listener);
+
+        return () => listeners.delete(listener);
+      },
+    });
+
+    // Attaching to the filter already in force, and unrelated Workbench changes, fetch nothing.
+    notify();
+    expect(mocks.fetchImageMapPoints).not.toHaveBeenCalled();
+
+    mediaFilter = 'video';
+    notify();
+    notify();
+    await vi.waitFor(() => expect(mocks.fetchImageMapPoints).toHaveBeenCalledTimes(1));
+    expect(mocks.fetchImageMapPoints).toHaveBeenLastCalledWith({ mediaKind: 'video' });
+
+    mediaFilter = 'all';
+    notify();
+    await vi.waitFor(() => expect(mocks.fetchImageMapPoints).toHaveBeenCalledTimes(2));
+    expect(mocks.fetchImageMapPoints).toHaveBeenLastCalledWith({ mediaKind: undefined });
+
+    detach();
+    mediaFilter = 'image';
+    notify();
+    expect(listeners.size).toBe(0);
+    expect(mocks.fetchImageMapPoints).toHaveBeenCalledTimes(2);
+    detachViewer();
   });
 });

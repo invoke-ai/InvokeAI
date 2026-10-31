@@ -28,7 +28,7 @@ import type { GeneratePresetRecord } from './GenerationUiContext';
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
-import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
+import { notifyGenerateDimensionsAdjusted, notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/PromptPanelHeader';
 
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
@@ -211,16 +211,22 @@ export const GeneratePresetsPopover = () => {
       }
 
       ui.settings.patchGenerateSettings(getGenerateFormCommitPatch(resolved.values), projectId);
+      const clearedLabels =
+        settings?.refinerModel && !resolved.values.refinerModel && !result.clearedLabels.includes('Refiner')
+          ? [...result.clearedLabels, 'Refiner']
+          : result.clearedLabels;
       notifyGenerateModelSelectionCleared({
-        clearedLabels: result.clearedLabels,
+        clearedLabels,
         locale: i18n.resolvedLanguage,
         modelName: model.name,
         notifications: ui.notifications,
+        reason: 'preset',
         t,
       });
+      notifyGenerateDimensionsAdjusted({ modelName: model.name, notifications: ui.notifications, result, t });
       setIsOpen(false);
     },
-    [i18n.resolvedLanguage, models, projectId, supportedModels, t, ui.notifications, ui.settings]
+    [i18n.resolvedLanguage, models, projectId, settings, supportedModels, t, ui.notifications, ui.settings]
   );
 
   const openSaveDialog = useCallback(() => setDialogSubject({ mode: 'save' }), []);

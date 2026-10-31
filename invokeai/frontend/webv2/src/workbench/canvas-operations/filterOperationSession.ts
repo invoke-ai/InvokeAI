@@ -180,11 +180,15 @@ export const createFilterOperationSession = (
         const exported = await deps.exportPixels();
         if (exported.status !== 'ok') {
           refusal =
-            exported.status === 'over-budget'
-              ? 'source-over-budget'
-              : exported.status === 'aborted'
-                ? 'not-ready'
-                : exported.status;
+            exported.status === 'adjustment-refused'
+              ? `source-adjustment-${exported.reason}`
+              : exported.status === 'over-budget'
+                ? 'source-over-budget'
+                : exported.status === 'unreadable'
+                  ? 'source-unreadable'
+                  : exported.status === 'aborted'
+                    ? 'not-ready'
+                    : exported.status;
           throw new Error(`The filter source is ${exported.status}.`);
         }
         try {
@@ -324,6 +328,10 @@ export const createFilterOperationSession = (
     operation.cancel();
     publish({ ...state, error: null, preview: null, status: 'ready' });
   };
+
+  // Auto-process covers the starting draft, not only later edits: the footer hides Process while it is on, so without
+  // this run Apply waits on a preview that never comes and only Reset and Cancel stay enabled.
+  scheduleAutoProcess();
 
   return {
     blockCommit: () => {

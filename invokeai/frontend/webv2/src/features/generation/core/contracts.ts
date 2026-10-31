@@ -4,6 +4,12 @@ export type ResultDestination = 'canvas' | 'gallery';
 
 export interface GenerationProjectSettings {
   useCpuNoise: boolean;
+  // The Generate and Canvas output filters are required so that a caller passing its settings structurally breaks
+  // the build when it renames one, instead of silently turning a safety filter off.
+  /** Blur images the NSFW checker flags before they are saved. */
+  useNsfwChecker: boolean;
+  /** Stamp an invisible watermark into every saved image. */
+  useWatermark: boolean;
 }
 
 export interface PromptHistoryItem {
@@ -62,13 +68,16 @@ export type KnownGenerationModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
+  | 'qwen-image-2-1'
   | 'z-image'
   | 'ideogram-4'
   | 'krea-2'
   | 'anima'
+  | 'moss-image'
   | 'wan'
   | 'external'
   | 'any'

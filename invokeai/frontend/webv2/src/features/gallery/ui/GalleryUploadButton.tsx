@@ -2,7 +2,9 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import type { TFunction } from 'i18next';
 
 import { Icon } from '@chakra-ui/react';
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { ALL_READABLE_BOARDS_ID } from '@features/gallery/core/items';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -11,17 +13,31 @@ import { useTranslation } from 'react-i18next';
 
 import { useGalleryUploadInput } from './useGalleryUploadInput';
 
-/** Tooltip/aria text for an upload control; null when the board cannot receive uploads. */
+/**
+ * Tooltip/aria text for an upload control, given the board the listing reads; unavailable when it cannot receive
+ * uploads.
+ */
 export const getGalleryUploadTargetLabel = (
   boards: readonly GalleryBoard[],
   selectedBoardId: string,
   t: TFunction
 ): { isAvailable: boolean; label: string } => {
+  if (selectedBoardId === ALL_READABLE_BOARDS_ID) {
+    return { isAvailable: false, label: t('widgets.gallery.uploadsUnavailableForAllBoards') };
+  }
+
   if (isDateBoardId(selectedBoardId)) {
     return { isAvailable: false, label: t('widgets.gallery.uploadsUnavailableForDateBoards') };
   }
 
   const selectedBoard = boards.find((board) => board.id === selectedBoardId);
+
+  if (selectedBoard && !canOnBoard(selectedBoard, 'add_media')) {
+    return {
+      isAvailable: false,
+      label: t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: getGalleryBoardLabel(selectedBoard, t) }),
+    };
+  }
 
   return {
     isAvailable: true,

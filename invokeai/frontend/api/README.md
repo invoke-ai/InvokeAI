@@ -8,7 +8,7 @@ From the repository root with its Python environment activated:
 make frontend-api-install
 make frontend-openapi
 make frontend-typegen
-pnpm -C invokeai/frontend/api test
+(cd invokeai/frontend/api && pnpm test)
 ```
 
 Legacy webv1 keeps its existing `services/api/schema` import path through a type-only re-export. Webv2 maps backend wire contracts through its owning platform/features adapters. The API package does not add a frontend runtime dependency.

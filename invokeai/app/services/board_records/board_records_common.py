@@ -2,22 +2,31 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from invokeai.app.services.board_access.board_access_common import GeneralAccess
 from invokeai.app.util.metaenum import MetaEnum
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
 
 
 class BoardVisibility(str, Enum, metaclass=MetaEnum):
-    """The visibility options for a board."""
+    """Deprecated: a board's general access under its pre-7.0 name. Kept until 8.0 for older clients."""
 
     Private = "private"
-    """Only the board owner (and admins) can see and modify this board."""
+    """General access `restricted`."""
     Shared = "shared"
-    """All users can view this board, but only the owner (and admins) can modify it."""
+    """General access `viewer`."""
     Public = "public"
-    """All users can view this board; only the owner (and admins) can modify its structure."""
+    """General access `contributor`."""
+
+
+GENERAL_ACCESS_BY_VISIBILITY = {
+    BoardVisibility.Private: GeneralAccess.Restricted,
+    BoardVisibility.Shared: GeneralAccess.Viewer,
+    BoardVisibility.Public: GeneralAccess.Contributor,
+}
+VISIBILITY_BY_GENERAL_ACCESS = {access: visibility for visibility, access in GENERAL_ACCESS_BY_VISIBILITY.items()}
 
 
 class BoardRecord(BaseModelExcludeNull):
@@ -39,16 +48,16 @@ class BoardRecord(BaseModelExcludeNull):
     """The name of the cover image of the board."""
     archived: bool = Field(description="Whether or not the board is archived.")
     """Whether or not the board is archived."""
-    board_visibility: BoardVisibility = Field(
-        default=BoardVisibility.Private, description="The visibility of the board."
+    general_access: GeneralAccess = Field(
+        default=GeneralAccess.Restricted,
+        description="The role every other account gets on the board: none (restricted), viewer or contributor.",
     )
-    """The visibility of the board (private, shared, or public)."""
     project_id: Optional[str] = Field(
         default=None, description="The id of the owner's project this board belongs to; absent for a Library board."
     )
     """A board lives in exactly one of its owner's projects, or in the Library when this is `None`.
-    Project boards are private and unshared. Clients must treat the field as absent-or-null: the
-    record's own `model_dump` drops `None` values, but a route's response serialization need not."""
+    Clients must treat the field as absent-or-null: the record's own `model_dump` drops `None` values,
+    but a route's response serialization need not."""
 
 
 def deserialize_board_record(board_dict: dict) -> BoardRecord:
@@ -66,11 +75,10 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
     deleted_at = board_dict.get("deleted_at", get_iso_timestamp())
     archived = board_dict.get("archived", False)
     project_id = board_dict.get("project_id")
-    board_visibility_raw = board_dict.get("board_visibility", BoardVisibility.Private.value)
     try:
-        board_visibility = BoardVisibility(board_visibility_raw)
+        general_access = GeneralAccess(board_dict.get("general_access", GeneralAccess.Restricted.value))
     except ValueError:
-        board_visibility = BoardVisibility.Private
+        general_access = GeneralAccess.Restricted
 
     return BoardRecord(
         board_id=board_id,
@@ -81,7 +89,7 @@ def deserialize_board_record(board_dict: dict) -> BoardRecord:
         updated_at=updated_at,
         deleted_at=deleted_at,
         archived=archived,
-        board_visibility=board_visibility,
+        general_access=general_access,
         project_id=project_id,
     )
 
@@ -103,7 +111,14 @@ class BoardChanges(BaseModel, extra="forbid"):
         default=None, max_length=255, description="The name of the board's new cover image."
     )
     archived: Optional[bool] = Field(default=None, description="Whether or not the board is archived")
-    board_visibility: Optional[BoardVisibility] = Field(default=None, description="The visibility of the board.")
+    general_access: Optional[GeneralAccess] = Field(
+        default=None, description="The role every other account gets on the board. Only its owner may change it."
+    )
+    board_visibility: Optional[BoardVisibility] = Field(
+        default=None,
+        description="Deprecated, to be removed in 8.0: general access under its old name. Send `general_access`.",
+        json_schema_extra={"deprecated": True},
+    )
     project_id: Optional[str] = Field(
         default=None,
         description=(
@@ -111,6 +126,16 @@ class BoardChanges(BaseModel, extra="forbid"):
             " Omit the field to leave the board where it is."
         ),
     )
+
+    @model_validator(mode="after")
+    def _visibility_names_general_access(self) -> "BoardChanges":
+        """`board_visibility` is `general_access` under its old name: only one of them may be sent."""
+        if self.board_visibility is not None:
+            if self.general_access is not None:
+                raise ValueError("Send general_access or board_visibility, not both")
+            self.general_access = GENERAL_ACCESS_BY_VISIBILITY[self.board_visibility]
+            self.board_visibility = None
+        return self
 
     @property
     def moves_board(self) -> bool:
@@ -154,15 +179,4 @@ class BoardRecordProjectNotFoundException(BoardRecordSaveException):
     """
 
     def __init__(self, message="Project not found"):
-        super().__init__(message)
-
-
-class BoardRecordProjectUnavailableException(BoardRecordSaveException):
-    """Raised when a board cannot be in a project: it is shared or public, or would become so.
-
-    Boards in a project are private and unshared, so a visibility change and a move are refused
-    together whenever the result would be a non-private project board.
-    """
-
-    def __init__(self, message="Boards in a project must be private"):
         super().__init__(message)

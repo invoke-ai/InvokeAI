@@ -1,7 +1,7 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
-import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryView } from '@features/gallery/core/types';
+import type { GallerySearchScope, GallerySettings } from '@features/gallery/core/settings';
+import type { GalleryGeneralAccess, GalleryView } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { GalleryItemStarPatchEvent } from '@features/gallery/data/queryCache';
 
@@ -33,11 +33,15 @@ export interface GalleryActions {
   moveBoard: (boardId: string, projectId: string | null, destinationLabel: string) => Promise<void>;
   refresh: () => void;
   renameBoard: (boardId: string, boardName: string) => Promise<void>;
+  /** Who else may open the board: its owner's (or an admin's) choice. */
+  setBoardGeneralAccess: (boardId: string, generalAccess: GalleryGeneralAccess) => Promise<void>;
   selectBoard: (boardId: string) => void;
   selectItem: (item: GalleryItem, selectionPage?: number) => void;
   selectItemRange: (items: GalleryItemRef[], primaryItem: GalleryItem, selectionPage?: number) => void;
   setCompareItem: (image: GalleryImageItem | null) => void;
   setSearchTerm: (searchTerm: string) => void;
+  /** Where a search looks: the selected board, or every readable board; resets the page like a search. */
+  setSearchScope: (searchScope: GallerySearchScope) => void;
   /** Restricts (or releases) the listing to starred items; resets the page like a search. */
   setStarredOnly: (starredOnly: boolean) => void;
   /** Clears the search field: its text, any ranking, and semantic mode. */
@@ -68,6 +72,8 @@ export interface GalleryStarredStrip {
 export interface GalleryWidgetContextValue {
   gallery: GalleryStateView;
   actions: GalleryActions;
+  /** The server has more than one account, so boards can be shared; absent where it does not apply. */
+  boardSharing?: boolean;
   /** The board list's standing; its failure is the board panel's to show, never the grid's. */
   boardsState: GalleryReadState;
   /**
@@ -90,8 +96,6 @@ export interface GalleryWidgetContextValue {
   /** See `GalleryData.pinRevealIndex`; offered for sparse infinite listings only. */
   pinRevealIndex?: (absoluteIndex: number) => void;
   starredStrip: GalleryStarredStrip;
-  /** See `GalleryUiAdapter.currentUserId`. */
-  currentUserId: string | null;
   projectId: string;
   projectName: string;
   /** Names for the projects other boards belong to, keyed by project id. */

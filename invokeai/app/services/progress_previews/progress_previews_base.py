@@ -21,13 +21,17 @@ class ProgressPreviewsBase(ABC):
     """
 
     @abstractmethod
-    def reserve_revision(self, item_id: int, session_id: str, percentage: float | None) -> int | None:
+    def reserve_revision(
+        self, item_id: int, session_id: str, percentage: float | None, min_interval_s: float | None = None
+    ) -> int | None:
         """Allocate the revision for a new image-bearing frame, or None if the frame should be dropped.
 
         Args:
             item_id: The queue item the frame belongs to.
             session_id: The session producing it; a new session on the same item starts a new epoch.
             percentage: The frame's progress, if determinate. A final frame (1.0) is never dropped.
+            min_interval_s: A longer interval the producer needs between its frames, e.g. because each
+                one is expensive to render. Never shortens the store's own interval.
         """
         pass
 

@@ -7,6 +7,7 @@ import {
   getModelTypeLabel,
   getModelVariantLabel,
   getVariantOptionsFor,
+  getUnrecordedModelFact,
 } from './taxonomy';
 
 describe('label fallbacks', () => {
@@ -44,10 +45,15 @@ describe('variant options', () => {
     expect(getVariantOptionsFor('flux2', 'qwen3_encoder')).toEqual(['qwen3_4b', 'qwen3_8b', 'qwen3_06b']);
   });
 
+  it('offers both Qwen3.5 sizes, which condition different architectures', () => {
+    expect(getVariantOptionsFor('any', 'qwen3_5_encoder')).toEqual(['qwen3_5_4b', 'qwen3_5_9b']);
+    expect(getModelVariantLabel('qwen3_5_9b')).toBe('Qwen3.5 9B (MOSS-Image)');
+  });
+
   it('offers both Qwen3-VL sizes, because the field is required on the config', () => {
     // Required variants must not offer None, which would send invalid null during save.
     expect(getVariantOptionsFor('any', 'qwen3_vl_encoder')).toEqual(['qwen3_vl_4b', 'qwen3_vl_8b']);
-    expect(getModelVariantLabel('qwen3_vl_8b')).toBe('Qwen3-VL 8B (Ideogram 4)');
+    expect(getModelVariantLabel('qwen3_vl_8b')).toBe('Qwen3-VL 8B (Ideogram 4, Qwen-Image-2.1)');
     // MiniMax H3 shares the encoder type but lacks a variant field; size choices would fail saving.
     expect(getVariantOptionsFor('minimax-h3', 'qwen3_vl_encoder')).toEqual([]);
   });
@@ -87,5 +93,25 @@ describe('getModelSourceHref', () => {
     expect(getModelSourceHref('/models/x.safetensors', 'path')).toBeNull();
     expect(getModelSourceHref('C:\\models\\x.safetensors', 'path')).toBeNull();
     expect(getModelSourceHref('some-name', 'unknown')).toBeNull();
+  });
+});
+
+describe('getUnrecordedModelFact', () => {
+  const fact = (model: Partial<Parameters<typeof getUnrecordedModelFact>[0]>) =>
+    getUnrecordedModelFact({ base: 'any', type: 'main', ...model } as Parameters<typeof getUnrecordedModelFact>[0]);
+
+  it('flags Anima ControlNets whose adapter channels were never recorded', () => {
+    expect(fact({ base: 'anima', cond_in_channels: null, type: 'controlnet' })).toBe('adapter_type');
+    expect(fact({ base: 'anima', type: 'controlnet' })).toBe('adapter_type');
+    expect(fact({ base: 'anima', cond_in_channels: 3, type: 'controlnet' })).toBeNull();
+    expect(fact({ base: 'anima', cond_in_channels: 4, type: 'controlnet' })).toBeNull();
+    expect(fact({ base: 'sdxl', cond_in_channels: null, type: 'controlnet' })).toBeNull();
+  });
+
+  it('flags upscalers whose native scale was never recorded', () => {
+    expect(fact({ scale: null, type: 'spandrel_image_to_image' })).toBe('native_scale');
+    expect(fact({ type: 'spandrel_image_to_image' })).toBe('native_scale');
+    expect(fact({ scale: 1, type: 'spandrel_image_to_image' })).toBeNull();
+    expect(fact({ scale: null, type: 'main' })).toBeNull();
   });
 });

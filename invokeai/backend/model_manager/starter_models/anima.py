@@ -1,6 +1,6 @@
 """Anima starter models."""
 
-from invokeai.backend.model_manager.starter_models.common import anima_qwen3_encoder
+from invokeai.backend.model_manager.starter_models.common import anima_qwen3_encoder, siglip2_base_512
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     AnimaVariantType,
@@ -56,6 +56,19 @@ anima_2_9b_int8 = StarterModel(
     f"per forward (no speedup). {_DERIVATIVE_LICENSE} ~3.1GB",
     type=ModelType.Main,
     format=ModelFormat.Checkpoint,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
+anima_turbo_gguf_q8_0 = StarterModel(
+    name="Anima Turbo 1.1 (GGUF, Q8_0)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/vanes430/Anima-Turbo-V1.1-GGUF/resolve/main/anima-turbo-v1.1-Q8_0.gguf",
+    description="Anima Turbo v1.1, the distilled version of Anima for fast generations, in a community Q8_0 "
+    "GGUF: about half the memory of the bf16 checkpoint. Recommended: 8-12 steps, CFG 1. "
+    f"{_DERIVATIVE_LICENSE} ~2.2GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
     variant=AnimaVariantType.Qwen3,
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
@@ -135,4 +148,16 @@ anima_lllite_pose_preview3 = StarterModel(
     description="ControlNet-LLLite pose adapter for Anima by kohya-ss. Trained on the Preview3 build; notably weak on Anima Base 1.0. ~23MB",
     type=ModelType.ControlNet,
     format=ModelFormat.Checkpoint,
+)
+
+anima_ip_adapter_character_reference = StarterModel(
+    name="Anima IP-Adapter (Character Reference)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/LuciferTC/Anima-IP-Adapter/resolve/main/ip_adapter-Character_Reference-10.safetensors",
+    description="IP-Adapter for Anima by LuciferTC: carries a character's look from reference images into the "
+    "generation. Trained on anime images, on the 28-block Anima releases. Needs the SigLIP2 image encoder. "
+    f"{_DERIVATIVE_LICENSE} ~500MB",
+    type=ModelType.IPAdapter,
+    format=ModelFormat.Checkpoint,
+    dependencies=[siglip2_base_512],
 )

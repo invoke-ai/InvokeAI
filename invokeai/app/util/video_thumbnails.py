@@ -24,13 +24,14 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterator, NamedTuple, Optional
+from typing import Any, Callable, Generator, Iterator, NamedTuple, Optional
 
 import numpy as np
 import psutil
 from PIL import Image
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
+from invokeai.app.util.process_tree import kill_process_tree
 
 # Generous — a healthy decode of a single frame or of container metadata takes well
 # under a second even for large files. The timeout exists to bound adversarial or hung
@@ -105,27 +106,14 @@ def _is_process_running(pid: int) -> bool:
 def _terminate_process_tree(proc: subprocess.Popen[Any]) -> None:
     """Kills a worker and every descendant it spawned."""
     if os.name != "nt":
+        # ``_spawn_worker`` starts the worker in its own session, so its process group is the whole tree.
         try:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
             proc.wait(timeout=5)
             return
         except (OSError, subprocess.TimeoutExpired):
             pass
-    try:
-        parent = psutil.Process(proc.pid)
-        processes = parent.children(recursive=True)
-        processes.append(parent)
-        for process in processes:
-            try:
-                process.kill()
-            except psutil.Error:
-                pass
-        psutil.wait_procs(processes, timeout=5)
-    except psutil.Error:
-        try:
-            proc.kill()
-        except OSError:
-            pass
+    kill_process_tree(proc)
 
 
 def _worker_tree_rss(proc: subprocess.Popen[Any]) -> int:
@@ -342,7 +330,7 @@ def iter_video_frames(
     video_path: Path,
     timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
     is_canceled: Optional[Callable[[], bool]] = None,
-) -> Iterator[np.ndarray]:
+) -> Generator[np.ndarray, None, None]:
     acquired: list[threading.BoundedSemaphore] = []
     capacity_deadline = time.monotonic() + timeout
     try:

@@ -27,13 +27,17 @@ import {
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
   getGenerationValidationReasons,
+  getKrea2EditLoraState,
   getMaxReferenceImages,
+  getMissingReferenceImageFormat,
   getPromptPolicy,
   getSchedulerOptions,
   getSettingsWithModelDefaults,
   isReferenceImageSupported,
   isGenerateModelSelectable,
   isSupportedGenerateModel,
+  QWEN_IMAGE_21_STANDALONE_ENCODER_REASON,
+  withAddedReferenceImages,
 } from './baseGenerationPolicies';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
 
@@ -53,7 +57,13 @@ const createSettings = (model: GenerateModelConfig, overrides: Partial<GenerateS
 });
 
 const t5Encoder: ComponentModelConfig = { base: 'any', key: 't5', name: 'T5 Encoder', type: 't5_encoder' };
-const clipEmbed: ComponentModelConfig = { base: 'any', key: 'clip', name: 'CLIP Embed', type: 'clip_embed' };
+const clipEmbed: ComponentModelConfig = {
+  base: 'any',
+  key: 'clip',
+  name: 'CLIP Embed',
+  type: 'clip_embed',
+  variant: 'large',
+};
 const mistralEncoder: ComponentModelConfig = {
   base: 'any',
   key: 'mistral',
@@ -499,16 +509,71 @@ describe('component policies', () => {
     ).toEqual([]);
   });
 
-  it('validates Z-Image non-anima Qwen3 and flux VAE requirements', () => {
+  describe('Z-Image Qwen3 encoder', () => {
     const model = createModel('z-image', { format: 'checkpoint' });
+    const qwen3_4b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-4b', name: 'Qwen3 4B', variant: 'qwen3_4b' };
+    const qwen3_8b: ComponentModelConfig = { ...qwen3Encoder, key: 'qwen3-8b', name: 'Qwen3 8B', variant: 'qwen3_8b' };
+    const source = createModel('z-image', { key: 'z-image-diffusers', format: 'diffusers' });
+    const incompatible =
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.';
 
-    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
-      'Generate needs a Qwen3 Encoder for Z-Image models.',
-      'Generate needs a VAE for Z-Image models.',
-    ]);
-    expect(
-      getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3Encoder, vae: fluxVae }))
-    ).toEqual([]);
+    it('requires a Qwen3 4B encoder and a FLUX VAE without a component source', () => {
+      expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([
+        'Generate needs a Qwen3 4B Encoder for Z-Image models.',
+        'Generate needs a VAE for Z-Image models.',
+      ]);
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_4b, vae: fluxVae }))
+      ).toEqual([]);
+    });
+
+    it('names a saved 8B encoder as incompatible, with or without a component source to fall back on', () => {
+      expect(
+        getGenerationValidationReasons(model, createSettings(model, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }))
+      ).toEqual([incompatible]);
+      expect(
+        getGenerationValidationReasons(
+          model,
+          createSettings(model, { componentSourceModel: source, qwen3EncoderModel: qwen3_8b })
+        )
+      ).toEqual([incompatible]);
+      expect(getGenerationValidationReasons(model, createSettings(model, { componentSourceModel: source }))).toEqual(
+        []
+      );
+    });
+
+    it('offers only the 4B encoder and clears an 8B one when switching to Z-Image', () => {
+      const settings = createSettings(model);
+      const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen3EncoderModel');
+      const ctx = { model, selectedComponents: { ...settings }, settings };
+      const klein9b = createModel('flux2', { format: 'gguf_quantized', variant: 'klein_9b' });
+
+      expect(
+        [qwen3_4b, qwen3_8b, animaQwen3Encoder].map((encoder) => slot?.filter?.(encoder as GenerateModelConfig, ctx))
+      ).toEqual([true, false, false]);
+
+      const result = getGenerateModelSelectionResult({
+        currentValues: createSettings(klein9b, { qwen3EncoderModel: qwen3_8b, vae: fluxVae }),
+        model,
+        models: [],
+      });
+
+      expect(result.settings.qwen3EncoderModel).toBeNull();
+      expect(result.clearedLabels).toContain('Qwen3 Encoder');
+    });
+  });
+
+  it('offers FLUX.1 only CLIP-L encoders, the one its text encoder runs', () => {
+    const model = createModel('flux');
+    const settings = createSettings(model);
+    const clipFilter = getComponentSectionPolicy(model, settings).slots.find(
+      (slot) => slot.key === 'clipEmbedModel'
+    )?.filter;
+    const ctx = { model, selectedComponents: { ...settings }, settings };
+    const clipG = { ...clipEmbed, key: 'clip-g', variant: 'gigantic' };
+
+    expect(clipFilter?.(clipEmbed as GenerateModelConfig, ctx)).toBe(true);
+    expect(clipFilter?.(clipG as GenerateModelConfig, ctx)).toBe(false);
   });
 
   it('offers complete SDNQ Z-Image pipelines as component sources but rejects partial folders', () => {
@@ -575,6 +640,83 @@ describe('component policies', () => {
     );
   });
 
+  it('validates the external mode being compiled against the modes the model advertises', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img', 'inpaint'] },
+    };
+
+    expect(getGenerationValidationReasons(model, createSettings(model))).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'inpaint')).toEqual([]);
+    expect(getGenerationValidationReasons(model, createSettings(model), 'img2img')).toContain(
+      'External Model does not support image-to-image generation.'
+    );
+    // Modes default to txt2img only when the record omits them.
+    expect(
+      getGenerationValidationReasons({ ...externalModel, capabilities: null }, createSettings(externalModel), 'inpaint')
+    ).toContain('External Model does not support inpainting.');
+  });
+
+  it('accepts provider sizes off the local model grids for external generators', () => {
+    expect(getGenerationValidationReasons(externalModel, createSettings(externalModel, { width: 1365 }))).toEqual([]);
+  });
+
+  it('rejects dimensions above the provider maximum on either axis', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { modes: ['txt2img'], max_image_size: { width: 2048, height: 1536 } },
+    };
+    expect(getGenerationValidationReasons(model, createSettings(model, { width: 2048, height: 1536 }))).toEqual([]);
+    for (const dimensions of [
+      { width: 2049, height: 1536 },
+      { width: 2048, height: 1537 },
+    ]) {
+      expect(getGenerationValidationReasons(model, createSettings(model, dimensions))).toContain(
+        'External Model supports a maximum size of 2048×1536.'
+      );
+    }
+  });
+
+  it('counts the canvas init and output against the Seedream total image budget', () => {
+    const model: GenerateModelConfig = {
+      ...externalModel,
+      provider_id: 'seedream',
+      provider_model_id: 'seedream-4-5-251128',
+      capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: true, max_reference_images: 14 },
+    };
+    const settings = createSettings(model, {
+      referenceImages: Array.from({ length: 14 }, (_, i) => ({
+        id: `reference-${i}`,
+        isEnabled: true,
+        config: {
+          type: 'external_reference_image',
+          image: {
+            imageName: `reference-${i}.png`,
+            width: 512,
+            height: 512,
+            original: { image: { image_name: `reference-${i}.png`, width: 512, height: 512 } },
+          },
+        },
+      })),
+    });
+    expect(getGenerationValidationReasons(model, settings, 'txt2img')).toEqual([]);
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([
+      'External Model supports at most 15 images total (reference + init + output), got 16.',
+    ]);
+    settings.referenceImages[0]!.isEnabled = false;
+    expect(getGenerationValidationReasons(model, settings, 'img2img')).toEqual([]);
+    settings.referenceImages[0]!.isEnabled = true;
+    // A record that does not take references sends none, so the budget counts none; the references are refused
+    // on their own terms instead.
+    const reasons = getGenerationValidationReasons(
+      { ...model, capabilities: { modes: ['txt2img', 'img2img'], supports_reference_images: false } },
+      settings,
+      'img2img'
+    );
+    expect(reasons).toContain('Reference Image #1 is not supported by external model.');
+    expect(reasons.filter((reason) => reason.includes('images total'))).toEqual([]);
+  });
+
   it('renders no component slots for bases without extra requirements', () => {
     expect(getComponentSectionPolicy(createModel('cogview4'), createSettings(createModel('cogview4'))).slots).toEqual(
       []
@@ -621,6 +763,86 @@ describe('component policies', () => {
     expect(result.settings.cfgRescaleMultiplier).toBe(0);
     expect(result.settings.seamlessXAxis).toBe(true);
     expect(result.clearedLabels).toEqual(['LoRAs', 'T5 Encoder', 'CLIP skip', 'CFG rescale']);
+  });
+
+  it('initializes a provider size on model changes while preserving supported and same-model dimensions', () => {
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '1:1', height: 1024, image_size: '1K', label: 'Square', width: 1024 },
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: 'Landscape', width: 2048 },
+        ],
+      },
+    };
+    const select = (settings: GenerateSettings) =>
+      getGenerateModelSelectionResult({ currentValues: settings, model, models: [] }).settings;
+
+    expect(select(createSettings(createModel('sd-1'), { height: 512, width: 512 }))).toMatchObject({
+      externalImageSize: '1K',
+      height: 1024,
+      width: 1024,
+    });
+    expect(select(createSettings(createModel('sdxl'), { height: 576, width: 1024 }))).toMatchObject({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 2048 / 1152,
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(
+      select(createSettings(createModel('sdxl'), { externalImageSize: 'stale', height: 1152, width: 2048 }))
+    ).toMatchObject({
+      externalImageSize: '2K',
+      height: 1152,
+      width: 2048,
+    });
+    expect(select(createSettings(model, { height: 1200, width: 1600 }))).toMatchObject({
+      externalImageSize: null,
+      height: 1200,
+      width: 1600,
+    });
+    const local = getGenerateModelSelectionResult({
+      currentValues: createSettings(model, { externalImageSize: '2K', height: 1152, width: 2048 }),
+      model: createModel('sdxl'),
+      models: [],
+    }).settings;
+
+    expect(local).toMatchObject({ externalImageSize: null, height: 1152, width: 2048 });
+  });
+
+  it('prefers the nearer pixel budget among presets of one nominal aspect ratio', () => {
+    // Rounded 16:9 presets have slightly different pixel ratios (1.75 vs 1.78), so an exact ratio tie never occurs.
+    const model: GenerateModelConfig = {
+      base: 'external',
+      format: 'external_api',
+      key: 'gemini',
+      name: 'Gemini',
+      provider_id: 'gemini',
+      type: 'external_image_generator',
+      capabilities: {
+        modes: ['txt2img'],
+        resolution_presets: [
+          { aspect_ratio: '16:9', height: 1152, image_size: '2K', label: '16:9 (2K)', width: 2048 },
+          { aspect_ratio: '16:9', height: 768, image_size: '1K', label: '16:9 (1K)', width: 1344 },
+          { aspect_ratio: '4:3', height: 768, image_size: '1K', label: '4:3 (1K)', width: 1024 },
+        ],
+      },
+    };
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 576, width: 1024 }),
+      model,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ externalImageSize: '1K', height: 768, width: 1344 });
   });
 
   it('turns HiDiffusion off when changing to an unsupported model family', () => {
@@ -703,14 +925,85 @@ describe('component policies', () => {
     expect(result.settings.componentSourceModel).toBe(devSource);
   });
 
-  it('reconciles dimensions to the new model grid when the selected model changes', () => {
+  it('reconciles dimensions to the new model grid as an adjustment, not a removed setting', () => {
     const model = createModel('cogview4');
     const settings = createSettings(createModel('sdxl'), { height: 520, width: 520 });
     const result = getGenerateModelSelectionResult({ currentValues: settings, model, models: [] });
 
     expect(result.settings.width).toBe(512);
     expect(result.settings.height).toBe(512);
-    expect(result.clearedLabels).toContain('Dimensions');
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports a snap to a provider size as an adjustment, so the switch is not lossy', () => {
+    const seedream: GenerateModelConfig = {
+      ...externalModel,
+      key: 'seedream',
+      name: 'Seedream 4.5',
+      provider_id: 'seedream',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: {
+          '1:1': { width: 2048, height: 2048 },
+          '16:9': { width: 2848, height: 1600 },
+        },
+      },
+    };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { height: 1024, width: 1024 }),
+      model: seedream,
+      models: [],
+    });
+
+    expect(result.settings).toMatchObject({ height: 2048, width: 2048 });
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('keeps the Canvas frame when switching to a provider with fixed sizes', () => {
+    const gptImage: GenerateModelConfig = {
+      ...externalModel,
+      key: 'gpt-image',
+      capabilities: {
+        modes: ['txt2img', 'img2img'],
+        aspect_ratio_sizes: { '1:1': { width: 1024, height: 1024 }, '3:2': { width: 1536, height: 1024 } },
+      },
+    };
+    const currentValues = createSettings(createModel('sdxl'), { height: 512, width: 640 });
+
+    // Generate snaps to the provider's size; the Canvas sync would carry that to the frame, so a frame is kept.
+    expect(getGenerateModelSelectionResult({ currentValues, model: gptImage, models: [] }).settings).toMatchObject({
+      height: 1024,
+      width: 1024,
+    });
+    const canvas = getGenerateModelSelectionResult({ currentValues, isCanvasFrame: true, model: gptImage, models: [] });
+    expect(canvas.settings).toMatchObject({ height: 512, width: 640 });
+    expect(canvas.dimensionsAdjusted).toBe(false);
+  });
+
+  it('reports the grid clamp from an off-grid provider size back to a local model as an adjustment', () => {
+    const provider: GenerateModelConfig = { ...externalModel, key: 'gemini', provider_id: 'gemini' };
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(provider, { height: 1024, width: 683 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.settings.width % 8).toBe(0);
+    expect(result.settings.height).toBe(1024);
+    expect(result.clearedLabels).toEqual([]);
+    expect(result.dimensionsAdjusted).toBe(true);
+  });
+
+  it('reports no adjustment when the size already fits the new model', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sd-1'), { height: 1024, width: 1024 }),
+      model: createModel('sdxl'),
+      models: [],
+    });
+
+    expect(result.dimensionsAdjusted).toBe(false);
   });
 
   it('keeps selected VAE when applying model defaults without a VAE override', () => {
@@ -961,6 +1254,404 @@ describe('component policies', () => {
     expect(result.clearedLabels).not.toContain('Reference Images');
   });
 
+  it('starts a Krea-2 reference list with a style reference and re-targets other kinds to it', () => {
+    // A Diffusers bundle needs no standalone components, which keeps the reasons to the reference check.
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(krea2)).toBe(true);
+    // One style reference, or up to three edit references.
+    expect(getMaxReferenceImages(krea2)).toBe(3);
+    expect(
+      withAddedReferenceImages(krea2, [sdxlIpAdapter], [], [{ id: 'new', image: referenceImage }])[0]?.config
+    ).toEqual({ image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' });
+
+    const fromSdxl = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              image: referenceImage,
+              method: 'style',
+              model: sdxlIpAdapter,
+              type: 'ip_adapter',
+              weight: 1,
+            },
+          },
+        ],
+      }),
+      model: krea2,
+      models: [sdxlIpAdapter],
+    });
+
+    expect(fromSdxl.settings.referenceImages).toEqual([
+      {
+        id: 'ref-1',
+        isEnabled: true,
+        config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+      },
+    ]);
+
+    const styleSettings = createSettings(krea2, {
+      referenceImages: [
+        {
+          id: 'style',
+          isEnabled: true,
+          config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' },
+        },
+      ],
+    });
+
+    expect(getGenerationValidationReasons(krea2, styleSettings)).toEqual([]);
+    expect(getGenerationValidationReasons(createModel('sd-3'), styleSettings)).toEqual([
+      'Reference Image #1 is not supported by sd-3 model.',
+    ]);
+  });
+
+  it('switches off the enabled references a newly selected model has no room for, keeping every reference', () => {
+    const singleReferenceModel: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { ...externalModel.capabilities, max_reference_images: 1, supports_reference_images: true },
+    };
+    const ipAdapter = (id: string, isEnabled: boolean) => ({
+      id,
+      isEnabled,
+      config: {
+        beginEndStepPct: [0, 1] as [number, number],
+        clipVisionModel: 'ViT-H' as const,
+        image: {
+          ...referenceImage,
+          original: { image: { ...referenceImage.original.image, image_name: `${id}.png` } },
+        },
+        method: 'style' as const,
+        model: sdxlIpAdapter,
+        type: 'ip_adapter' as const,
+        weight: 1,
+      },
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), {
+        referenceImages: [ipAdapter('bypassed', false), ipAdapter('used', true), ipAdapter('extra', true)],
+      }),
+      model: singleReferenceModel,
+      models: [sdxlIpAdapter],
+    });
+
+    // The first enabled reference is the one that keeps running, not the first in the list.
+    expect(
+      result.settings.referenceImages.map(({ config, id, isEnabled }) => ({ id, isEnabled, type: config.type }))
+    ).toEqual([
+      { id: 'bypassed', isEnabled: false, type: 'external_reference_image' },
+      { id: 'used', isEnabled: true, type: 'external_reference_image' },
+      { id: 'extra', isEnabled: false, type: 'external_reference_image' },
+    ]);
+    expect(result.clearedLabels).toContain('Reference Images');
+    expect(
+      getGenerationValidationReasons(singleReferenceModel, result.settings).filter((reason) =>
+        reason.includes('reference')
+      )
+    ).toEqual([]);
+  });
+
+  it('names a limit of one reference in the singular', () => {
+    const singleReferenceModel: GenerateModelConfig = {
+      ...externalModel,
+      capabilities: { ...externalModel.capabilities, max_reference_images: 1, supports_reference_images: true },
+    };
+    const external = (id: string) => ({
+      id,
+      isEnabled: true,
+      config: { image: referenceImage, type: 'external_reference_image' as const },
+    });
+
+    expect(
+      getGenerationValidationReasons(
+        singleReferenceModel,
+        createSettings(singleReferenceModel, { referenceImages: [external('a'), external('b')] })
+      )
+    ).toContain(`Generate supports at most 1 reference image for ${singleReferenceModel.name}.`);
+  });
+
+  describe('Krea-2 style and edit references', () => {
+    const krea2 = createModel('krea-2', { format: 'diffusers' });
+    const style = (id: string, isEnabled = true) => ({
+      id,
+      isEnabled,
+      config: { image: referenceImage, styleStrength: 1, type: 'krea2_reference_image' as const },
+    });
+    const edit = (id: string, isEnabled = true) => ({
+      id,
+      isEnabled,
+      config: { image: referenceImage, type: 'krea2_edit_reference_image' as const },
+    });
+    const reasonsFor = (model: MainModelConfig, overrides: Partial<GenerateSettings>) =>
+      getGenerationValidationReasons(model, createSettings(model, overrides));
+    const ggufEncoder: ComponentModelConfig = {
+      base: 'any',
+      format: 'gguf_quantized',
+      key: 'qwen3-vl-gguf',
+      name: 'Qwen3-VL 4B Q4_K_M',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_4b',
+    };
+    const ggufReason = `Krea-2 edit references need a Qwen3-VL encoder with vision weights, which the GGUF encoder "${ggufEncoder.name}" does not have. Select a safetensors file or Diffusers folder that includes the vision weights.`;
+
+    it('types a new Krea-2 reference as style only when it is the one running reference', () => {
+      const typesAfterAdding = (count: number, referenceImages: GenerateSettings['referenceImages'] = []) =>
+        withAddedReferenceImages(
+          krea2,
+          [],
+          referenceImages,
+          Array.from({ length: count }, (_, index) => ({ id: `new-${index}`, image: referenceImage }))
+        ).map(({ config, id, isEnabled }) => [id, config.type, isEnabled]);
+
+      expect(typesAfterAdding(1)).toEqual([['new-0', 'krea2_reference_image', true]]);
+      // Several images at once are an edit set, never a pile of style references.
+      expect(typesAfterAdding(3).map(([, type]) => type)).toEqual([
+        'krea2_edit_reference_image',
+        'krea2_edit_reference_image',
+        'krea2_edit_reference_image',
+      ]);
+      expect(typesAfterAdding(1, [edit('a')])).toEqual([
+        ['a', 'krea2_edit_reference_image', true],
+        ['new-0', 'krea2_edit_reference_image', true],
+      ]);
+      // Switched-off and zero-strength references do not run, so they leave the newcomer alone.
+      const bypassed = { ...style('s'), config: { ...style('s').config, styleStrength: 0 } };
+
+      expect(typesAfterAdding(1, [edit('a', false), bypassed])).toEqual([
+        ['a', 'krea2_edit_reference_image', false],
+        ['s', 'krea2_reference_image', true],
+        ['new-0', 'krea2_reference_image', true],
+      ]);
+    });
+
+    it('turns a lone untouched style reference into an edit reference when another image is added', () => {
+      const added = (referenceImages: GenerateSettings['referenceImages']) =>
+        withAddedReferenceImages(krea2, [], referenceImages, [{ id: 'new', image: referenceImage }]);
+
+      // Building an edit set one image at a time: the first card started as Style at its default strength.
+      expect(added([style('s')])).toEqual([edit('s'), edit('new')]);
+      expect(reasonsFor(krea2, { referenceImages: added([style('s')]) })).toEqual([]);
+      // Picking three images one by one, as the gallery picker hands them over, ends as an edit set.
+      const picked = ['a', 'b', 'c'].reduce<GenerateSettings['referenceImages']>(
+        (list, id) => withAddedReferenceImages(krea2, [], list, [{ id, image: referenceImage }]),
+        []
+      );
+
+      expect(picked).toEqual([edit('a'), edit('b'), edit('c')]);
+
+      // A changed strength marks the card as meant for style: it stays, and the mix is reported, not hidden.
+      const tuned = { ...style('s'), config: { ...style('s').config, styleStrength: 1.4 } };
+
+      expect(added([tuned])).toEqual([tuned, edit('new')]);
+      expect(reasonsFor(krea2, { referenceImages: added([tuned]) })).toEqual([
+        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.',
+      ]);
+      // Only a lone running style reference flips; a switched-off one stays as it is.
+      expect(added([style('off', false), edit('a')])).toEqual([style('off', false), edit('a'), edit('new')]);
+      // Other families have one kind, so nothing changes mode.
+      const flux2 = createModel('flux2', { format: 'diffusers' });
+      const flux2Reference = {
+        config: { image: referenceImage, type: 'flux2_reference_image' as const },
+        id: 'f',
+        isEnabled: true,
+      };
+
+      expect(withAddedReferenceImages(flux2, [], [flux2Reference], [{ id: 'new', image: referenceImage }])).toEqual([
+        flux2Reference,
+        { ...flux2Reference, id: 'new' },
+      ]);
+    });
+
+    it('treats a zero-strength style reference as off in every check', () => {
+      const bypassed = { ...style('bypassed'), config: { ...style('bypassed').config, styleStrength: 0 } };
+
+      expect(reasonsFor(krea2, { referenceImages: [bypassed, style('a')] })).toEqual([]);
+      expect(reasonsFor(krea2, { referenceImages: [bypassed, edit('a'), edit('b'), edit('c')] })).toEqual([]);
+
+      // It does not take precedence over the edit set when the model changes.
+      const otherKrea2 = createModel('krea-2', { format: 'diffusers', key: 'krea2-other' });
+      const switched = getGenerateModelSelectionResult({
+        currentValues: createSettings(krea2, { referenceImages: [bypassed, edit('a'), edit('b')] }),
+        model: otherKrea2,
+        models: [],
+      }).settings.referenceImages;
+
+      expect(switched.map(({ id, isEnabled }) => [id, isEnabled])).toEqual([
+        ['bypassed', true],
+        ['a', true],
+        ['b', true],
+      ]);
+    });
+
+    it('accepts up to three edit references and counts only enabled ones', () => {
+      expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c')] })).toEqual([]);
+      expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c'), edit('d', false)] })).toEqual([]);
+      expect(reasonsFor(krea2, { referenceImages: [edit('a'), edit('b'), edit('c'), edit('d')] })).toContain(
+        `Generate supports at most 3 reference images for ${krea2.name}.`
+      );
+    });
+
+    it('runs one enabled style reference at a time and never mixes style with edit references', () => {
+      const styleReason =
+        'Krea-2 uses one style reference at a time. Turn off all but one, or switch all of them to Edit.';
+      const mixReason =
+        'Krea-2 cannot combine a style reference with edit references. Switch the style reference to Edit, or turn off one kind.';
+
+      expect(reasonsFor(krea2, { referenceImages: [style('a'), style('b')] })).toEqual([styleReason]);
+      expect(reasonsFor(krea2, { referenceImages: [style('a'), edit('b')] })).toEqual([mixReason]);
+      // A switched-off reference of the other kind stays out of the check.
+      expect(reasonsFor(krea2, { referenceImages: [style('a', false), style('b'), edit('c', false)] })).toEqual([]);
+      expect(reasonsFor(krea2, { referenceImages: [style('a', false), edit('b'), edit('c')] })).toEqual([]);
+    });
+
+    it('says whether running edit references have an enabled Krea-2 LoRA to read them', () => {
+      const krea2Lora: LoraModelConfig = { base: 'krea-2', key: 'pose-lora', name: 'Pose LoRA', type: 'lora' };
+      const lora = (model: LoraModelConfig, isEnabled = true) => ({ isEnabled, model, weight: 1 });
+      const state = (overrides: Partial<GenerateSettings>, model: MainModelConfig = krea2) =>
+        getKrea2EditLoraState(model, createSettings(model, overrides));
+
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a')] })).toBe('ready');
+      // A disabled LoRA or one for another family does not reach the graph.
+      expect(state({ loras: [lora(krea2Lora, false), lora(sdxlLora)], referenceImages: [edit('a')] })).toBe('noLora');
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a', false), style('s')] })).toBe(
+        'noEditReferences'
+      );
+      expect(state({ loras: [lora(krea2Lora)], referenceImages: [edit('a')] }, createModel('flux2'))).toBe(
+        'noEditReferences'
+      );
+    });
+
+    it('blocks edit references on a GGUF encoder, which has no vision tower, and only then', () => {
+      const checkpoint = createModel('krea-2', { format: 'checkpoint', key: 'krea2-checkpoint' });
+      const vae: VaeModelConfig = { base: 'qwen-image', key: 'krea2-vae', name: 'Qwen VAE', type: 'vae' };
+      const safetensorsEncoder: ComponentModelConfig = { ...ggufEncoder, format: 'checkpoint', key: 'qwen3-vl-st' };
+
+      expect(reasonsFor(checkpoint, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')], vae })).toEqual([
+        ggufReason,
+      ]);
+      // A Diffusers main reads with the GGUF override too, when one is selected.
+      expect(reasonsFor(krea2, { qwen3VLEncoderModel: ggufEncoder, referenceImages: [edit('a')] })).toEqual([
+        ggufReason,
+      ]);
+      expect(reasonsFor(krea2, { referenceImages: [edit('a')] })).toEqual([]);
+      expect(
+        reasonsFor(checkpoint, { qwen3VLEncoderModel: safetensorsEncoder, referenceImages: [edit('a')], vae })
+      ).toEqual([]);
+      // Style transfer and switched-off edit references never reach the vision tower.
+      expect(
+        reasonsFor(checkpoint, {
+          qwen3VLEncoderModel: ggufEncoder,
+          referenceImages: [style('a'), edit('b', false)],
+          vae,
+        })
+      ).toEqual([]);
+    });
+
+    it('re-targets references into Krea-2 as one set and switches off the ones that cannot run together', () => {
+      const flux2 = createModel('flux2', { format: 'diffusers' });
+      const flux2Reference = (id: string, isEnabled = true) => ({
+        id,
+        isEnabled,
+        config: { image: referenceImage, type: 'flux2_reference_image' as const },
+      });
+      const select = (
+        model: MainModelConfig,
+        current: MainModelConfig,
+        referenceImages: GenerateSettings['referenceImages']
+      ) =>
+        getGenerateModelSelectionResult({
+          currentValues: createSettings(current, { referenceImages }),
+          model,
+          models: [],
+        }).settings.referenceImages;
+
+      // An edit set survives a trip through another family and back.
+      const viaFlux2 = select(flux2, krea2, [edit('a'), edit('b'), edit('c')]);
+      const backToKrea2 = select(krea2, flux2, viaFlux2);
+
+      expect(backToKrea2.map(({ config, id, isEnabled }) => ({ id, isEnabled, type: config.type }))).toEqual([
+        { id: 'a', isEnabled: true, type: 'krea2_edit_reference_image' },
+        { id: 'b', isEnabled: true, type: 'krea2_edit_reference_image' },
+        { id: 'c', isEnabled: true, type: 'krea2_edit_reference_image' },
+      ]);
+      expect(getGenerationValidationReasons(krea2, createSettings(krea2, { referenceImages: backToKrea2 }))).toEqual(
+        []
+      );
+
+      // The one running reference becomes the style reference, and a switched-off one would join it as an edit
+      // reference. Past the limit of three, the extra edit reference stops.
+      expect(select(krea2, flux2, [flux2Reference('a')]).map(({ config }) => config.type)).toEqual([
+        'krea2_reference_image',
+      ]);
+      expect(
+        select(krea2, flux2, [flux2Reference('a'), flux2Reference('b', false)]).map(({ config }) => config.type)
+      ).toEqual(['krea2_reference_image', 'krea2_edit_reference_image']);
+      expect(
+        select(
+          krea2,
+          flux2,
+          ['a', 'b', 'c', 'd'].map((id) => flux2Reference(id))
+        ).map(({ id, isEnabled }) => [id, isEnabled])
+      ).toEqual([
+        ['a', true],
+        ['b', true],
+        ['c', true],
+        ['d', false],
+      ]);
+
+      // An edit set keeps running on another Krea-2 model; a mixed list keeps its first kind.
+      const editSet = [edit('a'), edit('b'), edit('c')];
+      const otherKrea2 = createModel('krea-2', { format: 'diffusers', key: 'krea2-other' });
+
+      expect(
+        getGenerateModelSelectionResult({
+          currentValues: createSettings(krea2, { referenceImages: editSet }),
+          model: otherKrea2,
+          models: [],
+        }).settings.referenceImages
+      ).toBe(editSet);
+      expect(
+        getGenerateModelSelectionResult({
+          currentValues: createSettings(krea2, { referenceImages: [edit('a'), style('b'), edit('c')] }),
+          model: otherKrea2,
+          models: [],
+        }).settings.referenceImages.map(({ id, isEnabled }) => [id, isEnabled])
+      ).toEqual([
+        ['a', true],
+        ['b', false],
+        ['c', true],
+      ]);
+
+      // An edit reference after the style reference stops too, and the switch names what it changed.
+      const styleFirst = getGenerateModelSelectionResult({
+        currentValues: createSettings(krea2, { referenceImages: [style('s'), edit('e')] }),
+        model: otherKrea2,
+        models: [],
+      });
+
+      expect(styleFirst.settings.referenceImages.map(({ id, isEnabled }) => [id, isEnabled])).toEqual([
+        ['s', true],
+        ['e', false],
+      ]);
+      expect(styleFirst.clearedLabels).toContain('Reference Images');
+
+      // Leaving Krea-2 re-targets both kinds, keeping their images and enabled state.
+      const toFlux2 = getGenerateModelSelectionResult({
+        currentValues: createSettings(krea2, { referenceImages: [edit('a'), style('b', false)] }),
+        model: flux2,
+        models: [],
+      });
+
+      expect(toFlux2.settings.referenceImages).toEqual([flux2Reference('a'), flux2Reference('b', false)]);
+    });
+  });
+
   it('reports reference image support per model', () => {
     expect(isReferenceImageSupported(createModel('sdxl'))).toBe(true);
     expect(isReferenceImageSupported(createModel('cogview4'))).toBe(false);
@@ -974,6 +1665,29 @@ describe('component policies', () => {
       })
     ).toBe(true);
     expect(isReferenceImageSupported(undefined)).toBe(false);
+  });
+
+  it('offers Qwen-Image-2.1 reference images only on its Diffusers pipeline, whose encoder reads images', () => {
+    const diffusers = createModel('qwen-image-2-1', { format: 'diffusers' });
+
+    expect(isReferenceImageSupported(diffusers)).toBe(true);
+    expect(getMaxReferenceImages(diffusers)).toBe(4);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(false);
+    expect(isReferenceImageSupported(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe(false);
+  });
+
+  // The UI names the missing format only when switching to it would enable references.
+  it('names the format a model lacks for reference images only when the format alone blocks them', () => {
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'gguf_quantized' }))).toBe(
+      'diffusers'
+    );
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'checkpoint' }))).toBe('diffusers');
+    expect(getMissingReferenceImageFormat(createModel('qwen-image-2-1', { format: 'diffusers' }))).toBeNull();
+    // Qwen-Image needs the Edit variant, not a format; CogView4 takes no references at all.
+    expect(getMissingReferenceImageFormat(createModel('qwen-image', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(createModel('cogview4', { format: 'gguf_quantized' }))).toBeNull();
+    expect(getMissingReferenceImageFormat(externalModel)).toBeNull();
+    expect(getMissingReferenceImageFormat(undefined)).toBeNull();
   });
 
   it('derives the reference image limit from external provider capabilities', () => {
@@ -1041,6 +1755,31 @@ describe('component policies', () => {
     ).toContain('Reference Image #1 is not supported by sd-3 model.');
   });
 
+  it('blocks Qwen-Image-2.1 references while a standalone encoder replaces the one that reads them', () => {
+    const model = createModel('qwen-image-2-1', { format: 'diffusers' });
+    const encoder = {
+      base: 'any',
+      key: 'qwen3-vl-8b',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    } as const;
+    const referenceImages = [
+      {
+        config: { image: referenceImage, type: 'qwen_image_2_1_reference_image' as const },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+
+    expect(
+      getGenerationValidationReasons(model, createSettings(model, { qwen3VLEncoderModel: encoder, referenceImages }))
+    ).toContain(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON);
+    expect(getGenerationValidationReasons(model, createSettings(model, { referenceImages }))).not.toContain(
+      QWEN_IMAGE_21_STANDALONE_ENCODER_REASON
+    );
+  });
+
   it('reports missing reference image model dependencies', () => {
     const model = createModel('sd-1');
 
@@ -1095,6 +1834,358 @@ describe('component policies', () => {
         [model as never]
       )
     ).toEqual([]);
+  });
+});
+
+describe('Anima inpaint adapter slot', () => {
+  const anima = createModel('anima');
+  const inpaintAdapter: ComponentModelConfig = {
+    base: 'anima',
+    cond_in_channels: 4,
+    key: 'anima-inpaint',
+    name: 'Anima LLLite Inpainting',
+    type: 'controlnet',
+  };
+
+  it('is offered to Anima only, optional, and takes 4-channel or pre-field Anima LLLite models', () => {
+    const settings = createSettings(anima);
+    const slot = getComponentSectionPolicy(anima, settings).slots.find((s) => s.key === 'animaInpaintAdapterModel');
+    const ctx = { model: anima, selectedComponents: settings, settings };
+
+    expect(slot?.modelTypes).toEqual(['controlnet']);
+    expect(slot?.required).toBeUndefined();
+    expect(slot?.filter?.(inpaintAdapter, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: null }, ctx)).toBe(true);
+    expect(slot?.filter?.({ ...inpaintAdapter, cond_in_channels: 3 }, ctx)).toBe(false);
+    expect(slot?.filter?.({ ...inpaintAdapter, base: 'sdxl' }, ctx)).toBe(false);
+    expect(getGenerationValidationReasons(anima, settings)).not.toContain(expect.stringContaining('Inpaint Adapter'));
+    expect(
+      getComponentSectionPolicy(createModel('sdxl'), settings).slots.some((s) => s.key === 'animaInpaintAdapterModel')
+    ).toBe(false);
+  });
+
+  it('is cleared, and named, when the model leaves Anima', () => {
+    const settings = createSettings(anima, {
+      animaInpaintAdapterModel: inpaintAdapter,
+      animaInpaintAdapterWeight: 0.6,
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: createModel('sdxl'), models: [] });
+
+    expect(result.settings.animaInpaintAdapterModel).toBeNull();
+    expect(result.clearedLabels).toContain('Inpaint Adapter');
+    expect(result.settings.animaInpaintAdapterWeight).toBe(0.6);
+    expect(
+      getGenerateModelSelectionResult({ currentValues: settings, model: anima, models: [] }).settings
+        .animaInpaintAdapterModel
+    ).toBe(inpaintAdapter);
+  });
+});
+
+describe('FLUX.3 policies', () => {
+  const KLEIN_CFG_REASON = 'FLUX.3 Klein samples without CFG. Set CFG Scale to 1, or use FLUX.3 Klein Base for CFG.';
+
+  it('blocks CFG on the step-distilled Klein and allows it on Klein Base', () => {
+    const klein = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein' });
+    const kleinBase = createModel('flux3', { format: 'diffusers', variant: 'flux3_klein_base' });
+
+    expect(getGenerationValidationReasons(klein, createSettings(klein))).toEqual([]);
+    expect(getGenerationValidationReasons(klein, createSettings(klein, { cfgScale: 2 }))).toContain(KLEIN_CFG_REASON);
+    expect(getGenerationValidationReasons(kleinBase, createSettings(kleinBase, { cfgScale: 3.5 }))).toEqual([]);
+  });
+});
+
+describe('the Qwen3.5 encoder slots of Anima-3.8B and MOSS-Image', () => {
+  const qwen35Encoder = (variant: string): ComponentModelConfig => ({
+    base: 'any',
+    key: `qwen35-${variant}`,
+    name: `Qwen3.5 ${variant}`,
+    type: 'qwen3_5_encoder',
+    variant,
+  });
+  const anima38 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen35' });
+  const mossSingleFile = createModel('moss-image', { format: 'checkpoint' });
+  const offers = (model: MainModelConfig, candidate: ComponentModelConfig): boolean | undefined => {
+    const settings = createSettings(model);
+    const slot = getComponentSectionPolicy(model, settings).slots.find((s) => s.key === 'qwen35EncoderModel');
+
+    return slot?.filter?.(candidate, { model, selectedComponents: settings, settings });
+  };
+
+  it('offers each model only the encoder size it was trained on, though both share the setting', () => {
+    expect(offers(anima38, qwen35Encoder('qwen3_5_4b'))).toBe(true);
+    expect(offers(anima38, qwen35Encoder('qwen3_5_9b'))).toBe(false);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_9b'))).toBe(true);
+    expect(offers(mossSingleFile, qwen35Encoder('qwen3_5_4b'))).toBe(false);
+  });
+
+  it('requires the encoder and VAE for a single-file MOSS-Image, and nothing for a Diffusers one', () => {
+    expect(getGenerationValidationReasons(mossSingleFile, createSettings(mossSingleFile))).toEqual([
+      'Generate needs a Qwen3.5 9B Encoder for non-Diffusers MOSS-Image models.',
+      'Generate needs a VAE for non-Diffusers MOSS-Image models.',
+    ]);
+    expect(
+      getGenerationValidationReasons(
+        mossSingleFile,
+        createSettings(mossSingleFile, { qwen35EncoderModel: qwen35Encoder('qwen3_5_9b'), vae: flux2Vae })
+      )
+    ).toEqual([]);
+
+    const mossDiffusers = createModel('moss-image', { format: 'diffusers' });
+
+    expect(getComponentSectionPolicy(mossDiffusers, createSettings(mossDiffusers)).defaultOpen).toBe(false);
+    expect(getGenerationValidationReasons(mossDiffusers, createSettings(mossDiffusers))).toEqual([]);
+  });
+
+  it('clears an Anima-3.8B encoder, and names it, when the model changes to MOSS-Image', () => {
+    const settings = createSettings(anima38, {
+      qwen35EncoderModel: qwen35Encoder('qwen3_5_4b'),
+      qwen3EncoderModel: animaQwen3Encoder,
+      vae: qwenImageVae,
+    });
+
+    const result = getGenerateModelSelectionResult({ currentValues: settings, model: mossSingleFile, models: [] });
+
+    expect(result.settings.qwen35EncoderModel).toBeNull();
+    expect(result.clearedLabels).toContain('Qwen3.5 Encoder');
+  });
+});
+
+describe('Anima IP-Adapter references', () => {
+  const animaQwen3 = createModel('anima', { format: 'checkpoint', variant: 'anima_qwen3' });
+  const animaQwen35 = createModel('anima', { format: 'checkpoint', key: 'anima-3.8b', variant: 'anima_qwen35' });
+  const animaIpAdapter: ComponentModelConfig = {
+    base: 'anima',
+    key: 'anima-ip-adapter',
+    name: 'Anima IP-Adapter',
+    type: 'ip_adapter',
+  };
+  const secondAnimaIpAdapter: ComponentModelConfig = { ...animaIpAdapter, key: 'anima-ip-adapter-2', name: 'Second' };
+  const animaReference = (id: string) => ({
+    config: {
+      beginEndStepPct: [0, 1] as [number, number],
+      clipVisionModel: 'ViT-H' as const,
+      image: referenceImage,
+      method: 'full' as const,
+      model: animaIpAdapter,
+      type: 'ip_adapter' as const,
+      weight: 1,
+    },
+    id,
+    isEnabled: true,
+  });
+
+  it('offers four references on the Qwen3 releases and none on Anima-3.8B', () => {
+    expect(isReferenceImageSupported(animaQwen3)).toBe(true);
+    expect(getMaxReferenceImages(animaQwen3)).toBe(4);
+    expect(isReferenceImageSupported(animaQwen35)).toBe(false);
+    expect(getMaxReferenceImages(animaQwen35)).toBe(0);
+  });
+
+  it('accepts four references sharing one Anima IP-Adapter and rejects a fifth', () => {
+    const reasons = (count: number) =>
+      getGenerationValidationReasons(
+        animaQwen3,
+        createSettings(animaQwen3, {
+          referenceImages: Array.from({ length: count }, (_, index) => animaReference(`ref-${index}`)),
+        })
+      ).filter((reason) => reason.includes('reference') || reason.includes('Reference'));
+
+    expect(reasons(4)).toEqual([]);
+    expect(reasons(5)).toEqual(['Generate supports at most 4 reference images for anima model.']);
+  });
+
+  it('rejects a strength outside the 0-2 range the Anima node accepts', () => {
+    const withWeight = (weight: number) =>
+      getGenerationValidationReasons(
+        animaQwen3,
+        createSettings(animaQwen3, {
+          referenceImages: [{ ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, weight } }],
+        })
+      ).filter((reason) => reason.includes('strength'));
+
+    expect(withWeight(0)).toEqual([]);
+    expect(withWeight(2)).toEqual([]);
+    expect(withWeight(-0.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
+    expect(withWeight(2.5)).toEqual(['Reference Image #1 strength must be between 0 and 2.']);
+  });
+
+  it('defaults a re-targeted reference to the first installed Anima IP-Adapter', () => {
+    const sdxlModel = createModel('sdxl');
+    const settings = createSettings(sdxlModel, {
+      referenceImages: [
+        { ...animaReference('ref-1'), config: { ...animaReference('ref-1').config, model: sdxlIpAdapter } },
+      ],
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [sdxlIpAdapter, animaIpAdapter, secondAnimaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([
+      {
+        config: {
+          beginEndStepPct: [0, 1],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: animaIpAdapter,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ]);
+  });
+
+  it('re-targets an SD reference that never had an adapter, keeping its step window and taking the default strength', () => {
+    const sdxlModel = createModel('sdxl');
+    const sdxlReference = {
+      config: {
+        beginEndStepPct: [0.2, 0.8] as [number, number],
+        clipVisionModel: 'ViT-G' as const,
+        image: referenceImage,
+        method: 'style' as const,
+        model: null,
+        type: 'ip_adapter' as const,
+        weight: -0.5,
+      },
+      id: 'ref-1',
+      isEnabled: false,
+    };
+    const switchTo = (models: ComponentModelConfig[]) =>
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxlModel, { referenceImages: [sdxlReference] }),
+        model: animaQwen3,
+        models,
+      }).settings;
+    const animaDefault = (model: ComponentModelConfig | null) => [
+      {
+        config: {
+          beginEndStepPct: [0.2, 0.8],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model,
+          type: 'ip_adapter',
+          weight: 1,
+        },
+        id: 'ref-1',
+        isEnabled: false,
+      },
+    ];
+
+    const withAdapter = switchTo([sdxlIpAdapter, animaIpAdapter]);
+    expect(withAdapter.referenceImages).toEqual(animaDefault(animaIpAdapter));
+    expect(
+      getGenerationValidationReasons(animaQwen3, {
+        ...withAdapter,
+        referenceImages: withAdapter.referenceImages.map((ref) => ({ ...ref, isEnabled: true })),
+      }).filter((reason) => reason.startsWith('Reference Image'))
+    ).toEqual([]);
+
+    // Nothing to select: the weight is still brought into range, and a second switch leaves the result alone.
+    const withoutAdapter = switchTo([sdxlIpAdapter]);
+    expect(withoutAdapter.referenceImages).toEqual(animaDefault(null));
+    expect(
+      getGenerateModelSelectionResult({ currentValues: withoutAdapter, model: animaQwen3, models: [sdxlIpAdapter] })
+        .settings.referenceImages
+    ).toBe(withoutAdapter.referenceImages);
+  });
+
+  it('fills in the adapter of an Anima reference once one is installed, keeping its strength and step window', () => {
+    const settings = createSettings(animaQwen3, {
+      referenceImages: [
+        {
+          ...animaReference('ref-1'),
+          config: { ...animaReference('ref-1').config, beginEndStepPct: [0.3, 0.7], model: null, weight: 1.5 },
+        },
+      ],
+    });
+
+    const result = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [sdxlIpAdapter, animaIpAdapter, secondAnimaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([
+      {
+        config: {
+          beginEndStepPct: [0.3, 0.7],
+          clipVisionModel: 'ViT-H',
+          image: referenceImage,
+          method: 'full',
+          model: animaIpAdapter,
+          type: 'ip_adapter',
+          weight: 1.5,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ]);
+  });
+
+  it('keeps the chosen Anima adapter while clamping an out-of-range strength to 2', () => {
+    const settings = createSettings(animaQwen3, {
+      referenceImages: [
+        {
+          ...animaReference('ref-1'),
+          config: { ...animaReference('ref-1').config, model: secondAnimaIpAdapter, weight: 3 },
+        },
+      ],
+    });
+
+    const [reference] = getGenerateModelSelectionResult({
+      currentValues: settings,
+      model: animaQwen3,
+      models: [animaIpAdapter, secondAnimaIpAdapter],
+    }).settings.referenceImages;
+
+    expect(reference?.config).toMatchObject({ model: secondAnimaIpAdapter, weight: 2 });
+  });
+
+  it('keeps an SD reference without an adapter as it is on SDXL', () => {
+    const sdxlModel = createModel('sdxl');
+    const referenceImages = [
+      {
+        config: {
+          beginEndStepPct: [0.2, 0.8] as [number, number],
+          clipVisionModel: 'ViT-H' as const,
+          image: referenceImage,
+          method: 'style' as const,
+          model: null,
+          type: 'ip_adapter' as const,
+          weight: -0.5,
+        },
+        id: 'ref-1',
+        isEnabled: true,
+      },
+    ];
+
+    expect(
+      getGenerateModelSelectionResult({
+        currentValues: createSettings(sdxlModel, { referenceImages }),
+        model: createModel('sdxl', { key: 'sdxl-other' }),
+        models: [sdxlIpAdapter],
+      }).settings.referenceImages
+    ).toBe(referenceImages);
+  });
+
+  it('clears the reference when switching to Anima-3.8B', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(animaQwen3, { referenceImages: [animaReference('ref-1')] }),
+      model: animaQwen35,
+      models: [animaIpAdapter],
+    });
+
+    expect(result.settings.referenceImages).toEqual([]);
+    expect(result.clearedLabels).toContain('Reference Images');
   });
 });
 
@@ -1531,5 +2622,101 @@ describe('getGenerationDimensions and the variant it dispatches on', () => {
 
     expect(getGenerationDimensions({ base: 'flux', type: 'main', variant: 'schnell' }).optimal).toBe(512);
     expect(getGenerationDimensions({ base: 'flux', type: 'main' }).optimal).toBe(1024);
+  });
+});
+
+describe('SDXL Refiner policy', () => {
+  const refiner: MainModelConfig = { base: 'sdxl-refiner', key: 'refiner', name: 'SDXL Refiner', type: 'main' };
+
+  it('offers the refiner section for SDXL only and never lists refiners as main models', () => {
+    expect(getGenerationUiPolicy(createModel('sdxl')).refinerVisible).toBe(true);
+    expect(getGenerationUiPolicy(createModel('sd-1')).refinerVisible).toBe(false);
+    expect(getGenerationUiPolicy(createModel('flux')).refinerVisible).toBe(false);
+    expect(isGenerateModelSelectable(refiner)).toBe(false);
+    expect(isSupportedGenerateModel(refiner)).toBe(false);
+  });
+
+  it('clears the refiner when leaving SDXL but keeps its tuning for the next SDXL pick', () => {
+    const result = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner, refinerStart: 0.6 }),
+      model: createModel('flux'),
+      models: [],
+    });
+
+    expect(result.settings.refinerModel).toBeNull();
+    expect(result.settings.refinerStart).toBe(0.6);
+    expect(result.clearedLabels).toContain('Refiner');
+
+    const kept = getGenerateModelSelectionResult({
+      currentValues: createSettings(createModel('sdxl'), { refinerModel: refiner }),
+      model: createModel('sdxl', { key: 'sdxl-other' }),
+      models: [],
+    });
+
+    expect(kept.settings.refinerModel).toEqual(refiner);
+    expect(kept.clearedLabels).toEqual([]);
+  });
+
+  it('validates the refiner only on SDXL, rejecting PiD and out-of-range tuning', () => {
+    const sdxl = createModel('sdxl');
+    const withRefiner = (overrides: Partial<GenerateSettings> = {}) =>
+      getGenerationValidationReasons(sdxl, createSettings(sdxl, { refinerModel: refiner, ...overrides }));
+
+    expect(withRefiner()).toEqual([]);
+    expect(withRefiner({ refinerStart: 1.2, refinerSteps: 0 })).toEqual([
+      'Refiner steps must be a whole number of at least 1.',
+      'Refiner start must be between 0 and 1.',
+    ]);
+    expect(withRefiner({ refinerNegativeAestheticScore: 0 })).toEqual([
+      'Refiner negative aesthetic score must be between 1 and 10.',
+    ]);
+    expect(
+      withRefiner({
+        gemma2EncoderModel: { base: 'any', key: 'gemma2', name: 'Gemma 2', type: 'gemma2_encoder' },
+        pidDecoderModel: { base: 'sdxl', key: 'pid', name: 'PiD SDXL', type: 'pid_decoder' },
+        pidMode: 'fit',
+      })
+    ).toContain('PiD decode is not compatible with the SDXL Refiner. Turn PiD off or clear the refiner model.');
+    expect(withRefiner({ refinerModel: sdxl })).toEqual([
+      `${sdxl.name} is not an SDXL Refiner model. Pick a refiner or clear the slot.`,
+    ]);
+
+    const sd1 = createModel('sd-1');
+
+    expect(
+      getGenerationValidationReasons(sd1, createSettings(sd1, { refinerModel: refiner, refinerStart: 5 }))
+    ).toEqual([]);
+  });
+
+  it('ignores unavailable models and invalid tuning while the refiner is off, then validates reactivation', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, {
+      refinerModel: refiner,
+      refinerStart: 1,
+      refinerSteps: 0,
+      refinerCfgScale: Number.NaN,
+      refinerPositiveAestheticScore: 0,
+      refinerNegativeAestheticScore: 20,
+    });
+
+    expect(getGenerationValidationReasons(sdxl, settings)).toEqual([]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([]);
+    const reactivated = { ...settings, refinerStart: 0.8 };
+    expect(getGenerationValidationReasons(sdxl, reactivated)).toContain(
+      'Refiner steps must be a whole number of at least 1.'
+    );
+    expect(getGenerationModelAvailabilityReasons(sdxl, reactivated, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+  });
+
+  it('reports an uninstalled refiner', () => {
+    const sdxl = createModel('sdxl');
+    const settings = createSettings(sdxl, { refinerModel: refiner });
+
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never])).toEqual([
+      'Refiner "SDXL Refiner" is no longer installed.',
+    ]);
+    expect(getGenerationModelAvailabilityReasons(sdxl, settings, [sdxl as never, refiner as never])).toEqual([]);
   });
 });

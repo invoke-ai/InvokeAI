@@ -107,6 +107,7 @@ const getSubmittedBody = () => {
   expect(init?.body).toEqual(expect.any(String));
 
   return JSON.parse(init?.body as string) as {
+    prepend: boolean;
     batch: {
       batch_id?: string;
       data: { field_name: string; items: unknown[]; node_path: string }[][];
@@ -161,6 +162,17 @@ describe('enqueueGenerate', () => {
       },
       { field_name: 'value', items: ['low quality', 'low quality', 'low quality'], node_path: 'negative_prompt' },
     ]);
+  });
+
+  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
+    const { enqueueGenerate } = await import('./submissionApi');
+
+    await enqueueGenerate(createRequest());
+    expect(getSubmittedBody()).toMatchObject({ prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueGenerate(createRequest({ prepend: true }));
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 
   it('includes project-aware webv2 origin metadata', async () => {
@@ -328,6 +340,17 @@ describe('enqueueWorkflow', () => {
     });
   });
 
+  it('prepends a workflow batch only when the request asks for the front of the queue', async () => {
+    const { enqueueWorkflow } = await import('./submissionApi');
+
+    await enqueueWorkflow(createWorkflowRequest());
+    expect(getSubmittedBody()).toMatchObject({ prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueWorkflow(createWorkflowRequest({ prepend: true }));
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
+  });
+
   it('submits workflow runs for the requested batch count', async () => {
     const { enqueueWorkflow } = await import('./submissionApi');
 
@@ -413,6 +436,25 @@ describe('enqueueWorkflow', () => {
     await enqueueWorkflow(createWorkflowRequest({ batchCount: 10_000 }));
 
     expect(getSubmittedBody().batch.runs).toBe(10_000);
+  });
+});
+
+describe('enqueueUtility', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ enqueued: 1, item_ids: [4] });
+  });
+
+  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
+    const { enqueueUtility } = await import('./submissionApi');
+    const request = { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'webv2:util:1' };
+
+    await expect(enqueueUtility(request)).resolves.toEqual({ enqueued: 1, itemIds: [4] });
+    expect(getSubmittedBody()).toMatchObject({ batch: { origin: 'webv2:util:1', runs: 1 }, prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueUtility({ ...request, prepend: true });
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
   });
 });
 
@@ -736,5 +778,122 @@ describe('getResultVideoNames', () => {
     const { getResultVideoNames } = await import('./submissionApi');
 
     await expect(getResultVideoNames(1, { resultNodeIds: ['final_l2v'] })).resolves.toEqual(['final.mp4']);
+  });
+});
+
+describe('readQueueItemLastSavedOutput', () => {
+  const imageUrl = (imageName: string) => `/api/v1/images/i/${imageName}`;
+  const serveItem = (
+    item: Record<string, unknown>,
+    intermediates: readonly string[],
+    missing: readonly string[] = []
+  ) =>
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url === '/api/v1/queue/default/i/1') {
+        return Promise.resolve({ item_id: 1, status: 'completed', ...item });
+      }
+
+      const [, kind, name] = /^\/api\/v1\/(image|video)s\/i\/(.+)$/.exec(url)!;
+
+      if (missing.includes(name!)) {
+        return Promise.reject(new ApiError('Not found', 404));
+      }
+
+      return Promise.resolve({ [`${kind}_name`]: name, is_intermediate: intermediates.includes(name!) });
+    });
+  const session = {
+    results: {
+      first: { image: { image_name: 'first.png' }, type: 'image_output' },
+      saved: { image: { image_name: 'saved.png' }, type: 'image_output' },
+      deleted: { image: { image_name: 'deleted.png' }, type: 'image_output' },
+      preview: { image: { image_name: 'preview.png' }, type: 'image_output' },
+    },
+  };
+  let ApiError: new (message: string, status: number) => Error;
+
+  beforeEach(async () => {
+    accountLifecycle.activate('test-account');
+    mocks.apiFetchJson.mockReset();
+    ({ ApiError } = (await import('@platform/transport/http')) as unknown as { ApiError: typeof ApiError });
+  });
+
+  it('walks back from the last output to the first saved image, reading no earlier record', async () => {
+    serveItem({ session }, ['preview.png'], ['deleted.png']);
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'image', name: 'saved.png' });
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).not.toContain(imageUrl('first.png'));
+  });
+
+  it.each([
+    ['a video-only item', { clip: { type: 'video_output', video: { video_name: 'clip.mp4' } } }, [], 'clip.mp4'],
+    [
+      'an item whose frame extract is intermediate',
+      {
+        frame: { image: { image_name: 'frame.png' }, type: 'image_output' },
+        clip: { type: 'video_output', video: { video_name: 'clip.mp4' } },
+        last_frame: { image: { image_name: 'last_frame.png' }, type: 'image_output' },
+      },
+      ['frame.png', 'last_frame.png'],
+      'clip.mp4',
+    ],
+  ])('reveals the saved video of %s', async (_, results, intermediates, videoName) => {
+    serveItem({ session: { results } }, intermediates);
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'video', name: videoName });
+  });
+
+  it('walks back past a deleted and an intermediate video to an earlier saved image', async () => {
+    const results = {
+      still: { image: { image_name: 'still.png' }, type: 'image_output' },
+      draft: { type: 'video_output', video: { video_name: 'draft.mp4' } },
+      deleted: { type: 'video_output', video: { video_name: 'deleted.mp4' } },
+    };
+    serveItem({ session: { results } }, ['draft.mp4'], ['deleted.mp4']);
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'image', name: 'still.png' });
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => url)).toEqual([
+      '/api/v1/queue/default/i/1',
+      '/api/v1/videos/i/deleted.mp4',
+      '/api/v1/videos/i/draft.mp4',
+      '/api/v1/images/i/still.png',
+    ]);
+  });
+
+  it('takes whichever saved image or video comes last', async () => {
+    const image = { image: { image_name: 'still.png' }, type: 'image_output' };
+    const video = { type: 'video_output', video: { video_name: 'clip.mp4' } };
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+
+    serveItem({ session: { results: { image, video } } }, []);
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'video', name: 'clip.mp4' });
+
+    serveItem({ session: { results: { video, image } } }, []);
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toEqual({ kind: 'image', name: 'still.png' });
+  });
+
+  it('reveals nothing for a workflow-call child or an item without saved images', async () => {
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+
+    serveItem({ parent_item_id: 7, session }, []);
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toBeNull();
+
+    serveItem({ session }, ['first.png', 'saved.png', 'preview.png'], ['deleted.png']);
+    await expect(readQueueItemLastSavedOutput(1)).resolves.toBeNull();
+  });
+
+  it("passes the caller's abort signal to every read", async () => {
+    serveItem({ session }, ['preview.png'], ['deleted.png']);
+    const { readQueueItemLastSavedOutput } = await import('./submissionApi');
+    const controller = new AbortController();
+
+    await readQueueItemLastSavedOutput(1, controller.signal);
+    controller.abort();
+
+    for (const [, init] of mocks.apiFetchJson.mock.calls as [string, { signal: AbortSignal }][]) {
+      expect(init.signal.aborted).toBe(true);
+    }
   });
 });

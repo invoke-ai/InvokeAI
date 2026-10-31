@@ -4,16 +4,33 @@ import type {
   CanvasMaskContract,
   CanvasMaskFillContract,
   CanvasRegionalGuidanceLayerContract,
+  CanvasRegionalLayoutContract,
 } from '@workbench/canvas-engine/api';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
-import type { ChangeEvent, FocusEvent } from 'react';
+import type { ChangeEvent } from 'react';
 
-import { createListCollection, HStack, IconButton, Stack, Switch, Text } from '@chakra-ui/react';
-import { PROMPT_ATTENTION_TARGET_PROPS, PromptTextarea } from '@features/generation/components';
-import { getRegionalGuidanceSupport } from '@features/generation/graph';
+import {
+  createListCollection,
+  HStack,
+  IconButton,
+  Stack,
+  Switch,
+  Text,
+  Textarea,
+  VisuallyHidden,
+} from '@chakra-ui/react';
+import { PromptTextarea } from '@features/generation/components';
+import {
+  getLayoutRegionIssue,
+  getRegionalGuidanceSupport,
+  supportsPromptAttentionSyntax,
+} from '@features/generation/graph';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
+import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, ColorPicker, Field, Select, Tooltip } from '@platform/ui';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
+import { CANVAS_REGIONAL_LAYOUT_KINDS } from '@workbench/canvas-engine/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
@@ -21,11 +38,12 @@ import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/can
 import {
   baselineConfig,
   type CanvasPreparedEngine,
+  type PreparedCommitOutcome,
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useSelectedModelBase } from './useSelectedModelBase';
@@ -36,6 +54,7 @@ interface RegionalConfigPatch {
   positivePrompt?: string | null;
   negativePrompt?: string | null;
   autoNegative?: boolean;
+  layout?: CanvasRegionalLayoutContract | null;
 }
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
@@ -69,9 +88,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
-  const [positivePrompt, setPositivePrompt] = useState(layer.positivePrompt ?? '');
-  const [negativePrompt, setNegativePrompt] = useState(layer.negativePrompt ?? '');
+  // Null while not editing, so undo and edits from elsewhere show through and only typed text is ever committed.
+  const [positiveDraft, setPositiveDraft] = useState<string | null>(null);
+  const [negativeDraft, setNegativeDraft] = useState<string | null>(null);
+  const positivePrompt = positiveDraft ?? layer.positivePrompt ?? '';
+  const negativePrompt = negativeDraft ?? layer.negativePrompt ?? '';
 
+  const attentionSyntax = supportsPromptAttentionSyntax(base) ? 'edit' : 'none';
   const fill = layer.mask.fill;
   // Resolve support inside the capability selector to update memoized answers. Distinguish unavailable policy from
   // unsupported models.
@@ -93,44 +116,47 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
 
   // A previewed fill records from where its preview started; any other change from the live layer.
   const commitConfig = useCallback(
-    (label: string, next: RegionalConfigPatch) => {
+    (label: string, next: RegionalConfigPatch): PreparedCommitOutcome => {
       const config = { layerType: 'regional_guidance', ...next } as const;
-      commitPrepared(label, (model, baseline) =>
+      return commitPrepared(label, (model, baseline) =>
         model.prepare({ before: baselineConfig(baseline, config), config, id: layer.id, type: 'patch-config' })
       );
     },
     [commitPrepared, layer.id]
   );
 
-  const handlePositiveBlur = useCallback(
-    (event: FocusEvent<HTMLTextAreaElement>) => {
-      const value = event.target.value;
-      const next = value.length > 0 ? value : null;
-      if (next !== layer.positivePrompt) {
-        commitConfig(t('widgets.layers.regionalGuidance.positivePrompt'), { positivePrompt: next });
-      }
-    },
-    [commitConfig, layer.positivePrompt, t]
-  );
+  // Commits typed prompt drafts that differ from the layer, on blur and when Invoke (Ctrl+Enter included) flushes.
+  const commitPrompts = useCallback(() => {
+    if (positiveDraft === null && negativeDraft === null) {
+      return;
+    }
+    const positive = positiveDraft === null ? layer.positivePrompt : positiveDraft || null;
+    const negative = negativeDraft === null ? layer.negativePrompt : negativeDraft || null;
+    const patch: RegionalConfigPatch = {
+      ...(positive === layer.positivePrompt ? {} : { positivePrompt: positive }),
+      ...(negative === layer.negativePrompt ? {} : { negativePrompt: negative }),
+    };
+    const outcome =
+      'positivePrompt' in patch
+        ? commitConfig(t('widgets.layers.regionalGuidance.positivePrompt'), patch)
+        : 'negativePrompt' in patch
+          ? commitConfig(t('widgets.layers.regionalGuidance.negativePrompt'), patch)
+          : null;
+    // A refused edit (already reported) keeps the typed text in the field instead of discarding it.
+    if (outcome === null || outcome.status === 'committed' || outcome.status === 'unchanged') {
+      setPositiveDraft(null);
+      setNegativeDraft(null);
+    }
+  }, [commitConfig, layer.negativePrompt, layer.positivePrompt, negativeDraft, positiveDraft, t]);
+  useRegisterDraftFlusher(commitPrompts);
 
   const handlePositiveChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => setPositivePrompt(event.currentTarget.value),
+    (event: ChangeEvent<HTMLTextAreaElement>) => setPositiveDraft(event.currentTarget.value),
     []
   );
 
-  const handleNegativeBlur = useCallback(
-    (event: FocusEvent<HTMLTextAreaElement>) => {
-      const value = event.target.value;
-      const next = value.length > 0 ? value : null;
-      if (next !== layer.negativePrompt) {
-        commitConfig(t('widgets.layers.regionalGuidance.negativePrompt'), { negativePrompt: next });
-      }
-    },
-    [commitConfig, layer.negativePrompt, t]
-  );
-
   const handleNegativeChange = useCallback(
-    (event: ChangeEvent<HTMLTextAreaElement>) => setNegativePrompt(event.currentTarget.value),
+    (event: ChangeEvent<HTMLTextAreaElement>) => setNegativeDraft(event.currentTarget.value),
     []
   );
 
@@ -140,6 +166,87 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     },
     [commitConfig, t]
   );
+
+  // Layout bases read the region's role and, for text, its exact text; the stored role survives model switches.
+  const isLayout = support?.mode === 'layout';
+  const layoutKind = layer.layout?.kind ?? 'object';
+  const storedVisibleText = layer.layout?.text;
+  // Null while not editing, so undo and edits from elsewhere show through.
+  const [visibleTextDraft, setVisibleTextDraft] = useState<string | null>(null);
+  const visibleText = visibleTextDraft ?? storedVisibleText ?? '';
+  const layoutKindFieldId = useId();
+  const promptIssueId = useId();
+  const visibleTextIssueId = useId();
+
+  const commitLayout = useCallback(
+    (label: string, next: CanvasRegionalLayoutContract) =>
+      // A plain object role is stored as absence, like a layer that never had one.
+      commitConfig(label, { layout: next.kind === 'object' && next.text === undefined ? null : next }),
+    [commitConfig]
+  );
+
+  const layoutKindOptions = useMemo(
+    () =>
+      CANVAS_REGIONAL_LAYOUT_KINDS.map((kind) => ({
+        label: t(`widgets.layers.regionalGuidance.layoutKinds.${kind}`),
+        value: kind,
+      })),
+    [t]
+  );
+
+  const handleLayoutKindChange = useCallback(
+    (value: string) => {
+      const kind = CANVAS_REGIONAL_LAYOUT_KINDS.find((candidate) => candidate === value);
+      if (kind && kind !== layoutKind) {
+        commitLayout(t('widgets.layers.regionalGuidance.layoutKind'), {
+          kind,
+          ...(storedVisibleText === undefined ? {} : { text: storedVisibleText }),
+        });
+      }
+    },
+    [commitLayout, layoutKind, storedVisibleText, t]
+  );
+
+  const commitVisibleText = useCallback(() => {
+    if (visibleTextDraft === null) {
+      return;
+    }
+    const text = visibleTextDraft.length > 0 ? visibleTextDraft : undefined;
+    if (text === storedVisibleText) {
+      setVisibleTextDraft(null);
+      return;
+    }
+    const outcome = commitLayout(t('widgets.layers.regionalGuidance.visibleText'), {
+      kind: layoutKind,
+      ...(text === undefined ? {} : { text }),
+    });
+    // A refused edit (already reported) keeps the typed text in the field instead of discarding it.
+    if (outcome.status === 'committed' || outcome.status === 'unchanged') {
+      setVisibleTextDraft(null);
+    }
+  }, [commitLayout, layoutKind, storedVisibleText, t, visibleTextDraft]);
+  // Invoke flushes drafts first, so text typed but not yet blurred still reaches the graph.
+  useRegisterDraftFlusher(commitVisibleText);
+
+  const handleVisibleTextChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => setVisibleTextDraft(event.currentTarget.value),
+    []
+  );
+
+  // Generation skips a region the layout cannot place. The warning sits under the missing value and describes its
+  // control; a status region that exists before any warning announces each change.
+  const layoutIssue =
+    isLayout && support
+      ? getLayoutRegionIssue({ layout: { kind: layoutKind, text: visibleText }, positivePrompt })
+      : null;
+  const layoutIssueMessage = layoutIssue
+    ? t(
+        layoutIssue === 'missing_prompt'
+          ? 'widgets.layers.regionalGuidance.layoutMissingPrompt'
+          : 'widgets.layers.regionalGuidance.layoutMissingText',
+        { model: support?.label }
+      )
+    : null;
 
   const styleCollection = useMemo(
     () =>
@@ -197,10 +304,26 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           {t('widgets.layers.regionalGuidance.unsupportedModel')}
         </Text>
       ) : null}
+      {isLayout && support ? (
+        <Field
+          helpText={t('widgets.layers.regionalGuidance.layoutKindHelp', { model: support.label })}
+          id={layoutKindFieldId}
+          label={t('widgets.layers.regionalGuidance.layoutKind')}
+        >
+          <SegmentedControl
+            aria-describedby={`${layoutKindFieldId}-help`}
+            aria-labelledby={`${layoutKindFieldId}-label`}
+            options={layoutKindOptions}
+            value={layoutKind}
+            onChange={handleLayoutKindChange}
+          />
+        </Field>
+      ) : null}
       <Field label={t('widgets.layers.regionalGuidance.positivePrompt')}>
         <PromptTextarea
-          {...PROMPT_ATTENTION_TARGET_PROPS}
+          aria-describedby={layoutIssue === 'missing_prompt' ? promptIssueId : undefined}
           aria-label={t('widgets.layers.regionalGuidance.positivePrompt')}
+          attentionSyntax={attentionSyntax}
           defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
@@ -208,15 +331,40 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           showSyntaxHighlighting={showSyntaxHighlighting}
           size="lg"
           value={positivePrompt}
-          onBlur={handlePositiveBlur}
+          onBlur={commitPrompts}
           onChange={handlePositiveChange}
         />
       </Field>
+      {layoutIssue === 'missing_prompt' ? (
+        <Text color="fg.warning" fontSize="xs" id={promptIssueId}>
+          {layoutIssueMessage}
+        </Text>
+      ) : null}
+      {isLayout && layoutKind === 'text' ? (
+        <Field label={t('widgets.layers.regionalGuidance.visibleText')}>
+          <Textarea
+            aria-describedby={layoutIssue === 'missing_text' ? visibleTextIssueId : undefined}
+            autoComplete="off"
+            autoresize
+            placeholder={t('widgets.layers.regionalGuidance.visibleTextPlaceholder')}
+            rows={1}
+            value={visibleText}
+            onBlur={commitVisibleText}
+            onChange={handleVisibleTextChange}
+          />
+        </Field>
+      ) : null}
+      {layoutIssue === 'missing_text' ? (
+        <Text color="fg.warning" fontSize="xs" id={visibleTextIssueId}>
+          {layoutIssueMessage}
+        </Text>
+      ) : null}
+      {isLayout ? <VisuallyHidden role="status">{layoutIssueMessage}</VisuallyHidden> : null}
       {showNegativeControls && (
         <Field label={t('widgets.layers.regionalGuidance.negativePrompt')}>
           <PromptTextarea
-            {...PROMPT_ATTENTION_TARGET_PROPS}
             aria-label={t('widgets.layers.regionalGuidance.negativePrompt')}
+            attentionSyntax={attentionSyntax}
             defaultHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             minHeightPx={REGIONAL_PROMPT_HEIGHT_PX}
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
@@ -224,7 +372,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             showSyntaxHighlighting={showSyntaxHighlighting}
             size="lg"
             value={negativePrompt}
-            onBlur={handleNegativeBlur}
+            onBlur={commitPrompts}
             onChange={handleNegativeChange}
           />
         </Field>

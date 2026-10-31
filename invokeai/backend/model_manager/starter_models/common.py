@@ -8,6 +8,12 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
 )
 
+TINY_AUTOENCODER_NOTE = (
+    "Tiny AutoEncoder by madebyollin (MIT). Used only for live denoise previews when "
+    "`tiny_autoencoder_previews: true` is set in invokeai.yaml."
+)
+"""Closes the description of every Tiny AutoEncoder starter, one per family module."""
+
 # This is CLIP-ViT-H-14-laion2B-s32B-b79K
 ip_adapter_sd_image_encoder = StarterModel(
     name="IP Adapter SD1.5 Image Encoder",
@@ -194,6 +200,17 @@ siglip = StarterModel(
     type=ModelType.SigLIP,
 )
 
+# Dependency-only (like the IP-Adapter encoders above): not listed in STARTER_MODELS. Nothing but the
+# Anima IP-Adapter uses it, which declares it as a dependency, and `anima_ip_adapter` installs it on
+# first use when the adapter came from elsewhere.
+siglip2_base_512 = StarterModel(
+    name="SigLIP2 - google/siglip2-base-patch16-512",
+    base=BaseModelType.Any,
+    source="google/siglip2-base-patch16-512",
+    description="A SigLIP2 image encoder (used by the Anima IP-Adapter). ~1.5GB",
+    type=ModelType.SigLIP,
+)
+
 # region LlavaOnevisionModel (vision-language models for Image-to-Prompt)
 llava_onevision = StarterModel(
     name="LLaVA Onevision Qwen2 0.5B",
@@ -370,10 +387,21 @@ qwen3_vl_encoder_4b = StarterModel(
     name="Qwen3-VL 4B Encoder (Diffusers)",
     base=BaseModelType.Any,
     source="Qwen/Qwen3-VL-4B-Instruct",
-    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2, in HuggingFace folder layout "
-    "(includes tokenizer). Use with single-file / GGUF Krea-2 transformers. (~8GB)",
+    description="Qwen3-VL 4B text encoder (Qwen3VLModel) used by Krea-2 and FLUX.3, in HuggingFace folder "
+    "layout (includes tokenizer). Use with single-file / GGUF Krea-2 and FLUX.3 transformers. (~8GB)",
     type=ModelType.Qwen3VLEncoder,
     format=ModelFormat.Qwen3VLEncoder,
+)
+
+qwen3_vl_encoder_8b = StarterModel(
+    name="Qwen3-VL 8B Encoder",
+    previous_names=["Qwen3-VL 8B Encoder (Ideogram 4)"],
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Comfy-Org/Ideogram-4/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors",
+    description="Qwen3-VL 8B text encoder in ComfyUI scaled fp8, the encoder Ideogram 4 and Qwen-Image-2.1 condition "
+    "on. Distinct from the 4B encoder Krea-2 uses; the two are not interchangeable. ~9.9GB",
+    type=ModelType.Qwen3VLEncoder,
+    format=ModelFormat.Checkpoint,
 )
 
 # region Wan 2.2 (local)

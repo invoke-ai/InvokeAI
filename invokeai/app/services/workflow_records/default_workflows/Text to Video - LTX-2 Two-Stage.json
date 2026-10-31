@@ -431,7 +431,7 @@
       "type": "invocation",
       "data": {
         "id": "core_metadata",
-        "version": "2.7.0",
+        "version": "2.8.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count, steps, CFG and frame rate arrive over edges from the nodes that set them. They are the requested values: on the Distilled checkpoint the run itself takes 8 unguided steps whatever Steps and CFG say.",

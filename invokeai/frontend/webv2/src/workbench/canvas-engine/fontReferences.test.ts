@@ -123,6 +123,19 @@ describe('canvas font references', () => {
     expect(noOp).toMatchObject({ replacedCount: 0, document });
     expect(sameCanvasTextFontRef(from, { ...from })).toBe(true);
   });
+  it('raises a v3 document to schema 4 and keeps a v5 document at 5 when it remaps a font', () => {
+    const remap = (version: 3 | 4 | 5) =>
+      replaceCanvasFontReferences({ ...documentFrom([textLayer('text', from)]), version }, from, {
+        fontRef: to,
+        style: 'normal',
+        weight: 400,
+        axes: [],
+      }).document.version;
+
+    expect(remap(3)).toBe(4);
+    expect(remap(5)).toBe(5);
+  });
+
   it('uses target axis defaults when replacing a static face and synchronizes CSS typography', () => {
     const document = documentFrom([textLayer('text', from)]);
     const result = replaceCanvasFontReferences(document, from, {

@@ -1,5 +1,10 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
+import type {
+  FluxDypePreset,
+  GenerateModelConfig,
+  GenerateSettings,
+  Ideogram4SamplerPreset,
+} from '@features/generation/core/types';
 import type { ReactNode } from 'react';
 
 import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
@@ -11,6 +16,11 @@ import {
 } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import {
+  DEFAULT_FLUX_DYPE_EXPONENT,
+  DEFAULT_FLUX_DYPE_SCALE,
+  DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
+  DEFAULT_TIMESTEP_SHIFT,
+  FLUX_DYPE_PRESETS,
   getDynamicPromptsConfig,
   IDEOGRAM4_GUIDANCE_MAX,
   IDEOGRAM4_GUIDANCE_MIN,
@@ -19,8 +29,19 @@ import {
   IDEOGRAM4_SAMPLER_PRESETS,
   IDEOGRAM4_STEPS_MAX,
   IDEOGRAM4_STEPS_MIN,
+  isFluxDypePreset,
+  isValidMossImageSkipLayers,
+  MAX_FLUX_DYPE_EXPONENT,
+  MAX_FLUX_DYPE_SCALE,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
+  MAX_MOSS_IMAGE_SKIP_LAYER,
+  MAX_TIMESTEP_SHIFT,
+  MAX_ZIMAGE_SEED_VARIANCE_STRENGTH,
+  MIN_TIMESTEP_SHIFT,
+  MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  parseMossImageSkipLayers,
 } from '@features/generation/core/settings';
+import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox } from '@platform/ui/Combobox';
 import { Field } from '@platform/ui/Field';
@@ -29,6 +50,7 @@ import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Select } from '@platform/ui/Select';
 import { SliderNumberField } from '@platform/ui/SliderNumberField';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
@@ -46,6 +68,12 @@ import { SeedField as SharedSeedField } from './shared/SeedField';
 import { useDynamicPrompts } from './useDynamicPrompts';
 
 const STEPS_SLIDER_MAX = 100;
+/** The useful shift range; the input accepts the node's full `ge=0` span up to 10. */
+const TIMESTEP_SHIFT_SLIDER_MIN = 1;
+const TIMESTEP_SHIFT_SLIDER_MAX = 7;
+const TIMESTEP_SHIFT_MARKS = [{ label: String(DEFAULT_TIMESTEP_SHIFT), value: DEFAULT_TIMESTEP_SHIFT }];
+/** The exponent's `le=1000` bound is far beyond any documented recipe (0.5–2), so the track stops at 10. */
+const DYPE_EXPONENT_SLIDER_MAX = 10;
 const formatPercent = (value: number): string => `${value}%`;
 
 /**
@@ -70,6 +98,9 @@ const selectRenderSettings = pickGenerateSettings([
   'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',
   'dynamicPromptsSeedBehaviour',
+  'fluxDypeExponent',
+  'fluxDypePreset',
+  'fluxDypeScale',
   'ideogram4ColorPalette',
   'ideogram4GuidanceScale',
   'ideogram4Mu',
@@ -81,15 +112,21 @@ const selectRenderSettings = pickGenerateSettings([
   'krea2SeedVarianceEnabled',
   'krea2SeedVarianceRandomizePercent',
   'krea2SeedVarianceStrength',
+  'mossImageUncondSkipLayers',
   // The seed field counts the prompts the effective positive prompt expands to.
   'negativePrompt',
   'positivePrompt',
   'promptTemplate',
+  'qwenImageShift',
   'scheduler',
   'seed',
   'seedMode',
   'steps',
   'wanGuidanceScaleLowNoise',
+  'zImageSeedVarianceEnabled',
+  'zImageSeedVarianceRandomizePercent',
+  'zImageSeedVarianceStrength',
+  'zImageShift',
 ]);
 
 interface RenderFieldsProps {
@@ -202,6 +239,90 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
   );
 };
 
+const formatSkipLayers = (layers: readonly number[]): string => layers.join(', ');
+
+const isSameSkipLayers = (left: readonly number[], right: readonly number[]): boolean =>
+  left.length === right.length && left.every((layer, index) => layer === right[index]);
+
+/** Text typed into the skip-layer field, and the stored list from before the edit began. */
+interface SkipLayersDraft {
+  text: string;
+  layers: readonly number[];
+}
+
+/**
+ * The blocks MOSS-Image's negative branch skips. Typing only edits a draft, with its error shown while the text is
+ * not a list of blocks; the list commits when the field loses focus or drafts flush before Invoke. Text that is not a
+ * list then restores the list from before the edit, so no prefix typed on the way ever commits. Either way the field
+ * then shows the stored list unique and ascending: exactly what is sent. A stored list changed from elsewhere
+ * (recall, reset, preset) replaces the draft typed over the old one. CFG 1 runs no negative branch, so the field
+ * rests disabled there.
+ */
+const MossImageSkipLayersField = ({
+  onCommitImmediate,
+  settings,
+}: {
+  settings: RenderFieldsProps['settings'];
+  /** Immediate, so a commit made while drafts flush is in the settings Invoke reads. */
+  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
+}) => {
+  const { t } = useTranslation();
+  const [draft, setDraft] = useState<SkipLayersDraft | null>(null);
+  const stored = settings.mossImageUncondSkipLayers;
+  const activeDraft = draft && isSameSkipLayers(draft.layers, stored) ? draft : null;
+  const text = activeDraft?.text ?? formatSkipLayers(stored);
+  const parsed = parseMossImageSkipLayers(text);
+  const isValid = parsed !== null && isValidMossImageSkipLayers(parsed);
+  const label = t('widgets.generate.mossImageSkipLayers');
+  const isCfgOff = settings.cfgScale <= 1;
+
+  const finishEditing = () => {
+    if (activeDraft && isValid && !isSameSkipLayers(parsed, activeDraft.layers)) {
+      onCommitImmediate({ mossImageUncondSkipLayers: parsed });
+    }
+    setDraft(null);
+  };
+
+  useRegisterDraftFlusher(finishEditing);
+
+  return (
+    <GenerateFieldContextMenu
+      copyValue={() => formatSkipLayers(stored)}
+      isAtDefault={isSameSkipLayers(stored, DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS)}
+      onReset={() => {
+        setDraft(null);
+        onCommitImmediate({ mossImageUncondSkipLayers: [...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS] });
+      }}
+      resetLabel={t('widgets.generate.resetToDefault')}
+    >
+      <Field
+        disabled={isCfgOff}
+        error={
+          isCfgOff || isValid
+            ? null
+            : t('widgets.generate.mossImageSkipLayersInvalid', { max: MAX_MOSS_IMAGE_SKIP_LAYER })
+        }
+        helpText={
+          isCfgOff
+            ? t('widgets.generate.mossImageSkipLayersCfgOff')
+            : t('widgets.generate.mossImageSkipLayersHelp', {
+                defaultLayers: formatSkipLayers(DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS),
+                max: MAX_MOSS_IMAGE_SKIP_LAYER,
+              })
+        }
+        label={label}
+      >
+        <Input
+          aria-label={label}
+          value={text}
+          onBlur={finishEditing}
+          onChange={(event) => setDraft({ layers: activeDraft?.layers ?? stored, text: event.target.value })}
+        />
+      </Field>
+    </GenerateFieldContextMenu>
+  );
+};
+
 /** Null low-noise guidance inherits main guidance. */
 const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => {
   const { t } = useTranslation();
@@ -228,47 +349,209 @@ const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => 
   );
 };
 
-/** Perturbs Krea-2 conditioning between seeds — a variation concern, so it sits by the seed. */
-const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
+/**
+ * Perturbs conditioning between seeds — a variation concern, so it sits by the seed. Krea-2 and Z-Image each have
+ * their own enhancer node with the same three settings.
+ */
+const SeedVarianceFields = ({
+  enabled,
+  maxStrength,
+  minRandomizePercent,
+  onChange,
+  randomizePercent,
+  strength,
+}: {
+  enabled: boolean;
+  maxStrength: number;
+  minRandomizePercent: number;
+  randomizePercent: number;
+  strength: number;
+  onChange: (patch: { enabled?: boolean; randomizePercent?: number; strength?: number }) => void;
+}) => {
   const { t } = useTranslation();
 
   return (
     <>
       <Field
-        helpText={t('widgets.generate.krea2SeedVarianceHelp')}
-        label={t('widgets.generate.krea2SeedVariance')}
+        helpText={t('widgets.generate.seedVarianceHelp')}
+        hint="seedVariance"
+        label={t('widgets.generate.seedVariance')}
         labelEnd={
           <GenerateToggleSwitch
-            checked={settings.krea2SeedVarianceEnabled}
-            label={t('widgets.generate.krea2SeedVariance')}
-            onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
+            checked={enabled}
+            label={t('widgets.generate.seedVariance')}
+            onCheckedChange={(checked) => onChange({ enabled: checked })}
           />
         }
       >
         {null}
       </Field>
-      {settings.krea2SeedVarianceEnabled ? (
+      {enabled ? (
         <>
           <ScrubberField
-            label={t('widgets.generate.krea2SeedVarianceStrength')}
-            max={MAX_KREA2_SEED_VARIANCE_STRENGTH}
+            hint="seedVarianceStrength"
+            label={t('widgets.generate.seedVarianceStrength')}
+            max={maxStrength}
             min={0}
             step={0.05}
-            value={settings.krea2SeedVarianceStrength}
-            onChange={(value) => onCommit({ krea2SeedVarianceStrength: value })}
+            value={strength}
+            onChange={(value) => onChange({ strength: value })}
           />
           <ScrubberField
             formatValue={formatPercent}
-            label={t('widgets.generate.krea2SeedVarianceRandomize')}
+            hint="seedVarianceRandomize"
+            label={t('widgets.generate.seedVarianceRandomize')}
             max={100}
-            min={0}
+            min={minRandomizePercent}
             step={1}
-            value={settings.krea2SeedVarianceRandomizePercent}
-            onChange={(value) => onCommit({ krea2SeedVarianceRandomizePercent: value })}
+            value={randomizePercent}
+            onChange={(value) => onChange({ randomizePercent: value })}
           />
         </>
       ) : null}
     </>
+  );
+};
+
+const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => (
+  <SeedVarianceFields
+    enabled={settings.krea2SeedVarianceEnabled}
+    maxStrength={MAX_KREA2_SEED_VARIANCE_STRENGTH}
+    minRandomizePercent={0}
+    randomizePercent={settings.krea2SeedVarianceRandomizePercent}
+    strength={settings.krea2SeedVarianceStrength}
+    onChange={({ enabled, randomizePercent, strength }) =>
+      onCommit({
+        ...(enabled === undefined ? {} : { krea2SeedVarianceEnabled: enabled }),
+        ...(randomizePercent === undefined ? {} : { krea2SeedVarianceRandomizePercent: randomizePercent }),
+        ...(strength === undefined ? {} : { krea2SeedVarianceStrength: strength }),
+      })
+    }
+  />
+);
+
+const ZImageSeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => (
+  <SeedVarianceFields
+    enabled={settings.zImageSeedVarianceEnabled}
+    maxStrength={MAX_ZIMAGE_SEED_VARIANCE_STRENGTH}
+    minRandomizePercent={MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT}
+    randomizePercent={settings.zImageSeedVarianceRandomizePercent}
+    strength={settings.zImageSeedVarianceStrength}
+    onChange={({ enabled, randomizePercent, strength }) =>
+      onCommit({
+        ...(enabled === undefined ? {} : { zImageSeedVarianceEnabled: enabled }),
+        ...(randomizePercent === undefined ? {} : { zImageSeedVarianceRandomizePercent: randomizePercent }),
+        ...(strength === undefined ? {} : { zImageSeedVarianceStrength: strength }),
+      })
+    }
+  />
+);
+
+/** Preset labels name the trigger condition, which the backend IDs leave implicit. */
+const FLUX_DYPE_PRESET_LABEL_KEYS: Record<FluxDypePreset, string> = {
+  '4k': 'widgets.generate.dypePreset4k',
+  area: 'widgets.generate.dypePresetArea',
+  auto: 'widgets.generate.dypePresetAuto',
+  manual: 'widgets.generate.dypePresetManual',
+  off: 'widgets.generate.dypePresetOff',
+};
+
+/** The scale and exponent only reach the node under the manual preset, so they only show then. */
+const FluxDypeFields = ({ onCommit, settings }: RenderFieldsProps) => {
+  const { t } = useTranslation();
+  const presetCollection = useMemo(
+    () =>
+      createListCollection({
+        items: FLUX_DYPE_PRESETS.map((value) => ({ label: t(FLUX_DYPE_PRESET_LABEL_KEYS[value]), value })),
+      }),
+    [t]
+  );
+
+  return (
+    <>
+      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')}>
+        <Select
+          aria-label={t('widgets.generate.dypePreset')}
+          collection={presetCollection}
+          value={[settings.fluxDypePreset]}
+          onValueChange={({ value }) => {
+            const preset = value[0];
+
+            if (isFluxDypePreset(preset)) {
+              onCommit({ fluxDypePreset: preset });
+            }
+          }}
+        />
+      </Field>
+      {settings.fluxDypePreset === 'manual' ? (
+        <>
+          <ScrubberField
+            defaultValue={DEFAULT_FLUX_DYPE_SCALE}
+            label={t('widgets.generate.dypeScale')}
+            marks={[DEFAULT_FLUX_DYPE_SCALE]}
+            max={MAX_FLUX_DYPE_SCALE}
+            min={0}
+            step={0.1}
+            value={settings.fluxDypeScale}
+            onChange={(value) => onCommit({ fluxDypeScale: value })}
+          />
+          <ScrubberField
+            defaultValue={DEFAULT_FLUX_DYPE_EXPONENT}
+            inputMax={MAX_FLUX_DYPE_EXPONENT}
+            label={t('widgets.generate.dypeExponent')}
+            marks={[DEFAULT_FLUX_DYPE_EXPONENT]}
+            max={DYPE_EXPONENT_SLIDER_MAX}
+            min={0}
+            step={0.1}
+            value={settings.fluxDypeExponent}
+            onChange={(value) => onCommit({ fluxDypeExponent: value })}
+          />
+        </>
+      ) : null}
+    </>
+  );
+};
+
+/** Null lets the denoise node derive the shift from the image size; the override starts at the Lightning value. */
+const TimestepShiftField = ({
+  helpText,
+  onChange,
+  shift,
+}: {
+  helpText: string;
+  shift: number | null;
+  onChange: (shift: number | null) => void;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Field helpText={helpText} hint="timestepShift" label={t('widgets.generate.timestepShift')}>
+      <GenerateToggleSwitch
+        checked={shift !== null}
+        label={t('widgets.generate.override')}
+        labelVisible
+        onCheckedChange={(checked) => onChange(checked ? DEFAULT_TIMESTEP_SHIFT : null)}
+      />
+      {shift !== null ? (
+        <SliderNumberField
+          ariaLabel={t('widgets.generate.timestepShift')}
+          marks={TIMESTEP_SHIFT_MARKS}
+          max={TIMESTEP_SHIFT_SLIDER_MAX}
+          min={TIMESTEP_SHIFT_SLIDER_MIN}
+          numberInputMax={MAX_TIMESTEP_SHIFT}
+          numberInputMin={MIN_TIMESTEP_SHIFT}
+          step={0.1}
+          value={shift}
+          // The input reports each keystroke, so typing 0.5 passes through 0. Settings read a shift outside its
+          // bounds as auto, which would drop the override mid-edit; the input clamps it on blur instead.
+          onChange={(next) => {
+            if (next >= MIN_TIMESTEP_SHIFT && next <= MAX_TIMESTEP_SHIFT) {
+              onChange(next);
+            }
+          }}
+        />
+      ) : null}
+    </Field>
   );
 };
 
@@ -403,6 +686,9 @@ export const GenerateRenderSection = ({
         />
       </GenerateFieldContextMenu>
       {strengthField}
+      {familyBase === 'moss-image' ? (
+        <MossImageSkipLayersField settings={settings} onCommitImmediate={onCommitImmediate} />
+      ) : null}
       {familyBase === 'krea-2' ? (
         <>
           <Separator borderColor="border.subtle" />
@@ -414,6 +700,21 @@ export const GenerateRenderSection = ({
         </>
       ) : null}
       {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
+      {familyBase === 'z-image' ? (
+        <TimestepShiftField
+          helpText={t('widgets.generate.timestepShiftHelp')}
+          shift={settings.zImageShift}
+          onChange={(zImageShift) => onCommit({ zImageShift })}
+        />
+      ) : null}
+      {familyBase === 'qwen-image' ? (
+        <TimestepShiftField
+          helpText={t('widgets.generate.qwenImageShiftHelp')}
+          shift={settings.qwenImageShift}
+          onChange={(qwenImageShift) => onCommit({ qwenImageShift })}
+        />
+      ) : null}
+      {familyBase === 'flux' ? <FluxDypeFields settings={settings} onCommit={onCommit} /> : null}
       {uiPolicy.schedulerVisible ? (
         <GenerateFieldContextMenu
           copyValue={() => settings.scheduler}
@@ -448,6 +749,12 @@ export const GenerateRenderSection = ({
           <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
         </>
       ) : null}
+      {familyBase === 'z-image' ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <ZImageSeedVarianceFields settings={settings} onCommit={onCommit} />
+        </>
+      ) : null}
     </>
   );
 
@@ -472,8 +779,9 @@ export const GenerateRenderSection = ({
     </GenerateCollapsibleSection>
   );
 
-  // Switching source remounts the section's subtree, as the Size section does.
-  return project.invocationSourceId === 'canvas' ? (
+  // Switching source remounts the section's subtree, as the Size section does. A hosted provider edits the canvas
+  // composite at its own strength, so the canvas adds none for it.
+  return project.invocationSourceId === 'canvas' && selectedModel?.type !== 'external_image_generator' ? (
     <CanvasDenoisingStrengthSlot>{renderSection}</CanvasDenoisingStrengthSlot>
   ) : (
     renderSection(null)

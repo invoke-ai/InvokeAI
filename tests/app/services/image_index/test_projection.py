@@ -1,9 +1,14 @@
 """Tests for the pure projection/clustering functions (UMAP, DBSCAN, scope hashing)."""
 
+import contextlib
 import json
+import sys
+import tracemalloc
 
 import numpy as np
+import pytest
 
+from invokeai.app.services.image_index import projection
 from invokeai.app.services.image_index.image_index_common import IndexedItem
 from invokeai.app.services.image_index.projection import (
     CANDIDATE_QUANTILES,
@@ -16,9 +21,11 @@ from invokeai.app.services.image_index.projection import (
     cluster_with_diagnostics,
     compute_clusters,
     compute_umap,
+    projection_method,
     projection_params,
     resolve_cluster_eps,
     scope_hash,
+    stored_projection_method,
 )
 
 
@@ -475,3 +482,137 @@ def _blob_coords() -> np.ndarray:
     return np.concatenate([rng.standard_normal((20, 2)) * 0.1 + offset for offset in ([0, 0], [5, 5])]).astype(
         np.float32
     )
+
+
+@contextlib.contextmanager
+def _umap_hidden(monkeypatch: pytest.MonkeyPatch):
+    """`import umap` fails inside the block, and nothing it caches outlives it.
+
+    The cache is cleared on the way out as well as in: a None cached while umap was hidden would
+    otherwise make every later test in the worker run PCA instead of UMAP.
+    """
+    monkeypatch.setitem(sys.modules, "umap", None)
+    projection._umap_class.cache_clear()
+    try:
+        yield
+    finally:
+        projection._umap_class.cache_clear()
+
+
+@pytest.fixture
+def umap_unavailable(monkeypatch):
+    with _umap_hidden(monkeypatch):
+        yield
+
+
+@pytest.fixture
+def windows_arm64(monkeypatch):
+    monkeypatch.setattr(projection, "is_windows_arm64", lambda: True)
+
+
+@pytest.fixture
+def off_windows_arm64(monkeypatch):
+    # The suite also runs on Windows ARM64, where umap-learn is not installed.
+    monkeypatch.setattr(projection, "is_windows_arm64", lambda: False)
+
+
+def test_umap_missing_falls_back_to_pca_on_windows_arm64(umap_unavailable, windows_arm64) -> None:
+    """Without umap-learn (Windows ARM64 has no numba wheel), every gallery size still gets a map."""
+    embeddings = _blobs()
+    coords = compute_umap(embeddings)
+    assert coords.shape == (embeddings.shape[0], 2)
+    assert coords.dtype == np.float32
+    assert np.isfinite(coords).all()
+    # The fallback is deterministic and must still separate the blobs.
+    assert np.array_equal(coords, compute_umap(embeddings))
+    span = np.ptp(coords, axis=0).max()
+    labels = compute_clusters(coords, eps=span * 0.05, min_samples=10)
+    assert len({label for label in labels if label != -1}) >= 2
+    # The stored params say how the map was made, so it can be refit once UMAP is installed.
+    assert stored_projection_method(projection_params(n_points=embeddings.shape[0])) == "pca"
+
+
+def test_umap_missing_elsewhere_is_a_failed_fit_not_a_pca_map(umap_unavailable, off_windows_arm64) -> None:
+    """Off Windows ARM64 a missing umap is a broken install: the fit fails (and is retried) rather than degrade."""
+    with pytest.raises(ImportError):
+        compute_umap(_blobs())
+    assert projection_method(100) == "umap"
+
+
+def test_hiding_umap_leaves_no_cached_lookup_behind() -> None:
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(projection, "is_windows_arm64", lambda: True)
+        with _umap_hidden(mp):
+            compute_umap(_blobs())  # caches the fallback's None
+    assert projection._umap_class.cache_info().currsize == 0
+
+
+def test_projection_params_record_the_method(off_windows_arm64) -> None:
+    assert stored_projection_method(projection_params(n_points=100)) == "umap"
+    assert stored_projection_method(projection_params(n_points=3)) == "pca"
+    # Rows cached before the method was recorded were all UMAP fits.
+    legacy = json.loads(projection_params(n_points=100))
+    del legacy["method"]
+    assert stored_projection_method(json.dumps(legacy)) == "umap"
+    assert stored_projection_method("not json") == "umap"
+
+
+def test_a_broken_umap_on_windows_arm64_is_treated_as_umap(windows_arm64, monkeypatch) -> None:
+    """An import failure other than ImportError is a fit failure, not a reason to call a map PCA."""
+
+    def broken() -> None:
+        raise OSError("numba native library failed to load")
+
+    monkeypatch.setattr(projection, "_umap_class", broken)
+    assert projection_method(100) == "umap"
+
+
+def test_a_pca_map_is_current_only_while_umap_is_missing(windows_arm64, monkeypatch) -> None:
+    monkeypatch.setattr(projection, "_umap_class", lambda: None)
+    pca_params = projection_params(n_points=100)
+    assert projection.projection_method_is_current(pca_params, 100)
+
+    monkeypatch.setattr(projection, "_umap_class", lambda: object)
+    assert not projection.projection_method_is_current(pca_params, 100)
+    # Tiny and failed (empty) maps are never refit for their method.
+    assert projection.projection_method_is_current(pca_params, 3)
+    assert projection.projection_method_is_current(pca_params, 0)
+
+
+def test_a_umap_map_stays_current_on_a_host_without_umap(windows_arm64, monkeypatch) -> None:
+    """A UMAP map copied from an x64 database, or written before the method was recorded, beats a PCA refit."""
+    monkeypatch.setattr(projection, "_umap_class", lambda: None)
+    umap_params = json.loads(projection_params(n_points=100))
+    umap_params["method"] = "umap"
+    assert projection.projection_method_is_current(json.dumps(umap_params), 100)
+    del umap_params["method"]
+    assert projection.projection_method_is_current(json.dumps(umap_params), 100)
+
+
+def test_pca_fallback_matches_an_svd_projection() -> None:
+    rng = np.random.default_rng(11)
+    # Anisotropic, so the two leading components are well separated from the rest.
+    embeddings = (rng.standard_normal((500, 32)) * np.linspace(5.0, 0.1, 32)).astype(np.float32)
+    centered = embeddings.astype(np.float64) - embeddings.astype(np.float64).mean(axis=0)
+    _, _, vt = np.linalg.svd(centered, full_matrices=False)
+    expected = centered @ vt[:2].T
+
+    coords = projection._pca_projection(embeddings)
+    # Principal components are defined up to sign.
+    np.testing.assert_allclose(np.abs(coords), np.abs(expected), rtol=1e-4, atol=1e-4)
+    assert np.array_equal(coords, projection._pca_projection(embeddings.copy()))
+
+
+def test_pca_fallback_does_not_materialize_a_float64_copy() -> None:
+    """The fallback is the default map on Windows ARM64, so it has to fit a large gallery in memory."""
+    n_points, dim = 60_000, 256
+    embeddings = np.random.default_rng(0).standard_normal((n_points, dim)).astype(np.float32)
+    full_float64_copy = n_points * dim * 8
+
+    tracemalloc.start()
+    try:
+        projection._pca_projection(embeddings)
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    assert peak < full_float64_copy / 2, f"peak {peak / 1e6:.0f} MB against a {full_float64_copy / 1e6:.0f} MB copy"
