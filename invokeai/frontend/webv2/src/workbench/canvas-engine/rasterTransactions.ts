@@ -17,7 +17,16 @@ export interface RasterReadLease {
   release(): void;
 }
 
+export interface CaptureRasterSnapshotOptions {
+  signal?: AbortSignal;
+  includeDisabled?: boolean;
+  /** Document-space output region. Rotated/scaled layers and spatial stacks retain their full source context. */
+  region?: Rect;
+}
+
 export interface CanvasDetachedLayerSurface {
+  /** Whole source extent before optional region capture; authoritative for content bounds. */
+  readonly sourceRect?: Rect;
   readonly rect: Rect;
   readonly surface: RasterSurface;
 }

@@ -39,6 +39,7 @@ import type {
 } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasCompositeExecutorDeps,
+  CaptureRasterSnapshotOptions,
   CaptureRasterSnapshotResult,
   RasterReadLease,
 } from '@workbench/canvas-engine/rasterTransactions';
@@ -316,7 +317,7 @@ export interface CanvasEngineInternalExportCapability extends CanvasEngineExport
   captureRasterSnapshot(
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
+    options?: CaptureRasterSnapshotOptions
   ): Promise<CaptureRasterSnapshotResult>;
   exportBakedLayerPixels(
     layerId: string,
