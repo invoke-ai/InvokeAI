@@ -72,6 +72,14 @@ const project = {
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectSelector: (selector: (value: typeof project) => unknown) => selector(project),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      (
+        Object.values(project.widgetInstances).find((instance) => instance.typeId === widgetId) as
+          | { state?: { values?: Record<string, unknown> } }
+          | undefined
+      )?.state?.values ?? {}
+    ),
   useOptionalWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchExtensions: () => mocks.extensions,
 }));

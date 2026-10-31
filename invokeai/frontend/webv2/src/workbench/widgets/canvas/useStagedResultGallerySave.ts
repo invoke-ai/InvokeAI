@@ -77,7 +77,13 @@ export const useStagedResultGallerySave = (
 
         // The listing, its paging and the board counts are server-owned; refetch rather than guess where it lands.
         void invalidateGallery(queryClient, owner);
-        const board = await describeBoard(queryClient, project, outcome.boardId, t);
+        const board = await describeBoard(
+          queryClient,
+          project,
+          queries.getSnapshot().scopedDefaults,
+          outcome.boardId,
+          t
+        );
 
         if (!isAccountScopeCurrent(owner)) {
           return;
@@ -150,9 +156,12 @@ export const useStagedResultGallerySave = (
     };
 
     return (name: string) => {
-      const origin = { owner: captureAccountScope(), project: queries.getSnapshot().activeProject };
+      const snapshot = queries.getSnapshot();
+      const origin = { owner: captureAccountScope(), project: snapshot.activeProject };
 
-      return run(name, origin, () => saveStagedResultToGallery({ imageName: name, project: origin.project }));
+      return run(name, origin, () =>
+        saveStagedResultToGallery({ imageName: name, project: origin.project, scopedDefaults: snapshot.scopedDefaults })
+      );
     };
   }, [findGalleryItem, queries, queryClient, t]);
 

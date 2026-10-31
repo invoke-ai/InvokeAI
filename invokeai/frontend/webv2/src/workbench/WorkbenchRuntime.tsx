@@ -15,6 +15,7 @@ import type { WorkbenchInternalStore } from './workbenchStore';
 import { createCanvasDimsSync } from './canvasDimsSync';
 import { createWorkbenchFocusController, FocusRegionProvider } from './focusRegions';
 import { createShortcutHintSources, ShortcutHintSourcesProvider } from './hotkeys/hintSources';
+import { subscribeWorkbenchPreferences } from './settings/store';
 import { startConnectionNotices } from './shell/notifications/connectionNotices';
 import {
   useWorkbenchInternalStore,
@@ -40,11 +41,16 @@ export const WorkbenchRuntime = () => {
       notifications: store.commands.notifications,
       subscribe: store.subscribe,
     });
+    // Reads resolve project pins over the user's defaults from one snapshot; unchanged defaults keep their identity.
+    const stopScopedDefaults = subscribeWorkbenchPreferences((preferences) =>
+      store.internal.setScopedDefaults(preferences.scopedDefaults)
+    );
 
     return () => {
       canvasDimsSync.dispose();
       boardReferenceCheck.dispose();
       stopConnectionNotices();
+      stopScopedDefaults();
     };
   });
 

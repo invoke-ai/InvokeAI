@@ -40,7 +40,7 @@ vi.mock('@features/gallery/queries', () => ({
   galleryBoardsOptions: (query: unknown) => ({ kind: 'boards', query }),
 }));
 
-vi.mock('@workbench/widgetState', () => ({ getProjectWidgetValues: () => mocks.galleryValues }));
+vi.mock('@workbench/widgetState', () => ({ getResolvedProjectWidgetValues: () => mocks.galleryValues }));
 
 import { revealGalleryItem } from './revealGalleryItem';
 

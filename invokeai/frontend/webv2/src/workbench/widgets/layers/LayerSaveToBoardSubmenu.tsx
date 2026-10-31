@@ -8,8 +8,7 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import { useQuery } from '@tanstack/react-query';
 import { GalleryBoardDestinationGroups } from '@workbench/image-actions/GalleryBoardDestinationGroups';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { ChevronRightIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -68,7 +67,7 @@ export const LayerSaveToBoardSubmenu = ({
 const BoardChoices = ({ onSelect }: { onSelect: (board: LayerContextBoardChoice) => void }) => {
   const { t } = useTranslation();
   // The Gallery panel's own listing (same key, shared cache), so the boards read as the panel shows them.
-  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const { data, isError, isPending, refetch } = useQuery(
     galleryBoardsOptions(getGalleryListingBoardsQuery(getGallerySettings(galleryValues)))
   );

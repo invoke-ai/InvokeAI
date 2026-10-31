@@ -27,8 +27,7 @@ import {
   useImageActions,
   type ImageActions,
 } from '@workbench/image-actions';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectId, useActiveProjectSelector, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import { FilmIcon, ImagePlusIcon, ImagesIcon } from 'lucide-react';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -110,7 +109,7 @@ export const PasteMediaDialog = ({
 }) => {
   const { t } = useTranslation();
   const projectId = useActiveProjectId();
-  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
   // The gallery's own boards query (same key, shared cache): the board the
   // person is looking at may be archived or a date bucket, which the default

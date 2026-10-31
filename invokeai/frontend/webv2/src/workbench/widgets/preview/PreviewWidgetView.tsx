@@ -57,6 +57,7 @@ import {
   type ImageContextMenuVariant,
 } from '@workbench/image-actions';
 import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
@@ -193,11 +194,11 @@ const keepVideoArrowKeys = (event: KeyboardEvent<HTMLElement>) => {
 };
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
-  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const previewValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'preview'));
+  const previewValues = useWidgetValuesSelector('preview', (values) => values);
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
-  const { antialiasProgressImages } = useActiveProjectSelector((project) => project.settings);
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const livePreview = useLivePreviewFollow();
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();

@@ -76,7 +76,7 @@ describe('saveStagedResultToGallery', () => {
     const addToBoard = vi.fn((_boardId: string, names: string[]) => Promise.resolve(names));
 
     const outcome = await saveStagedResultToGallery(
-      { imageName: 'staged.png', project: createProject('board-a') },
+      { imageName: 'staged.png', project: createProject('board-a'), scopedDefaults: {} },
       { addToBoard, promote: (name) => Promise.resolve(promoted(name)) }
     );
 
@@ -88,7 +88,7 @@ describe('saveStagedResultToGallery', () => {
     const addToBoard = vi.fn();
 
     const outcome = await saveStagedResultToGallery(
-      { imageName: 'staged.png', project: createProject('none') },
+      { imageName: 'staged.png', project: createProject('none'), scopedDefaults: {} },
       { addToBoard, promote: (name) => Promise.resolve(promoted(name)) }
     );
 
@@ -100,7 +100,7 @@ describe('saveStagedResultToGallery', () => {
     const addToBoard = vi.fn();
 
     const outcome = await saveStagedResultToGallery(
-      { imageName: 'staged.png', project: createProject('board-a') },
+      { imageName: 'staged.png', project: createProject('board-a'), scopedDefaults: {} },
       { addToBoard, promote: (name) => Promise.resolve(promoted(name, 'board-b')) }
     );
 
@@ -113,7 +113,7 @@ describe('saveStagedResultToGallery', () => {
     const promotion = deferred<GalleryImage>();
     const addToBoard = vi.fn((_boardId: string, names: string[]) => Promise.resolve(names));
     const saving = saveStagedResultToGallery(
-      { imageName: 'staged.png', project },
+      { imageName: 'staged.png', project, scopedDefaults: {} },
       { addToBoard, promote: () => promotion.promise }
     );
 
@@ -133,7 +133,7 @@ describe('saveStagedResultToGallery', () => {
     ['skips the image', () => Promise.resolve([])],
   ])('reports the board alone as failed when the assignment %s', async (_case, addToBoard) => {
     const outcome = await saveStagedResultToGallery(
-      { imageName: 'staged.png', project: createProject('board-a') },
+      { imageName: 'staged.png', project: createProject('board-a'), scopedDefaults: {} },
       { addToBoard, promote: (name) => Promise.resolve(promoted(name)) }
     );
 
@@ -145,7 +145,7 @@ describe('saveStagedResultToGallery', () => {
 
     await expect(
       saveStagedResultToGallery(
-        { imageName: 'staged.png', project: createProject('board-a') },
+        { imageName: 'staged.png', project: createProject('board-a'), scopedDefaults: {} },
         { addToBoard, promote: () => Promise.reject(new Error('offline')) }
       )
     ).rejects.toThrow('offline');
@@ -156,7 +156,7 @@ describe('saveStagedResultToGallery', () => {
     const promotion = deferred<GalleryImage>();
     const addToBoard = vi.fn();
     const saving = saveStagedResultToGallery(
-      { imageName: 'staged.png', project: createProject('board-a') },
+      { imageName: 'staged.png', project: createProject('board-a'), scopedDefaults: {} },
       { addToBoard, promote: () => promotion.promise }
     );
 

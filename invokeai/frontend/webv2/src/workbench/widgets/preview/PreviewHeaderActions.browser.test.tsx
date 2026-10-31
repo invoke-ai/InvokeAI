@@ -159,6 +159,9 @@ vi.mock('@features/models', async (importOriginal) => ({
 vi.mock('@workbench/widgetState', () => ({
   getProjectWidgetInstance: () => undefined,
   getProjectWidgetValues: () => ({ metadataOpen: false }),
+  getResolvedProjectWidgetValues: () => ({ metadataOpen: false }),
+  applyWidgetDefaults: (values: Record<string, unknown>) => values,
+  resolveWidgetValues: () => ({}),
 }));
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({

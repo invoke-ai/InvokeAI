@@ -1,6 +1,6 @@
 import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { ProjectSettings } from '@workbench/settings/contracts';
+import type { EffectiveProjectSettings, ScopedDefaults } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
@@ -34,7 +34,8 @@ import {
   type WorkbenchLoadOptions,
 } from './projects/syncedPersistence';
 import { consumeWorkspaceClearFailure } from './settings/clearWorkspaceData';
-import { getProjectWidgetValues } from './widgetState';
+import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
+import { getResolvedProjectWidgetValues, resolveWidgetValues } from './widgetState';
 import { createWorkbenchStore, type WorkbenchSnapshot, type WorkbenchInternalStore } from './workbenchStore';
 
 const STAY_ON_LAUNCHPAD = <StayOnLaunchpadButton />;
@@ -290,23 +291,46 @@ export const useActiveProjectLayoutSelector = <Selected,>(
   isEqual?: EqualityFn<Selected>
 ): Selected => useActiveProjectSelector((project) => selector(project.layout), isEqual);
 
-export const useActiveProjectSettingsSelector = <Selected,>(
-  selector: (settings: ProjectSettings) => Selected,
+/** The user's defaults for per-project settings, as mirrored into the snapshot. */
+export const useScopedDefaultsSelector = <Selected,>(
+  selector: (scopedDefaults: ScopedDefaults) => Selected,
   isEqual?: EqualityFn<Selected>
-): Selected => useActiveProjectSelector((project) => selector(project.settings), isEqual);
+): Selected => useWorkbenchSelector((snapshot) => selector(snapshot.scopedDefaults), isEqual);
 
+/** The active project's settings with every layered flag resolved (pin, then the user's default, then built-in). */
+export const useActiveProjectSettingsSelector = <Selected,>(
+  selector: (settings: EffectiveProjectSettings) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected =>
+  useWorkbenchSelector(
+    (snapshot) =>
+      selector(
+        getEffectiveProjectSettings(snapshot.activeProject.settings, snapshot.scopedDefaults[PROJECT_SETTINGS_OWNER])
+      ),
+    isEqual
+  );
+
+/** A widget's values as it reads them: the active project's pins over the user's defaults for the widget's type. */
 export const useWidgetValuesSelector = <Selected,>(
   widgetId: WidgetTypeId,
   selector: (values: Record<string, unknown>) => Selected,
   isEqual?: EqualityFn<Selected>
-): Selected => useActiveProjectSelector((project) => selector(getProjectWidgetValues(project, widgetId)), isEqual);
+): Selected =>
+  useWorkbenchSelector(
+    (snapshot) => selector(getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults)),
+    isEqual
+  );
 
 export const useWidgetInstanceValuesSelector = <Selected,>(
   instanceId: WidgetInstanceId,
   selector: (values: Record<string, unknown>) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected =>
-  useActiveProjectSelector((project) => selector(project.widgetInstances[instanceId]?.state.values ?? {}), isEqual);
+  useWorkbenchSelector(
+    (snapshot) =>
+      selector(resolveWidgetValues(snapshot.activeProject.widgetInstances[instanceId], snapshot.scopedDefaults)),
+    isEqual
+  );
 
 export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   projectId: string,
@@ -317,7 +341,7 @@ export const useProjectWidgetInstanceValuesSelector = <Selected,>(
   useWorkbenchSelector((snapshot) => {
     const project = snapshot.projects.find((candidate) => candidate.id === projectId);
 
-    return selector(project?.widgetInstances[instanceId]?.state.values ?? {});
+    return selector(resolveWidgetValues(project?.widgetInstances[instanceId], snapshot.scopedDefaults));
   }, isEqual);
 
 export const useWorkbenchHasHydrated = (): boolean => useWorkbenchSelector((snapshot) => snapshot.hasHydrated);

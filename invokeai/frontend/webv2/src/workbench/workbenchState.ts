@@ -49,7 +49,7 @@ import type {
   WorkbenchNotificationKind,
   WorkbenchState,
 } from '@workbench/projectContracts';
-import type { ProjectSettings } from '@workbench/settings/contracts';
+import type { ProjectSettings, ScopedDefaults } from '@workbench/settings/contracts';
 import type {
   WidgetFailure,
   WidgetId,
@@ -135,7 +135,7 @@ import {
   type ProjectWorkflowCollection,
 } from './projectWorkflows';
 import { normalizeRestoredQueueItem } from './queue-integration/queueRunRestoration';
-import { getProjectWidgetValues } from './widgetState';
+import { applyWidgetDefaults, getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
 import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 
@@ -248,7 +248,12 @@ import {
   normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
-import { DEFAULT_PROJECT_SETTINGS, normalizeProjectSettings } from './settings/store';
+import {
+  BUILT_IN_PROJECT_SETTINGS,
+  getEffectiveProjectSettings,
+  normalizeProjectSettings,
+  PROJECT_SETTINGS_OWNER,
+} from './settings/projectSettings';
 
 interface QueueGenerateSnapshot {
   negativePromptNodeId: string;
@@ -382,6 +387,13 @@ type WorkbenchReducerAction =
       type: 'setWidgetInstanceValues';
       instanceId: WidgetInstanceId;
       values: Record<string, unknown>;
+      projectId?: string;
+    }
+  /** Deletes pins, so the instance follows the user's defaults for them again. */
+  | {
+      type: 'clearWidgetInstanceValues';
+      instanceId: WidgetInstanceId;
+      keys: readonly string[];
       projectId?: string;
     }
   /** Edits one workflow; absent targets mean the active project's active workflow. */
@@ -621,6 +633,8 @@ type WorkbenchReducerAction =
   | { type: 'restoreNotifications'; notifications: readonly WorkbenchNotification[] }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
   | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings> }
+  /** Mirrors the user's `scopedDefaults` preference; the settings store owns it. */
+  | { type: 'setScopedDefaults'; scopedDefaults: ScopedDefaults }
   | {
       type: 'recordError';
       message: string;
@@ -2223,8 +2237,8 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
       name: `Project Name #${index}`,
       promptHistory: [],
       queue: { items: [] },
-      // A new project starts on the defaults (Auto-switch In progress); only a stored one lacks the mode.
-      settings: normalizeProjectSettings(DEFAULT_PROJECT_SETTINGS),
+      // A new project starts on Auto-switch In progress (only a stored one lacks the mode) and pins no flag.
+      settings: normalizeProjectSettings({ viewerAutoSwitch: BUILT_IN_PROJECT_SETTINGS.viewerAutoSwitch }),
       undoRedo: { future: [], past: [] },
       widgetGraphs: {},
       widgetInstances: createWidgetInstances(),
@@ -3065,6 +3079,7 @@ const applyAutoRouteForRegionFront = (
 
 const compileInvocationSnapshot = (
   project: Project,
+  defaults: ScopedDefaults,
   route: InvocationRoute,
   models?: readonly ModelConfig[],
   workflowGenerators?: WorkflowGeneratorResolutions,
@@ -3079,7 +3094,8 @@ const compileInvocationSnapshot = (
   projectWorkflowId?: string;
 } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
-  const randDevice = resolveRandDeviceMetadata(project.settings.useCpuNoise, getGenerationDevicesSnapshot().options);
+  const projectSettings = getEffectiveProjectSettings(project.settings, defaults[PROJECT_SETTINGS_OWNER]);
+  const randDevice = resolveRandDeviceMetadata(projectSettings.useCpuNoise, getGenerationDevicesSnapshot().options);
 
   if (route.sourceId === 'workflow') {
     // Route validation guarantees templates are loaded before this imperative read.
@@ -3090,7 +3106,10 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
-      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard),
+      autoBoardId: getGalleryAutoAddBoardId(
+        getResolvedProjectWidgetValues(project, 'gallery', defaults),
+        canAddToCachedGalleryBoard
+      ),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
       // An explicit board a node names is judged like the auto-add board: one the caller may add to now.
@@ -3135,7 +3154,7 @@ const compileInvocationSnapshot = (
     const compiledGraph = compileUpscaleGraph(
       resolvedValues,
       route.destination,
-      project.settings,
+      projectSettings,
       randDevice,
       upscaleSourceMetadata?.metadata ?? null
     ).graph;
@@ -3205,7 +3224,7 @@ const compileInvocationSnapshot = (
     resolvedSettings,
     resolvedSettings.model,
     route.destination,
-    project.settings,
+    projectSettings,
     randDevice
   ).graph;
 
@@ -3317,7 +3336,8 @@ const patchGalleryItemsAcrossProjects = (
             ...(values.selectedImageQuery as Record<string, unknown>),
             boardId: changes.boardId,
             page: 0,
-            paginationMode: getGallerySettings(values).paginationMode,
+            paginationMode: getGallerySettings(applyWidgetDefaults(values, 'gallery', state.scopedDefaults))
+              .paginationMode,
             searchTerm: '',
           }
         : values.selectedImageQuery;
@@ -3651,10 +3671,11 @@ const shouldSelectGalleryResult = (project: Project, galleryValues: Record<strin
 
 const getGalleryResultSelectionValues = (
   galleryValues: Record<string, unknown>,
-  item: GalleryItem
+  item: GalleryItem,
+  defaults: ScopedDefaults
 ): Record<string, unknown> => {
   const itemKey = toGalleryItemKey(item);
-  const gallerySettings = getGallerySettings(galleryValues);
+  const gallerySettings = getGallerySettings(applyWidgetDefaults(galleryValues, 'gallery', defaults));
   // Navigate the kind the grid shows when it shows the result; a filter that hides it leaves both kinds.
   const mediaKind = toGalleryMediaKind(gallerySettings.mediaFilter);
 
@@ -3678,7 +3699,11 @@ const getGalleryResultSelectionValues = (
   };
 };
 
-const updateGalleryWithResultImages = (project: Project, images: GeneratedImageContract[]): Project => {
+const updateGalleryWithResultImages = (
+  project: Project,
+  images: GeneratedImageContract[],
+  defaults: ScopedDefaults
+): Project => {
   if (images.length === 0) {
     return project;
   }
@@ -3699,7 +3724,7 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
     ...galleryValues,
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
     ...(nextSelectedImage
-      ? getGalleryResultSelectionValues(galleryValues, legacyGeneratedImageToGalleryItem(nextSelectedImage))
+      ? getGalleryResultSelectionValues(galleryValues, legacyGeneratedImageToGalleryItem(nextSelectedImage), defaults)
       : { selectedImageNames: getPersistedSelectedGalleryItemKeys(galleryValues) }),
   }));
 };
@@ -3712,6 +3737,7 @@ const routeGalleryResultVideos = (
   project: Project,
   queueItemId: string,
   videos: readonly GeneratedVideoContract[],
+  defaults: ScopedDefaults,
   /** The project before this routing pass selected any image, so a run's video outranks its own images. */
   policyProject: Project = project
 ): Project => {
@@ -3735,7 +3761,7 @@ const routeGalleryResultVideos = (
 
   return updateProjectWidgetValues(nextProject, 'gallery', () => ({
     ...galleryValues,
-    ...getGalleryResultSelectionValues(galleryValues, generatedVideoToGalleryItem(video)),
+    ...getGalleryResultSelectionValues(galleryValues, generatedVideoToGalleryItem(video), defaults),
   }));
 };
 
@@ -3744,7 +3770,8 @@ const routeQueueItemPartialResults = (
   queueItemId: string,
   backendItemId: number,
   images: GeneratedImageContract[],
-  videos: readonly GeneratedVideoContract[] = []
+  videos: readonly GeneratedVideoContract[],
+  defaults: ScopedDefaults
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
@@ -3760,9 +3787,10 @@ const routeQueueItemPartialResults = (
   if (destination === 'gallery') {
     // A run's video is its primary output; it takes the selection over any images routed alongside it.
     return routeGalleryResultVideos(
-      updateGalleryWithResultImages(nextProject, images),
+      updateGalleryWithResultImages(nextProject, images, defaults),
       queueItemId,
       videos,
+      defaults,
       nextProject
     );
   }
@@ -3823,7 +3851,8 @@ const routeQueueItemResults = (
   sourceProject: Project,
   queueItemId: string,
   images: GeneratedImageContract[],
-  videos: readonly GeneratedVideoContract[] = []
+  videos: readonly GeneratedVideoContract[],
+  defaults: ScopedDefaults
 ): Project => {
   const queueItem = sourceProject.queue.items.find((item) => item.id === queueItemId);
   const project = recordWorkflowRunPreview(sourceProject, queueItem, images);
@@ -3842,9 +3871,10 @@ const routeQueueItemResults = (
   if (destination === 'gallery') {
     // A run's video is its primary output; it takes the selection over any images routed alongside it.
     return routeGalleryResultVideos(
-      updateGalleryWithResultImages(nextProject, images),
+      updateGalleryWithResultImages(nextProject, images, defaults),
       queueItemId,
       videos,
+      defaults,
       nextProject
     );
   }
@@ -3869,6 +3899,7 @@ const routeQueueItemResults = (
 /** Enqueue compiled snapshots from route validation or asynchronous canvas preparation. */
 const enqueueCompiledSnapshot = (
   project: Project,
+  defaults: ScopedDefaults,
   route: InvocationRoute,
   compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
@@ -3954,7 +3985,10 @@ const enqueueCompiledSnapshot = (
   const galleryBoardId =
     route.sourceId === 'workflow'
       ? null
-      : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}, canAddToCachedGalleryBoard);
+      : getGalleryAutoAddBoardId(
+          applyWidgetDefaults(widgetStates.gallery?.values ?? {}, 'gallery', defaults),
+          canAddToCachedGalleryBoard
+        );
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
@@ -4111,6 +4145,7 @@ const hasUpscaleInputChanged = (project: Project, metadata: UpscaleSourceMetadat
  */
 const submitModelOnlyUpscale = (
   project: Project,
+  defaults: ScopedDefaults,
   {
     backendSupportsCancellation,
     image,
@@ -4142,6 +4177,7 @@ const submitModelOnlyUpscale = (
 
   return enqueueCompiledSnapshot(
     project,
+    defaults,
     route,
     { graph: compiled.graph, widgetStates },
     backendSupportsCancellation,
@@ -4153,6 +4189,7 @@ const submitModelOnlyUpscale = (
 
 const submitInvocationSnapshot = (
   project: Project,
+  defaults: ScopedDefaults,
   backendSupportsCancellation: boolean,
   route = resolveInvocationRoute(project),
   models?: readonly ModelConfig[],
@@ -4168,6 +4205,7 @@ const submitInvocationSnapshot = (
 
   const compiledSnapshot = compileInvocationSnapshot(
     project,
+    defaults,
     route,
     models,
     workflowGenerators,
@@ -4181,6 +4219,7 @@ const submitInvocationSnapshot = (
 
   return enqueueCompiledSnapshot(
     project,
+    defaults,
     route,
     { ...compiledSnapshot, ...expansion },
     backendSupportsCancellation,
@@ -4199,6 +4238,8 @@ export const createInitialWorkbenchState = (): WorkbenchState => {
     backendConnection: { status: 'connecting' },
     notifications: [],
     projects: [draft],
+    // The store seeds the user's defaults (`createWorkbenchStore`); the reducer never reads the settings runtime.
+    scopedDefaults: {},
     widgetFailures: [],
   };
 };
@@ -4238,8 +4279,12 @@ const getRankingStampFields = (
 };
 
 /** The listing the Gallery shows now, which a selection made in it navigates within. */
-const getCurrentGallerySelectionQuery = (values: Record<string, unknown>, page: number): Record<string, unknown> => {
-  const settings = getGallerySettings(values);
+const getCurrentGallerySelectionQuery = (
+  values: Record<string, unknown>,
+  page: number,
+  defaults: ScopedDefaults
+): Record<string, unknown> => {
+  const settings = getGallerySettings(applyWidgetDefaults(values, 'gallery', defaults));
   const semanticKey = gallerySemanticReferenceKey(parseGallerySemanticReference(values.semanticImageQuery));
   const mediaKind = toGalleryMediaKind(settings.mediaFilter);
 
@@ -5268,6 +5313,20 @@ const reduceWorkbenchAction = (
         )
       );
     }
+    case 'clearWidgetInstanceValues': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        updateProjectWidgetInstanceValues(project, action.instanceId, (values) => {
+          if (!action.keys.some((key) => Object.hasOwn(values, key))) {
+            return values;
+          }
+          const next = { ...values };
+          for (const key of action.keys) {
+            delete next[key];
+          }
+          return next;
+        })
+      );
+    }
     case 'setWidgetInstanceValues': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
         updateProjectWidgetInstanceValues(project, action.instanceId, (currentValues) => {
@@ -5362,7 +5421,13 @@ const reduceWorkbenchAction = (
       return withEnqueueNotification(
         state,
         updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(project, action.backendSupportsCancellation, undefined, action.models)
+          submitInvocationSnapshot(
+            project,
+            state.scopedDefaults,
+            action.backendSupportsCancellation,
+            undefined,
+            action.models
+          )
         ),
         state.activeProjectId
       );
@@ -5416,6 +5481,7 @@ const reduceWorkbenchAction = (
         updateProjectById(state, action.projectId, (project) =>
           submitInvocationSnapshot(
             project,
+            state.scopedDefaults,
             action.backendSupportsCancellation,
             resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
             action.models,
@@ -5432,7 +5498,9 @@ const reduceWorkbenchAction = (
     case 'submitModelOnlyUpscale': {
       return withEnqueueNotification(
         state,
-        updateProjectById(state, action.projectId, (project) => submitModelOnlyUpscale(project, action)),
+        updateProjectById(state, action.projectId, (project) =>
+          submitModelOnlyUpscale(project, state.scopedDefaults, action)
+        ),
         action.projectId
       );
     }
@@ -5499,7 +5567,14 @@ const reduceWorkbenchAction = (
       }
 
       return updateProjectById(state, action.projectId, (project) =>
-        routeQueueItemPartialResults(project, action.queueItemId, action.backendItemId, action.images, action.videos)
+        routeQueueItemPartialResults(
+          project,
+          action.queueItemId,
+          action.backendItemId,
+          action.images,
+          action.videos ?? [],
+          state.scopedDefaults
+        )
       );
     }
     case 'markQueueItemBackendCancelled': {
@@ -5552,7 +5627,7 @@ const reduceWorkbenchAction = (
       }
 
       const nextState = updateProjectById(state, action.projectId, (project) =>
-        routeQueueItemResults(project, action.queueItemId, action.images, action.videos)
+        routeQueueItemResults(project, action.queueItemId, action.images, action.videos ?? [], state.scopedDefaults)
       );
 
       if (action.images.length === 0) {
@@ -5656,7 +5731,7 @@ const reduceWorkbenchAction = (
             values.selectedImageQuery && typeof values.selectedImageQuery === 'object'
               ? (values.selectedImageQuery as Record<string, unknown>)
               : null;
-          const settings = getGallerySettings(values);
+          const settings = getGallerySettings(applyWidgetDefaults(values, 'gallery', state.scopedDefaults));
           const selectedImageQuery = action.navigateItemBoard
             ? {
                 boardId: action.item.boardId,
@@ -5675,7 +5750,7 @@ const reduceWorkbenchAction = (
                   ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                   page: selectedImagePage,
                 }
-              : getCurrentGallerySelectionQuery(values, selectedImagePage);
+              : getCurrentGallerySelectionQuery(values, selectedImagePage, state.scopedDefaults);
           const itemKey = toGalleryItemKey(action.item);
 
           return {
@@ -5708,7 +5783,7 @@ const reduceWorkbenchAction = (
               selectedImageName: itemKey,
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
-              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage),
+              selectedImageQuery: getCurrentGallerySelectionQuery(values, selectedImagePage, state.scopedDefaults),
             };
           }
 
@@ -5753,7 +5828,7 @@ const reduceWorkbenchAction = (
               ? {}
               : {
                   selectedImagePage: nextPrimaryPage,
-                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage),
+                  selectedImageQuery: getCurrentGallerySelectionQuery(values, nextPrimaryPage, state.scopedDefaults),
                 }),
           };
         },
@@ -5786,7 +5861,7 @@ const reduceWorkbenchAction = (
                     ...getRankingStampFields(values, existingNavigationQuery, semanticKey),
                     page: selectedImagePage,
                   }
-                : getCurrentGallerySelectionQuery(values, selectedImagePage),
+                : getCurrentGallerySelectionQuery(values, selectedImagePage, state.scopedDefaults),
           };
         },
         action.projectId
@@ -6024,6 +6099,7 @@ const reduceWorkbenchAction = (
         updateProjectById(state, action.projectId, (project) =>
           enqueueCompiledSnapshot(
             project,
+            state.scopedDefaults,
             { ...project.invocation, destination: action.destination, sourceId: 'canvas' },
             {
               generate: action.generate,
@@ -6178,7 +6254,11 @@ const reduceWorkbenchAction = (
       });
     }
     case 'hydrateWorkbench': {
-      return { ...normalizeWorkbenchState(action.state), backendConnection: state.backendConnection };
+      return {
+        ...normalizeWorkbenchState(action.state),
+        backendConnection: state.backendConnection,
+        scopedDefaults: state.scopedDefaults,
+      };
     }
     case 'replaceProjectFromServer': {
       const normalizedServerProject = normalizeWorkbenchProject(action.project);
@@ -6399,18 +6479,20 @@ const reduceWorkbenchAction = (
     case 'setActiveProjectSettings': {
       return updateActiveProject(state, (project) => {
         const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
+        // Both sides' keys: an `undefined` in the patch clears a pin, which leaves the key out of `settings`.
+        const keys = new Set([...Object.keys(project.settings), ...Object.keys(settings)]) as Set<
+          keyof ProjectSettings
+        >;
 
-        return Object.entries(settings).every(([key, value]) => {
-          const settingKey = key as keyof ProjectSettings;
-
-          return areProjectSettingValuesEqual(
-            project.settings[settingKey],
-            value as ProjectSettings[typeof settingKey]
-          );
-        })
+        return [...keys].every((key) => areProjectSettingValuesEqual(project.settings[key], settings[key]))
           ? project
           : { ...project, settings };
       });
+    }
+    case 'setScopedDefaults': {
+      return Object.is(state.scopedDefaults, action.scopedDefaults)
+        ? state
+        : { ...state, scopedDefaults: action.scopedDefaults };
     }
   }
 };

@@ -201,6 +201,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -245,6 +246,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
         commands,
         formatControlLayerError,
         formatUpscaleMetadataFailure,
+        scopedDefaults: {},
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -313,6 +315,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -333,6 +336,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -431,6 +435,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -491,6 +496,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -529,6 +535,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -539,6 +546,53 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+  });
+});
+
+describe("submitResolvedInvocation reads the user's defaults", () => {
+  seedArchitectureCapabilities();
+
+  it('hands Canvas the compositing and generation flags the defaults give a project that pins none', async () => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const state = workbenchReducer(
+      workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' }),
+      {
+        type: 'setGenerateSettings',
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+      }
+    );
+    const project = getActiveProject(state);
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'canvas',
+      sourceLocked: false,
+    });
+    const prepareCanvasInvocation = vi.fn();
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands: createWorkbenchStore().commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {
+        canvas: { outputOnlyMaskedRegions: false },
+        generate: { useCpuNoise: false, useNsfwChecker: true, useWatermark: true },
+      },
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
+
+    expect(prepareCanvasInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compositing: expect.objectContaining({ outputOnlyMaskedRegions: false }),
+        projectSettings: expect.objectContaining({ useCpuNoise: false, useNsfwChecker: true, useWatermark: true }),
+      })
+    );
   });
 });
 
@@ -586,6 +640,7 @@ describe('submitResolvedInvocation for Upscale', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: [upscaler],
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),

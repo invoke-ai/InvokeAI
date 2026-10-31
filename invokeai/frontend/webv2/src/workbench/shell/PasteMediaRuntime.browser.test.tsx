@@ -31,7 +31,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => mocks.project.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
-  useWidgetValuesSelector: () => ({}),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      widgetId === 'gallery'
+        ? (Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === 'gallery')?.state
+            .values ?? {})
+        : {}
+    ),
 }));
 vi.mock('@features/gallery/picker', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),

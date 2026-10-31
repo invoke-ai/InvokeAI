@@ -19,11 +19,14 @@ import {
   requestVideoSpanPlayback,
   subscribeVideoSpanPlaybackState,
 } from '@workbench/widgets/preview/spanPlaybackRequest';
-import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import {
+  useActiveProjectSelector,
+  useWidgetValuesSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-
-const EMPTY_GALLERY_VALUES: Record<string, unknown> = Object.freeze({});
 
 /** Video owns its prompt in widget values; do not join the draft shared by Generate/Upscale. */
 export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) => {
@@ -44,9 +47,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   );
   // Panel uploads land where new results do: the auto-add board, resolved when the upload starts, against the board
   // listing as it is then.
-  const galleryValues = useActiveProjectSelector(
-    (activeProject) => getProjectWidgetInstance(activeProject, 'gallery')?.state?.values ?? EMPTY_GALLERY_VALUES
-  );
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values, Object.is);
   // Read the gallery values through a ref so board selection does not recreate project actions.
   const galleryValuesRef = useRef(galleryValues);
   // Async clip resolution can outlive a project switch; callbacks must check the live project.

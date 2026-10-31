@@ -1,8 +1,10 @@
 import type { Project } from '@workbench/projectContracts';
 import type { ProjectWorkflowCollection } from '@workbench/projectWorkflows';
+import type { LayeredSettingKey } from '@workbench/settings/projectSettings';
 
 import { stripInfiniteWindowAnchor, stripSessionScopedGallerySearch } from '@features/gallery/contracts';
 import { migrateProjectGraphToCollection, normalizeProjectWorkflowCollection } from '@workbench/projectWorkflows';
+import { getLayeredSettings } from '@workbench/settings/projectSettings';
 
 import { PROJECT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 
@@ -34,8 +36,17 @@ export type ProjectDocumentV3 = Omit<
   lastFloatingGeometry?: Project['lastFloatingGeometry'];
   /** Optional and additive, so schema 3 holds: a build that predates it ignores it and leaves it out of its next save. */
   presetWorkingLayouts?: Project['presetWorkingLayouts'];
+  /**
+   * Present once the document's layerable settings were coerced to pins (see `migrateProjectDocument`); every save
+   * of this build writes it. Additive like `presetWorkingLayouts`: an older build drops it, which only repeats the
+   * coercion.
+   */
+  settingsLayering?: typeof SETTINGS_LAYERING_VERSION;
   workflows: ProjectWorkflowCollection;
 };
+
+/** The `settingsLayering` marker's value. */
+export const SETTINGS_LAYERING_VERSION = 1;
 
 export const stripSessionScopedGalleryState = (project: Project): Project => {
   let didChange = false;
@@ -79,6 +90,7 @@ export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 
     ...(persistent.presetWorkingLayouts ? { presetWorkingLayouts: persistent.presetWorkingLayouts } : {}),
     promptHistory: persistent.promptHistory,
     settings: persistent.settings,
+    settingsLayering: SETTINGS_LAYERING_VERSION,
     widgetGraphs: persistent.widgetGraphs,
     widgetInstances: persistent.widgetInstances,
     widgetRegions: persistent.widgetRegions,
@@ -111,7 +123,11 @@ export const serializeProjectDocument = (project: Project): Record<string, unkno
     ...document
   } = stripSessionScopedGalleryState(project) as Project & { graphHistory?: unknown };
 
-  return { ...document, documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION };
+  return {
+    ...document,
+    documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
+    settingsLayering: SETTINGS_LAYERING_VERSION,
+  };
 };
 
 const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
@@ -129,6 +145,70 @@ const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/**
+ * Drops `values` keys the owner read as the built-in when settings first layered (`getLayeredSettings`, frozen at that
+ * version); null when none does.
+ */
+const withoutBuiltInValues = (
+  values: Record<string, unknown>,
+  layered: Readonly<Record<string, LayeredSettingKey>>
+): Record<string, unknown> | null => {
+  const redundant = Object.keys(layered).filter(
+    (key) => Object.hasOwn(values, key) && layered[key]!.read(values[key]) === layered[key]!.builtIn
+  );
+  if (redundant.length === 0) {
+    return null;
+  }
+  const next = { ...values };
+  for (const key of redundant) {
+    delete next[key];
+  }
+  return next;
+};
+
+const coerceWidgetInstances = (instances: Record<string, unknown>): Record<string, unknown> | null => {
+  const builtIns = getLayeredSettings().widgetValues;
+  let didChange = false;
+  const next: Record<string, unknown> = {};
+  for (const [instanceId, instance] of Object.entries(instances)) {
+    const owner = isRecord(instance) && typeof instance.typeId === 'string' ? builtIns[instance.typeId] : undefined;
+    const state = isRecord(instance) ? instance.state : undefined;
+    const values =
+      owner && isRecord(state) && isRecord(state.values) ? withoutBuiltInValues(state.values, owner) : null;
+    if (values && isRecord(state)) {
+      didChange = true;
+      next[instanceId] = { ...(instance as Record<string, unknown>), state: { ...state, values } };
+    } else {
+      next[instanceId] = instance;
+    }
+  }
+  return didChange ? next : null;
+};
+
+const coerceProjectSettings = (settings: Record<string, unknown>): Record<string, unknown> => {
+  const { antialiasProgressImages: _antialias, ...rest } = settings;
+  return withoutBuiltInValues(rest, getLayeredSettings().projectSettings) ?? rest;
+};
+
+/**
+ * Before settings layered over the user's defaults, a stored value equal to the built-in read the same as an absent
+ * one, so a document without the marker drops those (widget values its owner's settings edit, and the generation
+ * flags) and the retired per-project antialias flag: what is left is what the project chose. With the marker the
+ * document's values are its pins and stay as they are.
+ */
+const coerceSettingsLayering = (document: Record<string, unknown>): Record<string, unknown> => {
+  if (document.settingsLayering === SETTINGS_LAYERING_VERSION) {
+    return document;
+  }
+  const widgetInstances = isRecord(document.widgetInstances) ? coerceWidgetInstances(document.widgetInstances) : null;
+  return {
+    ...document,
+    ...(isRecord(document.settings) ? { settings: coerceProjectSettings(document.settings) } : {}),
+    settingsLayering: SETTINGS_LAYERING_VERSION,
+    ...(widgetInstances ? { widgetInstances } : {}),
+  };
+};
+
 export type ProjectDocumentMigration =
   | { status: 'migrated'; document: Record<string, unknown> }
   | { status: 'malformed'; reason: string };
@@ -136,7 +216,8 @@ export type ProjectDocumentMigration =
 /**
  * The migration boundary: any supported older document comes out as schema 3. A document without a version is
  * schema 1; schema 2 owned one `projectGraph`, which becomes the first, active workflow. Collections that would
- * lose a workflow if repaired are refused instead. Callers check for a future version before calling this.
+ * lose a workflow if repaired are refused instead. A document without `settingsLayering` has its stored built-in
+ * settings values dropped once (see `coerceSettingsLayering`). Callers check for a future version before calling this.
  */
 export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDocumentMigration => {
   const version = data.documentSchemaVersion;
@@ -186,7 +267,7 @@ export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDo
 
   return {
     document: {
-      ...rest,
+      ...coerceSettingsLayering(rest),
       documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
       invocation: isRecord(invocation)
         ? { ...invocation, sourceId: normalizeInvocationSourceId(invocation.sourceId) }

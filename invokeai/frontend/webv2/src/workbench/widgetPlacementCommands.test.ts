@@ -71,6 +71,8 @@ const applyCommand = (state: WorkbenchState, command: (widgets: WorkbenchWidgetC
 };
 
 const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): WorkbenchWidgetCommands => ({
+  clearInstanceValues: (instanceId, keys, projectId) =>
+    dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
   dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
   closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
   float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),

@@ -236,7 +236,8 @@ vi.mock('@workbench/WorkbenchContext', () => {
     useWorkbenchCommands: () => commands,
     useWorkbenchQueries: () => ({
       getProject: (...args: unknown[]) => mocks.getProject(...args),
-      getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
+      // Fixtures set no user defaults.
+      getSnapshot: (...args: unknown[]) => ({ scopedDefaults: {}, ...(mocks.getSnapshot(...args) as object) }),
       isActiveProject: (...args: unknown[]) => mocks.isActiveProject(...args),
     }),
     // Only the Video panel's reference capacity is selected; no test here exercises it.

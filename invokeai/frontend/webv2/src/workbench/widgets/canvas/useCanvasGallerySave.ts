@@ -50,7 +50,7 @@ export const useCanvasGallerySave = (
 
   const save = useCallback(
     async (region: CanvasGallerySaveRegion): Promise<void> => {
-      const project = queries.getSnapshot().activeProject;
+      const { activeProject: project, scopedDefaults } = queries.getSnapshot();
       if (savingProjects.get(project.id)) {
         return;
       }
@@ -60,12 +60,18 @@ export const useCanvasGallerySave = (
         savingProjects.set(project.id, true);
 
         try {
-          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region });
+          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region, scopedDefaults });
 
           assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {
             void invalidateGallery(queryClient, owner);
-            const board = await describeBoard(queryClient, project, result.boardId, t);
+            const board = await describeBoard(
+              queryClient,
+              project,
+              queries.getSnapshot().scopedDefaults,
+              result.boardId,
+              t
+            );
 
             if (!isAccountScopeCurrent(owner)) {
               return;
@@ -130,11 +136,11 @@ export const useCanvasGallerySave = (
   );
 
   const describeDestination = useCallback(async (): Promise<string | null> => {
-    const project = queries.getSnapshot().activeProject;
+    const { activeProject: project, scopedDefaults } = queries.getSnapshot();
     const owner = captureAccountScope();
     try {
-      const boardId = (await resolveCanvasSaveBoardId(project)) ?? 'none';
-      const board = await describeBoard(queryClient, project, boardId, t);
+      const boardId = (await resolveCanvasSaveBoardId(project, scopedDefaults)) ?? 'none';
+      const board = await describeBoard(queryClient, project, scopedDefaults, boardId, t);
       return isAccountScopeCurrent(owner) && board.kind === 'named' ? board.label : null;
     } catch {
       return null;

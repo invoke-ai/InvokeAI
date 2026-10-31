@@ -4,7 +4,6 @@ import { LOG_NAMESPACES } from '@platform/logging/contracts';
 import { CONTROL_TYPES } from '@workbench/canvas-engine/api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectSettings } from './contracts';
 import type * as storeModule from './store';
 
 /**
@@ -340,53 +339,6 @@ describe('clearWorkbenchSettings', () => {
   });
 });
 
-describe('normalizeProjectSettings', () => {
-  it('starts a project saved before Auto-switch Off, whatever its old progress toggle said', () => {
-    type Legacy = Parameters<typeof store.normalizeProjectSettings>[0] & { showProgressImagesInViewer?: boolean };
-    const legacy = (settings: Legacy) => store.normalizeProjectSettings(settings);
-
-    expect(legacy({}).viewerAutoSwitch).toBe('off');
-    expect(legacy({ showProgressImagesInViewer: true }).viewerAutoSwitch).toBe('off');
-    expect(legacy({ showProgressImagesInViewer: false }).viewerAutoSwitch).toBe('off');
-    expect(legacy({ showProgressImagesInViewer: true })).not.toHaveProperty('showProgressImagesInViewer');
-  });
-
-  it('keeps a saved Auto-switch mode and reads anything else as Off', () => {
-    for (const mode of ['off', 'latest', 'progress'] as const) {
-      expect(store.normalizeProjectSettings({ viewerAutoSwitch: mode }).viewerAutoSwitch).toBe(mode);
-    }
-    expect(store.normalizeProjectSettings({ viewerAutoSwitch: 'always' as unknown as 'off' }).viewerAutoSwitch).toBe(
-      'off'
-    );
-  });
-
-  it('starts new projects on In progress', () => {
-    expect(store.normalizeProjectSettings(store.DEFAULT_PROJECT_SETTINGS).viewerAutoSwitch).toBe('progress');
-  });
-
-  it('defaults the output filters off for projects saved before them', () => {
-    expect(store.normalizeProjectSettings({})).toMatchObject({ useNsfwChecker: false, useWatermark: false });
-    expect(store.normalizeProjectSettings({ useNsfwChecker: true, useWatermark: true })).toMatchObject({
-      useNsfwChecker: true,
-      useWatermark: true,
-    });
-  });
-
-  /**
-   * Discard legacy project highlighting/attention settings so imports cannot overwrite personal editor
-   * preferences.
-   */
-  it('drops prompt preferences that older documents still carry in project settings', () => {
-    const normalized = store.normalizeProjectSettings({
-      preferNumericAttentionStyle: true,
-      showPromptSyntaxHighlighting: true,
-    } as Partial<ProjectSettings>);
-
-    expect(normalized).not.toHaveProperty('showPromptSyntaxHighlighting');
-    expect(normalized).not.toHaveProperty('preferNumericAttentionStyle');
-  });
-});
-
 describe('normalizeWorkbenchPreferences prompt editing', () => {
   it('defaults prompt syntax highlighting on and numeric attention style off', () => {
     expect(store.normalizeWorkbenchPreferences({}).showPromptSyntaxHighlighting).toBe(true);
@@ -659,5 +611,69 @@ describe('controlModelMemory preference', () => {
     await store.clearWorkbenchSettings();
 
     expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({});
+  });
+});
+
+describe('scopedDefaults preference', () => {
+  it('keeps only layerable keys of known owners, and returns a clean record as is', () => {
+    const valid = { gallery: { thumbnailFit: 'aspect' }, generate: { useWatermark: true } };
+
+    expect(store.normalizeWorkbenchPreferences({}).scopedDefaults).toEqual({});
+    expect(store.normalizeWorkbenchPreferences({ scopedDefaults: valid }).scopedDefaults).toBe(valid);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        scopedDefaults: { canvas: [true], gallery: { thumbnailFit: 'aspect' }, preview: 'slider' } as never,
+      }).scopedDefaults
+    ).toEqual({ gallery: { thumbnailFit: 'aspect' } });
+    expect(store.normalizeWorkbenchPreferences({ scopedDefaults: [] as never }).scopedDefaults).toEqual({});
+    // Workspace state that never layers, an unknown owner, and the Generate widget's own values all drop.
+    expect(
+      store.normalizeWorkbenchPreferences({
+        scopedDefaults: {
+          gallery: { galleryPage: 4, selectedBoardId: 'b', showDateBoards: true },
+          generate: { model: 'm', useCpuNoise: false },
+          later: { anything: 1 },
+        },
+      }).scopedDefaults
+    ).toEqual({ gallery: { showDateBoards: true }, generate: { useCpuNoise: false } });
+  });
+
+  it('sets and clears one owner key at a time, keeping the others, and persists them', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchScopedDefault('gallery', { thumbnailFit: 'aspect' });
+    await store.patchScopedDefault('gallery', { showDateBoards: true });
+    await store.patchScopedDefault('generate', { useWatermark: true });
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toEqual({
+      gallery: { showDateBoards: true, thumbnailFit: 'aspect' },
+      generate: { useWatermark: true },
+    });
+    expect(readBackendPreferences().scopedDefaults).toEqual(store.getWorkbenchPreferences().scopedDefaults);
+
+    await store.clearScopedDefault('gallery', ['thumbnailFit']);
+    await store.clearScopedDefault('generate', ['useWatermark']);
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toEqual({ gallery: { showDateBoards: true } });
+  });
+
+  it('keeps the defaults record across an unrelated preference patch', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchScopedDefault('canvas', { showGrid: true });
+    const before = store.getWorkbenchPreferences().scopedDefaults;
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toBe(before);
+  });
+});
+
+describe('antialiasProgressImages preference', () => {
+  it('is off unless stored as on', () => {
+    expect(store.normalizeWorkbenchPreferences({}).antialiasProgressImages).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ antialiasProgressImages: 'yes' as never }).antialiasProgressImages
+    ).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ antialiasProgressImages: true }).antialiasProgressImages).toBe(true);
   });
 });

@@ -43,7 +43,7 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { lazy, useCallback, useMemo } from 'react';
 
@@ -276,7 +276,8 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   // The board is read from the project before anything is awaited, so a later change cannot redirect an upload
   // already under way.
   const getUploadBoardId = useCallback<GenerationUiAdapter['gallery']['getUploadBoardId']>(async () => {
-    const galleryValues = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    const { activeProject, scopedDefaults } = store.getSnapshot();
+    const galleryValues = getResolvedProjectWidgetValues(activeProject, 'gallery', scopedDefaults);
     const pendingListing = ensureGalleryBoardDestinations(queryClient);
 
     if (pendingListing) {

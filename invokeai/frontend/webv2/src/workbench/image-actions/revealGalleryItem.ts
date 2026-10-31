@@ -14,7 +14,7 @@ import {
 } from '@features/gallery/contracts';
 import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions } from '@features/gallery/queries';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 
 /** Inject workbench dependencies so reveal loads on demand without adding gallery transfer code to editor boot. */
 export interface GalleryRevealContext {
@@ -81,7 +81,10 @@ export const revealGalleryItem = (
       return;
     }
 
-    const getGalleryValues = () => getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery');
+    const getGalleryValues = () => {
+      const snapshot = queries.getSnapshot();
+      return getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
+    };
     const settings = getGallerySettings(getGalleryValues());
     // Match the post-reveal listing filters and starred partition so prefetched pages enter the gallery's cache.
     const wantsStarredOnly = image.starred === true;

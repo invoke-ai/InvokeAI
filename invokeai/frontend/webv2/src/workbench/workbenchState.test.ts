@@ -47,7 +47,7 @@ import {
 } from './layoutPresetSnapshots';
 import { PROJECT_EVENT_LIMIT } from './projectEvents';
 import { getActiveProjectGraph } from './projectWorkflows';
-import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
+import { BUILT_IN_PROJECT_SETTINGS } from './settings/projectSettings';
 import { getProjectWidgetValues } from './widgetState';
 import {
   clampPanelSize,
@@ -614,6 +614,46 @@ describe('project output filters', () => {
     });
 
     expect(getQueuedOutputNode(state)?.type).toBe('l2i');
+  });
+});
+
+describe("the user's defaults for the generation flags", () => {
+  const getQueuedNodeTypes = (state: WorkbenchState): string[] => {
+    const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
+    const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
+    return Object.values(nodes).map((node) => node.type);
+  };
+  const submitWithDefaults = (state: WorkbenchState) =>
+    workbenchReducer(
+      {
+        ...primeGenerate(state),
+        scopedDefaults: { generate: { useCpuNoise: false, useNsfwChecker: true, useWatermark: true } },
+      },
+      {
+        backendSupportsCancellation: true,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        projectId: state.activeProjectId,
+        type: 'submitResolvedInvocationSnapshot',
+      }
+    );
+
+  it('filters and stamps a project that pins nothing, and draws its noise as the default says', () => {
+    const state = submitWithDefaults(createInitialWorkbenchState());
+
+    expect(getQueuedNodeTypes(state)).toEqual(expect.arrayContaining(['img_nsfw', 'img_watermark']));
+    expect(getQueuedRandDevice(state)).toBe('cuda');
+  });
+
+  it("keeps a project's own pins over the defaults", () => {
+    const pinned = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useCpuNoise: true, useNsfwChecker: false },
+      type: 'setActiveProjectSettings',
+    });
+    const state = submitWithDefaults(pinned);
+
+    expect(getQueuedNodeTypes(state)).not.toContain('img_nsfw');
+    expect(getQueuedNodeTypes(state)).toContain('img_watermark');
+    expect(getQueuedRandDevice(state)).toBe('cpu');
   });
 });
 
@@ -1776,6 +1816,66 @@ describe('workbench widget state updates', () => {
     (values.nested as { mutable: string }).mutable = 'after';
 
     expect(getActiveProject(state).widgetInstances.generate?.state.values.nested).toEqual({ mutable: 'before' });
+  });
+
+  it('clears pins from the instance in the named project only, and is a no-op for keys it lacks', () => {
+    let state = createInitialWorkbenchState();
+    const firstProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, {
+      instanceId: 'gallery',
+      type: 'patchWidgetInstanceValues',
+      values: { showDateBoards: false, thumbnailFit: 'aspect' },
+    });
+    state = workbenchReducer(state, { type: 'createProject' });
+    state = workbenchReducer(state, {
+      instanceId: 'gallery',
+      type: 'patchWidgetInstanceValues',
+      values: { showDateBoards: false },
+    });
+    const secondProjectId = state.activeProjectId;
+
+    state = workbenchReducer(state, {
+      instanceId: 'gallery',
+      keys: ['showDateBoards', 'showArchivedBoards'],
+      projectId: firstProjectId,
+      type: 'clearWidgetInstanceValues',
+    });
+
+    const firstValues = getProject(state, firstProjectId).widgetInstances.gallery?.state.values ?? {};
+    expect(firstValues).not.toHaveProperty('showDateBoards');
+    expect(firstValues.thumbnailFit).toBe('aspect');
+    expect(getProject(state, secondProjectId).widgetInstances.gallery?.state.values.showDateBoards).toBe(false);
+    expect(
+      workbenchReducer(state, {
+        instanceId: 'gallery',
+        keys: ['showDateBoards'],
+        projectId: firstProjectId,
+        type: 'clearWidgetInstanceValues',
+      })
+    ).toBe(state);
+    expect(
+      workbenchReducer(state, {
+        instanceId: 'gallery',
+        keys: ['showDateBoards'],
+        projectId: 'missing-project',
+        type: 'clearWidgetInstanceValues',
+      })
+    ).toBe(state);
+  });
+
+  it('mirrors the user defaults and keeps the state for the same record', () => {
+    const state = createInitialWorkbenchState();
+    const scopedDefaults = { gallery: { thumbnailFit: 'aspect' } };
+    const next = workbenchReducer(state, { scopedDefaults, type: 'setScopedDefaults' });
+
+    expect(next.scopedDefaults).toBe(scopedDefaults);
+    expect(next.projects).toBe(state.projects);
+    expect(workbenchReducer(next, { scopedDefaults, type: 'setScopedDefaults' })).toBe(next);
+    // A hydrate replaces projects, not the account's defaults.
+    expect(
+      workbenchReducer(next, { state: createInitialWorkbenchState(), type: 'hydrateWorkbench' }).scopedDefaults
+    ).toBe(scopedDefaults);
   });
 });
 
@@ -7082,11 +7182,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 });
 
 describe('workbench account and project settings', () => {
-  it('starts with the default layout preset and legacy-matching project settings', () => {
+  it('starts with the default layout preset and a new project that pins no layered setting', () => {
     const state = createInitialWorkbenchState();
 
     expect(state.account).toEqual({ activeLayoutPresetId: 'compose' });
-    expect(getActiveProject(state).settings).toEqual(DEFAULT_PROJECT_SETTINGS);
+    expect(getActiveProject(state).settings).toEqual({ viewerAutoSwitch: BUILT_IN_PROJECT_SETTINGS.viewerAutoSwitch });
   });
 
   it('drops legacy preferences carried inside persisted accounts on hydrate', () => {
@@ -7171,17 +7271,15 @@ describe('workbench account and project settings', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, {
-      settings: { antialiasProgressImages: true, useCpuNoise: false },
+      settings: { useCpuNoise: false },
       type: 'setActiveProjectSettings',
     });
 
-    expect(getActiveProject(state).settings).toEqual({
-      antialiasProgressImages: true,
-      useCpuNoise: false,
-      useNsfwChecker: false,
-      useWatermark: false,
-      viewerAutoSwitch: 'progress',
-    });
+    expect(getActiveProject(state).settings).toEqual({ useCpuNoise: false, viewerAutoSwitch: 'progress' });
+
+    state = workbenchReducer(state, { settings: { useCpuNoise: undefined }, type: 'setActiveProjectSettings' });
+
+    expect(getActiveProject(state).settings).toEqual({ viewerAutoSwitch: 'progress' });
   });
 
   it('leaves the state alone when a project setting is set to the value it has', () => {

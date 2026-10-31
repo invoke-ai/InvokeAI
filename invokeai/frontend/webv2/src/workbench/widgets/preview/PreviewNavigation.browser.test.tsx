@@ -195,7 +195,16 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
-  useWidgetValuesSelector: () => ({}),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      widgetId === 'gallery' || widgetId === 'preview'
+        ? ((
+            Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === widgetId) as
+              | { state?: { values?: Record<string, unknown> } }
+              | undefined
+          )?.state?.values ?? {})
+        : {}
+    ),
   useWorkbenchCommands: () => mocks.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.

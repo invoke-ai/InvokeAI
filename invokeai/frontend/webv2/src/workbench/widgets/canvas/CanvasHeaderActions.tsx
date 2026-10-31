@@ -18,7 +18,7 @@ import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
 import {
   BugIcon,
   ChevronDownIcon,
@@ -35,7 +35,6 @@ import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState } fro
 import { useTranslation } from 'react-i18next';
 
 import type { CanvasHeaderCommandContext } from './canvasHeaderCommands';
-import type { ResolvedCanvasSettings } from './canvasSettings';
 
 import { useModelGridSize } from './bboxGrid';
 import { CreateFromBboxMenuItems } from './CanvasCreateFromBboxSubmenu';
@@ -83,10 +82,6 @@ const ZOOM_OPTIONS = zoomMenuOptions();
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 const ZOOM_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
-/** Reads the persisted, default-applied canvas settings for the active project. */
-const selectCanvasSettings = (project: Project): ResolvedCanvasSettings =>
-  resolveCanvasSettings(getProjectWidgetValues(project, 'canvas'));
-
 /** Reads the active generate model's base, so fit-bbox snaps to the same grid the bbox tool uses. */
 const selectModelBase = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { base?: unknown } } | undefined;
@@ -94,8 +89,7 @@ const selectModelBase = (project: Project): string | null => {
 };
 
 /** The project's clamped compositing mask blur, which fit-to-masks clears so the feathered edge stays in frame. */
-const selectMaskBlur = (project: Project): number =>
-  readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')).maskBlur;
+const selectMaskBlur = (values: Record<string, unknown>): number => readCanvasCompositingSettings(values).maskBlur;
 
 const selectModelVariant = (project: Project): string | null => {
   const values = getProjectWidgetValues(project, 'generate') as { model?: { variant?: unknown } } | undefined;
@@ -144,8 +138,8 @@ const CanvasHeaderActionsInner = ({
   const document = useActiveProjectSelector((project) => project.canvas.document);
   const modelBase = useActiveProjectSelector(selectModelBase);
   const modelVariant = useActiveProjectSelector(selectModelVariant);
-  const settings = useActiveProjectSelector(selectCanvasSettings, canvasSettingsEqual);
-  const maskBlur = useActiveProjectSelector(selectMaskBlur);
+  const settings = useWidgetValuesSelector('canvas', resolveCanvasSettings, canvasSettingsEqual);
+  const maskBlur = useWidgetValuesSelector('canvas', selectMaskBlur);
 
   const [isNewCanvasOpen, setIsNewCanvasOpen] = useState(false);
   const [stopGenerations, setStopGenerations] = useState(true);

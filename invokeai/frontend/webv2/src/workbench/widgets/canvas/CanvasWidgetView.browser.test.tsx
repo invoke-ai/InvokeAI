@@ -68,6 +68,11 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
   useActiveProjectId: () => activeProject().id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(activeProject()),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      Object.values(activeProject().widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ??
+        {}
+    ),
   useOptionalWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchCommands: () => harness.store!.commands,
   useWorkbenchQueries: () => harness.store!.queries,

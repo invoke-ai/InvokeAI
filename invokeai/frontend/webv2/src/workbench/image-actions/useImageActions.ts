@@ -66,7 +66,7 @@ import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
-import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetInstance, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -287,7 +287,8 @@ export const useImageActions = ({
     const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const project = getLatestProject();
 
-      return project ? getProjectWidgetValues(project, widgetId) : {};
+      // Read as the widget does: auto-add follows the Gallery's resolved `followSelectedBoard`.
+      return project ? getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults) : {};
     };
     const getLatestGenerateValues = () => getLatestWidgetValues('generate');
     const getLatestVideoValues = () => getLatestWidgetValues('video');

@@ -30,7 +30,7 @@ vi.mock('@workbench/canvas-operations/api', () => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({ notifications: { reportError: mocks.reportError } }),
   useWorkbenchQueries: () => ({
-    getSnapshot: () => ({ activeProject: { id: 'project-1', widgetInstances: {} } }),
+    getSnapshot: () => ({ activeProject: { id: 'project-1', widgetInstances: {} }, scopedDefaults: {} }),
     isActiveProject: (id: string) => id === mocks.activeProjectId,
   }),
 }));

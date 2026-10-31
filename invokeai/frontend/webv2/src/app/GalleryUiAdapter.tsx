@@ -15,18 +15,19 @@ import {
   areWorkbenchPreferencesReady,
   getWorkbenchPreferences,
   patchWorkbenchPreferences,
+  useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { useLivePreviewFollow } from '@workbench/widgets/preview/livePreviewFollow';
-import { getProjectWidgetInstance } from '@workbench/widgetState';
+import { getProjectWidgetInstance, resolveWidgetValues } from '@workbench/widgetState';
 import {
-  useActiveProjectSelector,
   useWorkbenchCommands,
   useWorkbenchInternalStore,
   useWorkbenchPersistenceService,
   useWorkbenchQueries,
+  useWorkbenchSelector,
 } from '@workbench/WorkbenchContext';
 import { lazy, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -36,8 +37,11 @@ const EMPTY_WIDGET_VALUES: Record<string, unknown> = Object.freeze({});
 /** What earlier builds stored for following the selected board, their default. */
 const LEGACY_AUTO_ADD_FOLLOW = 'follow';
 
-const getGalleryValues = (project: Parameters<typeof getProjectWidgetInstance>[0] | null | undefined) =>
-  (project && getProjectWidgetInstance(project, 'gallery')?.state?.values) ?? EMPTY_WIDGET_VALUES;
+/** The Gallery's values as it reads them: the project's pins over the user's gallery defaults. */
+const getGalleryValues = (
+  project: Parameters<typeof getProjectWidgetInstance>[0] | null | undefined,
+  scopedDefaults: Parameters<typeof resolveWidgetValues>[1]
+) => resolveWidgetValues(project ? getProjectWidgetInstance(project, 'gallery') : undefined, scopedDefaults);
 
 const selectGalleryProjects = (snapshot: ProjectLibrarySnapshot): GalleryProjectRef[] =>
   snapshot.summaries.map((summary) => ({ id: summary.id, name: summary.name }));
@@ -62,15 +66,16 @@ const GalleryImageContextMenu = lazy(() =>
 );
 
 export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) => {
-  const { projectId, projectName, galleryValues, generateValues, antialiasProgressImages, liveFollowEnabled } =
-    useActiveProjectSelector((project) => ({
+  const { projectId, projectName, galleryValues, generateValues, liveFollowEnabled } = useWorkbenchSelector(
+    ({ activeProject: project, scopedDefaults }) => ({
       projectId: project.id,
       projectName: project.name,
-      galleryValues: getProjectWidgetInstance(project, 'gallery')?.state?.values ?? EMPTY_WIDGET_VALUES,
+      galleryValues: getGalleryValues(project, scopedDefaults),
       generateValues: getProjectWidgetInstance(project, 'generate')?.state?.values ?? EMPTY_WIDGET_VALUES,
-      antialiasProgressImages: project.settings.antialiasProgressImages,
       liveFollowEnabled: project.settings.viewerAutoSwitch === 'progress',
-    }));
+    })
+  );
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const livePreview = useLivePreviewFollow();
   const boardSharing = useAuthSession().multiuserEnabled;
   const { gallery, notifications, widgets } = useWorkbenchCommands();
@@ -125,7 +130,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       generateValues,
       getItemLabel,
       noteBoardBrowsed: (boardId) => {
-        const values = getGalleryValues(queries.getProject(projectId));
+        const values = getGalleryValues(queries.getProject(projectId), queries.getSnapshot().scopedDefaults);
 
         // Once per account, for a project that followed the selected board as earlier builds did by default (it
         // stored 'follow', now read as the default destination): say that browsing no longer moves results, the first
@@ -148,7 +153,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       getProjectGalleryValues: (targetProjectId) => {
         const project = isAccountScopeCurrent(accountScope) ? queries.getProject(targetProjectId) : null;
 
-        return project ? getGalleryValues(project) : null;
+        return project ? getGalleryValues(project, queries.getSnapshot().scopedDefaults) : null;
       },
       ItemActionsProvider: GalleryItemActionsAdapter,
       ImageContextMenu: GalleryImageContextMenu,

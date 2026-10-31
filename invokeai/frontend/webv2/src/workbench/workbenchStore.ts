@@ -513,6 +513,11 @@ const createCommands = (
       raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
+      /** Deletes these pins from the instance, so it follows the user's defaults for them. */
+      clearInstanceValues: command(
+        'clearWidgetInstanceValues',
+        (instanceId: string, keys: readonly string[], projectId?: string) => ({ instanceId, keys, projectId })
+      ),
       patchInstanceValues: command(
         'patchWidgetInstanceValues',
         (instanceId: string, values: Record<string, unknown>, projectId?: string) => ({
@@ -706,6 +711,8 @@ export type WorkbenchPersistenceCommands = ReturnType<typeof createPersistenceAd
 
 export interface WorkbenchInternalAdapters {
   persistence: WorkbenchPersistenceCommands;
+  /** Mirrors the settings store's `scopedDefaults` into the aggregate; only the workbench runtime calls it. */
+  setScopedDefaults: (scopedDefaults: WorkbenchState['scopedDefaults']) => void;
 }
 
 export interface WorkbenchSnapshot {
@@ -716,6 +723,7 @@ export interface WorkbenchSnapshot {
   hasHydrated: boolean;
   notifications: WorkbenchState['notifications'];
   projects: WorkbenchState['projects'];
+  scopedDefaults: WorkbenchState['scopedDefaults'];
 }
 
 /** Imperative, read-only views for event handlers that must observe post-flush state. */
@@ -753,6 +761,7 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
   hasHydrated,
   notifications: state.notifications,
   projects: state.projects,
+  scopedDefaults: state.scopedDefaults,
 });
 
 const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState): boolean =>
@@ -934,7 +943,9 @@ export const createWorkbenchStore = (
   initialState = createInitialWorkbenchState(),
   options: WorkbenchStoreOptions = {}
 ): WorkbenchInternalStore => {
-  let state = initialState;
+  // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
+  // settings subscription keeps the mirror current from then on.
+  let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -1019,6 +1030,7 @@ export const createWorkbenchStore = (
     getState,
     internal: {
       persistence: createPersistenceAdapter(dispatch, getState),
+      setScopedDefaults: (scopedDefaults) => dispatch({ scopedDefaults, type: 'setScopedDefaults' }),
     },
     queries: {
       getProject: (projectId) => state.projects.find((project) => project.id === projectId) ?? null,

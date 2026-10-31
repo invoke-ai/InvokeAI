@@ -3,6 +3,7 @@ import type { Project } from '@workbench/projectContracts';
 import type * as SettingsStoreModule from '@workbench/settings/store';
 import type * as OpenWorkbenchWidgetModule from '@workbench/useOpenWorkbenchWidget';
 import type { OpenWorkbenchWidgetOptions, RegisteredWidget, WidgetTypeId } from '@workbench/widgetContracts';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -14,7 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { GalleryUiAdapterProvider } from './GalleryUiAdapter';
 
-const preferences = vi.hoisted(() => ({ galleryDestinationNoticeShown: false, ready: true }));
+const preferences = vi.hoisted(() => ({ galleryDestinationNoticeShown: false, ready: true, scopedDefaults: {} }));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<typeof SettingsStoreModule>()),
   areWorkbenchPreferencesReady: () => preferences.ready,
@@ -68,6 +69,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchInternalStore: () => store,
   useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
   useWorkbenchQueries: () => store.queries,
+  useWorkbenchSelector: (selector: (snapshot: WorkbenchSnapshot) => unknown) => selector(store.getSnapshot()),
 }));
 
 const renderAdapter = () => {

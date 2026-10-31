@@ -1,11 +1,10 @@
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type {
-  ProjectSettings,
   ProjectSortId,
   ProjectsViewId,
+  ScopedDefaults,
   StoredGeneratePreset,
   StoredRebalancePreset,
-  ViewerAutoSwitchMode,
   WorkbenchPreferences,
   WorkflowLibrarySortId,
 } from '@workbench/settings/contracts';
@@ -26,6 +25,7 @@ import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+import { getLayeredKeys } from '@workbench/settings/projectSettings';
 
 export { WORKBENCH_LANGUAGES } from '@platform/i18n/languages';
 
@@ -37,17 +37,9 @@ export const DEVELOPER_LOG_LEVELS: readonly LogLevel[] = LOG_LEVELS;
 
 export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
-export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
-  antialiasProgressImages: false,
-  useCpuNoise: true,
-  useNsfwChecker: false,
-  useWatermark: false,
-  // New projects; a stored project without the field reads as `off` (see normalizeProjectSettings).
-  viewerAutoSwitch: 'progress',
-};
-
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
+  antialiasProgressImages: false,
   autoSwitchInvocationRoute: true,
   canvasToolMemory: {},
   confirmImageDeletion: true,
@@ -77,6 +69,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
+  scopedDefaults: {},
   selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
@@ -303,6 +296,37 @@ const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string
 };
 
 /**
+ * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped,
+ * so nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as
+ * is, so resolved widget values keep their identity across unrelated preference patches.
+ */
+const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.scopedDefaults;
+  }
+  let changed = false;
+  const kept: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const [ownerId, record] of Object.entries(value)) {
+    const layered = getLayeredKeys(ownerId);
+    if (!layered || !isPlainRecord(record)) {
+      changed = true;
+      continue;
+    }
+    const entries = Object.entries(record);
+    const layeredEntries = entries.filter(([key]) => Object.hasOwn(layered, key));
+    if (layeredEntries.length !== entries.length) {
+      changed = true;
+    }
+    if (layeredEntries.length > 0) {
+      kept[ownerId] = layeredEntries.length === entries.length ? record : Object.fromEntries(layeredEntries);
+    } else if (entries.length > 0) {
+      changed = true;
+    }
+  }
+  return changed ? kept : (value as ScopedDefaults);
+};
+
+/**
  * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
  * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
  * identity and does not re-run selectors that read it (Invoke readiness).
@@ -326,23 +350,6 @@ const normalizeControlModelMemory = (values: unknown): Record<string, string> =>
   return kept.length === entries.length ? (values as Record<string, string>) : Object.fromEntries(kept);
 };
 
-export const isViewerAutoSwitchMode = (value: unknown): value is ViewerAutoSwitchMode =>
-  value === 'off' || value === 'latest' || value === 'progress';
-
-export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
-  antialiasProgressImages:
-    typeof settings?.antialiasProgressImages === 'boolean'
-      ? settings.antialiasProgressImages
-      : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
-  useNsfwChecker:
-    typeof settings?.useNsfwChecker === 'boolean' ? settings.useNsfwChecker : DEFAULT_PROJECT_SETTINGS.useNsfwChecker,
-  useWatermark:
-    typeof settings?.useWatermark === 'boolean' ? settings.useWatermark : DEFAULT_PROJECT_SETTINGS.useWatermark,
-  // Absent means a project saved before the mode existed, whatever its old progress toggle said: it starts `off`.
-  viewerAutoSwitch: isViewerAutoSwitchMode(settings?.viewerAutoSwitch) ? settings.viewerAutoSwitch : 'off',
-});
-
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
   | 'launchpadProjectsSort'
@@ -363,6 +370,7 @@ type WorkbenchPreferencesInput = Omit<
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
+  antialiasProgressImages: preferences?.antialiasProgressImages === true,
   autoSwitchInvocationRoute:
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'
       ? preferences.autoSwitchInvocationRoute
@@ -442,6 +450,7 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
   galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+  scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
   selectObjectAutoProcess:
     typeof preferences?.selectObjectAutoProcess === 'boolean'
       ? preferences.selectObjectAutoProcess
@@ -786,6 +795,31 @@ export const patchControlModelMemory = (key: string, modelKey: string | null): P
     controlModelMemory[key] = modelKey;
   }
   return patchWorkbenchPreferences({ controlModelMemory });
+};
+
+/** Sets the user's defaults for `values`' keys under `ownerId`, keeping the owner's other defaults. */
+export const patchScopedDefault = (ownerId: string, values: Readonly<Record<string, unknown>>): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  return patchWorkbenchPreferences({
+    scopedDefaults: { ...scopedDefaults, [ownerId]: { ...scopedDefaults[ownerId], ...values } },
+  });
+};
+
+/** Forgets the user's defaults for `keys` under `ownerId`; an owner left with none is dropped. */
+export const clearScopedDefault = (ownerId: string, keys: readonly string[]): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  const current = scopedDefaults[ownerId];
+  if (!current || !keys.some((key) => Object.hasOwn(current, key))) {
+    return Promise.resolve();
+  }
+  const owner = { ...current };
+  for (const key of keys) {
+    delete owner[key];
+  }
+  const { [ownerId]: _cleared, ...others } = scopedDefaults;
+  return patchWorkbenchPreferences({
+    scopedDefaults: Object.keys(owner).length > 0 ? { ...others, [ownerId]: owner } : others,
+  });
 };
 
 export const clearWorkbenchSettings = async (): Promise<void> => {

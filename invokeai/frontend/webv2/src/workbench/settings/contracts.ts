@@ -23,12 +23,16 @@ export type StartupDestination = 'launchpad' | 'recentProject';
  * WorkbenchPreferences} so imports cannot overwrite them.
  */
 export interface ProjectSettings {
-  useCpuNoise: boolean;
+  /**
+   * The three generation flags are this project's pins: absent follows the user's default
+   * (`WorkbenchPreferences.scopedDefaults.generate`), then the built-in. Read them through
+   * `getEffectiveProjectSettings`.
+   */
+  useCpuNoise?: boolean;
   /** Blur images the NSFW checker flags before they are saved. */
-  useNsfwChecker: boolean;
+  useNsfwChecker?: boolean;
   /** Stamp an invisible watermark into every saved image. */
-  useWatermark: boolean;
-  antialiasProgressImages: boolean;
+  useWatermark?: boolean;
   /**
    * What the Preview switches to while work runs; the Preview owns this control, so it is not in Settings. Projects
    * saved before it existed read as `off`, so an upgrade never starts moving a selection the user had settled on.
@@ -41,6 +45,17 @@ export interface ProjectSettings {
  * `off`: results land in the Gallery only (one still takes an empty selection). The canvas staging bar's values.
  */
 export type ViewerAutoSwitchMode = 'off' | 'latest' | 'progress';
+
+/** {@link ProjectSettings} with every layered flag resolved: project pin, then the user's default, then built-in. */
+export type EffectiveProjectSettings = Required<ProjectSettings>;
+
+/**
+ * The user's defaults for per-project settings, keyed by owner: a widget type id (`gallery`, `canvas`, `preview`,
+ * `image-map`), and `generate` for the layered {@link ProjectSettings} flags the Generate widget's settings show (they
+ * layer over the project settings, never over the Generate widget's values). Each record holds only layerable keys
+ * the user chose (`getLayeredSettings`); owners normalize the values on read, as they do their widget values.
+ */
+export type ScopedDefaults = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
 
 /**
  * Store the RebalancePreset shape locally to keep generation out of Launchpad's bundle. Generation owns and
@@ -149,6 +164,13 @@ export interface WorkbenchPreferences {
    * Settings.
    */
   canvasToolMemory: Readonly<Record<string, unknown>>;
+  /**
+   * Per-project settings' user defaults (see {@link ScopedDefaults}): a project without its own value for a setting
+   * follows these, then the built-in. Not shown as such in Settings.
+   */
+  scopedDefaults: ScopedDefaults;
+  /** Smooth the low-resolution live frames shown while an image generates. */
+  antialiasProgressImages: boolean;
 }
 
 export type SettingsSectionId = string;

@@ -20,7 +20,7 @@ import { getCanvasStagingSlotRect, getCanvasStagingSlots } from '@workbench/canv
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
-import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector, useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
@@ -28,6 +28,7 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
   useActiveProjectSelector,
+  useWidgetValuesSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
@@ -115,7 +116,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const { document, stagingArea } = canvas;
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
   const operation = useCanvasOperation(engine);
@@ -148,10 +149,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   }, [bboxGrid, engine]);
 
   // Feed persisted per-project view settings into engine stores; header controls write the widget values.
-  const settings = useActiveProjectSelector(
-    (project) => resolveCanvasSettings(getProjectWidgetValues(project, 'canvas')),
-    canvasSettingsEqual
-  );
+  const settings = useWidgetValuesSelector('canvas', resolveCanvasSettings, canvasSettingsEqual);
   useEffect(() => {
     if (!engine) {
       return;

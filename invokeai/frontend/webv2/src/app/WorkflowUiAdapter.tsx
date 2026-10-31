@@ -40,7 +40,7 @@ import {
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -174,6 +174,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
 
           assertAccountScopeCurrent(owner);
+          const snapshot = queries.getSnapshot();
           return resolveAndSubmitGraphPreviewInvocation({
             commands,
             formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
@@ -181,7 +182,8 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
             models: availabilityModels,
             owner,
             prepareCanvasInvocation,
-            project: queries.getSnapshot().activeProject,
+            project: snapshot.activeProject,
+            scopedDefaults: snapshot.scopedDefaults,
             sourceId,
           });
         } catch (error) {
@@ -233,7 +235,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
             activeWorkflowId: activeWorkflow.document.id,
             canRedo: history.future.length > 0,
             canUndo: history.past.length > 0,
-            galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
+            galleryValues: getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults),
             id: snapshot.activeProject.id,
             isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
             projectGraph: activeWorkflow.document,

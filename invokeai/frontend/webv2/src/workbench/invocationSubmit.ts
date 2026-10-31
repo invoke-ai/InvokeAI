@@ -15,6 +15,7 @@ import type {
   UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
+import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
@@ -36,9 +37,10 @@ import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepar
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { getActiveProjectWorkflow } from './projectWorkflows';
+import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
-import { getProjectWidgetValues } from './widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
 
 /** Locale keys with their English, which notices keep for a language without them (`resolveNotificationText`). */
 const EXPANSION_FAILED_TITLE = { title: 'The prompt could not be expanded', titleKey: 'topbar.invoke.expansionFailed' };
@@ -85,6 +87,8 @@ export interface SubmitResolvedInvocationDeps {
   route: ResolvedInvocationRoute;
   /** The project the canvas pipeline reads its generate/canvas widget values from. */
   project: Project;
+  /** The user's defaults captured with `project`; settings and widget values resolve against them. */
+  scopedDefaults: ScopedDefaults;
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
   /**
@@ -238,6 +242,7 @@ export const submitResolvedInvocation = async ({
   prepend,
   project,
   route,
+  scopedDefaults,
   workflowId,
 }: SubmitResolvedInvocationDeps): Promise<void> => {
   if (!isAccountScopeCurrent(owner)) {
@@ -318,6 +323,7 @@ export const submitResolvedInvocation = async ({
         prepend,
         project,
         route,
+        scopedDefaults,
         workflowId,
       },
       expansion.prompts.length > 0
@@ -342,6 +348,7 @@ export const submitResolvedInvocation = async ({
       prepend,
       project,
       route,
+      scopedDefaults,
       workflowId,
     },
     undefined,
@@ -363,6 +370,7 @@ const dispatchResolvedInvocation = async (
     prepend,
     project,
     route,
+    scopedDefaults,
   }: SubmitResolvedInvocationDeps,
   expansion: ExpandedPositivePrompts | undefined,
   workflowGenerators: WorkflowGeneratorResolutions | undefined,
@@ -401,8 +409,9 @@ const dispatchResolvedInvocation = async (
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
     // Canvas can output to Gallery.
+    const canvasValues = getResolvedProjectWidgetValues(project, 'canvas', scopedDefaults);
     await prepareCanvasInvocation({
-      compositing: readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')),
+      compositing: readCanvasCompositingSettings(canvasValues),
       destination: route.destination,
       commands,
       formatControlLayerError,
@@ -412,9 +421,9 @@ const dispatchResolvedInvocation = async (
       expansion,
       ...(prepend ? { prepend } : {}),
       projectId: project.id,
-      canvasValues: getProjectWidgetValues(project, 'canvas'),
-      projectSettings: project.settings,
-      strength: readCanvasDenoisingStrength(getProjectWidgetValues(project, 'canvas')),
+      canvasValues,
+      projectSettings: getEffectiveProjectSettings(project.settings, scopedDefaults[PROJECT_SETTINGS_OWNER]),
+      strength: readCanvasDenoisingStrength(canvasValues),
     });
     return;
   }
