@@ -1,7 +1,5 @@
 import type { CanvasControlAdapterContract } from '@workbench/canvas-engine/api';
 
-import { areControlAdapterValuesValid, getControlAdapterMinWeight } from '@features/generation/graph';
-
 export const CONTROL_ADAPTER_DEFAULTS: Readonly<
   Record<CanvasControlAdapterContract['kind'], CanvasControlAdapterContract>
 > = {
@@ -34,7 +32,8 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
     model: null,
     weight: 0.75,
   },
-  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred.
+  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred. An InstantX union on Qwen Image 2512
+  // wants about 1.5–2.0, which the user sets.
   qwen_image_control: {
     beginEndStepPct: [0, 1],
     controlMode: null,
@@ -75,6 +74,20 @@ export const getDefaultControlAdapterKind = (base: string | null | undefined): C
     (kind) => CONTROL_KIND_BASE[kind] === base
   ) ?? 'controlnet';
 
+/**
+ * The adapter kind a control model runs as on its own base: T2I-Adapter and Control LoRA by type, a `controlnet`
+ * model as its base's own kind (Z-Image, Qwen-Image, FLUX.2, Anima LLLite) or plain ControlNet. Null for other types.
+ */
+export const deriveControlKind = (model: {
+  type: string;
+  base: string;
+}): CanvasControlAdapterContract['kind'] | null => {
+  if (model.type === 't2i_adapter' || model.type === 'control_lora') {
+    return model.type;
+  }
+  return model.type === 'controlnet' ? getDefaultControlAdapterKind(model.base) : null;
+};
+
 /** A fresh copy of the default adapter for `base`, carrying `model`. */
 export const createDefaultControlAdapter = (
   base: string | null | undefined,
@@ -89,29 +102,49 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 const isControlAdapterKind = (value: unknown): value is CanvasControlAdapterContract['kind'] =>
   typeof value === 'string' && Object.hasOwn(CONTROL_ADAPTER_DEFAULTS, value);
 
-/** Repairs persisted numeric fields while preserving valid values and adapter kinds. */
+const CONTROL_MODES: readonly unknown[] = ['balanced', 'more_prompt', 'more_control', 'unbalanced'];
+
+/**
+ * Whether a stored weight can be kept: finite and within -1..2, the widest range any kind accepts. A stored adapter's
+ * kind is advisory (the layer runs as the kind its model resolves to, which the panel, readiness validation and the
+ * graph all use), so persistence must not judge the weight by it: a Fun kind's 0 floor would refuse or reset a
+ * negative weight a layer created under that base may now validly run with.
+ */
+export const isStorableControlWeight = (weight: unknown): weight is number =>
+  typeof weight === 'number' && Number.isFinite(weight) && weight >= -1 && weight <= 2;
+
+/** Whether a stored begin/end step range can be kept: finite, within 0..1 and ordered; the same for every kind. */
+export const isStorableControlStepRange = (range: unknown): range is [number, number] =>
+  Array.isArray(range) &&
+  range.length === 2 &&
+  typeof range[0] === 'number' &&
+  typeof range[1] === 'number' &&
+  Number.isFinite(range[0]) &&
+  Number.isFinite(range[1]) &&
+  range[0] >= 0 &&
+  range[1] <= 1 &&
+  range[0] < range[1];
+
+/**
+ * Maps a persisted adapter to the contract, keeping every stored value persistence can hold and repairing the rest
+ * with the stored kind's defaults. No kind-specific reset applies (see {@link isStorableControlWeight}): the stored
+ * kind and model are kept as they are, and the resolved kind governs what runs.
+ */
 export const normalizeControlAdapter = (value: unknown): unknown => {
   if (!isRecord(value) || !isControlAdapterKind(value.kind)) {
     return value;
   }
   const defaults = CONTROL_ADAPTER_DEFAULTS[value.kind];
-  const minWeight = getControlAdapterMinWeight(value.kind);
-  const weight =
-    typeof value.weight === 'number' && Number.isFinite(value.weight) && value.weight >= minWeight && value.weight <= 2
-      ? value.weight
-      : defaults.weight;
-  const beginEndStepPct: [number, number] = areControlAdapterValuesValid(value.kind, weight, value.beginEndStepPct)
-    ? [value.beginEndStepPct[0], value.beginEndStepPct[1]]
-    : [defaults.beginEndStepPct[0], defaults.beginEndStepPct[1]];
-
-  if (value.kind !== 'z_image_control' && value.kind !== 'qwen_image_control' && value.kind !== 'flux2_control') {
-    return { ...defaults, ...value, beginEndStepPct, weight } satisfies CanvasControlAdapterContract;
-  }
   return {
-    beginEndStepPct,
-    controlMode: null,
+    beginEndStepPct: isStorableControlStepRange(value.beginEndStepPct)
+      ? [value.beginEndStepPct[0], value.beginEndStepPct[1]]
+      : [defaults.beginEndStepPct[0], defaults.beginEndStepPct[1]],
+    controlMode:
+      value.controlMode === null || CONTROL_MODES.includes(value.controlMode)
+        ? (value.controlMode as CanvasControlAdapterContract['controlMode'])
+        : defaults.controlMode,
     kind: value.kind,
     model: typeof value.model === 'string' ? value.model : null,
-    weight,
+    weight: isStorableControlWeight(value.weight) ? value.weight : defaults.weight,
   } satisfies CanvasControlAdapterContract;
 };

@@ -188,6 +188,23 @@ def test_enqueue_receipt_survives_queue_item_deletion(session_queue: SessionQueu
     assert session_queue.list_all_queue_items("default") == []
 
 
+def test_a_replay_answers_as_a_retry_does_and_never_admits_the_batch(session_queue: SessionQueue) -> None:
+    batch = _batch()
+    assert session_queue.replay_enqueue("default", batch, False, "user-1") is None
+    assert session_queue.list_all_queue_items("default") == []
+
+    first = asyncio.run(session_queue.enqueue_batch("default", batch, False, "user-1"))
+    replayed = session_queue.replay_enqueue("default", batch, False, "user-1")
+
+    assert replayed is not None
+    assert (replayed.item_ids, replayed.batch.batch_id) == (first.item_ids, first.batch.batch_id)
+    with pytest.raises(EnqueueIdempotencyConflictError):
+        session_queue.replay_enqueue("default", _batch(prompt="another"), False, "user-1")
+    with pytest.raises(EnqueueIdempotencyConflictError):
+        session_queue.replay_enqueue("default", batch, True, "user-1")
+    assert len(session_queue.list_all_queue_items("default")) == 2
+
+
 def test_enqueue_receipt_does_not_expire_while_unacknowledged(
     session_queue: SessionQueue, mock_invoker: Invoker, mock_sqlite_database: Database
 ) -> None:

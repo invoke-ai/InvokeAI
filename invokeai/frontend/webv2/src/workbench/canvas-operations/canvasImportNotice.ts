@@ -1,3 +1,4 @@
+import type { SendGalleryImageAsControlResult } from './controlSourceActions';
 import type { ImportGalleryImagesResult } from './importGalleryImages';
 
 export interface CanvasImportNotice {
@@ -5,12 +6,13 @@ export interface CanvasImportNotice {
   titleKey:
     | 'widgets.canvas.import.blocked'
     | 'widgets.canvas.import.capabilitiesUnavailable'
+    | 'widgets.canvas.import.controlFilled'
     | 'widgets.canvas.import.empty'
     | 'widgets.canvas.import.partial'
     | 'widgets.canvas.import.staleDocument'
     | 'widgets.canvas.import.staleProject'
     | 'widgets.canvas.import.success';
-  options?: { count: number } | { count: number; failedCount: number; successCount: number };
+  options?: { count: number } | { count: number; failedCount: number; successCount: number } | { name: string };
 }
 
 const assertNever = (value: never): never => {
@@ -48,5 +50,17 @@ export const getCanvasImportNotice = (result: ImportGalleryImagesResult): Canvas
       return { kind: 'error', titleKey: 'widgets.canvas.import.staleProject' };
     default:
       return assertNever(result);
+  }
+};
+
+/** A gallery image used as control: the layer it filled is named; a new layer reads as any one-image import. */
+export const getSendAsControlNotice = (result: SendGalleryImageAsControlResult): CanvasImportNotice => {
+  switch (result.status) {
+    case 'filled':
+      return { kind: 'success', options: { name: result.layerName }, titleKey: 'widgets.canvas.import.controlFilled' };
+    case 'created':
+      return getCanvasImportNotice({ failedImageNames: [], layerIds: [result.layerId], status: 'imported' });
+    default:
+      return getCanvasImportNotice(result);
   }
 };

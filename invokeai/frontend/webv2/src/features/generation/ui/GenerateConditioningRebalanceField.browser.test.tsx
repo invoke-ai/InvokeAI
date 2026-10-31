@@ -136,7 +136,7 @@ const weightsInput = (): HTMLInputElement => {
   const input = byLabel('Per-tap weights');
 
   if (!(input instanceof HTMLInputElement)) {
-    throw new Error('weights input did not render');
+    throw new TypeError('weights input did not render');
   }
 
   return input;
@@ -274,7 +274,7 @@ describe('GenerateConditioningRebalanceField', () => {
     const nameInput = document.querySelector('[role="dialog"] input');
 
     if (!(nameInput instanceof HTMLInputElement)) {
-      throw new Error('preset name dialog did not open');
+      throw new TypeError('preset name dialog did not open');
     }
 
     await interact(() => typeInto(nameInput, 'Punchy'));

@@ -4,7 +4,8 @@
 `compileCanvasGraph.test.ts` (regenerate with `vitest -u`) from the real canvas compiler, one per family: a
 text-to-image submission with one control layer, an inpainting submission where that layer also hands the control the
 canvas composite and the inverted canvas mask, and an outpainting submission where it hands over the infilled image
-and the combined mask through edges. This module checks more than names: pydantic validates every node against its
+and the combined mask through edges. Qwen-Image adds an inpainting submission whose layer holds an InstantX union,
+which gets the control image alone. This module checks more than names: pydantic validates every node against its
 invocation (bounds such as `control_context_scale` in [0, 2] included), `Graph.validate_self` checks every edge type
 into the denoise's `control` and `vae`, the control node's own `invoke` runs on the fields it would receive, and
 `core_metadata` is serialised the way the gallery persists it. No model is loaded.
@@ -53,6 +54,8 @@ class Family:
     control_image: str
     scale: float
     metadata_prefix: str
+    # Graphs beyond the three every family has, by name.
+    extra_graphs: tuple[str, ...] = ()
 
 
 FAMILIES = {
@@ -65,6 +68,7 @@ FAMILIES = {
         control_image="q-control.png",
         scale=0.85,
         metadata_prefix="qwen_image",
+        extra_graphs=("inpaint_instantx_control_layer",),
     ),
     "flux2": Family(
         fixture="flux2ControlCanvasGraphs.json",
@@ -122,7 +126,9 @@ def _control_field(graph: Graph, node: Any) -> Any:
 @pytest.mark.parametrize("family", sorted(FAMILIES))
 def test_the_fixtures_cover_every_canvas_mode_with_one_control_layer(family: str) -> None:
     spec = FAMILIES[family]
-    assert sorted(GRAPHS[family]) == ["inpaint_control_layer", "outpaint_control_layer", "txt2img_control_layer"]
+    assert sorted(GRAPHS[family]) == sorted(
+        ["inpaint_control_layer", "outpaint_control_layer", "txt2img_control_layer", *spec.extra_graphs]
+    )
     for name, raw in GRAPHS[family].items():
         types = [node["type"] for node in raw["nodes"].values()]
         assert types.count(spec.control.get_type()) == 1, name
@@ -230,6 +236,26 @@ def test_outpainting_adds_the_infilled_image_and_the_inverted_combined_mask(fami
     assert field.inpaint_image_name is not None and field.inpaint_mask_name is not None
 
 
+def test_a_qwen_image_instantx_inpaint_sends_the_control_image_alone_and_keeps_the_denoise_mask() -> None:
+    """The InstantX union has no inpainting condition and the denoise refuses one, so the canvas leaves the inpaint
+    inputs off its node; the region is still regenerated through the denoise mask."""
+    spec = FAMILIES["qwen_image"]
+    graph = _graph("qwen_image", "inpaint_instantx_control_layer")
+    control = _only(graph, spec.control)
+
+    assert control.control_model.key == "qwen-instantx"
+    assert control.image is not None and control.image.image_name == spec.control_image
+    assert control.inpaint_image is None and control.inpaint_mask is None
+    assert _inputs(graph, control.id) == {}
+    assert not any(isinstance(node, ImageLerpInvocation) for node in graph.nodes.values())
+    gradient_mask = graph.nodes[_inputs(graph, _only(graph, spec.denoise).id)["denoise_mask"].node_id]
+    assert isinstance(gradient_mask, CreateGradientMaskInvocation)
+    assert gradient_mask.mask.image_name == "canvas-mask.png"
+    field = _control_field(graph, control)
+    assert field.image_name == spec.control_image
+    assert field.inpaint_image_name is None and field.inpaint_mask_name is None
+
+
 @pytest.mark.parametrize("family", sorted(FAMILIES))
 def test_the_control_node_refuses_the_half_pair_the_frontend_never_sends(family: str) -> None:
     """The frontend sends the inpaint image and mask together or not at all; pin the node constraint it mirrors."""
@@ -247,5 +273,5 @@ def test_persisted_metadata_records_the_canvas_mode(family: str, name: str) -> N
 
     persisted = metadata.invoke(None).metadata.root  # type: ignore[arg-type]
 
-    mode = name.removesuffix("_control_layer")
+    mode = name.split("_", 1)[0]
     assert persisted["generation_mode"] == f"{FAMILIES[family].metadata_prefix}_{mode}"

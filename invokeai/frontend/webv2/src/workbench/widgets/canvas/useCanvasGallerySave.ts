@@ -90,6 +90,11 @@ export const useCanvasGallerySave = (
             notify.info(t('widgets.canvas.contextMenu.stale'));
           } else if (result.status === 'adjustment-refused') {
             notify.error(t('widgets.canvas.contextMenu.saveError'), describeAdjustmentRefusal(result, t));
+          } else if (result.status === 'unreadable') {
+            notify.error(
+              t('widgets.canvas.contextMenu.saveError'),
+              t('widgets.canvas.contextMenu.unreadable', { name: result.layerName })
+            );
           } else {
             notify.info(t('widgets.canvas.contextMenu.notReady'));
           }

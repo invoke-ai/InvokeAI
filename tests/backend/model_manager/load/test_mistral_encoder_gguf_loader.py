@@ -19,8 +19,8 @@ import torch
 from invokeai.backend.model_manager.configs.mistral_encoder import MistralEncoder_GGUF_Config
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loaders.mistral_encoder import MistralEncoderGGUFLoader
-from invokeai.backend.model_manager.load.quantized_embedding import _PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.model_manager.taxonomy import MistralVariantType
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES as PEAK_COPIES
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 
 # `_build_mistral_config` derives the head counts by dividing the projection rows by a fixed head

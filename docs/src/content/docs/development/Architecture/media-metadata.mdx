@@ -1,7 +1,7 @@
 ---
 title: Media Metadata
 description: How generation metadata travels inside PNG and MP4 files, the versioned record schema, and what a recall can restore on another install.
-lastUpdated: 2026-09-19
+lastUpdated: 2026-10-30
 ---
 
 Every image and video InvokeAI produces carries its generation record **inside the file**, so a
@@ -9,15 +9,17 @@ download dropped into any Invoke instance is recallable and remixable without ac
 database that produced it. This page is the reference for that contract: where the record lives
 in each container, the record's fields, and how the format evolves.
 
-## Envelope: three keys, two containers
+## Envelope: shared keys and image inputs
 
-The same three strings are written to every media file. Each value is compact UTF-8 JSON.
+Three keys are shared by images and videos. Images generated from a graph also carry a
+separate resolved-input record. Values are JSON strings; saved workflow JSON retains its original bytes.
 
 | Key | Content | Required |
 |---|---|---|
 | `invokeai_metadata` | The generation record (schema below) | when the graph produced one |
 | `invokeai_workflow` | The `WorkflowWithoutID` the session ran, verbatim | only when a workflow was run |
-| `invokeai_graph` | The executed `Graph`, verbatim | when available |
+| `invokeai_graph` | For generated images, the complete session source `Graph`; videos retain their existing graph record | when available |
+| `invokeai_resolved_inputs` | PNG only: compact Graph JSON containing the active invocation's resolved inputs and ordinary ancestors | images generated from a graph |
 
 | Container | Where the keys live | Writer | Reader |
 |---|---|---|---|
@@ -27,8 +29,33 @@ The same three strings are written to every media file. Each value is compact UT
 Both readers feed `extract_metadata` in `invokeai/app/api/extract_metadata.py`, which owns the
 validation rules: the metadata must parse to a JSON object, the workflow must validate as a
 `WorkflowWithoutID`, and the graph must be an object with a `nodes` object and an `edges` list.
-Anything else degrades to "absent". On upload, a client-supplied `metadata` form field wins over
-the embedded copy; workflow and graph are never client-overridable.
+Anything else degrades to "absent". The image reader additionally extracts optional
+`invokeai_resolved_inputs` using the same graph envelope checks, preserving the JSON string verbatim.
+These checks accept unknown community node types and unset connected fields without loading node schemas.
+A missing or malformed resolved-input record is ignored independently of the other channels.
+On image upload, the file is fully decoded in a worker thread before reading records, including
+PNG text chunks after IDAT. Records are extracted before cropping or resizing can discard `Image.info`
+and passed explicitly to the image service for persistence. A client-supplied `metadata` form field wins
+over the embedded copy; workflow, graph, and resolved inputs are never client-overridable.
+
+When workflow JSON is absent, the image editor converts `invokeai_graph` into an editable
+workflow. Keeping the source graph preserves original `Iterate`, `If`, and `Collect` nodes
+and their edges. `invokeai_resolved_inputs` is a separate PNG text chunk, exposed as optional
+`resolved_inputs` stringified Graph JSON in `GET /api/v1/images/i/{image_name}/workflow`. Inspection
+can prefer this record to display actual inputs, while `workflow` and `graph` retain their original
+contents for editor restoration. The route applies the same image read-access and storage-maintenance
+checks to all three fields. Older PNGs return `resolved_inputs: null`; responses that omit the field
+remain valid. Videos use the shared response model's `null` default and retain their existing metadata
+behavior. Shared metadata extraction and the MP4 reader retain their three-key contract; only the
+image reader fills the optional resolved-input field. The new response field does not
+reserve or replace any key inside user `invokeai_metadata`. No migration is needed.
+
+The resolved-input record includes ordinary ancestors, such as math nodes and a Noise node's
+actual seed, and stops at loop/control and collection boundaries. Values crossing those
+boundaries are already resolved on the retained downstream invocation. Each image stores one
+source graph plus this record, avoiding copies of the expanded runtime graph in nested batches.
+Literal collections in the source graph and collection inputs on retained invocations still
+contribute their full size; neither graph field is guaranteed to contain a single node.
 
 The MP4 layout is the one `ffprobe`, `exiftool` and `mediainfo` display. Like PNG chunks it
 survives a container-aware copy — for ffmpeg that is a remux with `-movflags use_metadata_tags`;
@@ -60,7 +87,7 @@ H3Reference     = { kind: "image" | "video", image_name?, video_name?, detail?, 
 
 | Key | Type | Meaning |
 |---|---|---|
-| `metadata_version` | semver string | The record schema version, currently `1.0.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
+| `metadata_version` | semver string | The record schema version, currently `1.1.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
 | `app_version` | string | The InvokeAI release that wrote the record. Informational. |
 
 The version is over the **record**, not the node that writes it. A **minor** bump adds keys or

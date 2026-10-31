@@ -10,6 +10,7 @@ import type {
   CanvasDocumentSnapshot,
   CanvasRegionalGuidanceLayerContract,
   CanvasStateContractV3,
+  LayerUnreadable,
 } from '@workbench/canvas-engine/api';
 import type { CaptureRasterSnapshotResult } from '@workbench/canvas-engine/rasterTransactions';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -122,13 +123,17 @@ export interface GenerationComposites {
   noiseMaskImageName: string | null;
   /** One uploaded image per accepted control layer, in z-order. */
   controlImages: { layerId: string; imageName: string }[];
-  /** One uploaded alpha-mask image per accepted regional-guidance layer, in z-order. */
-  regionalMaskImages: { layerId: string; imageName: string }[];
+  /**
+   * One uploaded alpha-mask image per accepted regional-guidance layer, in z-order, with the alpha bounds of its
+   * pixels in bbox space (origin at the bbox corner; empty when the mask misses the bbox).
+   */
+  regionalMaskImages: { layerId: string; imageName: string; bounds: Rect }[];
 }
 
 export type ComposeForGenerationResult =
   | { status: 'ok'; composites: GenerationComposites; dedupeCommit: GenerationCompositeDedupeCommit }
   | { status: 'no-document' | 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 /**
@@ -269,7 +274,7 @@ export const composeForGeneration = async (
     }
 
     // Composite each accepted regional alpha mask separately in every mode.
-    const regionalMaskImages: { layerId: string; imageName: string }[] = [];
+    const regionalMaskImages: GenerationComposites['regionalMaskImages'] = [];
     for (const { entry, layerId } of regionalPlan) {
       const layer = lookupDocumentLayer(document, layerId);
       if (!layer || layer.type !== 'regional_guidance') {
@@ -279,7 +284,7 @@ export const composeForGeneration = async (
         continue;
       }
       const result = await executeRegionalMaskComposite(entry, deps);
-      regionalMaskImages.push({ imageName: result.imageName, layerId });
+      regionalMaskImages.push({ bounds: result.bounds, imageName: result.imageName, layerId });
     }
 
     let isCommitted = false;

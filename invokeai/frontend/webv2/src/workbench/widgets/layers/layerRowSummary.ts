@@ -1,6 +1,8 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
+import { getControlImageState } from '@workbench/canvasLayerContent';
+
 export const layerRowSummary = (layer: CanvasLayerContract, t: TFunction): string => {
   switch (layer.type) {
     case 'raster': {
@@ -13,8 +15,24 @@ export const layerRowSummary = (layer: CanvasLayerContract, t: TFunction): strin
       }
       return parts.join(' · ');
     }
-    case 'control':
-      return `${t(`widgets.layers.control.kinds.${layer.adapter.kind}`)} · ${layer.adapter.weight.toFixed(2)}`;
+    case 'control': {
+      if (!layer.controlType) {
+        // A legacy layer with its own model works untyped, so it reads as before; a new one asks for its type.
+        return layer.adapter.model
+          ? `${t(`widgets.layers.control.kinds.${layer.adapter.kind}`)} · ${layer.adapter.weight.toFixed(2)}`
+          : t('widgets.layers.control.summary.noType');
+      }
+      // Judged from the document alone: unsaved strokes read as no image until they persist.
+      if (getControlImageState(layer, false) === 'empty') {
+        return t('widgets.layers.control.summary.noImage');
+      }
+      const detector = layer.detection
+        ? t(`widgets.layers.control.filters.${layer.detection.type}`, layer.detection.type)
+        : t('common.none');
+      return [t(`widgets.layers.control.types.${layer.controlType}`), detector, layer.adapter.weight.toFixed(2)].join(
+        ' · '
+      );
+    }
     case 'regional_guidance': {
       const prompt = layer.positivePrompt?.trim();
       if (prompt) {
