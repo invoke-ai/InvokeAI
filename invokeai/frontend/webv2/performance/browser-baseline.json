@@ -1,6 +1,6 @@
 {
   "browserExecutable": "/home/lstein/.cache/ms-playwright/chromium-1243/chrome-linux64/chrome",
-  "capturedAt": "2026-10-29",
+  "capturedAt": "2026-10-31",
   "routes": [
     {
       "activatedResourceBaseline": {
@@ -30,11 +30,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 29,
-        "scriptRawBytes": 1929633,
+        "scriptRawBytes": 1931733,
         "scriptRequestCount": 25,
-        "totalRawBytes": 2251202
+        "totalRawBytes": 2258000
       },
       "routeReadyMedianMs": 215.30000019073486,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -68,11 +68,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 0,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 29,
-        "scriptRawBytes": 1929633,
+        "scriptRawBytes": 1931733,
         "scriptRequestCount": 25,
-        "totalRawBytes": 2251202
+        "totalRawBytes": 2258000
       },
       "routeReadyMedianMs": 225.39999961853027,
       "scriptSourceOwnerSet": "launchpad-static",
@@ -106,11 +106,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 84,
-        "scriptRawBytes": 4509581,
+        "scriptRawBytes": 4526560,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4875548
+        "totalRawBytes": 4897225
       },
       "routeReadyMedianMs": 360.90000009536743,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -144,11 +144,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 84,
-        "scriptRawBytes": 4509581,
+        "scriptRawBytes": 4526560,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4875548
+        "totalRawBytes": 4897225
       },
       "routeReadyMedianMs": 367.80000019073486,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -159,12 +159,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 344928,
+        "largestAssetRawBytes": 344918,
         "otherRawBytes": 0,
         "requestCount": 8,
-        "scriptRawBytes": 590699,
+        "scriptRawBytes": 594906,
         "scriptRequestCount": 8,
-        "totalRawBytes": 590699
+        "totalRawBytes": 594906
       },
       "domContentLoadedMedianMs": 100.40000009536743,
       "id": "editor-canvas",
@@ -182,11 +182,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 92,
-        "scriptRawBytes": 5100280,
+        "scriptRawBytes": 5121466,
         "scriptRequestCount": 87,
-        "totalRawBytes": 5466247
+        "totalRawBytes": 5492131
       },
       "routeReadyMedianMs": 1095.3000001907349,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -197,12 +197,12 @@
         "cssRawBytes": 0,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 344928,
+        "largestAssetRawBytes": 344918,
         "otherRawBytes": 0,
         "requestCount": 8,
-        "scriptRawBytes": 590699,
+        "scriptRawBytes": 594906,
         "scriptRequestCount": 8,
-        "totalRawBytes": 590699
+        "totalRawBytes": 594906
       },
       "domContentLoadedMedianMs": 97.7000002861023,
       "id": "editor-canvas",
@@ -220,11 +220,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 92,
-        "scriptRawBytes": 5100280,
+        "scriptRawBytes": 5121466,
         "scriptRequestCount": 87,
-        "totalRawBytes": 5466247
+        "totalRawBytes": 5492131
       },
       "routeReadyMedianMs": 1042.5,
       "scriptSourceOwnerSet": "editor-canvas-static",
@@ -235,12 +235,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 209902,
+        "largestAssetRawBytes": 209892,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 454655,
+        "scriptRawBytes": 454931,
         "scriptRequestCount": 5,
-        "totalRawBytes": 470068
+        "totalRawBytes": 470344
       },
       "domContentLoadedMedianMs": 101.40000009536743,
       "id": "editor-workflow",
@@ -258,11 +258,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 90,
-        "scriptRawBytes": 4964236,
+        "scriptRawBytes": 4981491,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5345616
+        "totalRawBytes": 5367569
       },
       "routeReadyMedianMs": 1093.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -273,12 +273,12 @@
         "cssRawBytes": 15413,
         "fontRawBytes": 0,
         "imageRawBytes": 0,
-        "largestAssetRawBytes": 209902,
+        "largestAssetRawBytes": 209892,
         "otherRawBytes": 0,
         "requestCount": 6,
-        "scriptRawBytes": 454655,
+        "scriptRawBytes": 454931,
         "scriptRequestCount": 5,
-        "totalRawBytes": 470068
+        "totalRawBytes": 470344
       },
       "domContentLoadedMedianMs": 99.89999961853027,
       "id": "editor-workflow",
@@ -296,11 +296,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 90,
-        "scriptRawBytes": 4964236,
+        "scriptRawBytes": 4981491,
         "scriptRequestCount": 84,
-        "totalRawBytes": 5345616
+        "totalRawBytes": 5367569
       },
       "routeReadyMedianMs": 1105.0999999046326,
       "scriptSourceOwnerSet": "editor-workflow-static",
@@ -334,11 +334,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 84,
-        "scriptRawBytes": 4509581,
+        "scriptRawBytes": 4526560,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4875548
+        "totalRawBytes": 4897225
       },
       "routeReadyMedianMs": 1324.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
@@ -372,11 +372,11 @@
         "fontRawBytes": 23664,
         "imageRawBytes": 44398,
         "largestAssetRawBytes": 751084,
-        "otherRawBytes": 295746,
+        "otherRawBytes": 300444,
         "requestCount": 84,
-        "scriptRawBytes": 4509581,
+        "scriptRawBytes": 4526560,
         "scriptRequestCount": 79,
-        "totalRawBytes": 4875548
+        "totalRawBytes": 4897225
       },
       "routeReadyMedianMs": 1301.5,
       "scriptSourceOwnerSet": "editor-minimal-static",
