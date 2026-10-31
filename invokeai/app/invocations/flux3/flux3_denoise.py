@@ -22,6 +22,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.sampling_utils import pack_flux2, unpack_flux2
 from invokeai.backend.flux3.denoise import denoise
+from invokeai.backend.flux3.denoise_working_memory import estimate_flux3_denoise_working_memory
 from invokeai.backend.flux3.ref_images import FLUX3_MAX_REFERENCE_IMAGES, encode_flux3_references
 from invokeai.backend.flux3.sampling import (
     get_noise_flux3,
@@ -31,19 +32,10 @@ from invokeai.backend.flux3.sampling import (
     text_position_ids,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
-from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Flux3ConditioningInfo
-from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
-
-FLUX3_ATTENTION_HEAD_DIM = 128
-FLUX3_ATTENTION_HEADS = 24
-# Peak activation bytes per attended token (image + reference + text) in bf16, at driver level: one Klein forward
-# on an RTX 4090 measured 0.286 MB/token from 1 to 4 MP without references and up to 0.320 with six 1 MP
-# references (the allocator peak is about half of that). ROCm is unmeasured; FLUX.2 Klein 4B ran ~8 % higher there.
-FLUX3_BYTES_PER_TOKEN = int(0.33 * 1024**2)
 
 
 @invocation(
@@ -211,22 +203,23 @@ class Flux3DenoiseInvocation(BaseInvocation):
         ref_tokens = ref_tokens.expand(batch_size, -1, -1) if ref_tokens is not None else None
         packed_h, packed_w = self.height // 16, self.width // 16
 
-        working_memory = self._estimate_working_memory(
-            num_tokens=packed_h * packed_w
-            + (ref_tokens.shape[1] if ref_tokens is not None else 0)
-            + max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
-            batch_size=batch_size,
-            device=device,
-            dtype=compute_dtype,
-        )
-
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
-            # A GGUF build dequantizes each linear per forward, a transient its resident size does not cover.
-            dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, compute_dtype)
-            (_, transformer) = exit_stack.enter_context(
-                transformer_info.model_on_device(working_mem_bytes=working_memory + dequant_bytes)
+            # Ask the model cache to keep free what one transformer forward needs. Reference images are the dominant
+            # term: their tokens join the attended sequence, so ten 1 MP references add ten times the tokens of a
+            # 1 MP image. Priced on the unlocked model, whose GGUF or fp8-stored layers add a transient per forward,
+            # before the VRAM lock the reservation applies to. CFG runs its two forwards one after the other, so only
+            # the longer caption counts.
+            working_memory = estimate_flux3_denoise_working_memory(
+                transformer_info.model,
+                image_seq_len=packed_h * packed_w,
+                ref_image_seq_len=ref_tokens.shape[1] if ref_tokens is not None else 0,
+                text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
+                batch_size=batch_size,
+                device=device,
+                dtype=compute_dtype,
             )
+            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device(working_memory=working_memory))
             x = denoise(
                 model=transformer,
                 img=x,
@@ -279,28 +272,6 @@ class Flux3DenoiseInvocation(BaseInvocation):
             antialias=False,
         )
         return mask.to(device=latents.device, dtype=latents.dtype).expand_as(latents)
-
-    @staticmethod
-    def _estimate_working_memory(num_tokens: int, batch_size: int, device: torch.device, dtype: torch.dtype) -> int:
-        """Peak transformer activation memory, so the model cache keeps that much VRAM free.
-
-        Attention runs through SDPA without materializing the score matrix, so activations grow linearly with
-        the attended sequence -- image, reference and text tokens alike. References are the dominant term: ten
-        1 MP references add ten times the tokens of a 1 MP image. CFG runs its two forwards one after the
-        other, so it does not double the peak. The fixed base covers allocator slack and transient casts.
-        """
-        estimated = num_tokens * batch_size * FLUX3_BYTES_PER_TOKEN + int(1.0 * 1024**3)
-        estimated += sdpa_score_matrix_bytes(
-            device=device,
-            dtype=dtype,
-            num_heads=FLUX3_ATTENTION_HEADS * batch_size,
-            head_dim=FLUX3_ATTENTION_HEAD_DIM,
-            seq_len=num_tokens,
-            has_attn_mask=False,
-            # diffusers' FLUX.3 transformer attends through `dispatch_attention_fn`.
-            via_diffusers_dispatch=True,
-        )
-        return estimated
 
     def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
         def step_callback(state: PipelineIntermediateState) -> None:

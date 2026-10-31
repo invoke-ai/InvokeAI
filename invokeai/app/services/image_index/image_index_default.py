@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterable, Iterator, Optional
+from uuid import uuid4
 
 import numpy as np
 import torch
@@ -542,21 +543,16 @@ class ImageIndexService(ImageIndexServiceBase):
             bundled_keys = {phrase.casefold() for phrase in bundled}
             custom = [term for term in custom if term.casefold() not in bundled_keys]
 
-            # The model hash contains ':' (e.g. 'blake3:...'), illegal in
-            # Windows filenames.
-            model_tag = self._model_id.replace(":", "_")[:24]
-            cache_dir = self._invoker.services.configuration.db_path.parent
+            bundled_path, custom_path = self._vocab_cache_paths()
 
             # Two cache tiers: the bundled vocabulary (~1700 phrases, minutes
             # to embed, effectively immutable) and the custom terms (a few
             # hundred at most, seconds). Caching them separately means an edit
             # to the custom list never pays the bundled tier's build again.
             try:
-                bundled_matrix = self._load_or_embed_phrases(bundled, cache_dir / f"cluster_vocab_{model_tag}.npz")
+                bundled_matrix = self._load_or_embed_phrases(bundled, bundled_path)
                 if custom:
-                    custom_matrix = self._load_or_embed_phrases(
-                        custom, cache_dir / f"cluster_vocab_custom_{model_tag}.npz"
-                    )
+                    custom_matrix = self._load_or_embed_phrases(custom, custom_path)
                     self._vocab_cache = (bundled + custom, np.concatenate([bundled_matrix, custom_matrix]))
                 else:
                     self._vocab_cache = (bundled, bundled_matrix)
@@ -620,29 +616,26 @@ class ImageIndexService(ImageIndexServiceBase):
 
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            # Written aside and renamed: two processes sharing a db_dir can
-            # first-run at once, and a kill mid-write would otherwise leave
-            # a truncated archive that costs another full re-embed.
-            #
-            # The staging name has to end in `.npz` because np.savez appends
-            # that extension to any path that lacks it: written as `.tmp`,
-            # the archive landed at `.tmp.npz` and the rename below then
-            # failed on the `.tmp` that was never created. The failure was
-            # swallowed by the handler, so the cache never reached disk and
-            # every restart re-embedded the whole vocabulary (minutes,
-            # during which cluster labels are unavailable) while leaking one
-            # orphaned staging file per run.
-            staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
-            np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
-            os.replace(staging_path, cache_path)
+            # Each writer owns a separate file in the cache directory. Normal
+            # file creation preserves the umask and directory's default ACLs.
+            staging_path = cache_path.with_name(f"{cache_path.name}.{uuid4().hex}.tmp.npz")
+            staging_file = staging_path.open("xb")
+            # Only clean up after exclusive creation succeeds: a collision
+            # must never remove another writer's staging file.
+            try:
+                with staging_file:
+                    np.savez(staging_file, embeddings=embeddings, fingerprint=np.str_(fingerprint))
+                # Windows requires the staging handle to be closed first.
+                os.replace(staging_path, cache_path)
+            finally:
+                staging_path.unlink(missing_ok=True)
         except Exception:
             # With the exception, not just the path. The caller caches the
             # matrix in RAM either way, so a write failure costs
             # nothing until the next restart and is invisible until someone
-            # goes looking at startup times. The `.tmp` bug above survived
-            # because this line said only that something had gone wrong,
-            # never what — the FileNotFoundError it swallowed names the
-            # missing staging file outright.
+            # goes looking at startup times. A past bug left the cache never
+            # reaching disk, unnoticed because this warning said only that
+            # something had failed, never what.
             self._invoker.services.logger.warning(
                 f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
             )
@@ -1037,6 +1030,7 @@ class ImageIndexService(ImageIndexServiceBase):
         discarded = invoker.services.image_index_records.delete_embeddings_for_other_models(self._model_id)
         if discarded:
             invoker.services.logger.info(f"Discarded {discarded} embeddings computed by a previously-configured model")
+        self._prune_vocab_caches()
 
         if not self._callbacks_registered:
             invoker.services.images.on_changed(self._on_image_changed)
@@ -1051,6 +1045,37 @@ class ImageIndexService(ImageIndexServiceBase):
         self._stop_event.clear()
         self._worker = threading.Thread(target=self._worker_loop, name="image_index_worker", daemon=True)
         self._worker.start()
+
+    def _vocab_cache_paths(self) -> tuple[Path, Path]:
+        """The current model's bundled and custom vocabulary archives, as written and as kept by pruning."""
+        assert self._invoker is not None and self._model_id is not None
+        cache_dir = self._invoker.services.configuration.db_path.parent
+        # The model hash contains ':' (e.g. 'blake3:...'), illegal in Windows filenames.
+        model_tag = self._model_id.replace(":", "_")[:24]
+        return cache_dir / f"cluster_vocab_{model_tag}.npz", cache_dir / f"cluster_vocab_custom_{model_tag}.npz"
+
+    def _prune_vocab_caches(self) -> None:
+        """Retire obsolete vocabulary archives under the index's one-current-model policy."""
+        assert self._invoker is not None
+        current = set(self._vocab_cache_paths())
+        cache_dir = self._invoker.services.configuration.db_path.parent
+        try:
+            for cache_path in cache_dir.glob("cluster_vocab_*.npz"):
+                # Both writer generations use .tmp.npz; these may still be open
+                # in another instance and are not obsolete published archives.
+                if cache_path in current or cache_path.name.lower().endswith(".tmp.npz"):
+                    continue
+                try:
+                    if cache_path.is_symlink() or not cache_path.is_file():
+                        continue
+                    cache_path.unlink(missing_ok=True)
+                except OSError:
+                    self._invoker.services.logger.warning(
+                        f"Could not remove stale cluster vocabulary cache at {cache_path}", exc_info=True
+                    )
+        except OSError:
+            # Cache maintenance must not prevent startup or a late encoder swap.
+            self._invoker.services.logger.warning("Could not prune obsolete cluster vocabulary caches", exc_info=True)
 
     def stop(self, invoker: Optional["Invoker"] = None) -> None:
         # Under the lock so a map request cannot be midway through starting a

@@ -67,9 +67,26 @@ from invokeai.backend.working_memory.platform import (
 )
 from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpec, import_estimator_modules
 
-OUT_OF_FIT = {((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6}
+OUT_OF_FIT = {
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "demand_peak"): 4,
+    (
+        (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows")),
+        "RX 9060 XT (gfx1200)",
+        "demand_peak",
+    ): 4,
+    (
+        (("allocator", "native"), ("conv_backend", "miopen")),
+        "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+        "demand_peak",
+    ): 5,
+}
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term. A point that leaves the fit needs an edit here."""
+check the score-matrix term, and the FLUX.3 denoise's checks. Those are the real Klein's forwards on each card, which
+hold the 2-block lines to the released model from below, and on the W7900 the forced-math forward, which checks the
+score-matrix term, and the 4-block forward. That one stands for the real Klein's 1024px forward and the math check's
+default-kernel one, out-of-fit points of the same features that demanded no more: the builder ships the larger of one
+measurement (`build_shipped.point_identity`). A point that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),

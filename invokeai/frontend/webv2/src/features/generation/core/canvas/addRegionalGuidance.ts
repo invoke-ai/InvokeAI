@@ -1,8 +1,10 @@
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
+import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 
 import { getArchitectureFeatures } from '@features/generation/core/architectureCapabilities';
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 import { COMPEL_PROMPT_NODE_TYPES } from '@features/generation/core/prompt/compel';
+import { getEffectivePositivePrompt, unwrapPromptFence } from '@features/generation/core/promptTemplates';
 
 import type { Rect } from './types';
 
@@ -149,6 +151,67 @@ export const getLayoutPromptRejectionReason = (params: {
     return null;
   }
   return `${support.label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
+};
+
+const LOOKS_LIKE_LAYOUT_DRAFT = /"bbox_coord_space"\s*:\s*"abs"/;
+const LAYOUT_DRAFT_FIX = 'Run Expand Prompt again or fix it.';
+
+const getDraftRejectionReason = (prompt: string): string | null => {
+  const body = unwrapPromptFence(prompt);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    return body.trimStart().startsWith('{') && LOOKS_LIKE_LAYOUT_DRAFT.test(body)
+      ? `The prompt looks like a MOSS-Image layout draft but is not valid JSON. ${LAYOUT_DRAFT_FIX}`
+      : null;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return null;
+  }
+  const draft = parsed as Record<string, unknown>;
+  if (draft.bbox_coord_space !== 'abs') {
+    return null;
+  }
+  if (draft.bbox_format !== 'xyxy') {
+    return `The MOSS-Image layout draft in the prompt uses a bbox_format other than xyxy. ${LAYOUT_DRAFT_FIX}`;
+  }
+  const summary =
+    typeof draft.summary === 'object' && draft.summary !== null ? (draft.summary as Record<string, unknown>) : null;
+  if (
+    typeof summary?.caption !== 'string' ||
+    !summary.caption.trim() ||
+    !Array.isArray(draft.items) ||
+    draft.items.length === 0 ||
+    typeof draft.width !== 'number' ||
+    typeof draft.height !== 'number'
+  ) {
+    return `The MOSS-Image layout draft in the prompt needs a summary with a caption, at least one item, and a numeric width and height. ${LAYOUT_DRAFT_FIX}`;
+  }
+  return null;
+};
+
+/**
+ * Why a MOSS-Image prompt holding a layout draft (as Expand Prompt writes it: a JSON object with
+ * `bbox_coord_space: "abs"`, optionally in a ``` fence) cannot be compiled, or null. Plain text and compiled layouts
+ * (`abs_centralized`) pass. Only the shape the layout node needs to start is checked; the backend validates the boxes.
+ * Both the authored prompt and the one the template makes of it are checked: template text around a broken draft
+ * would hide it, and a template that is itself a draft can break around authored text (an unescaped quote).
+ */
+export const getLayoutDraftRejectionReason = (params: {
+  base: string;
+  positivePrompt: string;
+  promptTemplate?: PromptTemplateSnapshot | null;
+}): string | null => {
+  // Only MOSS-Image compiles drafts; other layout bases (Ideogram 4) take `{` prompts verbatim.
+  if (params.base !== 'moss-image') {
+    return null;
+  }
+  const effectivePrompt = getEffectivePositivePrompt(params.positivePrompt, params.promptTemplate ?? null);
+  return (
+    getDraftRejectionReason(params.positivePrompt) ??
+    (effectivePrompt === params.positivePrompt ? null : getDraftRejectionReason(effectivePrompt))
+  );
 };
 
 /** A resolved reference-image (component) model identifier — the backend model field shape. */

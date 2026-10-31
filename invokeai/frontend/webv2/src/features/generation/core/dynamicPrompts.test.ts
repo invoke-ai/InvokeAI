@@ -20,6 +20,17 @@ describe('hasDynamicPromptSyntax', () => {
     expect(hasDynamicPromptSyntax('multi\nline {a|b}')).toBe(true);
   });
 
+  it('never treats a JSON prompt as dynamic, fenced or not', () => {
+    const draft =
+      '{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a #1 poster"},"items":[{"caption":"__colors__"}]}';
+    expect(hasDynamicPromptSyntax(draft)).toBe(false);
+    expect(hasDynamicPromptSyntax(`\`\`\`json\n${draft}\n\`\`\``)).toBe(false);
+    expect(hasDynamicPromptSyntax('[{"caption": "a {red|green} ball"}]')).toBe(false);
+    // Braces that do not form JSON are still variants.
+    expect(hasDynamicPromptSyntax('{"caption": a {red|green} ball}')).toBe(true);
+    expect(hasDynamicPromptSyntax('a poster {"caption": "x"}')).toBe(true);
+  });
+
   it('detects a wildcard reference', () => {
     expect(hasDynamicPromptSyntax('a __colors__ ball')).toBe(true);
     expect(hasDynamicPromptSyntax('prefix__name__')).toBe(true);
@@ -271,6 +282,29 @@ describe('planGenerateSubmission', () => {
 
     expect(suppressed.submission.negativePrompt).toBe('');
     expect(suppressed.effectivePrompts.negativePrompt).toBe('blurry, lowres');
+  });
+
+  it('sends a JSON prompt whole and unexpanded under a template, with the negative side templated', () => {
+    const layout =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a {red|green} cup"},"items":[]}';
+    const promptTemplate = {
+      id: 't',
+      name: 'Photo',
+      negativePrompt: '{prompt}, lowres',
+      positivePrompt: 'photo of {prompt}',
+    };
+    const plan = planGenerateSubmission(
+      source({ dynamicPromptsSeedBehaviour: 'per-image', positivePrompt: layout, promptTemplate }),
+      ['stale expansion']
+    );
+
+    expect(plan.submission).toEqual({
+      batchCount: 2,
+      negativePrompt: 'blurry, lowres',
+      positivePrompt: layout,
+      seed: 10,
+      seedStep: plan.seedPlan.step,
+    });
   });
 
   it('sends an expansion and its seed behaviour only for a prompt with dynamic syntax', () => {

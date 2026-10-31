@@ -915,45 +915,22 @@ const toLayoutElement = (
 
 /**
  * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
- * (which PiD can shrink below the processing size) and clamped to it. A `layout_prompt` node between the global prompt
- * and the positive encoder assembles them at run time, so batch prompt variation still flows through
- * `positive_prompt`; core metadata records the assembled prompt. Regions the layout cannot place are left out, and
- * without any the graph stays untouched.
+ * (which PiD can shrink below the processing size) and clamped to it. The base graph's `layout_prompt` node assembles
+ * them with the global prompt at run time; regions the layout cannot place are left out.
  */
 const addMossImageLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
-  const posCond = graph.nodes.pos_cond;
-  if (!posCond) {
-    throw new Error('addMossImageLayoutRegions: base graph is missing the positive conditioning node.');
+  const layoutPrompt = graph.nodes.layout_prompt;
+  if (!layoutPrompt) {
+    throw new Error('addMossImageLayoutRegions: base graph is missing the layout prompt node.');
   }
   const size = getDenoiseSize(graph, requireDenoise(graph));
   const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
-  const elements = options.regions.flatMap((region) => toLayoutElement(region, options.layoutKinds, scale, size) ?? []);
-  if (elements.length === 0) {
-    return;
-  }
-  const promptEdge = graph.edges.find(
-    (edge) =>
-      edge.source.node_id === 'positive_prompt' &&
-      edge.destination.node_id === posCond.id &&
-      edge.destination.field === 'prompt'
+  // The frame and the boxes come from one size, so they cannot drift apart.
+  layoutPrompt.width = size.width;
+  layoutPrompt.height = size.height;
+  layoutPrompt.regions = options.regions.flatMap(
+    (region) => toLayoutElement(region, options.layoutKinds, scale, size) ?? []
   );
-  if (!promptEdge) {
-    throw new Error('addMossImageLayoutRegions: the positive prompt does not feed the positive conditioning.');
-  }
-
-  const layoutPrompt = addNode(graph, {
-    height: size.height,
-    id: 'layout_prompt',
-    regions: elements,
-    type: 'moss_image_layout_prompt',
-    width: size.width,
-  });
-  promptEdge.destination = { field: 'prompt', node_id: layoutPrompt.id };
-  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
-  const metadata = findMetadataNode(graph);
-  if (metadata) {
-    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
-  }
 };
 
 /** One element of the `ideogram4_caption_builder` node's `regions` input; `bbox` is `[y_min, x_min, y_max, x_max]`. */

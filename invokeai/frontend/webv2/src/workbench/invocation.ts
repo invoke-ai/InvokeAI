@@ -12,7 +12,7 @@ import type {
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
-import { getLayoutPromptRejectionReason } from '@features/generation/graph';
+import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
   getEffectivePrompts,
@@ -299,6 +299,13 @@ const getGenerateSnapshotValidationReasons = (
       mode
     ),
     ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
+    ...[
+      getLayoutDraftRejectionReason({
+        base: values.model.base,
+        positivePrompt: values.positivePrompt,
+        promptTemplate: values.promptTemplate,
+      }),
+    ].filter((reason) => reason !== null),
   ];
 };
 

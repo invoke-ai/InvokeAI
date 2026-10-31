@@ -20,6 +20,7 @@ ESTIMATOR_MODULES: Final = (
     "invokeai.backend.util.vae_working_memory",
     "invokeai.backend.z_image.denoise_working_memory",
     "invokeai.backend.flux2.denoise_working_memory",
+    "invokeai.backend.flux3.denoise_working_memory",
 )
 """Every module that registers an `EstimatorSpec`. The registry holds only the specs of modules imported so far, so a
 caller that needs all of them imports these (`import_estimator_modules`); `tests/backend/working_memory/` fails on a

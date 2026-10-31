@@ -2288,13 +2288,12 @@ describe('compileCanvasGraph — regional guidance', () => {
     ]);
   });
 
-  it('adds no layout node, even on a blank prompt, when no region can be placed', () => {
+  it('places no region, even on a blank prompt, when no region can be placed', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img', {
       regionalGuidance: [region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } })],
     });
 
-    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([]);
   });
 
   it('blocks MOSS-Image regions on a blank prompt unless a prompt template supplies one', () => {
@@ -2390,11 +2389,12 @@ describe('compileCanvasGraph — regional guidance', () => {
     );
   });
 
-  it('keeps a MOSS-Image canvas graph without regions on the plain prompt', () => {
+  it('routes a MOSS-Image canvas prompt without regions through the layout node at the denoise size', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img');
 
-    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1024, regions: [], width: 768 });
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
   });
 
   it('places Ideogram 4 regions on the caption builder as boxes normalized to the 768×1024 bbox', () => {
