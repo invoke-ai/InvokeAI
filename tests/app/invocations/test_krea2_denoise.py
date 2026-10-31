@@ -954,17 +954,77 @@ def test_the_lock_prices_the_loras_at_their_file_size(monkeypatch, tmp_path) -> 
             for key in sizes
         ],
     )
-    context = _runtime_context(tmp_path, _Transformer())
-    transformer_config = context.models.get_config(None)
-    context.models.get_config = lambda identifier: (
-        SimpleNamespace(file_size=sizes[identifier.key]) if identifier.key in sizes else transformer_config
-    )
-    patches = {key: SimpleNamespace(model=ModelPatchRaw(layers={})) for key in sizes}
+    patches = {
+        key: SimpleNamespace(model=ModelPatchRaw(layers={}), config=SimpleNamespace(file_size=size))
+        for key, size in sizes.items()
+    }
 
-    estimate = _working_memory(monkeypatch, tmp_path, invocation, context=context, models=patches)
+    estimate = _working_memory(monkeypatch, tmp_path, invocation, models=patches)
 
     assert (estimate.features["lora_count"], estimate.features["lora_bytes"]) == (2, sum(sizes.values()))
     assert {term.name: term.bytes for term in estimate.terms}["lora_patches"] == sum(sizes.values())
+
+
+class _LoRAInfo:
+    """`LoadedModel` of a LoRA: its patch, its config and the RAM pin the patcher enters."""
+
+    def __init__(self) -> None:
+        self.model = ModelPatchRaw(layers={})
+        self.config = SimpleNamespace(file_size=2**20)
+        self.pinned = 0
+
+    @contextmanager
+    def model_in_ram(self):
+        self.pinned += 1
+        yield self.model
+
+
+def test_each_lora_is_loaded_once_for_the_estimate_and_the_patcher(monkeypatch, tmp_path) -> None:
+    """Every load signals progress and emits load events, so a LoRA loaded for the estimate and again for the patcher
+    shows twice. Both read the one load, and the patcher pins exactly the patches the lock was sized for."""
+    weights = {"lora-a": 0.5, "lora-b": 1.25}
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.transformer = TransformerField(
+        transformer=_model_identifier(),
+        loras=[
+            LoRAField(
+                lora=ModelIdentifierField(key=key, hash=key, name=key, base=BaseModelType.Krea2, type=ModelType.LoRA),
+                weight=weight,
+            )
+            for key, weight in weights.items()
+        ],
+    )
+    lora_infos = {key: _LoRAInfo() for key in weights}
+    transformer_info = _TransformerInfo(_Transformer())
+    loads: list[str] = []
+
+    def load(identifier):
+        loads.append(identifier.key)
+        return lora_infos.get(identifier.key, transformer_info)
+
+    applied: list[tuple[object, float]] = []
+
+    @contextmanager
+    def patcher(*, patches, **_kwargs):
+        for patch, weight, in_ram in patches:
+            with in_ram as pinned:
+                assert pinned is patch
+            applied.append((patch, weight))
+        yield
+
+    context = _runtime_context(tmp_path, transformer_info.transformer)
+    context.models.load = load
+    # Records answer with a file size too, so the count, not the size's source, decides the outcome.
+    context.models.get_config(None).file_size = 2**20
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr("invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches", patcher)
+
+    invocation._run_diffusion(context)
+
+    assert sorted(key for key in loads if key in weights) == sorted(weights)
+    assert applied == [(lora_infos[key].model, weight) for key, weight in weights.items()]
+    assert [info.pinned for info in lora_infos.values()] == [1, 1]
+    assert transformer_info.working_memory.features["lora_count"] == 2
 
 
 def test_a_loaded_lora_that_is_no_patch_is_refused_before_the_lock(monkeypatch, tmp_path) -> None:

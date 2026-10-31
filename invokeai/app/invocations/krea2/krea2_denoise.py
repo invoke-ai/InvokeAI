@@ -4,7 +4,7 @@ import statistics
 import time
 from contextlib import ExitStack, nullcontext
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -57,7 +57,7 @@ from invokeai.backend.krea2.style_reference_extension import Krea2StyleReference
 from invokeai.backend.krea2.text_encoding import KREA2_MAX_REFERENCE_IMAGES
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import requires_sidecar_patching
@@ -660,6 +660,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         transformer_config = context.models.get_config(self.transformer.transformer)
         num_train_timesteps = scheduler.config.num_train_timesteps
 
+        # Loaded once: the estimate prices these patches and the patcher applies the same ones. Each load reports its
+        # progress, and the un-entered wrappers keep the LoRA records shielded from eviction until the patcher pins them.
+        loaded_loras = [(lora, self._load_lora(context, lora)) for lora in self.transformer.loras]
+
         # The transformer's lock reserves what the whole denoise needs beside the weights: the forward, the cached
         # reference or style K/V, regional masks and the LoRA patches applied under it.
         working_memory = estimate_krea2_denoise_working_memory(
@@ -672,10 +676,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             reference_seq_len=reference_seq_len,
             cache_references=cache_references,
             cfg=do_cfg,
-            loras=[
-                (self._load_lora(context, lora).model, context.models.get_config(lora.lora).file_size)
-                for lora in self.transformer.loras
-            ],
+            loras=[(lora_info.model, lora_info.config.file_size) for _, lora_info in loaded_loras],
             regional_mask_bytes=self._regional_attention_mask_bytes(pos_extension, neg_extension, inference_dtype),
             style_kv_bytes=style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0,
             device=device,
@@ -703,7 +704,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context),
+                    patches=(
+                        (lora_info.model, lora.weight, lora_info.model_in_ram()) for lora, lora_info in loaded_loras
+                    ),
                     prefix=KREA2_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -958,11 +961,6 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             context.util.sd_step_callback(state, BaseModelType.Krea2)
 
         return step_callback
-
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
-        for lora in self.transformer.loras:
-            lora_info = self._load_lora(context, lora)
-            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     @staticmethod
     def _load_lora(context: InvocationContext, lora: LoRAField) -> LoadedModel:
