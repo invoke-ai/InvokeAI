@@ -87,7 +87,7 @@ The **Advanced** section appears for models with extra options, and its header c
 * **Reference K/V cache** — Krea-2 only, and only with active **Edit** references and an enabled LoRA in **Concepts**. Turn it on for edit LoRAs trained with isolated references (ai-toolkit's `kv_cache` option), such as the thedeoxen Krea-2 pose LoRA; the references then run through the model once per generation, which is faster. Leave it off for other edit LoRAs. See [Krea-2](/users-guide/models/local-models/krea-2/#reference-kv-cache).
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
 
-Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Upscale results, workflow runs and images from external models are not filtered.
+Two output filters live in the Generate widget's settings (the cog in its header, or **Settings** › **Generate**) rather than in the panel's form, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Changing one in an open project changes it for that project only; set your default for every project on the Launchpad under **Preferences**. Upscale results, workflow runs and images from external models are not filtered.
 
 ### Resetting to defaults
 
