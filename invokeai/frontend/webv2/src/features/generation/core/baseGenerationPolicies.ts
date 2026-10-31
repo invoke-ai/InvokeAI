@@ -18,6 +18,7 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ExpandPromptSuggestion,
   ExternalGenerationMode,
   GenerateModelConfig,
   GenerateReferenceImage,
@@ -366,6 +367,63 @@ export const getPromptPolicy = (
       ? { negativeHelpText: 'Used only when CFG is greater than 1.' }
       : {}),
   };
+};
+
+const HF_REPO_ID = /^[A-Za-z0-9][\w.-]*\/[\w.-]+$/;
+
+/**
+ * Whether an installed model's source is the Hugging Face repo `repoId`: the repo itself (also `repo::subfolder` or a
+ * huggingface.co URL), or a local folder named like the repo, as an in-place install of a downloaded copy is.
+ * Case-insensitive, as Hugging Face repo ids are.
+ */
+export const isModelFromRepo = (source: string | null | undefined, repoId: string): boolean => {
+  if (!source) {
+    return false;
+  }
+  const wanted = repoId.toLowerCase();
+  const withoutSubfolder = source.split('::')[0]!.trim();
+  const hfPath = /^https?:\/\/(?:www\.)?huggingface\.co\/([^?#]+)/i.exec(withoutSubfolder)?.[1];
+  const candidate = (hfPath ? hfPath.split('/').slice(0, 2).join('/') : withoutSubfolder).replace(/[/\\]+$/, '');
+  if (HF_REPO_ID.test(candidate)) {
+    return candidate.toLowerCase() === wanted;
+  }
+  const folder = candidate.split(/[/\\]/).pop() ?? '';
+  return folder.toLowerCase() === wanted.split('/').pop();
+};
+
+/** A family's released prompt enhancer, which Expand Prompt preselects for a text-only rewrite. */
+interface ImagePromptEnhancer {
+  /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
+  modelSource: string;
+  /** The starter model's name, for the hint shown when it is not installed. */
+  modelName: string;
+  /** Seeded public system prompt. */
+  systemPromptId: string;
+}
+
+const IMAGE_PROMPT_ENHANCERS: Partial<Record<string, ImagePromptEnhancer>> = {
+  // The OpenMOSS prompt-enhancer skill writes a layout draft the `moss_image_layout_prompt` node compiles.
+  'moss-image': {
+    modelName: 'Gemma 4 E4B (Prompt Enhancer)',
+    modelSource: 'google/gemma-4-E4B-it',
+    systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0011',
+  },
+};
+
+/** What Expand Prompt starts from for this image family, or null when the family ships no enhancer. */
+export const getImageExpandPromptSuggestion = (
+  model: GenerateModelConfig | undefined
+): ExpandPromptSuggestion | null => {
+  const enhancer = model?.type === 'main' ? IMAGE_PROMPT_ENHANCERS[model.base] : undefined;
+  return enhancer
+    ? {
+        image: null,
+        imageSystemPromptId: null,
+        modelName: enhancer.modelName,
+        modelSource: enhancer.modelSource,
+        systemPromptId: enhancer.systemPromptId,
+      }
+    : null;
 };
 
 export const getGenerationUiPolicy = (model: GenerateModelConfig | undefined) => {

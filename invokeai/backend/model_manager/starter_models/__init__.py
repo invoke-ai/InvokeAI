@@ -212,7 +212,11 @@ from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_ref2va_int8_transformer,
     minimax_h3_turbo_lora,
 )
-from invokeai.backend.model_manager.starter_models.moss_image import moss_image_base, moss_image_sft
+from invokeai.backend.model_manager.starter_models.moss_image import (
+    moss_image_base,
+    moss_image_prompt_enhancer,
+    moss_image_sft,
+)
 from invokeai.backend.model_manager.starter_models.qwen_image import (
     pid_1_5_decoder_qwenimage_2kto4k,
     pid_1_5_decoder_qwenimage_2kto4k_int8,
@@ -533,6 +537,7 @@ STARTER_MODELS: list[StarterModel] = [
     qwen3_vl_encoder_8b,
     moss_image_base,
     moss_image_sft,
+    moss_image_prompt_enhancer,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,

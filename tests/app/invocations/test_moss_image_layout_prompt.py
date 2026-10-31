@@ -71,3 +71,18 @@ def test_the_layout_prompt_can_be_recorded_in_core_metadata() -> None:
     graph.add_edge(edge)
 
     assert graph.edges == [edge]
+
+
+def test_the_node_compiles_a_layout_draft_at_its_own_size() -> None:
+    # Expand Prompt's MOSS-Image Prompt Enhancer writes drafts in their own frame; the generation size wins.
+    draft = (
+        '```json\n{"width":1000,"height":1000,"bbox_coord_space":"abs","bbox_format":"xyxy",'
+        '"summary":{"caption":"a poster"},"items":[{"label":"text","caption":"a title","text":"TEA",'
+        '"bbox":[0,0,1000,250]}]}\n```'
+    )
+
+    assert _node(prompt=draft, width=768, height=1344).invoke(MagicMock()).value == (
+        '{"summary":{"caption":"a poster"},"items":['
+        '{"label":"text","caption":"a title","text":"TEA","bbox":[-672,-384,-336,384]}'
+        '],"bbox_coord_space":"abs_centralized","bbox_format":"yxyx"}'
+    )
