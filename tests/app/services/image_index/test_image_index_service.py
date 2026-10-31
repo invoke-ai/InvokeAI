@@ -1,9 +1,12 @@
 """Tests for the image index worker service, using an injected fake encoder (no models/GPU)."""
 
 import inspect
+import os
+import stat
 import threading
 import time
 import weakref
+from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Callable
@@ -3226,6 +3229,146 @@ def test_a_failed_cache_write_says_what_went_wrong(tmp_path, monkeypatch: pytest
     assert exc_info is True
     # The run itself is unaffected — which is why the warning has to carry it.
     assert service._vocab_cache is not None
+
+
+def test_overlapping_vocabulary_writers_cannot_modify_a_published_cache(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Separate services model processes sharing a directory. Their PID-based
+    # staging names collide even though their in-process locks are independent.
+    first_matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    second_matrix = -first_matrix
+    first = _vocab_build_service(tmp_path, monkeypatch, first_matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    opened = threading.Event()
+    second_published = threading.Event()
+    first_written = threading.Event()
+    finish_first = threading.Event()
+    errors: list[BaseException] = []
+    save = np.savez
+
+    def _save(file, **arrays) -> None:
+        if threading.current_thread() is not writer:
+            save(file, **arrays)
+            return
+        # Keep the actual handle open across the other writer's publication.
+        # Accept either np.savez's path or file interface, without pinning the
+        # staging-name implementation. Windows refuses to rename a shared open
+        # path; POSIX publishes an inode that the first writer can still alter.
+        context = open(file, "wb") if isinstance(file, (str, Path)) else nullcontext(file)
+        with context as handle:
+            opened.set()
+            # Production swallows exceptions raised here, so record them.
+            try:
+                assert second_published.wait(10), "The second writer did not finish"
+                save(handle, **arrays)
+                handle.flush()
+                first_written.set()
+                assert finish_first.wait(10), "The first writer was not released"
+            except AssertionError as error:
+                errors.append(error)
+                raise
+
+    def _build_first() -> None:
+        try:
+            first._build_vocab_embeddings()
+        except BaseException as error:
+            errors.append(error)
+
+    monkeypatch.setattr(image_index_default.np, "savez", _save)
+    writer = threading.Thread(target=_build_first)
+    writer.start()
+    try:
+        assert opened.wait(10), "The first writer did not open its staging file"
+        second = _vocab_build_service(tmp_path, monkeypatch, second_matrix)
+        second._build_vocab_embeddings()
+        assert cache_path.exists(), "A concurrent writer could not publish its cache"
+        with np.load(cache_path, allow_pickle=False) as cached:
+            assert np.array_equal(cached["embeddings"], second_matrix)
+        published = cache_path.read_bytes()
+        second_published.set()
+        assert first_written.wait(10), "The first writer did not finish serialization"
+        assert cache_path.read_bytes() == published, "An unpublished writer altered the live cache"
+    finally:
+        second_published.set()
+        finish_first.set()
+        writer.join(timeout=10)
+
+    assert not writer.is_alive()
+    assert not errors
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], first_matrix)
+    assert sorted(tmp_path.iterdir()) == [cache_path]
+
+
+@pytest.mark.parametrize("existing_cache", [False, True], ids=["first-build", "replacement"])
+@pytest.mark.parametrize("failure", ["serialization", "publication"])
+def test_failed_vocabulary_publication_cleans_only_its_staging_file(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, existing_cache: bool, failure: str
+) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    previous: bytes | None = None
+    if existing_cache:
+        np.savez(cache_path, embeddings=-matrix, fingerprint=np.str_("older vocabulary"))
+        previous = cache_path.read_bytes()
+    # Another writer's staging file must not be swept on failure.
+    other_staging = tmp_path / f"{cache_path.name}.other.tmp.npz"
+    other_staging.write_bytes(b"another writer's incomplete cache")
+    recorded: list[tuple[str, object]] = []
+    service._invoker.services.logger = SimpleNamespace(  # type: ignore[union-attr]
+        warning=lambda message, exc_info=False: recorded.append((str(message), exc_info))
+    )
+
+    def _fail_save(file, **arrays) -> None:
+        if isinstance(file, (str, Path)):
+            Path(file).write_bytes(b"partial archive")
+        else:
+            file.write(b"partial archive")
+        raise OSError("simulated serialization failure")
+
+    def _fail_replace(src: object, dst: object) -> None:
+        raise PermissionError("simulated publication failure")
+
+    if failure == "serialization":
+        monkeypatch.setattr(image_index_default.np, "savez", _fail_save)
+    else:
+        monkeypatch.setattr(image_index_default.os, "replace", _fail_replace)
+    service._build_vocab_embeddings()
+
+    assert service._vocab_cache is not None
+    assert service._vocab_failure is None
+    vocabulary, cached_matrix = service._vocab_cache
+    assert vocabulary == ["a cat", "a dog", "a car"]
+    assert np.array_equal(cached_matrix, matrix)
+    assert len(recorded) == 1
+    assert "Could not write cluster vocabulary cache" in recorded[0][0]
+    assert recorded[0][1] is True
+    assert other_staging.read_bytes() == b"another writer's incomplete cache"
+    if previous is not None:
+        assert cache_path.read_bytes() == previous
+    else:
+        assert not cache_path.exists()
+    expected_files = {other_staging}
+    if existing_cache:
+        expected_files.add(cache_path)
+    assert set(tmp_path.iterdir()) == expected_files
+
+
+@pytest.mark.skipif(os.name != "posix", reason="POSIX file modes are not supported on this platform")
+def test_vocabulary_cache_uses_normal_file_mode(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
+    matrix = np.arange(3 * DIM, dtype=EMBEDDING_DTYPE).reshape(3, DIM)
+    service = _vocab_build_service(tmp_path, monkeypatch, matrix)
+    reference_path = tmp_path / "reference.npz"
+    np.savez(reference_path, embeddings=matrix, fingerprint=np.str_("reference vocabulary"))
+
+    service._build_vocab_embeddings()
+
+    cache_path = tmp_path / f"cluster_vocab_{MODEL_ID.replace(':', '_')[:24]}.npz"
+    assert stat.S_IMODE(cache_path.stat().st_mode) == stat.S_IMODE(reference_path.stat().st_mode)
+    with np.load(cache_path, allow_pickle=False) as cached:
+        assert np.array_equal(cached["embeddings"], matrix)
 
 
 def test_batch_normalization_zeroes_a_degenerate_row_instead_of_failing(service: ImageIndexService) -> None:

@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
 from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterable, Iterator, Optional
+from uuid import uuid4
 
 import numpy as np
 import torch
@@ -615,29 +616,26 @@ class ImageIndexService(ImageIndexServiceBase):
 
         try:
             cache_path.parent.mkdir(parents=True, exist_ok=True)
-            # Written aside and renamed: two processes sharing a db_dir can
-            # first-run at once, and a kill mid-write would otherwise leave
-            # a truncated archive that costs another full re-embed.
-            #
-            # The staging name has to end in `.npz` because np.savez appends
-            # that extension to any path that lacks it: written as `.tmp`,
-            # the archive landed at `.tmp.npz` and the rename below then
-            # failed on the `.tmp` that was never created. The failure was
-            # swallowed by the handler, so the cache never reached disk and
-            # every restart re-embedded the whole vocabulary (minutes,
-            # during which cluster labels are unavailable) while leaking one
-            # orphaned staging file per run.
-            staging_path = cache_path.with_name(f"{cache_path.name}.{os.getpid()}.tmp.npz")
-            np.savez(staging_path, embeddings=embeddings, fingerprint=np.str_(fingerprint))
-            os.replace(staging_path, cache_path)
+            # Each writer owns a separate file in the cache directory. Normal
+            # file creation preserves the umask and directory's default ACLs.
+            staging_path = cache_path.with_name(f"{cache_path.name}.{uuid4().hex}.tmp.npz")
+            staging_file = staging_path.open("xb")
+            # Only clean up after exclusive creation succeeds: a collision
+            # must never remove another writer's staging file.
+            try:
+                with staging_file:
+                    np.savez(staging_file, embeddings=embeddings, fingerprint=np.str_(fingerprint))
+                # Windows requires the staging handle to be closed first.
+                os.replace(staging_path, cache_path)
+            finally:
+                staging_path.unlink(missing_ok=True)
         except Exception:
             # With the exception, not just the path. The caller caches the
             # matrix in RAM either way, so a write failure costs
             # nothing until the next restart and is invisible until someone
-            # goes looking at startup times. The `.tmp` bug above survived
-            # because this line said only that something had gone wrong,
-            # never what — the FileNotFoundError it swallowed names the
-            # missing staging file outright.
+            # goes looking at startup times. A past bug left the cache never
+            # reaching disk, unnoticed because this warning said only that
+            # something had failed, never what.
             self._invoker.services.logger.warning(
                 f"Could not write cluster vocabulary cache to {cache_path}", exc_info=True
             )
