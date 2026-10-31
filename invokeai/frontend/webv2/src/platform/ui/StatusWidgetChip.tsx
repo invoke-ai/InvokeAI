@@ -1,7 +1,16 @@
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
-import { Box, HStack, Icon, Text, type RecipeVariantProps, type SystemStyleObject, useRecipe } from '@chakra-ui/react';
+import {
+  Box,
+  HStack,
+  Icon,
+  Text,
+  type RecipeVariantProps,
+  type SystemStyleObject,
+  useRecipe,
+  VisuallyHidden,
+} from '@chakra-ui/react';
 import { chipRecipe } from '@theme/recipes';
 
 /** Presence turns on the bar; a null `value` renders it as a full quiet fill. */
@@ -37,11 +46,17 @@ const PROGRESS_SWEEP_SX: SystemStyleObject = {
 
 export const StatusWidgetChip = ({
   children,
+  hiddenLabel,
   icon,
   progress,
   tone,
 }: {
   children: ReactNode;
+  /**
+   * The widget's name, read before the status when the visible text does not say it ("Queue idle" for Queue status).
+   * A status-bar chip is named by its content, so this keeps every chip's name starting with its widget.
+   */
+  hiddenLabel?: string;
   icon: LucideIcon;
   /** Optional live progress, drawn as a hairline along the chip's bottom edge. */
   progress?: StatusWidgetChipProgress;
@@ -51,6 +66,7 @@ export const StatusWidgetChip = ({
 
   return (
     <HStack css={recipe({ tone })} position={progress ? 'relative' : undefined}>
+      {hiddenLabel ? <VisuallyHidden>{hiddenLabel}</VisuallyHidden> : null}
       <Icon as={icon} boxSize="3" />
       <Text whiteSpace="nowrap">{children}</Text>
       {progress ? (

@@ -185,6 +185,14 @@ GENERATION_MODES = Literal[
     "qwen_image_2_1_img2img",
     "qwen_image_2_1_inpaint",
     "qwen_image_2_1_outpaint",
+    "flux3_txt2img",
+    "flux3_img2img",
+    "flux3_inpaint",
+    "flux3_outpaint",
+    "moss_image_txt2img",
+    "moss_image_img2img",
+    "moss_image_inpaint",
+    "moss_image_outpaint",
     "wan_txt2img",
     "wan_img2img",
     "wan_inpaint",
@@ -229,7 +237,7 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.0.0"
+CORE_METADATA_VERSION = "1.1.0"
 
 
 @invocation(
@@ -237,7 +245,7 @@ CORE_METADATA_VERSION = "1.0.0"
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.7.0",
+    version="2.8.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -304,6 +312,12 @@ class CoreMetadataInvocation(BaseInvocation):
     ideogram4_caption: Optional[str] = InputField(
         default=None,
         description="The structured JSON caption encoded for Ideogram 4 inference",
+    )
+    # MOSS-Image places canvas regions on the prompt at generation time (moss_image_layout_prompt), so, as for
+    # `ideogram4_caption`, the graph records the layout prompt actually encoded through an edge.
+    moss_image_layout_prompt: Optional[str] = InputField(
+        default=None,
+        description="The JSON layout prompt encoded for MOSS-Image inference",
     )
 
     # Video generation. Frame count and keyframes have no home among the image fields, and

@@ -184,7 +184,7 @@ export const LayerGroupContextMenu = ({
         return;
       }
       if (result.status !== 'nothing') {
-        reportLayerOperation(result.status, notify.error, t);
+        reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
         return;
       }
     } catch {

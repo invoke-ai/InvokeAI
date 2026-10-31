@@ -1,6 +1,6 @@
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { act, useCallback, useState } from 'react';
+import { act, useCallback, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -107,6 +107,59 @@ describe('ConfirmDialog', () => {
       expect(frame.text).toContain('Delete image');
       expect(frame.text).toContain('Delete Sunset?');
     }
+  });
+
+  it('is described by a text body, which looks as the plain paragraph it was before', async () => {
+    // Long enough to wrap in the dialog, so a line height of its own shows in the box too.
+    const BODY =
+      'Queued runs are canceled, and all of this calibration’s measurements are discarded, finished runs included.';
+    /** Opens a dialog with `body` and reads how the paragraph holding BODY renders. */
+    const readParagraph = async (body: ReactNode) => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      await act(() =>
+        root?.render(
+          <ChakraProvider value={system}>
+            <ConfirmDialog body={body} confirmLabel="Stop" isOpen title="Stop?" onClose={noop} onConfirm={noop} />
+          </ChakraProvider>
+        )
+      );
+      await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
+      const dialog = document.querySelector('[role="alertdialog"]')!;
+      const paragraph = [...dialog.querySelectorAll('*')].find(
+        (element) => element.childElementCount === 0 && element.textContent === BODY
+      )!;
+      const style = getComputedStyle(paragraph);
+      const read = {
+        describes: dialog.getAttribute('aria-describedby') === paragraph.id,
+        style: {
+          color: style.color,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          height: paragraph.getBoundingClientRect().height,
+          letterSpacing: style.letterSpacing,
+          lineHeight: style.lineHeight,
+          margin: style.margin,
+        },
+      };
+
+      await act(() => root?.unmount());
+      host.remove();
+      host = null;
+      root = null;
+      return read;
+    };
+
+    const described = await readParagraph(BODY);
+    // What a text body rendered before it described the dialog.
+    const plain = await readParagraph(<Text fontSize="md">{BODY}</Text>);
+
+    expect(described.describes).toBe(true);
+    expect(plain.describes).toBe(false);
+    expect(described.style).toEqual(plain.style);
+    // It wraps, so the comparison covers the lines' spacing.
+    expect(described.style.height).toBeGreaterThan(Number.parseFloat(described.style.lineHeight) * 1.5);
   });
 
   const renderDialog = async (isDestructive: boolean) => {

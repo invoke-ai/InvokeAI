@@ -7,6 +7,8 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
+from invokeai.backend.util.vae_working_memory import wan_vae_clip_bytes
+
 
 def _load_calibration_script():
     path = Path(__file__).parents[1] / "scripts" / "calibrate_wan_vae_working_memory.py"
@@ -82,8 +84,13 @@ def test_measure_tiling_uses_full_decode_and_tile_estimate(monkeypatch):
     assert result["streaming"] is False
     assert result["tiling"] is True
     assert result["tile_size"] == 128
-    fake_vae.enable_tiling.assert_called_once_with(tile_sample_min_height=128, tile_sample_min_width=128)
-    fake_vae.disable_tiling.assert_called_once_with()
+    # The stride follows the tile, as in the video node; left at its 192 px default, a 128 px tile drops bands.
+    fake_vae.enable_tiling.assert_called_once_with(
+        tile_sample_min_height=128,
+        tile_sample_min_width=128,
+        tile_sample_stride_height=96,
+        tile_sample_stride_width=96,
+    )
     fake_vae.decode.assert_called_once()
     estimate.assert_called_once_with(
         operation="decode",
@@ -96,7 +103,11 @@ def test_measure_tiling_uses_full_decode_and_tile_estimate(monkeypatch):
     )
 
 
-def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
+@pytest.mark.parametrize(("streaming", "tiling"), [(False, False), (True, False), (True, True)])
+def test_measure_implied_constant_subtracts_the_clip_the_estimate_budgets(monkeypatch, streaming, tiling):
+    """The implied constant is the per-frame term the estimate would need to match the measurement, so it subtracts
+    exactly the clip bytes the estimate budgets for the decode that ran: one chunk streaming, two clips full, and six
+    tiled, where tiling overrides streaming."""
     script = _load_calibration_script()
     parameter = torch.nn.Parameter(torch.zeros(1, dtype=torch.bfloat16))
     fake_vae = MagicMock()
@@ -104,14 +115,22 @@ def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
     fake_vae.parameters.side_effect = lambda: iter([parameter])
     fake_vae.decode.return_value = (torch.zeros(1, 3, 81, 64, 64),)
 
-    tile_size = 128
+    tile_size = 128 if tiling else None
     constant = 4321.0
     element_size = parameter.element_size()
     pixel_height = pixel_width = 512
     pixel_frames = 81
-    # The tiled decode's six clip copies, as the estimator budgets them.
-    clip_bytes = 6 * 3 * pixel_frames * pixel_height * pixel_width * element_size
-    measured_delta = int(tile_size**2 * element_size * constant * 1.25 + clip_bytes)
+    clip_bytes = wan_vae_clip_bytes(
+        "decode",
+        fake_vae,
+        pixel_height,
+        pixel_width,
+        pixel_frames,
+        tile_size=tile_size,
+        streaming=streaming and not tiling,
+    )
+    per_frame_basis = tile_size**2 * element_size * 1.25 if tile_size else pixel_height * pixel_width * element_size
+    measured_delta = int(per_frame_basis * constant + clip_bytes)
 
     monkeypatch.setattr(script.torch, "randn", lambda *args, **kwargs: torch.zeros(*args, dtype=kwargs["dtype"]))
     monkeypatch.setattr(script.torch.cuda, "synchronize", lambda *args, **kwargs: None)
@@ -123,14 +142,15 @@ def test_measure_tiling_implied_constant_uses_tiled_area(monkeypatch):
     monkeypatch.setattr(script.torch.cuda, "max_memory_allocated", lambda device: measured_delta - 12345)
     monkeypatch.setattr(script.torch.cuda, "get_device_name", lambda device: "test-device")
     monkeypatch.setattr(script, "estimate_vae_working_memory_wan", lambda **kwargs: measured_delta)
+    monkeypatch.setattr(script, "iter_wan_vae_decode_chunks", lambda vae, latents: iter([torch.zeros(1, 3, 4, 8, 8)]))
 
     result = script._measure(
         fake_vae,
         pixel_height,
         pixel_width,
         pixel_frames,
-        streaming=True,
-        tiling=True,
+        streaming=streaming,
+        tiling=tiling,
         tile_size=tile_size,
     )
 

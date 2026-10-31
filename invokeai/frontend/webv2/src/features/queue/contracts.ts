@@ -58,6 +58,11 @@ export {
 } from './core/submissionRules';
 export { extractGenerationMeta, getResultImageName, type QueueGenerationMeta } from './core/generationMeta';
 export {
+  planGenerateSubmissionBatch,
+  type GeneratePromptBatchPlan,
+  type GeneratePromptSubmission,
+} from './core/promptBatch';
+export {
   buildProjectQueueItemOriginPrefix,
   buildQueueItemOrigin,
   buildUtilityQueueItemOrigin,

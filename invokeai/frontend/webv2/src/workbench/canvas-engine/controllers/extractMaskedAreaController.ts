@@ -15,6 +15,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
+import { isLayerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import {
   type AdjustmentRefusal,
@@ -41,14 +42,19 @@ import {
   layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
+  readinessOfAll,
   rgbaBytes,
+  type LayerCacheReadiness,
   type LayerStepContext,
   type LayerEditRefusal,
 } from './editSteps';
 
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
-  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' }
+  | {
+      status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed';
+    }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type OwnedExport = Extract<ExportResult, { status: 'ok' }>;
@@ -56,6 +62,7 @@ type OwnedExport = Extract<ExportResult, { status: 'ok' }>;
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface ExtractMaskedAreaControllerOptions {
@@ -72,7 +79,7 @@ export interface ExtractMaskedAreaControllerOptions {
     >;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
-  readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
+  readonly cacheReadiness: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => LayerCacheReadiness;
   readonly hasExportableContent: (layerId: string) => boolean;
   readonly exportBaked: (layerId: string, includeDisabled?: boolean) => Promise<ExportResult>;
   readonly rasterize: (layerId: string) => Promise<ExportResult>;
@@ -138,11 +145,9 @@ export class ExtractMaskedAreaController {
     if (contributors.length === 0) {
       return { status: 'empty' };
     }
-    if (
-      !this.deps.isCacheReady(mask, document) ||
-      contributors.some((layer) => !this.deps.isCacheReady(layer, document))
-    ) {
-      return { status: 'not-ready' };
+    const readiness = readinessOfAll([mask, ...contributors].map((layer) => this.deps.cacheReadiness(layer, document)));
+    if (readiness !== 'ready') {
+      return readiness === 'not-ready' ? { status: readiness } : readiness;
     }
     const owned: Extract<ExportResult, { status: 'ok' }>[] = [];
     const acquire = async (resultPromise: Promise<ExportResult>): Promise<ExportResult> => {
@@ -168,8 +173,15 @@ export class ExtractMaskedAreaController {
         return { status: 'busy' };
       }
       const statuses = [maskPixels, ...contributorPixels].map((pixels) => pixels.status);
-      if (statuses.includes('over-budget') || statuses.includes('not-ready')) {
-        return { status: statuses.includes('over-budget') ? 'over-budget' : 'not-ready' };
+      if (statuses.includes('over-budget')) {
+        return { status: 'over-budget' };
+      }
+      const unreadable = [maskPixels, ...contributorPixels].find(isLayerUnreadable);
+      if (unreadable) {
+        return unreadable;
+      }
+      if (statuses.includes('not-ready')) {
+        return { status: 'not-ready' };
       }
       if (maskPixels.status !== 'ok' || statuses.some((status) => status !== 'ok')) {
         return { status: 'empty' };

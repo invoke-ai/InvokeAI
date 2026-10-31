@@ -94,7 +94,6 @@ void i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           gallery: {
-            collapseStarredItems: 'Collapse starred items',
             deleteConfirmLabel: 'Delete',
             deleteImagesConfirmTitle: 'Delete image?',
             inProgress: 'In progress',
@@ -903,7 +902,8 @@ describe('Gallery grid keyboard focus', () => {
     });
     // The strip's disclosure comes first, then the one thumbnail Tab stop.
     await tabIntoGallery();
-    expect(document.activeElement?.getAttribute('aria-label')).toBe('Collapse starred items');
+    expect(document.activeElement?.getAttribute('aria-expanded')).toBe('true');
+    expect(document.activeElement?.textContent).toMatch(/^Starred/);
     await act(() => userEvent.tab());
     expect(focusedThumbnail()).toBe('starred-0.png');
 
