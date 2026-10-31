@@ -14,6 +14,8 @@ import pytest
 
 from invokeai.app.util import video_audio
 
+pytestmark = pytest.mark.ffmpeg
+
 
 @pytest.fixture
 def media(tmp_path: Path, monkeypatch):
@@ -33,7 +35,7 @@ def media(tmp_path: Path, monkeypatch):
 @pytest.mark.parametrize("stderr", [b"No output audio track", b"Aucune piste audio"])
 def test_silent_clip_does_not_depend_on_error_wording(media, monkeypatch, float_pcm, stderr):
     silent, _ = media
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
 
     def run(command, **kwargs):
         proc = real_run(command, **kwargs)
@@ -42,7 +44,7 @@ def test_silent_clip_does_not_depend_on_error_wording(media, monkeypatch, float_
             return subprocess.CompletedProcess(command, proc.returncode, proc.stdout, stderr)
         return proc
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     assert video_audio.extract_audio_pcm(silent, float_pcm=float_pcm) is None
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
 
@@ -54,7 +56,7 @@ def test_invalid_input_is_not_silence_even_if_error_mentions_no_stream(media, mo
     invalid = silent.parent / f"{input_kind}.mp4"
     if input_kind == "corrupt":
         invalid.write_bytes(b"not a media container")
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
 
     def run(command, **kwargs):
         proc = real_run(command, **kwargs)
@@ -63,7 +65,7 @@ def test_invalid_input_is_not_silence_even_if_error_mentions_no_stream(media, mo
             return subprocess.CompletedProcess(command, proc.returncode, proc.stdout, b"does not contain any stream")
         return proc
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError):
         video_audio.extract_audio_pcm(invalid, float_pcm=float_pcm)
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
@@ -72,36 +74,73 @@ def test_invalid_input_is_not_silence_even_if_error_mentions_no_stream(media, mo
 @pytest.mark.parametrize("float_pcm", [False, True])
 def test_existing_audio_decode_error_is_not_silence(media, monkeypatch, float_pcm):
     _, audio = media
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
 
     def run(command, **kwargs):
         if "-acodec" in command:
             return subprocess.CompletedProcess(command, 1, b"", b"decoder does not contain any stream")
         return real_run(command, **kwargs)
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError, match="decoder does not contain any stream"):
         video_audio.extract_audio_pcm(audio, float_pcm=float_pcm)
     assert not list(audio.parent.glob("invokeai_audio_extract_*"))
 
 
 @pytest.mark.parametrize("float_pcm", [False, True])
+def test_unusual_audio_codec_is_not_silence_after_decode_failure(media, monkeypatch, float_pcm):
+    _, audio = media
+    unusual = audio.parent / "alaw.mkv"
+    subprocess.run(
+        [video_audio._ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(audio), "-c:a", "pcm_alaw", str(unusual)],
+        check=True,
+        capture_output=True,
+        timeout=20,
+    )
+    real_run = video_audio.run_ffmpeg_process
+    probes = []
+
+    def run(command, **kwargs):
+        if "-acodec" in command:
+            return subprocess.CompletedProcess(command, 1, b"", b"injected decoder failure")
+        proc = real_run(command, **kwargs)
+        probes.append(proc)
+        return proc
+
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
+    with pytest.raises(video_audio.AudioExtractionError, match="injected decoder failure"):
+        video_audio.extract_audio_pcm(unusual, float_pcm=float_pcm)
+    assert len(probes) == 1
+    assert probes[0].returncode == 0
+    assert b"[STREAM]" in probes[0].stdout.splitlines()
+    assert not list(audio.parent.glob("invokeai_audio_extract_*"))
+
+
+@pytest.mark.parametrize("float_pcm", [False, True])
 def test_successful_decode_does_not_add_a_structural_probe(media, monkeypatch, float_pcm):
     _, audio = media
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
     calls = []
+    rate_calls = []
+    real_probe = video_audio._probe_audio_sample_rate
+
+    def probe(path):
+        rate_calls.append(path)
+        return real_probe(path)
 
     def run(command, **kwargs):
         calls.append(command)
         return real_run(command, **kwargs)
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
+    monkeypatch.setattr(video_audio, "_probe_audio_sample_rate", probe)
     result = video_audio.extract_audio_pcm(audio, float_pcm=float_pcm)
     assert result is not None
     pcm, rate = result
     assert rate == 44100
     assert pcm.shape == (2, 4410)
-    assert len(calls) == (2 if float_pcm else 1)  # Float PCM already probes its rate.
+    assert len(calls) == 1
+    assert rate_calls == ([audio] if float_pcm else [])  # Float PCM already probes its rate.
     assert not any("ffmetadata" in call for call in calls)
 
 
@@ -117,7 +156,7 @@ def test_failed_or_unrecognized_probe_preserves_decode_error(media, monkeypatch,
             return subprocess.CompletedProcess(command, returncode, stdout, b"probe failed")
         return subprocess.CompletedProcess(command, 1, b"", b"original decode error")
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError, match="original decode error"):
         video_audio.extract_audio_pcm(silent)
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
@@ -132,7 +171,7 @@ def test_structural_probe_timeout_is_bounded_and_cleans_output(media, monkeypatc
             raise subprocess.TimeoutExpired(command, 60)
         return subprocess.CompletedProcess(command, 1, b"", b"original decode error")
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError, match="timed out probing audio"):
         video_audio.extract_audio_pcm(silent)
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
@@ -146,7 +185,7 @@ def test_structural_probe_launch_failure_preserves_decode_error(media, monkeypat
             raise OSError("probe binary unavailable")
         return subprocess.CompletedProcess(command, 1, b"", b"original decode error")
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError, match="original decode error"):
         video_audio.extract_audio_pcm(silent)
 
@@ -158,7 +197,7 @@ def test_extraction_timeout_does_not_start_a_probe(media, monkeypatch):
         assert "ffmetadata" not in command
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError, match="timed out extracting audio"):
         video_audio.extract_audio_pcm(silent)
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
@@ -179,7 +218,7 @@ def test_damaged_audio_payload_is_not_silence(media, monkeypatch, float_pcm):
     atom_size = int.from_bytes(encoded[marker - 4 : marker], "big")
     payload_end = marker - 4 + atom_size
     damaged.write_bytes(encoded[: marker + 4] + bytes(payload_end - marker - 4) + encoded[payload_end:])
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
     results = []
 
     def run(command, **kwargs):
@@ -187,14 +226,14 @@ def test_damaged_audio_payload_is_not_silence(media, monkeypatch, float_pcm):
         results.append((command, proc))
         return proc
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     with pytest.raises(video_audio.AudioExtractionError):
         video_audio.extract_audio_pcm(damaged, float_pcm=float_pcm)
     assert results[0][1].returncode != 0  # Real AAC decoding, not an injected failure.
-    if len(results) > 1:  # Baseline has no probe; the fixed path must recognize the stream.
-        assert "ffmetadata" in results[1][0]
-        assert results[1][1].returncode == 0
-        assert b"[STREAM]" in results[1][1].stdout.splitlines()
+    assert len(results) == 2
+    assert "ffmetadata" in results[1][0]
+    assert results[1][1].returncode == 0
+    assert b"[STREAM]" in results[1][1].stdout.splitlines()
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
 
 
@@ -250,7 +289,7 @@ def test_silent_clip_metadata_cannot_spoof_stream_section(media, monkeypatch):
         timeout=20,
     )
     assert b"[STREAM]" in metadata.stdout.splitlines()
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
 
     def run(command, **kwargs):
         proc = real_run(command, **kwargs)
@@ -258,7 +297,7 @@ def test_silent_clip_metadata_cannot_spoof_stream_section(media, monkeypatch):
             return subprocess.CompletedProcess(command, proc.returncode, proc.stdout, b"No output audio track")
         return proc
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     assert video_audio.extract_audio_pcm(tagged) is None
     assert not list(silent.parent.glob("invokeai_audio_extract_*"))
 
@@ -301,7 +340,7 @@ def non_audio_streams(request, tmp_path: Path, monkeypatch):
 
 @pytest.mark.parametrize("float_pcm", [False, True])
 def test_subtitles_and_attachments_are_not_audio(non_audio_streams, monkeypatch, float_pcm):
-    real_run = subprocess.run
+    real_run = video_audio.run_ffmpeg_process
     probes = []
 
     def run(command, **kwargs):
@@ -313,7 +352,7 @@ def test_subtitles_and_attachments_are_not_audio(non_audio_streams, monkeypatch,
             return subprocess.CompletedProcess(command, proc.returncode, proc.stdout, b"Aucune piste audio")
         return proc
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     assert video_audio.extract_audio_pcm(non_audio_streams, float_pcm=float_pcm) is None
     assert len(probes) == 1
     assert probes[0].returncode == 0
@@ -364,9 +403,9 @@ def test_failed_extractions_do_not_remove_concurrent_audio_outputs(media, monkey
     corrupt = silent.parent / "corrupt.mp4"
     missing = silent.parent / "missing.mp4"
     corrupt.write_bytes(b"not a media container")
-    real_run = subprocess.run
+    real_ffmpeg_run = subprocess.run
     ffmpeg = video_audio._ffmpeg_exe()
-    real_run(
+    real_ffmpeg_run(
         [
             ffmpeg,
             "-y",
@@ -392,7 +431,7 @@ def test_failed_extractions_do_not_remove_concurrent_audio_outputs(media, monkey
         codec, format_name, dtype = (
             ("pcm_f32le", "f32le", np.float32) if float_pcm else ("pcm_s16le", "s16le", np.int16)
         )
-        reference = real_run(
+        reference = real_ffmpeg_run(
             [
                 ffmpeg,
                 "-loglevel",
@@ -428,6 +467,8 @@ def test_failed_extractions_do_not_remove_concurrent_audio_outputs(media, monkey
     outputs = {}
     errors = {}
     probes = []
+
+    real_run = video_audio.run_ffmpeg_process
 
     def run(command, **kwargs):
         if "-i" not in command:
@@ -466,7 +507,7 @@ def test_failed_extractions_do_not_remove_concurrent_audio_outputs(media, monkey
             if path in cleaned:
                 cleaned[path].set()
 
-    monkeypatch.setattr(video_audio.subprocess, "run", run)
+    monkeypatch.setattr(video_audio, "run_ffmpeg_process", run)
     inputs = [first, second, silent, corrupt, missing]
     with ThreadPoolExecutor(max_workers=5) as pool:
         results = dict(zip(inputs, pool.map(extract, inputs), strict=True))
