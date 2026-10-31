@@ -15039,7 +15039,7 @@ export type components = {
          * @description Load a FLUX.2 [dev] transformer plus its Mistral text encoder and VAE.
          *
          *     FLUX.2 [dev] is a 32B guidance-distilled rectified flow transformer that uses
-         *     Mistral Small 3.1 (24B) as its sole text encoder, sharing the 32-channel
+         *     Mistral Small 3.2 (24B) as its sole text encoder, sharing the 32-channel
          *     AutoencoderKLFlux2 VAE with FLUX.2 Klein.
          *
          *     When the transformer is a Diffusers-format checkpoint, both VAE and Mistral
@@ -15138,7 +15138,7 @@ export type components = {
         };
         /**
          * Prompt - FLUX.2 [dev]
-         * @description Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder.
+         * @description Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.2 text encoder.
          */
         Flux2DevTextEncoderInvocation: {
             /**
@@ -24231,6 +24231,7 @@ export type components = {
          *         image_subfolder_strategy: Strategy for organizing images into subfolders. 'flat' stores all images in a single folder. 'date' organizes by YYYY/MM/DD. 'type' organizes by image category. 'hash' uses first 2 characters of UUID for filesystem performance.<br>Valid values: `flat`, `date`, `type`, `hash`
          *         custom_nodes_dir: Path to directory for custom nodes.
          *         style_presets_dir: Path to directory for style presets.
+         *         prompt_files_dir: Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
          *         workflow_thumbnails_dir: Path to directory for workflow thumbnails.
          *         log_handlers: Log handler. Valid options are "console", "file=<path>", "syslog=path|address:host:port", "http=<url>".
          *         log_format: Log format. Use "plain" for text-only, "color" for colorized output, "legacy" for 2.3-style logging and "syslog" for syslog-style.<br>Valid values: `plain`, `color`, `syslog`, `legacy`
@@ -24505,6 +24506,13 @@ export type components = {
              * @default style_presets
              */
             style_presets_dir?: string;
+            /**
+             * Prompt Files Dir
+             * Format: path
+             * @description Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.
+             * @default prompt_files
+             */
+            prompt_files_dir?: string;
             /**
              * Workflow Thumbnails Dir
              * Format: path
@@ -38974,7 +38982,7 @@ export type components = {
          * @description Configuration for a single-file Mistral text encoder (safetensors).
          *
          *     Accepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3
-         *     (BFL canonical / upstream Mistral 3.x single-files). The loader uses the
+         *     (BFL's release / upstream Mistral 3.x single-files). The loader uses the
          *     detected variant to decide whether to keep or strip the final RMSNorm.
          */
         MistralEncoder_Checkpoint_Config: {
@@ -39074,9 +39082,8 @@ export type components = {
          *     `Main_Diffusers_Flux2_Config` instead.
          *
          *     Accepts both:
-         *     - 30-layer "cow" distillation (recommended, produces the cleanest output)
-         *     - 40-layer Mistral Small 3 (BFL canonical / upstream Mistral 3.x — also works,
-         *       slightly weaker prompt adherence than cow in our tests)
+         *     - 40-layer Mistral Small 3 (BFL's ``text_encoder/`` or upstream Mistral Small 3.x)
+         *     - the 30-layer "cow" build, its first 30 layers
          *
          *     The variant field records which one was probed so the loader can decide
          *     whether to keep the final RMSNorm (40-layer) or strip it (30-layer cow).
@@ -40072,8 +40079,9 @@ export type components = {
          * @description Places regions on a MOSS-Image prompt as a JSON layout, at generation time.
          *
          *     The layout is built here rather than by the graph builder so the prompt that dynamic prompts and batching vary is
-         *     the one laid out. Without regions the prompt passes through unchanged; a prompt that already is a layout gets the
-         *     regions appended to its items.
+         *     the one laid out. A layout draft with absolute pixel boxes (what Expand Prompt's MOSS-Image Prompt Enhancer writes)
+         *     is compiled at this width and height, regions following its items. Otherwise, without regions the prompt passes
+         *     through unchanged, and a prompt that already is a compiled layout gets the regions appended to its items.
          */
         MossImageLayoutPromptInvocation: {
             /**
@@ -40095,7 +40103,7 @@ export type components = {
             use_cache?: boolean;
             /**
              * Prompt
-             * @description The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended.
+             * @description The image prompt: plain text becomes the layout's summary caption, a compiled layout gets the regions appended, and a layout draft with absolute pixel boxes is compiled at this width and height.
              * @default
              */
             prompt?: string;
@@ -42293,7 +42301,16 @@ export type components = {
         };
         /**
          * Prompts from File
-         * @description Loads prompts from a text file
+         * @description Loads prompts from a text file.
+         *
+         *     The file is read from the InvokeAI prompt files directory (`prompt_files_dir`, by default
+         *     `<root>/prompt_files`). `file_path` is relative to that directory - absolute paths and path
+         *     traversal are rejected - so the node can only read prompt lists an operator has deliberately
+         *     placed there.
+         *
+         *     In multi-user mode the node is restricted to administrators: the directory is shared by every
+         *     account, so letting one account read from it would hand it another account's prompt lists.
+         *     Non-admin users should use wildcards, which are stored per account.
          */
         PromptsFromFileInvocation: {
             /**
@@ -42310,12 +42327,12 @@ export type components = {
             /**
              * Use Cache
              * @description Whether or not to use the cache
-             * @default true
+             * @default false
              */
             use_cache?: boolean;
             /**
              * File Path
-             * @description Path to prompt text file
+             * @description Path to prompt text file, relative to the InvokeAI prompt files directory
              * @default null
              */
             file_path?: string | null;

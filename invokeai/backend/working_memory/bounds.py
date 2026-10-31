@@ -46,6 +46,11 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "vae.flux2-miopen,native,windows-decode-bf16-512x512-scores-RX9060XT-demand_peak": 1.33,
         "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
         "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
+        "denoise.flux3-cudnn,native-denoise-bf16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,native-denoise-fp16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-bf16-h3072-4096+560tok-b2-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-1024+560tok-RTX4090-demand_peak": 1.32,
         "denoise.krea2-cudnn,native-denoise-bf16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
         "denoise.krea2-cudnn,native-denoise-fp16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
         "denoise.krea2-cudnn,cudaMallocAsync-denoise-bf16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
@@ -53,7 +58,7 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
-instead. All but the Krea-2 `cudaMallocAsync` points are the native allocator, none expandable segments:
+instead. All but the FLUX.3 and Krea-2 `cudaMallocAsync` points are the native allocator, none expandable segments:
 
 - The VAE points are MIOpen on Windows, where the demand is concave in the size: first-run driver spikes at small sizes
   and a second run reserving up to 1.6x the first at large ones, so a line that covers every point cannot stay within
@@ -62,6 +67,13 @@ instead. All but the Krea-2 `cudaMallocAsync` points are the native allocator, n
   native allocator served them from 1676 MiB (RTX 4090) and 1879 MiB (RX 9060 XT), while the 512-token caption at
   8612 tokens took 2382 and 2577 MiB. The line has to cover the latter. Under `cudaMallocAsync` and expandable
   segments the two lie on one line.
+- The FLUX.3 denoise points are forwards without reference images on the RTX 4090, one of them a batch of two, that
+  the reference points put 1.302 to 1.320x under their line: references cost more per token than the image and the
+  caption (up to 8% under the native allocator, 12% under `cudaMallocAsync`; see `flux3/denoise_working_memory.py`), and
+  the line has to cover the reference forwards. Under the native allocator
+  the 1440px forward with an 80-token caption (8180 tokens, 2060 MiB, against 2516 MiB for the 560-token caption at 8660
+  tokens) in bf16 and fp16, under `cudaMallocAsync` a batch of two at 1024px in bf16 and, in fp32, the 512px forward
+  and the 1440px one with an 80-token caption.
 - The Krea-2 denoise points are a 77-token caption on the RTX 4090, bf16 and fp16 alike. A caption token reserves more
   than an image token. Allocated memory grows 0.14 to 0.15 MiB per token for caption and image tokens alike, reserved
   memory 0.30 MiB per image token and 0.73 to 0.95 MiB per caption token under the native allocator (1404 against

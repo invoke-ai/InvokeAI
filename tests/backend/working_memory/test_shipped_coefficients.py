@@ -70,6 +70,17 @@ from invokeai.backend.working_memory.spec import ESTIMATOR_MODULES, EstimatorSpe
 
 OUT_OF_FIT = {
     ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "reserved_peak"): 6,
+    ((("allocator", "native"), ("conv_backend", "cudnn")), "RTX 4090", "demand_peak"): 4,
+    (
+        (("allocator", "expandable"), ("conv_backend", "miopen"), ("os", "windows")),
+        "RX 9060 XT (gfx1200)",
+        "demand_peak",
+    ): 4,
+    (
+        (("allocator", "native"), ("conv_backend", "miopen")),
+        "AMD Radeon Pro W7900 Dual Slot (gfx1100)",
+        "demand_peak",
+    ): 5,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 16 + 40,
     ((("allocator", "cudaMallocAsync"), ("conv_backend", "cudnn")), "NVIDIA GeForce RTX 4090", "demand_peak"): 15 + 40,
     ((("allocator", "native"), ("conv_backend", "cudnn")), "NVIDIA RTX 6000 Ada Generation", "demand_peak"): 12,
@@ -90,12 +101,20 @@ OUT_OF_FIT = {
     ): 16,
 }
 """The out-of-fit points by platform, device and method: the six CUDA forced-math-kernel decodes and encodes, which
-check the score-matrix term, and the Krea-2 denoise checks: on each of the four platforms its 3 reference K/V-cache
-windows and 12 forwards with 1024- and 2048-token captions, and a 4-block forward under CUDA's native allocator and
-ROCm's expandable segments; an RTX 6000 Ada's 12 caption forwards on Linux under each CUDA allocator, which check
-the caption excess only; and the RTX 4090's 40 SageAttention forwards under each CUDA allocator (the fit, large,
-K/V-cache and caption grids in bf16 and fp16), which check that the SDPA lines cover a SageAttention denoise. A point
-that leaves the fit needs an edit here."""
+check the score-matrix term, and the FLUX.3 and Krea-2 denoise checks.
+
+The FLUX.3 checks are the real Klein's forwards on each card, which hold the 2-block lines to the released model from
+below, and on the W7900 the forced-math forward, which checks the score-matrix term, and the 4-block forward. That one
+stands for the real Klein's 1024px forward and the math check's default-kernel one, out-of-fit points of the same
+features that demanded no more: the builder ships the larger of one measurement (`build_shipped.point_identity`).
+
+The Krea-2 checks are, on each of its four platforms, 3 reference K/V-cache windows and 12 forwards with 1024- and
+2048-token captions, and a 4-block forward under CUDA's native allocator and ROCm's expandable segments; an RTX 6000
+Ada's 12 caption forwards on Linux under each CUDA allocator, which check the caption excess only; and the RTX 4090's
+40 SageAttention forwards under each CUDA allocator (the fit, large, K/V-cache and caption grids in bf16 and fp16),
+which check that the SDPA lines cover a SageAttention denoise.
+
+A point that leaves the fit needs an edit here."""
 
 LEGACY_ENTRIES = {
     ("denoise.z_image", (("allocator", "native"), ("conv_backend", "miopen"))),

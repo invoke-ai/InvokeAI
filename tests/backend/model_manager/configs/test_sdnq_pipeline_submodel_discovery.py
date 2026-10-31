@@ -547,7 +547,7 @@ def test_a_component_the_loader_always_reads_with_sdnq_needs_safetensors_even_wi
 # use — makes it identify as itself. Supporting [dev] SDNQ pipelines end to end is separate work.
 
 _FLUX2_DEV_TRANSFORMER_CONFIG = {
-    # 3 x Mistral Small 3.1 5120, and 48 heads x 128 head_dim -> see configs/flux2_variant.py
+    # 3 x Mistral Small 3 5120, and 48 heads x 128 head_dim -> see configs/flux2_variant.py
     "joint_attention_dim": 15360,
     "attention_head_dim": 128,
     "num_attention_heads": 48,
