@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCanvasImportNotice } from './canvasImportNotice';
+import { getCanvasImportNotice, getSendAsControlNotice } from './canvasImportNotice';
 
 describe('getCanvasImportNotice', () => {
   it('maps a complete import to a localized success notice', () => {
@@ -56,5 +56,24 @@ describe('getCanvasImportNotice', () => {
     expect(getCanvasImportNotice({ status: 'capabilities-unavailable' }).titleKey).toBe(
       'widgets.canvas.import.capabilitiesUnavailable'
     );
+  });
+});
+
+describe('getSendAsControlNotice', () => {
+  it('names a filled layer, reads a new layer as a one-image import, and passes refusals through', () => {
+    expect(getSendAsControlNotice({ layerId: 'control-1', layerName: 'Depth 1', status: 'filled' })).toEqual({
+      kind: 'success',
+      options: { name: 'Depth 1' },
+      titleKey: 'widgets.canvas.import.controlFilled',
+    });
+    expect(getSendAsControlNotice({ layerId: 'control-2', status: 'created' })).toEqual({
+      kind: 'success',
+      options: { count: 1 },
+      titleKey: 'widgets.canvas.import.success',
+    });
+    expect(getSendAsControlNotice({ status: 'stale-document' })).toEqual({
+      kind: 'error',
+      titleKey: 'widgets.canvas.import.staleDocument',
+    });
   });
 });

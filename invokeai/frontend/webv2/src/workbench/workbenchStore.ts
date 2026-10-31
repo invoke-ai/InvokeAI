@@ -159,19 +159,22 @@ const createCommands = (
           itemKeys: ActionPayload<'setGalleryMultiSelection'>['itemKeys'],
           primaryItem: ActionPayload<'setGalleryMultiSelection'>['primaryItem'],
           projectId?: string,
-          selectionPage?: number
-        ) => ({ itemKeys, primaryItem, projectId, selectionPage })
+          selectionPage?: number,
+          preserveNavigationQuery?: boolean
+        ) => ({ itemKeys, preserveNavigationQuery, primaryItem, projectId, selectionPage })
       ),
       toggleItemSelection: command(
         'toggleGalleryItemInSelection',
         (
           item: ActionPayload<'toggleGalleryItemInSelection'>['item'],
           nextPrimaryItem: ActionPayload<'toggleGalleryItemInSelection'>['nextPrimaryItem'],
-          projectId?: string
+          projectId?: string,
+          selectionPage?: number
         ) => ({
           item,
           nextPrimaryItem,
           projectId,
+          selectionPage,
         })
       ),
       selectImage: (
@@ -185,6 +188,14 @@ const createCommands = (
           preserveNavigationQuery,
           projectId,
           selectionPage,
+          type: 'selectGalleryItem',
+        }),
+      /** Select an image found outside the Gallery; Preview navigates within the image's own board. */
+      selectImageInItsBoard: (image: GeneratedImageContract & Partial<GalleryImage>, projectId?: string): void =>
+        dispatch({
+          item: legacyGeneratedImageToGalleryItem(image),
+          navigateItemBoard: true,
+          projectId,
           type: 'selectGalleryItem',
         }),
       setCompareImage: (image: (GeneratedImageContract & Partial<GalleryImage>) | null, projectId?: string): void =>
@@ -282,6 +293,7 @@ const createCommands = (
         sourceId,
       })),
       submitCanvas: command('submitCanvasInvocationSnapshot'),
+      submitModelOnlyUpscale: command('submitModelOnlyUpscale'),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),
@@ -334,7 +346,11 @@ const createCommands = (
       recover: command('recoverShellLayout'),
       renamePreset: command(
         'renameLayoutPreset',
-        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
+        (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string, localizedDefaultLabel?: string) => ({
+          label,
+          presetId,
+          ...(localizedDefaultLabel === undefined ? {} : { localizedDefaultLabel }),
+        })
       ),
       reset: command('resetActiveLayout'),
       /** Discards the named preset's unsaved arrangement in the active project. */
@@ -453,7 +469,9 @@ const createCommands = (
       setLocalRecoveryState: command('setQueueItemLocalRecoveryState'),
       routePartialResults: command('routeQueueItemPartialResults'),
       routeResults: command('routeQueueItemResults'),
+      reopenForRetry: command('reopenQueueItemForRetry'),
       restoreFromJournal: command('restoreQueueItemsFromJournal'),
+      stageRetriedCanvasResults: command('stageRetriedCanvasResults'),
       setConnectionStatus: command('setBackendConnectionStatus'),
       setStatus: command('setQueueItemStatus'),
     },
@@ -640,6 +658,7 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
       return { ok: true };
     },
     saveFailed: command('autosaveFailed', (error: string) => ({ error })),
+    saveNeedsAttention: command('autosaveNeedsAttention', (savedAt: string) => ({ savedAt })),
     savePending: command('autosavePending', (error: string) => ({ error })),
     saveScheduled: command('autosaveScheduled'),
     saveStarted: command('autosaveStarted'),
@@ -721,11 +740,17 @@ const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState
 const getDiagnosticProjectId = (state: WorkbenchState, projectId?: string): string | undefined =>
   projectId ?? getActiveProject(state)?.id;
 
+/** The reason of the retry warning last logged: a retrying save repeats it until a save finishes or fails. */
+interface AutosaveDiagnosticState {
+  loggedRetryReason: string | null;
+}
+
 /** The store is the one diagnostic owner for reported errors, widget failures and autosave outcomes. */
 const recordDiagnosticForAction = (
   action: WorkbenchAction,
   previousState: WorkbenchState,
-  nextState: WorkbenchState
+  nextState: WorkbenchState,
+  diagnostics: AutosaveDiagnosticState
 ): void => {
   switch (action.type) {
     case 'recordError': {
@@ -837,6 +862,7 @@ const recordDiagnosticForAction = (
       break;
     }
     case 'autosaveSucceeded': {
+      diagnostics.loggedRetryReason = null;
       recordLogEvent(
         'debug',
         { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
@@ -845,14 +871,31 @@ const recordDiagnosticForAction = (
       break;
     }
     case 'autosavePending': {
+      if (diagnostics.loggedRetryReason === action.error) {
+        break;
+      }
+      diagnostics.loggedRetryReason = action.error;
       recordLogEvent(
         'warn',
         { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
-        { context: { reason: action.error }, message: 'Autosave needs attention', name: 'persistence.autosave-pending' }
+        { context: { reason: action.error }, message: 'Autosave will retry', name: 'persistence.autosave-pending' }
+      );
+      break;
+    }
+    case 'autosaveNeedsAttention': {
+      diagnostics.loggedRetryReason = null;
+      recordLogEvent(
+        'warn',
+        { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
+        {
+          message: 'Autosave needs attention: an open project has a sync conflict or an unsupported schema',
+          name: 'persistence.autosave-needs-attention',
+        }
       );
       break;
     }
     case 'autosaveFailed': {
+      diagnostics.loggedRetryReason = null;
       recordLogEvent(
         'error',
         { area: 'autosave', namespace: 'persistence', projectId: nextState.activeProjectId },
@@ -872,6 +915,7 @@ export const createWorkbenchStore = (
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
   const snapshotStore = createExternalStore(createSnapshot(state, hasHydrated));
+  const diagnostics: AutosaveDiagnosticState = { loggedRetryReason: null };
 
   const setSnapshotState = (nextState: WorkbenchState, nextHasHydrated = hasHydrated): void => {
     if (Object.is(nextState, state) && nextHasHydrated === hasHydrated) {
@@ -915,7 +959,7 @@ export const createWorkbenchStore = (
     }
 
     setSnapshotState(nextState);
-    recordDiagnosticForAction(action, previousState, nextState);
+    recordDiagnosticForAction(action, previousState, nextState, diagnostics);
   };
 
   const getState = (): WorkbenchState => state;

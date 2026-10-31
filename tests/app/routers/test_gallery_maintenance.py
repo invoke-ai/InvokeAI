@@ -230,9 +230,10 @@ def test_disconnected_execute_keeps_reservation_until_completion_without_retry(
 ) -> None:
     """An abandoned HTTP response must not release the operation's image-storage reservation."""
     service = _patch_dependencies(monkeypatch, mock_invoker)
-    image_moves = ImageMoveService(db=Mock(), image_files=Mock(), config=Mock(), logger=Mock())
+    database = Mock()
+    database.queries.image_moves.active_job_id.return_value = None
+    image_moves = ImageMoveService(database=database, image_files=Mock(), config=Mock(), logger=Mock())
     image_moves._invoker = mock_invoker
-    monkeypatch.setattr(image_moves, "_get_active_job_id", lambda: None)
     monkeypatch.setattr(image_moves, "_assert_no_active_queue_work", lambda: None)
     mock_invoker.services.image_moves = image_moves
     started = Event()

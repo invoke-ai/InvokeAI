@@ -2,6 +2,7 @@ import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { reportProjectSync } from '@workbench/projects/syncStore';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -56,6 +57,7 @@ vi.mock('@platform/ui/ConfirmDialog', () => ({ ConfirmDialog: () => null }));
 vi.mock('@workbench/components/QueueProgressIndicator', () => ({ QueueCircularProgress: () => null }));
 vi.mock('@workbench/launchpad/formatRelativeTime', () => ({ formatRelativeTime: () => '' }));
 vi.mock('@workbench/projects/components', () => ({ OpenProjectDialog: () => null }));
+vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({ DeleteProjectDialog: () => null }));
 vi.mock('@workbench/projects/library', () => ({
   refreshProjectLibrary: vi.fn(() => Promise.resolve()),
   renameLibraryProject: vi.fn(() => Promise.resolve()),
@@ -75,7 +77,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
     selector({
       backendConnection: { status: 'connected' },
-      projects: [harness.makeProject()],
+      projects: [harness.makeProject(), { id: 'project-2', name: 'Other project', queue: { items: [] } }],
     }),
 }));
 vi.mock('react-i18next', () => ({
@@ -115,12 +117,45 @@ afterEach(async () => {
     setProjectSwitcherOpen(false);
     root?.unmount();
   });
+  reportProjectSync({ hasPendingChanges: false, localDraftStatus: 'ok', projects: {}, recoverableDrafts: [] });
   host?.remove();
   host = null;
   root = null;
 });
 
 describe('ProjectSwitcher', () => {
+  it('marks the open project that awaits a sync decision, and says so on the trigger', async () => {
+    await act(() =>
+      reportProjectSync({
+        hasPendingChanges: true,
+        localDraftStatus: 'ok',
+        projects: {
+          'project-1': { isPendingPush: false, revision: 5 },
+          'project-2': {
+            conflict: { detectedAt: '2026-10-14T09:00:00.000Z', kind: 'deleted' },
+            isPendingPush: true,
+            revision: 3,
+          },
+        },
+        recoverableDrafts: [],
+      })
+    );
+
+    await vi.waitFor(() => {
+      const rows = [...document.querySelectorAll('[role="menuitemradio"]')].map((row) => [
+        row.getAttribute('data-value'),
+        row.textContent?.includes('projects.needsAttention'),
+      ]);
+      expect(rows).toEqual([
+        ['project-1', false],
+        ['project-2', true],
+      ]);
+      expect(
+        document.querySelector('button[aria-label="topbar.projectSwitcher.triggerNeedsAttention"]')
+      ).not.toBeNull();
+    });
+  });
+
   it('keeps the rename dialog open after selecting Rename', async () => {
     let renameItem: HTMLElement | undefined;
     await vi.waitFor(() => {

@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
     _strip_quantization_metadata,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -65,21 +66,17 @@ def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
     `Qwen2_5_VLForConditionalGeneration.from_pretrained` would, since
     `load_state_dict` does not.
 
-    transformers ≤4.x exposed this as `_checkpoint_conversion_mapping`, but 5.x
-    dropped it (returns `{}`), so we fall back to the legacy mapping ourselves. The
-    negative lookahead keeps already-converted keys untouched, so the remap is safe
-    (and idempotent) for both legacy and new-layout single-file checkpoints.
+    transformers ≤4.x exposed this mapping as `_checkpoint_conversion_mapping`; 5.x
+    emptied and then removed it, so we carry it ourselves. The negative lookahead keeps
+    already-converted keys untouched, so the remap is safe (and idempotent) for both
+    legacy and new-layout single-file checkpoints.
     """
     import re
 
-    from transformers import Qwen2_5_VLForConditionalGeneration
-
-    key_mapping = Qwen2_5_VLForConditionalGeneration._checkpoint_conversion_mapping or {
+    key_mapping = {
         r"^visual": "model.visual",
         r"^model(?!\.(language_model|visual))": "model.language_model",
     }
-    if not key_mapping:
-        return sd
 
     remapped_sd: dict = {}
     for old_key, tensor in sd.items():
@@ -287,6 +284,14 @@ class QwenImageCheckpointModel(ModelLoader):
 
         sd = load_file(str(model_path))
         sd = CheckpointPrefix.detect(sd).strip(sd)
+        # Earlier versions identified InstantX's Qwen-Image ControlNet, a trimmed copy of this transformer, as a main
+        # model. Such a record still exists; the file only needs identifying again.
+        if is_qwen_image_instantx_controlnet(sd):
+            raise ValueError(
+                f"'{config.name}' is a Qwen Image ControlNet, not a main model: an earlier version of Invoke "
+                "installed it as one. Run Re-identify model on it in the Model Manager to fix the record, then pick "
+                "it in a control layer."
+            )
 
         # Comfy's nvfp4 build keeps the image stream's attention and MLP in nvfp4, beside scaled fp8. Take those layers
         # out before the fold: `_dequantize_comfyui_fp8` multiplies every `.weight_scale` into its weight, nvfp4's

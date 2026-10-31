@@ -6,15 +6,18 @@ import pytest
 
 from invokeai.app.services.events.events_common import QueueItemsRetriedEvent
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_common import RetriedQueueItem
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
-    db = mock_invoker.services.board_records._db
-    queue = SqliteSessionQueue(db=db)
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: Database) -> SessionQueue:
+    db = mock_sqlite_database
+    queue = SessionQueue(db)
     queue.start(mock_invoker)
     return queue
 
@@ -26,7 +29,7 @@ def event_bus(mock_invoker: Invoker) -> TestEventService:
 
 
 def _insert_queue_item(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
     *,
     session: GraphExecutionState,
     status: str,
@@ -35,7 +38,7 @@ def _insert_queue_item(
     project_id: str | None = None,
     queue_id: str = "default",
 ) -> int:
-    with session_queue._db.transaction() as cursor:
+    with sqlite_cursor_of(session_queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -85,7 +88,7 @@ def _insert_queue_item(
 
 
 def test_retry_items_by_id_retries_root_once_for_child_chain_item(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     root_session = GraphExecutionState(graph=Graph())
     child_session = GraphExecutionState(graph=Graph())
@@ -110,16 +113,36 @@ def test_retry_items_by_id_retries_root_once_for_child_chain_item(
     assert retried_items[0].workflow_call_id is None
     assert retried_items[0].parent_item_id is None
     assert retried_items[0].root_item_id is None
+    assert retry_result.retried_items == [
+        RetriedQueueItem(source_item_id=root_item_id, item_id=retried_items[0].item_id)
+    ]
 
     retry_events = [event for event in event_bus.events if isinstance(event, QueueItemsRetriedEvent)]
     assert len(retry_events) == 1
     assert retry_events[0].retried_item_ids == [root_item_id]
     assert retry_events[0].user_ids == ["user-1"]
     assert retry_events[0].retried_item_ids_by_user == {"user-1": [root_item_id]}
+    assert retry_events[0].retried_items == retry_result.retried_items
+
+
+def test_retrying_a_retry_pairs_it_with_its_own_rerun_and_keeps_the_original_lineage(
+    session_queue: SessionQueue,
+) -> None:
+    original_item_id = _insert_queue_item(
+        session_queue, session=GraphExecutionState(graph=Graph()), user_id="user-1", status="failed"
+    )
+    first = session_queue.retry_items_by_id("default", [original_item_id]).retried_items[0].item_id
+    session_queue.cancel_queue_item(first)
+
+    second = session_queue.retry_items_by_id("default", [first]).retried_items
+
+    assert [item.source_item_id for item in second] == [first]
+    rerun = session_queue.get_queue_item(second[0].item_id)
+    assert (rerun.status, rerun.retried_from_item_id) == ("pending", original_item_id)
 
 
 def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
-    session_queue: SqliteSessionQueue, event_bus: TestEventService
+    session_queue: SessionQueue, event_bus: TestEventService
 ) -> None:
     first_root_item_id = _insert_queue_item(
         session_queue, session=GraphExecutionState(graph=Graph()), user_id="user-1", status="failed"
@@ -131,6 +154,15 @@ def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
     retry_result = session_queue.retry_items_by_id("default", [first_root_item_id, second_root_item_id])
 
     assert retry_result.retried_item_ids == [first_root_item_id, second_root_item_id]
+    reruns = {
+        rerun.retried_from_item_id: rerun.item_id
+        for rerun in session_queue.list_all_queue_items("default")
+        if rerun.retried_from_item_id is not None
+    }
+    assert [(item.source_item_id, item.item_id) for item in retry_result.retried_items] == [
+        (first_root_item_id, reruns[first_root_item_id]),
+        (second_root_item_id, reruns[second_root_item_id]),
+    ]
 
     retry_events = [event for event in event_bus.events if isinstance(event, QueueItemsRetriedEvent)]
     assert len(retry_events) == 1
@@ -139,10 +171,11 @@ def test_retry_items_by_id_emits_unique_owner_ids_for_multiple_roots(
         "user-1": [first_root_item_id],
         "user-2": [second_root_item_id],
     }
+    assert retry_events[0].retried_items == retry_result.retried_items
 
 
 def test_retried_items_inherit_the_project_of_the_root(
-    session_queue: SqliteSessionQueue,
+    session_queue: SessionQueue,
 ) -> None:
     root_item_id = _insert_queue_item(
         session_queue,

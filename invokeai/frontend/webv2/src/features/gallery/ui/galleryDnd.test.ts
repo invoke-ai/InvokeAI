@@ -1,17 +1,22 @@
 import type { GalleryItem } from '@features/gallery/contracts';
+import type { GalleryBoard, GalleryBoardAction } from '@features/gallery/core/types';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  acceptsGalleryItemMoves,
   forwardGalleryBoardDrop,
   GALLERY_SEMANTIC_SEARCH_DROP_ID,
+  getGalleryBoardDragData,
   getGalleryBoardDropData,
+  getGalleryBoardTierDropData,
   getGalleryItemDragData,
   getGalleryItemDragId,
   isGalleryBoardDropData,
   isGalleryImageDragData,
   isGalleryItemDragData,
   resolveGalleryBoardDrop,
+  resolveGalleryBoardMove,
   resolveGallerySemanticSearchDrop,
 } from './galleryDnd';
 
@@ -235,5 +240,55 @@ describe('resolveGallerySemanticSearchDrop', () => {
     expect(resolveGallerySemanticSearchDrop(imageDrag, 'gallery-board:board-a')).toBe(null);
     expect(resolveGallerySemanticSearchDrop(imageDrag, undefined)).toBe(null);
     expect(resolveGallerySemanticSearchDrop({ kind: 'other' }, GALLERY_SEMANTIC_SEARCH_DROP_ID)).toBe(null);
+  });
+});
+
+describe('acceptsGalleryItemMoves', () => {
+  const board = (overrides: Partial<GalleryBoard>): GalleryBoard => ({
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id: 'b',
+    imageCount: 0,
+    isInbox: false,
+    kind: 'board',
+    name: 'B',
+    projectId: null,
+    videoCount: 0,
+    ...overrides,
+  });
+  const access = (actions: GalleryBoardAction[]) => ({
+    access: { actions, adminOverride: false, generalAccess: 'viewer' as const, role: 'viewer' as const },
+  });
+
+  it('takes items on boards that hold them, unless the caller may only view the board', () => {
+    expect(acceptsGalleryItemMoves(board({}))).toBe(true);
+    expect(acceptsGalleryItemMoves(board({ kind: 'uncategorized' }))).toBe(true);
+    expect(acceptsGalleryItemMoves(board({ kind: 'date' }))).toBe(false);
+    expect(acceptsGalleryItemMoves(board(access(['read', 'add_media'])))).toBe(true);
+    expect(acceptsGalleryItemMoves(board(access(['read'])))).toBe(false);
+  });
+});
+
+describe('resolveGalleryBoardMove', () => {
+  const dogs = getGalleryBoardDragData({ id: 'dogs', projectId: null }, 'left');
+
+  it('moves a board dropped on another tier of the gallery it was picked up in', () => {
+    expect(resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData('p2', 'Harbor Tower', 'left'), 'left')).toEqual({
+      boardId: 'dogs',
+      label: 'Harbor Tower',
+      projectId: 'p2',
+    });
+    expect(resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData(null, 'Library', 'left'), 'left')).toBeNull();
+  });
+
+  // Every mounted gallery hears every drop; only the one the drag began and ended in acts on it.
+  it('leaves a drop to the gallery it belongs to', () => {
+    const tier = getGalleryBoardTierDropData('p2', 'Harbor Tower', 'left');
+
+    expect(resolveGalleryBoardMove(dogs, tier, 'right')).toBeNull();
+    expect(
+      resolveGalleryBoardMove(dogs, getGalleryBoardTierDropData('p2', 'Harbor Tower', 'right'), 'right')
+    ).toBeNull();
   });
 });

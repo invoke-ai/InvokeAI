@@ -1,21 +1,23 @@
 import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryProjectRef } from '@features/gallery/core/types';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { TFunction } from 'i18next';
 
-import { toGalleryItemRef } from '@features/gallery/core/items';
+import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
-import { getGallerySettings } from '@features/gallery/core/settings';
+import { getGalleryRevealRequest, subscribeGalleryRevealRequests } from '@features/gallery/core/selection';
+import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryReadState, GalleryReadStatus, GalleryStateView } from './galleryStateView';
 
 import { GalleryBoardDragMonitor } from './GalleryBoardDragMonitor';
-import { mergeGalleryLoadedItems } from './galleryGridLayout';
+import { getGallerySparseSelectionPages, mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryLayout } from './GalleryLayout';
 import { GalleryAnnouncer } from './GalleryLoadError';
 import {
@@ -23,6 +25,7 @@ import {
   getGalleryPage,
   getGalleryProjectBoardId,
   getGalleryRawSelectedBoardId,
+  getGallerySearchScope,
   getGallerySearchTerm,
   getGallerySemanticImageQuery,
   getGalleryStarredOnly,
@@ -44,7 +47,7 @@ import {
   type GalleryWidgetContextValue,
 } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
-import { useGalleryData, type GalleryListingState } from './useGalleryData';
+import { useGalleryData, type GalleryData, type GalleryListingState } from './useGalleryData';
 import { useGalleryStarredStrip } from './useGalleryStarredStrip';
 
 export const shouldPublishGalleryTotal = ({
@@ -89,11 +92,13 @@ export const useGallerySemanticImageQuery = (value: unknown) =>
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
+    boardSharing = false,
     gallery: galleryCommands,
     galleryValues,
     generateValues,
     projectId,
     projectName,
+    projects,
     ItemActionsProvider,
   } = useGalleryUi();
   const galleryView = getGalleryView(galleryValues);
@@ -107,15 +112,19 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,
+    mediaKind: toGalleryMediaKind(settings.mediaFilter),
     page,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     recentImages,
+    searchScope: getGallerySearchScope(galleryValues),
     searchTerm,
     selectedBoardId: getGalleryRawSelectedBoardId(galleryValues),
     semanticQuery,
     settings,
     // The grid partitions: starred items live in the strip above it.
     starred: starredOnly,
+    // Compact bottom chips have no virtualized grid; keep their single page query on the dense listing path.
+    sparseViewport: region !== 'bottom' || presentation === 'expanded',
   });
 
   const { loadMore, selectedBoardId, total } = data;
@@ -134,6 +143,20 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     () => mergeGalleryLoadedItems(starredStrip.items, gallery.items),
     [gallery.items, starredStrip.items]
   );
+  const sparseSelectionPages = useMemo(
+    () =>
+      data.sparseListing
+        ? getGallerySparseSelectionPages({
+            itemSlots: data.sparseListing.itemSlots,
+            pageOffset: settings.paginationMode === 'paginated' ? page * GALLERY_PAGE_SIZE : 0,
+          })
+        : null,
+    [data.sparseListing, page, settings.paginationMode]
+  );
+  const getItemSelectionPage = useCallback(
+    (item: GalleryItem) => sparseSelectionPages?.get(toGalleryItemKey(item)) ?? page,
+    [page, sparseSelectionPages]
+  );
   const lastPublishedTotalRef = useRef<number | null>(null);
   const itemActionFilterIdentity = useMemo(() => JSON.stringify(data.filter), [data.filter]);
   const loadOrderedItemRefs = useCallback(
@@ -148,19 +171,24 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     [data.filter, queryClient, starredStrip.items]
   );
   const itemActionContextRef = useRef<GalleryItemActionContext | null>(null);
-  const galleryLocationRef = useRef({ galleryView, selectedBoardId });
+  const galleryLocationRef = useRef({
+    autoAddBoardId: gallery.settings.autoAddBoardId,
+    galleryView,
+    selectedBoardId,
+  });
 
   // In-flight deletion must read the latest rendered filter and selection without an effect-sized stale window.
   // eslint-disable-next-line react/refs
   itemActionContextRef.current = {
     filterIdentity: itemActionFilterIdentity,
+    getItemSelectionPage,
     items: gallery.items,
     loadOrderedRefs: loadOrderedItemRefs,
     selectedItemKey: gallery.selectedItemKey,
   };
   // Capture upload destination at launch; judge completion visibility against the latest rendered board and view.
   // eslint-disable-next-line react/refs
-  galleryLocationRef.current = { galleryView, selectedBoardId };
+  galleryLocationRef.current = { autoAddBoardId: gallery.settings.autoAddBoardId, galleryView, selectedBoardId };
 
   const getItemActionContext = useCallback(() => itemActionContextRef.current, []);
   const getCurrentGalleryLocation = useCallback(() => galleryLocationRef.current, []);
@@ -224,15 +252,21 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardSharing={boardSharing}
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
         isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
         loadedItems={loadedItems}
+        projectId={projectId}
         projectName={projectName}
+        projects={projects}
         region={region}
         runtime={runtime}
+        pinRevealIndex={data.pinRevealIndex}
+        setVisibleRange={data.setVisibleRange}
+        sparseListing={data.sparseListing}
         starredStrip={starredStrip}
       />
     </ItemActionsProvider>
@@ -271,34 +305,55 @@ const getGalleryFailureAnnouncement = (
 
 const GalleryWidgetContent = ({
   actions,
+  boardSharing,
   boardsState,
   filter,
   gallery,
   isWindowTruncated,
   listing,
   loadedItems,
+  pinRevealIndex,
+  projectId,
   projectName,
+  projects,
   region,
   runtime,
+  setVisibleRange,
+  sparseListing,
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardSharing: boolean;
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
   isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
+  pinRevealIndex: GalleryData['pinRevealIndex'];
+  projectId: string;
   projectName: string;
+  projects: readonly GalleryProjectRef[];
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
+  setVisibleRange: ((range: { endIndexExclusive: number; startIndex: number }) => void) | undefined;
+  sparseListing: GalleryData['sparseListing'];
   starredStrip: GalleryStarredStrip;
 }) => {
   const { t } = useTranslation();
   const itemActions = useGalleryItemActions();
+  const revealRequest = useSyncExternalStore(subscribeGalleryRevealRequests, getGalleryRevealRequest);
+  // Reveals requested before this mount were announced by an earlier one, or by none; a remount must not repeat them.
+  const [mountRevealToken] = useState(() => getGalleryRevealRequest()?.token ?? 0);
+  const revealAnnouncement =
+    revealRequest?.announcement === 'external-generation' && revealRequest.token > mountRevealToken
+      ? { message: t('widgets.gallery.externalGenerationRevealed'), token: revealRequest.token }
+      : null;
+  const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardSharing,
       boardsState,
       filter,
       gallery,
@@ -306,13 +361,19 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      pinRevealIndex,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
+      setVisibleRange,
+      sparseListing,
       starredStrip,
     }),
     [
       actions,
+      boardSharing,
       boardsState,
       filter,
       gallery,
@@ -320,9 +381,14 @@ const GalleryWidgetContent = ({
       itemActions,
       listing,
       loadedItems,
+      pinRevealIndex,
+      projectId,
       projectName,
+      projectNames,
       region,
       runtime,
+      setVisibleRange,
+      sparseListing,
       starredStrip,
     ]
   );
@@ -332,6 +398,16 @@ const GalleryWidgetContent = ({
       <GalleryBoardDragMonitor />
       <GalleryLayout region={region} />
       <GalleryAnnouncer message={getGalleryFailureAnnouncement({ boardsState, listing, starredStrip }, t)} />
+      {/*
+       * Each reveal request has its own token. Alternating regions by token parity makes consecutive identical
+       * announcements a change in an existing region, so each is read; any later reveal request blanks both.
+       */}
+      {[0, 1].map((parity) => (
+        <GalleryAnnouncer
+          key={parity}
+          message={revealAnnouncement && revealAnnouncement.token % 2 === parity ? revealAnnouncement.message : ''}
+        />
+      ))}
     </GalleryWidgetContext>
   );
 };

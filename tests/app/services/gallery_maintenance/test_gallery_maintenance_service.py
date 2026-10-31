@@ -1,3 +1,4 @@
+import errno
 import os
 import shutil
 from contextlib import contextmanager
@@ -8,10 +9,11 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 from PIL import Image
+from sqlalchemy import ColumnElement, Table, func, select
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.gallery_maintenance.gallery_maintenance_common import (
     GalleryMaintenanceError,
@@ -21,16 +23,19 @@ from invokeai.app.services.gallery_maintenance.gallery_maintenance_common import
 from invokeai.app.services.gallery_maintenance.gallery_maintenance_default import GalleryMaintenanceService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_index.image_index_common import IndexedItem
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecordNotFoundException,
     ResourceOrigin,
 )
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.boards import board_images
+from invokeai.app.services.shared.database.schema.image_index import image_embeddings, video_embeddings
+from invokeai.app.services.shared.database.schema.image_moves import image_subfolder_move_items
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+from invokeai.app.util import no_replace
 
 
 class _ImageMutationGate:
@@ -41,13 +46,12 @@ class _ImageMutationGate:
 
 @pytest.fixture
 def maintenance(
-    tmp_path: Path,
-) -> tuple[GalleryMaintenanceService, object, SqliteImageRecordStorage, DiskImageFileStorage]:
+    tmp_path: Path, database: Database
+) -> tuple[GalleryMaintenanceService, Database, ImageRecordStorage, DiskImageFileStorage]:
     config = InvokeAIAppConfig(use_memory_db=True)
     config._root = tmp_path
-    logger = InvokeAILogger.get_logger(config=config)
-    db = create_mock_sqlite_database(config, logger)
-    records = SqliteImageRecordStorage(db)
+    db = database
+    records = ImageRecordStorage(db)
     files = DiskImageFileStorage(config.outputs_path / "images")
     invoker = MagicMock()
     invoker.services.configuration = config
@@ -55,10 +59,10 @@ def maintenance(
     invoker.services.database = db
     invoker.services.image_records = records
     invoker.services.image_files = files
-    invoker.services.image_index_records = ImageIndexRecordsSqlite(db)
-    invoker.services.video_records = SqliteVideoRecordStorage(db)
-    invoker.services.board_records = SqliteBoardRecordStorage(db)
-    invoker.services.board_image_records = SqliteBoardImageRecordStorage(db)
+    invoker.services.image_index_records = ImageIndexRecords(db)
+    invoker.services.video_records = VideoRecordStorage(db)
+    invoker.services.board_records = BoardRecordStorage(db)
+    invoker.services.board_image_records = BoardImageRecordStorage(db)
     invoker.services.images = MagicMock()
     invoker.services.image_moves = _ImageMutationGate()
     files.start(invoker)
@@ -67,8 +71,21 @@ def maintenance(
     return service, db, records, files
 
 
+def _refuse_link(src: Path, dst: Path) -> None:
+    """Refuse hard links the way exFAT does on Linux."""
+    raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
+
+
+def _count(database: Database, table: Table, where: ColumnElement[bool] | None = None) -> int:
+    statement = select(func.count()).select_from(table)
+    if where is not None:
+        statement = statement.where(where)
+    with database.begin(write=False) as conn:
+        return conn.execute(statement).scalar_one()
+
+
 def _save_image_record(
-    records: SqliteImageRecordStorage,
+    records: ImageRecordStorage,
     image_name: str,
     image_subfolder: str = "",
     *,
@@ -159,19 +176,11 @@ def test_remove_missing_archives_thumbnail_and_cascades_all_image_relations(main
     assert not thumbnail_path.exists()
     archived_thumbnail = Path(result.archive_path) / "thumbnails" / "archived" / "board" / "missing.webp"
     assert archived_thumbnail.read_bytes() == b"recoverable thumbnail"
-    with db.transaction() as cursor:
-        assert cursor.execute("SELECT COUNT(*) FROM board_images WHERE image_name='missing.png';").fetchone()[0] == 0
-        assert (
-            cursor.execute("SELECT COUNT(*) FROM image_embeddings WHERE image_name='missing.png';").fetchone()[0] == 0
-        )
-        assert (
-            cursor.execute(
-                "SELECT COUNT(*) FROM image_subfolder_move_items WHERE image_name='missing.png';"
-            ).fetchone()[0]
-            == 0
-        )
-        assert cursor.execute("SELECT COUNT(*) FROM image_embeddings WHERE image_name='kept.png';").fetchone()[0] == 1
-        assert cursor.execute("SELECT COUNT(*) FROM video_embeddings WHERE video_name='kept.mp4';").fetchone()[0] == 1
+    assert _count(db, board_images, board_images.c.image_name == "missing.png") == 0
+    assert _count(db, image_embeddings, image_embeddings.c.image_name == "missing.png") == 0
+    assert _count(db, image_subfolder_move_items, image_subfolder_move_items.c.image_name == "missing.png") == 0
+    assert _count(db, image_embeddings, image_embeddings.c.image_name == "kept.png") == 1
+    assert _count(db, video_embeddings, video_embeddings.c.video_name == "kept.mp4") == 1
     assert IndexedItem(
         kind="image", name="missing.png"
     ) not in invoker.services.image_index_records.list_accessible_embedded_items(None, "model-a")
@@ -179,7 +188,11 @@ def test_remove_missing_archives_thumbnail_and_cascades_all_image_relations(main
     assert _embedding_bytes(invoker.services, "video", "kept.mp4") == kept_video_embedding
     assert _embedding_bytes(invoker.services, "image", "archived-board-kept.png") == archived_board_embedding
     invoker.services.images.notify_deleted.assert_called_once_with("missing.png")
-    assert Path(result.backup_path).is_file()
+    if db.dialect_name == "sqlite":
+        assert result.backup_path is not None and Path(result.backup_path).is_file()
+    else:
+        # A server database is backed up by its operator, not by gallery maintenance.
+        assert result.backup_path is None
 
 
 def test_archive_untracked_preserves_nested_paths_and_never_archives_tracked_or_video_files(maintenance) -> None:
@@ -219,7 +232,7 @@ def test_archive_untracked_preserves_nested_paths_and_never_archives_tracked_or_
     assert _embedding_bytes(service._invoker.services, "image", "tracked.png") == embedding_before
 
 
-def test_regenerate_missing_thumbnail_is_record_scoped_and_refreshes_cached_size(maintenance) -> None:
+def test_regenerate_missing_thumbnail_is_record_scoped_and_refreshes_cached_size(maintenance, monkeypatch) -> None:
     service, db, records, files = maintenance
     _save_image_record(records, "missing-thumb.png", "nested")
     original_bytes = _write_png(files, "missing-thumb.png", "nested")
@@ -238,15 +251,16 @@ def test_regenerate_missing_thumbnail_is_record_scoped_and_refreshes_cached_size
     assert preview.affected_count == 2
     assert preview.skipped_count == 1
 
-    original_backup = service._invoker.services.database.backup_to
+    original_backup = service._create_backup
 
-    def create_thumbnail_during_backup(destination: Path) -> None:
-        original_backup(destination)
+    def create_thumbnail_during_backup() -> str | None:
+        backup_path = original_backup()
         raced_thumbnail = files.get_path("raced-thumb.png", thumbnail=True, image_subfolder="nested")
         raced_thumbnail.parent.mkdir(parents=True, exist_ok=True)
         raced_thumbnail.write_bytes(b"created after preview scan")
+        return backup_path
 
-    service._invoker.services.database.backup_to = create_thumbnail_during_backup
+    monkeypatch.setattr(service, "_create_backup", create_thumbnail_during_backup)
 
     result = service.execute(GalleryMaintenanceOperation.REGENERATE_THUMBNAILS, preview.fingerprint)
 
@@ -264,8 +278,7 @@ def test_regenerate_missing_thumbnail_is_record_scoped_and_refreshes_cached_size
         "missing-thumb.png", image_subfolder="nested"
     )
     assert _embedding_bytes(service._invoker.services, "image", "missing-thumb.png") == embedding_before
-    with db.transaction() as cursor:
-        assert cursor.execute("SELECT COUNT(*) FROM image_embeddings;").fetchone()[0] == 1
+    assert _count(db, image_embeddings) == 1
 
 
 def test_execute_rejects_changed_preview_without_mutating_newly_untracked_file(maintenance) -> None:
@@ -279,14 +292,15 @@ def test_execute_rejects_changed_preview_without_mutating_newly_untracked_file(m
     assert files.get_path("arrived-after-preview.png").read_bytes() == added_bytes
 
 
-def test_backup_failure_prevents_record_removal_and_thumbnail_archival(maintenance) -> None:
+@pytest.mark.sqlite_only  # Only a SQLite database is backed up by gallery maintenance.
+def test_backup_failure_prevents_record_removal_and_thumbnail_archival(maintenance, monkeypatch) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "missing.png", "recoverable")
     thumbnail = files.get_path("missing.png", thumbnail=True, image_subfolder="recoverable")
     thumbnail.parent.mkdir(parents=True)
     thumbnail.write_bytes(b"recoverable thumbnail")
     preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
-    service._invoker.services.database.backup_to = MagicMock(side_effect=OSError("disk full"))
+    monkeypatch.setattr(service._invoker.services.database, "backup", MagicMock(side_effect=OSError("disk full")))
 
     with pytest.raises(GalleryMaintenanceError, match="database backup failed"):
         service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
@@ -388,21 +402,22 @@ def test_remove_missing_preserves_record_when_same_basename_image_exists_elsewhe
     assert files.get_path("duplicate.png", image_subfolder="actual").read_bytes() == elsewhere
 
 
-def test_archive_untracked_executes_only_confirmed_files_with_unchanged_stats(maintenance) -> None:
+def test_archive_untracked_executes_only_confirmed_files_with_unchanged_stats(maintenance, monkeypatch) -> None:
     service, _db, _records, files = maintenance
     confirmed = _write_png(files, "confirmed.png")
     changed_path = files.get_path("changed.png")
     changed_path.parent.mkdir(parents=True, exist_ok=True)
     changed_path.write_bytes(b"before preview")
     preview = service.preview(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED)
-    original_backup = service._invoker.services.database.backup_to
+    original_backup = service._create_backup
 
-    def change_storage(destination: Path) -> None:
-        original_backup(destination)
+    def change_storage() -> str | None:
+        backup_path = original_backup()
         changed_path.write_bytes(b"changed after preview")
         _write_png(files, "arrived.png")
+        return backup_path
 
-    service._invoker.services.database.backup_to = change_storage
+    monkeypatch.setattr(service, "_create_backup", change_storage)
 
     result = service.execute(GalleryMaintenanceOperation.ARCHIVE_UNTRACKED, preview.fingerprint)
 
@@ -428,17 +443,18 @@ def test_remove_missing_counts_committed_deletion_when_followup_check_fails(main
     assert result.status == "partial"
 
 
-def test_remove_missing_keeps_record_when_original_appears_during_backup(maintenance) -> None:
+def test_remove_missing_keeps_record_when_original_appears_during_backup(maintenance, monkeypatch) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "appeared.png", "during-backup")
     preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
-    original_backup = service._invoker.services.database.backup_to
+    original_backup = service._create_backup
 
-    def create_original(destination: Path) -> None:
-        original_backup(destination)
+    def create_original() -> str | None:
+        backup_path = original_backup()
         _write_png(files, "appeared.png", "during-backup")
+        return backup_path
 
-    service._invoker.services.database.backup_to = create_original
+    monkeypatch.setattr(service, "_create_backup", create_original)
 
     result = service.execute(GalleryMaintenanceOperation.REMOVE_MISSING, preview.fingerprint)
 
@@ -585,6 +601,43 @@ def test_archive_file_tolerates_ctime_difference_between_path_and_open_file(
     assert not source.exists()
 
 
+def test_archive_file_without_hard_links_publishes_and_restores_a_quarantined_source(
+    maintenance, tmp_path: Path, monkeypatch
+) -> None:
+    service, _db, _records, _files = maintenance
+    source_dir = tmp_path / "gallery"
+    source_dir.mkdir()
+    source = source_dir / "source.png"
+    destination = tmp_path / "archive" / "source.png"
+    source_bytes = b"confirmed source bytes"
+    source.write_bytes(source_bytes)
+    expected = service._signature(source.lstat())
+    real_fsync_directory = GalleryMaintenanceService._GalleryMaintenanceService__fsync_directory
+    quarantine_sync_failed = False
+
+    def fail_first_quarantine_sync(directory: Path) -> None:
+        nonlocal quarantine_sync_failed
+        if Path(directory).name.startswith(".gallery-archive-") and not quarantine_sync_failed:
+            quarantine_sync_failed = True
+            raise OSError("injected quarantine sync failure")
+        real_fsync_directory(directory)
+
+    monkeypatch.setattr(no_replace.os, "link", _refuse_link)
+    monkeypatch.setattr(
+        GalleryMaintenanceService,
+        "_GalleryMaintenanceService__fsync_directory",
+        staticmethod(fail_first_quarantine_sync),
+    )
+
+    with pytest.raises(OSError, match="injected quarantine sync failure"):
+        service._archive_file(source, destination, expected)
+
+    assert destination.read_bytes() == source_bytes
+    assert list(destination.parent.iterdir()) == [destination]
+    assert source.read_bytes() == source_bytes
+    assert list(source_dir.iterdir()) == [source]
+
+
 def test_preview_rejects_symlinked_record_subfolder(maintenance, tmp_path: Path) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "outside.png", "linked")
@@ -658,7 +711,10 @@ def test_regeneration_removes_thumbnail_if_size_persistence_fails(maintenance, m
     assert result.status == "failed"
 
 
-def test_regeneration_cleanup_preserves_replacement_thumbnail(maintenance, monkeypatch) -> None:
+@pytest.mark.parametrize("hard_links", [True, False], ids=["hard-links", "no-hard-links"])
+def test_regeneration_cleanup_preserves_replacement_thumbnail(maintenance, monkeypatch, hard_links: bool) -> None:
+    if not hard_links:
+        monkeypatch.setattr(no_replace.os, "link", _refuse_link)
     service, _db, records, files = maintenance
     _save_image_record(records, "replacement.png", "nested")
     _write_png(files, "replacement.png", "nested")
@@ -774,6 +830,7 @@ def test_archive_directory_entries_are_synced_before_quarantining_thumbnail(main
         assert parent_syncs and parent_syncs[0] > index
 
 
+@pytest.mark.sqlite_only  # Only a SQLite database is backed up by gallery maintenance.
 def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, monkeypatch) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "missing.png", "recoverable")
@@ -786,7 +843,7 @@ def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, mo
     preview = service.preview(GalleryMaintenanceOperation.REMOVE_MISSING)
     backup_directory = service._invoker.services.configuration.db_path.parent / "backup"
     database_directory = backup_directory.parent
-    backup_to = service._invoker.services.database.backup_to
+    backup = service._invoker.services.database.backup
     directory_fsync = GalleryMaintenanceService._GalleryMaintenanceService__fsync_directory
     real_mkdir = os.mkdir
     events: list[tuple[str, Path]] = []
@@ -805,7 +862,7 @@ def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, mo
 
     def create_backup(destination: Path) -> None:
         nonlocal completed_backup
-        backup_to(destination)
+        backup(destination)
         completed_backup = destination
         events.append(("backup", destination))
 
@@ -818,7 +875,7 @@ def test_backup_directory_sync_failure_prevents_gallery_deletion(maintenance, mo
             raise OSError("injected backup directory-entry sync failure")
         directory_fsync(directory)
 
-    service._invoker.services.database.backup_to = create_backup
+    monkeypatch.setattr(service._invoker.services.database, "backup", create_backup)
     monkeypatch.setattr(os, "mkdir", track_mkdir)
     monkeypatch.setattr(
         GalleryMaintenanceService,

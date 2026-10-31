@@ -1,16 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Literal, Optional
 
 from invokeai.app.services.gallery.gallery_common import (
     BoardMediaSummary,
     GalleryItem,
+    GalleryItemKind,
+    GalleryItemLocation,
     GalleryItemNames,
     GalleryItemNamesResult,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
+
+# A listing's media filter: one kind's items only. None (the default everywhere) lists both.
+GalleryMediaKind = Literal["image", "video"]
 
 
 class GalleryServiceABC(ABC):
@@ -33,8 +37,30 @@ class GalleryServiceABC(ABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         """Lists a paginated, time-sorted stream of image + video items."""
+        pass
+
+    @abstractmethod
+    def get_item_location(
+        self,
+        kind: GalleryItemKind,
+        name: str,
+        order_dir: SQLiteDirection = SQLiteDirection.Descending,
+        origin: Optional[ResourceOrigin] = None,
+        categories: Optional[list[ImageCategory]] = None,
+        is_intermediate: Optional[bool] = None,
+        board_id: Optional[str] = None,
+        search_term: Optional[str] = None,
+        user_id: Optional[str] = None,
+        is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
+    ) -> Optional[GalleryItemLocation]:
+        """Finds an item's exact zero-based position in an ordinary item listing."""
         pass
 
     @abstractmethod
@@ -53,6 +79,7 @@ class GalleryServiceABC(ABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNamesResult:
         """Returns ordered (kind, name) refs for optimistic UI / virtualized lists.
 
@@ -77,6 +104,7 @@ class GalleryServiceABC(ABC):
         created_from: Optional[str] = None,
         created_to: Optional[str] = None,
         starred: Optional[bool] = None,
+        media_kind: Optional[GalleryMediaKind] = None,
     ) -> GalleryItemNames:
         """Returns the ordered flat name list for optimistic UI / virtualized lists.
 
@@ -86,6 +114,8 @@ class GalleryServiceABC(ABC):
         `created_from` and `created_to` are inclusive YYYY-MM-DD bounds on created_at (UTC days).
 
         `starred` restricts to starred (`True`) or unstarred (`False`) items; `None` applies no filter.
+
+        `media_kind` restricts to images or videos; `None` lists both.
         """
         pass
 

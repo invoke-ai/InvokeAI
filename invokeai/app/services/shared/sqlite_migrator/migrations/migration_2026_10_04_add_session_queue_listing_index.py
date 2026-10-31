@@ -17,27 +17,37 @@ index's right edge. The mirrored `created_at DESC` key gives the same plans, but
 lands at the left edge and splits pages half-full: about 1.6x the index size once history grows.
 
 The database keeps no table statistics, so this index attracts statements that filter only on
-`queue_id`; see `PENDING_QUEUE_ITEM_COUNT_QUERY` in the session queue service for the guard rule.
+`queue_id`; the queue's queries keep such terms off it with `dialect.Unindexed`.
+
+SQLite only. On MySQL and MariaDB `queue_id` and `origin` are long texts, which no index holds whole, and a server's
+planner weighs its indexes by their statistics.
 """
 
-import sqlite3
+from sqlalchemy import inspect, text
 
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import (
+    PortableMigration,
+    PortableMigrationContext,
+)
 
-
-class AddSessionQueueListingIndexCallback:
-    def __call__(self, cursor: sqlite3.Cursor) -> None:
-        cursor.execute(
-            """--sql
-            CREATE INDEX IF NOT EXISTS idx_session_queue_listing
-            ON session_queue (queue_id, created_at ASC, item_id DESC, user_id, origin, status);
-            """
-        )
+_NAME = "idx_session_queue_listing"
 
 
-def build_migration() -> Migration:
-    return Migration(
+def _add_session_queue_listing_index(context: PortableMigrationContext) -> None:
+    if context.conn.dialect.name != "sqlite":
+        return
+    if any(index["name"] == _NAME for index in inspect(context.conn).get_indexes("session_queue")):
+        return
+    context.op.create_index(
+        _NAME,
+        "session_queue",
+        ["queue_id", "created_at", text("item_id DESC"), "user_id", "origin", "status"],
+    )
+
+
+def build_migration() -> PortableMigration:
+    return PortableMigration(
         id="2026_10_04_add_session_queue_listing_index",
         depends_on="2026_10_01_add_anima_variant",
-        callback=AddSessionQueueListingIndexCallback(),
+        callback=_add_session_queue_listing_index,
     )

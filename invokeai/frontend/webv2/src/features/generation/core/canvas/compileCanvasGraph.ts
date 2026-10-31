@@ -1,28 +1,59 @@
 /**
- * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; reject
- * external models and unsupported encode modes.
+ * Pure canvas compiler over uploaded inputs. Resize through the processing grid and restore the bbox; hosted
+ * providers are asked for one of their own sizes, take the bbox composite for edits, and have their result restored
+ * to the bbox; reject unsupported modes.
  */
 
 import type { SupportedGenerateBase } from '@features/generation/core/baseGenerationPolicies';
 import type { BackendGraphContract, BackendInvocationContract } from '@features/generation/core/contracts';
-import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
+import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { getGenerationValidationReasons } from '@features/generation/core/baseGenerationPolicies';
-import { GRAPH_BUILDERS } from '@features/generation/core/graph';
-import { addEdge, addNode, toGraphContract } from '@features/generation/core/graphBuilder';
+import {
+  getGenerationValidationReasons,
+  hasEnabledKrea2EditReferences,
+} from '@features/generation/core/baseGenerationPolicies';
+import {
+  describeExternalCanvasRefusal,
+  isExternalGenerationMode,
+  isExternalTextOnlyCanvasModel,
+} from '@features/generation/core/externalProvider';
+import { buildExternalGraph, findVaeSource, GRAPH_BUILDERS } from '@features/generation/core/graph';
+import {
+  addEdge,
+  addNode,
+  addOutputPostprocessors,
+  renameNode,
+  replaceCanvasOutput,
+  toGraphContract,
+} from '@features/generation/core/graphBuilder';
 import { addKrea2ConditioningEnhancers } from '@features/generation/core/krea2Conditioning';
-import { getIsPidSupportedBase } from '@features/generation/core/pid';
+import { getIsPidActive } from '@features/generation/core/pid';
+import { shouldUsePidDecode } from '@features/generation/core/pidGraph';
+import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
+import { getBaseDenoisingRange } from '@features/generation/core/sdxlRefiner';
+import { MAX_ANIMA_INPAINT_ADAPTER_WEIGHT, MIN_ANIMA_INPAINT_ADAPTER_WEIGHT } from '@features/generation/core/settings';
 
+import type { CanvasInpaintSources } from './addControlLayers';
 import type {
   CanvasCompositingSettings,
   CanvasInfillMethod,
   CompileCanvasGraphInput,
   CompiledCanvasGraph,
+  Rect,
 } from './types';
 
-import { addControlLayers } from './addControlLayers';
-import { addRegionalGuidance, isRegionalGuidanceSupportedForBase } from './addRegionalGuidance';
+import { addControlLayers, getOrAddLliteCollector } from './addControlLayers';
+import {
+  addRegionalGuidance,
+  getLayoutPromptRejectionReason,
+  getLayoutRegionIssue,
+  isLayoutRegionalGuidanceBase,
+  isRegionalGuidanceSupportedForBase,
+  type RegionalGuidanceInput,
+  type RegionalLayoutKind,
+} from './addRegionalGuidance';
 import { type CanvasSize, resolveCanvasProcessingSize } from './canvasProcessingSize';
+import { isAnimaInpaintAdapterModel } from './controlValidation';
 
 /** Map bases to encode nodes; SD families share i2l. */
 const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
@@ -32,23 +63,46 @@ const CANVAS_I2L_NODE_TYPES: Partial<Record<SupportedGenerateBase, string>> = {
   'sd-3': 'sd3_i2l',
   flux: 'flux_vae_encode',
   flux2: 'flux2_vae_encode',
+  // FLUX.3 encodes with the FLUX.2 VAE.
+  flux3: 'flux2_vae_encode',
   cogview4: 'cogview4_i2l',
   'qwen-image': 'qwen_image_i2l',
   'z-image': 'z_image_i2l',
   // Krea-2 shares the Qwen-Image VAE, so it encodes with that family's node too.
   'krea-2': 'qwen_image_i2l',
+  'qwen-image-2-1': 'qwen_image_2_1_i2l',
   anima: 'anima_i2l',
+  // MOSS-Image denoises in the FLUX.2 VAE's raw latent layout, so it encodes with that family's node.
+  'moss-image': 'flux2_vae_encode',
   wan: 'wan_i2l',
   // Ideogram lacks an encode node; reject these modes with an actionable error.
 };
 
-/** SD-3, FLUX, and FLUX.2 use start = 1 - strength^0.2. FLUX Fill always starts at 0; other bases use 1 - strength. */
+/**
+ * SD-3, FLUX, FLUX.2, FLUX.3 and MOSS-Image use start = 1 - strength^0.2; MOSS-Image clips its shifted schedule in
+ * sigma space like FLUX.2. FLUX Fill always starts at 0; other bases use 1 - strength.
+ */
 const canvasDenoisingStart = (model: GenerateModelConfig, strength: number): number => {
   if (model.base === 'flux' && model.variant === 'dev_fill') {
     return 0;
   }
-  const usesOptimizedCurve = model.base === 'sd-3' || model.base === 'flux' || model.base === 'flux2';
+  const usesOptimizedCurve =
+    model.base === 'sd-3' ||
+    model.base === 'flux' ||
+    model.base === 'flux2' ||
+    model.base === 'flux3' ||
+    model.base === 'moss-image';
   return 1 - strength ** (usesOptimizedCurve ? 0.2 : 1);
+};
+
+/** Re-derives the base denoise range from the strength; the refiner hand-over rule stays with its owner. */
+const setCanvasDenoisingRange = (
+  denoise: BackendInvocationContract,
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  strength: number
+): void => {
+  Object.assign(denoise, getBaseDenoisingRange(settings, model, canvasDenoisingStart(model, strength)));
 };
 
 /** True for the image-referencing modes (everything but pure txt2img). */
@@ -57,25 +111,91 @@ const isImageMode = (mode: CompileCanvasGraphInput['mode']): boolean => mode !==
 const sizesMatch = (left: CanvasSize, right: CanvasSize): boolean =>
   left.width === right.width && left.height === right.height;
 
+/** Whether an Anima inpaint/outpaint graph gets the adapter: it is switched on and picked, and the base is Anima. */
+const hasAnimaInpaintAdapter = (model: GenerateModelConfig, settings: GenerateSettings): boolean =>
+  model.base === 'anima' && settings.animaInpaintAdapterEnabled && settings.animaInpaintAdapterModel !== null;
+
+/**
+ * The legacy PiD guards (`buildSDXLGraph.ts:192–205`, repeated in the other builders): only the txt2img and img2img
+ * graphs decode through PiD, and Scale Before Processing must leave the bbox alone because PiD already decodes at
+ * 4× the generation size.
+ */
+const getCanvasPidValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
+  const { bbox, mode, model, settings } = input;
+  const reasons: string[] = [];
+
+  if (mode === 'inpaint' || mode === 'outpaint') {
+    reasons.push(
+      'PiD decode currently supports Text to Image and Image to Image only. Disable PiD for Inpaint/Outpaint.'
+    );
+  }
+
+  const unscaledSize = resolveCanvasProcessingSize(model, settings.pidMode, bbox, undefined);
+  if (!sizesMatch(processingSize, unscaledSize)) {
+    reasons.push('Turn off Scale Before Processing (set it to None) to use PiD decode.');
+  }
+
+  return reasons;
+};
+
 /** Canvas-specific validation reasons layered on top of the shared generate ones. */
-const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] => {
-  const { bbox, compositeImageName, maskImageName, mode, model, strength } = input;
+const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSize: CanvasSize): string[] => {
+  const { bbox, compositeImageName, maskImageName, mode, model, settings, strength } = input;
   const reasons: string[] = [];
 
   if (model.type === 'external_image_generator') {
-    reasons.push(`${model.name} does not support canvas generation.`);
-    return reasons;
+    if (mode !== 'txt2img' && isExternalTextOnlyCanvasModel(model)) {
+      // Every edit mode comes from raster content in the frame, which names the cause better than the mode does.
+      reasons.push(describeExternalCanvasRefusal(model, { kind: 'raster_content' }));
+    } else if (mode === 'inpaint') {
+      // The Canvas keep-mask does not match provider edit-mask contracts, and there is no masked compositing tail.
+      reasons.push(`${model.name} does not support inpainting on the canvas yet. Remove or disable the inpaint mask.`);
+    } else if (mode === 'outpaint') {
+      reasons.push(`${model.name} does not support outpainting on the canvas.`);
+    }
+    if (input.controlLayers && input.controlLayers.length > 0) {
+      reasons.push(`${model.name} does not support control layers.`);
+    }
+    if (input.regionalGuidance && input.regionalGuidance.length > 0) {
+      reasons.push(`${model.name} does not support regional guidance.`);
+    }
   }
 
-  // Reject canvas PiD because its graph lacks the expected VAE/decode seam.
-  if (input.settings.pidMode !== 'off' && getIsPidSupportedBase(model.base)) {
-    reasons.push('PiD decoding is not supported on the canvas yet. Turn PiD off to generate here.');
+  if (getIsPidActive(settings.pidMode, model.base)) {
+    reasons.push(...getCanvasPidValidationReasons(input, processingSize));
+  }
+
+  if ((mode === 'inpaint' || mode === 'outpaint') && hasAnimaInpaintAdapter(model, settings)) {
+    if (!isAnimaInpaintAdapterModel(settings.animaInpaintAdapterModel as ComponentModelConfig)) {
+      reasons.push('The Anima inpaint adapter must be a 4-channel Anima ControlNet-LLLite model.');
+    }
+    const weight = settings.animaInpaintAdapterWeight;
+    if (
+      !Number.isFinite(weight) ||
+      weight < MIN_ANIMA_INPAINT_ADAPTER_WEIGHT ||
+      weight > MAX_ANIMA_INPAINT_ADAPTER_WEIGHT
+    ) {
+      reasons.push(
+        `Anima inpaint adapter weight must be between ${MIN_ANIMA_INPAINT_ADAPTER_WEIGHT} and ${MAX_ANIMA_INPAINT_ADAPTER_WEIGHT}.`
+      );
+    }
+  }
+
+  // A regional mask covers the prompt and target tokens only; edit references add image tokens it cannot place.
+  if (
+    model.base === 'krea-2' &&
+    (input.regionalGuidance?.length ?? 0) > 0 &&
+    hasEnabledKrea2EditReferences(settings.referenceImages)
+  ) {
+    reasons.push(
+      'Krea-2 edit references cannot be combined with regional guidance. Turn off the edit references or disable the regional guidance layers.'
+    );
   }
 
   if (!Number.isFinite(bbox.width) || !Number.isFinite(bbox.height) || bbox.width <= 0 || bbox.height <= 0) {
-    reasons.push('Canvas bounding box must have a positive area.');
+    reasons.push('Canvas frame must have a positive area.');
   } else if (!Number.isInteger(bbox.width) || !Number.isInteger(bbox.height)) {
-    reasons.push('Canvas bounding box dimensions must be whole pixels.');
+    reasons.push('Canvas frame dimensions must be whole pixels.');
   }
 
   if (isImageMode(mode)) {
@@ -83,7 +203,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
       reasons.push('Canvas generation requires a composited source image.');
     }
 
-    if (!Number.isFinite(strength) || strength <= 0 || strength > 1) {
+    // A provider edits at its own strength; only the local denoise reads this one.
+    if (model.type !== 'external_image_generator' && (!Number.isFinite(strength) || strength <= 0 || strength > 1)) {
       reasons.push('Canvas denoising strength must be greater than 0 and at most 1.');
     }
   }
@@ -92,6 +213,18 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput): string[] =>
   // outpaint derives its mask from the raster alpha, so its mask is optional.
   if (mode === 'inpaint' && !maskImageName) {
     reasons.push('Canvas inpainting requires an inpaint mask.');
+  }
+
+  // The layout node refuses regions around a blank prompt. A mask with pixels in the bbox has an area to place.
+  const layoutPromptReason = getLayoutPromptRejectionReason({
+    base: model.base,
+    prompt: getEffectivePrompts(settings).positivePrompt,
+    regions: (input.regionalGuidance ?? []).filter(
+      (region) => region.maskBounds.width > 0 && region.maskBounds.height > 0
+    ),
+  });
+  if (layoutPromptReason) {
+    reasons.push(layoutPromptReason);
   }
 
   return reasons;
@@ -117,70 +250,125 @@ const findEdgeSource = (
   return edge && node ? { field: edge.source.field, node } : null;
 };
 
-/** Resolves the VAE source feeding the graph's decode node (throws if absent). */
+/** Resolves the VAE source the base graph decodes with, for the encode side (throws if absent). */
 const requireVaeSource = (graph: BackendGraphContract): { node: BackendInvocationContract; field: string } => {
-  const source = findEdgeSource(graph, 'canvas_output', 'vae');
+  const source = findVaeSource(graph);
   if (!source) {
     throw new Error('Canvas generation could not resolve a VAE source in the base graph.');
   }
   return source;
 };
 
-/** Rename every matching node ID and edge reference. */
-const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
-  const node = graph.nodes[oldId];
-  if (!node) {
-    throw new Error(`Canvas generation could not find the "${oldId}" node to rename.`);
+/** The size the base graph denoises at: the `noise` node carries it for SD families, the denoise node elsewhere. */
+const getDenoiseSize = (graph: BackendGraphContract, denoise: BackendInvocationContract): CanvasSize => {
+  const { height, width } = graph.nodes.noise ?? denoise;
+  if (typeof width !== 'number' || typeof height !== 'number') {
+    throw new TypeError('Canvas generation could not read the denoise size from the base graph.');
   }
-  delete graph.nodes[oldId];
-  node.id = newId;
-  graph.nodes[newId] = node;
-  for (const edge of graph.edges) {
-    if (edge.source.node_id === oldId) {
-      edge.source.node_id = newId;
-    }
-    if (edge.destination.node_id === oldId) {
-      edge.destination.node_id = newId;
-    }
-  }
-  return node;
+  return { height, width };
 };
+
+const findMetadataNode = (graph: BackendGraphContract): BackendInvocationContract | undefined =>
+  Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
 
 /** Resizes a model-grid processing output back to the bbox's exact final footprint. */
 const resizeCanvasOutputToBbox = (
   graph: BackendGraphContract,
   bbox: CompileCanvasGraphInput['bbox'],
   processingSize: CanvasSize,
-  destination: CompileCanvasGraphInput['destination']
+  destination: CompileCanvasGraphInput['destination'],
+  /** PiD Fit ends in an `img_resize` of the 4x decode to the processing size (`addPidDecode`). */
+  isPidFit: boolean
 ): void => {
   if (sizesMatch(bbox, processingSize)) {
     return;
   }
 
-  const processingOutput = renameNode(graph, 'canvas_output', 'canvas_processing_output');
-  processingOutput.is_intermediate = true;
+  // Retarget PiD Fit's resize so the output is resampled once, straight to the bbox (legacy parity), rather
+  // than through the processing size.
+  const terminalResize = graph.nodes.canvas_output;
+  if (isPidFit && terminalResize?.type === 'img_resize') {
+    terminalResize.width = bbox.width;
+    terminalResize.height = bbox.height;
+    return;
+  }
 
-  const output = addNode(graph, {
+  const { output, retired } = replaceCanvasOutput(graph, 'canvas_processing_output', {
     height: bbox.height,
-    id: 'canvas_output',
     is_intermediate: destination === 'canvas',
     type: 'img_resize',
     use_cache: false,
     width: bbox.width,
   });
-  addEdge(graph, processingOutput, 'image', output, 'image');
+  addEdge(graph, retired, 'image', output, 'image');
+};
 
-  const metadataEdge = graph.edges.find(
-    (edge) => edge.destination.node_id === processingOutput.id && edge.destination.field === 'metadata'
-  );
-  if (metadataEdge) {
-    metadataEdge.destination.node_id = output.id;
+/**
+ * Hosted nodes return an image collection; restore each image to the bbox with its own provider metadata. A
+ * text-to-image result at another aspect ratio is scaled to cover the bbox and center-cropped, never stretched.
+ * Scaling before cropping keeps the crop centered when a provider answers at another scale of the requested shape
+ * (named sizes such as Gemini's `2K`). An edit result is resized plainly, undoing its init image's resize.
+ */
+const restoreExternalCanvasOutputToBbox = (
+  graph: BackendGraphContract,
+  input: Pick<CompileCanvasGraphInput, 'bbox' | 'destination'> & { mode: 'txt2img' | 'img2img' },
+  requestSize: CanvasSize
+): void => {
+  const { bbox, destination, mode } = input;
+  const provider = renameNode(graph, 'canvas_output', 'canvas_processing_output');
+  provider.is_intermediate = true;
+  const image = addNode(graph, { id: 'canvas_provider_image', type: 'iterate', use_cache: false });
+  const metadata = addNode(graph, { id: 'canvas_provider_metadata', type: 'metadata_from_image' });
+  const output = { id: 'canvas_output', is_intermediate: destination === 'canvas', use_cache: false };
+  // Keep core metadata on the provider so its output adds request identity, defaults and actual seed to it.
+  addEdge(graph, provider, 'collection', image, 'collection');
+  addEdge(graph, image, 'item', metadata, 'image');
+
+  if (mode === 'img2img' || requestSize.width * bbox.height === requestSize.height * bbox.width) {
+    const resize = addNode(graph, { ...output, height: bbox.height, type: 'img_resize', width: bbox.width });
+    addEdge(graph, image, 'item', resize, 'image');
+    addEdge(graph, metadata, 'metadata', resize, 'metadata');
+    return;
   }
+
+  const scale = Math.max(bbox.width / requestSize.width, bbox.height / requestSize.height);
+  const cover = addNode(graph, {
+    height: Math.max(bbox.height, Math.round(requestSize.height * scale)),
+    id: 'canvas_provider_cover',
+    is_intermediate: true,
+    type: 'img_resize',
+    use_cache: false,
+    width: Math.max(bbox.width, Math.round(requestSize.width * scale)),
+  });
+  const crop = addNode(graph, {
+    ...output,
+    height: bbox.height,
+    type: 'img_crop',
+    width: bbox.width,
+    x: Math.floor((cover.width - bbox.width) / 2),
+    y: Math.floor((cover.height - bbox.height) / 2),
+  });
+  addEdge(graph, image, 'item', cover, 'image');
+  addEdge(graph, cover, 'image', crop, 'image');
+  addEdge(graph, metadata, 'metadata', crop, 'metadata');
+};
+
+/** Feeds the provider the composite at the request size, as the backend would have resized it to its own bucket. */
+const resizeExternalInitImage = (graph: BackendGraphContract, imageName: string, requestSize: CanvasSize): void => {
+  const provider = graph.nodes.canvas_output as BackendInvocationContract;
+  delete provider.init_image;
+  addEdge(
+    graph,
+    addInputResizeNode(graph, 'canvas_resize_image_to_request', imageName, requestSize),
+    'image',
+    provider,
+    'init_image'
+  );
 };
 
 /** Keeps saved-image metadata aligned to the bbox footprint, not the internal processing size. */
 const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileCanvasGraphInput['bbox']): void => {
-  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  const metadata = findMetadataNode(graph);
   if (metadata) {
     metadata.width = bbox.width;
     metadata.height = bbox.height;
@@ -189,7 +377,7 @@ const setCanvasMetadataDimensions = (graph: BackendGraphContract, bbox: CompileC
 
 /** Sets the metadata `generation_mode` variant + strength (legacy parity). */
 const setMetadataMode = (graph: BackendGraphContract, mode: string, strength: number): void => {
-  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  const metadata = findMetadataNode(graph);
   if (metadata) {
     if (typeof metadata.generation_mode === 'string') {
       metadata.generation_mode = metadata.generation_mode.replace('txt2img', mode);
@@ -232,9 +420,6 @@ const addInputResizeNode = (
 
 /** Resolves the encode node type for a supported base (throws otherwise). */
 const requireI2lType = (model: GenerateModelConfig): string => {
-  if (model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
-  }
   const i2lType = CANVAS_I2L_NODE_TYPES[model.base as SupportedGenerateBase];
   if (!i2lType) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);
@@ -258,24 +443,25 @@ const graftImageToImage = (
   settings: GenerateSettings,
   compositeImageName: string,
   strength: number,
-  bbox: CompileCanvasGraphInput['bbox'],
-  processingSize: CanvasSize
+  bbox: CompileCanvasGraphInput['bbox']
 ): void => {
   const i2lType = requireI2lType(model);
   const denoise = requireDenoise(graph);
   const vaeSource = requireVaeSource(graph);
-  const needsResize = !sizesMatch(bbox, processingSize);
+  // The source image is encoded at the size the graph denoises at. That is the processing size, except under
+  // native PiD, which denoises at a quarter of it and decodes straight back up (legacy `addPidImageToImageNative`).
+  const encodeSize = getDenoiseSize(graph, denoise);
+  const needsResize = !sizesMatch(bbox, encodeSize);
   const encode = addEncodeNode(graph, i2lType, settings, needsResize ? null : compositeImageName);
 
   if (needsResize) {
-    const resize = addInputResizeNode(graph, 'canvas_resize_initial_to_processing', compositeImageName, processingSize);
+    const resize = addInputResizeNode(graph, 'canvas_resize_initial_to_processing', compositeImageName, encodeSize);
     addEdge(graph, resize, 'image', encode, 'image');
   }
 
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, settings, strength);
 
   setMetadataMode(graph, 'img2img', strength);
 };
@@ -310,7 +496,59 @@ const addInfillNode = (
   }
 };
 
-/** outputOnlyMaskedRegions selects transparent output versus compositing with the original. */
+/**
+ * Anima's 4-channel ControlNet-LLLite inpaint adapter: it conditions on the raster image and the region to inpaint
+ * (legacy `addInpaint.ts` / `addOutpaint.ts`). The canvas mask is white = keep, the adapter expects white =
+ * inpaint, so `img_lerp` with `min: 255, max: 0` inverts it first. The adapter joins the control layers' collector;
+ * `anima_denoise` applies each LLLite model once, and control layers admit only 3-channel models, so they never
+ * collide.
+ */
+const addAnimaInpaintAdapter = (
+  graph: BackendGraphContract,
+  args: {
+    denoise: BackendInvocationContract;
+    inpaint: CanvasInpaintSources;
+    model: ComponentModelConfig;
+    weight: number;
+  }
+): void => {
+  const { denoise, inpaint, model, weight } = args;
+  const { image, mask } = inpaint;
+  const invertMask = addNode(graph, {
+    id: 'invert_anima_inpaint_adapter_mask',
+    ...('image_name' in mask ? { image: mask } : {}),
+    max: 0,
+    min: 255,
+    type: 'img_lerp',
+  });
+  if ('node' in mask) {
+    addEdge(graph, mask.node, mask.field, invertMask, 'image');
+  }
+
+  const adapter = addNode(graph, {
+    control_model: model,
+    id: 'anima_inpaint_adapter',
+    ...('image_name' in image ? { image } : {}),
+    type: 'anima_lllite',
+    weight,
+  });
+  if ('node' in image) {
+    addEdge(graph, image.node, image.field, adapter, 'image');
+  }
+  addEdge(graph, invertMask, 'image', adapter, 'mask');
+  addEdge(graph, adapter, 'control', getOrAddLliteCollector(graph, denoise), 'item');
+
+  const metadata = findMetadataNode(graph);
+  if (metadata) {
+    metadata.anima_inpaint_adapter = model;
+    metadata.anima_inpaint_adapter_weight = weight;
+  }
+};
+
+/**
+ * outputOnlyMaskedRegions selects transparent output versus compositing with the original. Returns what the
+ * inpaint-conditioned adapters read.
+ */
 const graftMaskTail = (
   graph: BackendGraphContract,
   args: {
@@ -328,14 +566,18 @@ const graftMaskTail = (
     /** Either a fixed mask image field or an edge-fed source node. */
     gradientMaskImage?: { image_name: string };
     gradientMaskEdge?: { node: BackendInvocationContract; field: string };
+    /** The raster image the inpaint-conditioned adapters read; the composite itself when absent. */
+    adapterImageEdge?: { node: BackendInvocationContract; field: string };
   }
-): void => {
-  const { compositing, denoise, destination, i2lType, initialImageName, settings, vaeSource } = args;
+): CanvasInpaintSources => {
+  const { compositing, denoise, destination, i2lType, initialImageName, model, settings, vaeSource } = args;
   const needsResize = !sizesMatch(args.bbox, args.processingSize);
 
-  // The final output owns canvas_output; the base decoder becomes intermediate.
-  const l2i = renameNode(graph, 'canvas_output', 'canvas_l2i');
-  l2i.is_intermediate = true;
+  // The base decoder, until the composited output below takes over canvas_output from it.
+  const l2i = graph.nodes.canvas_output;
+  if (!l2i) {
+    throw new Error('Canvas generation could not find the base graph output.');
+  }
 
   const gradientMask = addNode(graph, {
     coherence_mode: compositing.coherenceMode,
@@ -361,6 +603,20 @@ const graftMaskTail = (
     addEdge(graph, unetSource.node, unetSource.field, gradientMask, 'unet');
   }
   addEdge(graph, gradientMask, 'denoise_mask', denoise, 'denoise_mask');
+
+  // The image before any noise is added, and the mask the denoise limits itself to, both at processing size.
+  const inpaint: CanvasInpaintSources = {
+    image: args.adapterImageEdge ?? { image_name: initialImageName },
+    mask: args.gradientMaskEdge ?? (args.gradientMaskImage as { image_name: string }),
+  };
+  if (hasAnimaInpaintAdapter(model, settings)) {
+    addAnimaInpaintAdapter(graph, {
+      denoise,
+      inpaint,
+      model: settings.animaInpaintAdapterModel as ComponentModelConfig,
+      weight: settings.animaInpaintAdapterWeight,
+    });
+  }
 
   const expandMask = addNode(graph, {
     fade_size_px: compositing.maskBlur,
@@ -391,31 +647,26 @@ const graftMaskTail = (
     addEdge(graph, expandMask, 'image', outputMaskSource, 'image');
   }
 
-  const output = compositing.outputOnlyMaskedRegions
-    ? addNode(graph, {
-        id: 'canvas_output',
-        invert_mask: true,
-        is_intermediate: destination === 'canvas',
-        type: 'apply_mask_to_image',
-        use_cache: false,
-      })
-    : addNode(graph, {
-        id: 'canvas_output',
-        is_intermediate: destination === 'canvas',
-        layer_base: { image_name: initialImageName },
-        type: 'invokeai_img_blend',
-        use_cache: false,
-      });
+  const { output } = replaceCanvasOutput(
+    graph,
+    'canvas_l2i',
+    compositing.outputOnlyMaskedRegions
+      ? {
+          invert_mask: true,
+          is_intermediate: destination === 'canvas',
+          type: 'apply_mask_to_image',
+          use_cache: false,
+        }
+      : {
+          is_intermediate: destination === 'canvas',
+          layer_base: { image_name: initialImageName },
+          type: 'invokeai_img_blend',
+          use_cache: false,
+        }
+  );
   addEdge(graph, generatedImageSource, 'image', output, compositing.outputOnlyMaskedRegions ? 'image' : 'layer_upper');
   addEdge(graph, outputMaskSource, 'image', output, 'mask');
-
-  // Move metadata to the final saved output after renaming.
-  const metadataEdge = graph.edges.find(
-    (edge) => edge.destination.node_id === 'canvas_l2i' && edge.destination.field === 'metadata'
-  );
-  if (metadataEdge) {
-    metadataEdge.destination.node_id = 'canvas_output';
-  }
+  return inpaint;
 };
 
 /** Optionally inserts an `img_noise` node before encode; returns the node feeding `i2l.image`. */
@@ -455,7 +706,7 @@ const graftInpaint = (
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
-): void => {
+): CanvasInpaintSources => {
   const { model } = input;
   const i2lType = requireI2lType(model);
   const denoise = requireDenoise(graph);
@@ -465,8 +716,7 @@ const graftInpaint = (
   const strength = input.strength;
   const needsResize = !sizesMatch(input.bbox, processingSize);
 
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, input.settings, strength);
 
   const initialResize = needsResize
     ? addInputResizeNode(graph, 'canvas_resize_initial_to_processing', initialImageName, processingSize)
@@ -495,7 +745,8 @@ const graftInpaint = (
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
 
-  graftMaskTail(graph, {
+  const inpaint = graftMaskTail(graph, {
+    ...(initialResize ? { adapterImageEdge: { field: 'image', node: initialResize } } : {}),
     bbox: input.bbox,
     compositing,
     denoise,
@@ -513,6 +764,7 @@ const graftInpaint = (
   });
 
   setMetadataMode(graph, 'inpaint', strength);
+  return inpaint;
 };
 
 /** Grafts the outpaint pipeline (bbox extends past content / has transparent holes). */
@@ -521,7 +773,7 @@ const graftOutpaint = (
   input: CompileCanvasGraphInput,
   compositing: CanvasCompositingSettings,
   processingSize: CanvasSize
-): void => {
+): CanvasInpaintSources => {
   const { model } = input;
   const i2lType = requireI2lType(model);
   const denoise = requireDenoise(graph);
@@ -530,8 +782,7 @@ const graftOutpaint = (
   const strength = input.strength;
   const needsResize = !sizesMatch(input.bbox, processingSize);
 
-  denoise.denoising_start = canvasDenoisingStart(model, strength);
-  denoise.denoising_end = 1;
+  setCanvasDenoisingRange(denoise, model, input.settings, strength);
 
   // Infill the transparent region before encode (legacy `getInfill`).
   const infill = addInfillNode(graph, compositing.infillMethod, compositing);
@@ -590,7 +841,8 @@ const graftOutpaint = (
   addEdge(graph, vaeSource.node, vaeSource.field, encode, 'vae');
   addEdge(graph, encode, 'latents', denoise, 'latents');
 
-  graftMaskTail(graph, {
+  const inpaint = graftMaskTail(graph, {
+    adapterImageEdge: { field: 'image', node: infill },
     bbox: input.bbox,
     compositing,
     denoise,
@@ -606,6 +858,95 @@ const graftOutpaint = (
   });
 
   setMetadataMode(graph, 'outpaint', strength);
+  return inpaint;
+};
+
+/** One element of the `moss_image_layout_prompt` node's `regions` input; `bbox` is `[x1, y1, x2, y2]` pixels. */
+interface LayoutRegionElement {
+  kind: RegionalLayoutKind;
+  caption: string;
+  /** Present exactly for `text` elements, as the node requires. */
+  text?: string;
+  bbox: [number, number, number, number];
+}
+
+interface AddLayoutRegionsOptions {
+  /** The generation bbox the regions' mask bounds are measured in. */
+  bbox: Pick<Rect, 'width' | 'height'>;
+  regions: readonly RegionalGuidanceInput[];
+}
+
+// Scaling a box that ends on the bbox edge can overshoot the image by a rounding error; the node refuses that.
+const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0), max);
+
+const toLayoutElement = (
+  region: RegionalGuidanceInput,
+  scale: { x: number; y: number },
+  size: { width: number; height: number }
+): LayoutRegionElement | null => {
+  const caption = region.positivePrompt;
+  if (caption === null || getLayoutRegionIssue(region) !== null) {
+    return null;
+  }
+  const bounds = region.maskBounds;
+  const x1 = clamp(bounds.x * scale.x, size.width);
+  const y1 = clamp(bounds.y * scale.y, size.height);
+  const x2 = clamp((bounds.x + bounds.width) * scale.x, size.width);
+  const y2 = clamp((bounds.y + bounds.height) * scale.y, size.height);
+  // A mask that misses the bbox has no area there; the node refuses empty boxes.
+  if (x2 <= x1 || y2 <= y1) {
+    return null;
+  }
+  const kind = region.layout?.kind ?? 'object';
+  return {
+    bbox: [x1, y1, x2, y2],
+    caption,
+    kind,
+    ...(kind === 'text' ? { text: region.layout?.text } : {}),
+  };
+};
+
+/**
+ * MOSS-Image regions: each becomes a box around its mask, scaled from bbox pixels to the size the denoiser generates
+ * (which PiD can shrink below the processing size) and clamped to it. A `layout_prompt` node between the global prompt
+ * and the positive encoder assembles them at run time, so batch prompt variation still flows through
+ * `positive_prompt`; core metadata records the assembled prompt. Regions the layout cannot place are left out, and
+ * without any the graph stays untouched.
+ */
+const addLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const posCond = graph.nodes.pos_cond;
+  if (!posCond) {
+    throw new Error('addLayoutRegions: base graph is missing the positive conditioning node.');
+  }
+  const size = getDenoiseSize(graph, requireDenoise(graph));
+  const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
+  const elements = options.regions.flatMap((region) => toLayoutElement(region, scale, size) ?? []);
+  if (elements.length === 0) {
+    return;
+  }
+  const promptEdge = graph.edges.find(
+    (edge) =>
+      edge.source.node_id === 'positive_prompt' &&
+      edge.destination.node_id === posCond.id &&
+      edge.destination.field === 'prompt'
+  );
+  if (!promptEdge) {
+    throw new Error('addLayoutRegions: the positive prompt does not feed the positive conditioning.');
+  }
+
+  const layoutPrompt = addNode(graph, {
+    height: size.height,
+    id: 'layout_prompt',
+    regions: elements,
+    type: 'moss_image_layout_prompt',
+    width: size.width,
+  });
+  promptEdge.destination = { field: 'prompt', node_id: layoutPrompt.id };
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
+  const metadata = findMetadataNode(graph);
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+  }
 };
 
 /** Throw the first validation reason. */
@@ -614,16 +955,13 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   const processingSize = resolveCanvasProcessingSize(model, input.settings.pidMode, bbox, input.scaling);
   const settings = withProcessingDimensions(input.settings, processingSize);
 
-  const validationReasons = [...getCanvasValidationReasons(input), ...getGenerationValidationReasons(model, settings)];
+  const validationReasons = [
+    ...getCanvasValidationReasons(input, processingSize),
+    ...getGenerationValidationReasons(model, settings, isExternalGenerationMode(mode) ? mode : 'txt2img'),
+  ];
 
   if (validationReasons.length > 0) {
     throw new Error(validationReasons[0]);
-  }
-
-  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
-
-  if (!builder || model.type === 'external_image_generator') {
-    throw new Error(`${model.name} does not support canvas generation.`);
   }
 
   // Canvas outputs are intermediate; gallery outputs are durable.
@@ -632,56 +970,111 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     ...projectSettings,
     randDevice: input.randDevice ?? (projectSettings.useCpuNoise ? 'cpu' : 'cuda'),
   };
+
+  if (model.type === 'external_image_generator') {
+    // Validation above already named the mode; this narrows the provider inputs to the two modes Canvas compiles.
+    if (mode !== 'txt2img' && mode !== 'img2img') {
+      throw new Error(`${model.name} does not support ${mode}ing on the canvas.`);
+    }
+
+    // The provider is asked for the processing size, one of its own sizes, and the returned whole image is restored
+    // to the exact bbox footprint before staging or saving. No local denoising strength applies.
+    const backendGraph = buildExternalGraph(
+      settings,
+      model,
+      outputIsIntermediate,
+      runtimeProjectSettings,
+      mode === 'txt2img' ? { mode } : { initImageName: compositeImageName as string, mode }
+    );
+    if (mode === 'img2img' && !sizesMatch(processingSize, bbox)) {
+      resizeExternalInitImage(backendGraph, compositeImageName as string, processingSize);
+    }
+    restoreExternalCanvasOutputToBbox(backendGraph, { bbox, destination, mode }, processingSize);
+    setCanvasMetadataDimensions(backendGraph, bbox);
+
+    return {
+      backendGraph,
+      graph: toGraphContract(backendGraph, `${model.name} ${mode}`),
+      mode,
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+    };
+  }
+
+  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+
+  if (!builder) {
+    throw new Error(`Canvas generation is not supported for ${model.name}.`);
+  }
+
   const backendGraph = builder(settings, model, outputIsIntermediate, runtimeProjectSettings);
   const { compositing } = input;
 
   // Validation above guarantees the composite/mask images required per mode.
+  let inpaint: CanvasInpaintSources | undefined;
   if (mode === 'img2img') {
-    graftImageToImage(backendGraph, model, settings, compositeImageName as string, strength, bbox, processingSize);
+    graftImageToImage(backendGraph, model, settings, compositeImageName as string, strength, bbox);
   } else if (mode === 'inpaint') {
-    graftInpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftInpaint(backendGraph, input, compositing, processingSize);
   } else if (mode === 'outpaint') {
-    graftOutpaint(backendGraph, input, compositing, processingSize);
+    inpaint = graftOutpaint(backendGraph, input, compositing, processingSize);
   }
 
-  // Every mode accepts already-resolved, separately uploaded control inputs.
+  // Every mode accepts already-resolved, separately uploaded control inputs; inpaint and outpaint also hand the
+  // adapters what they regenerate.
   if (input.controlLayers && input.controlLayers.length > 0) {
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,
+      inpaint,
       layers: input.controlLayers,
       modelVariant: model.variant ?? undefined,
     });
   }
 
-  // Regional masks and models must already be validated.
-  if (input.regionalGuidance && input.regionalGuidance.length > 0 && isRegionalGuidanceSupportedForBase(model.base)) {
-    addRegionalGuidance(backendGraph, {
-      base: model.base,
-      modelVariant: model.variant,
-      regions: input.regionalGuidance,
-      ...(model.base === 'krea-2'
-        ? {
-            transformRegionalPositiveConditioning: (conditioning: BackendInvocationContract, regionId: string) => {
-              const seed = backendGraph.nodes.seed;
-              if (!seed) {
-                throw new Error('Krea-2 regional guidance requires the base graph seed node.');
-              }
-              return addKrea2ConditioningEnhancers({
-                conditioning,
-                graph: backendGraph,
-                idPrefix: `rg_krea2_${regionId}`,
-                seed,
-                settings,
-              });
-            },
-          }
-        : {}),
-    });
+  // Regional masks and models must already be validated. Layout bases read only each mask's bounds.
+  const regions = input.regionalGuidance ?? [];
+  const regionalBase = model.base;
+  if (regions.length > 0 && isRegionalGuidanceSupportedForBase(regionalBase)) {
+    if (isLayoutRegionalGuidanceBase(regionalBase)) {
+      addLayoutRegions(backendGraph, { bbox, regions });
+    } else {
+      addRegionalGuidance(backendGraph, {
+        base: regionalBase,
+        modelVariant: model.variant,
+        regions,
+        ...(regionalBase === 'krea-2'
+          ? {
+              transformRegionalPositiveConditioning: (conditioning: BackendInvocationContract, regionId: string) => {
+                const seed = backendGraph.nodes.seed;
+                if (!seed) {
+                  throw new Error('Krea-2 regional guidance requires the base graph seed node.');
+                }
+                return addKrea2ConditioningEnhancers({
+                  conditioning,
+                  graph: backendGraph,
+                  idPrefix: `rg_krea2_${regionId}`,
+                  seed,
+                  settings,
+                });
+              },
+            }
+          : {}),
+      });
+    }
   }
 
   if (mode === 'txt2img' || mode === 'img2img') {
-    resizeCanvasOutputToBbox(backendGraph, bbox, processingSize, destination);
+    resizeCanvasOutputToBbox(
+      backendGraph,
+      bbox,
+      processingSize,
+      destination,
+      shouldUsePidDecode(settings, model.base) && settings.pidMode === 'fit'
+    );
   }
+  // After every mode has settled its final image node, so the filters see the composited/resized result.
+  addOutputPostprocessors(backendGraph, runtimeProjectSettings, outputIsIntermediate);
   setCanvasMetadataDimensions(backendGraph, bbox);
 
   return {

@@ -588,11 +588,11 @@ def test_should_use_fp8_allows_z_image():
 
 
 def test_should_use_fp8_refuses_a_loader_that_declared_it_does_not_implement_the_cast():
-    """A Z-Image ControlNet asks for fp8 and its loader never casts, so the gate must say no.
+    """A Z-Image ControlNet asks for fp8 and its loader does not implement the cast, so the gate must say no.
 
     Not the same question as the one above: Z-Image *main* implements the cast. Both are
     `base=z-image`, which is why the answer cannot live on the architecture -- it lives on the
-    loader key, and `ZImageControlCheckpointModel` declares `Unimplemented` there.
+    loader key, and `ZImageFunControlNetLoader` declares `Unimplemented` there.
 
     The device probe must not run for it either: an inert request is no reason to touch the GPU.
     """
@@ -1212,3 +1212,15 @@ class TestSkippedModulesNeverKeepCheckpointFp8:
 
         assert out.dtype is torch.bfloat16
         assert torch.equal(out, reference(inp))
+
+
+@pytest.mark.parametrize("submodel", [SubModelType.TextEncoder, SubModelType.VisionEncoder])
+def test_a_krea2_pipelines_encoders_never_take_fp8_storage(submodel):
+    """FP8 Storage on a Krea-2 pipeline casts its transformer, never its Qwen3-VL text encoder or the vision
+    tower edit mode loads from it: both condition the image."""
+    loader = _make_loader("cuda")
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.Krea2)
+
+    with _device_holds_fp8():
+        assert loader._should_use_fp8(config, SubModelType.Transformer) is True
+        assert loader._should_use_fp8(config, submodel) is False

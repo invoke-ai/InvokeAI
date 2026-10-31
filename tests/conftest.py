@@ -7,41 +7,123 @@
 import logging
 import shutil
 import sys
+import warnings
 from pathlib import Path
+from typing import NamedTuple
 
 import pytest
+import torch
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.auth import password_utils
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.download import download_default
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
-from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.gallery.gallery_default import GalleryService
+from invokeai.app.services.image_index import image_index_default
 from invokeai.app.services.image_index.image_index_default import ImageIndexService
-from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_index.image_index_records_default import ImageIndexRecords
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
-from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
+from invokeai.app.services.intermediates.intermediates_records_default import IntermediatesRecords
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
-from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-    SqliteSystemPromptRecordsStorage,
+from invokeai.app.services.model_install import model_install_default
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+    SystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
+from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+from invokeai.backend.util.host_platform import is_windows_arm64
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
+from tests.fixtures.database import (  # noqa: F401
+    _external_application_schema,
+    _external_test_schema,
+    _migrated_sqlite,
+    database,
+    empty_database,
+    external_test_db_url,
+)
+from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
+
+# The app installs this from apply_monkeypatches(); the suite runs real transformers forwards on the CPU, so on a
+# CUDA torch build without a device (NVIDIA's Windows ARM64 build on a GPU-less runner) it needs the same shim.
+# Only there: every other CUDA build raises rather than crashes, and a process-wide patch would hide what the
+# rest of the suite runs against (Linux CI is a CUDA build without a GPU, too).
+if is_windows_arm64():
+    install_cuda_stream_capture_shim()
+
+# torch's own SDPA priority order, read as the session starts and before anything in it installs one. It is torch's
+# state, not code under test, and its layout differs by release, so `sdpa_orders` picks literal expectations by it.
+try:
+    _TORCH_SDPA_ORDER_AT_START: tuple[SDPBackend, ...] | None = tuple(
+        SDPBackend(backend) for backend in torch._C._get_sdp_priority_order()
+    )
+except Exception:  # a torch that renamed its private priority API; `sdpa_orders` skips
+    _TORCH_SDPA_ORDER_AT_START = None
+
+_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE = (
+    SDPBackend.FLASH_ATTENTION,
+    SDPBackend.EFFICIENT_ATTENTION,
+    SDPBackend.MATH,
+    SDPBackend.CUDNN_ATTENTION,
+    SDPBackend.OVERRIDEABLE,
+)
+# Each layout of torch's own order the suite knows -> the order once InvokeAI's ranking is installed on it.
+_INSTALLED_SDPA_ORDER_BY_TORCH_ORDER = {
+    # torch 2.8 and newer: all five backends.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE): (_FLASH, _CUDNN, _EFFICIENT, _MATH, _OVERRIDEABLE),
+    # torch 2.7 (macOS, Linux aarch64): a five-slot array initialised with four backends, so the last slot is 0,
+    # which is MATH again. The four ranked entries are written over the first four slots and the fifth stays.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _MATH): (_FLASH, _CUDNN, _EFFICIENT, _MATH, _MATH),
+}
+# The same layouts -> the order once `attention_backend` pins each kernel ahead of InvokeAI's ranking.
+_PINNED_SDPA_ORDERS_BY_TORCH_ORDER = {
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _OVERRIDEABLE): {
+        _FLASH: (_FLASH, _CUDNN, _EFFICIENT, _MATH, _OVERRIDEABLE),
+        _CUDNN: (_CUDNN, _FLASH, _EFFICIENT, _MATH, _OVERRIDEABLE),
+        _EFFICIENT: (_EFFICIENT, _FLASH, _CUDNN, _MATH, _OVERRIDEABLE),
+        _MATH: (_MATH, _FLASH, _CUDNN, _EFFICIENT, _OVERRIDEABLE),
+    },
+    # Here, too, only the four ranked slots are written, and the fifth stays MATH.
+    (_FLASH, _EFFICIENT, _MATH, _CUDNN, _MATH): {
+        _FLASH: (_FLASH, _CUDNN, _EFFICIENT, _MATH, _MATH),
+        _CUDNN: (_CUDNN, _FLASH, _EFFICIENT, _MATH, _MATH),
+        _EFFICIENT: (_EFFICIENT, _FLASH, _CUDNN, _MATH, _MATH),
+        _MATH: (_MATH, _FLASH, _CUDNN, _EFFICIENT, _MATH),
+    },
+}
+
+# Fixtures that put a test on the backend under test, which `-m uses_database` selects.
+_DATABASE_FIXTURES = {"empty_database", "database"}
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    # tryfirst: the marks must exist before `-m` deselects by them.
+    external = external_test_db_url() is not None
+    for item in items:
+        if _DATABASE_FIXTURES & set(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.uses_database)
+        if external and item.get_closest_marker("sqlite_only") is not None:
+            item.add_marker(pytest.mark.skip(reason="needs SQLite, but INVOKEAI_TEST_DB_URL names another backend"))
 
 
 @pytest.fixture(autouse=True)
@@ -56,26 +138,128 @@ def _clear_deferred_empty_cache():
 
 
 @pytest.fixture
-def mock_services() -> InvocationServices:
+def preserve_sdpa_priority_order():
+    """torch's SDPA priority order is process-global, and an xdist worker runs arbitrary files in one process.
+
+    For tests that change it -- `apply_monkeypatches` and `install_default_sdpa_priority` do -- so a later test does
+    not pick kernels by an order it never asked for.
+    """
+    saved = torch._C._get_sdp_priority_order()
+    yield
+    torch._C._set_sdp_priority_order(saved)
+
+
+class SdpaOrders(NamedTuple):
+    # torch's own order, which demoting cuDNN gives back.
+    torch_own: list[SDPBackend]
+    # The order once `install_default_sdpa_priority` has ranked flash, cuDNN, memory-efficient and math first.
+    installed: list[SDPBackend]
+    # The order once `install_default_sdpa_priority(pinned)` has ranked each kernel ahead of that.
+    pinned: dict[SDPBackend, list[SDPBackend]]
+
+
+@pytest.fixture
+def sdpa_orders() -> SdpaOrders:
+    """The literal SDPA priority orders a test expects on this torch, chosen by the layout of torch's own order."""
+    installed = _INSTALLED_SDPA_ORDER_BY_TORCH_ORDER.get(_TORCH_SDPA_ORDER_AT_START)
+    pinned = _PINNED_SDPA_ORDERS_BY_TORCH_ORDER.get(_TORCH_SDPA_ORDER_AT_START)
+    if _TORCH_SDPA_ORDER_AT_START is None or installed is None or pinned is None:
+        layout = None if _TORCH_SDPA_ORDER_AT_START is None else [b.name for b in _TORCH_SDPA_ORDER_AT_START]
+        pytest.skip(
+            f"torch {torch.__version__} has an SDPA priority order the suite has no expectations for ({layout}); "
+            "add its layout to _INSTALLED_SDPA_ORDER_BY_TORCH_ORDER and _PINNED_SDPA_ORDERS_BY_TORCH_ORDER in "
+            "tests/conftest.py"
+        )
+    return SdpaOrders(
+        torch_own=list(_TORCH_SDPA_ORDER_AT_START),
+        installed=list(installed),
+        pinned={kernel: list(order) for kernel, order in pinned.items()},
+    )
+
+
+@pytest.fixture(scope="session")
+def cpu_flash_serves_grouped_query_attention() -> bool:
+    """Whether this torch's CPU flash kernel takes grouped-query attention. torch 2.7's does not.
+
+    Asked by running it, with only flash enabled, so the answer comes from torch and not from the code under
+    test. A refusal arrives as warnings ahead of the error; they are this probe's own, so they are muted.
+    """
+    query, key_value = torch.zeros(1, 4, 8, 16), torch.zeros(1, 2, 8, 16)
+    try:
+        with warnings.catch_warnings(), sdpa_kernel(SDPBackend.FLASH_ATTENTION):
+            warnings.simplefilter("ignore")
+            torch._C._nn.scaled_dot_product_attention(query, key_value, key_value, enable_gqa=True)
+    except RuntimeError:
+        return False
+    return True
+
+
+_PRODUCTION_BCRYPT_ROUNDS = password_utils.BCRYPT_ROUNDS
+
+
+@pytest.fixture(autouse=True)
+def _cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """At the production cost factor every user a test creates or logs in costs a fifth of a second, which
+    was most of the multiuser router tests' run time. Cost-4 hashes still round-trip, and stored cost-12
+    hashes still verify. Tests about the cost itself request `production_password_hashing`."""
+    monkeypatch.setattr(password_utils, "BCRYPT_ROUNDS", 4)
+
+
+@pytest.fixture
+def production_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hash at the production cost factor, for tests that assert or measure it."""
+    monkeypatch.setattr(password_utils, "BCRYPT_ROUNDS", _PRODUCTION_BCRYPT_ROUNDS)
+
+
+@pytest.fixture(autouse=True)
+def _fast_service_polling(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Idle service workers poll their queues once a second, so every stop() in a fixture teardown waited up to
+    that long. Shortening the intervals keeps the same loops and orderings; it only removes the idle wait."""
+    monkeypatch.setattr(download_default, "_QUEUE_POLL_SECONDS", 0.02)
+    monkeypatch.setattr(model_install_default, "_INSTALL_QUEUE_POLL_SECONDS", 0.02)
+    monkeypatch.setattr(image_index_default, "_POLL_SECONDS", 0.02)
+
+
+@pytest.fixture(autouse=True)
+def _working_memory_platform_from_the_test_not_the_host(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A working-memory estimate prices the allocator torch is configured with and the OS it runs on. Read from the
+    host, a developer's `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True` or a Windows runner moves every expected
+    value. Tests start from no allocator configuration on Linux and set what they are about."""
+    from invokeai.backend.working_memory import platform
+
+    for var in ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF"):
+        monkeypatch.delenv(var, raising=False)
+    monkeypatch.setattr(platform, "_host_os", lambda: "linux")
+
+
+@pytest.fixture
+def mock_sqlite_database() -> Database:
+    """The in-memory database behind `mock_services`, for tests that need SQL of their own or a service that
+    `mock_services` leaves out (the session queue)."""
+    return create_mock_sqlite_database(InvokeAIAppConfig(use_memory_db=True), InvokeAILogger.get_logger())
+
+
+@pytest.fixture
+def mock_services(mock_sqlite_database: Database) -> InvocationServices:
     # Image indexing is on by default, but `model_manager` below is None: starting
     # the indexer against these stub services would fail while resolving the
     # embedding model. Tests that exercise the index enable it themselves.
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0, image_index_enabled=False)
     logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     # NOTE: none of these are actually called by the test invocations
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
         database=db,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -88,29 +272,29 @@ def mock_services() -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
-        project_records=ProjectRecordsSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db),
+        project_records=ProjectRecordsStorage(db),
         users=UserService(db),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db),
+        board_video_records=BoardVideoRecordStorage(db),
         # Real SQLite-backed gallery service: the virtual-boards router reads dates and
         # per-date item names through it, and MagicMock cannot exercise the filter SQL.
-        gallery=SqliteGalleryService(db=db),
-        image_index_records=ImageIndexRecordsSqlite(db=db),
+        gallery=GalleryService(db),
+        image_index_records=ImageIndexRecords(db),
         image_index=ImageIndexService(),
-        intermediates=IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger),
+        intermediates=IntermediatesService(records=IntermediatesRecords(db), logger=logger),
     )
 
 

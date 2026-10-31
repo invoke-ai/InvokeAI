@@ -11,17 +11,19 @@ import { getGenerateModelSelectionResult, getPromptHistoryRecallPatch } from '@f
 export const selectProjectGenerateModel = ({
   currentValues,
   generation,
+  isCanvasFrame,
   model,
   models,
   projectId,
 }: {
   currentValues: unknown;
   generation: Pick<WorkbenchGenerationCommands, 'setSettings'>;
+  isCanvasFrame: boolean;
   model: GenerateModelConfig;
   models: readonly GenerationModelCatalogItem[];
   projectId: string;
 }): GenerateModelSelectionResult => {
-  const result = getGenerateModelSelectionResult({ currentValues, model, models });
+  const result = getGenerateModelSelectionResult({ currentValues, isCanvasFrame, model, models });
 
   generation.setSettings({ ...result.settings, model }, projectId);
 

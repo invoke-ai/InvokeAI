@@ -29,6 +29,7 @@ import {
   getVideoModes,
   getVideoPromptPolicy,
   getVideoValidationReasons,
+  getAutoDurationBounds,
   isAutoDurationActive,
   isAutoDurationSupportedForMode,
   getWanExpertWiringWarning,
@@ -1586,7 +1587,7 @@ describe('reference mode policy', () => {
       settingsFor(model, { componentSourceModel: h3Model(), ...overrides });
 
     expect(getVideoValidationReasons(model, withRefTransformer({}))).toContain(
-      'Reference-to-video needs at least one image or video reference.'
+      'Reference-to-video needs at least one reference.'
     );
     expect(
       getVideoValidationReasons(
@@ -1609,9 +1610,7 @@ describe('reference mode policy', () => {
           ],
         })
       )
-    ).toContain(
-      'At least one reference must contribute visuals — add an image, or set a video reference to include video.'
-    );
+    ).toEqual([]);
     expect(getVideoValidationReasons(model, withRefTransformer({ references: [imageReference] }))).toEqual([]);
   });
 
@@ -1909,6 +1908,24 @@ const LTX2_ENCODER = {
 };
 
 describe('LTX-2 policy', () => {
+  it('runs a GGUF build exactly like the single-file checkpoint, components from the folder', () => {
+    const checkpoint = ltx2('ltx2_distilled');
+    const gguf = ltx2('ltx2_distilled', { format: 'gguf_quantized', key: 'ltx2-distilled-gguf' });
+    const missingComponents = { ltx2TextEncoderModel: LTX2_ENCODER };
+    const complete = { componentSourceModel: LTX2_COMPONENTS, ltx2TextEncoderModel: LTX2_ENCODER };
+
+    expect(isSupportedVideoModel(gguf)).toBe(true);
+    expect(isVideoModelSelectable(gguf)).toBe(true);
+    expect(getDefaultVideoSettings(gguf, [LTX2_COMPONENTS, LTX2_ENCODER]).componentSourceModel?.key).toBe(
+      LTX2_COMPONENTS.key
+    );
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, missingComponents))).toEqual(
+      getVideoValidationReasons(checkpoint, settingsFor(checkpoint, missingComponents))
+    );
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, missingComponents))).not.toEqual([]);
+    expect(getVideoValidationReasons(gguf, settingsFor(gguf, complete))).toEqual([]);
+  });
+
   it('offers every conditioning shape on both checkpoints', () => {
     const modes = ['txt2vid', 'first-frame', 'last-frame', 'first-last', 'extend', 'audio-to-video', 'video-to-audio'];
 
@@ -2562,11 +2579,14 @@ describe('auto duration', () => {
     }
   );
 
-  it('has none for a continuation: its length is the new material the user asked for', () => {
+  it('sizes a continuation at the source rate, with the context counted against the ceiling', () => {
     const extending = settings({
+      fps: 24,
+      ltx2ExtendContextFrames: 25,
+      numFrames: 121,
       sourceVideo: {
         endFrame: 48,
-        fps: 24,
+        fps: 30,
         height: 704,
         numFrames: 49,
         startFrame: 0,
@@ -2575,8 +2595,38 @@ describe('auto duration', () => {
       },
     } as Partial<VideoSettings>);
 
-    expect(isAutoDurationSupportedForMode(extending)).toBe(false);
-    expect(isAutoDurationActive(extending)).toBe(false);
+    expect(isAutoDurationSupportedForMode(extending)).toBe(true);
+    // 25 held frames leave 121 - 24 = 97 for the prediction, at 30 fps; the total is back at 121.
+    expect(getAutoDurationBounds(ltx2('ltx2_dev'), extending)).toEqual({
+      contextFrames: 25,
+      fps: 30,
+      maxFrames: 121,
+      maxNewFrames: 96,
+      maxSeconds: 97 / 30,
+      minSeconds: 1,
+    });
+  });
+
+  it('holds a continuation inside the trained range of the head, below the Frames ceiling', () => {
+    const extending = settings({
+      ltx2ExtendContextFrames: 17,
+      numFrames: 481,
+      sourceVideo: {
+        endFrame: 48,
+        fps: 20,
+        height: 704,
+        numFrames: 49,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      },
+    } as Partial<VideoSettings>);
+    const bounds = getAutoDurationBounds(ltx2('ltx2_dev'), extending);
+
+    // 465 frames of room is 23 s at 20 fps; the head stops at 20 s, i.e. 393 frames on the grid.
+    expect(bounds?.maxSeconds).toBe(20);
+    expect(bounds?.maxNewFrames).toBe(392);
+    expect(bounds?.maxFrames).toBe(17 + 392);
   });
 
   it('is inactive without a head, however the flag is stored', () => {

@@ -191,7 +191,7 @@ class Config_Base(ABC, BaseModel):
             # Special case: CLIP Embed models also need the variant to distinguish them.
             if (
                 type_ == ModelType.CLIPEmbed.value
-                and format_ == ModelFormat.Diffusers.value
+                and format_ in (ModelFormat.Diffusers.value, ModelFormat.Checkpoint.value)
                 and base_ == BaseModelType.Any.value
             ):
                 if variant_ := v.get("variant"):

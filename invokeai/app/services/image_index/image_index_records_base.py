@@ -17,11 +17,8 @@ class ImageIndexRecordsBase(ABC):
     embedding is deleted with its media by foreign key and eligibility and
     board access are answered from that kind's own tables.
 
-    Every method here is its own unit of work and must not be called from inside another
-    service's open transaction. `SqliteDatabase.transaction()` commits and rolls back the whole
-    shared connection rather than using savepoints, so a nested call either commits the outer
-    transaction's work early (on success) or discards it (on failure). No caller in the tree
-    nests these today; keep it that way.
+    Every method here runs in a transaction of its own, so none can be called inside another
+    transaction.
     """
 
     @abstractmethod
@@ -96,7 +93,7 @@ class ImageIndexRecordsBase(ABC):
 
         A user can access their own unboarded items, items on boards they own, items on
         shared or public boards, and items on boards individually shared with them
-        (shared_boards). Pass user_id=None for the admin scope.
+        (board members). Pass user_id=None for the admin scope.
 
         Items on an archived board are excluded from every scope, including the admin one,
         matching the gallery's "all" listing. So the admin scope is every embedded item that

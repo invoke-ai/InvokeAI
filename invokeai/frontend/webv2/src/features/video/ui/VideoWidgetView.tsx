@@ -153,14 +153,14 @@ export const VideoWidgetView = () => {
     () =>
       autoDurationBounds
         ? {
-            // The head converts seconds at the run's rate and floors onto the grid, the same as here.
-            frames: snapLtx2FramesDown(Math.round(autoDurationBounds.maxSeconds * timing.fps)),
-            seconds: autoDurationBounds.maxSeconds,
+            frames: autoDurationBounds.maxFrames,
+            seconds: autoDurationBounds.maxFrames / autoDurationBounds.fps,
           }
         : null,
-    [autoDurationBounds, timing.fps]
+    [autoDurationBounds]
   );
   const autoDurationSupported = useMemo(() => isAutoDurationSupportedForMode(values), [values]);
+  const extendNewFrames = autoDurationBounds?.maxNewFrames ?? policy.ui.extendContext?.newFrames ?? 0;
   const durationSeconds = getVideoDurationSeconds(
     timing.numFrames,
     // In extend mode the extension inherits the SOURCE clip's frame rate.
@@ -616,10 +616,15 @@ export const VideoWidgetView = () => {
                 defaultValue={LTX2_EXTEND_CONTEXT_FRAMES}
                 // The trade this control makes, which Frames alone does not show: the join consumes
                 // the context from both halves, so every frame held is a frame of new video given up.
-                helpText={t('widgets.video.extendContextHelp', {
-                  frames: policy.ui.extendContext.newFrames,
-                  seconds: (policy.ui.extendContext.newFrames / Math.max(1, values.fps)).toFixed(1),
-                })}
+                // Under auto duration Frames is only a ceiling, so the new material is too.
+                helpText={t(
+                  autoDurationBounds ? 'widgets.video.extendContextHelpAuto' : 'widgets.video.extendContextHelp',
+                  {
+                    frames: extendNewFrames,
+                    // The continuation plays at the source's rate, not the panel's.
+                    seconds: (extendNewFrames / Math.max(1, values.sourceVideo?.fps ?? values.fps)).toFixed(1),
+                  }
+                )}
                 inputMax={policy.ui.extendContext.max}
                 label={t('widgets.video.extendContext')}
                 max={policy.ui.extendContext.max}

@@ -1,7 +1,10 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryUiAdapter } from '@features/gallery/react';
 
+import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, createRef, type Ref, type ReactNode, useCallback, useImperativeHandle, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -12,10 +15,17 @@ import type { GalleryActions } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
 
 const mocks = vi.hoisted(() => ({
+  createGalleryBoard: vi.fn(),
   deleteGalleryBoard: vi.fn(),
+  ensureProjectOnServer: vi.fn(async () => {}),
   downloadBlob: vi.fn(),
   downloadGalleryArchive: vi.fn(),
+  // The ensured listing's answer per board; the panel's `boards` fixture names only board-1 and shared-viewer.
+  canAddToCachedGalleryBoard: vi.fn((boardId: string) => boardId === 'board-1'),
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
+  getCachedGalleryBoard: vi.fn((_boardId: string): unknown => undefined),
   invalidateGallery: vi.fn(),
+  invalidateGalleryBoardDestinations: vi.fn(),
   notificationsAdd: vi.fn(),
   notificationsReportError: vi.fn(),
   patchGalleryBoardCaches: vi.fn((..._args: unknown[]) => vi.fn()),
@@ -25,10 +35,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@features/gallery/data/backend', () => ({
-  createGalleryBoard: vi.fn(),
+  createGalleryBoard: (...args: unknown[]) => mocks.createGalleryBoard(...args),
   deleteGalleryBoard: (...args: unknown[]) => mocks.deleteGalleryBoard(...args),
   downloadGalleryArchive: (...args: unknown[]) => mocks.downloadGalleryArchive(...args),
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
+  isInvalidGalleryBoardDestination: (boardId: string) => boardId.startsWith('by_date:'),
   updateGalleryBoard: (...args: unknown[]) => mocks.updateGalleryBoard(...args),
   uploadGalleryImage: (...args: unknown[]) => mocks.uploadGalleryImage(...args),
   uploadGalleryVideo: (...args: unknown[]) => mocks.uploadGalleryVideo(...args),
@@ -72,7 +83,12 @@ vi.mock('react-i18next', () => ({
 }));
 
 vi.mock('@features/gallery/data/queryCache', () => ({
+  addGalleryBoardToCaches: vi.fn(),
+  canAddToCachedGalleryBoard: (boardId: string) => mocks.canAddToCachedGalleryBoard(boardId),
+  ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
+  getCachedGalleryBoard: (boardId: string) => mocks.getCachedGalleryBoard(boardId),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
+  invalidateGalleryBoardDestinations: (...args: unknown[]) => mocks.invalidateGalleryBoardDestinations(...args),
   patchGalleryBoardCaches: (...args: unknown[]) => mocks.patchGalleryBoardCaches(...args),
 }));
 
@@ -85,6 +101,7 @@ let root: Root | null = null;
 const actionsRef = createRef<GalleryActions>();
 const reconcileDeletedBoardOutcome = vi.fn();
 const selectBoard = vi.fn();
+const updateSettings = vi.fn();
 const selectItem = vi.fn();
 const setItemMultiSelection = vi.fn();
 const patchGalleryValues = vi.fn();
@@ -99,11 +116,12 @@ const Probe = ({
   ref: Ref<GalleryActions>;
   selectedBoardId: string;
 }) => {
-  const currentGalleryLocationRef = useRef({ galleryView, selectedBoardId });
+  const { autoAddBoardId } = getGallerySettings(galleryValues);
+  const currentGalleryLocationRef = useRef({ autoAddBoardId, galleryView, selectedBoardId });
 
   // Match GalleryWidgetView's render-assigned live-read port.
   // eslint-disable-next-line react/refs
-  currentGalleryLocationRef.current = { galleryView, selectedBoardId };
+  currentGalleryLocationRef.current = { autoAddBoardId, galleryView, selectedBoardId };
   const getCurrentGalleryLocation = useCallback(() => currentGalleryLocationRef.current, []);
   const actions = useGalleryActions({
     boards: [
@@ -115,8 +133,23 @@ const Probe = ({
         imageCount: 2,
         kind: 'board',
         name: 'Board 1',
+        isInbox: false,
         projectId: null,
         videoCount: 1,
+      },
+      {
+        access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+        archived: false,
+        assetCount: 0,
+        assetVideoCount: 0,
+        id: 'shared-viewer',
+        imageCount: 0,
+        isInbox: false,
+        kind: 'board',
+        name: 'Client references',
+        ownerName: 'Cleo',
+        projectId: null,
+        videoCount: 0,
       },
       {
         archived: false,
@@ -126,6 +159,7 @@ const Probe = ({
         imageCount: 0,
         kind: 'uncategorized',
         name: '',
+        isInbox: false,
         projectId: null,
         videoCount: 0,
       },
@@ -167,7 +201,7 @@ const adapter: GalleryUiAdapter = {
     clearSearch: noop,
     setView: noop,
     toggleItemSelection: noop,
-    updateSettings: noop,
+    updateSettings,
   },
   galleryValues: {},
   generateValues: {},
@@ -183,17 +217,37 @@ const adapter: GalleryUiAdapter = {
   },
   projectId: 'project-1',
   projectName: 'Project',
+  projects: [],
+  ensureProjectOnServer: () => mocks.ensureProjectOnServer(),
   widgets: { openGallery: () => true, patchGalleryValues },
+};
+
+/** The shared board as the ensured listing describes it once the caller may only view it. */
+const VIEW_ONLY_SHARED_BOARD = {
+  access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'shared-viewer',
+  imageCount: 0,
+  isInbox: false,
+  kind: 'board',
+  name: 'Client references',
+  ownerName: 'Cleo',
+  projectId: null,
+  videoCount: 0,
 };
 
 let selectedBoardId = 'board-1';
 let galleryView: 'images' | 'assets' = 'images';
 
+let galleryValues: Record<string, unknown> = {};
+
 const renderProbe = async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
-        <GalleryUiProvider adapter={adapter}>
+        <GalleryUiProvider adapter={{ ...adapter, galleryValues }}>
           <Probe galleryView={galleryView} ref={actionsRef} selectedBoardId={selectedBoardId} />
         </GalleryUiProvider>
       </QueryClientProvider>
@@ -203,9 +257,13 @@ const renderProbe = async () => {
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.canAddToCachedGalleryBoard.mockImplementation((boardId: string) => boardId === 'board-1');
+  mocks.ensureGalleryBoardDestinations.mockReturnValue(null);
+  mocks.getCachedGalleryBoard.mockReturnValue(undefined);
   accountLifecycle.activate('user-a');
   selectedBoardId = 'board-1';
   galleryView = 'images';
+  galleryValues = {};
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -285,6 +343,139 @@ describe('optimistic board updates', () => {
     expect(mocks.invalidateGallery).not.toHaveBeenCalled();
   });
 
+  it('moves before the request and rolls back when the backend rejects', async () => {
+    mocks.updateGalleryBoard.mockRejectedValue(new Error('move failed'));
+
+    await act(async () => {
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', { projectId: null });
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledWith('board-1', { projectId: null }, expect.anything());
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+    expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+    expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+  });
+
+  it('makes the project exist on the server before creating or moving a board into it, never for the Library', async () => {
+    mocks.createGalleryBoard.mockResolvedValue({ id: 'new', name: 'New' });
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+    // Each ensure is held until the test lets it finish, so a request sent without waiting for it shows.
+    let finishEnsure: () => void = () => undefined;
+    const holdNextEnsure = () =>
+      mocks.ensureProjectOnServer.mockImplementationOnce(
+        () =>
+          new Promise<void>((resolve) => {
+            finishEnsure = resolve;
+          })
+      );
+
+    await act(async () => {
+      await actionsRef.current?.createBoard('New', null);
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+    expect(mocks.ensureProjectOnServer).not.toHaveBeenCalled();
+
+    let create!: Promise<boolean | undefined>;
+    holdNextEnsure();
+    await act(() => {
+      create = actionsRef.current!.createBoard('New', 'p1');
+    });
+    expect(mocks.ensureProjectOnServer).toHaveBeenCalledOnce();
+    expect(mocks.createGalleryBoard).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishEnsure();
+      await expect(create).resolves.toBe(true);
+    });
+    expect(mocks.createGalleryBoard).toHaveBeenLastCalledWith('New', 'p1', expect.anything());
+
+    let move!: Promise<void>;
+    holdNextEnsure();
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'p1', 'Project');
+    });
+    expect(mocks.ensureProjectOnServer).toHaveBeenCalledTimes(2);
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledOnce();
+    await act(async () => {
+      finishEnsure();
+      await move;
+    });
+    expect(mocks.updateGalleryBoard).toHaveBeenLastCalledWith('board-1', { projectId: 'p1' }, expect.anything());
+  });
+
+  it('steps the selection and auto-add off a board moved into a project the panel hides, and back on failure', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let move!: Promise<void>;
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'other-project', 'Other');
+    });
+
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+
+    // Reflect both optimistic steps in the live gallery the failure path reads.
+    selectedBoardId = 'none';
+    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    await renderProbe();
+    rejectUpdate(new Error('move failed'));
+    await act(() => move);
+
+    expect(selectBoard).toHaveBeenLastCalledWith('board-1');
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' });
+  });
+
+  it('leaves choices the user made while a failing move was in flight', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+
+    let move!: Promise<void>;
+    await act(() => {
+      move = actionsRef.current!.moveBoard('board-1', 'other-project', 'Other');
+    });
+
+    // Another board selected, and another made the auto-add target, before the failure arrived.
+    selectedBoardId = 'board-2';
+    galleryValues = { autoAddBoardId: 'board-3' };
+    await renderProbe();
+    rejectUpdate(new Error('move failed'));
+    await act(() => move);
+
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+  });
+
+  it('keeps the selection and auto-add on a board that stays in sight', async () => {
+    mocks.updateGalleryBoard.mockResolvedValue(undefined);
+
+    for (const [values, destination] of [
+      [{ autoAddBoardId: 'board-1' }, 'project-1'],
+      [{ autoAddBoardId: 'board-1', showOtherProjectBoards: true }, 'other-project'],
+    ] as const) {
+      galleryValues = values;
+      await renderProbe();
+      await act(async () => {
+        await actionsRef.current?.moveBoard('board-1', destination, 'Somewhere');
+      });
+    }
+
+    expect(selectBoard).not.toHaveBeenCalled();
+    expect(updateSettings).not.toHaveBeenCalled();
+  });
+
   it('keeps a successful rename applied without rolling back', async () => {
     mocks.updateGalleryBoard.mockResolvedValue(undefined);
 
@@ -356,6 +547,147 @@ describe('optimistic board updates', () => {
 
     expect(selectBoard).toHaveBeenCalledOnce();
     expect(selectBoard).toHaveBeenCalledWith('none');
+  });
+});
+
+describe('board access', () => {
+  it('sets who can open a board at once, names the setting, and refetches', async () => {
+    mocks.updateGalleryBoard.mockResolvedValueOnce({});
+
+    await act(async () => {
+      await actionsRef.current?.setBoardGeneralAccess('board-1', 'viewer');
+    });
+
+    expect(mocks.patchGalleryBoardCaches).toHaveBeenCalledWith(expect.anything(), 'board-1', {
+      generalAccess: 'viewer',
+    });
+    expect(mocks.updateGalleryBoard).toHaveBeenCalledWith('board-1', { generalAccess: 'viewer' }, expect.anything());
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'success',
+      message: 'Board 1',
+      title: 'widgets.gallery.boardAccess.changed',
+    });
+    expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    // The role no longer allows the action; the board still exists and is readable.
+    [
+      'board-1',
+      403,
+      { code: 'board_action_denied', message: 'Not authorized to change this board' },
+      'widgets.gallery.boardAccess.stale',
+      'Board 1',
+    ],
+    // The board exists but stopped being readable: an owner restricted it, or a membership was revoked.
+    [
+      'shared-viewer',
+      403,
+      { code: 'board_unreadable', message: 'Not authorized to access this board' },
+      'widgets.gallery.boardAccess.lost',
+      'Client references',
+    ],
+    // Only a board that is gone answers 404.
+    ['board-1', 404, 'Board not found', 'widgets.gallery.boardAccess.gone', 'Board 1'],
+  ])(
+    'rolls back a refusal of %s answered %i %o, says why, and refetches',
+    async (boardId, status, detail, title, name) => {
+      mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail }), status));
+
+      await act(async () => {
+        await actionsRef.current?.renameBoard(boardId, 'Renamed');
+      });
+
+      expect(mocks.patchGalleryBoardCaches.mock.results[0]?.value).toHaveBeenCalledOnce();
+      expect(mocks.notificationsAdd).toHaveBeenCalledWith({ kind: 'info', message: name, title });
+      expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+      expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+    }
+  );
+
+  it.each([
+    [
+      'set who can open',
+      mocks.updateGalleryBoard,
+      () => actionsRef.current?.setBoardGeneralAccess('board-1', 'viewer'),
+    ],
+    ['archive', mocks.updateGalleryBoard, () => actionsRef.current?.archiveBoard('board-1', true)],
+    ['delete', mocks.deleteGalleryBoard, () => actionsRef.current?.deleteBoard('board-1', false)],
+    ['download', mocks.downloadGalleryArchive, () => actionsRef.current?.downloadBoard('board-1')],
+  ])('treats a refused attempt to %s the board as changed access', async (_action, request, run) => {
+    request.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Not allowed' }), 403));
+
+    await act(async () => {
+      await run();
+    });
+
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.boardAccess.stale' })
+    );
+    expect(mocks.notificationsReportError).not.toHaveBeenCalled();
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+
+  it('reports a move to a project that is gone as the server says, not as lost access', async () => {
+    mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Project not found' }), 404));
+
+    await act(async () => {
+      await actionsRef.current?.moveBoard('board-1', null, 'Library');
+    });
+
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'Project not found' })
+    );
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // Either the board or its destination is gone: the listing is refetched all the same.
+    expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
+  });
+});
+
+describe('archiving the auto-add board', () => {
+  const archiveFailingLater = async () => {
+    let rejectUpdate: (error: Error) => void = () => undefined;
+    mocks.updateGalleryBoard.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectUpdate = reject;
+      })
+    );
+    let archive!: Promise<void>;
+    await act(() => {
+      archive = actionsRef.current!.archiveBoard('board-1', true);
+    });
+
+    return { archive, reject: () => rejectUpdate(new Error('archive failed')) };
+  };
+
+  it('stops auto-adding there, and pins it again if the archive is refused', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
+
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+
+    // Reflect the optimistic step in the live gallery the failure path reads.
+    galleryValues = { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'board-1' });
+  });
+
+  it('leaves an auto-add board the user chose while the refused archive was in flight', async () => {
+    galleryValues = { autoAddBoardId: 'board-1' };
+    await renderProbe();
+    const { archive, reject } = await archiveFailingLater();
+
+    galleryValues = { autoAddBoardId: 'board-3' };
+    await renderProbe();
+    reject();
+    await act(() => archive);
+
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
   });
 });
 
@@ -472,6 +804,83 @@ describe('mixed gallery upload', () => {
       message: 'Uploads are unavailable for date boards.',
       namespace: 'gallery',
     });
+  });
+
+  it('refuses an upload to a board the caller may only view before starting any request', async () => {
+    selectedBoardId = 'shared-viewer';
+    mocks.getCachedGalleryBoard.mockReturnValue(VIEW_ONLY_SHARED_BOARD);
+    await renderProbe();
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledExactlyOnceWith({
+      area: 'gallery-upload',
+      message: 'widgets.gallery.uploadsUnavailableForViewOnlyBoard',
+      namespace: 'gallery',
+    });
+    expect(mocks.invalidateGalleryBoardDestinations).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    // The panel still lists board-1 with add_media; the ensured listing holds it as view-only: the role changed.
+    ['board-1', 'widgets.gallery.uploadsUnavailableForViewOnlyBoard', { ...VIEW_ONLY_SHARED_BOARD, id: 'board-1' }],
+    // Listed by the panel with add_media; the ensured listing no longer holds it: deleted or revoked since.
+    ['board-1', 'widgets.gallery.uploadsUnavailableForBoard', undefined],
+    // Nothing on screen names it.
+    ['gone', 'widgets.gallery.uploadsUnavailableForUnlistedBoard', undefined],
+  ])(
+    'refuses an upload to %s as the ensured listing says (%s), and reads the listing again',
+    async (boardId, message, cachedBoard) => {
+      selectedBoardId = boardId;
+      mocks.getCachedGalleryBoard.mockReturnValue(cachedBoard);
+      await renderProbe();
+      let settleListing!: () => void;
+      mocks.ensureGalleryBoardDestinations.mockReturnValue(
+        new Promise<void>((resolve) => {
+          settleListing = resolve;
+        })
+      );
+      mocks.canAddToCachedGalleryBoard.mockReturnValue(false);
+
+      let upload: Promise<unknown> | undefined;
+      await act(() => {
+        upload = actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+      });
+
+      // Judged only once the listing is in.
+      expect(mocks.ensureGalleryBoardDestinations).toHaveBeenCalledOnce();
+      expect(mocks.canAddToCachedGalleryBoard).not.toHaveBeenCalled();
+      await act(async () => {
+        settleListing();
+        await upload;
+      });
+
+      expect(mocks.canAddToCachedGalleryBoard).toHaveBeenCalledWith(boardId);
+      expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+      expect(mocks.notificationsReportError).toHaveBeenCalledExactlyOnceWith({
+        area: 'gallery-upload',
+        message,
+        namespace: 'gallery',
+      });
+      expect(mocks.invalidateGalleryBoardDestinations).toHaveBeenCalledOnce();
+      expect(mocks.invalidateGallery).not.toHaveBeenCalled();
+    }
+  );
+
+  it('sends an upload to Uncategorized without ensuring any listing', async () => {
+    selectedBoardId = 'none';
+    await renderProbe();
+    mocks.uploadGalleryImage.mockResolvedValue(imageUpload('photo.png', '2026-07-30T00:00:00Z'));
+
+    await act(async () => {
+      await actionsRef.current?.uploadFiles([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(mocks.ensureGalleryBoardDestinations).not.toHaveBeenCalled();
+    expect(mocks.uploadGalleryImage).toHaveBeenCalledWith(expect.any(File), 'none', expect.anything());
   });
 
   it('retains concurrent image uploads while running videos sequentially and continuing after failure', async () => {
@@ -694,5 +1103,27 @@ describe('setSemanticImageQuery', () => {
       semanticImageQuery: null,
       semanticSearchText: null,
     });
+  });
+});
+
+describe('search scope', () => {
+  it('starts a newly scoped listing from its first page', () => {
+    actionsRef.current?.setSearchScope('all');
+
+    expect(patchGalleryValues).toHaveBeenCalledExactlyOnceWith({ galleryPage: 0, searchScope: 'all' });
+  });
+
+  it('refuses uploads while a search looks in every board, before any request', async () => {
+    galleryValues = { searchScope: 'all', searchTerm: 'cat' };
+    await renderProbe();
+
+    const uploaded = await actionsRef.current?.uploadFiles([new File(['x'], 'a.png', { type: 'image/png' })]);
+
+    expect(uploaded).toEqual([]);
+    expect(mocks.ensureGalleryBoardDestinations).not.toHaveBeenCalled();
+    expect(mocks.uploadGalleryImage).not.toHaveBeenCalled();
+    expect(mocks.notificationsReportError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: 'widgets.gallery.uploadsUnavailableForAllBoards' })
+    );
   });
 });

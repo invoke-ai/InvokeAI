@@ -1,31 +1,27 @@
 """Guards the batch bound on the queue summary route.
 
-`item_summaries_by_ids` takes a client-supplied list of ids and the SQLite layer binds one
-parameter per id. Unbounded, a client could post tens of thousands of ids: past SQLite's
-per-statement variable limit the query raises `OperationalError`, which the route reports as a
-generic HTTP 500, and even below that limit it is an invitation to make the server do arbitrary
-work per request. The route caps the list so oversized requests are rejected by validation
-instead.
+`item_summaries_by_ids` takes a client-supplied list of ids. Unbounded, a client could post tens
+of thousands of ids and make the server do arbitrary work per request. The route caps the list so
+oversized requests are rejected by validation instead.
 
 The id listing the client hydrates from takes an optional limit with the same bound. A limited listing
 returns the head of the full order and counts only the ids it returns: counting every match would read
 the queue's whole history, which is what the limit exists to avoid.
 """
 
-import json
 import uuid
-from typing import cast
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
-from pydantic_core import to_jsonable_python
+from sqlalchemy import insert
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.session_queue import MAX_QUEUE_ITEM_IDS_PER_REQUEST
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.schema.session_queue import session_queue as session_queue_table
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 
 SUMMARIES_ROUTE = "/api/v1/queue/default/item_summaries_by_ids"
@@ -86,21 +82,22 @@ def test_full_items_by_ids_rejects_oversized_id_lists(mock_queue_invoker: MagicM
 @pytest.fixture
 def listed_queue(monkeypatch: pytest.MonkeyPatch, mock_invoker: Invoker) -> list[int]:
     """A real queue of five items in two projects, the ids in insertion (and creation) order."""
-    session_queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
-    mock_invoker.services.session_queue = session_queue
+    database = mock_invoker.services.database
+    mock_invoker.services.session_queue = SessionQueue(database)
     monkeypatch.setattr(ApiDependencies, "invoker", mock_invoker, raising=False)
-    session = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
+    session = GraphExecutionState(graph=Graph()).model_dump_json()
     item_ids = []
     for index, origin in enumerate(["webv2:p:a:q:1", "webv2:p:b:q:2", "webv2:p:a:q:3", "webv2:p:a:q:4", "x"]):
-        with session_queue._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                INSERT INTO session_queue (queue_id, session, session_id, batch_id, created_at, origin)
-                VALUES ('default', ?, ?, 'batch', ?, ?);
-                """,
-                (session, str(uuid.uuid4()), f"2026-10-01 10:00:0{index}.000", origin),
-            )
-            item_ids.append(cast(int, cursor.lastrowid))
+        values = {
+            "queue_id": "default",
+            "session": session,
+            "session_id": str(uuid.uuid4()),
+            "batch_id": "batch",
+            "created_at": f"2026-10-01 10:00:0{index}.000",
+            "origin": origin,
+        }
+        with database.begin(write=True) as conn:
+            item_ids.append(int(conn.execute(insert(session_queue_table).values(values)).inserted_primary_key[0]))
     return item_ids
 
 

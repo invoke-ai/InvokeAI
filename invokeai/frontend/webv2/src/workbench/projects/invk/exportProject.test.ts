@@ -9,7 +9,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
 import { executeInvkExport, planInvkExport } from './exportProject';
-import { INVK_DOCUMENT_ENTRY, INVK_MANIFEST_ENTRY } from './format';
+import { INVK_DOCUMENT_ENTRY, INVK_MANIFEST_ENTRY, INVK_WORKSPACE_ENTRY } from './format';
 
 const imageRef = (imageName: string) => ({ height: 64, imageName, width: 64 });
 
@@ -37,11 +37,13 @@ const projectDocument = (): Record<string, unknown> => ({
 
 const planInput = {
   appVersion: '7.0',
-  boardItems: [],
+  boards: [{ archived: false, isInbox: true, items: [], name: 'My project' }],
   createdAt: '2026-08-04T00:00:00.000Z',
   minimumCanvasSchemaVersion: 3,
+  content: projectDocument(),
+  documentSchemaVersion: 4,
   name: 'My project',
-  projectDocument: projectDocument(),
+  workspace: null,
 };
 
 /** The names a plan will fetch, in the union's stable order. */
@@ -68,7 +70,7 @@ describe('planInvkExport', () => {
   it('writes a document carrying no gallery selection', () => {
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         widgetInstances: {
           'gallery-1': {
@@ -85,8 +87,29 @@ describe('planInvkExport', () => {
     expect(plannedNames(plan)).toEqual(['live-a.png', 'live-b.png']);
   });
 
+  it('carries the workspace, and the media only it names, only when it is included', () => {
+    const workspace = {
+      canvas: { selectedLayerId: null, stagingArea: { images: [imageRef('staged.png')] } },
+      layout: {},
+      widgetInstances: {
+        'gallery-1': { state: { values: { recentImages: [imageRef('recent.png')] } }, typeId: 'gallery' },
+      },
+    };
+
+    const included = planInvkExport({ ...planInput, workspace });
+    const left = planInvkExport(planInput);
+
+    expect(plannedNames(included)).toEqual(['live-a.png', 'live-b.png', 'staged.png']);
+    expect(JSON.parse(included.workspaceJson!)).toMatchObject({ canvas: workspace.canvas });
+    // The newest result is the workspace's to show; without it the cover is the canvas's.
+    expect(included.coverImageName).toBe('recent.png');
+    expect(plannedNames(left)).toEqual(['live-a.png', 'live-b.png']);
+    expect(left.workspaceJson).toBeNull();
+    expect(left.coverImageName).toBe('live-a.png');
+  });
+
   it('omits the source project id when the document has none', () => {
-    const plan = planInvkExport({ ...planInput, projectDocument: { canvas: {}, layout: {}, name: 'x' } });
+    const plan = planInvkExport({ ...planInput, content: { canvas: {}, layout: {}, name: 'x' } });
 
     expect(plan.manifestInput.sourceProjectId).toBeUndefined();
     expect(plannedNames(plan)).toEqual([]);
@@ -110,6 +133,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 0,
@@ -135,9 +159,10 @@ describe('executeInvkExport', () => {
       contents: 'workbench-project',
       cover: 'cover.webp',
       name: 'My project',
+      documentSchemaVersion: 4,
       minimumCanvasSchemaVersion: 3,
       sourceProjectId: 'project-1',
-      version: 2,
+      version: 3,
     });
     expect(JSON.parse(readEntryText(entries.get(INVK_DOCUMENT_ENTRY)!))).toEqual(projectDocument());
   });
@@ -151,6 +176,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 1,
       bundledVideoCount: 0,
@@ -174,10 +200,26 @@ describe('executeInvkExport', () => {
     expect(result.boardItemIssues).toEqual([]);
   });
 
+  it('writes the workspace beside the content when it is included', async () => {
+    const download = vi.fn();
+    const workspace = { canvas: { selectedLayerId: null }, layout: { mode: 'kept' } };
+
+    await executeInvkExport(planInvkExport({ ...planInput, workspace }), {
+      download,
+      fetchImageBytes: () => Promise.resolve(null),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
+
+    expect(JSON.parse(readEntryText(entries.get(INVK_WORKSPACE_ENTRY)!))).toEqual(workspace);
+  });
+
   it('omits the cover entry when there is no cover to fetch', async () => {
     const download = vi.fn();
 
-    await executeInvkExport(planInvkExport({ ...planInput, projectDocument: { id: 'p', layout: {}, name: 'n' } }), {
+    await executeInvkExport(planInvkExport({ ...planInput, content: { id: 'p', layout: {}, name: 'n' } }), {
       download,
       fetchImageBytes: () => Promise.resolve(null),
       fetchImageThumbnail: () => Promise.resolve(null),
@@ -195,7 +237,7 @@ describe('executeInvkExport', () => {
     const download = vi.fn();
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
       },
@@ -211,6 +253,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 1,
@@ -233,7 +276,7 @@ describe('executeInvkExport', () => {
   it('skips a video the server will not serve, exactly as it skips an image', async () => {
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
       },
@@ -247,6 +290,7 @@ describe('executeInvkExport', () => {
     });
 
     expect(result).toEqual({
+      boardIssues: [],
       boardItemIssues: [],
       bundledImageCount: 2,
       bundledVideoCount: 0,
@@ -414,13 +458,14 @@ describe('board membership', () => {
 
     return JSON.parse(readEntryText(entries.get('board.json')!));
   };
+  const withInbox = (items: ReturnType<typeof boardItem>[]) => ({
+    ...planInput,
+    boards: [{ archived: false, isInbox: true, items, name: 'My project' }],
+  });
 
   it('carries board media the document never references', async () => {
     const download = vi.fn();
-    const plan = planInvkExport({
-      ...planInput,
-      boardItems: [boardItem('unreferenced.png', { category: 'user', starred: true })],
-    });
+    const plan = planInvkExport(withInbox([boardItem('unreferenced.png', { category: 'user', starred: true })]));
 
     expect(plan.transferItems.map((item) => item.name)).toEqual(['live-a.png', 'live-b.png', 'unreferenced.png']);
 
@@ -438,15 +483,54 @@ describe('board membership', () => {
     expect(entries.has('images/unreferenced.png')).toBe(true);
     // Category and starring travel: they are what the item was, not merely that it existed.
     expect(await readBoard(blob)).toEqual({
-      items: [{ category: 'user', kind: 'image', name: 'unreferenced.png', starred: true }],
-      version: 1,
+      boards: [
+        {
+          archived: false,
+          isInbox: true,
+          items: [{ category: 'user', kind: 'image', name: 'unreferenced.png', starred: true }],
+          name: 'My project',
+        },
+      ],
+      version: 2,
     });
+  });
+
+  it('carries every board of the project, each with its own media', async () => {
+    const download = vi.fn();
+    const plan = planInvkExport({
+      ...planInput,
+      boards: [
+        { archived: true, isInbox: false, items: [boardItem('old.png')], name: 'Old façades' },
+        { archived: false, isInbox: true, items: [boardItem('inbox.png')], name: 'My project' },
+      ],
+    });
+
+    // Items of every board are fetched once each; the inbox leads in the plan as in the file.
+    expect(plan.transferItems.map((item) => item.name)).toEqual(['inbox.png', 'live-a.png', 'live-b.png', 'old.png']);
+
+    await executeInvkExport(plan, {
+      download,
+      fetchImageBytes: (imageName) => Promise.resolve(bytesFor(imageName)),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+
+    expect(
+      (await readBoard(blob)).boards.map((board: { name: string; items: { name: string }[] }) => [
+        board.name,
+        board.items.map((item) => item.name),
+      ])
+    ).toEqual([
+      ['My project', ['inbox.png']],
+      ['Old façades', ['old.png']],
+    ]);
   });
 
   it('fetches an item that is both board media and a reference exactly once', async () => {
     const fetchImageBytes = vi.fn((imageName: string) => Promise.resolve(bytesFor(imageName)));
 
-    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+    await executeInvkExport(planInvkExport(withInbox([boardItem('live-a.png')])), {
       download: vi.fn(),
       fetchImageBytes,
       fetchImageThumbnail: () => Promise.resolve(null),
@@ -456,7 +540,7 @@ describe('board membership', () => {
   });
 
   it('reports an overlapping failure against both roles', async () => {
-    const result = await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('live-a.png')] }), {
+    const result = await executeInvkExport(planInvkExport(withInbox([boardItem('live-a.png')])), {
       download: vi.fn(),
       fetchImageBytes: (imageName) =>
         imageName === 'live-a.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
@@ -471,7 +555,7 @@ describe('board membership', () => {
   it('keeps the descriptor for an item whose bytes could not be fetched', async () => {
     const download = vi.fn();
 
-    await executeInvkExport(planInvkExport({ ...planInput, boardItems: [boardItem('gone.png')] }), {
+    await executeInvkExport(planInvkExport(withInbox([boardItem('gone.png')])), {
       download,
       fetchImageBytes: (imageName) =>
         imageName === 'gone.png' ? Promise.resolve(null) : Promise.resolve(bytesFor(imageName)),
@@ -481,7 +565,7 @@ describe('board membership', () => {
     const [blob] = download.mock.calls[0]! as [Blob];
     const board = await readBoard(blob);
 
-    expect(board.items.map((item: { name: string }) => item.name)).toEqual(['gone.png']);
+    expect(board.boards[0].items.map((item: { name: string }) => item.name)).toEqual(['gone.png']);
   });
 
   it('records an empty board rather than omitting the entry', async () => {
@@ -495,13 +579,29 @@ describe('board membership', () => {
 
     const [blob] = download.mock.calls[0]! as [Blob];
 
-    expect(await readBoard(blob)).toEqual({ items: [], version: 1 });
+    expect(await readBoard(blob)).toEqual({
+      boards: [{ archived: false, isInbox: true, items: [], name: 'My project' }],
+      version: 2,
+    });
   });
 
   /** Refused before a single round trip: discovering it after hundreds would be the wrong order. */
   it('refuses a project that could never be packed, before fetching anything', () => {
     const boardItems = Array.from({ length: 20_001 }, (_unused, index) => boardItem(`image-${index}.png`));
 
-    expect(() => planInvkExport({ ...planInput, boardItems })).toThrowError(/archive entries/u);
+    expect(() => planInvkExport(withInbox(boardItems))).toThrowError(/archive entries/u);
+  });
+
+  it('refuses a project with more boards than an archive may name, before fetching anything', () => {
+    const members = Array.from({ length: 1000 }, (_unused, index) => ({
+      archived: false,
+      isInbox: false,
+      items: [],
+      name: `Board ${String(index)}`,
+    }));
+
+    expect(() => planInvkExport({ ...withInbox([]), boards: [...withInbox([]).boards, ...members] })).toThrowError(
+      expect.objectContaining({ reason: 'too-large' })
+    );
   });
 });

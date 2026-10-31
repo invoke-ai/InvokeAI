@@ -14,7 +14,7 @@ import {
   SlidersHorizontalIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, type ChangeEvent, type KeyboardEvent, type Ref } from 'react';
+import { useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useMenuTriggerIds } from './galleryMenuIds';
@@ -24,13 +24,10 @@ const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="md" />;
 const SORT_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 export const GalleryBoardFilters = ({
-  ref,
   searchTerm,
   onSearchChange,
   onSubmitSearch,
 }: {
-  /** The panel focuses the field when "+" is pressed with nothing typed. */
-  ref?: Ref<HTMLInputElement>;
   searchTerm: string;
   onSearchChange: (searchTerm: string) => void;
   /** Enter on the field; the panel decides whether that means "create". */
@@ -102,7 +99,6 @@ export const GalleryBoardFilters = ({
     <HStack gap="1">
       <InputGroup endElement={clearSearchButton} flex="1" minW="0" startElement={SEARCH_START_ELEMENT}>
         <Input
-          ref={ref}
           aria-label={t('widgets.gallery.searchOrCreateBoards')}
           placeholder={t('widgets.gallery.searchOrCreateBoards')}
           value={searchTerm}

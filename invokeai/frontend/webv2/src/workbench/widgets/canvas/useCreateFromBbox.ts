@@ -16,6 +16,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
+import { describeAdjustmentRefusal } from './useStructuralCommit';
 
 type CreateFromBboxEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'layers' | 'lifecycle' | 'projectId'>;
 
@@ -82,6 +83,10 @@ export const useCreateFromBbox = (
           }
 
           const notice = getCreateFromBboxNotice(result);
+          if ('refusal' in notice) {
+            notify.error(t('widgets.canvas.contextMenu.createError'), describeAdjustmentRefusal(notice.refusal, t));
+            return;
+          }
           const options =
             notice.options && 'destination' in notice.options
               ? { destination: t(notice.options.destination) }

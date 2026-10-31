@@ -11,6 +11,7 @@ from diffusers.pipelines.pipeline_utils import DiffusionPipeline
 from diffusers.schedulers.scheduling_utils import SchedulerMixin
 from transformers import CLIPTokenizer, PreTrainedTokenizerBase, ProcessorMixin, T5Tokenizer
 
+from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
 from invokeai.backend.image_util.depth_anything.depth_anything_pipeline import DepthAnythingPipeline
 from invokeai.backend.image_util.grounding_dino.grounding_dino_pipeline import GroundingDinoPipeline
 from invokeai.backend.image_util.segment_anything.segment_anything_pipeline import SegmentAnythingPipeline
@@ -29,6 +30,9 @@ def calc_model_size_by_data(logger: logging.Logger, model: AnyModel) -> int:
     # the models themselves.
     if isinstance(model, DiffusionPipeline):
         return _calc_pipeline_by_data(model)
+    elif isinstance(model, AnimaIPAdapter):
+        # Its bundled LoRA is held outside the module, where `calc_module_size` does not see it.
+        return calc_module_size(model) + model.lora_patch().calc_size()
     elif isinstance(model, torch.nn.Module):
         return calc_module_size(model)
     elif isinstance(model, IAIOnnxRuntimeModel):

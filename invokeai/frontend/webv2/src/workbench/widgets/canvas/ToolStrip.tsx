@@ -10,21 +10,20 @@ import { Box } from '@chakra-ui/react';
 import { Toolbar, ToolbarButton } from '@platform/ui/Toolbar';
 import { GradientIcon } from '@platform/ui/VendoredIcon';
 import { useExtensionHotkeyDefinitions } from '@workbench/hotkeys/extensionHotkeys';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
   BrushIcon,
   CircleIcon,
   EraserIcon,
-  FrameIcon,
   HandIcon,
   LassoIcon,
   MousePointer2Icon,
   PenLineIcon,
   PentagonIcon,
   Rotate3dIcon,
-  SquareDashedIcon,
+  ScanIcon,
+  SquareDashedMousePointerIcon,
   SquareIcon,
   StarIcon,
   TriangleIcon,
@@ -120,17 +119,16 @@ const ShapeFamilyButton = ({
 };
 
 /**
- * A tool's first effective binding, remaps included, from the hotkeys the canvas widget registered; none outside a
+ * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
  * workbench or while unbound.
  */
-const toolShortcut = (
+const toolHotkeys = (
   definitions: readonly HotkeyDefinition[],
   customHotkeys: Record<string, string[]>,
   hotkeyId: string
 ): string[] | undefined => {
   const definition = definitions.find((hotkey) => hotkey.id === hotkeyId);
-  const key = definition ? applyCustomHotkeys(definition, customHotkeys).keys[0] : undefined;
-  return key ? formatHotkeyForPlatform(key) : undefined;
+  return definition ? applyCustomHotkeys(definition, customHotkeys).keys : undefined;
 };
 
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
@@ -156,16 +154,18 @@ const SelectFamilyButton = ({
   const items: ToolFlyoutItem[] = useMemo(
     () => [
       {
-        icon: SquareDashedIcon,
+        description: t('widgets.canvas.tools.marqueeHelp'),
+        icon: SquareDashedMousePointerIcon,
         id: 'marquee',
         label: t('widgets.canvas.tools.marquee'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
       },
       {
+        description: t('widgets.canvas.tools.lassoHelp'),
         icon: LassoIcon,
         id: 'lasso',
         label: t('widgets.canvas.tools.lasso'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
       },
     ],
     [customHotkeys, hotkeyDefinitions, t]
@@ -182,7 +182,7 @@ const SelectFamilyButton = ({
     <ToolFamilyButton
       currentId={current}
       disabled={!isCanvasToolEnabled(current, isInteractionLocked)}
-      icon={current === 'lasso' ? LassoIcon : SquareDashedIcon}
+      icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
       isActive={activeTool === 'marquee' || activeTool === 'lasso'}
       items={items}
       label={t(current === 'lasso' ? 'widgets.canvas.tools.lasso' : 'widgets.canvas.tools.marquee')}
@@ -235,7 +235,7 @@ const ToolStripRoot = ({
         />
         <ToolStripButton
           engine={engine}
-          icon={FrameIcon}
+          icon={ScanIcon}
           isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.bbox')}
           toolId="bbox"

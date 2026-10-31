@@ -1,11 +1,11 @@
 from typing import Optional
 
+from invokeai.app.services.board_access.board_access_common import BoardAccess, BoardRole, BoardViewer, role_of
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardRecord, BoardRecordOrderBy
 from invokeai.app.services.boards.boards_base import BoardServiceABC
 from invokeai.app.services.boards.boards_common import BoardDTO, board_record_to_dto
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class BoardService(BoardServiceABC):
@@ -41,28 +41,28 @@ class BoardService(BoardServiceABC):
 
     def _get_counts(self, board_id: str) -> tuple[int, int, int, int]:
         """Return ``(image_count, video_count, asset_count, asset_video_count)`` for a board."""
-        image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
-        asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
-        video_count = self.__invoker.services.board_video_records.get_video_count_for_board(board_id)
-        asset_video_count = self.__invoker.services.board_video_records.get_asset_video_count_for_board(board_id)
+        image_count, asset_count = self.__invoker.services.board_image_records.get_counts_for_board(board_id)
+        video_count, asset_video_count = self.__invoker.services.board_video_records.get_counts_for_board(board_id)
         return image_count, video_count, asset_count, asset_video_count
 
     def create(
         self,
         board_name: str,
         user_id: str,
+        project_id: Optional[str] = None,
+        *,
+        viewer: BoardViewer,
     ) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.save(board_name, user_id)
-        return board_record_to_dto(board_record, None, 0, 0)
+        board_record = self.__invoker.services.board_records.save(board_name, user_id, project_id)
+        return self._describe([board_record_to_dto(board_record, None, 0, 0)], viewer)[0]
 
-    def get_dto(self, board_id: str) -> BoardDTO:
-        # One query for the record and its claiming project. `get_dto` is what every authorization
-        # check resolves through, so a second lookup here is a second transaction — and the lock it
-        # takes — on the most-travelled read in the API.
-        board_record, project_id = self.__invoker.services.board_records.get_with_project_id(board_id)
+    def get_dto(self, board_id: str, viewer: BoardViewer) -> BoardDTO:
+        # One query for the record and the project it is the inbox of: a second lookup would be a second
+        # transaction, and the lock it takes, on a read every board route makes.
+        board_record, inbox_of_project_id = self.__invoker.services.board_records.get_with_inbox_project(board_id)
         cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
         image_count, video_count, asset_count, asset_video_count = self._get_counts(board_id)
-        return board_record_to_dto(
+        dto = board_record_to_dto(
             board_record,
             cover_image_name,
             image_count,
@@ -70,19 +70,16 @@ class BoardService(BoardServiceABC):
             cover_video_name=cover_video_name,
             video_count=video_count,
             asset_video_count=asset_video_count,
-            project_id=project_id,
+            is_inbox=inbox_of_project_id is not None,
         )
+        return self._describe([dto], viewer)[0]
 
-    def update(
-        self,
-        board_id: str,
-        changes: BoardChanges,
-    ) -> BoardDTO:
+    def update(self, board_id: str, changes: BoardChanges, viewer: BoardViewer) -> BoardDTO:
         self.__invoker.services.board_records.update(board_id, changes)
         # Re-read through `get_dto` rather than shaping the update's own return: it is the one
-        # place that resolves cover, counts and claiming project together, and an update that
-        # dropped `project_id` would tell the gallery a project's board is an ordinary one.
-        return self.get_dto(board_id)
+        # place that resolves cover, counts and the inbox flag together, and an update that
+        # dropped the flag would tell the gallery a project's inbox is an ordinary board.
+        return self.get_dto(board_id, viewer)
 
     def delete_if_unclaimed(self, board_id: str) -> bool:
         return self.__invoker.services.board_records.delete_if_unclaimed(board_id)
@@ -100,7 +97,7 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_many(
             user_id, is_admin, order_by, direction, offset, limit, include_archived
         )
-        board_dtos = self._to_dtos(board_records.items, is_admin)
+        board_dtos = self._to_dtos(board_records.items, BoardViewer(user_id=user_id, is_admin=is_admin))
 
         return OffsetPaginatedResults[BoardDTO](items=board_dtos, offset=offset, limit=limit, total=len(board_dtos))
 
@@ -115,46 +112,63 @@ class BoardService(BoardServiceABC):
         board_records = self.__invoker.services.board_records.get_all(
             user_id, is_admin, order_by, direction, include_archived
         )
-        return self._to_dtos(board_records, is_admin)
+        return self._to_dtos(board_records, BoardViewer(user_id=user_id, is_admin=is_admin))
 
-    def _to_dtos(self, board_records: list[BoardRecord], is_admin: bool) -> list[BoardDTO]:
-        """Builds board DTOs for a listing with a fixed number of queries.
-
-        Both the media summaries and (for admins) the owner display names are fetched for
-        the whole page at once. The owner lookup used to run one `users.get` per board, so
-        an admin listing 50 boards issued 50 extra queries for what is usually a handful of
-        distinct owners.
-        """
+    def _to_dtos(self, board_records: list[BoardRecord], viewer: BoardViewer) -> list[BoardDTO]:
+        """Builds the board DTOs of a listing with a fixed number of queries: the media summaries and inbox flags
+        for the whole page at once, then what `_describe` adds."""
         summaries = self.__invoker.services.gallery.get_board_media_summaries(
             [record.board_id for record in board_records]
         )
-        project_ids = self.__invoker.services.board_records.get_project_ids_for_boards(
+        inbox_board_ids = self.__invoker.services.board_records.get_inbox_board_ids(
             [record.board_id for record in board_records]
         )
-        owners = (
-            self.__invoker.services.users.get_many([record.user_id for record in board_records]) if is_admin else {}
-        )
+        dtos = [
+            board_record_to_dto(
+                r,
+                summaries[r.board_id].cover_image_name,
+                summaries[r.board_id].image_count,
+                summaries[r.board_id].asset_count,
+                cover_video_name=summaries[r.board_id].cover_video_name,
+                video_count=summaries[r.board_id].video_count,
+                asset_video_count=summaries[r.board_id].asset_video_count,
+                is_inbox=r.board_id in inbox_board_ids,
+            )
+            for r in board_records
+        ]
+        return self._describe(dtos, viewer)
 
-        board_dtos: list[BoardDTO] = []
-        for r in board_records:
-            summary = summaries[r.board_id]
-
-            # For admin users, include owner username
-            owner = owners.get(r.user_id)
-            owner_username = (owner.display_name or owner.email) if owner else None
-
-            board_dtos.append(
-                board_record_to_dto(
-                    r,
-                    summary.cover_image_name,
-                    summary.image_count,
-                    summary.asset_count,
-                    owner_username,
-                    cover_video_name=summary.cover_video_name,
-                    video_count=summary.video_count,
-                    asset_video_count=summary.asset_video_count,
-                    project_id=project_ids.get(r.board_id),
+    def _describe(self, dtos: list[BoardDTO], viewer: BoardViewer) -> list[BoardDTO]:
+        """Adds what depends on who is looking: their role and allowed actions, the owner's name, and the project,
+        which only the owner and admins learn. Two queries for any number of boards."""
+        board_ids = [dto.board_id for dto in dtos]
+        member_roles = self.__invoker.services.board_access.member_roles(board_ids, viewer.user_id)
+        owners = self.__invoker.services.users.get_many([dto.user_id for dto in dtos])
+        described: list[BoardDTO] = []
+        for dto in dtos:
+            role = role_of(
+                owner_id=dto.user_id,
+                user_id=viewer.user_id,
+                member_role=member_roles.get(dto.board_id),
+                general_access=dto.general_access,
+            )
+            access = BoardAccess(role=role, is_admin=viewer.is_admin, is_inbox=dto.is_inbox)
+            owner = owners.get(dto.user_id)
+            owner_username = None
+            if owner is not None:
+                # An email only for admins and the owner themselves.
+                sees_email = viewer.is_admin or owner.user_id == viewer.user_id
+                owner_username = owner.display_name or (owner.email if sees_email else "Unknown user")
+            sees_project = viewer.is_admin or role is BoardRole.Owner
+            described.append(
+                dto.model_copy(
+                    update={
+                        "my_role": role,
+                        "allowed_actions": access.allowed_actions(),
+                        "admin_override": access.admin_override,
+                        "owner_username": owner_username,
+                        "project_id": dto.project_id if sees_project else None,
+                    }
                 )
             )
-
-        return board_dtos
+        return described

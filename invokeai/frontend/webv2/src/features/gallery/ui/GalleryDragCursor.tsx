@@ -1,7 +1,7 @@
 import { useDndContext } from '@dnd-kit/core';
 import { useEffect } from 'react';
 
-import { isGalleryItemDragData } from './galleryDnd';
+import { isGalleryBoardDragData, isGalleryItemDragData } from './galleryDnd';
 
 /**
  * Mount once inside DndContext. The body marker enables global drag cursors that override element-specific button
@@ -9,7 +9,7 @@ import { isGalleryItemDragData } from './galleryDnd';
  */
 export const GalleryDragCursor = () => {
   const { active } = useDndContext();
-  const isGalleryDrag = isGalleryItemDragData(active?.data.current);
+  const isGalleryDrag = isGalleryItemDragData(active?.data.current) || isGalleryBoardDragData(active?.data.current);
 
   useEffect(() => {
     if (!isGalleryDrag) {

@@ -10,11 +10,18 @@ import os
 import stat
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
+from invokeai.app.api.extract_metadata import extract_metadata_from_image
+from invokeai.app.invocations.baseinvocation import BaseInvocation
+from invokeai.app.invocations.collections import CollectionConcatInvocation
+from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_common import (
     ImageFileDeleteException,
@@ -26,16 +33,26 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
     ImageRecordChanges,
-    ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ResourceOrigin,
 )
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
-from invokeai.app.services.shared.sqlite.sqlite_util import init_db
+from invokeai.app.services.shared.database.errors import LockTimeoutError
+from invokeai.app.services.shared.database.startup import init_database
+from invokeai.app.services.shared.graph import (
+    CollectInvocation,
+    Edge,
+    EdgeConnection,
+    Graph,
+    GraphExecutionState,
+    IterateInvocation,
+)
+from invokeai.app.services.shared.invocation_context import ImagesInterface
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from tests.test_nodes import AnyTypeTestInvocation
 
 
 @pytest.fixture
@@ -78,7 +95,7 @@ def _make_record(
 
 
 @pytest.fixture
-def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+def real_image_service(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage]:
     logger = InvokeAILogger.get_logger()
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
     config._root = tmp_path
@@ -86,8 +103,8 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordS
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 6
     storage.start(invoker)
-    db = init_db(config=config, logger=logger, image_files=storage)
-    records = SqliteImageRecordStorage(db=db)
+    db = init_database(config=config, logger=logger, image_files=storage)
+    records = ImageRecordStorage(db)
 
     invoker.services.configuration.image_subfolder_strategy = "flat"
     invoker.services.names.create_image_name.return_value = "uploaded.png"
@@ -102,8 +119,149 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordS
     return service, records, storage
 
 
+@pytest.mark.parametrize(
+    ("boundary", "output", "expected_values"),
+    [
+        pytest.param(IterateInvocation(id="boundary", collection=[17, 18]), "item", [17, 18], id="iterate"),
+        pytest.param(
+            IfInvocation(id="boundary", condition=True, true_input=17, false_input=90), "value", [17], id="if-true"
+        ),
+        pytest.param(
+            IfInvocation(id="boundary", condition=False, true_input=17, false_input=90), "value", [90], id="if-false"
+        ),
+        pytest.param(CollectInvocation(id="boundary", collection=[17, 18]), "collection", [[17, 18]], id="collect"),
+    ],
+)
+def test_image_save_graph_only_restores_source_and_persists_separate_resolved_inputs(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+    boundary: BaseInvocation,
+    output: str,
+    expected_values: list[object],
+) -> None:
+    graph = Graph(
+        nodes={
+            "boundary": boundary,
+            "active": AnyTypeTestInvocation(id="active"),
+            "future": AnyTypeTestInvocation(id="future"),
+        },
+        edges=[
+            Edge(
+                source=EdgeConnection(node_id="boundary", field=output),
+                destination=EdgeConnection(node_id="active", field="value"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="active", field="value"),
+                destination=EdgeConnection(node_id="future", field="value"),
+            ),
+        ],
+    )
+    if isinstance(boundary, (IterateInvocation, CollectInvocation)):
+        graph.add_node(CollectionConcatInvocation(id="source", first=[17, 18]))
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id="source", field="collection"),
+                destination=EdgeConnection(node_id="boundary", field="collection"),
+            )
+        )
+    else:
+        graph.add_node(AddInvocation(id="true", a=16, b=1))
+        graph.add_node(AddInvocation(id="false", a=89, b=1))
+        for name in ("true", "false"):
+            graph.add_edge(
+                Edge(
+                    source=EdgeConnection(node_id=name, field="value"),
+                    destination=EdgeConnection(node_id="boundary", field=f"{name}_input"),
+                )
+            )
+    source_json = graph.model_dump_json()
+    session = GraphExecutionState(graph=graph)
+    service, records, storage = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    data = SimpleNamespace(
+        queue_item=SimpleNamespace(
+            user_id=None,
+            project_id=None,
+            session_id=None,
+            session=session,
+            workflow=None,
+            root_item_id=None,
+            _workflow_json_loaded=False,
+            _workflow_json_snapshot=None,
+        ),
+        invocation=None,
+    )
+    images = ImagesInterface(services, data, MagicMock())
+    metadata = MetadataField.model_validate({"invokeai_resolved_inputs": {"user": "保留"}, "seed": 123})
+    metadata_json = metadata.model_dump_json()
+    saved: list[tuple[str, str, object]] = []
+    for _ in range(12):
+        node = session.next()
+        if node is None:
+            break
+        data.invocation = node
+        if session.prepared_source_mapping[node.id] == "active":
+            name = f"{len(saved)}.png"
+            services.names.create_image_name.return_value = name
+            execution_json = session.execution_graph.model_dump_json()
+            with Image.new("RGB", (2, 2), (12, 34, 56)) as image:
+                images.save(image, metadata=metadata)
+            assert session.execution_graph.model_dump_json() == execution_json
+            saved.append((name, node.id, node.value))
+        session.complete(node.id, node.invoke(MagicMock()))
+    else:
+        pytest.fail("Boundary graph did not finish")
+    assert session.is_complete()
+    assert [value for _, _, value in saved] == expected_values
+    assert graph.model_dump_json() == session.graph.model_dump_json() == source_json
+    assert metadata.model_dump_json() == metadata_json
+
+    reader = DiskImageFileStorage(storage.image_root)
+    for name, node_id, value in saved:
+        with reader.get(name) as reopened:
+            assert (reopened.format, reopened.size, reopened.getpixel((0, 0))) == ("PNG", (2, 2), (12, 34, 56))
+            extracted = extract_metadata_from_image(reopened, None, None, None, services.logger)
+            assert extracted.invokeai_workflow is None
+            # This is exactly the graph returned to executeLoadMediaWorkflow's graph-only fallback.
+            assert reader.get_graph(name) == extracted.invokeai_graph == source_json
+            restored = Graph.model_validate_json(extracted.invokeai_graph)
+            assert restored.model_dump() == graph.model_dump()  # Includes boundary nodes and all original edges.
+            assert extracted.invokeai_metadata == metadata_json
+            assert records.get(name).has_workflow
+            assert records.get_metadata(name).model_dump_json() == metadata_json
+            resolved = Graph.model_validate_json(reopened.info["invokeai_resolved_inputs"])
+            assert set(resolved.nodes) == {node_id}
+            assert resolved.edges == []
+            assert resolved.nodes[node_id].value == value
+
+
+def test_create_without_resolved_inputs_preserves_legacy_png_channels(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    metadata = '{ "seed": 123, "invokeai_resolved_inputs": "user-owned" }'
+    graph = '{ "nodes": {}, "edges": [] }'
+    with Image.new("RGB", (2, 2)) as image:
+        dto = service.create(
+            image,
+            ResourceOrigin.EXTERNAL,
+            ImageCategory.GENERAL,
+            metadata=metadata,
+            graph=graph,
+        )
+    reader = DiskImageFileStorage(storage.image_root)
+    with reader.get(dto.image_name) as reopened:
+        assert "invokeai_resolved_inputs" not in reopened.info
+        assert reopened.info["invokeai_metadata"] == metadata
+        assert reopened.info["invokeai_graph"] == graph
+        assert "invokeai_workflow" not in reopened.info
+    assert records.get(dto.image_name).has_workflow
+    assert records.get_metadata(dto.image_name).root["invokeai_resolved_inputs"] == "user-owned"
+
+
 def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
-    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
 ) -> None:
     service, records, storage = real_image_service
     image = Image.new("RGB", (32, 32), "red")
@@ -131,7 +289,7 @@ def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
 
 
 def test_create_accepts_large_16_bit_image(
-    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
 ) -> None:
     service, records, storage = real_image_service
     image = Image.new("I;16", (1024, 1024), 32768)
@@ -419,11 +577,11 @@ def _failing_directory_fsync(error_number: int):
 
 
 @pytest.fixture
-def wired(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+def wired(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage]:
     """ImageService wired to a real record store and a real disk store — no stub decides anything."""
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
-    records = SqliteImageRecordStorage(db=create_mock_sqlite_database(config, logger))
+    records = ImageRecordStorage(create_mock_sqlite_database(config, logger))
     storage = DiskImageFileStorage(tmp_path / "outputs")
 
     svc = ImageService()
@@ -440,14 +598,14 @@ def wired(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskI
 @pytest.fixture
 def wired_with_move_service(
     tmp_path: Path,
-) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService]:
+) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService]:
     """ImageService and ImageMoveService wired to one real db and disk store, as production does."""
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    records = SqliteImageRecordStorage(db=db)
+    records = ImageRecordStorage(db)
     storage = DiskImageFileStorage(tmp_path / "outputs")
-    moves = ImageMoveService(db=db, image_files=storage, config=config, logger=logger)
+    moves = ImageMoveService(db, image_files=storage, config=config, logger=logger)
 
     svc = ImageService()
     invoker = MagicMock()
@@ -463,7 +621,7 @@ def wired_with_move_service(
     return svc, records, storage, moves
 
 
-def _seed_record_at_subfolder(records: SqliteImageRecordStorage, name: str, image_subfolder: str) -> None:
+def _seed_record_at_subfolder(records: ImageRecordStorage, name: str, image_subfolder: str) -> None:
     records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -476,7 +634,7 @@ def _seed_record_at_subfolder(records: SqliteImageRecordStorage, name: str, imag
     )
 
 
-def _seed_record(records: SqliteImageRecordStorage, name: str, is_intermediate: bool = True) -> None:
+def _seed_record(records: ImageRecordStorage, name: str, is_intermediate: bool = True) -> None:
     records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -488,7 +646,7 @@ def _seed_record(records: SqliteImageRecordStorage, name: str, is_intermediate: 
     )
 
 
-def _restart_file_storage(storage: DiskImageFileStorage, records: SqliteImageRecordStorage) -> DiskImageFileStorage:
+def _restart_file_storage(storage: DiskImageFileStorage, records: ImageRecordStorage) -> DiskImageFileStorage:
     """Simulates a restart over the same output folder, running delete-journal recovery."""
     invoker = MagicMock()
     invoker.services.image_records = records
@@ -505,7 +663,7 @@ class TestDeleteTransactional:
     """delete() journals its intent, deletes the record, then purges — never losing files on failure."""
 
     def test_notify_deleted_is_public_and_callbacks_observe_removed_record(
-        self, real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]
+        self, real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage]
     ) -> None:
         service, records, _storage = real_image_service
         _seed_record(records, "maintenance-removed.png", is_intermediate=False)
@@ -557,11 +715,11 @@ class TestDeleteTransactional:
         storage = invoker.services.image_files
         _save_image_file(storage, "img.png")
         invoker.services.image_records.get.return_value = _make_record(image_name="img.png")
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
         deleted_callbacks: list[str] = []
         disk_image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             disk_image_service.delete("img.png")
 
         # Nothing was moved, so the image and its thumbnail are still exactly where they were.
@@ -572,12 +730,12 @@ class TestDeleteTransactional:
 
     def test_delete_journal_cleanup_failure_still_raises_db_error(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
         invoker.services.image_files.abandon_delete.side_effect = ImageFileDeleteException("journal locked")
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             image_service.delete("test.png")
 
         invoker.services.image_files.abandon_delete.assert_called_once_with(
@@ -703,11 +861,13 @@ class TestDeleteIntermediatesTransactional:
     def test_db_failure_raises_and_purges_nothing(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "", "tmp2.png": ""}
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = LockTimeoutError(
+            "database is locked"
+        )
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             image_service.delete_intermediates_by_names(["tmp1.png", "tmp2.png"])
 
         # No record was removed, so no file may be purged and the journal must be discarded.
@@ -754,13 +914,13 @@ class TestDeleteIntermediatesAgainstRealRecords:
     and where the concurrency hazards JPPhoto reported would surface.
     """
 
-    def _seed(self, records: SqliteImageRecordStorage, storage: DiskImageFileStorage, name: str) -> None:
+    def _seed(self, records: ImageRecordStorage, storage: DiskImageFileStorage, name: str) -> None:
         _seed_record(records, name)
         _save_image_file(storage, name)
 
     def _promote_after_snapshot(
         self,
-        records: SqliteImageRecordStorage,
+        records: ImageRecordStorage,
         monkeypatch,
         image_name: str,
     ) -> None:
@@ -898,13 +1058,13 @@ class TestDeleteAgainstRealRecords:
             # this delete is still in flight, and only then does this one's own delete fail.
             real_delete(image_name)
             storage.delete(image_name)
-            raise ImageRecordDeleteException()
+            raise LockTimeoutError("database is locked")
 
         monkeypatch.setattr(records, "delete", competing_delete_then_fail)
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             svc.delete("img.png")
 
         assert not storage.get_path("img.png").exists()
@@ -918,11 +1078,11 @@ class TestDeleteAgainstRealRecords:
         _save_image_file(storage, "img.png")
 
         def failing_delete(image_name: str) -> None:
-            raise ImageRecordDeleteException()
+            raise LockTimeoutError("database is locked")
 
         monkeypatch.setattr(records, "delete", failing_delete)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             svc.delete("img.png")
 
         assert storage.get_path("img.png").exists()
@@ -1037,7 +1197,7 @@ class TestFailedSaveCleanup:
         """If the record cannot be deleted the image is still referenced, so nothing may be purged."""
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_files.save.side_effect = ImageFileSaveException()
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
 
         with pytest.raises(ImageFileSaveException):
             image_service.create(
@@ -1074,7 +1234,7 @@ class TestFailedSaveCleanup:
     @pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
     def test_a_leftover_file_is_never_orphaned_without_a_journal(
         self,
-        real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+        real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
     ) -> None:
         """Real storage, real records: the save leaves a file behind and the disk refuses to make
         the cleanup journal durable. The record must survive, and an ordinary delete once the disk
@@ -1167,7 +1327,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_cannot_interleave_with_delete_intermediates(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
         monkeypatch,
     ) -> None:
         """While delete_intermediates_by_names() runs its unit, a concurrent move_all_images() must wait.
@@ -1224,7 +1384,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_holds_the_lock_across_its_batch_cycle(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
     ) -> None:
         """While a move unit runs, a concurrent delete must wait for it rather than race it.
 
@@ -1256,7 +1416,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_failed_save_cleanup_purges_the_relocated_subfolder_too(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
     ) -> None:
         """A failed save whose record was relocated mid-save must not strand the moved files.
 
@@ -1279,8 +1439,7 @@ class TestDeleteVersusSubfolderMove:
         new_thumbnail.parent.mkdir(parents=True, exist_ok=True)
         old_image.replace(new_image)
         old_thumbnail.replace(new_thumbnail)
-        with records._db.transaction() as cursor:
-            cursor.execute("UPDATE images SET image_subfolder = '' WHERE image_name = 'failed.png';")
+        moves._queries.image_moves.repoint_image("failed.png", "old", "")
         assert records.get("failed.png").image_subfolder == ""
 
         # The failed save's cleanup still holds the subfolder the save captured.
@@ -1296,7 +1455,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_cannot_interleave_with_create(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
         monkeypatch,
     ) -> None:
         """While create() runs its save unit, a concurrent move_all_images() must wait.

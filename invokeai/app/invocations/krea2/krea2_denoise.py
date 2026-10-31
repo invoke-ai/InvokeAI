@@ -28,41 +28,51 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.krea2.attention import (
     Krea2RegionalPromptingState,
     build_krea2_attention_processors,
     resolve_krea2_sdpa_backends,
+)
+from invokeai.backend.krea2.reference_edit import (
+    Krea2ReferenceKVCache,
+    forward_with_references,
+    precompute_reference_kv,
+    reference_kv_cache_bytes,
 )
 from invokeai.backend.krea2.regional_prompting import (
     Krea2RegionalPromptingExtension,
     Krea2TextConditioning,
 )
 from invokeai.backend.krea2.sampling_utils import (
-    KREA2_BASE_IMAGE_SEQ_LEN,
-    KREA2_BASE_SHIFT,
     KREA2_DISTILLED_MU,
-    KREA2_MAX_IMAGE_SEQ_LEN,
-    KREA2_MAX_SHIFT,
+    KREA2_SCHEDULER_CONFIG,
     build_sigmas,
-    calculate_shift,
     pack_latents,
     prepare_position_ids,
+    prepare_position_ids_with_references,
+    prepare_reference_position_ids,
     unpack_latents,
 )
-from invokeai.backend.krea2.style_reference_extension import Krea2StyleReferenceExtension
+from invokeai.backend.krea2.style_reference import KREA2_NUM_BLOCKS
+from invokeai.backend.krea2.style_reference_extension import (
+    KREA2_HEAD_DIM,
+    KREA2_NUM_KV_HEADS,
+    Krea2StyleReferenceExtension,
+)
+from invokeai.backend.krea2.text_encoding import KREA2_MAX_REFERENCE_IMAGES
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
-from invokeai.backend.util import sdpa_scope
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 # Krea-2 latent channels (Qwen-Image VAE z_dim). The packed transformer in_channels is 16 * patch_size**2 = 64.
 KREA2_LATENT_CHANNELS = 16
@@ -84,10 +94,6 @@ class _Krea2StepBenchmark:
         self._label = label
         self._step_ms: list[float] = []
         self._step_started_at = 0.0
-        # A window that did not own the process-global backend selection ran under someone else's
-        # policy. For an exclusive override that voids the measurement, so the summary has to say it
-        # rather than print a label for a kernel that may not have run.
-        self._foreign_windows_at_start = sdpa_scope.foreign_window_entries()
         # Reset here, immediately before the loop, so the reported peak is the loop's and not the
         # model load's.
         torch.cuda.reset_peak_memory_stats(device)
@@ -115,12 +121,6 @@ class _Krea2StepBenchmark:
         # The first step absorbs kernel selection and allocator warmup -- on a cold cuDNN run it has
         # been seen at 2606 ms against a 1451 ms steady mean -- so it is reported, not averaged in.
         steady = self._step_ms[1:] or self._step_ms
-        foreign = sdpa_scope.foreign_window_entries() - self._foreign_windows_at_start
-        if foreign:
-            logger.warning(
-                f"Krea-2 SDPA benchmark [{self._label}]: {foreign} attention window(s) ran under another "
-                "session's backend policy, so these timings are not a measurement of the requested kernel."
-            )
         logger.info(
             f"Krea-2 SDPA benchmark [{self._label}]: {len(self._step_ms)} steps | "
             f"first {first_ms:.0f} ms | "
@@ -135,7 +135,7 @@ class _Krea2StepBenchmark:
     title="Denoise - Krea-2",
     tags=["image", "krea2", "krea-2"],
     category="image",
-    version="1.3.0",
+    version="1.4.0",
     classification=Classification.Prototype,
 )
 class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -171,7 +171,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         default=None,
         description="Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what "
         "the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for "
-        "the distilled Turbo checkpoint, resolution-dependent for Raw.",
+        "the distilled Turbo checkpoint, resolution-dependent for Raw up to the area of 1280x1280 and held above it.",
     )
     style_reference: Optional[Krea2StyleReferenceField] = InputField(
         default=None,
@@ -189,6 +189,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         "a short neutral prompt describing the reference can give a purer style transfer.",
         input=Input.Connection,
         title="Style Reference Prompt",
+    )
+    reference_latents: LatentsField | list[LatentsField] | None = InputField(
+        default=None,
+        description="Edit references for Krea-2 edit LoRAs, encoded by 'Image to Latents - Qwen Image' with "
+        f"'reference' enabled. Up to {KREA2_MAX_REFERENCE_IMAGES}. They join every transformer pass as clean "
+        "(t=0) image tokens, about 4096 tokens per megapixel each; with Reference K/V Cache on they run once "
+        "instead of in every pass. Not combinable with style reference or regional prompts.",
+        input=Input.Connection,
+        title="Reference Latents",
+    )
+    reference_kv_cache: bool = InputField(
+        default=False,
+        description="For edit LoRAs trained with ai-toolkit's 'kv_cache' option, where reference tokens attend only "
+        "to each other. The references then run through the transformer once per generation instead of in every "
+        "pass, which is faster. Leave off for normal edit LoRAs. The LoRA file does not say which kind it is; "
+        "check its model card. No effect without reference latents.",
+        title="Reference K/V Cache",
     )
 
     @field_validator("cfg_scale")
@@ -307,6 +324,23 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             return self.cfg_scale
         raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
 
+    def _step_window(self, num_steps: int) -> tuple[int, int]:
+        """The ``[start, end)`` indices of the configured steps that denoising_start/denoising_end select."""
+        return int(round(self.denoising_start * num_steps)), int(round(self.denoising_end * num_steps))
+
+    def _active_cfg_scale(self, num_steps: int) -> list[float]:
+        """The CFG of each step this node runs.
+
+        Built against the full step count, then clipped to the active window, so a caller-supplied per-step list
+        (one value per configured step) survives the reduction caused by denoising_start/denoising_end.
+        """
+        start_idx, end_idx = self._step_window(num_steps)
+        return self._prepare_cfg_scale(num_steps)[start_idx:end_idx]
+
+    def _negative_prompt_runs(self, num_steps: int) -> bool:
+        """Whether a step this node runs applies CFG, the only steps that read the negative prompt."""
+        return bool(self.negative_conditioning) and any(value > 1.0 for value in self._active_cfg_scale(num_steps))
+
     @staticmethod
     def _should_apply_cfg_for_step(cfg_scale: float, *, has_negative_conditioning: bool) -> bool:
         return has_negative_conditioning and cfg_scale > 1.0
@@ -324,6 +358,111 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError("denoising_start must be less than denoising_end.")
         if self.denoise_mask is not None and self.latents is None:
             raise ValueError("Initial latents are required when a denoise mask is provided.")
+        self._validate_reference_latent_combination()
+
+    def _reference_latent_fields(self) -> list[LatentsField]:
+        if self.reference_latents is None:
+            return []
+        return [self.reference_latents] if isinstance(self.reference_latents, LatentsField) else self.reference_latents
+
+    def _validate_reference_latent_combination(self) -> None:
+        reference_fields = self._reference_latent_fields()
+        if not reference_fields:
+            return
+        if len(reference_fields) > KREA2_MAX_REFERENCE_IMAGES:
+            raise ValueError(
+                f"Krea-2 accepts at most {KREA2_MAX_REFERENCE_IMAGES} reference latents, got {len(reference_fields)}."
+            )
+        # Style reference splices its keys/values in assuming the image tokens are the tail of the sequence,
+        # and a regional mask is sized for exactly [text | target]. Reference tokens break both.
+        if self.style_reference is not None and self.style_reference.style_strength > 0:
+            raise ValueError("Krea-2 reference latents cannot be combined with a style reference. Disconnect one.")
+        conditioning_fields = [
+            field
+            for conditioning in (self.positive_conditioning, self.negative_conditioning)
+            if conditioning is not None
+            for field in (conditioning if isinstance(conditioning, list) else [conditioning])
+        ]
+        if any(field.mask is not None for field in conditioning_fields):
+            raise ValueError(
+                "Krea-2 reference latents cannot be combined with regional (masked) prompts. Remove the masks "
+                "or disconnect the reference latents."
+            )
+        if type(self)._install_attention_processors is not Krea2DenoiseInvocation._install_attention_processors:
+            # A subclass's processors are sized for [text | target]: joint references would reach them as extra
+            # image tokens, and the K/V cache lives in this node's own processors, which a subclass replaces.
+            raise ValueError(
+                f"'{type(self).__name__}' installs its own Krea-2 attention processors, which cannot take reference "
+                "latents. Use the stock 'Denoise - Krea-2' node for edit references."
+            )
+
+    def _validate_reference_counts(self, context: InvocationContext) -> None:
+        """Each prompt that runs must be a single prompt that saw as many references as the denoise is given.
+
+        The encoder numbers the references it saw ("Picture 1", ...) and the transformer numbers the reference
+        latents by their position ids. An edit LoRA is trained with the two agreeing; a mismatch -- a reference
+        missing on one side, or a prompt encoded without them -- would condition on an image the other side
+        never sees. Only the count can be checked: the denoise gets latents, not the images they came from, so
+        keeping the same images in the same order on both sides is the workflow's job.
+
+        Several prompts are concatenated into one text sequence, so each would bring the references' vision tokens
+        in again, a layout no edit LoRA is trained on.
+        """
+        reference_count = len(self._reference_latent_fields())
+        checked = [("positive", self.positive_conditioning)]
+        # An unused negative prompt need not match. `self.steps` is the configured step count `_run_diffusion`
+        # builds its schedule against.
+        if self._negative_prompt_runs(self.steps):
+            checked.append(("negative", self.negative_conditioning))
+        for label, conditioning in checked:
+            if conditioning is None:
+                continue
+            fields = conditioning if isinstance(conditioning, list) else [conditioning]
+            if reference_count and len(fields) > 1:
+                raise ValueError(
+                    f"The {label} Krea-2 prompt is a collection of {len(fields)} prompts. With reference latents, "
+                    "connect a single 'Prompt - Krea-2' node instead: each prompt would add the reference images "
+                    "to the text sequence again, which edit LoRAs are not trained on."
+                )
+            for field in fields:
+                info = context.conditioning.load(field.conditioning_name).conditionings[0]
+                encoded_count = getattr(info, "num_reference_images", 0)
+                if encoded_count != reference_count:
+                    raise ValueError(
+                        f"The {label} Krea-2 prompt was encoded with {encoded_count} reference image(s), but the "
+                        f"denoise node has {reference_count} reference latents. Connect the same reference "
+                        "images, in the same order, to the prompt and (through 'Image to Latents - Qwen Image') to "
+                        "the denoise node."
+                    )
+
+    def _load_reference_latents(
+        self, context: InvocationContext, dtype: torch.dtype, device: torch.device
+    ) -> tuple[torch.Tensor | None, list[tuple[int, int]]]:
+        """Load and pack the reference latents: every reference's tokens in order, and each one's patch grid."""
+        packed: list[torch.Tensor] = []
+        grids: list[tuple[int, int]] = []
+        for index, field in enumerate(self._reference_latent_fields(), start=1):
+            latents = context.tensors.load(field.latents_name)
+            if latents.dim() == 5 and latents.shape[2] == 1:
+                # The Qwen-Image VAE emits a single-frame axis.
+                latents = latents.squeeze(2)
+            if latents.dim() != 4 or latents.shape[0] != 1 or latents.shape[1] != KREA2_LATENT_CHANNELS:
+                raise ValueError(
+                    f"Krea-2 reference latents {index} have shape {tuple(latents.shape)}; expected "
+                    f"(1, {KREA2_LATENT_CHANNELS}, height, width) from the Qwen-Image VAE."
+                )
+            _, _, height, width = latents.shape
+            if height == 0 or width == 0 or height % 2 or width % 2:
+                raise ValueError(
+                    f"Krea-2 reference latents {index} are {height}x{width}; the transformer packs 2x2 patches, so "
+                    "both sides must be even. Encode the reference at a multiple of 16 pixels."
+                )
+            latents = latents.to(device=device, dtype=dtype)
+            packed.append(pack_latents(latents, 1, KREA2_LATENT_CHANNELS, height, width))
+            grids.append((height // 2, width // 2))
+        if not packed:
+            return None, []
+        return torch.cat(packed, dim=1), grids
 
     def _is_distilled(self, context: InvocationContext) -> bool:
         """Whether the transformer is the distilled Turbo checkpoint (fixed mu) vs. Raw (dynamic mu).
@@ -352,12 +491,18 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         return True
 
     def _run_diffusion(self, context: InvocationContext):
-        from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
-
         self._validate_inputs()
 
         device = TorchDevice.choose_torch_device()
         inference_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+
+        # Before the transformer loads, so a malformed reference fails before anything is spent on the model.
+        self._validate_reference_counts(context)
+        reference_tokens, reference_grids = self._load_reference_latents(context, inference_dtype, device)
+        reference_seq_len = 0 if reference_tokens is None else reference_tokens.shape[1]
+        # K/V-cache mode keeps the references out of the per-step sequence: they run once, alone, before the loop.
+        cache_references = self.reference_kv_cache and reference_tokens is not None
+        joint_references = None if cache_references else reference_tokens
 
         transformer_info = context.models.load(self.transformer.transformer)
 
@@ -376,21 +521,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
         pos_prompt_embeds = pos_extension.regional_text_conditioning.prompt_embeds
 
-        # Scheduler: load from the model's scheduler/ dir if present, else construct with Krea-2 defaults.
         model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
-        scheduler_path = Path(model_path) / "scheduler"
-        if scheduler_path.is_dir() and (scheduler_path / "scheduler_config.json").exists():
-            scheduler = FlowMatchEulerDiscreteScheduler.from_pretrained(str(scheduler_path), local_files_only=True)
-        else:
-            scheduler = FlowMatchEulerDiscreteScheduler(
-                use_dynamic_shifting=True,
-                base_shift=0.5,
-                max_shift=1.15,
-                base_image_seq_len=256,
-                max_image_seq_len=6400,
-                num_train_timesteps=1000,
-                time_shift_type="exponential",
-            )
+        scheduler = load_scheduler(Path(model_path), KREA2_SCHEDULER_CONFIG)
 
         # A non-positive shift means "unset", not "no time shift". The node editor builds every float field
         # with `schemaObject.default ?? 0`, so an untouched optional shift arrives here as 0.0 rather than
@@ -401,26 +533,17 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         elif self._is_distilled(context):
             mu = KREA2_DISTILLED_MU
         else:
-            # Resolution-aware shift. Honor the loaded scheduler's config so a Raw checkpoint that ships a
-            # customized scheduler_config.json is sampled with its own shift params, falling back to the
-            # Krea-2 defaults for the stock scheduler (and for any field the config omits).
-            mu = calculate_shift(
-                image_seq_len,
-                base_image_seq_len=getattr(scheduler.config, "base_image_seq_len", KREA2_BASE_IMAGE_SEQ_LEN),
-                max_image_seq_len=getattr(scheduler.config, "max_image_seq_len", KREA2_MAX_IMAGE_SEQ_LEN),
-                base_shift=getattr(scheduler.config, "base_shift", KREA2_BASE_SHIFT),
-                max_shift=getattr(scheduler.config, "max_shift", KREA2_MAX_SHIFT),
-            )
+            # Resolution-aware shift, held at the end of its fit (see `KREA2_SCHEDULER_CONFIG`), from the loaded
+            # scheduler's config: a Raw checkpoint that ships its own scheduler_config.json samples with its fit.
+            mu = ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
 
         init_sigmas = build_sigmas(self.steps)
         scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
 
         # Clip the schedule based on denoising_start/denoising_end for img2img strength.
         sigmas_sched = scheduler.sigmas  # (N+1,) including terminal 0
-        total_sigmas = len(sigmas_sched) - 1  # == self.steps
         is_clipped = self.denoising_start > 0 or self.denoising_end < 1
-        start_idx = int(round(self.denoising_start * total_sigmas))
-        end_idx = int(round(self.denoising_end * total_sigmas))
+        start_idx, end_idx = self._step_window(self.steps)
         self._validate_effective_schedule(start_idx=start_idx, end_idx=end_idx)
         if is_clipped:
             sigmas_sched = sigmas_sched[start_idx : end_idx + 1]
@@ -430,16 +553,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         total_steps = len(timesteps_sched)
 
-        # Build the CFG schedule against the FULL step count, then clip it to the active window. This way a
-        # caller-supplied per-step CFG list (one value per configured step) survives the reduction caused
-        # by denoising_start/denoising_end; a scalar is simply broadcast.
-        full_cfg_scale = self._prepare_cfg_scale(total_sigmas)
-        cfg_scale = full_cfg_scale[start_idx:end_idx] if is_clipped else full_cfg_scale
+        cfg_scale = self._active_cfg_scale(self.steps)
 
         # Load negative conditioning only if at least one active step actually uses CFG. CFG is still
         # decided per step below so values at or below 1.0 use the conditional prediction directly.
-        has_negative_conditioning = bool(self.negative_conditioning)
-        do_cfg = has_negative_conditioning and any(value > 1.0 for value in cfg_scale)
+        do_cfg = self._negative_prompt_runs(self.steps)
         neg_extension: Krea2RegionalPromptingExtension | None = None
         neg_prompt_embeds = None
         if do_cfg and self.negative_conditioning is not None:
@@ -475,17 +593,17 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Pack latents into 2x2 patches: (B, C, H, W) -> (B, grid_h*grid_w, C*4).
         latents = pack_latents(latents, 1, KREA2_LATENT_CHANNELS, latent_height, latent_width)
 
-        # Position ids: text tokens at origin, image tokens carry their grid coords.
-        text_seq_len = pos_prompt_embeds.shape[1]
-        position_ids = prepare_position_ids(text_seq_len, grid_height, grid_width, device)
+        # Position ids: text tokens at origin, image tokens carry their grid coords, reference i its (i, h, w).
+        def build_position_ids(text_seq_len: int) -> torch.Tensor:
+            if joint_references is None:
+                return prepare_position_ids(text_seq_len, grid_height, grid_width, device)
+            return prepare_position_ids_with_references(text_seq_len, grid_height, grid_width, reference_grids, device)
+
+        position_ids = build_position_ids(pos_prompt_embeds.shape[1])
         # The negative prompt can tokenize to a different length than the positive prompt, so it needs its
         # own position ids. Reusing the positive ids would leave the rotary embedding (text + image tokens)
         # a different length than the uncond query sequence and crash in the transformer's apply_rotary_emb.
-        neg_position_ids = (
-            prepare_position_ids(neg_prompt_embeds.shape[1], grid_height, grid_width, device)
-            if neg_prompt_embeds is not None
-            else None
-        )
+        neg_position_ids = build_position_ids(neg_prompt_embeds.shape[1]) if neg_prompt_embeds is not None else None
 
         # Inpaint extension operates in 4D, so unpack/repack around each merge.
         inpaint_mask = self._prep_inpaint_mask(context, noise)
@@ -557,8 +675,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         regional_attention_mask_bytes = self._regional_attention_mask_bytes(
             pos_extension, neg_extension, inference_dtype
         )
+        # Joint references are image tokens to every block and count in full toward the activations. Cached ones
+        # only run in the one reference-only pass, and their K/V stay resident for the whole loop.
         estimated_working_memory = self._estimate_working_memory(
-            image_seq_len=image_seq_len,
+            image_seq_len=image_seq_len + (0 if cache_references else reference_seq_len),
             positive_text_seq_len=pos_prompt_embeds.shape[1],
             negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
@@ -567,29 +687,37 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             style_reference_kv_bytes=(
                 style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0
             ),
+            reference_precompute_seq_len=reference_seq_len if cache_references else 0,
+            reference_kv_bytes=(
+                self._reference_kv_cache_bytes(transformer_info.model, reference_seq_len, inference_dtype)
+                if cache_references
+                else 0
+            ),
         )
         # The activation estimate assumes a fused kernel. Where the build has none for this attention -- ROCm on
         # Windows, MPS -- the score matrix is built as well (chunked on ROCm, see `install_rocm_sdpa_guard`).
+        step_seq_len = image_seq_len + max(
+            pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0
+        )
+        if cache_references:
+            # Each pass's S queries see S + R keys, and the one reference-only pass is R x R. The helper prices a
+            # square, so it gets the side of the larger area, rounded up.
+            score_area = max(step_seq_len * (step_seq_len + reference_seq_len), reference_seq_len**2)
+            score_seq_len = math.isqrt(score_area - 1) + 1
+        else:
+            score_seq_len = step_seq_len + reference_seq_len
         estimated_working_memory += self._attention_score_bytes(
             transformer_info.model,
-            seq_len=image_seq_len
-            + max(pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0),
+            seq_len=score_seq_len,
             has_attn_mask=regional_attention_mask_bytes > 0,
             device=device,
             dtype=inference_dtype,
         )
-        # An int8_tensorwise build stores its linears quantized and materializes the dequantized,
-        # derotated weight per forward call. That transient is alive alongside the activations above,
+        # An int8_tensorwise or GGUF build stores its linears quantized and materializes the dequantized
+        # weight per forward call. That transient is alive alongside the activations above,
         # so it is added rather than compared -- and it is invisible to an activation estimate, which
         # is how a model that loaded comfortably OOMs in its first step. Zero for any other format.
         estimated_working_memory += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
-
-        # Once per device per process, and from here rather than from startup: the probe allocates,
-        # so on the boot path it would create a CUDA context on an idle server -- and on `cuda:0`,
-        # which need not be a device this session ever uses. Before the model is locked, because it
-        # ends with `empty_cache()` and dropping the allocator's blocks is cheap now and expensive
-        # once the transformer is resident.
-        log_attention_backends(logger, device)
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
@@ -603,6 +731,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             attention_state = self._install_attention_processors(transformer, exit_stack)
             if style_extension is not None:
                 self._install_style_reference_processors(transformer, exit_stack, attention_state, style_extension)
+            reference_kv = (
+                self._install_reference_kv_processors(transformer, exit_stack, attention_state)
+                if cache_references
+                else None
+            )
 
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
@@ -625,7 +758,46 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # the sampler will use.
                 style_extension.prepare([sigma.item() for sigma in sigmas_sched[:total_steps]])
 
+            if reference_kv is not None:
+                assert reference_tokens is not None
+                # After the LoRA patcher, whose weights shape the reference K/V. Once per generation: the cache
+                # depends on neither the prompt nor the timestep, so it serves every step and both CFG passes.
+                context.util.signal_progress("Precomputing reference K/V")
+                precompute_reference_kv(
+                    transformer,
+                    reference_tokens,
+                    prepare_reference_position_ids(reference_grids, device),
+                    reference_kv,
+                )
+
+            # An INVOKE_KREA2_SDPA_BACKEND override measures PyTorch's kernels -- one pinned kernel, or the
+            # process-wide order for `default` -- so SageAttention must not serve those calls instead.
+            if resolve_krea2_sdpa_backends().override is None:
+                exit_stack.enter_context(sage_attention_scope())
+
             benchmark = _Krea2StepBenchmark.create(device)
+
+            def predict(
+                model_latents: torch.Tensor,
+                prompt_embeds: torch.Tensor,
+                timestep: torch.Tensor,
+                pass_position_ids: torch.Tensor,
+            ) -> torch.Tensor:
+                if joint_references is None:
+                    # Cached references enter through the attention processors.
+                    return transformer(
+                        hidden_states=model_latents,
+                        encoder_hidden_states=prompt_embeds,
+                        encoder_attention_mask=None,
+                        timestep=timestep,
+                        position_ids=pass_position_ids,
+                        return_dict=False,
+                    )[0]
+                # Both CFG passes carry the references (as in Qwen-Image-Edit), so guidance contrasts the
+                # prompts and not the presence of the edit reference.
+                return forward_with_references(
+                    transformer, model_latents, prompt_embeds, timestep, pass_position_ids, joint_references
+                )
 
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 if benchmark is not None:
@@ -658,27 +830,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # cfg ~4. The single reference pass above is shared by both.
                 with style_pass:
                     self._install_attention_payload(attention_state, pos_attention_payload)
-                    noise_pred_cond = transformer(
-                        hidden_states=model_latents,
-                        encoder_hidden_states=pos_prompt_embeds,
-                        encoder_attention_mask=None,
-                        timestep=timestep,
-                        position_ids=position_ids,
-                        return_dict=False,
-                    )[0]
+                    noise_pred_cond = predict(model_latents, pos_prompt_embeds, timestep, position_ids)
 
                     if self._should_apply_cfg_for_step(
                         cfg_scale[step_idx], has_negative_conditioning=neg_prompt_embeds is not None
                     ):
                         self._install_attention_payload(attention_state, neg_attention_payload)
-                        noise_pred_uncond = transformer(
-                            hidden_states=model_latents,
-                            encoder_hidden_states=neg_prompt_embeds,
-                            encoder_attention_mask=None,
-                            timestep=timestep,
-                            position_ids=neg_position_ids,
-                            return_dict=False,
-                        )[0]
+                        noise_pred_uncond = predict(model_latents, neg_prompt_embeds, timestep, neg_position_ids)
                         noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
                     else:
                         noise_pred = noise_pred_cond
@@ -777,6 +935,38 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # to ~1.7 GiB at 2560x1440 and would otherwise stay on the cached transformer.
         exit_stack.callback(style_state.clear)
 
+    def _install_reference_kv_processors(
+        self,
+        transformer: torch.nn.Module,
+        exit_stack: ExitStack,
+        attention_state: Krea2RegionalPromptingState,
+    ) -> Krea2ReferenceKVCache:
+        """Re-install the processors so every main block also carries the edit-reference K/V cache.
+
+        Like style reference, kept out of ``_install_attention_processors`` so that seam's signature stays as node
+        packs know it; subclasses overriding it are refused in validation.
+        """
+        cache = Krea2ReferenceKVCache()
+        transformer.set_attn_processor(
+            build_krea2_attention_processors(transformer, attention_state, reference_kv_cache=cache)
+        )
+        # ~0.66 GiB per 1 MP reference in bf16, retained on the cached transformer's processors unless dropped here.
+        exit_stack.callback(cache.clear)
+        return cache
+
+    @staticmethod
+    def _reference_kv_cache_bytes(transformer: object, reference_seq_len: int, dtype: torch.dtype) -> int:
+        """Size of the edit-reference K/V cache, from the loaded model's config (Krea-2 defaults where absent)."""
+        config = getattr(transformer, "config", None)
+        return reference_kv_cache_bytes(
+            num_layers=getattr(config, "num_layers", KREA2_NUM_BLOCKS),
+            num_heads=getattr(config, "num_attention_heads", 48),
+            num_kv_heads=getattr(config, "num_key_value_heads", KREA2_NUM_KV_HEADS),
+            head_dim=getattr(config, "attention_head_dim", KREA2_HEAD_DIM),
+            reference_seq_len=reference_seq_len,
+            element_size=torch.empty((), dtype=dtype).element_size(),
+        )
+
     @staticmethod
     def _clear_attention_state(state: Krea2RegionalPromptingState) -> None:
         """Drop every tensor the shared attention state retains. Override alongside the state object."""
@@ -820,10 +1010,10 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         """The score matrix the main blocks' joint attention materializes, where it does (0 on a fused kernel).
 
         One call is alive at a time: the blocks run in sequence, and so do the conditional and unconditional passes.
-        The K/V heads are expanded to the query heads before the call on any build without a fused grouped-query
-        kernel (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the
-        loaded model's config. The probe answers for torch's default policy, so forcing the math kernel through the
-        `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
+        The K/V heads are expanded to the query heads before the call unless a fused kernel takes them grouped
+        (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the loaded
+        model's config. The probe answers for the process-wide policy the call runs under (`attention_backend: math`
+        included), so forcing the math kernel through the `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
         """
         config = getattr(transformer, "config", None)
         num_heads = getattr(config, "num_attention_heads", None)
@@ -848,6 +1038,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         num_loras: int,
         regional_attention_mask_bytes: int = 0,
         style_reference_kv_bytes: int = 0,
+        reference_precompute_seq_len: int = 0,
+        reference_kv_bytes: int = 0,
     ) -> int:
         """Estimate peak transformer activation memory (bytes) so the model cache reserves enough headroom.
 
@@ -870,7 +1062,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         MB = 1024**2
         per_token_bytes = int(0.5 * MB)
         text_seq_len = max(positive_text_seq_len, negative_text_seq_len or 0)
-        estimated = (image_seq_len + text_seq_len) * per_token_bytes
+        # The edit-reference K/V precompute runs the references alone, before the loop; its peak is the larger
+        # one when the references outnumber the per-step tokens.
+        estimated = max(image_seq_len + text_seq_len, reference_precompute_seq_len) * per_token_bytes
         estimated += int(1.5 * GB)
         if do_cfg:
             # Conditional/unconditional passes are sequential, but the larger combined sequence and extra
@@ -888,6 +1082,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             # after the multiplier rather than scaled by it.
             estimated = int(estimated * 1.35)
             estimated += style_reference_kv_bytes
+        # The cached reference K/V are an exact size and stay resident through the loop, like the style cache.
+        estimated += reference_kv_bytes
         if num_loras > 0:
             estimated += int(0.5 * num_loras * GB)
         return estimated

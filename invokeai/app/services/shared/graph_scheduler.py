@@ -10,6 +10,7 @@ from invokeai.app.services.shared.execution_engine.scheduler import (
     ExecutionPlan,
     ExecutionScheduler,
 )
+from invokeai.app.services.shared.graph_loop_topology import NestedForBody, NestedIterateChain
 from invokeai.app.services.shared.graph_nested_iterate_planner import (
     can_use_nested_iterate_planner,
     get_nested_iterate_sequence_depth,
@@ -32,13 +33,12 @@ def _prepare_deferred_nested_for_body(
     """Prepare a deferred nested For body through the caller's node planner."""
 
     completed_source_id = state._prepared_registry().get_source_node_id(exec_node_id)
-    graph = state._get_source_graph_flat()
-    for source_for_id, source_node in state.graph.nodes.items():
-        if not isinstance(source_node, ForInvocation):
-            continue
-        serial_nested_body = state.graph._get_supported_for_serial_nested_iterate_chain(source_for_id, graph)
-        if serial_nested_body is not None:
-            if completed_source_id not in serial_nested_body.body_path_nodes:
+    loop_topology = state._loop_topology()
+    graph = loop_topology.flat_graph
+    # Fors without a nested body shape have nothing deferred.
+    for source_for_id, body_shape in loop_topology.for_body_shapes.items():
+        if isinstance(body_shape, NestedIterateChain):
+            if completed_source_id not in body_shape.body_path_nodes:
                 continue
             prepared_exec_path = state._get_iteration_path(exec_node_id)
             for prepared_for_id in state._prepared_registry().get_prepared_ids(source_for_id):
@@ -52,18 +52,12 @@ def _prepare_deferred_nested_for_body(
                 if prepared_exec_path[: len(prepared_for_path)] == prepared_for_path:
                     planner.create_for_body_iteration(source_for_id=source_for_id, prepared_for_id=prepared_for_id)
                     return
-        nested_body = state.graph._get_supported_for_nested_iterate_body(source_for_id, graph)
-        nested_for_body = state.graph._get_supported_for_nested_for_body(source_for_id, graph)
-        if nested_body is not None:
-            body_path_nodes = nested_body.body_path_nodes
-            deferred_node_ids = (nested_body.iterate_node_id,)
-        elif nested_for_body is None:
             continue
-        else:
-            body_path_nodes = nested_for_body.body_path_nodes
-            deferred_node_ids = nested_for_body.inner_for_ids
+        deferred_node_ids = (
+            body_shape.inner_for_ids if isinstance(body_shape, NestedForBody) else (body_shape.iterate_node_id,)
+        )
         if completed_source_id != source_for_id and (
-            completed_source_id not in body_path_nodes
+            completed_source_id not in body_shape.body_path_nodes
             or not any(
                 nx.has_path(graph, completed_source_id, deferred_node_id) for deferred_node_id in deferred_node_ids
             )
@@ -79,7 +73,7 @@ def _prepare_deferred_nested_for_body(
                 )
             if prepared_for_path != state._get_iteration_path(exec_node_id):
                 continue
-            if nested_for_body is not None:
+            if isinstance(body_shape, NestedForBody):
                 if not all(
                     any(
                         state._get_for_parent_iteration_path(prepared_child_id) == prepared_for_path
@@ -145,12 +139,12 @@ class _ExecutionScheduler:
         self.mark_skipped(exec_node_id)
         return True
 
-    def _discard_rejected_activation_nodes(self) -> None:
-        for exec_node_id in tuple(nx.topological_sort(self._state._get_execution_graph_flat())):
+    def _discard_rejected_activation_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        for exec_node_id in exec_node_ids:
             self._discard_rejected_activation_node(exec_node_id)
 
-    def _enqueue_activation_ready_nodes(self) -> None:
-        for exec_node_id in tuple(self._state.prepared_source_mapping):
+    def _enqueue_activation_ready_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        for exec_node_id in exec_node_ids:
             if exec_node_id not in self._state.indegree or exec_node_id in self._state.executed:
                 continue
             self.enqueue_if_ready(exec_node_id)
@@ -310,9 +304,7 @@ class _ExecutionScheduler:
         completed_node = self._state.execution_graph.get_node(exec_node_id)
         if isinstance(completed_node, ForInvocation) and completed_node.index >= 0:
             source_for_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
-            nested_body = self._state.graph._get_supported_for_nested_iterate_body(
-                source_for_id, self._state._get_source_graph_flat()
-            )
+            nested_body = self._state._loop_topology().nested_iterate_body(source_for_id)
             prepared_for_node = self._state.execution_graph.get_node(exec_node_id)
             prepared_for_path = self._state._get_iteration_path(exec_node_id)
             if isinstance(prepared_for_node, ForInvocation) and prepared_for_node.index >= 0:
@@ -429,7 +421,10 @@ class _GenericGraphSchedulerAdapter:
         self._state._resolve_activation_gate(exec_node_id, selected_field)
         self._state._tx_set_mapping(runtime.resolved_if_exec_branches, exec_node_id, selected_field)
         self._state._record_compatibility_activation_token(exec_node_id, selected_field)
-        self._discard_rejected_nodes()
+        source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
+        self._state._invalidate_selected_if_frames_for_preparation(source_if_id)
+        iteration_path = self._state._get_iteration_path(exec_node_id)
+        self._discard_rejected_nodes(self._state._get_activation_dependents_for_if(source_if_id, iteration_path))
         self._sync_indegree()
         if enqueue:
             self._project_ready_nodes()
@@ -443,10 +438,10 @@ class _GenericGraphSchedulerAdapter:
         ):
             self._retire_unselected_node(exec_node_id)
 
-    def _discard_rejected_nodes(self) -> None:
-        """Discard plan nodes whose opaque activation requirements are rejected."""
+    def _discard_rejected_nodes(self, exec_node_ids: Iterable[str]) -> None:
+        """Discard only prepared plan nodes governed by the resolved If frame."""
 
-        for exec_node_id in tuple(self._scheduler.plan.nodes):
+        for exec_node_id in exec_node_ids:
             self._discard_rejected_node(exec_node_id)
 
     def _sync_executed_state(self, excluded: Iterable[str] = ()) -> None:
@@ -537,7 +532,7 @@ class _GenericGraphSchedulerAdapter:
     def _enqueue_activation_ready_nodes(self) -> None:
         """Recheck prepared nodes whose activation input arrived after plan registration."""
 
-        for exec_node_id in tuple(self._if_exec_ids):
+        for exec_node_id in tuple(self._state._pending_if_exec_nodes):
             if exec_node_id not in self._state.indegree or exec_node_id in self._state.executed:
                 continue
             self._state._tx_set_mapping(
@@ -648,7 +643,7 @@ class _GenericGraphSchedulerAdapter:
         # Fresh If branch inputs may be materialized after the If dependency was
         # registered, so no ordinary plan edge exists to re-enqueue the If when
         # its selected branch completes. Recheck activation readiness here.
-        if any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
+        if self._if_exec_ids:
             self._enqueue_activation_ready_nodes()
         if can_use_nested_iterate_planner(self._state):
             prepare_nested_iterate_bodies(self._state)

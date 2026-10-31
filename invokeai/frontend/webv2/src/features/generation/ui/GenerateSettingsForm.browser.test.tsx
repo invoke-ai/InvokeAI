@@ -88,16 +88,43 @@ const CATALOG: readonly GenerationModelCatalogItem[] = [MODEL];
 const OTHER_SDXL = { ...MODEL, key: 'sdxl-2', name: 'SDXL 2' } as GenerationModelCatalogItem;
 // A coarser size grid than SDXL's, and no SDXL LoRAs.
 const FLUX = { ...MODEL, base: 'flux', key: 'flux', name: 'FLUX' } as GenerationModelCatalogItem;
+const ANIMA = { ...MODEL, base: 'anima', key: 'anima', name: 'Anima' } as GenerationModelCatalogItem;
+const ANIMA_INPAINT_ADAPTER = {
+  base: 'anima',
+  cond_in_channels: 4,
+  key: 'anima-inpaint',
+  name: 'Anima LLLite Inpainting',
+  type: 'controlnet',
+} as GenerationModelCatalogItem;
+const ANIMA_SKETCH_ADAPTER = {
+  ...ANIMA_INPAINT_ADAPTER,
+  cond_in_channels: 3,
+  key: 'anima-sketch',
+  name: 'Anima LLLite Sketch',
+} as GenerationModelCatalogItem;
 
-/** The model card's picker, reduced to buttons that hand a model to its real selection handler. */
-const MainModelPicker = ({ modelTypes, onChange }: GenerationModelSelectProps) =>
-  modelTypes.includes('external_image_generator')
-    ? [OTHER_SDXL, FLUX].map((model) => (
-        <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
-          {model.name}
-        </button>
-      ))
-    : null;
+/**
+ * The picker, reduced to buttons that hand a model to its real selection handler: the model card's main picks, and
+ * for a component slot the catalog models of its types that pass its filter.
+ */
+const MainModelPicker = ({ filter, modelTypes, onChange, value }: GenerationModelSelectProps) =>
+  modelTypes.includes('external_image_generator') ? (
+    [OTHER_SDXL, FLUX].map((model) => (
+      <button key={model.key} data-model-pick={model.key} type="button" onClick={() => onChange(model)}>
+        {model.name}
+      </button>
+    ))
+  ) : (
+    <div data-component-types={modelTypes.join(',')} data-component-value={value ?? ''}>
+      {stableGroups.models.catalog
+        .filter((model) => modelTypes.includes(model.type) && (filter?.(model) ?? true))
+        .map((model) => (
+          <button key={model.key} data-component-pick={model.key} type="button" onClick={() => onChange(model)}>
+            {model.name}
+          </button>
+        ))}
+    </div>
+  );
 const INITIAL_VALUES: Record<string, unknown> = {
   ...getDefaultGenerateSettings(MODEL as never),
   modelKey: MODEL.key,
@@ -114,6 +141,7 @@ let root: Root | null = null;
 let queryClient = new QueryClient();
 let projectValues = new Map<string, ExternalStoreCore<Record<string, unknown>>>();
 let patches: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
+let sizeResets: Array<{ patch: Record<string, unknown>; projectId: string | undefined }> = [];
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const storedValues = (projectId = 'project-1') => {
@@ -135,7 +163,7 @@ const createStableGroups = () => ({
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },
   capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
-  gallery: { findImage: noop, selectedImage: null, touchImages: noop },
+  gallery: { findImage: noop, getUploadBoardId: () => Promise.resolve('none'), selectedImage: null, touchImages: noop },
   models: {
     ModelSelect: MainModelPicker,
     catalog: CATALOG,
@@ -155,6 +183,10 @@ const createStableGroups = () => ({
   settings: {
     patchGenerateSettings: (patch: Record<string, unknown>, projectId?: string) => {
       patches.push({ patch, projectId });
+      storedValues(projectId).patchSnapshot(patch);
+    },
+    resetDimensions: (patch: Record<string, unknown>, projectId?: string) => {
+      sizeResets.push({ patch, projectId });
       storedValues(projectId).patchSnapshot(patch);
     },
   },
@@ -252,6 +284,7 @@ beforeEach(async () => {
     ['project-2', createExternalStoreCore<Record<string, unknown>>({ ...INITIAL_VALUES, steps: 50 })],
   ]);
   patches = [];
+  sizeResets = [];
   stableGroups = createStableGroups();
   // Seeded, never-stale reads keep late responses from landing inside a counted window.
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } });
@@ -271,6 +304,131 @@ afterEach(async () => {
   root = null;
   commits.clear();
   accountLifecycle.invalidate();
+});
+
+describe('GenerateSettingsForm Anima inpaint adapter', () => {
+  const adapterSlot = () => host!.querySelector<HTMLElement>('[data-component-types="controlnet"]');
+  const adapterPicks = () =>
+    [...(adapterSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
+      pick.getAttribute('data-component-pick')
+    );
+  const weightLabel = 'widgets.generate.animaInpaintAdapterWeight';
+  const weightScrubber = () =>
+    [...document.querySelectorAll('[data-scope="scrubber"]')].find(
+      (candidate) => candidate.querySelector('[data-part="label"]')?.textContent === weightLabel
+    );
+
+  it('offers the slot to Anima only, lists only 4-channel adapters, and shows the weight once one is picked', async () => {
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER, ANIMA_SKETCH_ADAPTER];
+    await renderAdapter(buildAdapter());
+
+    expect(adapterSlot()).toBeNull();
+
+    await settle(() =>
+      storedValues().patchSnapshot({ ...getDefaultGenerateSettings(ANIMA as never), modelKey: ANIMA.key })
+    );
+
+    expect(adapterPicks()).toEqual([ANIMA_INPAINT_ADAPTER.key]);
+    expect(weightScrubber()).toBeUndefined();
+
+    await settle(() => host!.querySelector<HTMLElement>('[data-component-pick="anima-inpaint"]')?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER });
+    const slider = sliderNamed(weightLabel);
+    expect(slider.getAttribute('aria-valuenow')).toBe('1');
+    expect(document.getElementById(slider.getAttribute('aria-labelledby') ?? '')?.textContent).toBe(weightLabel);
+
+    await pressRight(sliderNamed(weightLabel));
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ animaInpaintAdapterWeight: 1.05 });
+  });
+
+  it('switches the adapter off and back on without losing the pick or the weight', async () => {
+    const switchLabel = 'widgets.generate.animaInpaintAdapterEnabled';
+    const offHelp = 'widgets.generate.animaInpaintAdapterOffHelp';
+    const adapterSwitch = () =>
+      [...host!.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(
+        (input) => input.labels?.[0]?.textContent === switchLabel
+      );
+    stableGroups.models.catalog = [MODEL, ANIMA, ANIMA_INPAINT_ADAPTER];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(ANIMA as never),
+        animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER as never,
+        animaInpaintAdapterWeight: 0.6,
+        modelKey: ANIMA.key,
+      })
+    );
+
+    expect(adapterSwitch()?.checked).toBe(true);
+    expect(host!.textContent).not.toContain(offHelp);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: false,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(adapterSwitch()?.checked).toBe(false);
+    expect(host!.textContent).toContain(offHelp);
+    expect(adapterSlot()?.getAttribute('data-component-value')).toBe(ANIMA_INPAINT_ADAPTER.key);
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBe('true');
+
+    await userEvent.click(adapterSwitch()!.labels![0]!);
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({
+      animaInpaintAdapterEnabled: true,
+      animaInpaintAdapterModel: ANIMA_INPAINT_ADAPTER,
+      animaInpaintAdapterWeight: 0.6,
+    });
+    expect(sliderNamed(weightLabel).getAttribute('aria-disabled')).toBeNull();
+  });
+});
+
+describe('GenerateSettingsForm Z-Image Qwen3 encoder', () => {
+  const Z_IMAGE = { ...MODEL, base: 'z-image', format: 'gguf_quantized', key: 'z-image', name: 'Z-Image' };
+  const encoder = (variant: string) =>
+    ({ base: 'any', key: `qwen3-${variant}`, name: `Qwen3 ${variant}`, type: 'qwen3_encoder', variant }) as const;
+  const QWEN3_4B = encoder('qwen3_4b');
+  const QWEN3_8B = encoder('qwen3_8b');
+  const encoderSlot = () => host!.querySelector<HTMLElement>('[data-component-types="qwen3_encoder"]');
+  const encoderError = () => encoderSlot()?.closest('[data-scope="field"]')?.querySelector('[role="alert"]');
+
+  it('keeps a saved 8B encoder visible with its reason until a 4B one replaces it', async () => {
+    stableGroups.models.catalog = [MODEL, Z_IMAGE, QWEN3_4B, QWEN3_8B] as GenerationModelCatalogItem[];
+    await renderAdapter(buildAdapter());
+    await settle(() =>
+      storedValues().patchSnapshot({
+        ...getDefaultGenerateSettings(Z_IMAGE as never),
+        modelKey: Z_IMAGE.key,
+        qwen3EncoderModel: QWEN3_8B,
+      })
+    );
+
+    expect(encoderSlot()?.getAttribute('data-component-value')).toBe(QWEN3_8B.key);
+    expect(encoderError()?.textContent).toBe(
+      'The selected Qwen3 Encoder is not the 4B one Z-Image conditions on. Select a Qwen3 4B Encoder or clear it.'
+    );
+    expect(
+      [...(encoderSlot()?.querySelectorAll('[data-component-pick]') ?? [])].map((pick) =>
+        pick.getAttribute('data-component-pick')
+      )
+    ).toEqual([QWEN3_4B.key]);
+
+    await settle(() => host!.querySelector<HTMLElement>(`[data-component-pick="${QWEN3_4B.key}"]`)?.click());
+    await settle(flushGenerateDrafts);
+
+    expect(storedValues().getSnapshot()).toMatchObject({ qwen3EncoderModel: { key: QWEN3_4B.key } });
+    expect(encoderSlot()?.getAttribute('data-component-value')).toBe(QWEN3_4B.key);
+    expect(encoderError()).toBeNull();
+  });
 });
 
 describe('GenerateSettingsForm render isolation', () => {
@@ -404,6 +562,40 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
   });
 
+  it('applies a size reset at once, superseding a pending size edit that can then never land after it', async () => {
+    await settle(() =>
+      storedValues().patchSnapshot({
+        aspectRatioId: '2:3',
+        aspectRatioIsLocked: true,
+        aspectRatioValue: 2 / 3,
+        height: 1216,
+        width: 832,
+      })
+    );
+    await settle(() =>
+      host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.resetSize"]')?.click()
+    );
+    const menu = document.querySelector<HTMLElement>('[role="menu"]');
+    // Highlights the first choice, Square at native size.
+    await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+
+    // A width step still inside its debounce window, then the reset.
+    await settle(() => {
+      sliderNamed('widgets.generate.width').dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })
+      );
+      menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    });
+    await settle(noop, 400);
+
+    // SDXL is native at 1024.
+    expect(sizeResets).toEqual([
+      { patch: { aspectRatioId: '1:1', aspectRatioValue: 1, height: 1024, width: 1024 }, projectId: 'project-1' },
+    ]);
+    expect(patches).toEqual([]);
+    expect(storedValues().getSnapshot()).toMatchObject({ aspectRatioIsLocked: true, height: 1024, width: 1024 });
+  });
+
   it('batches fast edits to several fields into one patch on the project they were made in', async () => {
     await stepSteps();
     await stepSteps();
@@ -533,6 +725,25 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(stepsValue()).toBe(31);
   });
 
+  it('switches at once when only the size moves, reporting the new size', async () => {
+    const info = vi.fn();
+    stableGroups.notifications.info = info;
+    stableGroups.models.catalog = [MODEL, FLUX];
+    await renderAdapter(buildAdapter());
+    // 1032 sits on SDXL's 8 px grid but not FLUX's 16 px one.
+    await pressRight(sliderNamed('widgets.generate.width'));
+
+    await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
+
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(patches.at(-1)?.patch).toMatchObject({ modelKey: 'flux' });
+    expect((patches.at(-1)?.patch.width as number) % 16).toBe(0);
+    expect(info).toHaveBeenCalledWith(
+      'widgets.generate.dimensionsAdjusted',
+      'widgets.generate.dimensionsAdjustedDescription'
+    );
+  });
+
   it('confirms a lossy switch against the draft, pending edits included', async () => {
     stableGroups.models.catalog = [MODEL, FLUX, ink];
     storedValues().patchSnapshot({ loras: [{ isEnabled: true, model: ink, weight: 0.75 }] });
@@ -544,7 +755,9 @@ describe('GenerateSettingsForm render isolation', () => {
     await settle(() => host!.querySelector<HTMLElement>('[data-model-pick="flux"]')?.click());
 
     const dialog = document.querySelector<HTMLElement>('[role="alertdialog"]');
-    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+    // The size moves to the FLUX grid, which the dialog reports beside the loss rather than as one.
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelBody: LoRAs');
+    expect(dialog?.textContent).toContain('widgets.generate.switchModelAdjustsDimensions');
     expect(patches).toEqual([]);
 
     const confirm = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
@@ -555,7 +768,7 @@ describe('GenerateSettingsForm render isolation', () => {
     // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
     expect(frames).not.toHaveLength(0);
     for (const frame of frames) {
-      expect(frame.text).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+      expect(frame.text).toContain('widgets.generate.switchModelBody: LoRAs');
     }
 
     await settle(noop, 400);

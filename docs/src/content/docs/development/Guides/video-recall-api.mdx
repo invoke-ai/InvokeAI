@@ -1,6 +1,6 @@
 ---
 title: Video Recall API
-description: REST endpoints that let an external process recall or remix video generation parameters and place gallery or uploaded videos into a user's Video panel.
+description: REST endpoints that let an external process recall or remix video generation parameters and place gallery images and gallery or uploaded videos into a user's Video panel.
 ---
 
 ## Overview
@@ -19,9 +19,14 @@ browser, a script, another application — drive a user's open **Video** panel:
 - **Use as Conditioning Clip** — set a video as the conditioning clip of models that
   generate one half of a clip from the other (today, LTX-2): its soundtrack, to
   generate a picture for it, or its picture, to generate a soundtrack for it.
+- **Send Image / Append Image** — place a gallery image wherever the panel's model
+  takes images: as a reference image (MiniMax H3 Ref2VA) or as the first or last
+  frame (Wan I2V, LTX-2, MiniMax H3 FL2VA). Send replaces the panel's images;
+  Append adds to them.
 
 Send Video, Use as Ref Video and Use as Conditioning Clip take either the name of a video already in the
-gallery or a video file, which is uploaded into the gallery first.
+gallery or a video file, which is uploaded into the gallery first. Send Image and
+Append Image take only the name of an image already in the gallery.
 
 ## How it works
 
@@ -47,6 +52,7 @@ gallery or a video file, which is uploaded into the gallery first.
 | `POST /api/v1/recall/video/{queue_id}/reference-video/upload` | multipart `file` | Upload, then use as a reference |
 | `POST /api/v1/recall/video/{queue_id}/conditioning-video?video_name=…&role=…` | none | Use a gallery video as the conditioning clip |
 | `POST /api/v1/recall/video/{queue_id}/conditioning-video/upload?role=…` | multipart `file` | Upload, then use as the conditioning clip |
+| `POST /api/v1/recall/video/{queue_id}/image?image_name=…&append=…` | none | Send or append a gallery image |
 
 `queue_id` is the frontend's queue, normally `default`.
 
@@ -109,6 +115,24 @@ extend a clip, a reference video needs a model that takes reference videos,
 with room for another, and a conditioning clip needs a model that generates in the
 requested role.
 
+### Send Image and Append Image
+
+`POST /api/v1/recall/video/{queue_id}/image`
+
+| Query parameter | Default | Meaning |
+|---|---|---|
+| `image_name` | required | A gallery image the caller can read, 1–255 characters |
+| `append` | `false` | `false` (Send) replaces the panel's images; `true` (Append) adds the image after them |
+
+The backend cannot know which model the user's panel holds, so the response only
+confirms that the event was emitted to the user; where the image lands, or why it was
+declined, is reported to the user in the panel. See
+[Frontend behavior](#frontend-behavior). There is no upload variant: upload the image
+with `POST /api/v1/images/upload` first, then send its name.
+
+Clients can feature-detect this route by looking for the `recall_video_image`
+operation in `/openapi.json`.
+
 ## Frontend behavior
 
 webv2 applies each event, in arrival order, to the Video panel of the project that
@@ -157,6 +181,23 @@ in a text field; the notification still reports the change.
   file, whose picture is only a placeholder. Other settings are not changed to fit
   the clip: a two-stage resolution, or a clip whose length falls outside the
   model's frame range, still has to be fixed before the panel can generate.
+- **Send Image / Append Image** place the image according to the panel's model,
+  which is never switched to make it fit:
+
+  | Panel model | Send (`append=false`) | Append (`append=true`) |
+  |---|---|---|
+  | Takes reference images (MiniMax H3 Ref2VA) | Replaces the reference images; reference videos stay | Added after the references; declined when all nine image slots are taken |
+  | Takes frames (Wan I2V, LTX-2, MiniMax H3 FL2VA) | Becomes the first frame; the last frame is cleared | Fills the first frame when it is empty, otherwise the last frame; declined once both are set, or once the first is set on a model without a last frame |
+  | Takes no images (e.g. Wan T2V) | Declined | Declined |
+
+  Placement follows the panel's own fields. A reference image displaces the frame
+  slots and a conditioning clip, and the initial video too unless the panel
+  extends from its references, in which case the clip's continuity reference stays
+  last. A first frame displaces the initial video, and an initial video counts as
+  the first frame when appending. A frame displaces a conditioning clip in the
+  `video` role; a clip in the `audio` role stays, anchored by the frame. When
+  placing the image clears a conditioning clip or an initial video, the
+  notification says so.
 
 The gallery's context menu offers the same *Extend in Video*, *Use as Reference
 Video* and *Use as Conditioning Clip* actions for any video in the gallery.
@@ -256,6 +297,10 @@ curl -X POST "http://localhost:9090/api/v1/recall/video/default/reference-video/
 # Generate an LTX-2 picture for a song's soundtrack
 curl -X POST "http://localhost:9090/api/v1/recall/video/default/conditioning-video/upload?role=audio" \
   -F "file=@song.mp3"
+
+# Use a gallery image as the first frame, then append another as the last frame
+curl -X POST "http://localhost:9090/api/v1/recall/video/default/image?image_name=0b6f….png"
+curl -X POST "http://localhost:9090/api/v1/recall/video/default/image?image_name=9d2a….png&append=true"
 ```
 
 In multi-user mode, add `-H "Authorization: Bearer <token>"`.
@@ -303,6 +348,16 @@ Send Video / Use as Ref Video / Use as Conditioning Clip:
 
 `video` is the gallery video's full record.
 
+Send Image / Append Image:
+
+```json
+{ "status": "success", "queue_id": "default", "image": { "image_name": "…", "width": 832, "height": 480 }, "append": false }
+```
+
+`success` means the event was emitted to the user's open sessions. It is not an
+acknowledgement: nothing is placed when no webv2 session is open, and a decline is
+reported only in the panel.
+
 ## Errors
 
 | Status | Cause |
@@ -310,8 +365,8 @@ Send Video / Use as Ref Video / Use as Conditioning Clip:
 | `401` | Multi-user mode without a valid token |
 | `400` | The upload ended before its body was complete |
 | `403` | The caller may not read a referenced image or video, or may not add media to `board_id` |
-| `404` | `video_name` (Send Video / Use as Ref Video / Use as Conditioning Clip) is not in the gallery, or `board_id` does not exist |
-| `409` | Image storage maintenance is running (Recall / Remix) |
+| `404` | `video_name` (Send Video / Use as Ref Video / Use as Conditioning Clip) or `image_name` (Send Image / Append Image) is not in the gallery, or `board_id` does not exist |
+| `409` | Image storage maintenance is running (Recall / Remix, Send Image / Append Image) |
 | `413` | The upload exceeds the video upload size limit |
 | `415` | The upload is not a supported video or audio file, or could not be converted |
 | `422` | Malformed JSON or multipart body, an unknown field, a value out of bounds, a missing or unknown `role` (Use as Conditioning Clip), or `metadata` that is not a JSON object |
@@ -326,12 +381,14 @@ Send Video / Use as Ref Video / Use as Conditioning Clip:
 |---|---|---|
 | `queue_id` | string | From the request path |
 | `user_id` | string | The caller |
-| `action` | `"parameters"` \| `"initial_video"` \| `"reference_video"` \| `"conditioning_video"` | What to do |
+| `action` | `"parameters"` \| `"initial_video"` \| `"reference_video"` \| `"conditioning_video"` \| `"image"` | What to do |
 | `mode` | `"recall"` \| `"remix"` \| null | `parameters` only |
 | `strict` | boolean | `parameters` only |
 | `parameters` | object \| null | `parameters` only: the resolved fields, with models as `{key, hash, name, base, type}` |
-| `video` | object \| null | Placements only: `{video_name, width, height, duration, fps, media_origin}` |
+| `video` | object \| null | Video placements only: `{video_name, width, height, duration, fps, media_origin}` |
 | `conditioning_role` | `"audio"` \| `"video"` \| null | `conditioning_video` only: which stream of `video` is the condition |
+| `image` | object \| null | `image` only: `{image_name, width, height}` |
+| `append` | boolean | `image` only: add to the panel's images instead of replacing them; always `false` for other actions |
 
 ## Implementation
 

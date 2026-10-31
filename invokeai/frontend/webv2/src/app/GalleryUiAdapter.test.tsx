@@ -38,6 +38,8 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(store.getSnapshot().activeProject),
   useWorkbenchCommands: () => store.commands,
+  useWorkbenchInternalStore: () => store,
+  useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
   useWorkbenchQueries: () => store.queries,
 }));
 
@@ -66,6 +68,15 @@ describe('Gallery live-follow adapter', () => {
 
     owner.followProgressSession('run:2', { revealPreview: true });
     expect(openWorkbenchWidget).toHaveBeenCalledExactlyOnceWith('preview');
+  });
+
+  it('shows live frames in the Gallery only while Auto-switch is In progress', () => {
+    const modes = (['progress', 'latest', 'off'] as const).map((mode) => {
+      store.commands.account.updateProjectPreferences({ viewerAutoSwitch: mode });
+      return renderAdapter().liveFollowEnabled;
+    });
+
+    expect(modes).toEqual([true, false, false]);
   });
 
   it('ignores a follow retained across an account change', () => {

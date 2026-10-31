@@ -1,5 +1,7 @@
 export type {
   GalleryBoard,
+  GalleryBoardAccess,
+  GalleryBoardAction,
   GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
@@ -11,7 +13,13 @@ export type {
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './core/types';
-export { getGalleryBoardLabel, type GalleryBoardTranslate } from './core/boardLabels';
+export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
+export {
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
+  type GalleryBoardDestinationGroup,
+  type GalleryBoardTranslate,
+} from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
 export {
   assertNeverGalleryItem,
@@ -51,7 +59,10 @@ export {
 export {
   DEFAULT_GALLERY_SETTINGS,
   GALLERY_AUTO_ADD_FOLLOW,
+  getGalleryMediaFilter,
   getGallerySettings,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
@@ -59,17 +70,21 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
   getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryView,
+  settleGallerySearchScope,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {
+  captureGalleryNavigation,
   claimGalleryNavigationSequence,
   getGalleryDeletionSuccessor,
   getGalleryNavigationStep,
@@ -77,8 +92,13 @@ export {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
+  hasGalleryListingSearch,
+  hasGalleryLocatorRequests,
   isGalleryNavigationCurrent,
+  isGalleryNavigationStateUnchanged,
   requestGalleryItemReveal,
+  type GalleryNavigationSnapshot,
+  type GalleryRevealAnnouncement,
   type GalleryNavigationDirection,
   type GalleryNavigationEntry,
 } from './core/selection';

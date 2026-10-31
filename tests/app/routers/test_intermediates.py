@@ -12,6 +12,8 @@ from PIL import Image
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 @pytest.fixture
@@ -36,7 +38,7 @@ def _user_id(mock_invoker: Invoker, email: str) -> str:
     return user.user_id
 
 
-def _seed_intermediate(mock_invoker: Invoker, name: str, user_id: str) -> None:
+def _seed_intermediate(mock_invoker: Invoker, database: Database, name: str, user_id: str) -> None:
     mock_invoker.services.image_records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -47,7 +49,7 @@ def _seed_intermediate(mock_invoker: Invoker, name: str, user_id: str) -> None:
         is_intermediate=True,
         user_id=user_id,
     )
-    with mock_invoker.services.image_records._db.transaction() as cursor:
+    with sqlite_cursor(database) as cursor:
         cursor.execute("UPDATE images SET created_at = '2020-01-01 00:00:00.000' WHERE image_name = ?;", (name,))
     mock_invoker.services.image_files.save(image=Image.new("RGB", (8, 8)), image_name=name)
 
@@ -83,10 +85,15 @@ def test_every_route_requires_authentication(enable_multiuser: Any, client: Test
 
 
 def test_non_admins_see_only_their_rows_and_cannot_widen_scope(
-    storage_ready: None, mock_invoker: Invoker, client: TestClient, user1_token: str, user2_token: str
+    storage_ready: None,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    client: TestClient,
+    user1_token: str,
+    user2_token: str,
 ) -> None:
-    _seed_intermediate(mock_invoker, "u1.png", _user_id(mock_invoker, "user1@test.com"))
-    _seed_intermediate(mock_invoker, "u2.png", _user_id(mock_invoker, "user2@test.com"))
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "u1.png", _user_id(mock_invoker, "user1@test.com"))
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "u2.png", _user_id(mock_invoker, "user2@test.com"))
 
     summary = client.get("/api/v1/intermediates/summary", headers=_auth(user1_token))
     assert summary.status_code == 200
@@ -117,10 +124,16 @@ def test_non_admins_see_only_their_rows_and_cannot_widen_scope(
 
 
 def test_preview_operation_and_list_flow(
-    storage_ready: None, mock_invoker: Invoker, client: TestClient, user1_token: str, user2_token: str, admin_token: str
+    storage_ready: None,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    client: TestClient,
+    user1_token: str,
+    user2_token: str,
+    admin_token: str,
 ) -> None:
     user1 = _user_id(mock_invoker, "user1@test.com")
-    _seed_intermediate(mock_invoker, "u1.png", user1)
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "u1.png", user1)
 
     preview = client.post(
         "/api/v1/intermediates/previews",
@@ -184,10 +197,15 @@ def test_mutations_are_refused_during_image_storage_maintenance(
 
 
 def test_hold_is_account_scoped_at_the_http_boundary(
-    storage_ready: None, mock_invoker: Invoker, client: TestClient, user1_token: str, user2_token: str
+    storage_ready: None,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    client: TestClient,
+    user1_token: str,
+    user2_token: str,
 ) -> None:
     user1 = _user_id(mock_invoker, "user1@test.com")
-    _seed_intermediate(mock_invoker, "held.png", user1)
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "held.png", user1)
     assert (
         client.put(
             "/api/v1/intermediates/holds/tab", json={"images": ["held.png"]}, headers=_auth(user1_token)
@@ -214,11 +232,16 @@ def test_hold_lease_ids_are_single_tokens(storage_ready: None, client: TestClien
 
 
 def test_legacy_clear_keeps_its_shape_and_the_safety_policy(
-    storage_ready: None, mock_invoker: Invoker, client: TestClient, user1_token: str, admin_token: str
+    storage_ready: None,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    client: TestClient,
+    user1_token: str,
+    admin_token: str,
 ) -> None:
     user1 = _user_id(mock_invoker, "user1@test.com")
-    _seed_intermediate(mock_invoker, "safe.png", user1)
-    _seed_intermediate(mock_invoker, "referenced.png", user1)
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "safe.png", user1)
+    _seed_intermediate(mock_invoker, mock_sqlite_database, "referenced.png", user1)
     mock_invoker.services.project_records.create(user1, "P", {"imageName": "referenced.png"})
 
     # The count is what the clear would delete, so the legacy button settles at zero.

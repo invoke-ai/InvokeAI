@@ -13,13 +13,16 @@ export type ModelBase =
   | 'sdxl-refiner'
   | 'flux'
   | 'flux2'
+  | 'flux3'
   | 'cogview4'
   | 'ernie-image'
   | 'qwen-image'
+  | 'qwen-image-2-1'
   | 'z-image'
   | 'ideogram-4'
   | 'krea-2'
   | 'anima'
+  | 'moss-image'
   /** Wan 2.2. A video architecture, used here for image generation at `num_frames=1`. */
   | 'wan'
   /** MiniMax H3. A video architecture that generates video with synchronized audio. */
@@ -53,6 +56,7 @@ export type ModelTaxonomyType =
   | 'gemma4_encoder'
   | 'pid_decoder'
   | 'ltx2_duration_head'
+  | 'tiny_autoencoder'
   | 'siglip'
   | 'spandrel_image_to_image'
   | 'flux_redux'
@@ -115,9 +119,45 @@ export interface ControlAdapterDefaultSettings {
   fp8_storage?: boolean | null;
 }
 
+/** Hosted-provider defaults (`ExternalApiModelDefaultSettings`): the size and image count the provider is asked for. */
+export interface ExternalModelDefaultSettings {
+  width?: number | null;
+  height?: number | null;
+  num_images?: number | null;
+}
+
 export type AnyModelDefaultSettings = MainModelDefaultSettings &
   LoraModelDefaultSettings &
-  ControlAdapterDefaultSettings;
+  ControlAdapterDefaultSettings &
+  ExternalModelDefaultSettings;
+
+export type ExternalGenerationMode = 'txt2img' | 'img2img' | 'inpaint';
+
+export interface ExternalImageSize {
+  width: number;
+  height: number;
+}
+
+/**
+ * The capability matrix of an external model (`ExternalModelCapabilities`). Fields the editor does not expose are
+ * typed loosely and carried through unchanged, because a PATCH replaces the whole object.
+ */
+export interface ExternalModelCapabilities {
+  modes?: ExternalGenerationMode[];
+  supports_reference_images?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_seed?: boolean;
+  supports_guidance?: boolean;
+  supports_steps?: boolean;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  max_reference_images?: number | null;
+  allowed_aspect_ratios?: string[] | null;
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: unknown[] | null;
+  mask_format?: string;
+  input_image_required_for?: ExternalGenerationMode[] | null;
+}
 
 /**
  * A model config record. This is the union of fields across all backend config
@@ -151,9 +191,14 @@ export interface ModelConfig {
   image_encoder_model_id?: string;
   /** Anima ControlNet-LLLite: 3 = control image, 4 = inpainting; null when installed before it was recorded. */
   cond_in_channels?: number | null;
+  /** Qwen-Image ControlNets: `fun_union` also conditions on an inpainted region, `instantx_union` does not. */
+  control_architecture?: 'fun_union' | 'instantx_union';
+  /** Spandrel upscalers: native scale (1 = same size); null when installed before it was recorded. */
+  scale?: number | null;
   /** External API models. */
   provider_id?: string;
   provider_model_id?: string;
+  capabilities?: ExternalModelCapabilities | null;
   [key: string]: unknown;
 }
 
@@ -173,6 +218,10 @@ export interface ModelRecordChanges {
   cpu_only?: boolean | null;
   trigger_phrases?: string[] | null;
   default_settings?: AnyModelDefaultSettings | null;
+  /** External API models; `capabilities` replaces the stored matrix wholesale. */
+  provider_id?: string;
+  provider_model_id?: string;
+  capabilities?: ExternalModelCapabilities | null;
 }
 
 export type ModelInstallStatus =
@@ -197,6 +246,10 @@ export interface ModelInstallDownloadPart {
   resume_message?: string | null;
   /** The part was silently restarted from the beginning after a failed resume. */
   resume_from_scratch?: boolean;
+  /** Exception class and message of an errored part, e.g. `HTTPError(503 Server Error)`. */
+  error_type?: string | null;
+  /** Full traceback of an errored part. */
+  error?: string | null;
 }
 
 /** A model install job as returned by `/api/v2/models/install`. */

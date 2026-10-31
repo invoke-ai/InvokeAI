@@ -20,6 +20,9 @@ from invokeai.app.services.session_queue.session_queue_common import (
     ItemIdsResult,
     NodeFieldValue,
     PruneResult,
+    QueueItemDeliveryResult,
+    QueueItemLineage,
+    QueueItemOwner,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -27,8 +30,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
-from invokeai.app.services.shared.pagination import CursorPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
 
 
 @dataclass(frozen=True)
@@ -53,9 +55,11 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> Coroutine[Any, Any, EnqueueBatchResult]:
-        """Enqueues all permutations of a batch for execution for a specific user."""
+        """Enqueues all permutations of a batch for execution for a specific user. A queue without room for all of
+        them takes as many as fit, or with `all_or_none` none of them. A repeat with the batch's idempotency key
+        returns the key's settled receipt as it is: `all_or_none` is not part of the payload the receipt matches."""
         pass
 
     @abstractmethod
@@ -71,22 +75,40 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        """What `enqueue_batch` answers a repeat of `batch` (which has an idempotency key) with, from the key's receipt;
+        None once the queue has collected the receipt. Never admits items: unlike a repeat of the enqueue, a receipt
+        collected meanwhile cannot let the batch in a second time. A receipt of another payload raises
+        `EnqueueIdempotencyConflictError`."""
+        pass
+
+    @abstractmethod
     def get_current(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the currently-executing session queue item"""
         pass
 
-    def get_current_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        """Gets the current item in the response projection used by API reads."""
-        return self.get_current(queue_id=queue_id, origin_prefix=origin_prefix)
+    @abstractmethod
+    def get_current_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the current item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
+        pass
 
     @abstractmethod
     def get_next(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
         """Gets the next session queue item (does not dequeue it)"""
         pass
 
-    def get_next_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        """Gets the next item in the response projection used by API reads."""
-        return self.get_next(queue_id=queue_id, origin_prefix=origin_prefix)
+    @abstractmethod
+    def get_next_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        """Gets the next item in the response projection used by API reads; with owner_id, of that user's items
+        only."""
+        pass
 
     @abstractmethod
     def clear(self, queue_id: str, user_id: Optional[str] = None) -> ClearResult:
@@ -116,10 +138,12 @@ class SessionQueueBase(ABC):
         acting_user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         is_admin: bool = False,
+        owner_id: Optional[str] = None,
     ) -> SessionQueueStatus:
         """Gets the status of the queue.
 
-        Aggregate counts (pending/in_progress/.../total) are always global across all users.
+        owner_id limits everything below, counts and current item alike, to that user's items; it is a filter,
+        unlike user_id. Without it, aggregate counts (pending/in_progress/.../total) are global across all users.
         If user_id is provided, the requesting user's own counts are additionally returned in
         the user_pending/user_in_progress fields (left None otherwise). Admin callers should
         also pass their user_id so personal UI (e.g. the progress bar) can distinguish their
@@ -170,8 +194,9 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
-        """Cancels a session queue item"""
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
+        """Cancels a session queue item and its workflow-call chain. A supplied `queue_item`, the item's own, takes the
+        committed cancellation before it is announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod
@@ -186,9 +211,15 @@ class SessionQueueBase(ABC):
 
     @abstractmethod
     def fail_queue_item(
-        self, item_id: int, error_type: str, error_message: str, error_traceback: str
+        self,
+        item_id: int,
+        error_type: str,
+        error_message: str,
+        error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
-        """Fails a session queue item"""
+        """Fails a session queue item. A supplied `queue_item`, the item's own, takes the committed failure before it is
+        announced, as with `complete_queue_item`."""
         pass
 
     @abstractmethod
@@ -268,15 +299,27 @@ class SessionQueueBase(ABC):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        user_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> ItemIdsResult:
         """Gets the ids of queue items that match the given parameters, in the requested created_at order.
 
-        If user_id is provided, only returns items for that user. If limit is provided, returns only the first
+        If owner_id is provided, only returns items for that user. If limit is provided, returns only the first
         `limit` ids of that order. total_count is the number of ids in item_ids, which equals the number of
         matching items only when no limit is given."""
+        pass
+
+    @abstractmethod
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        """The status, origin and retry source of every item whose origin starts with `origin_prefix` (ignoring
+        case), in no order."""
+        pass
+
+    @abstractmethod
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        """The origins of the items pending, in progress or waiting whose origin starts with `origin_prefix` (ignoring
+        case). Found through the items' status: it costs the queue's unfinished items, not its history."""
         pass
 
     @abstractmethod
@@ -292,6 +335,27 @@ class SessionQueueBase(ABC):
     def get_queue_item_for_api(self, item_id: int) -> SessionQueueItem:
         """Gets a queue item in the response projection used by API reads."""
         return self.get_queue_item(item_id=item_id)
+
+    @abstractmethod
+    def get_queue_item_owner(self, item_id: int) -> QueueItemOwner:
+        """Gets a queue item's queue and owner without reading its session, for authorizing frequent requests."""
+        pass
+
+    @abstractmethod
+    def claim_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Claims delivering a queue item's results for a claimant: `claimed` unless they were delivered or another
+        claimant's unexpired claim holds them."""
+        pass
+
+    @abstractmethod
+    def confirm_queue_item_delivery(self, item_id: int) -> QueueItemDeliveryResult:
+        """Marks a queue item's results delivered, whoever claimed them."""
+        pass
+
+    @abstractmethod
+    def release_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        """Drops a claimant's claim of a queue item's undelivered results, if it holds one."""
+        pass
 
     @abstractmethod
     def get_queue_item_workflow_json(self, item_id: int) -> str | None:

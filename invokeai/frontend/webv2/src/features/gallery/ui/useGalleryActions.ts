@@ -1,30 +1,37 @@
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
-import { toGalleryItemKey } from '@features/gallery/core/items';
+import { ALL_READABLE_BOARDS_ID, toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
   downloadGalleryArchive,
   updateGalleryBoard,
 } from '@features/gallery/data/backend';
-import { invalidateGallery, patchGalleryBoardCaches } from '@features/gallery/data/queryCache';
+import { addGalleryBoardToCaches, invalidateGallery, patchGalleryBoardCaches } from '@features/gallery/data/queryCache';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { ApiError, getApiErrorCode, getApiErrorMessage } from '@platform/transport/http';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryActions } from './GalleryWidgetContext';
 
+import { getGallerySearchScope } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryUploadAction } from './useGalleryUploadAction';
 
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const toErrorMessage = (error: unknown): string =>
+  getApiErrorMessage(error, error instanceof Error ? error.message : String(error));
+
+/** The server's 403 code for a board that exists but the caller may not read; other 403s refuse an action. */
+const BOARD_UNREADABLE_CODE = 'board_unreadable';
 
 export const useGalleryActions = ({
   boards,
@@ -33,18 +40,56 @@ export const useGalleryActions = ({
   selectedBoardId,
 }: {
   boards: GalleryBoard[];
-  getCurrentGalleryLocation: () => { galleryView: GalleryView; selectedBoardId: string };
+  /** The latest rendered gallery, for settling an action the user may have moved on from while it ran. */
+  getCurrentGalleryLocation: () => { autoAddBoardId: string; galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { exportProject, gallery, notifications, widgets } = useGalleryUi();
+  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
+    useGalleryUi();
+  const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
+  const isSearchingAllBoards = getGallerySearchScope(galleryValues) === 'all';
   const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const uploadFiles = useGalleryUploadAction({ boards, getCurrentGalleryLocation, selectedBoardId });
+  // A search of every board has no board to upload to; the upload action refuses it.
+  const uploadFiles = useGalleryUploadAction({
+    boards,
+    getCurrentGalleryLocation,
+    selectedBoardId: isSearchingAllBoards ? ALL_READABLE_BOARDS_ID : selectedBoardId,
+  });
 
   return useMemo<GalleryActions>(() => {
     const recordError = (error: unknown) =>
       notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
+    /**
+     * A board action the server refuses (403: the board exists but the caller may no longer read it, or their role no
+     * longer allows the action) or answers as missing (404: deleted) means the listing's view of the board is stale:
+     * say so plainly and refetch, so the board's menu and place in the list follow what the server says now.
+     * `missingIsBoard` is false where a 404 can name something else, such as a move's destination project.
+     */
+    const recordBoardError = (boardId: string, error: unknown, { missingIsBoard = true } = {}) => {
+      const status = error instanceof ApiError ? error.status : null;
+      if (status === 403 || (status === 404 && missingIsBoard)) {
+        notifications.add({
+          kind: 'info',
+          message: getBoardName(boardId),
+          title: t(
+            status === 404
+              ? 'widgets.gallery.boardAccess.gone'
+              : getApiErrorCode(error) === BOARD_UNREADABLE_CODE
+                ? 'widgets.gallery.boardAccess.lost'
+                : 'widgets.gallery.boardAccess.stale'
+          ),
+        });
+        refresh();
+        return;
+      }
+      recordError(error);
+      // Whichever was missing, the board or where it was going, the listing may be out of date.
+      if (status === 404) {
+        refresh();
+      }
+    };
     const recordSuccess = (title: string, message?: string) => notifications.add({ kind: 'success', message, title });
     const refresh = () => void invalidateGallery(queryClient);
     const getBoard = (boardId: string) => boards.find((board) => board.id === boardId);
@@ -61,9 +106,15 @@ export const useGalleryActions = ({
         const owner = captureAccountScope();
         const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
         const movedSelectionAway = archived && boardId === selectedBoardId;
+        // An archived board is out of the way, as a deleted one is: results stop going to it rather than to a board
+        // nothing on screen shows.
+        const stoppedAutoAdding = archived && autoAddBoardId === boardId;
 
         if (movedSelectionAway) {
           gallery.selectBoard('none');
+        }
+        if (stoppedAutoAdding) {
+          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
         }
 
         try {
@@ -83,29 +134,43 @@ export const useGalleryActions = ({
 
           rollback();
 
-          if (movedSelectionAway && getCurrentGalleryLocation().selectedBoardId === 'none') {
+          // Each only while the user has not chosen again since.
+          const current = getCurrentGalleryLocation();
+          if (movedSelectionAway && current.selectedBoardId === 'none') {
             gallery.selectBoard(boardId);
           }
+          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
+            gallery.updateSettings({ autoAddBoardId: boardId });
+          }
 
-          recordError(error);
+          recordBoardError(boardId, error);
         }
       },
-      createBoard: async (boardName) => {
+      createBoard: async (boardName, projectId) => {
         const owner = captureAccountScope();
 
         try {
-          const board = await createGalleryBoard(boardName, owner.signal);
+          if (projectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
 
+          const board = await createGalleryBoard(boardName, projectId, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          await addGalleryBoardToCaches(queryClient, board);
           assertAccountScopeCurrent(owner);
           gallery.selectBoard(board.id);
           recordSuccess(t('widgets.gallery.boardCreated', { name: board.name }));
           refresh();
+
+          return true;
         } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
+          if (isAccountScopeCurrent(owner)) {
+            recordError(error);
           }
 
-          recordError(error);
+          return false;
         }
       },
       deleteBoard: async (boardId, includeImages) => {
@@ -142,7 +207,7 @@ export const useGalleryActions = ({
             return;
           }
 
-          recordError(error);
+          recordBoardError(boardId, error);
         }
       },
       downloadBoard: async (boardId) => {
@@ -171,11 +236,60 @@ export const useGalleryActions = ({
             return;
           }
 
-          recordError(error);
+          recordBoardError(boardId, error);
         }
       },
       exportProject,
       loadMore,
+      moveBoard: async (boardId, destinationProjectId, destinationLabel) => {
+        const owner = captureAccountScope();
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { projectId: destinationProjectId });
+        // Into another project while other projects are hidden, the board leaves the panel as an archived one does:
+        // it stops being the selection and the auto-add target rather than take results nothing on screen shows.
+        const leavesView =
+          destinationProjectId !== null && destinationProjectId !== projectId && !showOtherProjectBoards;
+        const movedSelectionAway = leavesView && boardId === selectedBoardId;
+        const stoppedAutoAdding = leavesView && boardId === autoAddBoardId;
+
+        if (movedSelectionAway) {
+          gallery.selectBoard('none');
+        }
+        if (stoppedAutoAdding) {
+          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+        }
+
+        try {
+          if (destinationProjectId !== null) {
+            await ensureProjectOnServer?.();
+            assertAccountScopeCurrent(owner);
+          }
+
+          await updateGalleryBoard(boardId, { projectId: destinationProjectId }, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          recordSuccess(
+            t('widgets.gallery.boardMoved', { destination: destinationLabel, name: getBoardName(boardId) })
+          );
+          refresh();
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          rollback();
+
+          // Each only while the user has not chosen again since.
+          const current = getCurrentGalleryLocation();
+          if (movedSelectionAway && current.selectedBoardId === 'none') {
+            gallery.selectBoard(boardId);
+          }
+          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
+            gallery.updateSettings({ autoAddBoardId: boardId });
+          }
+
+          recordBoardError(boardId, error, { missingIsBoard: false });
+        }
+      },
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
@@ -193,13 +307,42 @@ export const useGalleryActions = ({
           }
 
           rollback();
-          recordError(error);
+          recordBoardError(boardId, error);
+        }
+      },
+      setBoardGeneralAccess: async (boardId, generalAccess) => {
+        const owner = captureAccountScope();
+        const rollback = patchGalleryBoardCaches(queryClient, boardId, { generalAccess });
+
+        try {
+          await updateGalleryBoard(boardId, { generalAccess }, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          recordSuccess(
+            t('widgets.gallery.boardAccess.changed', {
+              access: t(`widgets.gallery.boardAccess.general.${generalAccess}`),
+            }),
+            getBoardName(boardId)
+          );
+          refresh();
+        } catch (error: unknown) {
+          if (!isAccountScopeCurrent(owner)) {
+            return;
+          }
+
+          rollback();
+          recordBoardError(boardId, error);
         }
       },
       selectBoard: gallery.selectBoard,
       selectItem: gallery.selectItem,
-      selectItemRange: (items, primaryItem) => gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem),
+      selectItemRange: (items, primaryItem, selectionPage) =>
+        selectionPage === undefined
+          ? gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem)
+          : gallery.setItemMultiSelection(items.map(toGalleryItemKey), primaryItem, selectionPage),
       setCompareItem: gallery.setCompareItem,
+      setSearchScope: (scope) => widgets.patchGalleryValues({ galleryPage: 0, searchScope: scope }),
+      // Clearing the search returns its scope to the selected board; the gallery values' writer keeps that rule.
       setSearchTerm: gallery.setSearchTerm,
       setStarredOnly: gallery.setStarredOnly,
       setSemanticSearchMode: gallery.setSemanticSearchMode,
@@ -208,27 +351,32 @@ export const useGalleryActions = ({
       clearSearch: gallery.clearSearch,
       // Store references in widget values, reset pagination, and clear replaced text/mode so hidden filters cannot
       // affect listing or Preview navigation.
-      setSemanticImageQuery: (reference) =>
+      setSemanticImageQuery: (reference) => {
         widgets.patchGalleryValues({
           galleryPage: 0,
           searchTerm: '',
           semanticImageQuery: reference,
           semanticSearchText: null,
-        }),
+        });
+      },
       setView: gallery.setView,
       toggleItemInSelection: gallery.toggleItemSelection,
       updateSettings: gallery.updateSettings,
       uploadFiles,
     };
   }, [
+    autoAddBoardId,
     boards,
+    ensureProjectOnServer,
     exportProject,
     gallery,
     getCurrentGalleryLocation,
     loadMore,
     notifications,
+    projectId,
     queryClient,
     selectedBoardId,
+    showOtherProjectBoards,
     t,
     uploadFiles,
     widgets,

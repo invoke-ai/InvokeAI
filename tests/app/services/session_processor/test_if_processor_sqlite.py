@@ -17,9 +17,14 @@ from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
 )
-from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
+from invokeai.app.services.session_queue.session_queue_default import SessionQueue
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from tests.fixtures.sqlite_database import sqlite_cursor_of
 from tests.test_nodes import create_edge
+
+# These waits bound hangs, not processor latency on contended CI workers.
+_PROCESSOR_TIMEOUT = 30
 
 
 class _RecordingRegisteredEventService(EventServiceBase):
@@ -33,7 +38,7 @@ class _RecordingRegisteredEventService(EventServiceBase):
             self._events_condition.notify_all()
         asyncio.run(local_handler.handle((event.__event_name__, event)))
 
-    def wait_for_status(self, item_id: int, status: str, timeout: float = 5) -> bool:
+    def wait_for_status(self, item_id: int, status: str, timeout: float = _PROCESSOR_TIMEOUT) -> bool:
         def has_status() -> bool:
             return any(
                 isinstance(event, QueueItemStatusChangedEvent) and event.item_id == item_id and event.status == status
@@ -72,9 +77,9 @@ def _build_if_graph(*, condition: bool = True) -> Graph:
     return graph
 
 
-def _insert_session(queue: SqliteSessionQueue, graph: Graph) -> int:
+def _insert_session(queue: SessionQueue, graph: Graph) -> int:
     session = GraphExecutionState(graph=graph)
-    with queue._db.transaction() as cursor:
+    with sqlite_cursor_of(queue) as cursor:
         cursor.execute(
             """--sql
             INSERT INTO session_queue (
@@ -125,7 +130,7 @@ def _stop_processor(processor: DefaultSessionProcessor) -> None:
     processor.stop()
     for worker in processor._workers:
         assert worker.thread is not None
-        worker.thread.join(timeout=5)
+        worker.thread.join(timeout=_PROCESSOR_TIMEOUT)
         assert not worker.thread.is_alive()
 
 
@@ -147,14 +152,14 @@ def registered_event_bus() -> Iterator[_RecordingRegisteredEventService]:
 )
 def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branch(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
     unselected_branch: str,
     selected_field: str,
 ) -> None:
-    test_timeout = 30
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -180,8 +185,8 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
     )
     try:
         processor.start(mock_invoker)
-        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=test_timeout)
-        assert session_persisted.wait(timeout=test_timeout)
+        assert registered_event_bus.wait_for_status(item_id, "canceled", timeout=_PROCESSOR_TIMEOUT)
+        assert session_persisted.wait(timeout=_PROCESSOR_TIMEOUT)
 
         queue_item = queue.get_queue_item(item_id)
         assert queue_item.status == "canceled"
@@ -214,6 +219,7 @@ def test_if_cancellation_preserves_activation_and_never_resumes_unselected_branc
 )
 def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activation(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
@@ -222,7 +228,7 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
     sink_value: int,
     cancel_after_source: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -244,7 +250,7 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
     try:
         processor.start(mock_invoker)
         assert registered_event_bus.wait_for_status(item_id, "canceled")
-        assert session_persisted.wait(timeout=5)
+        assert session_persisted.wait(timeout=_PROCESSOR_TIMEOUT)
     finally:
         _stop_processor(processor)
 
@@ -287,13 +293,14 @@ def test_if_retry_starts_fresh_and_preserves_selected_output_without_stale_activ
 )
 def test_if_early_cancellation_before_resolution_does_not_run_any_branch_continuation(
     mock_invoker: Invoker,
+    mock_sqlite_database: Database,
     registered_event_bus: _RecordingRegisteredEventService,
     condition: bool,
     selected_branch: str,
     unselected_branch: str,
     selected_field: str,
 ) -> None:
-    queue = SqliteSessionQueue(db=mock_invoker.services.board_records._db)
+    queue = SessionQueue(mock_sqlite_database)
     mock_invoker.services.events = registered_event_bus
     mock_invoker.services.session_queue = queue
     mock_invoker.services.performance_statistics = _Stats()
@@ -319,7 +326,7 @@ def test_if_early_cancellation_before_resolution_does_not_run_any_branch_continu
     try:
         processor.start(mock_invoker)
         assert registered_event_bus.wait_for_status(item_id, "canceled")
-        assert session_persisted.wait(timeout=5)
+        assert session_persisted.wait(timeout=_PROCESSOR_TIMEOUT)
     finally:
         _stop_processor(processor)
 

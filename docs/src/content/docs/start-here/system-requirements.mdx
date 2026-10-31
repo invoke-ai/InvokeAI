@@ -2,7 +2,7 @@
 title: Hardware Requirements
 sidebar:
   order: 1
-lastUpdated: 2026-07-14
+lastUpdated: 2026-10-18
 ---
 
 import { Tabs, TabItem, Steps } from '@astrojs/starlight/components'
@@ -16,10 +16,11 @@ Hardware requirements vary significantly depending on model and image output siz
 The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low VRAM Guide] to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
-- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126`, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
-- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126` and without the `cuda` extra, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
+- AMD GPUs are supported on Windows and Linux `x86_64` through ROCm 10 (see [AMD](#amd) below for the GPUs and drivers). On Linux, Vega-based cards (gfx900/gfx906) are no longer supported. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
+- Windows on ARM64 with an NVIDIA RTX Spark GPU is supported as a **Developer Preview**, tracking NVIDIA's own preview status for the platform. See [Windows on ARM64](#windows-on-arm64-rtx-spark) below for the requirements and the feature differences.
 
 ### Windows/Linux
 
@@ -30,10 +31,13 @@ The requirements below are rough guidelines for best performance. GPUs with less
 | FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB | Download totals: NF4 ~12GB, int8 ~18GB, bf16 ~33GB. The int8 transformer is 11.5GB resident on any supported GPU, so it streams on a 10GB card |
 | FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
 | FLUX.2 Klein 9B | 1024x1024 | Nvidia 30xx+ | 12GB | 32GB | int8 transformer ~9.5GB on any supported GPU; FP8 checkpoints stay about as small with FP8 Storage, which installation switches on. The Qwen3 8B encoder is 15GB (int8 7.6GB) and streams on a 12GB card |
+| FLUX.3 Klein | 1024x1024 | Nvidia 30xx+ | 12GB | 32GB | Transformer bf16 10.3GB, GGUF Q8_0 5.6GB, Q4_K_M 3.1GB, plus the Qwen3-VL 4B encoder (8.5GB bf16). Diffusers ~20GB; single files and GGUFs need a standalone FLUX.2 VAE + Qwen3-VL encoder. Each 1MP reference image adds about as much working memory as the image itself |
 | Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K / NVFP4 / int8 8GB (int8 ~6GB resident); Q8/BF16 16GB+ |
 | Krea-2 (Turbo / Raw) | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 16GB+; NVFP4 or GGUF Q4_K transformer ~7GB, plus the Qwen3-VL encoder (8.5GB bf16, ~2.8GB as GGUF Q4_K), int8 transformer 12.6GB. Diffusers ~26GB; single files need a standalone VAE + Qwen3-VL encoder (GGUF encoder ~2.8GB) |
-| Ideogram 4 | 1024x1024 | Nvidia 30xx+ | 24GB | 32GB | Two transformers resident at once. nf4 build fits 24GB (CUDA only); single-file fp8 or int8 pair ~17.5GB plus the Qwen3-VL 8B encoder. See [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
-| ERNIE-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Single-file transformer ~16GB plus the Ministral 3B encoder ~7.7GB |
+| Ideogram 4 | 1024x1024 | Nvidia 30xx+ | 24GB | 32GB | Two transformers resident at once. nf4 build fits 24GB (CUDA only); single-file fp8 or int8 pair ~17.5GB, GGUF Q4_0 pair ~11GB, plus the Qwen3-VL 8B encoder. See [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
+| Qwen-Image-2.1 | 1024x1024 | Nvidia 30xx+ | 16GB | 32GB | GGUF Q4_K_M transformer ~4GB, bf16 ~14GB, plus the Qwen3-VL 8B encoder (~10GB fp8). Diffusers ~31GB. See [Qwen-Image-2.1](/users-guide/models/local-models/qwen-image-2-1/) |
+| ERNIE-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Single-file transformer ~16GB (GGUF Q4_K_M ~5.0GB, Q8_0 ~8.7GB) plus the Ministral 3B encoder ~7.7GB |
+| MOSS-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Transformer 10.2GB (5.3GB with FP8 Storage) plus the Qwen3.5 9B encoder 16.8GB, which do not fit 24GB together, so Invoke swaps them. ~70s per 1024x1024 image on an RTX 4090. Diffusers ~27GB. See [MOSS-Image](/users-guide/models/local-models/moss-image/) |
 | Wan 2.2 A14B (T2V/I2V) | 1280x720 | Nvidia 30xx+ | 12GB | 32GB | Dual-expert MoE; Q4_K_M 12GB; Q8 18GB+; Diffusers requires 32GB+ |
 | Wan 2.2 TI2V-5B | 1280x720 | Nvidia 20xx+ | 8GB | 16GB | Single transformer; Q4_K_M 6GB+; Q8 8GB+; Diffusers 12GB+ |
 
@@ -121,6 +125,25 @@ Invoke's CUDA build (PyTorch 2.13 with CUDA 13.0) needs an Nvidia driver from th
 
 An alternative to installing CUDA locally is to use the [Nvidia Container Runtime] to run the application in a container.
 
+#### Windows on ARM64 (RTX Spark)
+
+Requirements:
+
+- NVIDIA's RTX Spark Developer Driver, 616.41 or later, and Windows 11 ARM64. NVIDIA's [RTX Spark developer page] has the driver and the porting guide; the CUDA Toolkit itself is not needed, the torch wheel bundles its CUDA 13.4 libraries.
+- Python **3.12**, as a native ARM64 build. An x86_64 Python runs under emulation but cannot load the ARM64 torch wheel. `uv` installs an x86_64 interpreter on ARM64 Windows unless asked for the native one: request `cpython-3.12-windows-aarch64-none` (see the [manual install](../manual) guide).
+- torch comes from NVIDIA's index (`https://pypi.nvidia.com/nvtorch_oot/`), not from PyTorch's, and the torch wheel is 1.85 GB. `uv sync` from a source checkout handles this automatically; a manual `uv pip install` needs the `--index` and `--find-links` options from the manual install guide. The Invoke Launcher does not support Windows ARM64 yet; use the manual install until a launcher release adds it. An existing launcher install on ARM64 runs an emulated x86_64 Python and cannot update to this release; see the [FAQ](../../troubleshooting/faq#updating-fails-on-windows-on-arm64-with-a-torch-or-win_amd64-error).
+- An `ffmpeg` on `PATH` (or the `IMAGEIO_FFMPEG_EXE` environment variable) for the video nodes and video thumbnails. On other platforms the `imageio-ffmpeg` package bundles one; it has no ARM64 build.
+
+Differences from Windows x64, all because the underlying package has no Windows ARM64 build:
+
+- The MediaPipe face detection preprocessor and the Face Tools nodes (Face Identifier, Face Mask, Face Off) report an error when run.
+- The image map projects with PCA instead of UMAP, so it is less structured.
+- `xformers` is not available; torch's own attention kernels are used.
+- `.woff2` fonts cannot be read: the font list skips them, and an upload is rejected with a message that the format is not supported on this platform. `.ttf`, `.otf` and `.woff` work.
+- PyPatchMatch has no prebuilt library for Windows ARM64, so the `patchmatch` infill method is unavailable.
+
+GPU generation on RTX Spark has not yet been validated by the Invoke team on hardware; installation and the CPU code paths are exercised in CI on Windows ARM64 runners.
+
 #### Windows - Nvidia cuDNN DLLs
 
 An out-of-date cuDNN library can greatly hamper performance on 30-series and 40-series cards. Check with the community on discord to compare your `it/s` if you think you may need this fix.
@@ -145,8 +168,15 @@ If, after restarting the app, this doesn't improve your performance, either rest
 
 ### AMD
 
-:::tip[Linux Only]{icon="linux"}
-  AMD GPUs are supported on Linux only, due to ROCm (the AMD equivalent of CUDA) support being Linux only.
+Invoke installs AMD's ROCm 10 build of PyTorch on Windows and Linux. It brings the ROCm runtime with it, so
+there is no separate ROCm or HIP SDK to install, but the GPU needs an up-to-date driver: [AMD Software: Adrenalin
+Edition] on Windows, AMD's kernel driver on Linux (see [Linux](#linux) below). AMD's [ROCm compatibility matrix] lists the GPUs and operating
+systems ROCm 10 supports. AMD lists Windows 11; the Invoke team has run it on Windows 10 with an RX 9060 XT.
+
+:::caution[Vega-based cards on Linux]
+  ROCm 10 has no kernels for gfx900 and gfx906 (Radeon RX Vega 56/64, Radeon VII, Instinct MI25/MI50/MI60).
+  Stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=rocm7.2`,
+  whose PyTorch build still includes them (not tested by the Invoke team).
 :::
 
 :::caution[Bumps Ahead]
@@ -160,11 +190,33 @@ If, after restarting the app, this doesn't improve your performance, either rest
   (for example `MIOPEN_FIND_MODE=NORMAL` to let MIOpen re-tune its kernel database).
 :::
 
+:::note[Fused attention on newer Radeon GPUs]
+  On some GPUs - among them the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series -
+  PyTorch uses its fused attention kernels only when `TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL` is set.
+  Without them, attention runs on the slower math kernel, which also needs far more memory. The
+  `rocm_aotriton_experimental` setting decides. Its default, `auto`, turns the kernels on where they
+  were measured correct with ROCm 10: so far the RX 9060 series (gfx1200), where Z-Image at 1024px
+  takes 17 s instead of 36 s. Set it to `on` to try them on another GPU, and back to `auto` if images
+  come out wrong or generation fails. The startup log says whether they are on.
+:::
+
+:::note[Integrated graphics]
+  ROCm lists the Radeon graphics built into Ryzen CPUs as a GPU of its own. When a discrete GPU is
+  present, Invoke leaves the integrated one out of `generation_devices: auto`. On Windows it also hides
+  it from ROCm at startup (by setting `HIP_VISIBLE_DEVICES`) unless you set `HIP_VISIBLE_DEVICES`,
+  `CUDA_VISIBLE_DEVICES` or `ROCR_VISIBLE_DEVICES` yourself: while ROCm can see the integrated GPU,
+  Task Manager shows tens of GB of shared GPU memory for Invoke that is not really in use, and nothing
+  can run on it. Device names such as `cuda:1` in `device`, `generation_devices` and the settings then
+  count the discrete GPUs only, and naming the integrated GPU is refused with an error. Set
+  `HIP_VISIBLE_DEVICES` yourself to choose the devices.
+:::
+
 :::note[Wide-head attention runs on the math kernel]
   On ROCm builds Invoke routes attention whose head dimension exceeds 256 to PyTorch's math kernel.
   The fused kernels return wrong output there on torch 2.13 / ROCm 7.2 (measured on a W7900), which
   showed up as black or noisy images from the image VAEs - their mid-block attention is one 512-wide
-  head. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
+  head. With ROCm 10 they were correct on an RX 9060 XT, but RDNA3 cards have not been measured
+  again, so the threshold stays. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
   at 1536px), so Invoke computes it in pieces of at most 1 GB. The result can differ from a single
   math call in the last bit of a bf16 value, and each such call is roughly 10% slower. Export
   `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` to raise the threshold on a build whose fused kernels are
@@ -187,11 +239,11 @@ If, after restarting the app, this doesn't improve your performance, either rest
   `rocprof`/ROCTracer-based kernel profiling, which this disables.
 :::
 
-Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
+#### Linux
 
-Go to the [ROCm Documentation] and carefully follow the instructions for your system to get everything installed.
-
-Confirm that `rocm-smi` displays driver and CUDA versions after installation.
+The ROCm libraries come with Invoke's PyTorch packages, so ROCm itself does not need to be installed. The GPU needs
+AMD's `amdgpu` kernel driver; on the distributions in AMD's [ROCm compatibility matrix], the driver that comes with
+the kernel is enough. For other distributions, follow the [ROCm Documentation] to install the driver.
 
 #### Linux - via Docker Container
 
@@ -203,12 +255,15 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [using `uv` to manage your python installation]: https://docs.astral.sh/uv/concepts/python-versions/#installing-a-python-version
 [Microsoft Visual C++ Redistributable]: https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170
 [Invoke Launcher]: ../installation
+[RTX Spark developer page]: https://developer.nvidia.com/topics/ai/local-ai/port-apps
 [CUDA Toolkit Downloads]: https://developer.nvidia.com/cuda-downloads
 [Cuda Docs]: https://developer.nvidia.com/cudnn
 [cuDNN support matrix]: https://docs.nvidia.com/deeplearning/cudnn/support-matrix/index.html
 [Intel Arc & Iris Xe Graphics driver]: https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
 [Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
+[ROCm compatibility matrix]: https://rocm.docs.amd.com/en/docs-10.0.0/compatibility/compatibility-matrix.html
+[AMD Software: Adrenalin Edition]: https://www.amd.com/en/support/download/drivers.html
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers
 [ROCm/ROCm#6522]: https://github.com/ROCm/ROCm/issues/6522
 [ROCm/TheRock#7051]: https://github.com/ROCm/TheRock/issues/7051

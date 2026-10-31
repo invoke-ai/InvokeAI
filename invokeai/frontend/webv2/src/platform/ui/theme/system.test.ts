@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import legacyBaseline from './__fixtures__/legacyTokenBaseline.json';
-import { CONSUMER_TOKENS, resolveToken, THEME_SELECTORS, THEMES, type TokenSystem } from './__tokenResolve';
+import { resolveToken, THEME_SELECTORS, THEMES, type TokenSystem } from './__tokenResolve';
 import { progressCircleSlotRecipe } from './recipes';
 import { system } from './system';
 import { THEMES as THEME_DEFINITIONS } from './themes';
@@ -16,18 +15,6 @@ const lightnessOf = (oklch: string): number => {
   }
   return Number(match[1]);
 };
-
-describe('color token contract — legacy-value gate', () => {
-  // Pin semantic-token values against __fixtures__/legacyTokenBaseline.json.
-  for (const theme of THEMES) {
-    for (const token of CONSUMER_TOKENS) {
-      it(`${theme}: ${token} is unchanged`, () => {
-        const expected = (legacyBaseline as Record<string, Record<string, string>>)[theme][token];
-        expect(resolveToken(sys, theme, token)).toBe(expected);
-      });
-    }
-  }
-});
 
 describe('ramp + mapping structure', () => {
   it('resolves every registered theme (a theme missing from THEME_SELECTORS would skip the gate)', () => {

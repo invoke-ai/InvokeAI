@@ -13,8 +13,7 @@ from invokeai.app.services.image_records.image_records_common import (
 )
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageServiceABC(ABC):
@@ -59,8 +58,9 @@ class ImageServiceABC(ABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
-        """Creates an image, storing the file and its metadata."""
+        """Creates an image, storing its metadata and optional per-image resolved-input Graph JSON."""
         pass
 
     @abstractmethod
@@ -115,6 +115,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_graph(self, image_name: str) -> Optional[str]:
         """Gets an image's workflow."""
+        pass
+
+    @abstractmethod
+    def get_resolved_inputs(self, image_name: str) -> Optional[str]:
+        """Gets an image's resolved-input Graph JSON, when present."""
         pass
 
     @abstractmethod

@@ -52,6 +52,7 @@ export const useGalleryPickerScope = () => {
     searchTerm: scope.pane === 'items' ? deferredSearchTerm : '',
     selectedBoardId: scope.boardId,
     semanticQuery: null,
+    sparseViewport: true,
     settings,
   });
   const gallerySelectedItem = useMemo(() => getSelectedGalleryItemFromValues(galleryValues), [galleryValues]);

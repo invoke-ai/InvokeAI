@@ -69,7 +69,12 @@ export const PROJECT_FILE_BOARD = Object.freeze({
   video: 'fixture-video-project.mp4',
   /** Drawn by the canvas but owned by no project: reused on import, never copied. */
   externalImages: Object.freeze(['fixture-image-0001.png', 'fixture-image-0003.png', 'fixture-image-0004.png']),
+  /** On the project's other board, so an archive carries more than the inbox. */
+  memberImages: Object.freeze(['fixture-image-0013.png', 'fixture-image-0014.png']),
 });
+
+/** The journey project's board other than its inbox; see `createBoards`. */
+export const PROJECT_FILE_MEMBER_BOARD = Object.freeze({ id: 'fixture-member-board-02', name: 'Site plan refs' });
 
 /** Category and visibility overrides that put the board composition above onto the project's board. */
 const PROJECT_BOARD_IMAGES = new Map([
@@ -81,6 +86,7 @@ const PROJECT_BOARD_IMAGES = new Map([
   [PROJECT_FILE_BOARD.canvasOwnedImage, { image_category: 'other' }],
   [PROJECT_FILE_BOARD.intermediateImage, { image_category: 'general', is_intermediate: true }],
 ]);
+const MEMBER_BOARD_IMAGES = new Set(PROJECT_FILE_BOARD.memberImages);
 
 const createImages = (count) =>
   range(count, (index) => {
@@ -104,6 +110,9 @@ const createImages = (count) =>
       ...(projectBoardMembership === undefined
         ? {}
         : { board_id: PROJECT_FILE_BOARD_ID, starred: false, ...projectBoardMembership }),
+      ...(MEMBER_BOARD_IMAGES.has(imageName)
+        ? { board_id: PROJECT_FILE_MEMBER_BOARD.id, image_category: 'general', starred: false }
+        : {}),
     };
   });
 
@@ -268,7 +277,7 @@ export const projectBoardId = (index) => `fixture-project-board-${ordinal(index,
 
 export const PROJECT_FILE_BOARD_ID = projectBoardId(1);
 
-const buildBoard = (boardId, boardName, images, videos, createdAt) => {
+const buildBoard = (boardId, boardName, images, videos, createdAt, projectId = null) => {
   const boardImages = images.filter((image) => image.board_id === boardId);
   const boardVideos = videos.filter((video) => video.board_id === boardId);
   const cover = [
@@ -297,16 +306,21 @@ const buildBoard = (boardId, boardName, images, videos, createdAt) => {
     asset_count: boardImages.filter((image) => image.image_category !== 'general').length,
     board_id: boardId,
     board_name: boardName,
-    board_visibility: 'private',
+    general_access: 'restricted',
     cover_image_name: cover?.kind === 'image' ? cover.name : null,
     cover_video_name: cover?.kind === 'video' ? cover.name : null,
     created_at: createdAt,
     image_count: boardImages.filter((image) => image.image_category === 'general').length,
     owner_username: null,
+    // Membership, as the backend stores it: an inbox belongs to its project, a Library board to none.
+    project_id: projectId,
     user_id: FIXTURE_USER_ID,
     video_count: boardVideos.length,
   };
 };
+
+/** The project ids `createProjects` assigns, so boards can belong to them without the documents in hand. */
+export const fixtureProjectId = (index) => `fixture-project-${ordinal(index, 3)}`;
 
 const createBoards = (images, videos, projectCount) => [
   ...range(10, (index) =>
@@ -319,7 +333,25 @@ const createBoards = (images, videos, projectCount) => [
     )
   ),
   ...range(projectCount, (index) =>
-    buildBoard(projectBoardId(index), `Fixture Project ${ordinal(index, 3)}`, images, videos, timestampAt(index))
+    buildBoard(
+      projectBoardId(index),
+      `Fixture Project ${ordinal(index, 3)}`,
+      images,
+      videos,
+      timestampAt(index),
+      fixtureProjectId(index)
+    )
+  ),
+  // The first two projects also hold ordinary boards, so a project section has more than its inbox to show.
+  ...range(Math.min(projectCount, 2), (index) =>
+    buildBoard(
+      `fixture-member-board-${ordinal(index, 2)}`,
+      index === 0 ? 'Façade variants' : 'Site plan refs',
+      images,
+      videos,
+      timestampAt(index + 100),
+      fixtureProjectId(index)
+    )
   ),
 ];
 
@@ -363,14 +395,168 @@ const createQueueItems = (count) =>
 
 const MODEL_BASES = ['sd-1', 'sdxl', 'flux', 'flux2', 'qwen-image'];
 const MODEL_TYPES = ['main', 'lora', 'controlnet', 'vae', 'embedding'];
+// Main models cycle through their own bases so Generate sees SDXL mains and refiners, not only SD 1.5.
+const MAIN_MODEL_BASES = ['sd-1', 'sdxl', 'sdxl-refiner'];
 
-const createModels = (count) =>
+/** The source of the hosted record the mock starter catalog also lists, so the Model Manager shows it read-only. */
+export const CATALOG_MANAGED_EXTERNAL_SOURCE = 'external://gemini/gemini-2.5-flash-image';
+
+/**
+ * Hosted-provider records with the capability shapes the Generate panel, Canvas, and Model Manager read: a named
+ * resolution table (Gemini), fixed sizes per ratio with an edit mode (OpenAI), provider toggles (Seedream), and a
+ * record the starter catalog manages. No shipped provider accepts a mask, so none advertises inpaint.
+ */
+const EXTERNAL_MODEL_FIXTURES = [
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_image_size: { height: 4096, width: 4096 },
+      max_images_per_request: 1,
+      max_reference_images: 14,
+      modes: ['txt2img'],
+      resolution_presets: ['1K', '2K'].flatMap((imageSize) =>
+        [
+          ['1:1', 1, 1],
+          ['16:9', 16, 9],
+          ['9:16', 9, 16],
+        ].map(([ratio, w, h]) => {
+          const base = imageSize === '1K' ? 1024 : 2048;
+          const width = w >= h ? base : Math.round((base * w) / h);
+          const height = w >= h ? Math.round((base * h) / w) : base;
+          return {
+            aspect_ratio: ratio,
+            height,
+            image_size: imageSize,
+            label: `${ratio} (${imageSize}) — ${width}×${height}`,
+            width,
+          };
+        })
+      ),
+      supports_reference_images: true,
+      supports_seed: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with named resolution presets and sampling options.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:fixture-gemini-image',
+    key: 'fixture-external-gemini',
+    name: 'Fixture Gemini Image',
+    path: 'external://gemini/fixture-gemini-image',
+    provider_id: 'gemini',
+    provider_model_id: 'fixture-gemini-image',
+    source: 'external://gemini/fixture-gemini-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '3:2', '2:3'],
+      aspect_ratio_sizes: {
+        '1:1': { height: 1024, width: 1024 },
+        '3:2': { height: 1024, width: 1536 },
+        '2:3': { height: 1536, width: 1024 },
+      },
+      max_images_per_request: 10,
+      modes: ['txt2img', 'img2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model with fixed ratio sizes and canvas image-to-image.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:openai:fixture-gpt-image',
+    key: 'fixture-external-openai',
+    name: 'Fixture GPT Image',
+    path: 'external://openai/fixture-gpt-image',
+    provider_id: 'openai',
+    // A GPT Image model id, so Generate offers OpenAI's quality, background, and input-fidelity options; the
+    // fixture source keeps the record out of the starter catalog and editable in the Model Manager.
+    provider_model_id: 'gpt-image-1',
+    source: 'external://openai/fixture-gpt-image',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9'],
+      aspect_ratio_sizes: { '1:1': { height: 2048, width: 2048 }, '16:9': { height: 1600, width: 2848 } },
+      max_images_per_request: 15,
+      max_reference_images: 14,
+      modes: ['txt2img', 'img2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 2048, num_images: 1, width: 2048 },
+    description: 'Fixture hosted model with provider toggles.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:seedream:fixture-seedream',
+    key: 'fixture-external-seedream',
+    name: 'Fixture Seedream',
+    path: 'external://seedream/fixture-seedream',
+    provider_id: 'seedream',
+    provider_model_id: 'fixture-seedream',
+    source: 'external://seedream/fixture-seedream',
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+  {
+    base: 'external',
+    capabilities: {
+      allowed_aspect_ratios: ['1:1', '16:9', '9:16'],
+      max_images_per_request: 1,
+      max_reference_images: 3,
+      modes: ['txt2img'],
+      supports_reference_images: true,
+    },
+    cover_image: null,
+    default_settings: { height: 1024, num_images: 1, width: 1024 },
+    description: 'Fixture hosted model whose capabilities the starter catalog manages.',
+    file_size: 0,
+    format: 'external_api',
+    hash: 'external:gemini:gemini-2.5-flash-image',
+    key: 'fixture-external-gemini-catalog',
+    name: 'Fixture Gemini Flash (Catalog)',
+    path: CATALOG_MANAGED_EXTERNAL_SOURCE,
+    provider_id: 'gemini',
+    provider_model_id: 'gemini-2.5-flash-image',
+    source: CATALOG_MANAGED_EXTERNAL_SOURCE,
+    source_type: 'external',
+    source_url: null,
+    trigger_phrases: null,
+    type: 'external_image_generator',
+  },
+];
+
+/** The last slots of the model library hold the hosted-provider records so the profile counts stay as declared. */
+const createModels = (count) => [
+  ...createLocalModels(Math.max(0, count - EXTERNAL_MODEL_FIXTURES.length)),
+  ...EXTERNAL_MODEL_FIXTURES.slice(0, count).map((model) => structuredClone(model)),
+];
+
+const createLocalModels = (count) =>
   range(count, (index) => {
     const id = ordinal(index);
     const type = MODEL_TYPES[index % MODEL_TYPES.length];
+    const base =
+      type === 'main'
+        ? MAIN_MODEL_BASES[Math.floor(index / MODEL_TYPES.length) % MAIN_MODEL_BASES.length]
+        : MODEL_BASES[index % MODEL_BASES.length];
 
     return {
-      base: MODEL_BASES[index % MODEL_BASES.length],
+      base,
       cover_image: null,
       default_settings: type === 'main' ? { cfg_scale: 7, height: 1024, steps: 30, width: 1024 } : null,
       description: `Deterministic representative ${type} model ${id}.`,
@@ -387,6 +573,128 @@ const createModels = (count) =>
       type,
     };
   });
+
+/** A model record in the shape the list endpoint serves; the seed sets below override only what they need. */
+const seedModel = ({ key, name, ...fields }) => ({
+  base: 'any',
+  cover_image: null,
+  default_settings: null,
+  description: null,
+  file_size: 32_000_000,
+  format: 'checkpoint',
+  hash: `seed-hash-${key}`,
+  key,
+  name,
+  path: `seeds/${key}.safetensors`,
+  source: `seeds/${key}.safetensors`,
+  source_type: 'path',
+  source_url: null,
+  trigger_phrases: null,
+  variant: null,
+  ...fields,
+});
+
+/** A control adapter seed keyed and named by its install name; a ControlNet unless `fields` says otherwise. */
+const controlSeed = (name, base, preprocessor, fields = {}) => ({
+  record: seedModel({
+    base,
+    default_settings: preprocessor === null ? null : { preprocessor },
+    key: `seed-${name}`,
+    name,
+    type: 'controlnet',
+    ...fields,
+  }),
+});
+
+/**
+ * Opt-in model sets for browser checks, added by `POST /__models` so the profiles' fixture counts stay fixed. Each
+ * entry is the record as installed plus `probe`: the fields `POST /api/v2/models/i/{key}/reidentify` fills in, as
+ * the backend's probe would for a record installed before it recorded them.
+ */
+export const MODEL_SEED_SETS = Object.freeze({
+  // Anima ControlNet-LLLite adapters: one usable, two from before `cond_in_channels` was recorded.
+  'anima-lllite': [
+    { record: seedModel({ base: 'anima', key: 'seed-anima-main', name: 'Anima Preview', type: 'main' }) },
+    {
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: 3,
+        key: 'seed-lllite-sketch',
+        name: 'Anima LLLite Sketch',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 3 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-lineart',
+        name: 'Anima LLLite Lineart (old install)',
+        type: 'controlnet',
+      }),
+    },
+    {
+      probe: { cond_in_channels: 4 },
+      record: seedModel({
+        base: 'anima',
+        cond_in_channels: null,
+        key: 'seed-lllite-inpaint',
+        name: 'Anima LLLite Inpainting (old install)',
+        type: 'controlnet',
+      }),
+    },
+  ],
+  // Spandrel upscalers with a recorded native scale, a 1x model, and one from before the scale was recorded.
+  spandrel: [
+    {
+      record: seedModel({ key: 'seed-spandrel-4x', name: '4x-UltraSharp', scale: 4, type: 'spandrel_image_to_image' }),
+    },
+    {
+      record: seedModel({ key: 'seed-spandrel-2x', name: '2x-AnimeSharp', scale: 2, type: 'spandrel_image_to_image' }),
+    },
+    { record: seedModel({ key: 'seed-spandrel-1x', name: '1x-Denoise', scale: 1, type: 'spandrel_image_to_image' }) },
+    {
+      probe: { scale: 4 },
+      record: seedModel({
+        key: 'seed-spandrel-legacy',
+        name: 'RealESRGAN x4 (old install)',
+        scale: null,
+        type: 'spandrel_image_to_image',
+      }),
+    },
+  ],
+  // SDXL control models for the control-layer panel: two depth models naming their preprocessor in the legacy and
+  // the node form, a pose model, a Union model, one whose purpose nothing names, and a T2I-Adapter.
+  'control-sdxl': [
+    controlSeed('controlnet-depth-sdxl-1.0', 'sdxl', 'depth_anything_image_processor'),
+    controlSeed('controlnet-zoe-depth-sdxl', 'sdxl', 'depth_anything_depth_estimation'),
+    controlSeed('thibaud-openpose-sdxl', 'sdxl', 'dw_openpose_image_processor'),
+    controlSeed('xinsir-controlnet-union-sdxl-promax', 'sdxl', null),
+    controlSeed('my-sdxl-control', 'sdxl', null),
+    controlSeed('t2i-adapter-canny-sdxl-1.0', 'sdxl', 'canny_image_processor', {
+      format: 'diffusers',
+      type: 't2i_adapter',
+    }),
+  ],
+  // A FLUX dev main with a depth Control LoRA and a Union ControlNet.
+  'control-flux': [
+    {
+      record: seedModel({
+        base: 'flux',
+        key: 'seed-flux-dev',
+        name: 'FLUX.1 dev',
+        type: 'main',
+        variant: 'dev',
+      }),
+    },
+    controlSeed('flux-depth-control-lora', 'flux', 'depth_anything_image_processor', {
+      format: 'lycoris',
+      type: 'control_lora',
+    }),
+    controlSeed('flux-controlnet-union-pro', 'flux', null),
+  ],
+});
 
 const createNodePacks = (nodeCount) =>
   range(Math.ceil(nodeCount / 5), (packIndex) => {
@@ -609,7 +917,7 @@ const createWorkflowDocument = ({ description, graphId, index, name, workflowNod
  * `projectGraph`, which the project-file journey loads, exports and imports through the migration boundary.
  */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
-  const id = `fixture-project-${ordinal(index, 3)}`;
+  const id = fixtureProjectId(index);
   const graphId = `${id}-graph`;
   const primaryWorkflow = createWorkflowDocument({
     description: index === 0 ? 'Representative 100-node workflow.' : '',

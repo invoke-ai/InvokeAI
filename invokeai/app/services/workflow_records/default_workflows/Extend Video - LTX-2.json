@@ -458,7 +458,7 @@
       "type": "invocation",
       "data": {
         "id": "video_output",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Joins source + extension. `transition_frames` arrives over an edge from context_frames -- the crossfade must consume exactly the held frames or they play twice.",
@@ -493,6 +493,12 @@
             "label": "",
             "description": "",
             "value": "match_first"
+          },
+          "smart_render": {
+            "name": "smart_render",
+            "label": "",
+            "description": "",
+            "value": true
           }
         },
         "isOpen": true,
@@ -573,7 +579,7 @@
       "type": "invocation",
       "data": {
         "id": "core_metadata",
-        "version": "2.7.0",
+        "version": "2.8.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count and steps arrive over edges from the nodes that set them. The frame rate is recorded as 24 and CFG as 3 whatever the source and the Denoise node say: the join delivers the source's own frame rate, and edit this node if you change CFG.",

@@ -6,6 +6,15 @@ from typing import Any, ClassVar, Literal, Self
 import torch
 from pydantic import BaseModel, Field
 
+from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.backend.anima.checkpoint_layout import (
+    ANIMA_KEY_PREFIXES,
+    anima_transformer_shape_contract,
+    count_anima_dit_blocks,
+)
+from invokeai.backend.flux.controlnet.state_dict_utils import (
+    is_state_dict_xlabs_controlnet,
+)
 from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
 from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
 from invokeai.backend.model_manager.configs.base import (
@@ -39,13 +48,16 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
     state_dict_has_any_keys_exact,
+    state_dict_has_any_keys_starting_with,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 from invokeai.backend.model_manager.taxonomy import (
     AnimaVariantType,
     BaseModelType,
     Flux2VariantType,
+    Flux3VariantType,
     FluxVariantType,
     Krea2VariantType,
     LTX2VariantType,
@@ -54,12 +66,14 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelRepoVariant,
     ModelType,
     ModelVariantType,
+    QwenImage21VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     SubModelType,
     WanVariantType,
     ZImageVariantType,
 )
+from invokeai.backend.quantization.fp8_scaled import FP8_WEIGHT_DTYPES, is_scale_metadata_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
@@ -246,6 +260,54 @@ def _has_krea2_keys(state_dict: dict[str | int, Any]) -> bool:
     return has_text_fusion and has_corroborator
 
 
+_SD_GGUF_UNSUPPORTED = (
+    "Stable Diffusion 1.x, 2.x and SDXL models are not supported in GGUF format. Install the model's .safetensors "
+    "or .ckpt checkpoint, or its Diffusers folder, instead."
+)
+
+# A UNet's cross-attention takes its text encoder's width, which tells the bases apart: SD 1.x (768) and 2.x (1024)
+# at the first resolution level, where SDXL has no attention, and SDXL (2048) and its refiner (1280) at the second.
+# The keys are named as in the original checkpoint layout, and as in diffusers'.
+_SD_BASES_BY_CONTEXT_WIDTH = (
+    {768: BaseModelType.StableDiffusion1, 1024: BaseModelType.StableDiffusion2},
+    {2048: BaseModelType.StableDiffusionXL, 1280: BaseModelType.StableDiffusionXLRefiner},
+)
+_SD_CHECKPOINT_CONTEXT_KEYS = (
+    "input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight",
+    "input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight",
+)
+_SD_DIFFUSERS_CONTEXT_KEYS = (
+    "down_blocks.0.attentions.1.transformer_blocks.0.attn2.to_k.weight",
+    "down_blocks.1.attentions.0.transformer_blocks.0.attn2.to_k.weight",
+)
+
+
+def _sd_unet_base(state_dict: dict[str | int, Any], context_keys: tuple[str, ...]) -> BaseModelType | None:
+    """The SD base whose context width the UNet's cross-attention at `context_keys` takes, or None."""
+    for key, bases in zip(context_keys, _SD_BASES_BY_CONTEXT_WIDTH, strict=True):
+        tensor = state_dict.get(key)
+        if tensor is not None and (base := bases.get(tensor.shape[-1])) is not None:
+            return base
+    return None
+
+
+def _bare_sd_unet_base(state_dict: dict[str | int, Any]) -> BaseModelType | None:
+    """The base of a whole SD UNet stored without the checkpoint's `model.diffusion_model.` prefix, or None.
+
+    ComfyUI-GGUF's converter writes SD GGUFs this way: the UNet alone, under the checkpoint's key names or diffusers'.
+    The decoder half (`output_blocks.` / `up_blocks.`) is required because a ControlNet copies the encoder half under
+    the same names.
+    """
+    for context_keys, decoder_prefix in (
+        (_SD_CHECKPOINT_CONTEXT_KEYS, "output_blocks."),
+        (_SD_DIFFUSERS_CONTEXT_KEYS, "up_blocks."),
+    ):
+        base = _sd_unet_base(state_dict, context_keys)
+        if base is not None:
+            return base if state_dict_has_any_keys_starting_with(state_dict, decoder_prefix) else None
+    return None
+
+
 class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
     """Model config for main checkpoint models."""
 
@@ -263,6 +325,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
         cls._validate_looks_like_main_model(mod)
 
         cls._validate_base(mod)
+
+        # No SD loader reads GGUF: a stable-diffusion.cpp conversion would install as a checkpoint and fail to load.
+        # Checked after the base, so only a file that is this base is refused.
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
 
         prediction_type = override_fields.pop("prediction_type", None) or cls._get_scheduler_prediction_type_or_raise(
             mod
@@ -282,21 +349,11 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
-        state_dict = mod.load_state_dict()
-
-        key_name = "model.diffusion_model.input_blocks.2.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 768:
-            return BaseModelType.StableDiffusion1
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 1024:
-            return BaseModelType.StableDiffusion2
-
-        key_name = "model.diffusion_model.input_blocks.4.1.transformer_blocks.0.attn2.to_k.weight"
-        if key_name in state_dict and state_dict[key_name].shape[-1] == 2048:
-            return BaseModelType.StableDiffusionXL
-        elif key_name in state_dict and state_dict[key_name].shape[-1] == 1280:
-            return BaseModelType.StableDiffusionXLRefiner
-
-        raise NotAMatchError("unable to determine base type from state dict")
+        context_keys = tuple(f"model.diffusion_model.{key}" for key in _SD_CHECKPOINT_CONTEXT_KEYS)
+        base = _sd_unet_base(mod.load_state_dict(), context_keys)
+        if base is None:
+            raise NotAMatchError("unable to determine base type from state dict")
+        return base
 
     @classmethod
     def _get_scheduler_prediction_type_or_raise(cls, mod: ModelOnDisk) -> SchedulerPredictionType:
@@ -341,9 +398,16 @@ class Main_SD_Checkpoint_Config_Base(Checkpoint_Config_Base, Main_Config_Base):
 
     @classmethod
     def _validate_looks_like_main_model(cls, mod: ModelOnDisk) -> None:
-        has_main_model_keys = _has_main_keys(mod.load_state_dict())
-        if not has_main_model_keys:
-            raise NotAMatchError("state dict does not look like a main model")
+        """Raise `NotAMatch` unless the state dict looks like a main model; refuse a bare GGUF UNet of this base.
+
+        That UNet has none of the checkpoint's prefixes, so without the refusal it would register as Unknown.
+        """
+        state_dict = mod.load_state_dict()
+        if _has_main_keys(state_dict):
+            return
+        if _bare_sd_unet_base(state_dict) is cls.model_fields["base"].default and _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(_SD_GGUF_UNSUPPORTED)
+        raise NotAMatchError("state dict does not look like a main model")
 
 
 class Main_Checkpoint_SD1_Config(Main_SD_Checkpoint_Config_Base, Config_Base):
@@ -372,6 +436,11 @@ def _is_flux2_model(state_dict: dict[str | int, Any]) -> bool:
 
     Also checks for FLUX.2-specific 32-channel latent space (in_channels=128 after packing).
     """
+    # FLUX.3 shares the 32-channel latent space and a wide text input (`txt_in`, read by
+    # `_get_flux2_variant`), so it is excluded by name rather than left to which keys happen to differ.
+    if _has_flux3_keys(state_dict):
+        return False
+
     # Check context_embedder input dimension (most reliable)
     # Weight shape: [hidden_size, context_in_dim]
     for key in {"context_embedder.weight", "model.diffusion_model.context_embedder.weight"}:
@@ -590,6 +659,9 @@ class Main_Checkpoint_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
         ):
             raise NotAMatchError("state dict does not look like a FLUX checkpoint")
 
+        if is_state_dict_xlabs_controlnet(state_dict):
+            raise NotAMatchError("state dict is a FLUX ControlNet, not a main model")
+
         # Exclude FLUX.2 models - they have their own config class
         if _is_flux2_model(state_dict):
             raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
@@ -763,6 +835,8 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
 
         cls._validate_looks_like_gguf_quantized(mod)
 
+        cls._validate_has_flux_blocks(mod)
+
         cls._validate_is_not_flux2(mod)
 
         variant = override_fields.pop("variant", None) or cls._get_variant_or_raise(mod)
@@ -796,11 +870,28 @@ class Main_GGUF_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Bas
             raise NotAMatchError("state dict does not look like GGUF quantized")
 
     @classmethod
+    def _validate_has_flux_blocks(cls, mod: ModelOnDisk) -> None:
+        # `_has_main_keys` accepts any ComfyUI-prefixed transformer, and `_get_flux_variant` then calls
+        # anything with 64 input channels and no guidance embedding Schnell: a Qwen-Image-2.1 GGUF was
+        # filed as FLUX.1 Schnell that way. FLUX.1 GGUFs keep BFL's `double_blocks` naming.
+        if not any(
+            isinstance(k, str) and _strip_comfyui_key_prefix(k).startswith("double_blocks.")
+            for k in mod.load_state_dict()
+        ):
+            raise NotAMatchError("state dict has no FLUX double_blocks")
+
+    @classmethod
     def _validate_is_not_flux2(cls, mod: ModelOnDisk) -> None:
-        """Validate that this is NOT a FLUX.2 model."""
+        """Validate that this is NOT a FLUX.2 or FLUX.3 model.
+
+        This config has no positive FLUX.1 key of its own, and FLUX.3 GGUFs label themselves
+        `general.architecture = "flux"` too, so both are excluded by name.
+        """
         state_dict = mod.load_state_dict()
         if _is_flux2_model(state_dict):
             raise NotAMatchError("model is a FLUX.2 model, not FLUX.1")
+        if _has_flux3_keys(state_dict):
+            raise NotAMatchError("model is a FLUX.3 model, not FLUX.1")
 
 
 class Main_GGUF_Flux2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -1183,7 +1274,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
             match class_name:
                 case "CLIPTextModelWithProjection":
                     model_type = ModelType.CLIPEmbed
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
 
                     # We need to read the config to determine the variant of the CLIP model.
                     clip_embed_config = get_config_dict_or_raise(
@@ -1200,7 +1291,7 @@ class Main_Diffusers_SD3_Config(Diffusers_Config_Base, Main_Config_Base, Config_
                     )
                 case "SD3Transformer2DModel":
                     model_type = ModelType.Main
-                    path_or_prefix = (mod.path / key).resolve().as_posix()
+                    path_or_prefix = key
                     variant = None
                     submodels[SubModelType(key)] = SubmodelDefinition(
                         path_or_prefix=path_or_prefix,
@@ -1291,13 +1382,10 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
 #: bundle records it in its header as `anima_v2_connector_prefix` (`net.anima_v2_connector.`).
 ANIMA_V2_CONNECTOR_KEY_PREFIX = "anima_v2_connector."
 
-#: Anima's own wrapper namespaces, as `_has_anima_keys` accepts them.
-_ANIMA_KEY_PREFIXES = ("", "net.", "model.diffusion_model.")
-
 
 def _get_anima_variant(state_dict: dict[str | int, Any]) -> AnimaVariantType:
     """An Anima checkpoint that bundles the semantic connector needs Qwen3.5 as well as Qwen3."""
-    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in _ANIMA_KEY_PREFIXES)
+    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in ("", *ANIMA_KEY_PREFIXES))
     if any(isinstance(key, str) and key.startswith(connector_prefixes) for key in state_dict):
         return AnimaVariantType.Qwen35
     return AnimaVariantType.Qwen3
@@ -1506,6 +1594,91 @@ def _ideogram4_branch_from_filename(filename: str) -> Ideogram4Branch:
     return "unconditional" if "unconditional" in lowered or "uncond" in lowered else "conditional"
 
 
+def _ideogram4_branch_or_raise(mod: ModelOnDisk) -> Ideogram4Branch:
+    """The branch, from the file's own declaration where it has one.
+
+    A declaration this does not recognise is refused rather than ignored. Falling back to the
+    filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
+    build) as one of *these* two branches, and the loader node trusts the recorded branch
+    precisely because it came from the file — which is how a wrong model would end up guiding
+    against a right one with nothing in the log.
+    """
+    declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
+    if not declared:
+        return _ideogram4_branch_from_filename(mod.path.name)
+    branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
+    if branch is None:
+        raise InvalidMatchError(
+            f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
+            f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
+            "likely a newer or different Ideogram model that this version cannot run."
+        )
+    return branch
+
+
+def _raise_for_unsupported_comfy_quantization(mod: ModelOnDisk, state_dict: dict[str | int, Any], family: str) -> None:
+    """Refuse the ComfyUI quantization schemes the Ideogram 4 and Qwen-Image-2.1 single-file loaders cannot build.
+
+    `InvalidMatchError`, not `NotAMatchError`: the file *is* a `family` transformer, so the
+    right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
+    registers it as a model nothing can load.
+
+    Three of them. torchao's serialized tensor subclasses (unsloth's Qwen-Image-2.1 FP8 build) store each quantized
+    weight as `<layer>._weight_qdata` beside its scale, with no `<layer>.weight` the transformer could load. Only
+    a family whose fingerprint reads unquantized tensors gets here with such a file: Qwen-Image-2.1 does, while an
+    Ideogram 4 build that quantized its fingerprint Linears would not match at all.
+
+    nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
+    the `comfy_quant` markers every repack carries -- including the two supported ones; the
+    per-tensor `weight_scale_2` is what only nvfp4 writes.
+
+    And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
+    (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
+    generates noise. Refusing them here too is what keeps that refusal at install time -- an
+    `int8_dynamic` repack would otherwise register as a multi-GiB model, pull in its
+    starter dependencies, and fail at the first render.
+
+    The markers come from the file's header rather than from `state_dict`: identification loads
+    tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
+    is a header parse plus one seek per marker, and it only happens for a file that has int8
+    weights to explain in the first place.
+    """
+    if any(isinstance(key, str) and key.endswith("._weight_qdata") for key in state_dict):
+        raise InvalidMatchError(
+            f"this {family} transformer is saved as torchao-quantized tensors (as unsloth's FP8 build is), which "
+            "is not supported. Install the bf16, fp8_scaled or int8_convrot build, or a GGUF, instead."
+        )
+    if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
+        raise InvalidMatchError(
+            f"this is an nvfp4-quantized {family} transformer, which is not supported yet. "
+            "Install the fp8_scaled or int8_convrot build instead."
+        )
+
+    int8_weights = sorted(
+        key
+        for key, value in state_dict.items()
+        if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+    )
+    if not int8_weights:
+        return
+
+    try:
+        markers = read_comfy_quant_markers(mod.path)
+    except Exception:
+        # Not readable safetensors, so there are no markers to find and nothing explains the
+        # int8 weights. The refusal below is the right answer for that file too.
+        markers = {}
+    unmarked = [
+        key for key in int8_weights if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
+    ]
+    if unmarked:
+        raise InvalidMatchError(
+            f"{len(unmarked)} int8 weight(s) in this {family} transformer carry no readable "
+            f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
+            "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
+        )
+
+
 class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
 
@@ -1539,90 +1712,48 @@ class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base,
             raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
 
         if _has_ggml_tensors(state_dict):
-            raise NotAMatchError("GGUF-quantized Ideogram 4 checkpoints are not supported yet")
+            raise NotAMatchError("state dict looks like GGUF quantized")
 
-        cls._raise_for_unsupported_quantization(mod, state_dict)
+        _raise_for_unsupported_comfy_quantization(mod, state_dict, "Ideogram 4")
 
-        branch = override_fields.pop("branch", None) or cls._branch_or_raise(mod)
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
         return cls(**override_fields, branch=branch)
 
-    @classmethod
-    def _branch_or_raise(cls, mod: ModelOnDisk) -> Ideogram4Branch:
-        """The branch, from the file's own declaration where it has one.
 
-        A declaration this does not recognise is refused rather than ignored. Falling back to the
-        filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
-        build) as one of *these* two branches, and the loader node trusts the recorded branch
-        precisely because it came from the file — which is how a wrong model would end up guiding
-        against a right one with nothing in the log.
-        """
-        declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
-        if not declared:
-            return _ideogram4_branch_from_filename(mod.path.name)
-        branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
-        if branch is None:
-            raise InvalidMatchError(
-                f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
-                f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
-                "likely a newer or different Ideogram model that this version cannot run."
-            )
-        return branch
+class Main_GGUF_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Ideogram 4 transformers (single-file).
+
+    Like the safetensors single files, one GGUF holds ONE of the two dual-branch transformers and
+    the loader node pairs them. Unlike them, no published GGUF carries any metadata (every release
+    has a key/value count of zero), so the branch comes from the filename alone: keep the files
+    under their published names.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    branch: Ideogram4Branch = Field(
+        description="Which of Ideogram 4's two transformer branches this file holds. GGUF releases "
+        "record no metadata, so it is read from the filename: anything naming 'unconditional' or "
+        "'uncond' is the unconditional branch. Rename and re-install to correct it."
+    )
 
     @classmethod
-    def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
-        """Refuse the quantization schemes this loader cannot build.
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
 
-        `InvalidMatchError`, not `NotAMatchError`: the file *is* an Ideogram 4 transformer, so the
-        right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
-        registers it as a model nothing can load.
+        raise_for_override_fields(cls, override_fields)
 
-        Two of them. nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
-        the `comfy_quant` markers every repack carries -- including the two supported ones; the
-        per-tensor `weight_scale_2` is what only nvfp4 writes.
+        state_dict = mod.load_state_dict()
+        if not _has_ideogram4_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
 
-        And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
-        (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
-        generates noise. Refusing them here too is what keeps that refusal at install time -- a
-        torchao or `int8_dynamic` repack of this architecture would otherwise register as a 9 GiB
-        model, pull in its three starter dependencies, and fail at the first render.
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
 
-        The markers come from the file's header rather than from `state_dict`: identification loads
-        tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
-        is a header parse plus one seek per marker, and it only happens for a file that has int8
-        weights to explain in the first place.
-        """
-        if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
-            raise InvalidMatchError(
-                "this is an nvfp4-quantized Ideogram 4 transformer, which is not supported yet. "
-                "Install the fp8_scaled or int8_convrot build instead."
-            )
+        branch = override_fields.pop("branch", None) or _ideogram4_branch_or_raise(mod)
 
-        int8_weights = sorted(
-            key
-            for key, value in state_dict.items()
-            if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
-        )
-        if not int8_weights:
-            return
-
-        try:
-            markers = read_comfy_quant_markers(mod.path)
-        except Exception:
-            # Not readable safetensors, so there are no markers to find and nothing explains the
-            # int8 weights. The refusal below is the right answer for that file too.
-            markers = {}
-        unmarked = [
-            key
-            for key in int8_weights
-            if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
-        ]
-        if unmarked:
-            raise InvalidMatchError(
-                f"{len(unmarked)} int8 weight(s) in this Ideogram 4 transformer carry no readable "
-                f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
-                "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
-            )
+        return cls(**override_fields, branch=branch)
 
 
 class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -1832,12 +1963,16 @@ def _ltx2_generation_from_keys(stripped_keys: set[str]) -> str | None:
 
     LTX-2.5 dropped the video feed-forward biases (2.0/2.3 keep them on both streams), and its video
     VAE decoder gained a fourth upsampling stage (``up_blocks.8``; 2.0/2.3 stop at ``up_blocks.6``).
-    Either component identifies the generation on its own.
+    A transformer is dated either way: with the video biases it is one of the two earlier generations,
+    which its structure cannot tell apart -- reported as such, so the refusal names it. A VAE is dated
+    only by the 2.5 stage, because the earlier decoder's keys are shared with LTX-Video 0.9.
     """
     if "transformer_blocks.0.ff.net.0.proj.weight" in stripped_keys:
         video_ff_bias = "transformer_blocks.0.ff.net.2.bias" in stripped_keys
         audio_ff_bias = "transformer_blocks.0.audio_ff.net.2.bias" in stripped_keys
-        return "2.5" if (not video_ff_bias and audio_ff_bias) else None
+        if not audio_ff_bias:
+            return None
+        return "2.0/2.3" if video_ff_bias else "2.5"
     for prefix in ("", "vae."):
         if f"{prefix}decoder.up_blocks.0.res_blocks.0.conv1.conv.weight" in stripped_keys:
             return "2.5" if f"{prefix}decoder.up_blocks.8.res_blocks.0.conv1.conv.weight" in stripped_keys else None
@@ -1969,11 +2104,8 @@ class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
     Covers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization
     scheme is read from the file's own markers by the loader, not recorded here. The file may hold
     only the transformer (the 2.5 releases) or bundle other components beside it (earlier
-    generations) -- either way everything else comes from an installed LTX-2 component folder.
-
-    Dev and Distilled transformers are key-for-key identical, so the FILENAME is the variant
-    classifier and ``variant`` is the user-correctable override for renamed files. A misclassified
-    variant runs but samples with the wrong recipe (guided schedule vs fixed distilled sigmas).
+    generations) -- either way everything else comes from an installed LTX-2 component folder. Dev and
+    Distilled are told apart by the filename.
     """
 
     base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
@@ -1990,19 +2122,65 @@ class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Conf
             raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
 
         state_dict = mod.load_state_dict()
-        keys = {k for k in state_dict if isinstance(k, str)}
         if ltx2_layout.ROLE_TRANSFORMER not in ltx2_layout.classify_roles(state_dict, mod.metadata()):
             raise NotAMatchError("state dict does not look like an LTX-2 transformer")
-        if _has_ggml_tensors(state_dict):
-            raise NotAMatchError("GGUF-quantized LTX-2 checkpoints are not supported yet")
 
-        generation = override_fields.pop("generation", None) or _ltx2_generation_or_raise(
-            mod, mod.path, {ltx2_layout.strip_transformer_prefix(k) for k in keys}
-        )
-        variant = override_fields.pop("variant", None) or (
-            LTX2VariantType.Distilled if ltx2_layout.is_distilled_filename(mod.path.name) else LTX2VariantType.Dev
-        )
-        return cls(**override_fields, variant=LTX2VariantType(variant), generation=generation)
+        generation, variant = _ltx2_transformer_identity(mod, state_dict, override_fields)
+        return cls(**override_fields, variant=variant, generation=generation)
+
+
+class Main_GGUF_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """An LTX-2 single-file transformer in GGUF, in the official key layout.
+
+    The community builds are conversions of the official single files: the transformer's keys, bare or
+    under ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for
+    the official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``
+    for every generation, and some carry another model's metadata outright, so the keys identify them,
+    exactly as they do the safetensors files. Some keep the official ``model_version`` string and some
+    drop it; the structure dates those. Dev and Distilled are told apart by the filename.
+    """
+
+    base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: LTX2VariantType = Field()
+    generation: str = Field(description="The LTX-2 generation the transformer belongs to, e.g. '2.5'.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".gguf":
+            raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        if ltx2_layout.ROLE_TRANSFORMER not in ltx2_layout.classify_roles(state_dict, mod.metadata()):
+            raise NotAMatchError("state dict does not look like an LTX-2 transformer")
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        generation, variant = _ltx2_transformer_identity(mod, state_dict, override_fields)
+        return cls(**override_fields, variant=variant, generation=generation)
+
+
+def _ltx2_transformer_identity(
+    mod: ModelOnDisk, state_dict: dict[str | int, Any], override_fields: dict[str, Any]
+) -> tuple[str, LTX2VariantType]:
+    """The generation and variant of a single-file LTX-2 transformer, whatever its container.
+
+    The generation is the header's version or else the structure's, and one this version cannot run is
+    refused here. Dev and Distilled transformers are key-for-key identical, so the FILENAME is the
+    variant classifier and ``variant`` is the user-correctable override for renamed files. A
+    misclassified variant runs but samples with the wrong recipe (guided schedule vs fixed distilled
+    sigmas).
+    """
+    generation = override_fields.pop("generation", None) or _ltx2_generation_or_raise(
+        mod, mod.path, {ltx2_layout.strip_transformer_prefix(k) for k in state_dict if isinstance(k, str)}
+    )
+    variant = override_fields.pop("variant", None) or (
+        LTX2VariantType.Distilled if ltx2_layout.is_distilled_filename(mod.path.name) else LTX2VariantType.Dev
+    )
+    return generation, LTX2VariantType(variant)
 
 
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -2072,6 +2250,154 @@ class Main_GGUF_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Ba
     def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
         if not _has_ggml_tensors(mod.load_state_dict()):
             raise NotAMatchError("state dict does not look like GGUF quantized")
+
+
+_FLUX3_LORA_SUFFIXES = (
+    ".lora_down.weight",
+    ".lora_up.weight",
+    ".lora_A.weight",
+    ".lora_B.weight",
+    ".dora_scale",
+    ".alpha",
+)
+
+# A quantized side channel next to a weight, or a weight stored in a quantized dtype. FLUX.3 loads these
+# builds later; until it does, they are refused with a message rather than loaded wrongly.
+_FLUX3_QUANTIZATION_SUFFIXES = (".weight_scale", ".weight_scale_2", ".input_scale", ".scale_weight", ".comfy_quant")
+_FLUX3_QUANTIZED_DTYPES = (torch.float8_e4m3fn, torch.float8_e5m2, torch.uint8, torch.int8)
+
+
+def _has_flux3_keys(state_dict: dict[str | int, Any]) -> bool:
+    """True for a FLUX.3 Image transformer in Black Forest Labs' native layout, False for its LoRAs.
+
+    The per-mode stage before the joint blocks is unique to FLUX.3: `content_mode_blocks.<mode>.N` and
+    `early_stream_modulations`. FLUX.1 and FLUX.2 have `double_blocks`, Krea-2 `text_fusion`. ComfyUI's key
+    prefixes are tolerated; the BFL file and the ComfyUI repackage are byte-identical and carry none.
+    """
+    keys = [_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)]
+    if any(key.endswith(_FLUX3_LORA_SUFFIXES) for key in keys):
+        return False
+    return "early_stream_modulations.image.lin.weight" in set(keys) and any(
+        key.startswith("content_mode_blocks.image.") for key in keys
+    )
+
+
+def _get_flux3_variant(state_dict: dict[str | int, Any]) -> Flux3VariantType:
+    """The step-distilled checkpoint has a second timestep embedder; the Base model does not."""
+    keys = {_strip_comfyui_key_prefix(key) for key in state_dict if isinstance(key, str)}
+    return Flux3VariantType.Klein if "ref_time_in.in_layer.weight" in keys else Flux3VariantType.KleinBase
+
+
+class Main_Diffusers_Flux3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.3 Image diffusers models (Klein and Klein Base).
+
+    FLUX.3 ships as a Modular Diffusers pipeline: the root config is `modular_model_index.json`. The Hub
+    repositories also hold BFL's own single-file package at the root (`model.safetensors`, a BFL-format
+    `config.json`, `ae.safetensors`) and quantized `variants/`; none of them is read here.
+    """
+
+    base: Literal[BaseModelType.Flux3] = Field(BaseModelType.Flux3)
+    variant: Flux3VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        raise_for_class_name(
+            mod.path / "modular_model_index.json",
+            {"Flux3ModularPipeline", "Flux3DistilledModularPipeline"},
+        )
+        raise_for_class_name(mod.path / "transformer" / "config.json", {"Flux3Transformer2DModel"})
+
+        # A partial download is refused here rather than failing mid-generation.
+        if not (mod.path / "vae" / "config.json").exists():
+            raise InvalidMatchError("FLUX.3 folder has no `vae/`; download the full Diffusers pipeline")
+        text_encoder_dir = mod.path / "text_encoder"
+        if not (text_encoder_dir / "config.json").exists():
+            raise InvalidMatchError("FLUX.3 folder has no `text_encoder/`; download the full Diffusers pipeline")
+        if not (text_encoder_dir / "tokenizer.json").exists() and not (
+            (text_encoder_dir / "vocab.json").exists() and (text_encoder_dir / "merges.txt").exists()
+        ):
+            raise InvalidMatchError("FLUX.3 folder has no tokenizer files in `text_encoder/`")
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> Flux3VariantType:
+        """The step-distilled transformer is a flow map (`flow_map: true`); the Base transformer is not."""
+        config = get_config_dict_or_raise(mod.path / "transformer" / "config.json")
+        return Flux3VariantType.Klein if config.get("flow_map", False) else Flux3VariantType.KleinBase
+
+
+class Main_Checkpoint_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16)."""
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: Flux3VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        if not _has_flux3_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.3 model")
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+        cls._raise_for_quantized_weights(state_dict)
+
+        variant = override_fields.pop("variant", None) or _get_flux3_variant(state_dict)
+
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _raise_for_quantized_weights(cls, state_dict: dict[str | int, Any]) -> None:
+        for key, value in state_dict.items():
+            if not isinstance(key, str):
+                continue
+            if key.endswith(_FLUX3_QUANTIZATION_SUFFIXES) or (
+                key.endswith(".weight") and getattr(value, "dtype", None) in _FLUX3_QUANTIZED_DTYPES
+            ):
+                raise InvalidMatchError(
+                    "this FLUX.3 build is quantized (fp8, int8 or nvfp4), which is not supported yet; install the "
+                    "bf16 file or a GGUF build"
+                )
+
+
+class Main_GGUF_Flux3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized FLUX.3 Image transformers (single-file)."""
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: Flux3VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_flux3_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a FLUX.3 model")
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        variant = override_fields.pop("variant", None) or _get_flux3_variant(state_dict)
+
+        return cls(**override_fields, variant=variant)
 
 
 class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -2148,7 +2474,17 @@ def _has_qwen_image_keys(state_dict: dict[str | int, Any]) -> bool:
     has_img_in = any(k.startswith("img_in.") for k in keys)
     # Must NOT have context_embedder (which would indicate FLUX)
     has_context_embedder = any("context_embedder" in k for k in keys)
-    return has_txt_in and has_txt_norm and has_img_in and not has_context_embedder
+    return (
+        has_txt_in
+        and has_txt_norm
+        and has_img_in
+        and not has_context_embedder
+        # InstantX's Qwen-Image ControlNet is a trimmed copy of this transformer, `img_in`/`txt_in`/`txt_norm`
+        # included; the ControlNet config claims it. Asked of the stripped keys, as the loader asks: a prefixed copy
+        # identified as a main model would be refused at load, and identified as one again by Re-identify.
+        and not is_qwen_image_instantx_controlnet(set(keys))
+        and not _has_qwen_image21_keys(state_dict)
+    )
 
 
 # Matches "edit" as a standalone token (delimited by start/end or any non-alphanumeric
@@ -2227,6 +2563,120 @@ class Main_GGUF_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Confi
         explicit_variant = override_fields.pop("variant", None) or _infer_qwen_image_variant(sd, mod.path)
 
         return cls(**override_fields, variant=explicit_variant)
+
+
+_LORA_KEY_SUFFIXES = (
+    ".lora_down.weight",
+    ".lora_up.weight",
+    ".lora_A.weight",
+    ".lora_B.weight",
+    ".dora_scale",
+    ".alpha",
+)
+
+
+def _has_qwen_image21_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a Qwen-Image-2.1 transformer (any layout), and not a LoRA for one.
+
+    Its `txt_in` is a module with its own `text_norm`, where Qwen-Image's is a plain Linear beside a
+    top-level `txt_norm`. The MLP is gated: diffusers names the halves `gate_layer`/`proj`, ComfyUI fuses
+    them into `gate_up`.
+    """
+    keys = [_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)]
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    has_text_norm = "txt_in.text_norm.weight" in keys
+    has_gated_mlp = any(".img_mlp.gate_up." in k or ".img_mlp.gate_layer." in k for k in keys)
+    has_img_in = any(k.startswith("img_in.") for k in keys)
+    return has_text_norm and has_gated_mlp and has_img_in
+
+
+def _get_qwen_image21_variant_from_name(name: str) -> QwenImage21VariantType:
+    """Turbo and Base share every tensor shape, so a single file says which it is by its name only.
+
+    "turbo" anywhere in the name means Turbo (`Qwen-Image-2.1-Turbo`, `qwen_image_2.1_turbo_bf16`);
+    anything else is the released base model. The model manager can override it.
+    """
+    return QwenImage21VariantType.Turbo if "turbo" in name.lower() else QwenImage21VariantType.Base
+
+
+class Main_Diffusers_QwenImage21_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 diffusers pipelines."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(BaseModelType.QwenImage21)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"QwenImage21Pipeline"})
+
+        variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, variant=variant, repo_variant=repo_variant)
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> QwenImage21VariantType:
+        """Turbo ships the sigma table it was distilled for as `sample_sigmas` in model_index.json."""
+        config = get_config_dict_or_raise(mod.path / "model_index.json")
+        if config.get("sample_sigmas"):
+            return QwenImage21VariantType.Turbo
+        return QwenImage21VariantType.Base
+
+
+class Main_Checkpoint_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Qwen-Image-2.1 single-file transformers (bf16, ComfyUI fp8 scaled or int8 convrot)."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+        _raise_for_unsupported_comfy_quantization(mod, sd, "Qwen-Image-2.1")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
+
+
+class Main_GGUF_QwenImage21_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Qwen-Image-2.1 transformers."""
+
+    base: Literal[BaseModelType.QwenImage21] = Field(default=BaseModelType.QwenImage21)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    variant: QwenImage21VariantType = Field()
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_qwen_image21_keys(sd):
+            raise NotAMatchError("state dict does not look like a Qwen-Image-2.1 transformer")
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        variant = override_fields.pop("variant", None) or _get_qwen_image21_variant_from_name(mod.path.name)
+
+        return cls(**override_fields, variant=variant)
 
 
 def _has_wan_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -2916,6 +3366,8 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         raise_for_override_fields(cls, override_fields)
 
         cls._validate_looks_like_anima_model(mod)
+        if _has_ggml_tensors(mod.load_state_dict()):
+            raise NotAMatchError("state dict looks like GGUF quantized")
         cls._reject_unbundled_qwen35_dit(mod)
 
         variant = override_fields.pop("variant", None) or _get_anima_variant(mod.load_state_dict())
@@ -2947,6 +3399,103 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
             "Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint instead "
             "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
         )
+
+
+#: The tensor whose width the rest of an Anima transformer follows. Its rows are 68 wide, which no GGML block
+#: divides, so every converter stores it unquantized and it keeps the true geometry in a file whose quantized
+#: tensors lost theirs.
+_ANIMA_PATCH_EMBED_KEY = "x_embedder.proj.1.weight"
+
+#: Anima-3.8B's depth. Without its connector the v1.0 transformer looks like any other 52-block build.
+_ANIMA_3_8B_DEPTH = 52
+
+
+class Main_GGUF_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized Anima transformers (ComfyUI-GGUF, stable-diffusion.cpp).
+
+    Recognized by its keys under any of Anima's wrappers, never by the header: some converters write none.
+    Unlike the checkpoint config it checks every tensor's shape against the transformer the loader builds,
+    because broken conversions are published: one quantized the bf16 weights' bytes, doubling every
+    quantized tensor's columns, and would otherwise install and fail at the first render.
+    """
+
+    base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    # Required, for the reason given on `Main_Checkpoint_Anima_Config.variant`.
+    variant: AnimaVariantType = Field(description="Which text encoders the model is conditioned on.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        sd = mod.load_state_dict()
+        if not _has_anima_keys(sd):
+            raise NotAMatchError("state dict does not look like an Anima model")
+        if not _has_ggml_tensors(sd):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        # No GGUF of Anima-3.8B exists to verify against, so the loader builds no semantic connector from GGUF.
+        if _get_anima_variant(sd) is AnimaVariantType.Qwen35:
+            raise InvalidMatchError(
+                f"{mod.path.name} is an Anima-3.8B transformer with its Qwen3.5 semantic connector. No GGUF of "
+                "Anima-3.8B has been verified, so this version of Invoke does not install one. Install the "
+                "Anima-3.8B (v1.1) starter model, the safetensors release, instead."
+            )
+        cls._raise_for_unbuildable_transformer(mod, sd)
+
+        variant = override_fields.pop("variant", None) or AnimaVariantType.Qwen3
+        return cls(**override_fields, variant=variant)
+
+    @classmethod
+    def _raise_for_unbuildable_transformer(cls, mod: ModelOnDisk, sd: dict[str | int, Any]) -> None:
+        name = mod.path.name
+        try:
+            present, required = anima_transformer_shape_contract(sd)
+        except ValueError as e:
+            raise InvalidMatchError(f"{name}: {e}") from None
+
+        if count_anima_dit_blocks(present) == _ANIMA_3_8B_DEPTH:
+            raise InvalidMatchError(
+                f"{name} is a 52-block Anima transformer without the Qwen3.5 semantic connector. Without the "
+                "connector a GGUF cannot be told apart from the Anima-3.8B v1.0 transformer, which only works "
+                "together with its separate Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint "
+                "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
+            )
+
+        patch_embed = present.get(_ANIMA_PATCH_EMBED_KEY)
+        if patch_embed is not None and patch_embed != required[_ANIMA_PATCH_EMBED_KEY]:
+            raise InvalidMatchError(
+                f"{name} is an Anima transformer of a size this version of Invoke cannot build: its patch embedding "
+                f"`{_ANIMA_PATCH_EMBED_KEY}` is {patch_embed}, where Anima's is {required[_ANIMA_PATCH_EMBED_KEY]}. "
+                "Use a GGUF or checkpoint of a supported Anima model instead."
+            )
+
+        mismatched = {
+            key: (present[key], shape) for key, shape in required.items() if key in present and present[key] != shape
+        }
+        if mismatched:
+            key, (actual, expected) = next(iter(mismatched.items()))
+            doubled = all(a[:-1] == e[:-1] and a[-1] == 2 * e[-1] for a, e in mismatched.values())
+            cause = (
+                " Each stores twice the columns the model has: the converter quantized the bfloat16 weights' raw "
+                "bytes rather than their values, so the weights cannot be recovered from this file."
+                if doubled
+                else ""
+            )
+            raise InvalidMatchError(
+                f"{name} cannot be loaded: {len(mismatched)} of its tensors do not have the shapes of the Anima "
+                f"transformer its own patch embedding implies, e.g. `{key}` is {actual} where the model's is "
+                f"{expected}.{cause} Use the safetensors release of this model, or a GGUF converted from it, instead."
+            )
+
+        missing = sorted(required.keys() - present.keys())
+        if missing:
+            raise InvalidMatchError(
+                f"{name} lacks {len(missing)} tensor(s) of the Anima transformer, e.g. `{missing[0]}`. Use a "
+                "complete GGUF of the model or its safetensors release instead."
+            )
 
 
 class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -3417,6 +3966,10 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
             # its loader needs, otherwise a partial pipeline is treated as self-contained
             # (is_self_contained_sdnq_pipeline) and the loaders later request fixed vae/ text_encoder/
             # tokenizer/ subfolders that have nothing to load.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3431,7 +3984,7 @@ class Main_SDNQ_Diffusers_Flux2_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3564,6 +4117,10 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
             # See the FLUX.2 _get_submodels note: only record a component whose folder actually holds
             # the files its loader needs, so a partial download with a complete model_index.json isn't
             # mis-classified as a self-contained SDNQ pipeline.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_PIPELINE_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3577,7 +4134,7 @@ class Main_SDNQ_Diffusers_ZImage_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3718,6 +4275,10 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
             # *should* have, so a partial download keeps a complete index over missing or empty
             # folders, and the advertised class is a claim about the folder rather than a fact.
             # Without these, a half-downloaded pipeline looks complete until generation time.
+            # The record stores the key and loading joins it onto wherever the model ends up, so only a
+            # bare folder name keeps the folder validated here the same one that is loaded later.
+            if not is_plain_filename(key):
+                continue
             component_path = mod.path / key
             if not _sdnq_component_dir_is_populated(component_path, submodel_type, _SDNQ_FLUX1_ALWAYS_SDNQ_LOADED):
                 continue
@@ -3729,7 +4290,7 @@ class Main_SDNQ_Diffusers_FLUX_Config(Main_Config_Base, Config_Base):
                 continue
 
             submodels[submodel_type] = SubmodelDefinition(
-                path_or_prefix=component_path.resolve().as_posix(),
+                path_or_prefix=key,
                 model_type=model_type,
                 variant=None,
             )
@@ -3808,5 +4369,162 @@ class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base
 
         if _has_ggml_tensors(state_dict):
             raise NotAMatchError("state dict looks like GGUF quantized")
+
+        return cls(**override_fields)
+
+
+class Main_GGUF_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for GGUF-quantized ERNIE-Image transformers (single-file).
+
+    The community GGUFs carry the diffusers key layout unchanged, so the same fingerprint identifies
+    them. Their `general.architecture` says nothing about ERNIE -- unsloth's builds declare `wan`,
+    others `flux` -- so identification rests on the keys alone. As with the safetensors file, Turbo
+    and base are told apart by the model name.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+
+        if not _has_ernie_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+        if not _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict does not look like GGUF quantized")
+
+        return cls(**override_fields)
+
+
+# ---------------------------------------------------------------------------------------------
+# MOSS-Image
+# ---------------------------------------------------------------------------------------------
+
+# What a MOSS-Image pipeline folder must hold besides its `model_index.json`. The scheduler is not listed: the
+# denoise node builds the schedule itself and never reads `scheduler/`.
+_MOSS_IMAGE_REQUIRED_COMPONENT_FILES = {
+    "transformer": ("config.json", "*.safetensors"),
+    "text_encoder": ("config.json", "*.safetensors"),
+    # The chat template is its own file here, not a `tokenizer_config.json` key, and the prompt encoding needs it.
+    "tokenizer": ("tokenizer_config.json", "tokenizer.json", "chat_template.jinja"),
+    "vae": ("config.json", "*.safetensors"),
+}
+
+
+class Main_Diffusers_MossImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image diffusers pipelines (MOSS-Image Base and SFT).
+
+    The folder bundles the transformer, the Qwen3.5-9B text encoder with its tokenizer, and a FLUX.2 VAE. Base and SFT
+    differ only in their transformer weights, so there is no variant.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(BaseModelType.MossImage)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # The pipeline class name implies the base.
+        raise_for_class_name(common_config_paths(mod.path), {"MOSSImagePipeline"})
+
+        # From here on the folder is a MOSS-Image pipeline, so what is missing is a broken download, not another
+        # model: refuse it with what to fetch rather than registering a model that fails at its first generation.
+        missing = [
+            f"{component}/{pattern}"
+            for component, patterns in _MOSS_IMAGE_REQUIRED_COMPONENT_FILES.items()
+            for pattern in patterns
+            if not any((mod.path / component).glob(pattern))
+        ]
+        if missing:
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline folder is incomplete; missing: {', '.join(missing)}. "
+                "Download the whole repository again."
+            )
+        transformer_class = get_config_dict_or_raise(mod.path / "transformer" / "config.json").get("_class_name")
+        if transformer_class != "MOSSImageTransformer":
+            raise InvalidMatchError(
+                f"this MOSS-Image pipeline's transformer is a {transformer_class!r}, not a MOSSImageTransformer"
+            )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        return cls(**override_fields, repo_variant=repo_variant)
+
+
+def _has_moss_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Whether the state dict is a MOSS-Image transformer, and not a LoRA for one.
+
+    The modulation shared by every block, the video head and the text refiner's fused qkv: no other architecture
+    probed here spells any of them. The diffusers shards and the ComfyUI single-file export use the same names.
+    """
+    keys = {_strip_comfyui_key_prefix(k) for k in state_dict.keys() if isinstance(k, str)}
+    if any(k.endswith(_LORA_KEY_SUFFIXES) for k in keys):
+        return False
+    return all(
+        key in keys
+        for key in (
+            "shared_block_modulation.weight",
+            "final_linear_video.weight",
+            "text_embedder.blocks.0.qkv.weight",
+        )
+    )
+
+
+def _moss_image_quantized_key(state_dict: dict[str | int, Any]) -> str | None:
+    """The first key that shows the checkpoint is quantized, or None for a dense one.
+
+    A side channel (`weight_scale`, `input_scale`, `.comfy_quant` markers) or a weight stored as fp8 or as packed
+    integer codes. Identification reads the header on the meta device, so the dtype is all there is to go on.
+    """
+    quantized_dtypes = (*FP8_WEIGHT_DTYPES, torch.uint8, torch.int8)
+    for key, value in state_dict.items():
+        if not isinstance(key, str):
+            continue
+        if is_scale_metadata_key(key) or getattr(value, "dtype", None) in quantized_dtypes:
+            return key
+    return None
+
+
+class Main_Checkpoint_MossImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.
+
+    The file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on
+    the loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with
+    `InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown
+    model instead.
+    """
+
+    base: Literal[BaseModelType.MossImage] = Field(default=BaseModelType.MossImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_moss_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MOSS-Image transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise InvalidMatchError(
+                "GGUF-quantized MOSS-Image checkpoints are not supported yet. Install the bf16 transformer instead."
+            )
+
+        quantized_key = _moss_image_quantized_key(state_dict)
+        if quantized_key is not None:
+            raise InvalidMatchError(
+                f"quantized MOSS-Image checkpoints are not supported yet (found '{quantized_key}'). "
+                "Install the bf16 transformer instead."
+            )
 
         return cls(**override_fields)

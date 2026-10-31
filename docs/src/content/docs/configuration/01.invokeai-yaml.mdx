@@ -195,9 +195,36 @@ Notes:
 
 Background indexing of new images already waits until no generation is running, so it simply takes the first idle GPU; it is search by image that benefits during a generation.
 
+#### Attention Kernel
+
+`attention_backend` decides how attention runs. The default, `auto`, uses PyTorch's exact attention kernels ranked flash, cuDNN, memory-efficient, math: each call takes the first one the GPU and the PyTorch build support for it. `sage` uses [SageAttention](/configuration/optimization/sage-attention/) for the models listed there.
+
+For measurements and support questions you can rank one of PyTorch's kernels first instead, for the attention of every model on CUDA and ROCm GPUs. It takes effect after restarting InvokeAI:
+
+```yaml
+attention_backend: cudnn
+```
+
+| Value       | Kernel ranked first                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `cudnn`     | cuDNN attention. ROCm builds of PyTorch do not have it.                                                                               |
+| `flash`     | Flash attention. PyTorch's Windows builds do not have it.                                                                             |
+| `efficient` | Memory-efficient attention.                                                                                                           |
+| `math`      | PyTorch's unfused fallback. It builds the full attention score matrix, so it is much slower and needs far more memory. For debugging. |
+
+The working-memory estimates of most model families do not include the score matrix `math` builds, so with `math` generations can run out of memory; startup logs a warning saying so.
+
+A pinned kernel is never exclusive. A call it cannot serve — the build or GPU has no such kernel, or the call's precision, head size, mask or grouped-query heads rule it out — runs on the next kernel of the default order, and the log says so once per node type and reason:
+
+```
+attention_backend 'flash' is not possible for attention in flux_denoise: this PyTorch build or GPU (cuda:0) has no flash kernel; it runs on CUDNN_ATTENTION.
+```
+
+The PiD decoder's attention is ranked the same way, but not reported. Images can differ slightly between kernels at the same seed. On the CPU and on Apple Silicon, PyTorch picks its kernels itself and the ranking does not apply.
+
 #### Image Subfolder Strategy
 
-By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, in the Settings panel.
+By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, under **Settings → Server → Image storage**.
 
 ```yaml
 image_subfolder_strategy: flat # default value
@@ -249,6 +276,8 @@ If you serve InvokeAI through nginx, Caddy, or similar, set `http_compression_le
 
 #### Database Durability
 
+This section concerns the default SQLite database. A [MySQL or MariaDB database](/configuration/external-database/), set with `db_url`, has its durability set on the server.
+
 Every write to InvokeAI's SQLite database is committed to disk before the request returns. How hard that commit is pushed to the physical disk is controlled by `db_synchronous`:
 
 ```yaml
@@ -268,7 +297,7 @@ Running the database on a network share is not a supported configuration -- SQLi
 
 The safeguard exists anyway, because WAL needs shared memory and a few setups cannot provide it: a database on a network share, some container volume drivers, and SQLite builds compiled without WAL all leave a rollback journal in place instead — and on a rollback journal, `normal` _can_ corrupt the database on power loss. InvokeAI reads back the journal mode it actually got, so in that case it ignores `normal`, uses `full`, and logs a warning naming the mode. An in-memory database (`use_memory_db`) has no durability to trade and is unaffected.
 
-`db_synchronous` applies to the application's own database connection. Gallery maintenance is an administrator action in Settings and uses that same application database connection, so its database work follows this setting. The image import script, `invokeai/frontend/install/import_images.py`, still opens the database independently and leaves SQLite's own default in place; the measurements below describe the running app, not that script.
+`db_synchronous` applies to the application's own database connection, which gallery maintenance (an administrator action in Settings) uses too, and to the image import script, `invokeai/frontend/install/import_images.py`, which reads the same `invokeai.yaml`. The measurements below describe the running app.
 
 Measured on a copy of a real library, 300 single-row inserts each committed on its own:
 

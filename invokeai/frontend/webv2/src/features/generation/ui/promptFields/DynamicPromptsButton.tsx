@@ -2,7 +2,6 @@ import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFi
 
 import { Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { DynamicPromptsPanel } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
-import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
 import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { IconButton } from '@platform/ui/Button';
@@ -10,10 +9,14 @@ import { PopoverContent } from '@platform/ui/Popover';
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { BracesIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
+
+// The wildcard manager and its list load with the popover, not with every prompt field at editor boot.
+const loadWildcardsPanel = () => import('@features/generation/ui/promptFields/WildcardsPanel');
+const WildcardsPanel = lazy(() => loadWildcardsPanel().then((module) => ({ default: module.WildcardsPanel })));
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 
 interface DynamicPromptsButtonProps {
@@ -21,6 +24,8 @@ interface DynamicPromptsButtonProps {
   batchCount: number;
   positivePrompt: string;
   showSyntaxHighlighting: boolean;
+  /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
+  highlightExpandedPrompts: boolean;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -28,6 +33,7 @@ interface DynamicPromptsButtonProps {
 export const DynamicPromptsButton = ({
   batchCount,
   config,
+  highlightExpandedPrompts,
   onInsertText,
   onUsePrompt,
   positivePrompt,
@@ -42,7 +48,13 @@ export const DynamicPromptsButton = ({
   const catalog = useWildcards();
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
 
-  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const handleOpenChange = useCallback((event: { open: boolean }) => {
+    if (event.open) {
+      // Ready before the Wildcards tab is chosen, so it opens without a loading gap.
+      void loadWildcardsPanel();
+    }
+    setIsOpen(event.open);
+  }, []);
   const handleTabChange = useCallback((value: 'preview' | 'wildcards') => setTab(value), []);
   const closeWith = useCallback(
     (apply: (value: string) => void) => (value: string) => {
@@ -123,15 +135,17 @@ export const DynamicPromptsButton = ({
                       batchCount={batchCount}
                       config={config}
                       expansion={expansion}
-                      showSyntaxHighlighting={showSyntaxHighlighting}
+                      showSyntaxHighlighting={highlightExpandedPrompts}
                       onUsePrompt={handleUsePrompt}
                     />
                   ) : (
-                    <WildcardsPanel
-                      catalog={catalog}
-                      showSyntaxHighlighting={showSyntaxHighlighting}
-                      onInsert={handleInsert}
-                    />
+                    <Suspense fallback={null}>
+                      <WildcardsPanel
+                        catalog={catalog}
+                        showSyntaxHighlighting={showSyntaxHighlighting}
+                        onInsert={handleInsert}
+                      />
+                    </Suspense>
                   )}
                 </Stack>
               </Stack>

@@ -21,7 +21,9 @@ from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.flux_lora_constants import FLUX_LORA_CLIP_PREFIX, FLUX_LORA_T5_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, FLUXConditioningInfo
+from invokeai.backend.util.devices import TorchDevice
 
 
 @invocation(
@@ -81,8 +83,13 @@ class FluxTextEncoderInvocation(BaseInvocation):
         t5_encoder_config = t5_encoder_info.config
         assert t5_encoder_config is not None
 
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover;
+        # zero for other builds.
+        dequant_bytes = peak_dequant_transient_bytes(
+            t5_encoder_info.model, TorchDevice.choose_bfloat16_safe_dtype(t5_encoder_info.compute_device)
+        )
         with (
-            t5_encoder_info.model_on_device() as (cached_weights, t5_text_encoder),
+            t5_encoder_info.model_on_device(working_mem_bytes=dequant_bytes) as (cached_weights, t5_text_encoder),
             context.models.load(self.t5_encoder.tokenizer) as t5_tokenizer,
             ExitStack() as exit_stack,
         ):
@@ -142,12 +149,17 @@ class FluxTextEncoderInvocation(BaseInvocation):
             context.models.load(self.clip.tokenizer) as clip_tokenizer,
             ExitStack() as exit_stack,
         ):
-            assert isinstance(clip_text_encoder, CLIPTextModel)
+            if not isinstance(clip_text_encoder, CLIPTextModel):
+                # A CLIP-G loads with its projection; FLUX.1 conditions on CLIP-L alone.
+                raise ValueError(
+                    f"FLUX.1 needs a CLIP-L text encoder; '{clip_text_encoder_config.name}' is not one. "
+                    "Select a CLIP-L encoder such as clip_l or clip-vit-large-patch14."
+                )
             assert isinstance(clip_tokenizer, CLIPTokenizer)
 
             # Apply LoRA models to the CLIP encoder.
             # Note: We apply the LoRA after the transformer has been moved to its target device for faster patching.
-            if clip_text_encoder_config.format in [ModelFormat.Diffusers]:
+            if clip_text_encoder_config.format in [ModelFormat.Diffusers, ModelFormat.Checkpoint]:
                 # The model is non-quantized, so we can apply the LoRA weights directly into the model.
                 exit_stack.enter_context(
                     LayerPatcher.apply_smart_model_patches(

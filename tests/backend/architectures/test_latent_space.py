@@ -1,7 +1,7 @@
 """The latent-space facet: the projection maths, and what each architecture declares.
 
-Two tables carry this file. `DECLARED_LATENT_SPACES` says which space each of the sixteen
-architectures denoises in; `PINNED_PREVIEW_PIXELS` says what each of the nine spaces actually
+Two tables carry this file. `DECLARED_LATENT_SPACES` says which space each of the eighteen
+architectures denoises in; `PINNED_PREVIEW_PIXELS` says what each of the eleven spaces actually
 computes. Together they are what stops a wrong space reaching generation: swapping `FLUX_16` for
 `SD3_16` in `defs/flux.py` moves one row of the first table, and the second table is what proves
 the two rows are not interchangeable.
@@ -10,7 +10,7 @@ the two rows are not interchangeable.
 import pytest
 import torch
 
-from invokeai.backend.architectures import generative_bases, resolve_latent_space
+from invokeai.backend.architectures import generative_bases, latent_space_with_channels, resolve_latent_space
 from invokeai.backend.architectures.facets import latent_space
 from invokeai.backend.architectures.facets.latent_space import (
     COGVIEW4_16,
@@ -18,6 +18,7 @@ from invokeai.backend.architectures.facets.latent_space import (
     FLUX_16,
     LTX2_128,
     MINIMAX_H3_24,
+    QWEN_IMAGE21_64,
     SD3_16,
     SD15_4,
     SDXL_4,
@@ -57,6 +58,8 @@ DECLARED_LATENT_SPACES: dict[BaseModelType, tuple[LatentSpace, ...]] = {
     BaseModelType.ErnieImage: (FLUX2_32,),
     BaseModelType.Flux: (FLUX_16,),
     BaseModelType.Flux2: (FLUX2_32,),
+    # The FLUX.3 VAE is byte-identical to FLUX.2's.
+    BaseModelType.Flux3: (FLUX2_32,),
     # The one row the `if/elif` chain cannot corroborate: it had no Ideogram 4 branch and would
     # have raised "Unsupported base model" here. The second, divergent copy of the projection is
     # the source instead -- `ideogram4_denoise.py` at the same revision built its own preview from
@@ -66,7 +69,11 @@ DECLARED_LATENT_SPACES: dict[BaseModelType, tuple[LatentSpace, ...]] = {
     BaseModelType.Krea2: (WAN21_16,),
     BaseModelType.LTX2: (LTX2_128,),
     BaseModelType.MiniMaxH3: (MINIMAX_H3_24,),
+    # No old branch to corroborate: MOSS-Image arrived after the dispatch was gone. Its VAE's encoder and
+    # BatchNorm are FLUX.2's, and it denoises in FLUX.2's normalized latent.
+    BaseModelType.MossImage: (FLUX2_32,),
     BaseModelType.QwenImage: (WAN21_16,),
+    BaseModelType.QwenImage21: (QWEN_IMAGE21_64,),
     BaseModelType.StableDiffusion1: (SD15_4,),
     BaseModelType.StableDiffusion2: (SD15_4,),
     BaseModelType.StableDiffusion3: (SD3_16,),
@@ -119,6 +126,9 @@ PINNED_PREVIEW_PIXELS: list[tuple[LatentSpace, float, tuple[int, int, int], tupl
     (WAN22_48, 1.0, (65, 91, 227), (131, 116, 109)),
     # colsums (-0.0698, -0.0317, 0.0266), bias (-0.2223, -0.2864, -0.2917)
     (LTX2_128, 0.25, (96, 89, 91), (99, 90, 90)),
+    # colsums (-0.0175, 0.2169, -0.1644), bias (-0.1543, -0.1408, -0.2869). B lands at 69.96, so the
+    # truncating cast is again what makes it 69.
+    (QWEN_IMAGE21_64, 1.0, (105, 137, 69), (107, 109, 90)),
 ]
 
 
@@ -196,6 +206,42 @@ class TestResolution:
         """
         facet = LatentSpaceFacet(WAN21_16)
         assert facet.resolve(torch.empty(0)) is WAN21_16
+
+
+class TestLookupByChannels:
+    """`latent_space_with_channels` pairs a model recorded as `(base, channels)` with a space."""
+
+    @pytest.mark.parametrize(
+        ("base", "expected"),
+        [
+            pytest.param(base, expected, id=base.value)
+            for base, expected in sorted(DECLARED_LATENT_SPACES.items(), key=lambda item: item[0].value)
+        ],
+    )
+    def test_every_declared_space_is_found_by_its_channel_count(
+        self, base: BaseModelType, expected: tuple[LatentSpace, ...]
+    ) -> None:
+        found = [latent_space_with_channels(base, space.channels) for space in expected]
+        assert [None if space is None else _name(space) for space in found] == [_name(space) for space in expected]
+
+    def test_an_unknown_channel_count_is_no_match_rather_than_the_primary(self) -> None:
+        """Unlike `resolve`: a fallback here would pair a 32-channel decoder with FLUX.1's 16-channel space."""
+        assert latent_space_with_channels(BaseModelType.Flux, 32) is None
+        assert latent_space_with_channels(BaseModelType.Wan, 7) is None
+
+    def test_a_base_without_an_architecture_has_no_space(self) -> None:
+        assert latent_space_with_channels(BaseModelType.Any, 4) is None
+
+    def test_architectures_sharing_a_vae_share_the_space_object(self) -> None:
+        assert latent_space_with_channels(BaseModelType.StableDiffusion1, 4) is latent_space_with_channels(
+            BaseModelType.StableDiffusion2, 4
+        )
+        assert latent_space_with_channels(BaseModelType.Flux, 16) is latent_space_with_channels(
+            BaseModelType.ZImage, 16
+        )
+        assert latent_space_with_channels(BaseModelType.Flux, 16) is not latent_space_with_channels(
+            BaseModelType.StableDiffusion3, 16
+        )
 
 
 class TestWhatArchitecturesDeclare:

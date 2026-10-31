@@ -18,6 +18,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE
 
 
 class ZImageControlField(BaseModel):
@@ -43,6 +44,17 @@ class ZImageControlField(BaseModel):
         le=1.0,
         description="When the control is last applied (% of total steps)",
     )
+    tiled: bool = Field(
+        default=False,
+        description="Encode the control image in tiles. The denoise encodes it at generation size, which for an "
+        "upscale is the enlarged frame -- too large for an untiled encode on consumer hardware.",
+    )
+    tile_size: int = Field(
+        default=0,
+        ge=0,
+        multiple_of=8,
+        description="Tile size in pixels for a tiled control encode; 0 uses the VAE's default.",
+    )
 
 
 @invocation_output("z_image_control_output")
@@ -57,7 +69,7 @@ class ZImageControlOutput(BaseInvocationOutput):
     title="Z-Image ControlNet",
     tags=["image", "z-image", "control", "controlnet"],
     category="conditioning",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
 class ZImageControlInvocation(BaseInvocation):
@@ -98,6 +110,15 @@ class ZImageControlInvocation(BaseInvocation):
         le=1.0,
         description="When the control is last applied (% of total steps)",
     )
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # NOTE: tile_size = 0 is a special value, as on the Z-Image VAE nodes: the workflow UI cannot set None.
+    tile_size: int = InputField(
+        default=0,
+        ge=0,
+        multiple_of=8,
+        description=f"{FieldDescriptions.vae_tile_size} Values between 1 and "
+        f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
+    )
 
     def invoke(self, context: InvocationContext) -> ZImageControlOutput:
         return ZImageControlOutput(
@@ -107,5 +128,7 @@ class ZImageControlInvocation(BaseInvocation):
                 control_context_scale=self.control_context_scale,
                 begin_step_percent=self.begin_step_percent,
                 end_step_percent=self.end_step_percent,
+                tiled=self.tiled,
+                tile_size=self.tile_size,
             )
         )

@@ -129,14 +129,6 @@ class MiniMaxH3DiffusersModel(ModelLoader):
 
                 from transformers import AutoConfig, Qwen3VLForConditionalGeneration
 
-                from invokeai.backend.minimax_h3.qwen3vl_vision_device_patch import (
-                    apply_qwen3vl_vision_pos_embed_device_patch,
-                )
-
-                # Keep the vision tower's pos-embed interpolation on the compute device when the
-                # partial loader leaves pos_embed.weight on the CPU; see the patch module.
-                apply_qwen3vl_vision_pos_embed_device_patch()
-
                 te_config = normalize_qwen3vl_rope_config(
                     AutoConfig.from_pretrained(submodel_path, local_files_only=True)
                 )
@@ -354,9 +346,6 @@ class MiniMaxH3TextEncoderCheckpointModel(ModelLoader):
         from safetensors.torch import load_file
         from transformers import Qwen3VLConfig, Qwen3VLForConditionalGeneration
 
-        from invokeai.backend.minimax_h3.qwen3vl_vision_device_patch import (
-            apply_qwen3vl_vision_pos_embed_device_patch,
-        )
         from invokeai.backend.minimax_h3.text_conditioning import MINIMAX_H3_TEXT_ENCODER_LAYER
         from invokeai.backend.model_manager.load.model_loaders.minimax_h3_state_dict_utils import (
             convert_minimax_h3_text_encoder_checkpoint,
@@ -394,10 +383,6 @@ class MiniMaxH3TextEncoderCheckpointModel(ModelLoader):
         config_dict["text_config"]["num_hidden_layers"] = num_layers
         config_dict["tie_word_embeddings"] = True
         te_config = normalize_qwen3vl_rope_config(Qwen3VLConfig.from_dict(config_dict))
-
-        # Keep the vision tower's pos-embed interpolation on the compute device when the partial
-        # loader leaves pos_embed.weight on the CPU; see the patch module.
-        apply_qwen3vl_vision_pos_embed_device_patch()
 
         with accelerate.init_empty_weights():
             model = Qwen3VLForConditionalGeneration._from_config(te_config)

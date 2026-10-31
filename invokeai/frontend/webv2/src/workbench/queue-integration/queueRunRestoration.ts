@@ -128,6 +128,10 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
     cancellable: value.cancellable,
     ...(completedBackendItemIds === undefined ? {} : { completedBackendItemIds: [...completedBackendItemIds] }),
     id: value.id,
+    // Lineage only steers later retries back here; a malformed list just loses that.
+    ...(isBackendItemIdList(value.retriedBackendItemIds)
+      ? { retriedBackendItemIds: [...value.retriedBackendItemIds] }
+      : {}),
     // Keeps a restored run from reselecting videos it already showed before the reload.
     ...(Array.isArray(value.resultVideoNames) && value.resultVideoNames.every((name) => typeof name === 'string')
       ? { resultVideoNames: [...value.resultVideoNames] }
@@ -154,6 +158,8 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
           : { positivePrompt: snapshot.presentation.positivePrompt }),
         width: snapshot.presentation.width,
       },
+      // Invoke Front must survive a reload before admission, or the replayed enqueue appends instead.
+      ...(snapshot.prepend === true ? { prepend: true } : {}),
       ...(recall ? { recall } : {}),
       ...(snapshot.resultNodeIds === undefined ? {} : { resultNodeIds: [...snapshot.resultNodeIds] }),
       sourceId: snapshot.sourceId,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from invokeai.app.services.board_access.board_access_default import BoardAccessService
 from invokeai.app.services.object_serializer.object_serializer_base import ObjectSerializerBase
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
@@ -47,7 +48,7 @@ if TYPE_CHECKING:
     from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
-    from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+    from invokeai.app.services.shared.database.database import Database
     from invokeai.app.services.urls.urls_base import UrlServiceBase
     from invokeai.app.services.users.users_base import UserServiceBase
     from invokeai.app.services.video_files.video_files_base import VideoFileStorageBase
@@ -55,6 +56,9 @@ if TYPE_CHECKING:
     from invokeai.app.services.videos.videos_base import VideoServiceABC
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
+    from invokeai.app.services.working_memory_calibration.working_memory_calibration_base import (
+        WorkingMemoryCalibrationServiceBase,
+    )
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 
 
@@ -75,7 +79,7 @@ class InvocationServices:
         board_records: "BoardRecordStorageBase",
         bulk_download: "BulkDownloadBase",
         configuration: "InvokeAIAppConfig",
-        database: "SqliteDatabase",
+        database: "Database",
         events: "EventServiceBase",
         images: "ImageServiceABC",
         image_files: "ImageFileStorageBase",
@@ -116,6 +120,8 @@ class InvocationServices:
         progress_previews: "ProgressPreviewsBase | None" = None,
         fonts: "FontService | None" = None,
         gallery_maintenance: "GalleryMaintenanceService | None" = None,
+        working_memory_calibration: "WorkingMemoryCalibrationServiceBase | None" = None,
+        board_access: "BoardAccessService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -168,3 +174,7 @@ class InvocationServices:
         self.fonts = fonts
         self.intermediates = intermediates
         self.gallery_maintenance = gallery_maintenance
+        self.working_memory_calibration = working_memory_calibration
+        # Stateless over the database, so a real one is the default: no caller should get looser rules by leaving it
+        # out.
+        self.board_access = board_access or BoardAccessService(database)

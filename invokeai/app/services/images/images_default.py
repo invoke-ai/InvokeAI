@@ -16,7 +16,6 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageNamesResult,
     ImageRecord,
     ImageRecordChanges,
-    ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ImageRecordSaveException,
     InvalidImageCategoryException,
@@ -33,8 +32,7 @@ from invokeai.app.services.shared.intermediate_delete import (
     JournaledDeleteAdapter,
     delete_journaled_intermediates,
 )
-from invokeai.app.services.shared.pagination import OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 
 
 class ImageService(ImageServiceABC):
@@ -78,6 +76,7 @@ class ImageService(ImageServiceABC):
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
@@ -135,6 +134,7 @@ class ImageService(ImageServiceABC):
                     metadata=metadata,
                     workflow=workflow,
                     graph=graph,
+                    resolved_inputs=resolved_inputs,
                     image_subfolder=image_subfolder,
                 )
                 self._record_file_size(image_name, image_subfolder)
@@ -426,6 +426,22 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image graph")
             raise
 
+    def get_resolved_inputs(self, image_name: str) -> Optional[str]:
+        try:
+            record = self.__invoker.services.image_records.get(image_name)
+            return self.__invoker.services.image_files.get_resolved_inputs(
+                image_name, image_subfolder=record.image_subfolder
+            )
+        except ImageRecordNotFoundException:
+            self.__invoker.services.logger.debug(f"Image record not found: {image_name}")
+            raise
+        except ImageFileNotFoundException:
+            self.__invoker.services.logger.error("Image file not found")
+            raise
+        except Exception:
+            self.__invoker.services.logger.error("Problem getting image resolved inputs")
+            raise
+
     def get_path(self, image_name: str, thumbnail: bool = False) -> str:
         try:
             record = self.__invoker.services.image_records.get(image_name)
@@ -541,9 +557,6 @@ class ImageService(ImageServiceABC):
             except ImageRecordNotFoundException:
                 # Already deleted by another request; nothing here failed, so nothing to log.
                 raise
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image record")
-                raise
             except ImageFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image file")
                 raise
@@ -590,9 +603,6 @@ class ImageService(ImageServiceABC):
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image records")
-                raise
             except ImageFileDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image files")
                 raise
@@ -623,9 +633,6 @@ class ImageService(ImageServiceABC):
                         log_error=self.__invoker.services.logger.error,
                     ),
                 )
-            except ImageRecordDeleteException:
-                self.__invoker.services.logger.error("Failed to delete image records")
-                raise
             except Exception as e:
                 self.__invoker.services.logger.error("Problem deleting intermediate image records and files")
                 raise e

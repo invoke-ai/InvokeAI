@@ -1,6 +1,21 @@
 import type { QueueItem } from '@features/queue/core/historyTypes';
 import type { QueueSourceId } from '@features/queue/core/types';
 
+/** The graph nodes whose outputs are a source's results; Workflow runs deliver every image they produce. */
+export const QUEUE_SOURCE_RESULT_NODE_IDS: Readonly<Partial<Record<QueueSourceId, readonly string[]>>> = {
+  canvas: ['canvas_output'],
+  generate: ['canvas_output'],
+  upscale: ['upscale_output'],
+  video: ['video_output'],
+};
+
+/** The snapshot fields that limit a source's queued run to its result nodes. */
+export const getQueueSourceResultSelection = (sourceId: QueueSourceId): { resultNodeIds?: string[] } => {
+  const resultNodeIds = QUEUE_SOURCE_RESULT_NODE_IDS[sourceId];
+
+  return resultNodeIds ? { resultNodeIds: [...resultNodeIds] } : {};
+};
+
 /** Source kinds whose pending queue items the runtime enqueues to the backend. */
 export const BACKEND_SUBMITTABLE_SOURCE_IDS = [
   'generate',

@@ -5,18 +5,21 @@ import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Optional
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.security.utils import get_authorization_scheme_param
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.middleware import EventHandlerASGIMiddleware
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
-from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
+from starlette.middleware.gzip import GZipMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 import invokeai.frontend.webv2 as webv2_dir
@@ -49,9 +52,11 @@ from invokeai.app.api.routers import (
     virtual_boards,
     wildcards,
     workflows,
+    working_memory,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
+from invokeai.app.services.shared.database.errors import TransientDatabaseError
 from invokeai.app.util.custom_openapi import get_openapi_func
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.frontend.cli.arg_parser import InvokeAIArgs
@@ -108,6 +113,42 @@ app = FastAPI(
     separate_input_output_schemas=False,
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(TransientDatabaseError)
+async def database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    return _database_busy(request, error)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, error: StarletteHTTPException) -> Response:
+    # Many routes answer every exception with an error of their own ("not found", "unexpected error"); one raised
+    # while handling a busy database still means the database is busy.
+    transient = _transient_cause(error)
+    if transient is not None:
+        return _database_busy(request, transient)
+    return await http_exception_handler(request, error)
+
+
+def _database_busy(request: Request, error: TransientDatabaseError) -> JSONResponse:
+    # A lock held too long elsewhere, a race the call lost on every attempt, a server out of reach: the same
+    # request can succeed in a moment, so it is a busy server rather than a failed request.
+    logger.warning(f"{request.method} {request.url.path}: the database is busy: {error}")
+    return JSONResponse(
+        status_code=503, content={"detail": "The database is busy; try again"}, headers={"Retry-After": "1"}
+    )
+
+
+def _transient_cause(error: BaseException) -> Optional[TransientDatabaseError]:
+    """The busy database an exception was raised while handling, if any."""
+    seen: set[int] = set()
+    cause: Optional[BaseException] = error.__cause__ or error.__context__
+    while cause is not None and id(cause) not in seen:
+        if isinstance(cause, TransientDatabaseError):
+            return cause
+        seen.add(id(cause))
+        cause = cause.__cause__ or cause.__context__
+    return None
 
 
 class SlidingWindowTokenMiddleware(BaseHTTPMiddleware):
@@ -225,49 +266,51 @@ def _is_compressible(content_type: str) -> bool:
     return content_type.startswith(COMPRESSIBLE_CONTENT_TYPES)
 
 
-class _ContentTypeAwareGZipResponder(GZipResponder):
-    """Skips compression for response types that are already compressed.
-
-    `content_type_is_excluded` is computed when the response starts and only read once the
-    body arrives, so widening it right after the base class has set it is enough — no need to
-    reimplement Starlette's streaming/pathsend handling.
-    """
-
-    async def send_with_compression(self, message: Message) -> None:
-        await super().send_with_compression(message)
-        if message["type"] == "http.response.start" and not self.content_type_is_excluded:
-            self.content_type_is_excluded = not _is_compressible(
-                Headers(raw=message["headers"]).get("content-type", "")
-            )
-
-
-class ContentTypeAwareGZipMiddleware(GZipMiddleware):
+class ContentTypeAwareGZipMiddleware:
     """GZip, but only for content types that actually compress.
 
-    Starlette's GZipMiddleware compresses every response type except `text/event-stream`. The
-    gallery serves PNG, WebP and MP4 bytes, which are already compressed: a 3 MB PNG costs
-    ~52ms of event-loop time to gzip and comes back *larger* than it went in. With auto-switch
-    enabled the UI fetches the full image after every generated image, so that cost lands
-    repeatedly during a batch — exactly when the server can least afford to stall.
+    Older Starlette releases compress every response type except `text/event-stream`, and even
+    newer ones only skip a fixed list of media types. The gallery serves PNG, WebP and MP4 bytes,
+    which are already compressed: a 3 MB PNG costs ~52ms of event-loop time to gzip and comes
+    back *larger* than it went in. With auto-switch enabled the UI fetches the full image after
+    every generated image, so that cost lands repeatedly during a batch — exactly when the
+    server can least afford to stall.
+
+    Each response is routed when it starts: compressible ones through Starlette's GZipMiddleware,
+    everything else straight to the server. Only the middleware's public ASGI interface is used,
+    because FastAPI leaves Starlette unbounded above and the responder's internals change between
+    releases — Starlette 1.8 began forwarding `http.response.start` for its own excluded types
+    inside the responder, so patching its exclusion flag afterwards dropped the start message.
 
     Lowering `compresslevel` does not help here: on incompressible input, level 1 costs
     essentially the same as level 9 because deflate still has to scan the data. It does help a
     great deal on the compressible path — see `configure_gzip`.
     """
 
+    def __init__(self, app: ASGIApp, minimum_size: int, compresslevel: int) -> None:
+        self.app = app
+        self.minimum_size = minimum_size
+        self.compresslevel = compresslevel
+
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http":
             await self.app(scope, receive, send)
             return
 
-        if "gzip" in Headers(scope=scope).get("Accept-Encoding", ""):
-            responder: ASGIApp = _ContentTypeAwareGZipResponder(
-                self.app, self.minimum_size, compresslevel=self.compresslevel
-            )
-        else:
-            responder = IdentityResponder(self.app, self.minimum_size)
+        async def route_by_content_type(scope: Scope, receive: Receive, gzip_send: Send) -> None:
+            target = send
 
-        await responder(scope, receive, send)
+            async def routed_send(message: Message) -> None:
+                nonlocal target
+                if message["type"] == "http.response.start":
+                    content_type = Headers(raw=message.get("headers", [])).get("content-type", "")
+                    target = gzip_send if _is_compressible(content_type) else send
+                await target(message)
+
+            await self.app(scope, receive, routed_send)
+
+        gzip = GZipMiddleware(route_by_content_type, minimum_size=self.minimum_size, compresslevel=self.compresslevel)
+        await gzip(scope, receive, send)
 
 
 # Responses below this are not worth a compression pass; the gzip framing alone is ~20 bytes.
@@ -277,13 +320,14 @@ GZIP_MINIMUM_SIZE = 1000
 def configure_gzip(app: FastAPI, compresslevel: int) -> None:
     """Install response compression, unless it is turned off.
 
-    Compression runs on the event loop, so its cost is not paid by the requesting client alone —
-    it stalls every other request and every socket.io event for its duration. That makes the
-    level a real trade-off rather than a free win.
+    Body chunks under 128 KiB are compressed on the event loop (Starlette moves larger ones to a
+    worker thread), so the cost is not paid by the requesting client alone — it stalls every other
+    request and every socket.io event for its duration, and offloaded chunks still compete for CPU.
+    That makes the level a real trade-off rather than a free win.
 
     Measured on the flat name list of a 200k-image library (8.48 MB of JSON): level 1 takes
     16.4ms and returns 6.1% of the input, level 9 takes 90.2ms and returns 5.7%. Level 9 costs
-    5.5x the event-loop time for 0.4 percentage points of bandwidth, which is a poor deal for a
+    5.5x the compression time for 0.4 percentage points of bandwidth, which is a poor deal for a
     locally-served app. The default stays at 9 so behavior is unchanged for existing installs;
     users who feel the stall on a large library can lower it.
 
@@ -593,7 +637,8 @@ def _is_project_write(method: str, path: str) -> bool:
         return path == "/api/v1/projects/"
     if method != "PUT" or not path.startswith("/api/v1/projects/"):
         return False
-    project_id = path.removeprefix("/api/v1/projects/")
+    # A project's content, or the caller's workspace in it: each is a document as large.
+    project_id = path.removeprefix("/api/v1/projects/").removesuffix("/workspace")
     return bool(project_id) and "/" not in project_id
 
 
@@ -742,6 +787,7 @@ app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(fonts.fonts_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
+app.include_router(working_memory.working_memory_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(image_map.image_map_router, prefix="/api")

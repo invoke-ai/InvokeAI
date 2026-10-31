@@ -21,18 +21,20 @@ from invokeai.app.api.routers._access import (
     assert_board_write_access as _assert_board_write_access,
 )
 from invokeai.app.api.routers._access import (
-    assert_image_owner as _assert_image_owner,
+    assert_image_action as _assert_image_action,
 )
 from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
-from invokeai.app.api.routers._access import assert_project_owned
 from invokeai.app.api.routers._access import (
-    board_share_recipients as _board_share_recipients,
+    assert_project_owned,
+    item_action_for_changes,
+    redact_project_ids,
 )
 from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
@@ -49,8 +51,7 @@ from invokeai.app.services.images.images_common import (
     UnstarredImagesResult,
 )
 from invokeai.app.services.intermediates.intermediates_base import IntermediatesCaller
-from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
-from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 
@@ -65,11 +66,10 @@ IMAGE_MAX_AGE = 31536000
 # in the videos router.
 #
 # "At least one" is doing real work in that sentence. The authorization helpers in _access.py
-# short-circuit on the first hit, so an admin or a direct owner costs 0-1 queries per name --
-# but a user reading someone else's Shared/Public board falls all the way through to
-# boards.get_dto(), which is six queries including three COUNT aggregates over the board's
-# contents. That is the case the bound has to hold, and it is why no route gets a laxer one:
-# the oversized selections this cap rejects are split client-side instead.
+# short-circuit for an admin (no query) and a direct owner (one), but a user acting on someone
+# else's item on a board they share costs three indexed reads per name: the item's owner, its
+# board, and that board's access facts. That is the case the bound has to hold, and it is why no
+# route gets a laxer one: the oversized selections this cap rejects are split client-side instead.
 MAX_IMAGE_BATCH_SIZE = 1000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.
@@ -133,9 +133,7 @@ async def upload_image(
     ),
 ) -> ImageDTO:
     """Uploads an image for the current user"""
-    # If uploading into a board, verify the user has write access.
-    # Public boards allow uploads from any authenticated user.
-    board = await asyncio.to_thread(_assert_board_write_access, board_id, current_user)
+    await asyncio.to_thread(_assert_board_write_access, board_id, current_user)
     await asyncio.to_thread(assert_project_owned, project_id, current_user)
 
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
@@ -145,10 +143,27 @@ async def upload_image(
 
     contents = await file.read()
     try:
-        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
+
+        def _read_image() -> Image.Image:
+            image = Image.open(io.BytesIO(contents))
+            # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
+            image.load()
+            return image
+
+        pil_image = await asyncio.to_thread(_read_image)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
+
+    # Read file records before pixel transforms: resizing through NumPy discards Image.info.
+    extracted_metadata = await asyncio.to_thread(
+        extract_metadata_from_image,
+        pil_image=pil_image,
+        invokeai_metadata_override=metadata,
+        invokeai_workflow_override=None,
+        invokeai_graph_override=None,
+        logger=ApiDependencies.invoker.services.logger,
+    )
 
     if crop_visible:
         try:
@@ -179,15 +194,6 @@ async def upload_image(
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
-    extracted_metadata = await asyncio.to_thread(
-        extract_metadata_from_image,
-        pil_image=pil_image,
-        invokeai_metadata_override=metadata,
-        invokeai_workflow_override=None,
-        invokeai_graph_override=None,
-        logger=ApiDependencies.invoker.services.logger,
-    )
-
     try:
         image_dto = await asyncio.to_thread(
             ApiDependencies.invoker.services.images.create,
@@ -199,6 +205,7 @@ async def upload_image(
             metadata=extracted_metadata.invokeai_metadata,
             workflow=extracted_metadata.invokeai_workflow,
             graph=extracted_metadata.invokeai_graph,
+            resolved_inputs=extracted_metadata.invokeai_resolved_inputs,
             is_intermediate=is_intermediate,
             user_id=current_user.user_id,
             project_id=project_id,
@@ -208,10 +215,7 @@ async def upload_image(
         raise HTTPException(status_code=500, detail="Failed to create image")
 
     if not is_intermediate and is_gallery_category(image_category):
-        shared_user_ids = await asyncio.to_thread(_board_share_recipients, board)
-        ApiDependencies.invoker.services.events.emit_image_uploaded(
-            image_dto, user_id=current_user.user_id, board=board, shared_user_ids=shared_user_ids
-        )
+        ApiDependencies.invoker.services.events.emit_image_uploaded(image_dto, user_id=current_user.user_id)
 
     response.status_code = 201
     response.headers["Location"] = image_dto.image_url
@@ -242,7 +246,7 @@ def delete_image(
     image_name: str = Path(description="The name of the image to delete"),
 ) -> DeleteImagesResult:
     """Deletes an image"""
-    _assert_image_owner(image_name, current_user)
+    _assert_image_action(image_name, current_user, ItemAction.Delete)
     assert_image_move_maintenance_inactive()
 
     # Let service-level failures surface as errors rather than swallowing them and returning
@@ -326,13 +330,16 @@ def update_image(
     image_changes: ImageRecordChanges = Body(description="The changes to apply to the image"),
 ) -> ImageDTO:
     """Updates an image"""
-    _assert_image_owner(image_name, current_user)
+    _assert_image_action(image_name, current_user, item_action_for_changes(image_changes))
     assert_image_move_maintenance_inactive()
 
     try:
-        return ApiDependencies.invoker.services.images.update(image_name, image_changes)
+        image_dto = ApiDependencies.invoker.services.images.update(image_name, image_changes)
     except Exception:
         raise HTTPException(status_code=400, detail="Failed to update image")
+    # Starring is a board role's to do, so the caller may be a member reading another member's item.
+    redact_project_ids([image_dto], current_user)
+    return image_dto
 
 
 @images_router.get(
@@ -348,7 +355,7 @@ def get_image_dto(
     _assert_image_read_access(image_name, current_user)
 
     try:
-        return ApiDependencies.invoker.services.images.get_dto(image_name)
+        image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
     except ImageRecordNotFoundException:
         # Only a genuinely missing record answers 404. This route is what a workflow's image
         # field and a canvas reference image read, and they drop the user's reference when it
@@ -357,6 +364,8 @@ def get_image_dto(
         # workflows using it. Narrowed here rather than everywhere, because this is the 404
         # that is acted on destructively — the media, metadata and workflow routes keep theirs.
         raise HTTPException(status_code=404)
+    redact_project_ids([image_dto], current_user)
+    return image_dto
 
 
 @images_router.get(
@@ -380,6 +389,10 @@ def get_image_metadata(
 class WorkflowAndGraphResponse(BaseModel):
     workflow: Optional[str] = Field(description="The workflow used to generate the image, as stringified JSON")
     graph: Optional[str] = Field(description="The graph used to generate the image, as stringified JSON")
+    resolved_inputs: Optional[str] = Field(
+        default=None,
+        description="The image's per-invocation resolved inputs, as stringified Graph JSON, when available",
+    )
 
 
 @images_router.get(
@@ -395,7 +408,8 @@ def get_image_workflow(
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
         graph = ApiDependencies.invoker.services.images.get_graph(image_name)
-        return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
+        resolved_inputs = ApiDependencies.invoker.services.images.get_resolved_inputs(image_name)
+        return WorkflowAndGraphResponse(workflow=workflow, graph=graph, resolved_inputs=resolved_inputs)
     except Exception:
         raise HTTPException(status_code=404)
 
@@ -562,6 +576,7 @@ def list_image_dtos(
         user_id=current_user.user_id,
         is_admin=current_user.is_admin,
     )
+    redact_project_ids(image_dtos.items, current_user)
 
     return image_dtos
 
@@ -577,7 +592,7 @@ def delete_images_from_list(
         assert_image_move_maintenance_inactive()
     except HTTPException:
         for image_name in image_names:
-            _assert_image_owner(image_name, current_user)
+            _assert_image_action(image_name, current_user, ItemAction.Delete)
         raise
 
     try:
@@ -600,7 +615,7 @@ def delete_images_from_list(
             # only the delete lost the race.
             board_id: str | None = None
             try:
-                _assert_image_owner(image_name, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.Delete)
                 image_dto = ApiDependencies.invoker.services.images.get_dto(image_name)
                 board_id = image_dto.board_id or "none"
                 ApiDependencies.invoker.services.images.delete(image_name)
@@ -667,7 +682,7 @@ def delete_uncategorized_images(
         affected_boards: set[str] = set()
         for image_name in image_names:
             try:
-                _assert_image_owner(image_name, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.Delete)
                 ApiDependencies.invoker.services.images.delete(image_name)
                 deleted_images.add(image_name)
                 affected_boards.add("none")
@@ -761,7 +776,7 @@ def star_images_in_list(
         assert_image_move_maintenance_inactive()
     except HTTPException:
         for image_name in image_names:
-            _assert_image_owner(image_name, current_user)
+            _assert_image_action(image_name, current_user, ItemAction.Star)
         raise
 
     try:
@@ -778,7 +793,7 @@ def star_images_in_list(
         # twice and could land in both starred_images and failed_images.
         for image_name in dict.fromkeys(image_names):
             try:
-                _assert_image_owner(image_name, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.Star)
                 updated_image_dto = ApiDependencies.invoker.services.images.update(
                     image_name, changes=ImageRecordChanges(starred=True)
                 )
@@ -819,7 +834,7 @@ def unstar_images_in_list(
         assert_image_move_maintenance_inactive()
     except HTTPException:
         for image_name in image_names:
-            _assert_image_owner(image_name, current_user)
+            _assert_image_action(image_name, current_user, ItemAction.Star)
         raise
 
     try:
@@ -830,7 +845,7 @@ def unstar_images_in_list(
         affected_boards: set[str] = set()
         for image_name in dict.fromkeys(image_names):
             try:
-                _assert_image_owner(image_name, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.Star)
                 updated_image_dto = ApiDependencies.invoker.services.images.update(
                     image_name, changes=ImageRecordChanges(starred=False)
                 )
@@ -1036,6 +1051,7 @@ def get_images_by_names(
                 # Skip missing images - they may have been deleted between name fetch and DTO fetch
                 continue
 
+        redact_project_ids(image_dtos, current_user)
         return image_dtos
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get image DTOs")

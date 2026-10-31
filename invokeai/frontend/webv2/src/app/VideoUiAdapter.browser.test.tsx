@@ -44,14 +44,26 @@ vi.mock('@features/video', async (importOriginal) => ({
     return children;
   },
 }));
-vi.mock('@features/gallery/queries', () => ({ invalidateGallery: vi.fn() }));
+const galleryQueries = vi.hoisted(() => ({
+  canAddToCachedGalleryBoard: vi.fn(() => true),
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
+}));
+vi.mock('@features/gallery/queries', () => ({
+  canAddToCachedGalleryBoard: galleryQueries.canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations: galleryQueries.ensureGalleryBoardDestinations,
+  invalidateGallery: vi.fn(),
+  invalidateGalleryBoardDestinations: vi.fn(() => Promise.resolve()),
+}));
 vi.mock('@workbench/image-actions/revealGalleryItem', () => ({ revealGalleryItem }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: () => ({}) }));
 vi.mock('@workbench/settings/store', () => ({ useWorkbenchPreferenceSelector: () => false }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => openWorkbenchWidget }));
+/** The active project's widget instances, read by the adapter's project selectors. */
+let widgetInstances: Record<string, unknown> = {};
+
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
-    selector({ id: activeProjectId, widgetInstances: {} }),
+    selector({ id: activeProjectId, widgetInstances }),
   useWorkbenchCommands: () => ({
     gallery: { selectItem },
     notifications: { reportError },
@@ -95,6 +107,9 @@ beforeEach(async () => {
   reportError.mockClear();
   galleryRegions = ['right'];
   storedProjects = {};
+  widgetInstances = {};
+  galleryQueries.canAddToCachedGalleryBoard.mockReset().mockReturnValue(true);
+  galleryQueries.ensureGalleryBoardDestinations.mockReset().mockReturnValue(null);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -137,6 +152,37 @@ describe('readValues', () => {
     expect(readValues()).toEqual({ positivePrompt: 'one' });
     storedProjects = {};
     expect(readValues()).toEqual({});
+  });
+});
+
+describe('getUploadBoardId', () => {
+  it('resolves the auto-add board from the ensured listing, and the inbox once the listing refuses it', async () => {
+    widgetInstances = {
+      'gallery-1': { state: { values: { autoAddBoardId: 'shared', projectBoardId: 'inbox' } }, typeId: 'gallery' },
+    };
+    await renderAdapter();
+    let settleListing!: () => void;
+    galleryQueries.ensureGalleryBoardDestinations.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        settleListing = resolve;
+      })
+    );
+
+    const pending = adapter.getUploadBoardId();
+    let resolved: string | null = null;
+    void pending.then((boardId) => {
+      resolved = boardId;
+    });
+    await Promise.resolve();
+
+    // Judged only once the listing is in: nothing is trusted unseen.
+    expect(resolved).toBeNull();
+    settleListing();
+    await expect(pending).resolves.toBe('shared');
+    expect(galleryQueries.canAddToCachedGalleryBoard).toHaveBeenCalledWith('shared', expect.anything());
+
+    galleryQueries.canAddToCachedGalleryBoard.mockReturnValue(false);
+    await expect(adapter.getUploadBoardId()).resolves.toBe('inbox');
   });
 });
 
@@ -197,7 +243,11 @@ describe('findInGallery', () => {
 
     await vi.waitFor(() => expect(revealGalleryItem).toHaveBeenCalledTimes(1));
 
-    expect(revealGalleryItem.mock.calls[0]?.[2]).toEqual({ projectId: 'project-1', sequence: before + 1 });
+    expect(revealGalleryItem.mock.calls[0]?.[2]).toMatchObject({
+      accountScope: { epoch: expect.any(Number), signal: expect.any(AbortSignal) },
+      projectId: 'project-1',
+      sequence: before + 1,
+    });
     expect(afterPress).toBe(before + 2);
   });
 
