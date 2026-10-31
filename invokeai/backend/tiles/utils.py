@@ -108,7 +108,7 @@ def seam_blend(ia1: np.ndarray, ia2: np.ndarray, blend_amount: int, x_seam: bool
 
     # create an array max_y long
     lowest_energy_line = np.empty([max_y], dtype="uint16")
-    lowest_energy_line[max_y - 1] = np.argmin(res[max_y - 1, min_x : max_x - 1])
+    lowest_energy_line[max_y - 1] = np.argmin(res[max_y - 1, min_x:max_x]) + min_x
 
     # Calc the path of the seam
     # could offer options for larger search than just 1 pixel by adjusting lpos and rpos
