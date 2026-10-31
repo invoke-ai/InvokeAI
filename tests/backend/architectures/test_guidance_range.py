@@ -35,6 +35,7 @@ GUIDANCE_FIELD: dict[BaseModelType, tuple[str, str]] = {
     BaseModelType.CogView4: ("cogview4_denoise", "cfg_scale"),
     BaseModelType.Krea2: ("krea2_denoise", "cfg_scale"),
     BaseModelType.QwenImage21: ("qwen_image_2_1_denoise", "cfg_scale"),
+    BaseModelType.Flux3: ("flux3_denoise", "cfg_scale"),
     BaseModelType.QwenImage: ("qwen_image_denoise", "cfg_scale"),
     BaseModelType.Flux: ("flux_denoise", "guidance"),
     BaseModelType.Flux2: ("flux2_denoise", "guidance"),
