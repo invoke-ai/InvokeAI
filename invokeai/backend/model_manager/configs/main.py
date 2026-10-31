@@ -517,7 +517,7 @@ def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | N
     Distinguishes between variants based on context embedding dimension:
     - Klein 4B: context_in_dim = 7680 (3 × Qwen3-4B hidden_size 2560)
     - Klein 9B: context_in_dim = 12288 (3 × Qwen3-8B hidden_size 4096)
-    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3.1 hidden_size 5120)
+    - Dev:      context_in_dim = 15360 (3 × Mistral Small 3 hidden_size 5120)
 
     Note: Klein 9B (distilled) and Klein 9B Base (undistilled) have identical architectures
     and cannot be distinguished from the state dict alone. This function defaults to Klein9B
@@ -1076,7 +1076,7 @@ class Main_Diffusers_Flux2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         FLUX.2 variants are distinguished by joint_attention_dim (= 3 × text encoder hidden_size):
         - Klein 4B/4B Base: 7680 (3 × Qwen3-4B 2560)
         - Klein 9B/9B Base: 12288 (3 × Qwen3-8B 4096)
-        - Dev:              15360 (3 × Mistral Small 3.1 5120)
+        - Dev:              15360 (3 × Mistral Small 3 5120)
 
         Klein distilled and Base variants share identical architectures; the Base variant
         is detected by a filename heuristic.
