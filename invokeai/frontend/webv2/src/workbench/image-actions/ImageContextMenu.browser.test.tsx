@@ -1134,6 +1134,13 @@ describe('ImageContextMenu change-board destinations', () => {
     expect(document.querySelector('[data-value="remove-from-board"]')).toBeNull();
   });
 
+  /**
+   * Zag places a submenu a frame after it mounts, and only then sets the `--available-height` its height cap reads, so
+   * a long list overflows the screen unscrolled until then; a scroll set before it is clamped to zero.
+   */
+  const waitForCappedList = (scroller: HTMLElement) =>
+    settleUntil(() => scroller.scrollHeight > scroller.clientHeight, 'the board list to be capped and scrollable');
+
   it('grows a long board list past the old 18rem cap, keeps it on screen, and scrolls to the last board by keyboard', async () => {
     const owned = {
       actions: ['read', 'add_media'],
@@ -1147,12 +1154,12 @@ describe('ImageContextMenu change-board destinations', () => {
     const last = document.querySelector<HTMLElement>('[data-value="board-b30"]')!;
     const content = last.closest<HTMLElement>('[data-scope="menu"][data-part="content"]')!;
     const scroller = last.closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    // Thirty boards overflow even the taller list, so the Scrollable carries the rest.
+    await waitForCappedList(scroller);
     const contentRect = content.getBoundingClientRect();
     expect(contentRect.height).toBeGreaterThan(18 * 16);
     expect(contentRect.top).toBeGreaterThanOrEqual(0);
     expect(contentRect.bottom).toBeLessThanOrEqual(window.innerHeight);
-    // Thirty boards overflow even the taller list, so the Scrollable carries the rest.
-    expect(scroller.scrollHeight).toBeGreaterThan(scroller.clientHeight);
     expect(last.getBoundingClientRect().top).toBeGreaterThanOrEqual(scroller.getBoundingClientRect().bottom);
 
     await interact(() => content.focus());
@@ -1179,6 +1186,7 @@ describe('ImageContextMenu change-board destinations', () => {
     const scroller = document
       .querySelector('[data-value="board-b30"]')!
       .closest<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    await waitForCappedList(scroller);
     // Leave the first board half scrolled away above the list's top edge.
     const first = document.querySelector<HTMLElement>('[data-value="board-b01"]')!;
     await interact(() => {
