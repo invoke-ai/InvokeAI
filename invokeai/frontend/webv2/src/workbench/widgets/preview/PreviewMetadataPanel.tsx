@@ -3,9 +3,11 @@ import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } 
 import { DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { toaster } from '@platform/ui/toaster';
 import { useQuery } from '@tanstack/react-query';
 import {
   EMPTY_IMAGE_RECALL_CAPABILITIES,
@@ -117,7 +119,12 @@ const PreviewDetailsQuery = ({
           galleryImages.workflow(item.name, signal),
         ]);
 
-        return { graph: workflow.graph, kind: 'image', metadata, workflow: workflow.workflow };
+        return {
+          graph: workflow.resolved_inputs ?? workflow.graph,
+          kind: 'image',
+          metadata,
+          workflow: workflow.workflow,
+        };
       }
 
       const [metadata, workflow] = await Promise.all([
@@ -315,7 +322,14 @@ const MetadataRow = ({
   recallKind?: ImageRecallKind;
 }) => {
   const { t } = useTranslation();
-  const copyValue = useCallback(() => void navigator.clipboard.writeText(entry.value), [entry.value]);
+  const canCopy = canCopyText();
+  const copyValue = useCallback(
+    () =>
+      void copyText(entry.value).catch(() =>
+        toaster.create({ description: t('common.clipboardBlocked'), title: t('common.couldNotCopy'), type: 'error' })
+      ),
+    [entry.value, t]
+  );
   const recallValue = useCallback(() => {
     if (recallKind) {
       onRecall(recallKind);
@@ -356,11 +370,17 @@ const MetadataRow = ({
               </IconButton>
             </Tooltip>
           ) : null}
-          <Tooltip content={t('common.copy')}>
-            <IconButton aria-label={t('common.copy')} color="fg.muted" size="sm" variant="ghost" onClick={copyValue}>
-              <Icon as={CopyIcon} boxSize="3" />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            tooltip={t('common.copy')}
+            unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
+            aria-label={t('common.copy')}
+            color="fg.muted"
+            size="sm"
+            variant="ghost"
+            onClick={copyValue}
+          >
+            <Icon as={CopyIcon} boxSize="3" />
+          </IconButton>
         </HStack>
       </DataList.ItemValue>
     </DataList.Item>

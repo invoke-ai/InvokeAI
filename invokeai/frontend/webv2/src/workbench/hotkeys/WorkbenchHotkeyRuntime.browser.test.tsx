@@ -4,14 +4,18 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, createListCollection, Menu, Portal, Select } from '@chakra-ui/react';
+import { PromptTextarea } from '@features/generation/components';
+import { adjustFocusedPromptAttention } from '@features/generation/react';
+import { MenuContent } from '@platform/ui/Menu';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFloatingWindowFocus, useFocusRegionProps } from '@workbench/focusRegions';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
-import { act, useCallback } from 'react';
+import { act, useCallback, useState, type ChangeEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -38,6 +42,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 }));
 vi.mock('./firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
+import { IS_MAC_OS } from './keys';
 import { WorkbenchHotkeyRuntime } from './WorkbenchHotkeyRuntime';
 
 const Harness = () => {
@@ -84,6 +89,20 @@ const pressKey = (key: string, target: EventTarget = document.body) =>
   act(async () => {
     target.dispatchEvent(
       new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: `Key${key.toUpperCase()}`, key })
+    );
+    await Promise.resolve();
+  });
+/** Mod+Comma, Settings: a global chord the popups leave alone (Zag menus swallow Enter whatever the modifiers). */
+const pressOpenSettings = (target: EventTarget) =>
+  act(async () => {
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        code: 'Comma',
+        key: ',',
+        ...(IS_MAC_OS ? { metaKey: true } : { ctrlKey: true }),
+      })
     );
     await Promise.resolve();
   });
@@ -223,5 +242,342 @@ describe('WorkbenchHotkeyRuntime and toast buttons', () => {
     // Outside the toast the binding still runs.
     await pressKey('Enter', host!.querySelector('[data-testid="window"]')!);
     expect(ran).toEqual(['map.apply']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
+  /** A docked widget's DOM as the widget frame marks it for key targeting. */
+  const mountWidget = (typeId: string, region: string) => {
+    const element = document.createElement('div');
+    element.dataset.hotkeyWidgetInstanceId = typeId;
+    element.dataset.hotkeyWidgetRegion = region;
+    element.dataset.hotkeyWidgetTypeId = typeId;
+    host!.append(element);
+    return element;
+  };
+
+  beforeEach(() => {
+    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
+    for (const id of [
+      'viewer.recallAll',
+      'viewer.recallSeed',
+      'viewer.recallPrompts',
+      'viewer.useSize',
+      'viewer.loadWorkflow',
+      'viewer.remix',
+      'gallery.remix',
+    ]) {
+      runtimeMocks.extensions.commands.register({ handler: () => ran.push(id), id, title: id });
+    }
+  });
+
+  // Recall acts on the gallery selection, so its keys answer where the user selects it as well as in Preview.
+  it('recalls from the gallery selection with focus in Gallery or Preview', async () => {
+    const gallery = mountWidget('gallery', 'right');
+    const preview = mountWidget('preview', 'center');
+
+    await pressKey('a', gallery);
+    await pressKey('s', gallery);
+    await pressKey('p', gallery);
+    await pressKey('d', gallery);
+    await pressKey('w', gallery);
+    await pressKey('s', preview);
+
+    expect(ran).toEqual([
+      'viewer.recallAll',
+      'viewer.recallSeed',
+      'viewer.recallPrompts',
+      'viewer.useSize',
+      'viewer.loadWorkflow',
+      'viewer.recallSeed',
+    ]);
+  });
+
+  it('keeps remix on each widget’s own binding and recall out of other widgets', async () => {
+    const gallery = mountWidget('gallery', 'right');
+    const preview = mountWidget('preview', 'center');
+
+    await pressKey('r', gallery);
+    await pressKey('r', preview);
+    await pressKey('s', host!.querySelector('[data-testid="window"]')!);
+
+    expect(ran).toEqual(['gallery.remix', 'viewer.remix']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and open menus', () => {
+  let menuRoot: Root | null = null;
+
+  beforeEach(() => {
+    // First-party commands are registered without a source, as `useRegisterFirstPartyCommands` does.
+    for (const id of ['viewer.recallSeed', 'app.openSettings']) {
+      runtimeMocks.extensions.commands.register({ handler: () => ran.push(id), id, title: id });
+    }
+  });
+
+  afterEach(async () => {
+    await act(() => menuRoot?.unmount());
+    menuRoot = null;
+  });
+
+  /** A gallery item's context menu: portaled content, so its DOM lies outside every widget. */
+  const ImageMenu = () => (
+    <Menu.Root>
+      <Menu.Trigger>Image actions</Menu.Trigger>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent>
+            <Menu.Item value="select">Select</Menu.Item>
+            <Menu.Item value="star">Star</Menu.Item>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+
+  const sizes = createListCollection({ items: ['Small', 'Seed', 'Square'] });
+  /** A settings Select: portaled content that takes focus as a `listbox` and runs its own typeahead. */
+  const SizeSelect = () => (
+    <Select.Root collection={sizes}>
+      <Select.Control>
+        <Select.Trigger>
+          <Select.ValueText placeholder="Size" />
+        </Select.Trigger>
+      </Select.Control>
+      <Portal>
+        <Select.Positioner>
+          <Select.Content>
+            {sizes.items.map((item) => (
+              <Select.Item key={item} item={item}>
+                {item}
+              </Select.Item>
+            ))}
+          </Select.Content>
+        </Select.Positioner>
+      </Portal>
+    </Select.Root>
+  );
+
+  /** Gallery holds workbench focus, then the popup opens from its trigger and takes focus. */
+  const openPopup = async (popup: React.ReactNode, role: 'listbox' | 'menu') => {
+    await pressOn('right');
+    const menuHost = document.createElement('div');
+    host!.append(menuHost);
+    menuRoot = createRoot(menuHost);
+    await act(() => {
+      menuRoot?.render(<ChakraProvider value={system}>{popup}</ChakraProvider>);
+    });
+    await act(() => userEvent.click(menuHost.querySelector('button')!));
+    const content = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>(`[role="${role}"][data-state="open"]`);
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    await vi.waitFor(() => expect(document.activeElement).toBe(content));
+    return content;
+  };
+
+  it('still runs a global chord pressed inside a portaled menu', async () => {
+    const menu = await openPopup(<ImageMenu />, 'menu');
+
+    await pressKey('s', menu);
+    await pressOpenSettings(menu);
+
+    expect(ran).toEqual(['app.openSettings']);
+  });
+
+  it('leaves a letter typed into a portaled Select listbox to the Select while Gallery holds focus', async () => {
+    const listbox = await openPopup(<SizeSelect />, 'listbox');
+
+    await pressKey('s', listbox);
+    expect(ran).toEqual([]);
+    await pressOpenSettings(listbox);
+    expect(ran).toEqual(['app.openSettings']);
+  });
+
+  it('leaves a letter typed into a portaled menu to the menu while Gallery holds focus', async () => {
+    // Gallery is the right region's active widget: a press outside any widget's DOM resolves against it.
+    await pressOn('right');
+    await pressKey('s');
+    expect(ran).toEqual(['viewer.recallSeed']);
+
+    const menuHost = document.createElement('div');
+    host!.append(menuHost);
+    menuRoot = createRoot(menuHost);
+    await act(() => {
+      menuRoot?.render(
+        <ChakraProvider value={system}>
+          <ImageMenu />
+        </ChakraProvider>
+      );
+    });
+    await act(() => userEvent.click(menuHost.querySelector('button')!));
+    const menu = await vi.waitFor(() => {
+      const content = document.querySelector<HTMLElement>('[role="menu"][data-state="open"]');
+      expect(content).not.toBeNull();
+      return content!;
+    });
+    // Zag focuses the content on open; typeahead keydowns target it, prevent their default, and still bubble.
+    await vi.waitFor(() => expect(document.activeElement).toBe(menu));
+
+    await pressKey('s', menu);
+    await pressKey('s', menu.querySelector('[role="menuitem"]')!);
+
+    expect(ran).toEqual(['viewer.recallSeed']);
+    // Gallery still holds workbench focus: the menu, not lost focus, kept the key.
+    await pressKey('s');
+    expect(ran).toEqual(['viewer.recallSeed', 'viewer.recallSeed']);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
+  let promptRoot: Root | null = null;
+
+  beforeEach(() => {
+    // Registered without a source, as `useRegisterFirstPartyCommands` does.
+    runtimeMocks.extensions.commands.register({
+      handler: () => adjustFocusedPromptAttention('increment', false),
+      id: 'app.promptWeightUp',
+      title: 'app.promptWeightUp',
+    });
+  });
+
+  afterEach(async () => {
+    await act(() => promptRoot?.unmount());
+    promptRoot = null;
+  });
+
+  const PromptHarness = ({ attentionSyntax }: { attentionSyntax: 'edit' | 'none' }) => {
+    const [value, setValue] = useState('a cat');
+    const handleChange = useCallback(
+      (event: ChangeEvent<HTMLTextAreaElement>) => setValue(event.currentTarget.value),
+      []
+    );
+
+    return (
+      <PromptTextarea
+        aria-label="Prompt"
+        attentionSyntax={attentionSyntax}
+        defaultHeightPx={96}
+        minHeightPx={56}
+        resizeHandleAriaLabel="Resize prompt"
+        showSyntaxHighlighting
+        value={value}
+        onChange={handleChange}
+      />
+    );
+  };
+
+  /** Select "cat" and press Ctrl+Up; report whether the runtime took the key from the text field. */
+  const pressWeightUp = async (attentionSyntax: 'edit' | 'none') => {
+    const promptHost = document.createElement('div');
+    host!.append(promptHost);
+    promptRoot = createRoot(promptHost);
+    await act(() => {
+      promptRoot?.render(
+        <ChakraProvider value={system}>
+          <PromptHarness attentionSyntax={attentionSyntax} />
+        </ChakraProvider>
+      );
+    });
+    const textarea = promptHost.querySelector('textarea')!;
+    textarea.focus();
+    textarea.setSelectionRange(2, 5);
+
+    let claimed = false;
+    await act(async () => {
+      claimed = !textarea.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          bubbles: true,
+          cancelable: true,
+          code: 'ArrowUp',
+          ctrlKey: true,
+          key: 'ArrowUp',
+        })
+      );
+      await Promise.resolve();
+    });
+
+    return { claimed, textarea };
+  };
+
+  it('weights the selection in a prompt whose model reads attention syntax', async () => {
+    const { claimed, textarea } = await pressWeightUp('edit');
+
+    expect(claimed).toBe(true);
+    await expect.poll(() => textarea.value).toBe('a cat+');
+  });
+
+  it('leaves Ctrl+Up to the text field when the model reads the prompt as plain text', async () => {
+    const { claimed, textarea } = await pressWeightUp('none');
+
+    expect(claimed).toBe(false);
+    expect(textarea.value).toBe('a cat');
+  });
+});
+
+const VIEW_OPTIONS = [
+  { label: 'Original', value: 'original' },
+  { label: 'Map', value: 'map' },
+  { label: 'Overlay', value: 'overlay' },
+];
+
+describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
+  let controlRoot: Root | null = null;
+
+  afterEach(async () => {
+    await act(() => controlRoot?.unmount());
+    controlRoot = null;
+  });
+
+  const Segments = () => {
+    const [value, setValue] = useState('map');
+    return (
+      <SegmentedControl ariaLabel="View" isFullWidth={false} options={VIEW_OPTIONS} value={value} onChange={setValue} />
+    );
+  };
+
+  it('leaves arrow keys to the radio group while Gallery, which binds them, holds focus', async () => {
+    // Gallery's grid binds the plain arrows to its own navigation.
+    contribute('gallery.galleryNavRight', 'arrowright', 'focused-region', {
+      instanceId: 'gallery',
+      projectId: projectId(),
+      region: 'right',
+      typeId: 'gallery',
+    });
+    await pressOn('right');
+    const controlHost = document.createElement('div');
+    host!.append(controlHost);
+    controlRoot = createRoot(controlHost);
+    await act(() => {
+      controlRoot?.render(
+        <ChakraProvider value={system}>
+          <Segments />
+        </ChakraProvider>
+      );
+    });
+    const radio = (value: string) => controlHost.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
+    const prevented: boolean[] = [];
+    // Registered after the runtime's listener, so it sees the press once the runtime has handled it.
+    const record = (event: KeyboardEvent) => prevented.push(event.defaultPrevented);
+    window.addEventListener('keydown', record);
+
+    try {
+      await act(async () => {
+        radio('map').focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+    } finally {
+      window.removeEventListener('keydown', record);
+    }
+
+    expect(prevented).toEqual([false]);
+    expect(ran).toEqual([]);
+    expect(radio('overlay').checked).toBe(true);
+    expect(document.activeElement).toBe(radio('overlay'));
+
+    // Outside the radio group the same press is Gallery's.
+    await pressKey('ArrowRight', host!.querySelector('[data-testid="right"]')!);
+    expect(ran).toEqual(['gallery.galleryNavRight']);
   });
 });

@@ -1,6 +1,8 @@
 import { Box, Code, Icon, ScrollArea } from '@chakra-ui/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { CheckIcon, CopyIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { IconButton } from './Button';
 import { toaster } from './toaster';
@@ -27,6 +29,8 @@ export const JsonPreview = ({
   text?: string;
   value?: unknown;
 }) => {
+  const { t } = useTranslation();
+  const canCopy = canCopyText();
   const [hasCopied, setHasCopied] = useState(false);
   const copyResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -44,8 +48,7 @@ export const JsonPreview = ({
   );
 
   const copy = useCallback(() => {
-    navigator.clipboard
-      .writeText(json)
+    copyText(json)
       .then(() => {
         setHasCopied(true);
 
@@ -73,12 +76,13 @@ export const JsonPreview = ({
       w="full"
     >
       <IconButton
+        tooltip={copyLabel}
+        unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
         aria-label={copyLabel}
         bg="bg.muted"
         position="absolute"
         right="1.5"
         size="sm"
-        title={copyLabel}
         top="1.5"
         variant="ghost"
         zIndex="1"

@@ -28,6 +28,7 @@ import type { InstallQueueRow, InstallRowStatus } from './queueModel';
 import { InstallProgressCell } from './InstallProgressCell';
 import {
   canRestartFailedParts,
+  canResumeInstall,
   getInstallJobDisplayName,
   getInstallJobSourceLabel,
   getProblemDownloadParts,
@@ -135,7 +136,7 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
                   {job.error_reason}
                 </Badge>
               ) : null}
-              <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
+              <Text color="fg" fontSize="xs" overflowWrap="anywhere">
                 {job.error}
               </Text>
             </HStack>
@@ -159,26 +160,33 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
             </HStack>
           ) : null}
           {problemParts.map((part) => (
-            <HStack key={part.key} gap="1.5" pt="0.5">
-              <Icon
-                as={TriangleAlertIcon}
-                boxSize="3"
-                color={part.resumeRequired ? 'fg.warning' : 'fg.error'}
-                flexShrink={0}
-              />
-              <MiddleTruncate color="fg" fontFamily="mono" fontSize="xs" minW="0" text={part.fileName} />
-              <Text color="fg.muted" fontSize="xs" whiteSpace="nowrap">
-                {part.message ?? (part.resumeRequired ? t('models.resumeRequired') : t('common.failed'))}
-              </Text>
-              {part.url ? (
-                <RowAction
-                  disabled={actions.isBusy}
-                  icon={RotateCcwIcon}
-                  label={t('models.restartThisFile')}
-                  onClick={() => actions.restartFile(part.url!)}
+            <Stack key={part.key} gap="0" pt="0.5">
+              <HStack gap="1.5">
+                <Icon
+                  as={TriangleAlertIcon}
+                  boxSize="3"
+                  color={part.resumeRequired ? 'fg.warning' : 'fg.error'}
+                  flexShrink={0}
                 />
+                <MiddleTruncate color="fg" fontFamily="mono" fontSize="xs" minW="0" text={part.fileName} />
+                <Text color="fg.muted" fontSize="xs" whiteSpace="nowrap">
+                  {part.resumeRequired ? t('models.resumeRequired') : t('common.failed')}
+                </Text>
+                {part.url ? (
+                  <RowAction
+                    disabled={actions.isBusy}
+                    icon={RotateCcwIcon}
+                    label={t('models.restartThisFile')}
+                    onClick={() => actions.restartFile(part.url!)}
+                  />
+                ) : null}
+              </HStack>
+              {part.message ? (
+                <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere" ps="4.5">
+                  {part.message}
+                </Text>
               ) : null}
-            </HStack>
+            </Stack>
           ))}
         </Stack>
       </Table.Cell>
@@ -220,12 +228,20 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
               onClick={actions.pause}
             />
           ) : null}
-          {status === 'paused' ? (
+          {canResumeInstall(job) ? (
             <RowAction
               disabled={actions.isBusy}
-              icon={canRestartFailedParts(job) ? RotateCcwIcon : PlayIcon}
-              label={canRestartFailedParts(job) ? t('models.retryFailedDownload') : t('models.resumeDownload')}
-              onClick={canRestartFailedParts(job) ? actions.retry : actions.resume}
+              icon={PlayIcon}
+              label={t('models.resumeDownload')}
+              onClick={actions.resume}
+            />
+          ) : null}
+          {status === 'paused' && canRestartFailedParts(job) ? (
+            <RowAction
+              disabled={actions.isBusy}
+              icon={RotateCcwIcon}
+              label={t('models.retryFailedDownload')}
+              onClick={actions.retry}
             />
           ) : null}
           {isSettledRowStatus(status) && status !== 'installed' ? (

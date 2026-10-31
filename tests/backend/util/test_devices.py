@@ -15,6 +15,7 @@ from invokeai.backend.util.devices import (
     TorchDevice,
     choose_precision,
     choose_torch_device,
+    device_has_dedicated_vram,
     device_is_integrated,
     torch_dtype,
 )
@@ -31,6 +32,30 @@ def test_device_choice(device_name):
     config.device = device_name
     torch_device = TorchDevice.choose_torch_device()
     assert torch_device == torch.device(device_name)
+
+
+@pytest.mark.parametrize(
+    ("device_name", "integrated", "expected"),
+    [
+        pytest.param("cpu", None, False, id="cpu-shared"),
+        pytest.param("mps", None, False, id="mps-shared"),
+        pytest.param("cuda:1", True, True, id="rocm-apu-keeps-dedicated-budget"),
+        pytest.param("xpu:2", True, False, id="integrated-xpu-shared"),
+        pytest.param("xpu:2", False, True, id="discrete-xpu-dedicated"),
+        pytest.param("xpu:2", None, True, id="unknown-xpu-dedicated"),
+    ],
+)
+def test_device_memory_budget_classification(device_name, integrated, expected, monkeypatch):
+    device = torch.device(device_name)
+
+    def probe(probed_device):
+        assert probed_device == device
+        return integrated
+
+    monkeypatch.setattr("invokeai.backend.util.devices.xpu_device_is_integrated", probe)
+    monkeypatch.setattr(torch.cuda, "get_device_properties", lambda _: SimpleNamespace(is_integrated=1))
+    monkeypatch.setattr(torch.version, "hip", "7.15.26333")
+    assert device_has_dedicated_vram(device) is expected
 
 
 # ===== per-thread session device (multi-GPU worker pinning) ================
@@ -352,6 +377,26 @@ def test_a_backend_that_rejects_bfloat16_falls_back_by_device(monkeypatch, devic
     monkeypatch.setattr(torch, "empty", unsupported)
 
     assert TorchDevice.choose_bfloat16_safe_dtype(torch.device(device_name)) is expected
+
+
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_the_flux_vae_dtype_keeps_a_configured_float32_or_bfloat16(dtype):
+    assert TorchDevice.dtype_avoiding_float16(dtype, torch.device("cpu")) is dtype
+
+
+@pytest.mark.parametrize("bfloat16_supported, expected", [(True, torch.bfloat16), (False, torch.float32)])
+def test_the_flux_vae_dtype_replaces_float16_with_bfloat16_or_else_float32(monkeypatch, bfloat16_supported, expected):
+    """Full width also on CUDA, unlike `choose_bfloat16_safe_dtype`: the FLUX autoencoders are broken in float16."""
+    empty = torch.empty
+
+    def answer(*args, dtype, device):
+        if not bfloat16_supported:
+            raise TypeError("BFloat16 is not supported on this device")
+        return empty(0, dtype=dtype)
+
+    monkeypatch.setattr(torch, "empty", answer)
+
+    assert TorchDevice.dtype_avoiding_float16(torch.float16, torch.device("cuda")) is expected
 
 
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
@@ -923,6 +968,61 @@ def test_disable_conv_benchmark_empty_cache_flips_torch_flag():
         assert getter() is False
     finally:
         setter(original)
+
+
+class TestCudaStreamCaptureShim:
+    """NVIDIA's Windows ARM64 torch crashes in is_current_stream_capturing() without a device; the shim answers False
+    there and stays out of the way everywhere else."""
+
+    @staticmethod
+    def _cuda_build_without_device(monkeypatch) -> None:
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: True)
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+
+        # A fresh, unshimmed stand-in for torch's function (the shim may already be live in this process), raising
+        # as torch does without a device; monkeypatch restores whatever was there before.
+        def is_current_stream_capturing() -> bool:
+            raise RuntimeError("no CUDA device")
+
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", is_current_stream_capturing)
+
+    def test_answers_false_without_a_device_and_installs_once(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        shim = torch.cuda.is_current_stream_capturing
+        assert shim is not unshimmed, "the shim must replace the function"
+        assert shim() is False
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is shim, "a second install must not wrap the shim"
+
+    def test_leaves_torch_alone_where_cuda_works_or_is_absent(self, monkeypatch):
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        original = torch.cuda.is_current_stream_capturing
+        monkeypatch.setattr(torch.cuda, "is_current_stream_capturing", original)
+        monkeypatch.setattr(torch.version, "cuda", None)
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+        monkeypatch.setattr(torch.version, "cuda", "13.4")
+        monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is original
+
+    def test_leaves_torch_alone_off_windows_arm64(self, monkeypatch):
+        """Other CUDA builds raise without a device rather than crash; they keep torch's own function."""
+        from invokeai.backend.util.devices import install_cuda_stream_capture_shim
+
+        self._cuda_build_without_device(monkeypatch)
+        monkeypatch.setattr("invokeai.backend.util.devices.is_windows_arm64", lambda: False)
+        unshimmed = torch.cuda.is_current_stream_capturing
+        install_cuda_stream_capture_shim()
+        assert torch.cuda.is_current_stream_capturing is unshimmed
 
 
 # ===== integrated GPUs on CUDA/ROCm =========================================

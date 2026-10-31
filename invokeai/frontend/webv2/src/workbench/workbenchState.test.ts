@@ -16,12 +16,16 @@ import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import {
   GALLERY_RECENT_IMAGE_LIMIT,
+  getGallerySelectedImageQuery,
   legacyGeneratedImageToGalleryItem,
   registerImageCluster,
 } from '@features/gallery/contracts';
+import { galleryKeys } from '@features/gallery/queries';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { MAX_PROMPT_HISTORY } from '@features/generation/settings';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
+import { queryClient } from '@platform/query/client';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
@@ -31,7 +35,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { createEmptyCanvasDocument } from './canvasMigration';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
-import { layoutPresets } from './layoutPresets';
+import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { PROJECT_EVENT_LIMIT } from './projectEvents';
 import { getActiveProjectGraph } from './projectWorkflows';
@@ -107,6 +111,7 @@ const CANVAS_MUTATION_TYPES = new Set<CanvasProjectMutation['type']>([
   'reorderCanvasSiblings',
   'replaceCanvasDocument',
   'replaceCanvasLayer',
+  'replaceCanvasLayers',
   'rollbackStagedImageCommit',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
@@ -203,6 +208,13 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   pidDecoderModel: null,
   gemma2EncoderModel: null,
   pidSteps: 4,
+  refinerModel: null,
+  refinerSteps: 20,
+  refinerCfgScale: 7.5,
+  refinerScheduler: 'euler',
+  refinerPositiveAestheticScore: 6,
+  refinerNegativeAestheticScore: 2.5,
+  refinerStart: 0.8,
   cfgRescaleMultiplier: 0,
   cfgScale: 7,
   clipEmbedModel: null,
@@ -239,6 +251,9 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   qwenVLEncoderModel: null,
   qwen3VLEncoderModel: null,
   qwen35EncoderModel: null,
+  animaInpaintAdapterModel: null,
+  animaInpaintAdapterEnabled: true,
+  animaInpaintAdapterWeight: 1,
   wanT5EncoderModel: null,
   wanLowNoiseModel: null,
   ideogram4UnconditionalModel: null,
@@ -248,12 +263,31 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   ideogram4GuidanceScale: null,
   ideogram4Mu: null,
   ideogram4ColorPalette: [],
+  externalImageSize: null,
+  openaiQuality: 'auto',
+  openaiBackground: 'auto',
+  openaiInputFidelity: null,
+  geminiTemperature: null,
+  geminiThinkingLevel: null,
+  seedreamWatermark: false,
+  seedreamOptimizePrompt: false,
   krea2RebalanceEnabled: false,
   krea2RebalanceMultiplier: 4,
   krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
   krea2SeedVarianceEnabled: false,
   krea2SeedVarianceStrength: 0.1,
   krea2SeedVarianceRandomizePercent: 50,
+  krea2ReferenceKvCache: false,
+  fluxDypePreset: 'off',
+  fluxDypeScale: 2,
+  fluxDypeExponent: 2,
+  zImageShift: null,
+  zImageSeedVarianceEnabled: false,
+  zImageSeedVarianceStrength: 0.1,
+  zImageSeedVarianceRandomizePercent: 50,
+  qwenImageShift: null,
+  qwenImageEncoderQuantization: 'none',
+  mossImageUncondSkipLayers: [22],
   referenceImages: [],
   scheduler: 'euler_a',
   seamlessXAxis: false,
@@ -441,6 +475,62 @@ const primeGenerate = (
 const submitGenerate = (state: WorkbenchState) =>
   workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
 
+describe('Invoke Front', () => {
+  const getQueuedSnapshot = (state: WorkbenchState) => getActiveProject(state).queue.items[0]?.snapshot;
+
+  it('records front priority on resolved submissions only when the command asks for it', () => {
+    const submitResolved = (prepend?: boolean) => {
+      const state = primeGenerate();
+
+      return workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        ...(prepend === undefined ? {} : { prepend }),
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+    };
+
+    expect(getQueuedSnapshot(submitResolved())).not.toHaveProperty('prepend');
+    expect(getQueuedSnapshot(submitResolved(true))?.prepend).toBe(true);
+  });
+
+  it('records front priority on prepared Canvas submissions', () => {
+    const state = primeGenerate();
+    const queued = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      canvas: structuredClone(getActiveProject(state).canvas),
+      destination: 'canvas',
+      generate: {
+        negativePromptNodeId: 'negative_prompt',
+        positivePromptNodeId: 'positive_prompt',
+        seedNodeId: 'seed',
+        values: createGenerateValues({ seed: 1, seedMode: 'fixed' }),
+      },
+      graph: {
+        edges: [],
+        id: 'canvas-graph',
+        label: 'Canvas',
+        nodes: [],
+        updatedAt: '2026-06-09T00:00:00.000Z',
+        version: 1,
+      },
+      prepend: true,
+      projectId: state.activeProjectId,
+      type: 'submitCanvasInvocationSnapshot',
+    });
+
+    expect(getQueuedSnapshot(queued)?.prepend).toBe(true);
+  });
+});
+
+const getQueuedOutputNode = (state: WorkbenchState) => {
+  const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
+  const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
+
+  return nodes.canvas_output;
+};
+
 const getQueuedRandDevice = (state: WorkbenchState): unknown => {
   const submission = getActiveProject(state).queue.items[0]?.snapshot.backendSubmission;
   const nodes = submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {});
@@ -460,6 +550,61 @@ const createUpscaleModel = (key: string, type: string, base: string, name = key)
   source: key,
   source_type: 'path',
   type,
+});
+
+/**
+ * Lists boards as a fetched listing of every readable board would, so the reducer can take them as destinations: a
+ * board no listing holds is never one.
+ */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
+describe('project output filters', () => {
+  it('queues the NSFW checker as the generate output when the project turns it on', () => {
+    const initial = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { useNsfwChecker: true },
+      type: 'setActiveProjectSettings',
+    });
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)).toMatchObject({ is_intermediate: false, type: 'img_nsfw' });
+  });
+
+  it('queues the plain decode while the filters are off', () => {
+    const initial = createInitialWorkbenchState();
+    const state = workbenchReducer(primeGenerate(initial), {
+      backendSupportsCancellation: true,
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+    });
+
+    expect(getQueuedOutputNode(state)?.type).toBe('l2i');
+  });
 });
 
 describe('generation-device orchestration metadata', () => {
@@ -508,6 +653,174 @@ describe('generation-device orchestration metadata', () => {
     });
 
     expect(getQueuedRandDevice(state)).toBe('xpu');
+  });
+});
+
+describe('model-only upscale submissions', () => {
+  const upscaler = {
+    ...createUpscaleModel('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    scale: 4,
+    type: 'spandrel_image_to_image' as const,
+  };
+  const input = { height: 64, image_name: 'input.png', width: 48 };
+  const sourceMetadata = { height: 512, positive_prompt: 'a lighthouse', seed: 42, width: 384 };
+  const getQueued = (state: WorkbenchState) => {
+    const snapshot = getActiveProject(state).queue.items[0]?.snapshot;
+    const submission = snapshot?.backendSubmission;
+
+    return { nodes: submission?.kind === 'invalid' ? {} : (submission?.graph.nodes ?? {}), snapshot, submission };
+  };
+  const primeModelOnly = () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues([upscaler]),
+        // Iterations would repeat one image: Model only runs once.
+        batchCount: 3,
+        inputImage: input,
+        mode: 'model-only',
+        seed: 10,
+        seedMode: 'increment',
+      },
+      widgetId: 'upscale',
+    });
+
+    // The shared prompt draft is not this run's: nothing reads a prompt.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { positivePrompt: 'the Generate draft' },
+      widgetId: 'generate',
+    });
+
+    return state;
+  };
+  const submitRoute = (state: WorkbenchState, imageName = input.image_name) =>
+    workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      models: [upscaler],
+      route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+      projectId: state.activeProjectId,
+      type: 'submitResolvedInvocationSnapshot',
+      upscaleSourceMetadata: { imageName, metadata: sourceMetadata },
+    });
+
+  it('queues the upscaler alone, once, with the input metadata, no main model, and leaves the Refine seed', () => {
+    const state = submitRoute(primeModelOnly());
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(Object.values(nodes).map((node) => node.type)).toEqual([
+      'string',
+      'string',
+      'integer',
+      'spandrel_image_to_image_autoscale',
+    ]);
+    expect(nodes.upscale_output).toMatchObject({
+      is_intermediate: false,
+      metadata: { ...sourceMetadata, upscale_scale: 4 },
+      scale: 4,
+    });
+    expect(submission).toMatchObject({
+      batchCount: 1,
+      kind: 'generate',
+      negativePrompt: '',
+      positivePrompt: '',
+      seedStep: 0,
+    });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 256, width: 192 });
+    expect(getProjectWidgetValues(getActiveProject(state), 'upscale').seed).toBe(10);
+  });
+
+  it('queues nothing, and says why, with metadata read for an image that is no longer the input', () => {
+    const state = submitRoute(primeModelOnly(), 'earlier.png');
+
+    expect(getActiveProject(state).queue.items).toEqual([]);
+    expect(state.notifications[0]).toMatchObject({ kind: 'error', titleKey: 'widgets.upscale.inputChanged' });
+  });
+
+  it("queues the image menu's upscale to the gallery without touching the widget or the route", () => {
+    listGalleryBoardsInCache('auto-board');
+    let state = workbenchReducer(primeModelOnly(), {
+      settings: { autoAddBoardId: 'auto-board' },
+      type: 'updateGallerySettings',
+    });
+    state = workbenchReducer(state, { destination: 'canvas', type: 'setInvocationDestination' });
+    const before = getActiveProject(state);
+
+    state = workbenchReducer(state, {
+      backendSupportsCancellation: true,
+      // Odd sizes: 4x gives 404 x 324, which the result floors to multiples of 8 as the Upscale widget's does.
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: state.activeProjectId,
+      scale: 'native',
+      sourceMetadata,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+
+    const after = getActiveProject(state);
+    const { nodes, snapshot, submission } = getQueued(state);
+
+    expect(after.queue.items).toHaveLength(1);
+    expect(snapshot).toMatchObject({ destination: 'gallery', galleryBoardId: 'auto-board', sourceId: 'upscale' });
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 400, width: 320 });
+    expect(submission).toMatchObject({ batchCount: 1, kind: 'generate', positivePrompt: '' });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      image: { image_name: 'menu.png' },
+      metadata: {
+        ...sourceMetadata,
+        upscale_initial_image: { height: 101, image_name: 'menu.png', width: 81 },
+        upscale_scale: 4,
+      },
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
+    expect(after.invocation).toEqual({ ...before.invocation, lastSubmittedRunId: after.queue.items[0]?.id });
+    expect(after.widgetInstances).toEqual(before.widgetInstances);
+    expect(after.widgetGraphs).toEqual(before.widgetGraphs);
+  });
+
+  it("runs the image menu's native entry for an upscaler of unknown native scale once, as a plain pass", () => {
+    const primed = primeModelOnly();
+    const { scale: _scale, ...legacy } = upscaler;
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 101, image_name: 'menu.png', width: 81 },
+      projectId: primed.activeProjectId,
+      scale: 'native',
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: legacy,
+    });
+    const { nodes } = getQueued(state);
+
+    expect(nodes.upscale_output).toMatchObject({ type: 'spandrel_image_to_image' });
+    expect(nodes.upscale_output).not.toHaveProperty('scale');
+    expect(nodes.upscale_output).not.toHaveProperty('fit_to_multiple_of_8');
+    expect(nodes.upscale_output?.metadata).not.toHaveProperty('upscale_scale');
+  });
+
+  it("runs the image menu's other factors as Model only plans them and sizes the result to that factor", () => {
+    const primed = primeModelOnly();
+    const state = workbenchReducer(primed, {
+      backendSupportsCancellation: true,
+      image: { height: 100, image_name: 'menu.png', width: 80 },
+      projectId: primed.activeProjectId,
+      scale: 1.5,
+      sourceMetadata: null,
+      type: 'submitModelOnlyUpscale',
+      upscaleModel: upscaler,
+    });
+    const { nodes, snapshot } = getQueued(state);
+
+    // One 4x pass, then the node resizes to 1.5x, floored to a multiple of 8: 150 x 120 becomes 144 x 120.
+    expect(snapshot?.presentation).toEqual({ batchCount: 1, height: 144, width: 120 });
+    expect(nodes.upscale_output).toMatchObject({
+      fit_to_multiple_of_8: true,
+      metadata: { upscale_scale: 1.5 },
+      scale: 1.5,
+      type: 'spandrel_image_to_image_autoscale',
+    });
   });
 });
 
@@ -1062,6 +1375,49 @@ describe('adopting a project from another realm', () => {
     expect(normalized.queue.items).toEqual([]);
   });
 
+  it('loads a gallery saved with an all-boards scope but no search on the selected board', () => {
+    const project = createInitialWorkbenchState().projects[0]!;
+    const galleryInstance = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
+    const saved = {
+      ...project,
+      widgetInstances: {
+        ...project.widgetInstances,
+        [galleryInstance.id]: {
+          ...galleryInstance,
+          state: { ...galleryInstance.state, values: { ...galleryInstance.state.values, searchScope: 'all' } },
+        },
+      },
+    } as Project;
+
+    expect(getProjectWidgetValues(normalizeWorkbenchProject(saved), 'gallery').searchScope).toBe('board');
+  });
+
+  it('loads a project saved before Auto-switch with it Off and without the retired pause stamp', () => {
+    const project = createInitialWorkbenchState().projects[0]!;
+    const { viewerAutoSwitch: _mode, ...settings } = project.settings;
+    const galleryInstance = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
+    const legacyProject = {
+      ...project,
+      settings: { ...settings, showProgressImagesInViewer: true },
+      widgetInstances: {
+        ...project.widgetInstances,
+        [galleryInstance.id]: {
+          ...galleryInstance,
+          state: {
+            ...galleryInstance.state,
+            values: { ...galleryInstance.state.values, liveFollowPausedAt: '2026-06-10T00:00:00.000Z' },
+          },
+        },
+      },
+    } as unknown as Project;
+
+    const normalized = normalizeWorkbenchProject(legacyProject);
+
+    expect(normalized.settings.viewerAutoSwitch).toBe('off');
+    expect(normalized.settings).not.toHaveProperty('showProgressImagesInViewer');
+    expect(getProjectWidgetValues(normalized, 'gallery')).not.toHaveProperty('liveFollowPausedAt');
+  });
+
   it('carries the iteration count workflow runs borrowed from Generate over to the workflow widget once', () => {
     const workflowValuesOf = (candidate: Project) => getProjectWidgetValues(candidate, 'workflow');
     const withoutWorkflowCount = (candidate: Project): Project => {
@@ -1288,6 +1644,20 @@ describe('adopting a project from another realm', () => {
 
     expect(values.semanticImageQuery).toEqual({ kind: 'text', query: 'sunset' });
     expect(values.galleryPage).toBe(3);
+  });
+});
+
+describe('new projects', () => {
+  it('take a global UUID id, since another account may hold any other', () => {
+    const initial = createInitialWorkbenchState();
+    const first = workbenchReducer(initial, { type: 'createProject' });
+    const second = workbenchReducer(first, { type: 'createProject' });
+    const ids = second.projects.slice(-2).map((project) => project.id);
+
+    for (const id of ids) {
+      expect(id).toMatch(/^project-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    }
+    expect(new Set(ids).size).toBe(2);
   });
 });
 
@@ -1984,6 +2354,36 @@ describe('workbench layout presets', () => {
     expect(state.account.layoutPresetOrder).toBe(layoutPresetOrder);
   });
 
+  it('stores no name for a built-in preset saved under its default name in the language shown', () => {
+    let state = createInitialWorkbenchState();
+
+    // The edit dialog in German shows Automate as "Arbeitsablauf", its translated default.
+    state = workbenchReducer(state, {
+      label: 'Arbeitsablauf',
+      localizedDefaultLabel: 'Arbeitsablauf',
+      presetId: 'automate',
+      type: 'renameLayoutPreset',
+    });
+
+    expect(state.account.layoutPresetMetadataOverrides?.automate).toBeUndefined();
+    expect(resolveSavedLayoutPreset(state.account, 'automate')).toMatchObject({
+      label: 'Workflow',
+      labelKey: 'topbar.presets.builtInLabels.automate',
+    });
+
+    state = workbenchReducer(state, {
+      label: 'Nodes',
+      localizedDefaultLabel: 'Arbeitsablauf',
+      presetId: 'automate',
+      type: 'renameLayoutPreset',
+    });
+
+    // A renamed preset reads as named in every language.
+    expect(state.account.layoutPresetMetadataOverrides?.automate).toEqual({ label: 'Nodes' });
+    expect(resolveSavedLayoutPreset(state.account, 'automate')).not.toHaveProperty('labelKey');
+    expect(getLayoutPresetLabel(resolveSavedLayoutPreset(state.account, 'automate'), () => 'translated')).toBe('Nodes');
+  });
+
   it('moves every project off a deleted custom layout preset', () => {
     let state = createInitialWorkbenchState();
     const firstProjectId = state.activeProjectId;
@@ -2235,6 +2635,267 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(updatedOriginProject.queue.items[0]?.status).toBe('completed');
     expect(activeProject.canvas.stagingArea.pendingImageIds).toEqual([]);
     expect(activeProject.queue.items).toEqual([]);
+  });
+
+  it('reopens a failed Canvas run around its rerun and stages the rerun at the submitted bbox', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const submittedBbox = queueItem.snapshot.canvas.document.bbox;
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      error: 'Out of memory',
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = workbenchReducer(state, {
+      bbox: { ...submittedBbox, x: submittedBbox.x + 64 },
+      type: 'setCanvasBbox',
+    });
+    state = workbenchReducer(state, {
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      // A rerun of another run's item is not this run's to adopt.
+      retriedItems: [
+        { itemId: 99, sourceItemId: 41 },
+        { itemId: 100, sourceItemId: 7 },
+      ],
+      type: 'reopenQueueItemForRetry',
+    });
+
+    const reopened = getProject(state, project.id).queue.items[0];
+    expect(reopened).toEqual(expect.objectContaining({ backendItemIds: [99], status: 'running' }));
+    expect(reopened).not.toHaveProperty('error');
+
+    state = workbenchReducer(state, {
+      images: [createImage('rerun.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+    });
+
+    const { stagingArea } = getProject(state, project.id).canvas;
+    expect(stagingArea.pendingImageIds).toEqual(['rerun.png']);
+    expect(stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({
+        placement: expect.objectContaining({ x: submittedBbox.x, y: submittedBbox.y }),
+        sourceBackendItemId: 99,
+      })
+    );
+  });
+
+  it('keeps the staged candidate selected when a retry reopens an earlier run', () => {
+    let state = submitGenerate(primeGenerate());
+    const projectId = state.activeProjectId;
+    const runA = getProject(state, projectId).queue.items[0]!;
+    state = workbenchReducer(state, { mode: 'off', type: 'setCanvasStagingAutoSwitch' });
+    state = workbenchReducer(state, {
+      backendItemIds: [41, 42],
+      projectId,
+      queueItemId: runA.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 41,
+      images: [createImage('a1.png', runA.id)],
+      projectId,
+      queueItemId: runA.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId,
+      queueItemId: runA.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = submitGenerate(state);
+    const runB = getProject(state, projectId).queue.items.find((item) => item.id !== runA.id)!;
+    state = workbenchReducer(state, {
+      backendItemIds: [51],
+      projectId,
+      queueItemId: runB.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      images: [createImage('b1.png', runB.id), createImage('b2.png', runB.id)],
+      projectId,
+      queueItemId: runB.id,
+      type: 'routeQueueItemResults',
+    });
+    const selectedImageName = () => {
+      const project = getProject(state, projectId);
+      const slot = getCanvasStagingSlots(project.canvas, project.queue.items)[
+        project.canvas.stagingArea.selectedImageIndex
+      ];
+      return slot?.kind === 'candidate' ? slot.candidate.imageName : slot?.kind;
+    };
+    const slotsBefore = getCanvasStagingSlots(
+      getProject(state, projectId).canvas,
+      getProject(state, projectId).queue.items
+    );
+    state = workbenchReducer(state, {
+      imageIndex: slotsBefore.findIndex((slot) => slot.kind === 'candidate' && slot.candidate.imageName === 'b2.png'),
+      type: 'setStagedImageIndex',
+    });
+    expect(selectedImageName()).toBe('b2.png');
+
+    state = workbenchReducer(state, {
+      projectId,
+      queueItemId: runA.id,
+      retriedItems: [{ itemId: 99, sourceItemId: 42 }],
+      type: 'reopenQueueItemForRetry',
+    });
+
+    expect(getProject(state, projectId).queue.items.find((item) => item.id === runA.id)?.status).toBe('running');
+    expect(selectedImageName()).toBe('b2.png');
+  });
+
+  it('leaves a run finished when it is still active or its Canvas document was replaced', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const reopen = (current: WorkbenchState) =>
+      workbenchReducer(current, {
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        retriedItems: [{ itemId: 99, sourceItemId: 41 }],
+        type: 'reopenQueueItemForRetry',
+      });
+
+    state = workbenchReducer(state, {
+      backendItemIds: [41],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    expect(reopen(state)).toBe(state);
+
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(reopen(state)).toBe(state);
+  });
+
+  it('returns a later retry of another item the run left behind to that run, keeping its earlier results', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const reopen = (current: WorkbenchState, itemId: number, sourceItemId: number) =>
+      workbenchReducer(current, {
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        retriedItems: [{ itemId, sourceItemId }],
+        type: 'reopenQueueItemForRetry',
+      });
+    const finish = (current: WorkbenchState, imageName: string) =>
+      workbenchReducer(current, {
+        images: [createImage(imageName, queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+    state = workbenchReducer(state, {
+      backendItemIds: [40, 41, 42],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'markQueueItemBackendSubmitted',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 40,
+      images: [createImage('first.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemPartialResults',
+    });
+    state = workbenchReducer(state, {
+      notify: false,
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      status: 'failed',
+      type: 'setQueueItemStatus',
+    });
+
+    state = finish(reopen(state, 99, 41), 'rerun-41.png');
+    expect(getProject(state, project.id).queue.items[0]).toEqual(
+      expect.objectContaining({
+        resultImages: [
+          expect.objectContaining({ imageName: 'first.png' }),
+          expect.objectContaining({ imageName: 'rerun-41.png' }),
+        ],
+        status: 'completed',
+      })
+    );
+
+    state = reopen(state, 100, 42);
+    expect(getProject(state, project.id).queue.items[0]).toEqual(
+      expect.objectContaining({ backendItemIds: [100], status: 'running' })
+    );
+  });
+
+  it('stages a rerun its active run could not adopt where that run stages', () => {
+    let state = submitGenerate(primeGenerate());
+    const project = getActiveProject(state);
+    const queueItem = project.queue.items[0]!;
+    const submittedBbox = queueItem.snapshot.canvas.document.bbox;
+
+    state = workbenchReducer(state, {
+      bbox: { ...submittedBbox, x: submittedBbox.x + 64 },
+      type: 'setCanvasBbox',
+    });
+    state = workbenchReducer(state, {
+      backendItemId: 100,
+      images: [createImage('rerun.png', queueItem.id)],
+      projectId: project.id,
+      queueItemId: queueItem.id,
+      type: 'stageRetriedCanvasResults',
+    });
+
+    expect(getCanvas(state).stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({ placement: expect.objectContaining({ x: submittedBbox.x, y: submittedBbox.y }) })
+    );
+  });
+
+  it('stages a rerun no run adopted at the current bbox', () => {
+    let state = primeGenerate();
+    const projectId = state.activeProjectId;
+    const initialBbox = getCanvas(state).document.bbox;
+
+    state = workbenchReducer(state, { bbox: { ...initialBbox, x: initialBbox.x + 64 }, type: 'setCanvasBbox' });
+    const currentBbox = getCanvas(state).document.bbox;
+    expect(currentBbox.x).not.toBe(initialBbox.x);
+    state = workbenchReducer(state, {
+      backendItemId: 99,
+      images: [createImage('rerun.png', 'run-from-another-tab')],
+      projectId,
+      queueItemId: 'run-from-another-tab',
+      type: 'stageRetriedCanvasResults',
+    });
+
+    const { stagingArea } = getCanvas(state);
+    expect(stagingArea.pendingImageIds).toEqual(['rerun.png']);
+    expect(stagingArea.isVisible).toBe(true);
+    expect(stagingArea.pendingImages[0]).toEqual(
+      expect.objectContaining({
+        placement: expect.objectContaining({ x: currentBbox.x, y: currentBbox.y }),
+        sourceBackendItemId: 99,
+      })
+    );
   });
 
   it("keeps the selected workflow candidate when auto-switch is 'off'", () => {
@@ -3548,12 +4209,15 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
 
       workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      listGalleryBoardsInCache('selected-board', 'auto-board', 'kept-board');
       state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
       state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
 
       for (const [id, board] of [
         ['auto-node', 'auto'],
         ['none-node', 'none'],
+        ['kept-node', { board_id: 'kept-board' }],
+        ['revoked-node', { board_id: 'revoked-board' }],
       ] as const) {
         state = workbenchReducer(state, {
           action: { node: boardNode(id, board), type: 'addNode' },
@@ -3567,6 +4231,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // An explicit board is judged like the auto-add board: listed as the caller's to add to, or Auto's board.
+      expect(graph.nodes['kept-node']).toMatchObject({ board: { board_id: 'kept-board' } });
+      expect(graph.nodes['revoked-node']).toMatchObject({ board: { board_id: 'auto-board' } });
       // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
       expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
     });
@@ -4621,6 +5288,31 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(galleryValues.selectedImageName).toBe('image:gallery-image.png');
   });
 
+  it('stamps a routed result with the media kind the grid shows, or both kinds when the filter hides it', () => {
+    const routeImageUnder = (mediaFilter: 'image' | 'video') => {
+      let state = primeGenerate();
+
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = workbenchReducer(state, { settings: { mediaFilter }, type: 'updateGallerySettings' });
+      state = submitGenerate(state);
+
+      const project = getActiveProject(state);
+      const queueItem = project.queue.items[0];
+
+      state = workbenchReducer(state, {
+        images: [createImage('result.png', queueItem.id)],
+        projectId: project.id,
+        queueItemId: queueItem.id,
+        type: 'routeQueueItemResults',
+      });
+
+      return getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind;
+    };
+
+    expect(routeImageUnder('image')).toBe('image');
+    expect(routeImageUnder('video')).toBeNull();
+  });
+
   it('normalizes the gallery page to a non-negative integer', () => {
     let state = primeGenerate();
 
@@ -4683,6 +5375,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('preserves the destination board on freshly routed Gallery results', () => {
     let state = primeGenerate();
 
+    listGalleryBoardsInCache('board-1');
     state = workbenchReducer(state, { boardId: 'board-1', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = submitGenerate(state);
@@ -5000,18 +5693,37 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     );
   });
 
-  it('pauses live-follow when the user selects a saved Gallery image', () => {
-    let state = createInitialWorkbenchState();
+  it.each(['latest', 'progress'] as const)(
+    'turns Auto-switch Off in the same step when the user selects a saved Gallery image under %s',
+    (mode) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        settings: { viewerAutoSwitch: mode },
+        type: 'setActiveProjectSettings',
+      });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
+      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
 
-    state = workbenchReducer(state, {
-      item: createGalleryImageItem('selected.png'),
-      type: 'selectGalleryItem',
+      expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
+    }
+  );
+
+  it('changes only the selection when Auto-switch is already Off', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      settings: { viewerAutoSwitch: 'off' },
+      type: 'setActiveProjectSettings',
     });
+    const settings = getActiveProject(state).settings;
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+
+    expect(getActiveProject(state).settings).toBe(settings);
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).not.toHaveProperty('liveFollowPausedAt');
+  });
+
+  it('starts a new project on In progress', () => {
+    expect(getActiveProject(createInitialWorkbenchState()).settings.viewerAutoSwitch).toBe('progress');
+    expect(createDraftProject([]).settings.viewerAutoSwitch).toBe('progress');
   });
 
   it('clears the Gallery selection while keeping the compare image and navigation stamp', () => {
@@ -5052,46 +5764,76 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
-  it('selects a result whose generation was submitted after the manual selection', () => {
-    vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
+  it.each(['latest', 'progress'] as const)('selects each finished result under %s', (mode) => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: mode }, type: 'setActiveProjectSettings' });
+    state = submitGenerate(state);
+    const first = getActiveProject(state).queue.items[0]!;
+    state = submitGenerate(state);
+    const second = getActiveProject(state).queue.items[0]!;
+    const projectId = getActiveProject(state).id;
 
-    try {
-      let state = primeGenerate();
-      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-      state = submitGenerate(state);
-      const earlierItem = getActiveProject(state).queue.items[0];
-
-      vi.setSystemTime(new Date('2026-06-10T00:00:01.000Z'));
-      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-      expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-
-      // Invoking again is the counter-signal: the user wants to see what they just asked for.
-      vi.setSystemTime(new Date('2026-06-10T00:00:02.000Z'));
-      state = submitGenerate(state);
-      const laterItem = getActiveProject(state).queue.items[0];
-      expect(laterItem.id).not.toBe(earlierItem.id);
-      expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(true);
-
-      // The batch already running when the user picked stays out of the way…
+    for (const [name, item] of [
+      ['first.png', first],
+      ['second.png', second],
+    ] as const) {
       state = workbenchReducer(state, {
-        images: [createImage('earlier.png', earlierItem.id)],
-        projectId: getActiveProject(state).id,
-        queueItemId: earlierItem.id,
+        images: [createImage(name, item.id)],
+        projectId,
+        queueItemId: item.id,
         type: 'routeQueueItemResults',
       });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-
-      // …while the one submitted after the pick takes the preview when it lands.
-      state = workbenchReducer(state, {
-        images: [createImage('later.png', laterItem.id)],
-        projectId: getActiveProject(state).id,
-        queueItemId: laterItem.id,
-        type: 'routeQueueItemResults',
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:later.png');
-    } finally {
-      vi.useRealTimers();
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe(`image:${name}`);
     }
+  });
+
+  it('leaves a selection alone under Off, and selects a result only when nothing is selected', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'off' }, type: 'setActiveProjectSettings' });
+    state = submitGenerate(state);
+    state = submitGenerate(state);
+    const [second, first] = getActiveProject(state).queue.items;
+    const projectId = getActiveProject(state).id;
+
+    state = workbenchReducer(state, {
+      images: [createImage('first.png', first!.id)],
+      projectId,
+      queueItemId: first!.id,
+      type: 'routeQueueItemResults',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:first.png');
+
+    state = workbenchReducer(state, {
+      images: [createImage('second.png', second!.id)],
+      projectId,
+      queueItemId: second!.id,
+      type: 'routeQueueItemResults',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:first.png');
+  });
+
+  it('keeps a manual selection through a later submission and its results', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    const settings = getActiveProject(state).settings;
+
+    state = submitGenerate(state);
+    const queueItem = getActiveProject(state).queue.items[0]!;
+    state = workbenchReducer(state, {
+      images: [createImage('later.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+      videos: [createVideo('later.mp4', queueItem.id)],
+    });
+
+    // Submitting no longer touches settings, so the selection the user settled on stays.
+    expect(getActiveProject(state).settings).toBe(settings);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('selects a finished Gallery video once, so a later result keeps the preview', () => {
@@ -5138,49 +5880,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:later.png');
   });
 
-  it('selects only videos from runs submitted after a manual selection', () => {
-    vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
-
-    try {
-      let state = primeGenerate();
-      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-      state = submitGenerate(state);
-      const earlierItem = getActiveProject(state).queue.items[0];
-
-      vi.setSystemTime(new Date('2026-06-10T00:00:01.000Z'));
-      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-      vi.setSystemTime(new Date('2026-06-10T00:00:02.000Z'));
-      state = submitGenerate(state);
-      const laterItem = getActiveProject(state).queue.items[0];
-      const projectId = getActiveProject(state).id;
-
-      state = workbenchReducer(state, {
-        images: [],
-        projectId,
-        queueItemId: earlierItem.id,
-        type: 'routeQueueItemResults',
-        videos: [createVideo('earlier.mp4', earlierItem.id)],
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-
-      state = workbenchReducer(state, {
-        images: [],
-        projectId,
-        queueItemId: laterItem.id,
-        type: 'routeQueueItemResults',
-        videos: [createVideo('later.mp4', laterItem.id)],
-      });
-      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('video:later.mp4');
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
   it("selects a run's video over images routed with it", () => {
     let state = primeGenerate();
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: false },
+      settings: { viewerAutoSwitch: 'off' },
       type: 'setActiveProjectSettings',
     });
     state = submitGenerate(state);
@@ -5204,7 +5908,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const projectId = getActiveProject(state).id;
     state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
     state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
+      settings: { viewerAutoSwitch: 'progress' },
       type: 'setActiveProjectSettings',
     });
     state = workbenchReducer(state, {
@@ -5222,32 +5926,6 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
 
     expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
-  });
-
-  it('leaves an explicit live-follow opt-out alone when submitting', () => {
-    let state = primeGenerate();
-    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: false },
-      type: 'setActiveProjectSettings',
-    });
-
-    state = submitGenerate(state);
-
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
-  });
-
-  it('lifts the selection pause when live-follow is toggled explicitly', () => {
-    let state = createInitialWorkbenchState();
-    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
-    expect(typeof getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBe('string');
-
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
-      type: 'setActiveProjectSettings',
-    });
-
-    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').liveFollowPausedAt).toBeUndefined();
   });
 
   it('stamps a host page into the navigation query already on a multi-selection', () => {
@@ -5305,6 +5983,46 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       searchTerm: 'sunset',
       starredOnly: true,
     });
+  });
+
+  it('restarts the listing at its first page when the media filter changes', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { page: 3, type: 'setGalleryPage' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'video' }, type: 'updateGallerySettings' });
+
+    const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
+
+    expect(values.mediaFilter).toBe('video');
+    expect(values.galleryPage).toBe(0);
+  });
+
+  it('stamps a Gallery selection with the media kind the grid lists, and an item-board selection with none', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('listed.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      'image'
+    );
+
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('searched.png'),
+      navigateItemBoard: true,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+
+    state = workbenchReducer(state, { settings: { mediaFilter: 'all' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('both.png'), type: 'selectGalleryItem' });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
   });
 
   it('stamps a toggled selection with the page of the item that becomes primary', () => {
@@ -5414,6 +6132,60 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
+  it('keeps the stamped media kind on an ordinary host step, whatever the filter is now', () => {
+    let state = createInitialWorkbenchState();
+
+    // Selected under both kinds; the filter then hides videos, and Preview steps onto one in the listing it walks.
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, { settings: { mediaFilter: 'image' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, {
+      item: createGalleryVideoItem('stepped.mp4'),
+      preserveNavigationQuery: true,
+      selectionPage: 4,
+      type: 'selectGalleryItem',
+    });
+
+    const query = getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery'));
+
+    expect(query.mediaKind).toBeNull();
+    expect(query.page).toBe(4);
+
+    state = workbenchReducer(state, {
+      itemKeys: ['video:stepped.mp4', 'image:range.png'],
+      preserveNavigationQuery: true,
+      primaryItem: createGalleryImageItem('range.png'),
+      selectionPage: 5,
+      type: 'setGalleryMultiSelection',
+    });
+
+    expect(getGallerySelectedImageQuery(getProjectWidgetValues(getActiveProject(state), 'gallery')).mediaKind).toBe(
+      null
+    );
+  });
+
+  it('stamps the live media kind on a ranked host step, with the live ranking it navigated', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { item: createGalleryImageItem('anchor.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { mediaFilter: 'image', semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('ranked.png'),
+      preserveNavigationQuery: true,
+      selectionPage: 1,
+      type: 'selectGalleryItem',
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery).toMatchObject({
+      mediaKind: 'image',
+      page: 1,
+      semanticKey: 'text:sunset',
+    });
+  });
+
   it('retires a semantic page stamp when Preview resumes ordinary listing navigation', () => {
     let state = createInitialWorkbenchState();
 
@@ -5441,7 +6213,46 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('pauses live-follow for saved Gallery multi-selection and comparison intents', () => {
+  it('returns the search scope to the selected board whatever clears the search, so the next search starts there', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: { searchScope: 'all', searchTerm: 'cat' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('all');
+
+    // Find in Gallery clears the search with this write, outside the search field.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { searchTerm: '', semanticImageQuery: null, semanticSearchText: null, starredOnly: false },
+      widgetId: 'gallery',
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: { searchTerm: 'dog' }, widgetId: 'gallery' });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery')).toMatchObject({
+      searchScope: 'board',
+      searchTerm: 'dog',
+    });
+  });
+
+  it('keeps the search scope while semantic text alone still searches', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: { searchScope: 'all', semanticSearchText: 'a red car', searchTerm: '' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('all');
+
+    // Semantic mode left with no text is no search.
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { semanticSearchText: '' },
+      widgetId: 'gallery',
+    });
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').searchScope).toBe('board');
+  });
+
+  it('turns Auto-switch Off for saved Gallery multi-selection and comparison intents', () => {
     const primaryImage = createGalleryImageItem('primary.png');
     const compareImage = createGalleryImageItem('compare.png');
     let state = createInitialWorkbenchState();
@@ -5452,15 +6263,12 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       type: 'setGalleryMultiSelection',
     });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
 
-    state = workbenchReducer(state, {
-      settings: { showProgressImagesInViewer: true },
-      type: 'setActiveProjectSettings',
-    });
+    state = workbenchReducer(state, { settings: { viewerAutoSwitch: 'latest' }, type: 'setActiveProjectSettings' });
     state = workbenchReducer(state, { image: compareImage, type: 'setGalleryCompareImage' });
 
-    expect(getActiveProject(state).settings.showProgressImagesInViewer).toBe(false);
+    expect(getActiveProject(state).settings.viewerAutoSwitch).toBe('off');
   });
 
   it('resets the page and stamps the selection query when the starred-only filter changes', () => {
@@ -5716,6 +6524,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('stores selected backend board id for gallery submissions', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('backend-board-id');
     state = workbenchReducer(state, { boardId: 'backend-board-id', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
     state = primeGenerate(state);
@@ -5729,6 +6538,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
   it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
     let state = createInitialWorkbenchState();
 
+    listGalleryBoardsInCache('selected-board', 'auto-board');
     state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
@@ -6094,9 +6904,19 @@ describe('workbench account and project settings', () => {
 
     expect(getActiveProject(state).settings).toEqual({
       antialiasProgressImages: true,
-      showProgressImagesInViewer: true,
       useCpuNoise: false,
+      useNsfwChecker: false,
+      useWatermark: false,
+      viewerAutoSwitch: 'progress',
     });
+  });
+
+  it('leaves the state alone when a project setting is set to the value it has', () => {
+    const state = createInitialWorkbenchState();
+
+    expect(
+      workbenchReducer(state, { settings: { viewerAutoSwitch: 'progress' }, type: 'setActiveProjectSettings' })
+    ).toBe(state);
   });
 });
 
@@ -7322,6 +8142,48 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(missing).document).toBe(getCanvas(replaced).document);
   });
 
+  it('replaces several leaves in place in one edit, and refuses them all when any entry is invalid', () => {
+    const state = withCanvasLayers(createInitialWorkbenchState(), [
+      createRasterLayer('a'),
+      createRasterLayer('b'),
+      createInpaintMaskLayer('m'),
+    ]);
+    const before = getCanvas(state).document;
+    const paintA = { ...createRasterLayer('a'), source: { bitmap: null, type: 'paint' as const } };
+    const emptiedMask = { ...getDocumentLeaves(before).find((layer) => layer.id === 'm')!, name: 'Emptied' };
+
+    const replaced = workbenchReducer(state, {
+      replacements: [
+        { layer: paintA, layerId: 'a' },
+        { layer: emptiedMask, layerId: 'm' },
+      ],
+      type: 'replaceCanvasLayers',
+    });
+    const leaves = getDocumentLeaves(getCanvas(replaced).document);
+    expect(leaves.map((layer) => layer.id)).toEqual(getDocumentLeaves(before).map((layer) => layer.id));
+    expect(leaves.find((layer) => layer.id === 'a')).toBe(paintA);
+    expect(leaves.find((layer) => layer.id === 'm')).toBe(emptiedMask);
+    expect(leaves.find((layer) => layer.id === 'b')).toBe(getDocumentLeaves(before).find((layer) => layer.id === 'b'));
+
+    const refusals = [
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: { ...paintA, id: 'missing' }, layerId: 'missing' },
+      ],
+      [
+        { layer: paintA, layerId: 'a' },
+        { layer: paintA, layerId: 'a' },
+      ],
+      [{ layer: paintA, layerId: 'b' }],
+      [{ layer: { ...createControlLayer('a') }, layerId: 'a' }],
+      [],
+    ];
+    for (const replacements of refusals) {
+      const refused = workbenchReducer(state, { replacements, type: 'replaceCanvasLayers' });
+      expect(refused).toBe(state);
+    }
+  });
+
   it('swaps a raster/control layer source but ignores mask-only layer types', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('a')]);
     const newSource = { image: { height: 10, imageName: 'swapped.png', width: 10 }, type: 'image' } as const;
@@ -8545,5 +9407,56 @@ describe('auto invocation route switching', () => {
 
     // Editing the surface already routed as the source keeps the manual destination.
     expect(getRoute(state)).toMatchObject({ destination: 'canvas', sourceId: 'generate' });
+  });
+});
+
+describe('canvas schema adoption', () => {
+  const typedControl = (id: string): CanvasControlLayerContract => ({
+    ...createControlLayer(id),
+    controlType: 'depth',
+    detection: { settings: {}, type: 'depth_anything_depth_estimation' },
+    source: { image: { height: 64, imageName: 'photo.png', width: 64 }, type: 'image' },
+  });
+  const withV4Canvas = (layers: readonly CanvasLayerContract[]): WorkbenchState =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      document: { ...createEmptyCanvasDocument(), stacks: stacksFrom([...layers]), version: 4 },
+      type: 'replaceCanvasDocument',
+    });
+  const versions = (state: WorkbenchState) => [getCanvas(state).version, getCanvas(state).document.version];
+
+  it('moves a v4 canvas to schema 6 when a control layer gains a type, and keeps 6 after it loses it', () => {
+    let state = withV4Canvas([createControlLayer('ctrl')]);
+    expect(versions(state)).toEqual([4, 4]);
+
+    state = workbenchReducer(state, { layer: typedControl('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { layer: createControlLayer('ctrl'), layerId: 'ctrl', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([6, 6]);
+
+    state = workbenchReducer(state, { document: createEmptyCanvasDocument(), type: 'replaceCanvasDocument' });
+    expect(getCanvas(state).version).toBe(6);
+  });
+
+  it('adopts 4, not 5, for custom-font typography alone', () => {
+    const text: CanvasLayerContract = {
+      ...createRasterLayer('text'),
+      source: {
+        align: 'left',
+        color: '#fff',
+        content: 'hello',
+        fontFamily: 'Example',
+        fontRef: { contentHash: 'a'.repeat(64), family: 'Example', id: 'font-1', label: 'Example Regular' },
+        fontSize: 24,
+        fontWeight: 400,
+        lineHeight: 1.2,
+        type: 'text',
+      },
+    };
+    let state = withCanvasLayers(createInitialWorkbenchState(), [createRasterLayer('text')]);
+    expect(versions(state)).toEqual([3, 3]);
+
+    state = workbenchReducer(state, { layer: text, layerId: 'text', type: 'replaceCanvasLayer' });
+    expect(versions(state)).toEqual([4, 4]);
   });
 });

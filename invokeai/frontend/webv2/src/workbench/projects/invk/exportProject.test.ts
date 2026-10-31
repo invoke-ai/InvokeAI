@@ -9,7 +9,7 @@ vi.mock('@platform/transport/http', async (importOriginal) => ({
 
 import { INVK_MAX_ARCHIVE_BYTES, readArchive, readEntryText } from './archive';
 import { executeInvkExport, planInvkExport } from './exportProject';
-import { INVK_DOCUMENT_ENTRY, INVK_MANIFEST_ENTRY } from './format';
+import { INVK_DOCUMENT_ENTRY, INVK_MANIFEST_ENTRY, INVK_WORKSPACE_ENTRY } from './format';
 
 const imageRef = (imageName: string) => ({ height: 64, imageName, width: 64 });
 
@@ -40,8 +40,10 @@ const planInput = {
   boards: [{ archived: false, isInbox: true, items: [], name: 'My project' }],
   createdAt: '2026-08-04T00:00:00.000Z',
   minimumCanvasSchemaVersion: 3,
+  content: projectDocument(),
+  documentSchemaVersion: 4,
   name: 'My project',
-  projectDocument: projectDocument(),
+  workspace: null,
 };
 
 /** The names a plan will fetch, in the union's stable order. */
@@ -68,7 +70,7 @@ describe('planInvkExport', () => {
   it('writes a document carrying no gallery selection', () => {
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         widgetInstances: {
           'gallery-1': {
@@ -85,8 +87,29 @@ describe('planInvkExport', () => {
     expect(plannedNames(plan)).toEqual(['live-a.png', 'live-b.png']);
   });
 
+  it('carries the workspace, and the media only it names, only when it is included', () => {
+    const workspace = {
+      canvas: { selectedLayerId: null, stagingArea: { images: [imageRef('staged.png')] } },
+      layout: {},
+      widgetInstances: {
+        'gallery-1': { state: { values: { recentImages: [imageRef('recent.png')] } }, typeId: 'gallery' },
+      },
+    };
+
+    const included = planInvkExport({ ...planInput, workspace });
+    const left = planInvkExport(planInput);
+
+    expect(plannedNames(included)).toEqual(['live-a.png', 'live-b.png', 'staged.png']);
+    expect(JSON.parse(included.workspaceJson!)).toMatchObject({ canvas: workspace.canvas });
+    // The newest result is the workspace's to show; without it the cover is the canvas's.
+    expect(included.coverImageName).toBe('recent.png');
+    expect(plannedNames(left)).toEqual(['live-a.png', 'live-b.png']);
+    expect(left.workspaceJson).toBeNull();
+    expect(left.coverImageName).toBe('live-a.png');
+  });
+
   it('omits the source project id when the document has none', () => {
-    const plan = planInvkExport({ ...planInput, projectDocument: { canvas: {}, layout: {}, name: 'x' } });
+    const plan = planInvkExport({ ...planInput, content: { canvas: {}, layout: {}, name: 'x' } });
 
     expect(plan.manifestInput.sourceProjectId).toBeUndefined();
     expect(plannedNames(plan)).toEqual([]);
@@ -136,9 +159,10 @@ describe('executeInvkExport', () => {
       contents: 'workbench-project',
       cover: 'cover.webp',
       name: 'My project',
+      documentSchemaVersion: 4,
       minimumCanvasSchemaVersion: 3,
       sourceProjectId: 'project-1',
-      version: 2,
+      version: 3,
     });
     expect(JSON.parse(readEntryText(entries.get(INVK_DOCUMENT_ENTRY)!))).toEqual(projectDocument());
   });
@@ -176,10 +200,26 @@ describe('executeInvkExport', () => {
     expect(result.boardItemIssues).toEqual([]);
   });
 
+  it('writes the workspace beside the content when it is included', async () => {
+    const download = vi.fn();
+    const workspace = { canvas: { selectedLayerId: null }, layout: { mode: 'kept' } };
+
+    await executeInvkExport(planInvkExport({ ...planInput, workspace }), {
+      download,
+      fetchImageBytes: () => Promise.resolve(null),
+      fetchImageThumbnail: () => Promise.resolve(null),
+    });
+
+    const [blob] = download.mock.calls[0]! as [Blob];
+    const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
+
+    expect(JSON.parse(readEntryText(entries.get(INVK_WORKSPACE_ENTRY)!))).toEqual(workspace);
+  });
+
   it('omits the cover entry when there is no cover to fetch', async () => {
     const download = vi.fn();
 
-    await executeInvkExport(planInvkExport({ ...planInput, projectDocument: { id: 'p', layout: {}, name: 'n' } }), {
+    await executeInvkExport(planInvkExport({ ...planInput, content: { id: 'p', layout: {}, name: 'n' } }), {
       download,
       fetchImageBytes: () => Promise.resolve(null),
       fetchImageThumbnail: () => Promise.resolve(null),
@@ -197,7 +237,7 @@ describe('executeInvkExport', () => {
     const download = vi.fn();
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
       },
@@ -236,7 +276,7 @@ describe('executeInvkExport', () => {
   it('skips a video the server will not serve, exactly as it skips an image', async () => {
     const plan = planInvkExport({
       ...planInput,
-      projectDocument: {
+      content: {
         ...projectDocument(),
         projectGraph: { nodes: [{ data: { inputs: { video: { video_name: 'clip.mp4' } } }, id: 'n' }] },
       },

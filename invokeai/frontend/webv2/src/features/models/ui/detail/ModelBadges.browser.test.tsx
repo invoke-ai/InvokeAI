@@ -16,12 +16,15 @@ const UPDATED_BASES = new Set([
   'sd-2',
   'sdxl-refiner',
   'flux2',
+  'flux3',
   'z-image',
   'ideogram-4',
   'krea-2',
   'wan',
   'minimax-h3',
   'ltx-2',
+  'qwen-image-2-1',
+  'moss-image',
 ]);
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 

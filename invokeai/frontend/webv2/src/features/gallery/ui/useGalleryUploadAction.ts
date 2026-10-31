@@ -1,14 +1,27 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import {
+  ALL_READABLE_BOARDS_ID,
   classifyGalleryUpload,
   compareGalleryItems,
   legacyGeneratedImageToGalleryItem,
 } from '@features/gallery/core/items';
-import { isDateBoardId, uploadGalleryImage, uploadGalleryVideo } from '@features/gallery/data/backend';
-import { invalidateGallery } from '@features/gallery/data/queryCache';
+import {
+  isDateBoardId,
+  isInvalidGalleryBoardDestination,
+  uploadGalleryImage,
+  uploadGalleryVideo,
+} from '@features/gallery/data/backend';
+import {
+  canAddToCachedGalleryBoard,
+  ensureGalleryBoardDestinations,
+  getCachedGalleryBoard,
+  invalidateGallery,
+  invalidateGalleryBoardDestinations,
+} from '@features/gallery/data/queryCache';
 import { createLogger } from '@platform/logging/logger';
 import {
   assertAccountScopeCurrent,
@@ -25,6 +38,8 @@ import type { GalleryActions } from './GalleryWidgetContext';
 import { useGalleryHost, useOptionalGalleryUi } from './GalleryUiContext';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+/** A real board's id: not Uncategorized and not a virtual board, which hold no uploads. */
+const isGalleryBoardId = (boardId: string): boolean => boardId !== 'none' && !isInvalidGalleryBoardDestination(boardId);
 const uploadLogger = createLogger({ area: 'upload', namespace: 'gallery' });
 
 export const useGalleryUploadAction = ({
@@ -38,7 +53,11 @@ export const useGalleryUploadAction = ({
    * the selection alone, as hosts without a workbench must.
    */
   getCurrentGalleryLocation?: () => { galleryView: GalleryView; selectedBoardId: string };
-  /** A getter is read when the upload starts, for hosts that must not re-render on board changes. */
+  /**
+   * A getter is read when the upload starts and, when it names a real board, once more after the listing of every
+   * readable board is ensured, the second reading deciding: for hosts that resolve the board from that listing or
+   * must not re-render on board changes.
+   */
   selectedBoardId: string | (() => string);
 }): GalleryActions['uploadFiles'] => {
   const { notifications } = useGalleryHost();
@@ -49,8 +68,30 @@ export const useGalleryUploadAction = ({
   return useCallback(
     async (files) => {
       const owner = captureAccountScope();
-      const selectedBoardId =
+      const readSelectedBoardId = () =>
         typeof selectedBoardIdOrGetter === 'function' ? selectedBoardIdOrGetter() : selectedBoardIdOrGetter;
+      let selectedBoardId = readSelectedBoardId();
+
+      // A search of every board has no board of its own to upload to; Uncategorized would be a guess.
+      if (selectedBoardId === ALL_READABLE_BOARDS_ID) {
+        notifications.reportError({
+          area: 'gallery-upload',
+          message: t('widgets.gallery.uploadsUnavailableForAllBoards'),
+          namespace: 'gallery',
+        });
+        return [];
+      }
+
+      // A board is judged from the listing of every readable board, never trusted as given: an upload to a board
+      // that was deleted, archived out of reach or shared read-only since the panel listed it would only fail.
+      // Uncategorized and virtual boards need no listing.
+      if (isGalleryBoardId(selectedBoardId)) {
+        await ensureGalleryBoardDestinations(queryClient);
+        if (!isAccountScopeCurrent(owner)) {
+          return [];
+        }
+        selectedBoardId = readSelectedBoardId();
+      }
 
       if (isDateBoardId(selectedBoardId)) {
         notifications.reportError({
@@ -81,15 +122,35 @@ export const useGalleryUploadAction = ({
       const targetBoardName = selectedBoard
         ? getGalleryBoardLabel(selectedBoard, t)
         : t('widgets.gallery.uncategorized');
+
+      // Refused before any upload: the server would refuse each file, leaving nothing but errors. The reason comes
+      // from the listing that decided, not the panel's older view of the board. The listing is read again at once,
+      // so the panel stops offering the board and the next upload is judged afresh.
+      if (isGalleryBoardId(selectedBoardId) && !canAddToCachedGalleryBoard(selectedBoardId, queryClient)) {
+        const cachedBoard = getCachedGalleryBoard(selectedBoardId, queryClient);
+        const cachedBoardName = cachedBoard ? getGalleryBoardLabel(cachedBoard, t) : targetBoardName;
+
+        notifications.reportError({
+          area: 'gallery-upload',
+          message:
+            cachedBoard && !canOnBoard(cachedBoard, 'add_media')
+              ? t('widgets.gallery.uploadsUnavailableForViewOnlyBoard', { name: cachedBoardName })
+              : cachedBoard || selectedBoard
+                ? t('widgets.gallery.uploadsUnavailableForBoard', { name: cachedBoardName })
+                : t('widgets.gallery.uploadsUnavailableForUnlistedBoard'),
+          namespace: 'gallery',
+        });
+        void invalidateGalleryBoardDestinations(queryClient, owner);
+        return [];
+      }
       const formatImageCount = (count: number) => t('widgets.gallery.imageCount', { count });
       const formatVideoCount = (count: number) => t('widgets.gallery.videoCount', { count });
       const recordError = (error: unknown) =>
         notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
 
       try {
-        // Only a board known to be virtual is demoted; an id the (possibly
-        // narrower or still-loading) list does not name is trusted as given.
-        const targetBoardId = selectedBoard && selectedBoard.kind !== 'board' ? 'none' : selectedBoardId;
+        // A virtual board holds no uploads; a real board was judged above.
+        const targetBoardId = isGalleryBoardId(selectedBoardId) ? selectedBoardId : 'none';
         const imageUploads = accepted.filter((upload) => upload.kind === 'image');
         const videoUploads = accepted.filter((upload) => upload.kind === 'video');
         const imageResultsPromise = Promise.allSettled(
@@ -147,6 +208,10 @@ export const useGalleryUploadAction = ({
           });
         }
 
+        // What landed is listed; a board that refused a file leaves the listing's view of it stale. Either way the
+        // gallery, boards included, reads again.
+        void invalidateGallery(queryClient);
+
         if (uploadedItems.length === 0) {
           const fallback = t('widgets.gallery.uploadFailed', { failed: failedCount });
 
@@ -177,8 +242,6 @@ export const useGalleryUploadAction = ({
         if (newestVisibleUpload) {
           gallery?.selectItem(newestVisibleUpload);
         }
-
-        void invalidateGallery(queryClient);
 
         const summary = t('widgets.gallery.uploadSummary', {
           board: targetBoardName,

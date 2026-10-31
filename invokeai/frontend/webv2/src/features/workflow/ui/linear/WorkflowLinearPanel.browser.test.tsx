@@ -6,7 +6,7 @@ import type { ProjectGraphAction } from '@features/workflow/utility';
 import { ChakraProvider } from '@chakra-ui/react';
 import { useDroppable } from '@dnd-kit/core';
 import { WorkflowUiProvider } from '@features/workflow/react';
-import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act, useCallback, useMemo, useState } from 'react';
@@ -250,7 +250,7 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const content = chrome?.lastElementChild;
 
     if (!(content instanceof HTMLElement)) {
-      throw new Error(`card content not found for "${title}"`);
+      throw new TypeError(`card content not found for "${title}"`);
     }
 
     return content;
@@ -728,5 +728,239 @@ describe('Workflow form empty states', () => {
     );
     expect([...host.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Add form element']);
     expect(overflowingElements()).toEqual([]);
+  });
+});
+
+describe('Form builder field settings', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.width = '480px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const renderBuilder = async (fieldName = 'steps') => {
+    const node = buildInvocationNode(entryTemplate, { x: 0, y: 0 });
+    let latest = projectGraphReducer(createProjectGraph('form-settings-test'), { node, type: 'addNode' });
+
+    latest = projectGraphReducer(latest, {
+      fieldIdentifier: { fieldName, nodeId: node.id },
+      type: 'exposeField',
+    });
+
+    const Harness = () => {
+      const [projectGraph, setProjectGraph] = useState(latest);
+      const editGraph = useCallback((action: ProjectGraphAction) => {
+        setProjectGraph((current) => {
+          latest = projectGraphReducer(current, action);
+
+          return latest;
+        });
+      }, []);
+      const adapter = useMemo(
+        () =>
+          ({
+            commands: { editGraph, redo: () => undefined, undo: () => undefined },
+            project: TEST_PROJECT_PORT,
+            widgets: { open: () => undefined, patchValues: () => undefined },
+          }) as unknown as WorkflowUiAdapter,
+        [editGraph]
+      );
+
+      return (
+        <I18nextProvider i18n={i18n}>
+          <WorkflowUiProvider adapter={adapter}>
+            <FormBuilderTab projectGraph={projectGraph} />
+          </WorkflowUiProvider>
+        </I18nextProvider>
+      );
+    };
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <Harness />
+        </ChakraProvider>
+      );
+    });
+
+    const storedSettings = () => {
+      const element = Object.values(latest.form.elements).find((candidate) => candidate.type === 'node-field');
+
+      return element?.type === 'node-field' ? element.data.settings : undefined;
+    };
+
+    return { storedSettings };
+  };
+
+  it('keeps both authored bounds while they are inverted and warns instead of dropping one', async () => {
+    const { storedSettings } = await renderBuilder();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+
+    const maxInput = document.querySelector<HTMLInputElement>(
+      `input[aria-label="${i18n.t('widgets.workflow.formBuilder.maximum')}"]`
+    )!;
+    const minInput = document.querySelector<HTMLInputElement>(
+      `input[aria-label="${i18n.t('widgets.workflow.formBuilder.minimum')}"]`
+    )!;
+
+    await userEvent.fill(maxInput, '5');
+    expect(storedSettings()).toMatchObject({ max: 5, type: 'integer-field-config' });
+
+    await userEvent.fill(minInput, '10');
+    expect(storedSettings()).toMatchObject({ max: 5, min: 10 });
+    expect(document.body.textContent).toContain(i18n.t('widgets.workflow.formBuilder.invertedBounds'));
+    expect(maxInput.value).toBe('5');
+
+    await userEvent.fill(minInput, '1');
+    expect(storedSettings()).toMatchObject({ max: 5, min: 1 });
+    expect(document.body.textContent).not.toContain(i18n.t('widgets.workflow.formBuilder.invertedBounds'));
+  });
+
+  it('warns that a slider has no track until its bounds admit a step multiple', async () => {
+    const { storedSettings } = await renderBuilder();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+
+    const sliderOption = Array.from(document.querySelectorAll<HTMLElement>('[data-part="item"]')).find(
+      (item) => item.textContent === i18n.t('widgets.workflow.formBuilder.controlSlider')
+    )!;
+    const boundInput = (key: 'maximum' | 'minimum' | 'step') =>
+      document.querySelector<HTMLInputElement>(`input[aria-label="${i18n.t(`widgets.workflow.formBuilder.${key}`)}"]`)!;
+    // Typed into the focused element: a locator for "Step" also matches the exposed "Steps" field by label.
+    const fillBound = async (key: 'maximum' | 'minimum' | 'step', value: string) => {
+      boundInput(key).focus();
+      await userEvent.keyboard(`{Control>}a{/Control}${value}`);
+    };
+    const hint = i18n.t('widgets.workflow.formBuilder.sliderNeedsBounds');
+
+    await userEvent.click(sliderOption);
+    expect(storedSettings()).toMatchObject({ component: 'slider' });
+    // The integer template has no bounds of its own.
+    expect(document.body.textContent).toContain(hint);
+
+    await fillBound('minimum', '1');
+    await fillBound('maximum', '8');
+    await fillBound('step', '8');
+    // 1…8 holds the single multiple 8: a value, but nothing for a track to move between.
+    expect(document.body.textContent).toContain(hint);
+
+    await fillBound('maximum', '16');
+    expect(storedSettings()).toMatchObject({ max: 16, min: 1, step: 8 });
+    expect(document.body.textContent).not.toContain(hint);
+  });
+
+  it('warns a number input too when its bounds leave no multiple of the step', async () => {
+    const { storedSettings } = await renderBuilder();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+
+    const fillBound = async (key: 'maximum' | 'minimum' | 'step', value: string) => {
+      document
+        .querySelector<HTMLInputElement>(`input[aria-label="${i18n.t(`widgets.workflow.formBuilder.${key}`)}"]`)!
+        .focus();
+      await userEvent.keyboard(`{Control>}a{/Control}${value}`);
+    };
+    const warning = i18n.t('widgets.workflow.formBuilder.noValidValue');
+
+    await fillBound('minimum', '1');
+    await fillBound('maximum', '7');
+    await fillBound('step', '8');
+    // 1…7 holds no multiple of 8, so every value fails validation whichever control shows the field.
+    expect(storedSettings()).toMatchObject({ component: 'number-input', max: 7, min: 1, step: 8 });
+    expect(document.body.textContent).toContain(warning);
+    // Announced as it appears, and read with the bound being edited.
+    const description = document.getElementById(document.activeElement?.getAttribute('aria-describedby') ?? '');
+    expect(description?.textContent).toBe(warning);
+    expect(description?.getAttribute('aria-live')).toBe('polite');
+
+    await fillBound('maximum', '8');
+    expect(document.body.textContent).not.toContain(warning);
+  });
+
+  it('offers Shuffle only while the authored bounds and step leave a value to shuffle to', async () => {
+    await renderBuilder();
+    const shuffleButton = () =>
+      host.querySelector(`button[aria-label="${i18n.t('nodes.shuffleField', { label: 'Steps' })}"]`);
+    const fillBound = async (key: 'maximum' | 'minimum' | 'step', value: string) => {
+      document
+        .querySelector<HTMLInputElement>(`input[aria-label="${i18n.t(`widgets.workflow.formBuilder.${key}`)}"]`)!
+        .focus();
+      await userEvent.keyboard(`{Control>}a{/Control}${value}`);
+    };
+
+    await userEvent.click(host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.showShuffle')}"]`)!);
+    expect(shuffleButton()).not.toBeNull();
+
+    await userEvent.click(
+      host.querySelector(`[aria-label="${i18n.t('widgets.workflow.formBuilder.fieldSettings')}"]`)!
+    );
+    await fillBound('minimum', '1');
+    await fillBound('maximum', '7');
+    await fillBound('step', '8');
+    // 1…7 holds no multiple of 8: a shuffle could only write a value the node rejects.
+    expect(shuffleButton()).toBeNull();
+
+    await fillBound('maximum', '8');
+    expect(shuffleButton()).not.toBeNull();
+  });
+
+  it('authors dropdown options and offers exactly those on the form', async () => {
+    const { storedSettings } = await renderBuilder('prompt');
+    const formBuilder = (key: string, index?: number) => i18n.t(`widgets.workflow.formBuilder.${key}`, { index });
+    const byLabel = <T extends HTMLElement>(label: string) => document.querySelector<T>(`[aria-label="${label}"]`)!;
+
+    await userEvent.click(host.querySelector(`[aria-label="${formBuilder('fieldSettings')}"]`)!);
+    await userEvent.click(
+      Array.from(document.querySelectorAll<HTMLElement>('[data-part="item"]')).find(
+        (item) => item.textContent === formBuilder('controlDropdown')
+      )!
+    );
+    expect(document.body.textContent).toContain(formBuilder('noOptions'));
+
+    await userEvent.click(
+      Array.from(document.querySelectorAll('button')).find((button) => button.textContent === formBuilder('addOption'))!
+    );
+    await userEvent.click(
+      Array.from(document.querySelectorAll('button')).find((button) => button.textContent === formBuilder('addOption'))!
+    );
+    await userEvent.fill(byLabel<HTMLInputElement>(formBuilder('optionLabel', 1)), 'Fast');
+    await userEvent.fill(byLabel<HTMLInputElement>(formBuilder('optionValue', 1)), 'fast');
+    await userEvent.fill(byLabel<HTMLInputElement>(formBuilder('optionLabel', 2)), 'Slow');
+    await userEvent.fill(byLabel<HTMLInputElement>(formBuilder('optionValue', 2)), 'slow');
+    expect(storedSettings()).toMatchObject({
+      component: 'dropdown',
+      options: [
+        { label: 'Fast', value: 'fast' },
+        { label: 'Slow', value: 'slow' },
+      ],
+    });
+
+    await userEvent.click(byLabel(formBuilder('removeOption', 1)));
+    expect(storedSettings()).toMatchObject({ options: [{ label: 'Slow', value: 'slow' }] });
+    expect(byLabel<HTMLInputElement>(formBuilder('optionLabel', 1)).value).toBe('Slow');
+
+    await userEvent.keyboard('{Escape}');
+    await act(() => userEvent.click(host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]')!));
+    expect(
+      Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]')).map(
+        (item) => item.textContent
+      )
+    ).toEqual(['Slow']);
   });
 });

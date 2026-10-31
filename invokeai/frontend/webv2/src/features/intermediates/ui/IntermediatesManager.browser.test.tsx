@@ -88,6 +88,7 @@ const forceAffectedDocuments: IntermediatesPreview['affectedDocuments'] = [
   { ...documentOf('alice'), kind: 'project', name: 'Portraits', ownerId: 'p1', references: 2 },
   { ...documentOf('alice'), kind: 'client_state', name: null, ownerId: 'canvas', references: 1 },
   { ...documentOf('alice'), kind: 'quarantined_project', name: 'Old sketch', ownerId: 'q1', references: 1 },
+  { ...documentOf('alice'), kind: 'project_workspace', name: 'Portraits', ownerId: 'p1', references: 3 },
   { ...documentOf('bob'), kind: 'client_state', name: null, ownerId: 'canvas', references: 1 },
 ];
 
@@ -531,6 +532,7 @@ describe('IntermediatesManager', () => {
     const { activeOperationStore } = await import('@features/intermediates/data/operationStore');
     const dialog = await openForceDialogReadyToConfirm();
     expect(dialog.textContent).toContain('intermediates.dialog.affectedQuarantinedProject(count=1,name=Old sketch)');
+    expect(dialog.textContent).toContain('intermediates.dialog.affectedProjectWorkspace(count=3,name=Portraits)');
     expect(dialog.textContent).toContain('intermediates.dialog.forceWarningOwn');
     dependencies.startIntermediatesOperation.mockRejectedValueOnce(new ApiError('Server error', 500));
 

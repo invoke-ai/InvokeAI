@@ -6,6 +6,7 @@ import { Badge, Flex, Text } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity';
+import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { GripHorizontalIcon } from 'lucide-react';
@@ -51,6 +52,8 @@ interface PreviewFrameProps {
   frameWidth: number;
   /** Keep the last denoise frame until source decoding completes, then notify onSourceLoaded. */
   holdSource?: StreamingImageSource | null;
+  /** A settled image failed to load. */
+  onSourceError?: () => void;
   onSourceLoaded?: (src: string) => void;
   /** A small, usually cached rendition (the thumbnail) shown until a settled image's full pixels load. */
   placeholderSrc?: string;
@@ -103,6 +106,7 @@ const PreviewImageFrame = ({
   isLive,
   loupeControlsRef,
   onContextMenu,
+  onSourceError,
   onSourceLoaded,
   onZoomChange,
   padding,
@@ -236,6 +240,13 @@ const PreviewImageFrame = ({
     },
     [holdSource, onSourceLoaded, placeholderSrc]
   );
+  const handleSourceError = useCallback(
+    (event: SyntheticEvent<HTMLImageElement>) => {
+      handleSourceSettled(event);
+      onSourceError?.();
+    },
+    [handleSourceSettled, onSourceError]
+  );
   // A hold arriving after the image already decoded (a cached image, or the
   // element reused across a source swap) would never see a load event.
   useEffect(() => {
@@ -290,7 +301,7 @@ const PreviewImageFrame = ({
         src={source.src}
         style={isHolding ? heldImageStyle : imageStyle}
         width={frameWidth}
-        onError={handleSourceSettled}
+        onError={handleSourceError}
         onLoad={handleSourceSettled}
       />
       {/* The hidden finished image keeps the frame's geometry; the held frame
@@ -461,10 +472,8 @@ const PreviewVideo = ({
   );
   const copyCurrentFrame = useCallback(async (): Promise<PreviewVideoFrameCopyResult> => {
     const video = videoRef.current;
-    const clipboardItem = globalThis.ClipboardItem;
-    const write = navigator.clipboard?.write?.bind(navigator.clipboard);
 
-    if (!clipboardItem || !write) {
+    if (!canCopyImage()) {
       return { ok: false, reason: 'unsupported' };
     }
 
@@ -512,11 +521,8 @@ const PreviewVideo = ({
       return { ok: false, reason: 'stale' };
     }
 
-    let item: ClipboardItem;
-
     try {
-      item = new clipboardItem({ 'image/png': blob });
-      await write([item]);
+      await copyImage(blob);
     } catch {
       return { ok: false, reason: 'clipboard-failed' };
     }
@@ -981,9 +987,7 @@ const isVideoFrameReady = (video: HTMLVideoElement | null): video is HTMLVideoEl
   );
 
 const isVideoFrameCopyAvailable = (video: HTMLVideoElement | null): boolean =>
-  typeof globalThis.ClipboardItem !== 'undefined' &&
-  typeof navigator.clipboard?.write === 'function' &&
-  isVideoFrameReady(video);
+  canCopyImage() && isVideoFrameReady(video);
 
 const encodeCanvasPng = (canvas: HTMLCanvasElement): Promise<Blob | null> =>
   new Promise((resolve, reject) => {

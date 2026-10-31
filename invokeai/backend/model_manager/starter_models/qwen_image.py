@@ -196,3 +196,22 @@ qwen_image_lightning_8step = StarterModel(
     "Settings: Steps=8, CFG=1, Shift Override=3.",
     type=ModelType.LoRA,
 )
+
+# region Qwen Image ControlNet
+qwen_image_fun_controlnet_union = StarterModel(
+    name="Qwen Image ControlNet Union",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union/resolve/main/Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors",
+    description="Unified ControlNet for Qwen Image 2512 supporting Canny, HED, Depth, Pose, MLSD, Scribble and Gray "
+    "control images, plus inpainting. Works best at weights 0.70-0.95. Apache-2.0. ~3.5GB",
+    type=ModelType.ControlNet,
+)
+qwen_image_instantx_controlnet_union = StarterModel(
+    name="Qwen Image InstantX ControlNet Union",
+    base=BaseModelType.QwenImage,
+    source="https://huggingface.co/Comfy-Org/Qwen-Image-InstantX-ControlNets/resolve/main/split_files/controlnet/Qwen-Image-InstantX-ControlNet-Union.safetensors",
+    description="InstantX's ControlNet for Qwen Image supporting Canny, Soft Edge, Depth and Pose control images; "
+    "no inpainting. Trained on the original Qwen Image: on Qwen Image 2512 use weights of about 1.5-2.0. Apache-2.0. "
+    "~3.5GB",
+    type=ModelType.ControlNet,
+)

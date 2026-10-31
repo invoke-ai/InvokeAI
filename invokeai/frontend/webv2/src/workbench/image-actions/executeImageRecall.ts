@@ -9,8 +9,9 @@ import type { ModelConfig } from '@features/models';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { galleryImages } from '@features/gallery';
+import { galleryImages, galleryVideos } from '@features/gallery';
 import {
+  getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getEffectiveReferenceImage,
   hasArchitectureCapabilities,
@@ -18,7 +19,12 @@ import {
   isVaeModelConfig,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
-import { requestWorkflowDocumentLoad } from '@features/workflow/react';
+import {
+  getInvocationTemplatesSnapshot,
+  refreshInvocationTemplates,
+  requestWorkflowDocumentLoad,
+} from '@features/workflow/react';
+import { serializeWorkflowJson } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -35,6 +41,21 @@ import {
   type ImageRecallKind,
   type ImageRecallSkip,
 } from './imageRecall';
+
+const getSkippedRefinerMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
+  const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedRefiner') };
+
+  switch (reason) {
+    case 'ambiguous':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.ambiguous', values);
+    case 'invalid':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.invalid', values);
+    case 'modelUnavailable':
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.modelUnavailable', values);
+    default:
+      return t('widgets.gallery.itemActions.recall.skippedRefiner.unresolved', values);
+  }
+};
 
 const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
   const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedConcept') };
@@ -55,67 +76,6 @@ const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunctio
   }
 };
 
-/**
- * Open the workflow editor before requesting replacement with the image's embedded graph; false means no editor
- * can consume it.
- */
-export const executeLoadImageWorkflow = async ({
-  image,
-  isProjectActive,
-  notifications,
-  openWorkflowEditor,
-  t,
-}: {
-  image: GalleryImage;
-  /** Re-checked after the fetch: a store-resident request must not land on another project's editor. */
-  isProjectActive: () => boolean;
-  notifications: Pick<WorkbenchCommands['notifications'], 'add'>;
-  openWorkflowEditor: () => boolean;
-  t: TFunction;
-}): Promise<void> => {
-  const owner = captureAccountScope();
-
-  try {
-    const { workflow } = await galleryImages.workflow(image.imageName, owner.signal);
-
-    assertAccountScopeCurrent(owner);
-
-    if (!workflow) {
-      notifications.add({ kind: 'info', title: t('widgets.gallery.itemActions.loadWorkflow.missing') });
-      return;
-    }
-
-    if (!isProjectActive()) {
-      return;
-    }
-
-    if (!openWorkflowEditor()) {
-      throw new Error(t('widgets.gallery.itemActions.loadWorkflow.editorUnavailable'));
-    }
-
-    const raw: unknown = JSON.parse(workflow);
-    const name =
-      typeof raw === 'object' && raw !== null && typeof (raw as { name?: unknown }).name === 'string'
-        ? (raw as { name: string }).name
-        : '';
-
-    requestWorkflowDocumentLoad(
-      raw,
-      t('widgets.gallery.itemActions.loadWorkflow.loadedLabel', { name: name || image.imageName })
-    );
-  } catch (error) {
-    if (!isAccountScopeCurrent(owner)) {
-      return;
-    }
-
-    notifications.add({
-      kind: 'error',
-      message: toErrorMessage(error),
-      title: t('widgets.gallery.itemActions.loadWorkflow.failed'),
-    });
-  }
-};
-
 const imageMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
 
 registerAccountOwnedResource({
@@ -126,6 +86,125 @@ registerAccountOwnedResource({
 });
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+export interface WorkflowMediaRef {
+  kind: 'image' | 'video';
+  /** The image or video name the backend stores the embedded workflow under. */
+  name: string;
+}
+
+const fetchEmbeddedWorkflow = (media: WorkflowMediaRef, signal: AbortSignal) =>
+  media.kind === 'image' ? galleryImages.workflow(media.name, signal) : galleryVideos.workflow(media.name, signal);
+
+/**
+ * Load the media's authored workflow, or reconstruct its generation graph, then open the workflow editor. False
+ * from `openWorkflowEditor` means no editor can consume the load request.
+ */
+export const executeLoadMediaWorkflow = async ({
+  isProjectActive,
+  media,
+  notifications,
+  openWorkflowEditor,
+  t,
+}: {
+  /** Re-checked after the fetch: a store-resident request must not land on another project's editor. */
+  isProjectActive: () => boolean;
+  media: WorkflowMediaRef;
+  notifications: Pick<WorkbenchCommands['notifications'], 'add'>;
+  openWorkflowEditor: () => boolean;
+  t: TFunction;
+}): Promise<void> => {
+  const owner = captureAccountScope();
+  const suffix = media.kind === 'video' ? 'Video' : '';
+
+  try {
+    const { workflow, graph } = await fetchEmbeddedWorkflow(media, owner.signal);
+
+    assertAccountScopeCurrent(owner);
+
+    if (!isProjectActive()) {
+      return;
+    }
+
+    if (!workflow && !graph) {
+      notifications.add({ kind: 'info', title: t(`widgets.gallery.itemActions.loadWorkflow.missing${suffix}`) });
+      return;
+    }
+
+    let raw: unknown;
+
+    if (workflow) {
+      raw = JSON.parse(workflow);
+    } else {
+      const { storedGraphToDocument } = await import('@features/workflow/preview');
+
+      assertAccountScopeCurrent(owner);
+
+      if (!isProjectActive()) {
+        return;
+      }
+
+      if (getInvocationTemplatesSnapshot().status !== 'loaded') {
+        await refreshInvocationTemplates();
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      if (!isProjectActive()) {
+        return;
+      }
+
+      const snapshot = getInvocationTemplatesSnapshot();
+
+      if (snapshot.status !== 'loaded') {
+        throw new Error(snapshot.error || t('graphPreview.editInEditorFailed'));
+      }
+
+      const { document, skippedNodeTypes } = storedGraphToDocument(JSON.parse(graph!), snapshot.templates);
+
+      if (document.nodes.length === 0) {
+        throw new Error(t('graphPreview.editInEditorFailed'));
+      }
+
+      raw = serializeWorkflowJson(document);
+
+      if (skippedNodeTypes.length > 0) {
+        notifications.add({
+          kind: 'info',
+          title: t('graphPreview.nodesSkipped', { count: skippedNodeTypes.length, types: skippedNodeTypes.join(', ') }),
+        });
+      }
+    }
+
+    if (!isProjectActive()) {
+      return;
+    }
+
+    if (!openWorkflowEditor()) {
+      throw new Error(t('widgets.gallery.itemActions.loadWorkflow.editorUnavailable'));
+    }
+
+    const name =
+      typeof raw === 'object' && raw !== null && typeof (raw as { name?: unknown }).name === 'string'
+        ? (raw as { name: string }).name
+        : '';
+
+    requestWorkflowDocumentLoad(
+      raw,
+      t(`widgets.gallery.itemActions.loadWorkflow.loadedLabel${suffix}`, { name: name || media.name })
+    );
+  } catch (error) {
+    if (!isAccountScopeCurrent(owner)) {
+      return;
+    }
+
+    notifications.add({
+      kind: 'error',
+      message: toErrorMessage(error),
+      title: t(`widgets.gallery.itemActions.loadWorkflow.failed${suffix}`),
+    });
+  }
+};
 
 const loadImageMetadata = (imageName: string, owner: AccountScope): Promise<unknown> => {
   const cachedRequest = imageMetadataRequests.get(imageName);
@@ -217,6 +296,7 @@ export const executeImageRecall = async ({
   generateValues,
   getGenerateValues,
   image,
+  isCanvasFrame,
   kind,
   models,
   owner: callerOwner,
@@ -227,6 +307,8 @@ export const executeImageRecall = async ({
   generateValues: Record<string, unknown>;
   getGenerateValues?: () => Record<string, unknown>;
   image: GalleryImage;
+  /** The project's route is Canvas, whose frame the Generate size is. */
+  isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   models: ModelConfig[];
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
@@ -271,6 +353,7 @@ export const executeImageRecall = async ({
     const result = buildImageRecallSettings({
       currentValues: currentGenerateValues,
       image,
+      isCanvasFrame,
       kind,
       metadata,
       models,
@@ -287,21 +370,34 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    if (result.fields.includes('referenceImages')) {
+    // An empty recalled list clears the current references; there is nothing to check for it.
+    if (result.fields.includes('referenceImages') && result.values.referenceImages.length > 0) {
       result.values.referenceImages = await filterAvailableReferenceImages(result.values.referenceImages, owner.signal);
       assertAccountScopeCurrent(owner);
 
+      // Every recorded reference was deleted: keep the current ones, fitted to the recalled model as an unrecorded list
+      // would be, rather than clearing them as if the record listed none.
       if (result.values.referenceImages.length === 0) {
+        result.values.referenceImages = getCompatibleReferenceImages(
+          currentGenerateValues.referenceImages,
+          result.values.model,
+          models
+        );
         result.fields = result.fields.filter((field) => field !== 'referenceImages');
       }
     }
 
-    const skipMessage =
-      result.skipped.length > 0
+    const skippedConcepts = result.skipped.filter((skipped) => skipped.subject === 'concept');
+    const skippedRefiner = result.skipped.find((skipped) => skipped.subject === 'refiner');
+    const skipMessages = [
+      skippedConcepts.length > 0
         ? t('widgets.gallery.itemActions.recall.conceptsNotRestored', {
-            concepts: result.skipped.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
+            concepts: skippedConcepts.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
           })
-        : null;
+        : null,
+      skippedRefiner ? getSkippedRefinerMessage(skippedRefiner, t) : null,
+    ].filter((message) => message !== null);
+    const skipMessage = skipMessages.length > 0 ? skipMessages.join(' ') : null;
 
     if (result.fields.length === 0) {
       commands.notifications.add({

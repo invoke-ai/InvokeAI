@@ -18,6 +18,7 @@ from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.text_encoder.anima_text_encoder import AnimaTextEncoderInvocation
 from invokeai.backend.anima.semantic_connector import QWEN35_LAYER_INDICES
+from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, ConditioningFieldData
 
 
@@ -25,6 +26,7 @@ class _Loaded:
     def __init__(self, model, compute_device=torch.device("cpu")):
         self.model = model
         self.compute_device = compute_device
+        self.config = SimpleNamespace(format=ModelFormat.Checkpoint)
 
     @contextmanager
     def model_on_device(self, working_mem_bytes=None):
@@ -75,11 +77,16 @@ def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer
     assert mask.tolist() == [True, True, True]
 
 
-def test_the_prompt_node_does_not_import_transformers_qwen3_5_at_startup() -> None:
-    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it."""
+@pytest.mark.platform_independent
+def test_the_qwen3_5_prompt_nodes_do_not_import_transformers_qwen3_5_at_startup() -> None:
+    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it.
+
+    Anima's and MOSS-Image's prompt nodes share the one cold interpreter this needs.
+    """
     program = (
         "import sys\n"
         "import invokeai.app.invocations.text_encoder.anima_text_encoder\n"
+        "import invokeai.app.invocations.text_encoder.moss_image_text_encoder\n"
         "loaded = [m for m in sys.modules if m.startswith('transformers.models.qwen3_5')]\n"
         "assert not loaded, loaded\n"
         "print('OK')\n"

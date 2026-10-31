@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => ({
   closeProject: vi.fn<() => ProjectCommandResult>(() => ({ ok: true })),
   conflict: undefined as
     | { detectedAt: string; kind: 'deleted' }
-    | { detectedAt: string; kind: 'revision'; serverRevision: number }
+    | { detectedAt: string; half?: 'workspace'; kind: 'revision'; serverRevision: number }
     | undefined,
   createProject: vi.fn(),
   deleteRecoverableDraft: vi.fn(() => Promise.resolve()),
@@ -50,15 +50,18 @@ vi.mock('@platform/browser/downloadBlob', () => ({ downloadText: harness.downloa
 // it closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
   ConfirmDialog: ({
+    body,
     isOpen,
     onClose,
     onConfirm,
   }: {
+    body: string;
     isOpen: boolean;
     onClose(): void;
     onConfirm(): Promise<void> | void;
   }) => (
     <div data-open={String(isOpen)} data-testid="resolution-dialog">
+      {isOpen ? <p>{body}</p> : null}
       {isOpen ? (
         <button
           data-testid="confirm-resolution"
@@ -215,6 +218,27 @@ describe('ProjectConflictBanner', () => {
     expect(harness.replaceProjectFromServer).toHaveBeenCalledWith({ project: serverProject, projectId: 'project-1' });
     expect(harness.replaceProjectFromServer.mock.invocationCallOrder[0]).toBeLessThan(
       harness.acknowledgeProjectResolution.mock.invocationCallOrder[0]!
+    );
+  });
+
+  it('says a conflict of the caller’s settings keeps their project edits when they take the server’s', async () => {
+    harness.conflict = {
+      detectedAt: '2026-09-03T12:00:00.000Z',
+      half: 'workspace',
+      kind: 'revision',
+      serverRevision: 2,
+    };
+    await renderBanner();
+
+    expect(document.body.textContent).toContain('shell.projectConflict.workspaceRevisionTitle');
+    expect(document.body.textContent).not.toContain('shell.projectConflict.revisionTitle');
+    const useServer = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'shell.projectConflict.useServer'
+    );
+    await act(() => userEvent.click(useServer!));
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('shell.projectConflict.workspaceUseServerConfirmBody')
     );
   });
 

@@ -30,6 +30,7 @@ from invokeai.backend.architectures.facets.features import (
 from invokeai.backend.architectures.facets.latent_space import (
     LatentSpace,
     LatentSpaceFacet,
+    latent_space_with_channels,
     resolve_latent_space,
 )
 from invokeai.backend.architectures.facets.modality import (
@@ -89,6 +90,7 @@ __all__ = [
     "generation_modes",
     "get_max_unet_downscale",
     "get_variant_enum",
+    "latent_space_with_channels",
     "resolve_default_settings",
     "resolve_latent_space",
     "defs_module_path",

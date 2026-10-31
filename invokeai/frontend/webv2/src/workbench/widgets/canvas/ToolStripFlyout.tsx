@@ -1,12 +1,14 @@
 import type { KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from 'react';
 
-import { Box, Icon, Menu, Portal, useMenu } from '@chakra-ui/react';
+import { Box, Icon, Menu, Portal, Stack, Text, useMenu } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
-import { useCallback, useRef } from 'react';
+import { formatHotkeyForPlatform, formatHotkeyLabel, isHotkeyPress } from '@workbench/hotkeys/keys';
+import { useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 const HOLD_OPEN_MS = 350;
 const TOOLTIP_POSITIONING = { placement: 'right' } as const;
@@ -18,8 +20,10 @@ export interface ToolFlyoutItem {
   id: string;
   icon: React.ElementType;
   label: string;
-  /** The subtool's effective hotkey, already formatted for the platform. */
-  shortcut?: readonly string[];
+  /** The subtool's effective bindings, remaps included. The first shows as the entry's keycaps. */
+  hotkeys?: readonly string[];
+  /** One help line the slot's tooltip shows under its title while this subtool is current. */
+  description?: string;
 }
 
 const isOverElement = (element: Element, event: ReactPointerEvent): boolean => {
@@ -65,6 +69,7 @@ export const ToolFamilyButton = ({
 }) => {
   // The menu anchors to, and returns focus to, the element carrying the trigger id: the slot, through its tooltip.
   // The slot is not a `Menu.Trigger`, whose click would open the menu instead of selecting the current subtool.
+  const { t } = useTranslation();
   const ids = useTooltipTriggerIds();
   const menuMachine = useMenu({ ids, positioning: MENU_POSITIONING });
   const menu = menuMachine.api;
@@ -207,9 +212,47 @@ export const ToolFamilyButton = ({
       if (event.key === 'ArrowLeft') {
         event.preventDefault();
         menu.setOpen(false);
+        return;
+      }
+      // An open menu keeps unmodified keys from the workbench hotkeys, so the keycaps an entry shows are honoured
+      // here: the entry's binding chooses it, as a click would, instead of moving the typeahead highlight.
+      if (disabled) {
+        return;
+      }
+      const item = items.find((candidate) =>
+        candidate.hotkeys?.some((hotkey) => isHotkeyPress(event.nativeEvent, hotkey))
+      );
+      if (item) {
+        event.preventDefault();
+        // A modified binding also resolves as a workbench hotkey on window; the menu has already handled it.
+        event.stopPropagation();
+        onSelectSubtool(item.id);
+        menu.setOpen(false);
       }
     },
-    [menu]
+    [disabled, items, menu, onSelectSubtool]
+  );
+
+  // The title names the slot with the current subtool's first effective binding; its help line follows.
+  const current = items.find((item) => item.id === currentId);
+  const currentHotkey = current?.hotkeys?.[0];
+  const description = current?.description;
+  const title = currentHotkey
+    ? t('widgets.canvas.tools.withHotkey', { hotkey: formatHotkeyLabel(currentHotkey), label })
+    : label;
+  const tooltip = useMemo(
+    () =>
+      description ? (
+        <Stack gap="0.5" maxW="16rem">
+          <Text>{title}</Text>
+          <Text color="fg.muted" fontSize="sm">
+            {description}
+          </Text>
+        </Stack>
+      ) : (
+        title
+      ),
+    [description, title]
   );
 
   return (
@@ -217,7 +260,7 @@ export const ToolFamilyButton = ({
       {/* Forcing `open={false}` (not `disabled`) suppresses the tooltip while
           the menu is open: the disabled path unwraps the trigger and remounts
           the button, dropping pointer capture mid-hold. */}
-      <Tooltip content={label} ids={ids} open={menu.open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
+      <Tooltip content={tooltip} ids={ids} open={menu.open ? false : undefined} positioning={TOOLTIP_POSITIONING}>
         <IconButton
           aria-controls={menu.open ? menu.getContentProps().id : undefined}
           aria-expanded={menu.open}
@@ -259,9 +302,9 @@ export const ToolFamilyButton = ({
                   <Menu.ItemIndicator />
                   <Icon as={item.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
                   <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>
-                  {item.shortcut && item.shortcut.length > 0 ? (
+                  {item.hotkeys?.[0] ? (
                     <Menu.ItemCommand>
-                      <ShortcutKeycaps parts={item.shortcut} />
+                      <ShortcutKeycaps parts={formatHotkeyForPlatform(item.hotkeys[0])} />
                     </Menu.ItemCommand>
                   ) : null}
                 </Menu.RadioItem>

@@ -14,11 +14,11 @@ import {
   isFlux2DiffusersSourceForModel,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isNonAnimaQwen3Encoder,
   isSelfContainedSDNQFlux1Pipeline,
   isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
   isVaeCompatibleWithGenerateModel,
+  isZImageQwen3Encoder,
   type GenerateComponentCandidate,
 } from './componentCompatibility';
 
@@ -96,14 +96,15 @@ describe('Generate component compatibility', () => {
     ).toBe(false);
   });
 
-  it('separates Anima Qwen3 0.6B encoders from other Qwen3 encoders', () => {
+  it('gives Anima the Qwen3 0.6B encoder and Z-Image only the 4B one', () => {
     const qwen06b = candidate({ variant: 'qwen3_06b' });
     const qwen4b = candidate({ variant: 'qwen3_4b' });
+    const qwen8b = candidate({ variant: 'qwen3_8b' });
 
-    expect(isAnimaQwen3Encoder(qwen06b)).toBe(true);
-    expect(isAnimaQwen3Encoder(qwen4b)).toBe(false);
-    expect(isNonAnimaQwen3Encoder(qwen06b)).toBe(false);
-    expect(isNonAnimaQwen3Encoder(qwen4b)).toBe(true);
+    expect([qwen06b, qwen4b, qwen8b].map(isAnimaQwen3Encoder)).toEqual([true, false, false]);
+    // The 8B encoder is 4096 wide; Z-Image's caption embedder takes 2560.
+    expect([qwen06b, qwen4b, qwen8b].map(isZImageQwen3Encoder)).toEqual([false, true, false]);
+    expect(isZImageQwen3Encoder(candidate({ type: 'qwen3_vl_encoder', variant: 'qwen3_4b' }))).toBe(false);
   });
 
   it('matches FLUX.2 Klein models to compatible Qwen3 encoder variants', () => {
@@ -112,6 +113,15 @@ describe('Generate component compatibility', () => {
     expect(filter(candidate({ variant: 'qwen3_8b' }))).toBe(true);
     expect(filter(candidate({ variant: 'qwen3_4b' }))).toBe(false);
     expect(filter(candidate({ variant: 'qwen3_06b' }))).toBe(false);
+  });
+
+  it('lets a FLUX.2 Klein model of unknown size take either Klein encoder but never the Anima one', () => {
+    const filter = isFlux2Qwen3EncoderForModel(flux2Model('klein_unknown'));
+
+    expect(filter(candidate({ variant: 'qwen3_4b' }))).toBe(true);
+    expect(filter(candidate({ variant: 'qwen3_8b' }))).toBe(true);
+    expect(filter(candidate({ variant: 'qwen3_06b' }))).toBe(false);
+    expect(filter(candidate({ type: 'mistral_encoder', variant: 'qwen3_8b' }))).toBe(false);
   });
 
   it('matches FLUX.2 component sources by shared Qwen3 encoder variant', () => {

@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
@@ -65,6 +65,8 @@ export interface GalleryItemsFilter {
   /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
   createdTo?: string;
   galleryView: GalleryView;
+  /** Only this media kind; absent lists both. Applies to ordinary and semantic listings alike. */
+  mediaKind?: GalleryItemKind;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   /**
@@ -82,6 +84,8 @@ export interface CanonicalGalleryItemsFilter {
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
+  /** Present only when restricted, so unrestricted keys match those from before the field existed. */
+  mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   /** Label-free semantic reference: a file query is keyed by its registry id. */
@@ -137,6 +141,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     return {
       boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
+      ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
       orderDir: 'DESC',
       searchTerm: '',
       semantic,
@@ -148,6 +153,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
     ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
     galleryView: filter.galleryView,
+    ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
     orderDir: filter.orderDir ?? 'DESC',
     searchTerm: filter.searchTerm.trim(),
     ...(filter.starred !== undefined ? { starred: filter.starred } : {}),
@@ -201,6 +207,9 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
+  /** What a video's context menu can offer (recall, embedded workflow), read from its record when opened. */
+  videoMenuCapabilities: (owner: AccountScope, videoName: string | null) =>
+    [...galleryKeys.itemsRoot(), 'menu-capabilities', getAccountKey(owner), videoName] as const,
 };
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
@@ -208,7 +217,12 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
     queryFn: async ({ signal }) => {
       const requestSignal = AbortSignal.any([signal, owner.signal]);
       const result = await (filter.semantic
-        ? listSemanticGalleryItemNames({ boardId: filter.boardId, query: filter.semantic, signal: requestSignal })
+        ? listSemanticGalleryItemNames({
+            boardId: filter.boardId,
+            mediaKind: filter.mediaKind,
+            query: filter.semantic,
+            signal: requestSignal,
+          })
         : isDateBoardId(filter.boardId)
           ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
           : listGalleryItemNames({ ...filter, signal: requestSignal }));
@@ -245,6 +259,7 @@ interface PendingPageFetch<T> {
 }
 
 interface GalleryPageLifecycle {
+  pageReadFreshness: WeakMap<object, boolean>;
   lastUse: WeakMap<Query, number>;
   nextUse: number;
   queue: PendingPageFetch<unknown>[];
@@ -286,6 +301,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   }
 
   const lifecycle: GalleryPageLifecycle = {
+    pageReadFreshness: new WeakMap(),
     lastUse: new WeakMap(),
     nextUse: 0,
     queue: [],
@@ -346,6 +362,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   seedExistingPages();
   lifecycle.unsubscribe = client.getQueryCache().subscribe((event) => {
     if (event.type === 'removed') {
+      lifecycle.pageReadFreshness.delete(event.query);
       return;
     }
 
@@ -353,6 +370,16 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
 
     if (!identity) {
       return;
+    }
+
+    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated
+    // page as fresh, including when cancellation restores the state captured by one of those manual writes.
+    if (event.type === 'updated') {
+      if (event.query.state.isInvalidated || event.action.type === 'error') {
+        lifecycle.pageReadFreshness.set(event.query, false);
+      } else if (event.action.type === 'success' && !event.action.manual) {
+        lifecycle.pageReadFreshness.set(event.query, true);
+      }
     }
 
     // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
@@ -383,6 +410,25 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   lifecycles.set(client, lifecycle);
 
   return lifecycle;
+};
+
+/** A successful page read remains authoritative through local patches, but only another read ends invalidation. */
+export const getFreshGalleryItemsPage = (client: QueryClient, queryHash: string): GalleryItemsPage | undefined => {
+  const query = client.getQueryCache().get<GalleryItemsPage>(queryHash);
+
+  return query &&
+    query.state.status === 'success' &&
+    !query.state.isInvalidated &&
+    lifecycles.get(client)?.pageReadFreshness.get(query) === true
+    ? query.state.data
+    : undefined;
+};
+
+/** Manual or unobserved cache seeds are unknown, not suspended; only an invalidation or failure requires a reread. */
+export const isGalleryItemsPageAwaitingRefresh = (client: QueryClient, queryHash: string): boolean => {
+  const query = client.getQueryCache().get(queryHash);
+
+  return query !== undefined && lifecycles.get(client)?.pageReadFreshness.get(query) === false;
 };
 
 const schedulePageFetch = <T>(

@@ -80,6 +80,52 @@ export const loraDefaultSettingsSchema = z
 
 export type LoraDefaultSettingsFormValues = z.infer<typeof loraDefaultSettingsSchema>;
 
+const optionalPositiveInteger = (label: string) =>
+  z
+    .number({ message: `${label} must be a number.` })
+    .int(`${label} must be a whole number.`)
+    .positive(`${label} must be greater than 0.`)
+    .nullable();
+
+/**
+ * The hosted-provider record editor. Null numbers mean "not limited" / "no default"; the modes are flags so the
+ * draft store compares flat values.
+ */
+export const externalModelSchema = z
+  .object({
+    providerId: trimmed.min(1, 'Provider is required.'),
+    providerModelId: trimmed.min(1, 'Provider model ID is required.'),
+    modeTxt2img: z.boolean(),
+    modeImg2img: z.boolean(),
+    modeInpaint: z.boolean(),
+    supportsSeed: z.boolean(),
+    supportsReferenceImages: z.boolean(),
+    supportsNegativePrompt: z.boolean(),
+    maxImagesPerRequest: optionalPositiveInteger('Images per request'),
+    maxReferenceImages: optionalPositiveInteger('Reference images'),
+    maxImageWidth: optionalPositiveInteger('Max width'),
+    maxImageHeight: optionalPositiveInteger('Max height'),
+    defaultWidth: optionalPositiveInteger('Default width'),
+    defaultHeight: optionalPositiveInteger('Default height'),
+    defaultNumImages: optionalPositiveInteger('Default image count'),
+  })
+  .superRefine((values, context) => {
+    if (!values.modeTxt2img && !values.modeImg2img && !values.modeInpaint) {
+      context.addIssue({ code: 'custom', message: 'Choose at least one supported mode.', path: ['modeTxt2img'] });
+    }
+
+    // The backend's max size is one object with both sides.
+    if ((values.maxImageWidth === null) !== (values.maxImageHeight === null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Set both a max width and a max height, or neither.',
+        path: [values.maxImageWidth === null ? 'maxImageWidth' : 'maxImageHeight'],
+      });
+    }
+  });
+
+export type ExternalModelFormValues = z.infer<typeof externalModelSchema>;
+
 /** POSIX (/x), Windows drive (C:\ or C:/), or UNC (\\server) — the shapes in-place installs record. */
 export const isAbsoluteModelPath = (path: string): boolean =>
   path.startsWith('/') || path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(path);
@@ -91,6 +137,37 @@ export const isAbsoluteModelPath = (path: string): boolean =>
  */
 export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
   isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
+
+/**
+ * One spelling per local path, for comparing paths the server reports in different forms: scan rows carry OS-native
+ * separators while install records store forward slashes. Trims, turns `\` into `/`, drops trailing slashes, and
+ * case-folds Windows drive and UNC paths only, since POSIX file systems are case-sensitive.
+ */
+export const canonicalLocalPath = (path: string): string => {
+  const canonical = path.trim().replaceAll('\\', '/').replace(/\/+$/, '');
+
+  return /^([A-Za-z]:(\/|$)|\/\/)/.test(canonical) ? canonical.toLowerCase() : canonical;
+};
+
+/**
+ * Whether `path` is the models directory or inside it. The comparison is textual — the server reports the directory
+ * resolved, so a symlinked or `~` spelling of it does not match, and a path with `..` segments never does. Windows
+ * drive and UNC paths compare case-insensitively.
+ */
+export const isInModelsDir = (path: string, modelsDir: string | null): boolean => {
+  if (!modelsDir) {
+    return false;
+  }
+
+  const dir = canonicalLocalPath(modelsDir);
+  const candidate = canonicalLocalPath(path);
+
+  if (/(^|\/)\.\.(\/|$)/.test(candidate)) {
+    return false;
+  }
+
+  return dir !== '' && (candidate === dir || candidate.startsWith(`${dir}/`));
+};
 
 /**
  * Replacement path for a relocated model. Only absolute paths are accepted:

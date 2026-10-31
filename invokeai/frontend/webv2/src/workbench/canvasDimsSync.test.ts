@@ -9,11 +9,17 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
-import { type CanvasDimsSnapshot, createCanvasDimsSync, reconcileCanvasDims } from './canvasDimsSync';
+import {
+  type CanvasDimsSnapshot,
+  createCanvasDimsSync,
+  reconcileCanvasDims,
+  resetGenerateDims,
+  resizeBboxAroundCentre,
+} from './canvasDimsSync';
 import { getProjectWidgetValues } from './widgetState';
 import { createWorkbenchStore } from './workbenchStore';
 
@@ -254,6 +260,7 @@ const setupCanvasStore = () => {
           store.commands.generation.patchSettings(...args);
         },
       },
+      widgets: store.commands.widgets,
     },
     getState: store.getState,
     subscribe: store.subscribe,
@@ -263,6 +270,82 @@ const setupCanvasStore = () => {
 
   return { getSyncDispatches: () => syncDispatches, store, sync };
 };
+
+describe('resizeBboxAroundCentre (pure)', () => {
+  it('keeps the centre of the frame', () => {
+    // Centre (516, 708); a 1024 square around it starts at (4, 196).
+    expect(resizeBboxAroundCentre(bbox(832, 1216, 100, 100), { height: 1024, width: 1024 })).toEqual(
+      bbox(1024, 1024, 4, 196)
+    );
+  });
+
+  it('rounds a half-pixel offset from an odd size difference to whole pixels', () => {
+    // 10 + (513 - 512) / 2 = 10.5 and 20 + (512 - 515) / 2 = 18.5.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 10, 20), { height: 515, width: 512 })).toEqual(bbox(512, 515, 11, 19));
+    // -0.5 rounds to zero, not negative zero.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 0, 0), { height: 512, width: 514 }).x).toBe(0);
+  });
+});
+
+describe('resetGenerateDims (wiring)', () => {
+  seedArchitectureCapabilities();
+
+  const SQUARE_RESET = {
+    aspectRatioId: '1:1',
+    aspectRatioIsLocked: true,
+    aspectRatioValue: 1,
+    height: 1024,
+    width: 1024,
+  } as const;
+
+  it('resizes the canvas frame around its centre with system writes only, then settles', () => {
+    const { store, sync } = setupCanvasStore();
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    resetGenerateDims(store, SQUARE_RESET);
+
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
+    expect(nextBbox).toEqual({ height: 1024, width: 1024, x: 4, y: 196 });
+    expect(values).toMatchObject(SQUARE_RESET);
+    expect(store.getState().projects[0]?.invocation.sourceId).toBe('canvas');
+    // Frame writes stay out of canvas history.
+    expect(apply.mock.calls.length).toBeGreaterThan(0);
+    for (const call of apply.mock.calls) {
+      expect(call[2]).toBe('system');
+    }
+
+    // Frame and size now agree, so the next reconciliation writes nothing.
+    apply.mockClear();
+    store.commands.generation.patchSettings({ steps: 31 });
+    expect(apply).not.toHaveBeenCalled();
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 1024, x: 4, y: 196 });
+
+    // A later size edit keeps the top-left as before.
+    store.commands.generation.patchSettings({ width: 512 });
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 512, x: 4, y: 196 });
+    sync.dispose();
+  });
+
+  it('changes only the fields when the project is not generating into the canvas', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('generate');
+    store.commands.generation.toggleSourceLock();
+    store.commands.generation.patchSettings({ height: 1216, model, modelKey: model.key, width: 832 });
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const sync = createCanvasDimsSync(store);
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    resetGenerateDims(store, SQUARE_RESET);
+
+    expect(getActiveGenerate(store.getState())).toMatchObject({
+      bbox: { height: 1216, width: 832, x: 100, y: 100 },
+      values: SQUARE_RESET,
+    });
+    expect(apply).not.toHaveBeenCalled();
+    sync.dispose();
+  });
+});
 
 describe('createCanvasDimsSync (wiring)', () => {
   seedArchitectureCapabilities();
@@ -408,6 +491,7 @@ describe('createCanvasDimsSync (wiring)', () => {
             store.commands.generation.patchSettings(...args);
           },
         },
+        widgets: store.commands.widgets,
       },
       getState: store.getState,
       subscribe: store.subscribe,
@@ -470,6 +554,7 @@ describe('createCanvasDimsSync before the capability table arrives', () => {
             store.commands.generation.patchSettings(...args);
           },
         },
+        widgets: store.commands.widgets,
       },
       getState: store.getState,
       subscribe: store.subscribe,
@@ -536,5 +621,175 @@ describe('createCanvasDimsSync before the capability table arrives', () => {
     setArchitectureCapabilities(architectureCapabilitiesFixture);
 
     expect(getSyncDispatches()).toBe(0);
+  });
+});
+
+describe('createCanvasDimsSync (manual render size)', () => {
+  seedArchitectureCapabilities();
+
+  const getRenderSize = (store: ReturnType<typeof createWorkbenchStore>) => {
+    const state = store.getState();
+    const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
+    const { scaledHeight, scaledWidth } = project ? getProjectWidgetValues(project, 'canvas') : {};
+    return { height: scaledHeight, width: scaledWidth };
+  };
+
+  /** A canvas project whose frame is locked to 3:2 and renders at a custom 1536x1024 (1,572,864 px). */
+  const setupLockedCustom = () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('canvas');
+    dispatchCanvas(store, { bbox: { height: 832, width: 1248, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    store.commands.generation.patchSettings({
+      aspectRatioId: '3:2',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 3 / 2,
+      height: 832,
+      model,
+      modelKey: model.key,
+      width: 1248,
+    });
+    const sync = createCanvasDimsSync(store);
+    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
+    return { store, sync };
+  };
+
+  it('keeps a custom size that already holds the locked ratio', () => {
+    const { store, sync } = setupLockedCustom();
+
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+    sync.dispose();
+  });
+
+  it('reshapes the custom size to a newly chosen ratio at about the same area', () => {
+    const { store, sync } = setupLockedCustom();
+
+    store.commands.generation.patchSettings({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 16 / 9,
+      height: 768,
+      width: 1360,
+    });
+
+    // sqrt(1,572,864 × 16/9) ≈ 1672.2 wide and 940.6 tall, each to the nearest multiple of 8.
+    expect(getRenderSize(store)).toEqual({ height: 944, width: 1672 });
+    sync.dispose();
+  });
+
+  it('turns the custom size with the frame when width and height swap', () => {
+    const { store, sync } = setupLockedCustom();
+
+    store.commands.generation.patchSettings({
+      aspectRatioId: '2:3',
+      aspectRatioValue: 2 / 3,
+      height: 1248,
+      width: 832,
+    });
+
+    expect(getRenderSize(store)).toEqual({ height: 1536, width: 1024 });
+    sync.dispose();
+  });
+
+  it('follows a bbox resize while the ratio is locked', () => {
+    const { store, sync } = setupLockedCustom();
+
+    dispatchCanvas(store, { bbox: { height: 700, width: 1000, x: 0, y: 0 }, type: 'setCanvasBbox' });
+
+    // The bbox's 10:7 at the same area: ≈ 1499.0 × 1049.3.
+    expect(getRenderSize(store)).toEqual({ height: 1048, width: 1496 });
+    sync.dispose();
+  });
+
+  it('fits the custom size to the ratio when the lock engages', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('canvas');
+    dispatchCanvas(store, { bbox: { height: 800, width: 1040, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    store.commands.generation.patchSettings({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
+      aspectRatioValue: 1.3,
+      height: 800,
+      model,
+      modelKey: model.key,
+      width: 1040,
+    });
+    const sync = createCanvasDimsSync(store);
+    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
+
+    store.commands.generation.patchSettings({ aspectRatioIsLocked: true });
+
+    // 1.3 at the same area: ≈ 1429.9 × 1099.95.
+    expect(getRenderSize(store)).toEqual({ height: 1096, width: 1432 });
+    sync.dispose();
+  });
+
+  it('fits a remembered custom size to the locked ratio when Custom is chosen again', () => {
+    const { store, sync } = setupLockedCustom();
+    store.commands.widgets.patchValues('canvas', { scaleMethod: 'auto' });
+    store.commands.generation.patchSettings({
+      aspectRatioId: '16:9',
+      aspectRatioValue: 16 / 9,
+      height: 768,
+      width: 1360,
+    });
+    // Auto renders at the frame, so the remembered size waits until Custom is chosen.
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+
+    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual' });
+
+    expect(getRenderSize(store)).toEqual({ height: 944, width: 1672 });
+    sync.dispose();
+  });
+
+  it('leaves the custom size alone while the ratio is free', () => {
+    const { store, sync } = setupLockedCustom();
+    store.commands.generation.patchSettings({ aspectRatioId: 'Free', aspectRatioIsLocked: false });
+
+    store.commands.generation.patchSettings({ aspectRatioValue: 1.3, height: 800, width: 1040 });
+    dispatchCanvas(store, { bbox: { height: 700, width: 1000, x: 0, y: 0 }, type: 'setCanvasBbox' });
+
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+    sync.dispose();
+  });
+
+  it('leaves the custom size alone when a free bbox edit lands on a preset ratio, until the person locks it', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('canvas');
+    dispatchCanvas(store, { bbox: { height: 800, width: 1040, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    store.commands.generation.patchSettings({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
+      aspectRatioValue: 1.3,
+      height: 800,
+      model,
+      modelKey: model.key,
+      width: 1040,
+    });
+    const sync = createCanvasDimsSync(store);
+    store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
+
+    // The frame labels these bboxes 3:2 and 1:1, which the Size section shows as locked; the person never locked them.
+    dispatchCanvas(store, { bbox: { height: 832, width: 1248, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('3:2');
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+    dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
+    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('1:1');
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+
+    // Choosing the 1:1 preset the frame already shows is a new lock at the same ratio.
+    store.commands.generation.patchSettings({ aspectRatioId: '1:1', aspectRatioIsLocked: true, aspectRatioValue: 1 });
+
+    // 1:1 at the same area: sqrt(1,572,864) ≈ 1254.1 per side, to the nearest multiple of 8.
+    expect(getRenderSize(store)).toEqual({ height: 1256, width: 1256 });
+    sync.dispose();
+  });
+
+  it('leaves the custom size alone when the canvas is not the invocation source', () => {
+    const { store, sync } = setupLockedCustom();
+    store.commands.generation.setSource('generate');
+
+    store.commands.generation.patchSettings({ aspectRatioId: '16:9', aspectRatioValue: 16 / 9 });
+
+    expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
+    sync.dispose();
   });
 });
