@@ -16,7 +16,7 @@ from invokeai.app.invocations.model import (
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.architectures import accepted_vae_bases, accepts_vae
-from invokeai.backend.model_manager.qwen3_vl_labels import variant_label as _variant_label
+from invokeai.backend.model_manager.qwen3_vl_labels import raise_for_wrong_qwen3_vl_variant
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -111,15 +111,10 @@ class Krea2ModelLoaderInvocation(BaseInvocation):
             if encoder_config.type is not ModelType.Qwen3VLEncoder:
                 raise ValueError(f"Encoder '{encoder_config.name}' is not a Qwen3-VL encoder compatible with Krea-2.")
             # Two Qwen3-VL encoders install under this type and they are not interchangeable: Krea-2
-            # conditions on the 4B, Ideogram 4 on the 8B. Without this check the 8B loads (~10 GB)
-            # and then fails on a 4096-against-2560 shape error naming a tensor, which says nothing
-            # about what the user picked.
-            encoder_variant = getattr(encoder_config, "variant", None)
-            if encoder_variant is not Qwen3VLVariantType.Qwen3VL_4B:
-                raise ValueError(
-                    f"'{encoder_config.name}' is the Qwen3-VL {_variant_label(encoder_variant)} encoder. "
-                    "Krea-2 conditions on the 4B one (hidden size 2560)."
-                )
+            # conditions on the 4B, Ideogram 4 on the 8B.
+            raise_for_wrong_qwen3_vl_variant(
+                encoder_config.name, getattr(encoder_config, "variant", None), Qwen3VLVariantType.Qwen3VL_4B, "Krea-2"
+            )
             tokenizer = self.qwen3_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.Tokenizer})
             text_encoder = self.qwen3_vl_encoder_model.model_copy(update={"submodel_type": SubModelType.TextEncoder})
         else:

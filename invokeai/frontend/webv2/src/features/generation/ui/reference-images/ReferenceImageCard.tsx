@@ -7,16 +7,26 @@ import type {
 } from '@features/generation/core/types';
 import type { CSSProperties } from 'react';
 
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FindInGalleryButton } from '@features/gallery/mediaSlot';
 import { isStrengthOnlyIPAdapterBase } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { Button, IconButton, toaster, ToggleDot, Tooltip } from '@platform/ui';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CropIcon,
+  ImageIcon,
+  RulerIcon,
+  Trash2Icon,
+} from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatWeight, getModeLabelKey } from './referenceImageConfig';
@@ -49,6 +59,7 @@ const COVER_IMG_STYLE: CSSProperties = {
   objectFit: 'cover',
   width: '100%',
 };
+const PROMPT_TAG_COPIED_MS = 1500;
 const OVERLAY_GRADIENT_STYLE: CSSProperties = {
   background: 'linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent)',
 };
@@ -63,6 +74,8 @@ interface ReferenceImageCardProps {
   onPatch: (id: string, patch: Partial<GenerateReferenceImage>) => void;
   onRemove: (id: string) => void;
   onUseSize: (image: GenerateReferenceImageAsset) => void;
+  /** How the prompt names this reference, for models that address references by tag. */
+  promptTag?: string;
 }
 
 const ReferenceImageCardBase = ({
@@ -73,6 +86,7 @@ const ReferenceImageCardBase = ({
   onPatch,
   onRemove,
   onUseSize,
+  promptTag,
   referenceImage,
   selectedModel,
 }: ReferenceImageCardProps) => {
@@ -179,6 +193,8 @@ const ReferenceImageCardBase = ({
             {title}
           </Text>
         )}
+
+        {promptTag ? <PromptTagButton tag={promptTag} /> : null}
 
         <HStack gap="0.5">
           {/* Array order is conditioning order. */}
@@ -298,6 +314,67 @@ const ReferenceImageCardBase = ({
 };
 
 export const ReferenceImageCard = memo(ReferenceImageCardBase);
+
+const PromptTagButton = ({ tag }: { tag: string }) => {
+  const { t } = useTranslation();
+  const [hasCopied, setHasCopied] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const copyTag = useCallback(() => {
+    copyText(tag)
+      .then(() => {
+        setHasCopied(true);
+        if (resetTimerRef.current !== null) {
+          clearTimeout(resetTimerRef.current);
+        }
+        resetTimerRef.current = setTimeout(() => setHasCopied(false), PROMPT_TAG_COPIED_MS);
+      })
+      .catch(() =>
+        toaster.create({ description: t('common.clipboardBlocked'), title: t('common.couldNotCopy'), type: 'error' })
+      );
+  }, [t, tag]);
+
+  const canCopy = canCopyText();
+  // Without a clipboard the button shows its own tooltip, the reason, so the explanation joins it there rather than
+  // opening a second tooltip; it leaves out the hint's "click to copy", which is untrue then.
+  const unavailableReason = canCopy
+    ? undefined
+    : `${t('widgets.generate.referenceImagePromptTagExplanation', { tag })} ${t('common.copyUnavailable')}`;
+  const button = (
+    <Button
+      aria-label={t('widgets.generate.copyReferenceImagePromptTag', { tag })}
+      color="fg.muted"
+      flexShrink="0"
+      fontFamily="mono"
+      fontWeight="normal"
+      size="xs"
+      unavailableReason={unavailableReason}
+      variant="subtle"
+      onClick={copyTag}
+    >
+      {hasCopied ? <Icon as={CheckIcon} color="green.solid" /> : null}
+      {tag}
+      <VisuallyHidden aria-live="polite">
+        {hasCopied ? t('widgets.generate.referenceImagePromptTagCopied', { tag }) : ''}
+      </VisuallyHidden>
+    </Button>
+  );
+
+  return canCopy ? (
+    <Tooltip content={t('widgets.generate.referenceImagePromptTagHint', { tag })}>{button}</Tooltip>
+  ) : (
+    button
+  );
+};
 
 const ReferenceModelSelector = ({
   config,

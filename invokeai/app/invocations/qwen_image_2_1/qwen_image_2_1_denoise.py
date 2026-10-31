@@ -25,7 +25,6 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata_linked import LatentsMetaOutput
 from invokeai.app.invocations.model import TransformerField
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.app.util.startup_utils import log_attention_backends
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, QwenImage21VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
@@ -476,7 +475,6 @@ class QwenImage21DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_seq_len + max(pos_prefix, neg_prefix or 0),
             dtype,
         )
-        log_attention_backends(logger, device)
 
         total_steps = len(sigmas) - 1
         step_callback = self._step_callback(context)
