@@ -38,7 +38,7 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
         'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
-        'widgets.gallery.uploadSplit': 'Images appear in Assets; videos appear in Media.',
+        'widgets.gallery.uploadSplit': 'Images and videos appear in Uploads.',
         'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
           values?.board
         )}. ${String(values?.failed)} failed.`,
@@ -286,7 +286,7 @@ describe('focused gallery upload action', () => {
     expect(mocks.invalidateGallery).toHaveBeenCalledOnce();
     expect(mocks.notificationsAdd).toHaveBeenCalledWith({
       kind: 'success',
-      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images appear in Assets; videos appear in Media.',
+      message: '2 images and 2 videos uploaded to Board 1. 1 failed. Images and videos appear in Uploads.',
       title: 'Uploaded 4 of 5 files',
     });
     expect(selectItem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'video', name: 'third.mp4' }));
