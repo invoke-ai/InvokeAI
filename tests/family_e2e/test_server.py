@@ -309,6 +309,33 @@ def test_stop_kills_the_server_tree_and_never_a_process_by_its_recorded_pid(tmp_
         unrelated.wait()
 
 
+@pytest.mark.parametrize("failure", ["survives the kill", "kill refused"])
+def test_terminate_raises_while_a_process_of_the_tree_may_still_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    # A process stuck in the GPU driver outlives the kill; it may still write the scratch root.
+    process, job, tree = _spawn_tree(tmp_path)
+
+    def kill(*args: object) -> None:
+        if failure == "kill refused":
+            raise PermissionError(errno.EPERM, "Operation not permitted")
+
+    try:
+        with monkeypatch.context() as m:
+            m.setattr(server, "STOP_TIMEOUT_S", 0.05)
+            m.setattr(server.KillOnCloseJob, "close", kill)
+            if sys.platform != "win32":
+                m.setattr(os, "killpg", kill)
+            with pytest.raises(server.TerminationError) as raised:
+                server.terminate(process, job)
+        if failure == "survives the kill":
+            assert all(str(p.pid) in str(raised.value) for p in tree)
+    finally:
+        for p in tree:
+            p.kill()
+        process.wait()
+
+
 def _gone(process: psutil.Process) -> bool:
     try:
         return process.status() == psutil.STATUS_ZOMBIE

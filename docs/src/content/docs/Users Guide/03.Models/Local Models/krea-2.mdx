@@ -129,11 +129,11 @@ Canvas regional negative prompts, auto-negative, and regional reference images a
 :::caution[Regional prompting memory]
 Regional prompting builds a dense boolean attention mask whose memory grows quadratically with the combined
 text and image token count. Invoke reserves memory for retained masks, construction scratch space, and the
-dtype-sized additive attention bias created by SDPA. Fused memory-efficient attention support for dense masks
-still depends on the GPU, PyTorch build, dtype, and sequence shape. When no fused kernel is available, PyTorch
-falls back to math attention, which may use substantially more VRAM and can cause an out-of-memory error.
-Reducing image resolution or disabling regional prompting is the practical fallback. Automated CUDA coverage
-is skipped on unsupported hardware and cannot exercise every GPU/backend combination.
+dtype-sized additive attention bias created by SDPA. Whether a fused kernel (cuDNN or memory-efficient) accepts
+a dense mask still depends on the GPU, PyTorch build, dtype, and sequence shape. When no fused kernel is
+available, PyTorch falls back to math attention, which may use substantially more VRAM and can cause an
+out-of-memory error. Reducing image resolution or disabling regional prompting is the practical fallback.
+Automated CUDA coverage is skipped on unsupported hardware and cannot exercise every GPU/backend combination.
 :::
 
 ## Style reference
@@ -280,11 +280,16 @@ figures with reference images can mean the LoRA was trained with isolated refere
 
 ## Attention backend
 
-On CUDA, Krea-2 picks the fastest available attention kernel by itself (Flash Attention where the PyTorch
-build has it, then cuDNN, then memory-efficient attention). For benchmarking or support questions you
-can force one kernel with the environment variable `INVOKE_KREA2_SDPA_BACKEND`: `flash`, `cudnn`,
-`efficient` or `math`, or `default` for the automatic order. A forced kernel that the GPU or build does
-not support raises an error instead of quietly falling back, and an unknown value stops InvokeAI at startup.
+Krea-2 uses InvokeAI's attention kernel order, the same as every other model: Flash Attention where the
+PyTorch build has it, then cuDNN, then memory-efficient attention, unless
+[`attention_backend`](/configuration/invokeai-yaml/#attention-kernel) ranks another kernel first. A
+pinned kernel applies to Krea-2 as well: where it does not take Krea-2's grouped-query heads as they are —
+memory-efficient attention does not — InvokeAI expands them so that it can. With `attention_backend: sage`, its
+unmasked attention runs on [SageAttention](/configuration/optimization/sage-attention/) instead. For
+benchmarking or support questions you can force one kernel with the environment variable
+`INVOKE_KREA2_SDPA_BACKEND`: `flash`, `cudnn`, `efficient` or `math`, or `default` for InvokeAI's order.
+A forced kernel that the GPU or build does not support raises an error instead of quietly falling back,
+and an unknown value stops InvokeAI at startup.
 
 Any value, `default` included, also turns on per-step timing in the log, which synchronizes the GPU after
-every step and slows generation slightly. Unset the variable for normal use.
+every step and slows generation slightly, and keeps SageAttention off. Unset the variable for normal use.

@@ -74,6 +74,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -190,6 +191,14 @@ from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_Folder_SD1_Config,
     TI_Folder_SD2_Config,
     TI_Folder_SDXL_Config,
+)
+from invokeai.backend.model_manager.configs.tiny_autoencoder import (
+    TinyAutoencoder_Checkpoint_Flux2_Config,
+    TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_QwenImage21_Config,
+    TinyAutoencoder_Checkpoint_SD1_Config,
+    TinyAutoencoder_Checkpoint_SD3_Config,
+    TinyAutoencoder_Checkpoint_SDXL_Config,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
@@ -502,6 +511,15 @@ AnyModelConfig = Annotated[
         Annotated[PiDDecoder_Checkpoint_SD3_Config, PiDDecoder_Checkpoint_SD3_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_SDXL_Config, PiDDecoder_Checkpoint_SDXL_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_QwenImage_Config, PiDDecoder_Checkpoint_QwenImage_Config.get_tag()],
+        # Tiny AutoEncoder (denoise preview decoder) - checkpoint format
+        Annotated[TinyAutoencoder_Checkpoint_SD1_Config, TinyAutoencoder_Checkpoint_SD1_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_SDXL_Config, TinyAutoencoder_Checkpoint_SDXL_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_SD3_Config, TinyAutoencoder_Checkpoint_SD3_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_FLUX_Config, TinyAutoencoder_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_Flux2_Config, TinyAutoencoder_Checkpoint_Flux2_Config.get_tag()],
+        Annotated[
+            TinyAutoencoder_Checkpoint_QwenImage21_Config, TinyAutoencoder_Checkpoint_QwenImage21_Config.get_tag()
+        ],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -527,6 +545,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_QwenImage21_Config, LoRA_LyCORIS_QwenImage21_Config.get_tag()],
         # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
         # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
         # is mutually exclusive with Wan/Anima regardless of order (locked in by

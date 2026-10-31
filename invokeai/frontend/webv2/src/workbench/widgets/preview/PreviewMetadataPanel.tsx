@@ -119,7 +119,12 @@ const PreviewDetailsQuery = ({
           galleryImages.workflow(item.name, signal),
         ]);
 
-        return { graph: workflow.graph, kind: 'image', metadata, workflow: workflow.workflow };
+        return {
+          graph: workflow.resolved_inputs ?? workflow.graph,
+          kind: 'image',
+          metadata,
+          workflow: workflow.workflow,
+        };
       }
 
       const [metadata, workflow] = await Promise.all([

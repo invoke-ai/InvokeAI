@@ -2,7 +2,7 @@
 geometry it reads off the tensors, the dtype it casts to, and the files it refuses rather than loads wrongly.
 
 Both designs build under `init_empty_weights` and assign the file's tensors, so an fp8 weight with its scale dropped
-would become the parameter as it is (`test_z_image_control_adapter_loader.py`). No quantized build of either is
+would become the parameter as it is (`test_z_image_fun_controlnet_loader.py`). No quantized build of either is
 published (alibaba-pai and Comfy-Org ship dense bf16 files), so refusing costs nothing.
 """
 

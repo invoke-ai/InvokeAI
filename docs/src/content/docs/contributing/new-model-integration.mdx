@@ -1,7 +1,7 @@
 ---
 title: New Model Type Integration Checklist
 description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-10-28
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
@@ -157,7 +157,7 @@ It checks only that the facets are *present*, not that their values are right.
 
 | Facet | Required | What it declares | Read by |
 | --- | --- | --- | --- |
-| `LatentSpaceFacet` | yes | Latent channels, spatial compression, latent→RGB projection | Step previews (`app/util/step_callback.py`) |
+| `LatentSpaceFacet` | yes | Latent channels, spatial compression, latent→RGB projection | Step previews (`app/util/step_callback.py`), and which Tiny AutoEncoder renders them |
 | `ConditioningFacet` | yes | The `*ConditioningInfo` class the text encoder writes | The safe-globals list for conditioning deserialization |
 | `DefaultSettingsFacet` | yes | Steps, CFG or guidance, scheduler and size per variant (`None` is the fallback); optional `by_name_hint` | Stored on the model config at identification; prefills the UI |
 | `ModalityFacet` | yes | Modes (`txt2img`, `img2img`, `inpaint`, `outpaint`, video modes) and `metadata_slug` | Must equal `GENERATION_MODES`; which canvas tools the UI offers |
@@ -638,7 +638,7 @@ Packages are discovered automatically. A directory of node modules without an `_
 - **External noise (optional).** Only if the denoise node accepts a noise tensor: extend `LatentNoiseType` and its shape and grid logic in `invokeai/app/invocations/latent_noise.py`, and extend `noise_type` in `invocations/noise.py`. Validate with `validate_noise_tensor_shape`.
 - **Timestep-dependent conditioning.** Most architectures turn the text embeddings into the transformer's context once, before the loop. If a module between encoder and transformer reads the timestep -- Anima-3.8B's semantic connector does -- the context has to be recomputed at every step, for the positive, the negative and every regional conditioning. Pass the timestep exactly as the reference does: the connector scales sigma by 1000 before embedding it, so it gets a float32 sigma, where bf16's rounding would move its high frequencies by radians. A mask that leaves a query no key (an empty prompt encoded as one masked token) needs a defined result; `masked_sdpa` makes it zero instead of leaving it to the SDPA backend.
 - **Inpainting.** Rectified-flow models use `RectifiedFlowInpaintExtension` (`invokeai/backend/rectified_flow/rectified_flow_inpaint_extension.py`).
-- **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback.
+- **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback. With `tiny_autoencoder_previews` on, the same callback decodes with an installed Tiny AutoEncoder for the space ([Tiny AutoEncoder previews](#tiny-autoencoder-previews)).
 
 ---
 
@@ -905,6 +905,21 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 ### PiD decoding
 
 Declare `PiDDecoderVariantType` in the `VariantFacet`, and extend `configs/pid_decoder.py`, `load/model_loaders/pid_decoder.py` and `backend/pid/decode.py`. In webv2, update `pid.ts` and `pidGraph.ts`.
+
+### Tiny AutoEncoder previews
+
+A Tiny AutoEncoder (TAE) record serves every architecture whose step-callback sample resolves to the same `LatentSpace` object: `latent_space_with_channels(record.base, record.latent_channels) is resolve_latent_space(base, sample)` (`backend/tiny_autoencoder/preview.py`). An architecture that reuses a declared space, as Z-Image reuses `FLUX_16` and ERNIE-Image `FLUX2_32`, gets TAE previews from the existing records with no further work.
+
+A new latent space gets TAE previews only if a TAE exists for it. Then:
+
+- **Config:** a `TinyAutoencoder_Checkpoint_<Base>_Config` in `configs/tiny_autoencoder.py` with its `ARCH`, listed in `_CONFIG_CLASSES` and in `AnyModelConfig` (`configs/factory.py`). If another base's TAE has the same architecture and channel count, both TAEs' published names must be in `_TAE_NAME_PATTERNS`: identification tells them apart only by name.
+- **Loader:** one more `@ModelLoaderRegistry.register(base=..., type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)` on `TinyAutoencoderLoader` (`load/model_loaders/tiny_autoencoder.py`).
+- **Starter:** next to the family's VAE in its starter module, with a pinned `resolve/<sha>` URL and the shared `TINY_AUTOENCODER_NOTE` closing the description; listed in `STARTER_MODELS`, not in a bundle.
+- **Decoder:** a network the vendored code in `backend/tiny_autoencoder/` does not have is vendored there, and `checkpoint.py` learns its fingerprint, so that identification and the loader keep accepting exactly the same files.
+
+The TAE decodes the latent the denoise node hands to the step callback, so check that this is the latent the TAE was trained on, with the same normalization and channel order. The previews must also go through `context.util.sd_step_callback` (or `flux_step_callback`/`flux2_step_callback`); a node that renders its own preview image does not get TAE previews.
+
+Send the first step callback, step 0 included, only once the denoise model is locked (`model_on_device`). The TAE is loaded at the first preview and locked only if it fits next to the models already in VRAM; before the main model is locked, it always fits.
 
 ---
 
