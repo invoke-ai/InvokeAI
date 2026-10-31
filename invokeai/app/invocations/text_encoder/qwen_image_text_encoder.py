@@ -330,6 +330,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             attention_mask=model_inputs.attention_mask,
             pixel_values=getattr(model_inputs, "pixel_values", None),
             image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
+            # Transformers 5 needs the processor's token types to build 3-D positions for image tokens.
+            mm_token_type_ids=getattr(model_inputs, "mm_token_type_ids", None),
             output_hidden_states=True,
         )
 
