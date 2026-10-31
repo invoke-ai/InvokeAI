@@ -427,38 +427,58 @@ describe('resolveInvocationRoute — canvas source', () => {
     ).toBe(true);
   });
 
-  it('measures each visible raster layer against the frame, for a text-only provider on a Canvas route', () => {
-    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
-    let project = getActiveProject(createGenerateValues(textOnly));
-    const raster = (
-      x: number,
-      y: number,
-      overrides: Partial<CanvasRasterLayerContractV2> = {}
-    ): CanvasRasterLayerContractV2 => ({
-      blendMode: 'normal',
-      id: `raster-${x}-${y}`,
-      isEnabled: true,
-      isLocked: false,
-      name: `Raster ${x},${y}`,
-      opacity: 1,
-      source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
-      type: 'raster',
-      ...overrides,
-    });
-    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
-      getInvocationRouteInput({
-        ...project,
-        canvas: {
-          ...project.canvas,
-          document: {
-            ...project.canvas.document,
-            bbox: { height: 100, width: 100, x: 200, y: 0 },
-            stacks: { ...project.canvas.document.stacks, raster: layers },
-          },
+  const textOnlyModel: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+  const raster = (
+    x: number,
+    y: number,
+    overrides: Partial<CanvasRasterLayerContractV2> = {}
+  ): CanvasRasterLayerContractV2 => ({
+    blendMode: 'normal',
+    id: `raster-${x}-${y}`,
+    isEnabled: true,
+    isLocked: false,
+    name: `Raster ${x},${y}`,
+    opacity: 1,
+    source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
+    type: 'raster',
+    ...overrides,
+  });
+  /** A project whose 100×100 frame sits at (200, 0), with these raster layers and this source selected. */
+  const projectWithRaster = (
+    model: GenerateModelConfig,
+    layers: CanvasNodeContract[],
+    sourceId: InvocationRoute['sourceId'] = 'canvas'
+  ) => {
+    const project = getActiveProject(createGenerateValues(model));
+    return {
+      ...project,
+      canvas: {
+        ...project.canvas,
+        document: {
+          ...project.canvas.document,
+          bbox: { height: 100, width: 100, x: 200, y: 0 },
+          stacks: { ...project.canvas.document.stacks, raster: layers },
         },
-        invocation: { ...project.invocation, sourceId },
-      }).canvasRasterInFrame;
+      },
+      invocation: { ...project.invocation, sourceId },
+    };
+  };
+  /**
+   * What the workflow graph preview resolves for its Canvas button: the project's route input with Canvas mounted,
+   * the Canvas source locked over the selected one, in dialog mode.
+   */
+  const resolveCanvasPreview = (project: ReturnType<typeof getActiveProject>) =>
+    resolveInvocationRouteInput(
+      { ...getInvocationRouteInput(project), mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
+      'dialog',
+      { ...project.invocation, sourceId: 'canvas', sourceLocked: true }
+    );
+
+  it('measures each visible raster layer against the frame, for a text-only provider whatever the source', () => {
+    let model: GenerateModelConfig = textOnlyModel;
+    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
+      getInvocationRouteInput(projectWithRaster(model, layers, sourceId)).canvasRasterInFrame;
 
     expect(withRaster([])).toBe(false);
     expect(withRaster([raster(250, 50)])).toBe(true);
@@ -499,10 +519,20 @@ describe('resolveInvocationRoute — canvas source', () => {
       ])
     ).toBe(false);
 
-    // Other routes and other models never measure.
-    expect(withRaster([raster(250, 50)], 'generate')).toBe(false);
-    project = getActiveProject(validGenerateValues);
+    // A graph preview can ask for the Canvas route while Generate is selected, so the source does not matter.
+    expect(withRaster([raster(250, 50)], 'generate')).toBe(true);
+    // Other models never measure.
+    model = animaModel;
     expect(withRaster([raster(250, 50)])).toBe(false);
+  });
+
+  it('refuses a Canvas graph preview for a text-only provider over raster content while Generate is selected', () => {
+    const preview = resolveCanvasPreview(projectWithRaster(textOnlyModel, [raster(250, 50)], 'generate'));
+
+    expect(preview.sourceValid).toBe(false);
+    expect(preview.validationReasons).toEqual([
+      'Unknown External Provider cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
   });
 
   it('invalidates a zero-area generation frame', () => {
@@ -637,14 +667,14 @@ describe('resolveInvocationRoute — canvas source', () => {
       type: 'regional_guidance',
       ...overrides,
     });
-    const inputFor = (
+    const projectFor = (
       model: MainModelConfig,
       overrides: Partial<GenerateWidgetValues>,
       layers: CanvasRegionalGuidanceLayerContract[],
       sourceId: InvocationRoute['sourceId'] = 'canvas'
     ) => {
       const project = getActiveProject(createGenerateValues(model, overrides));
-      return getInvocationRouteInput({
+      return {
         ...project,
         canvas: {
           ...project.canvas,
@@ -655,8 +685,9 @@ describe('resolveInvocationRoute — canvas source', () => {
           },
         },
         invocation: { ...project.invocation, sourceId },
-      });
+      };
     };
+    const inputFor = (...args: Parameters<typeof projectFor>) => getInvocationRouteInput(projectFor(...args));
     const reasonsFor = (
       model: MainModelConfig,
       overrides: Partial<GenerateWidgetValues>,
@@ -720,28 +751,16 @@ describe('resolveInvocationRoute — canvas source', () => {
       ).toBe(true);
     });
 
-    it('measures on a Canvas route only, whatever the model, keeping the input stable', () => {
+    it('measures whatever the model or selected source, keeping the input stable', () => {
       const inside = [region('inside', { x: 300, y: 200 })];
+      const measured = (...args: Parameters<typeof projectFor>) =>
+        inputFor(...args).canvasRegionalLayersInFrame.map((layer) => layer.id);
 
-      expect(inputFor(ideogramModel, {}, inside).canvasRegionalLayersInFrame.map((layer) => layer.id)).toEqual([
-        'inside',
-      ]);
-      expect(inputFor(animaModel, {}, inside).canvasRegionalLayersInFrame.map((layer) => layer.id)).toEqual(['inside']);
-      expect(inputFor(ideogramModel, {}, inside, 'generate').canvasRegionalLayersInFrame).toEqual([]);
+      expect(measured(ideogramModel, {}, inside)).toEqual(['inside']);
+      expect(measured(animaModel, {}, inside)).toEqual(['inside']);
+      expect(measured(ideogramModel, {}, inside, 'generate')).toEqual(['inside']);
 
-      const project = getActiveProject(createGenerateValues(ideogramModel));
-      const withRegions = {
-        ...project,
-        canvas: {
-          ...project.canvas,
-          document: {
-            ...project.canvas.document,
-            bbox: frame,
-            stacks: { ...project.canvas.document.stacks, regional_guidance: inside },
-          },
-        },
-        invocation: { ...project.invocation, sourceId: 'canvas' as const },
-      };
+      const withRegions = projectFor(ideogramModel, {}, inside);
       // Recomputing over the same document yields an equal input, so the stable selector keeps its identity.
       expect(
         areInvocationRouteInputsEqual(getInvocationRouteInput(withRegions), getInvocationRouteInput(withRegions))
@@ -761,6 +780,17 @@ describe('resolveInvocationRoute — canvas source', () => {
           canvasRoute
         ).validationReasons
       ).toEqual([blankPromptReason('Ideogram 4')]);
+    });
+
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('resolves a Canvas graph preview while Generate is selected against the frame: %s', (model, label) => {
+      const previewReasons = (layers: CanvasRegionalGuidanceLayerContract[]) =>
+        resolveCanvasPreview(projectFor(model, { positivePrompt: '' }, layers, 'generate')).validationReasons;
+
+      expect(previewReasons([region('inside', { x: 300, y: 200 })])).toEqual([blankPromptReason(label)]);
+      expect(previewReasons([region('outside', { x: 0, y: 0 })])).toEqual([]);
     });
   });
 

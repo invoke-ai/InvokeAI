@@ -119,14 +119,13 @@ export interface InvocationRouteInput {
   canvasLayers: readonly CanvasLayerContract[];
   /**
    * Whether a visible raster layer's bounds overlap the frame, so a text-only hosted model is blocked before invoke
-   * without reading pixels. Measured only for a Canvas route with such a model; false otherwise.
+   * without reading pixels. Measured only with such a model, whatever the selected source; false otherwise.
    */
   canvasRasterInFrame: boolean;
   /**
    * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a
-   * layout base places around the global prompt. Measured on every Canvas route, whatever the model: which bases
-   * read them is capability data that can arrive after the project, so readiness decides that when it runs. Empty
-   * on other routes.
+   * layout base places around the global prompt. Measured whatever the model: which bases read them is capability
+   * data that can arrive after the project, so readiness decides that when it runs.
    */
   canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
@@ -224,12 +223,11 @@ const getRegionalLayersInFrame = (
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
-  // This runs on every project change, so only a Canvas route measures layers, and raster ones only for the model
-  // they gate.
+  // Canvas facts are measured whatever source is selected: a graph preview resolves the Canvas route from this same
+  // input while another source is. This runs on every project change, over leaves the document index caches; raster
+  // layers are measured only for the model they gate.
   const measuresRaster =
-    project.invocation.sourceId === 'canvas' &&
-    isGenerateModelConfig(generateValues.model) &&
-    isExternalTextOnlyCanvasModel(generateValues.model);
+    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
   const canvasLayers = compileContributingLayers(project.canvas.document);
 
   return {
@@ -238,10 +236,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
       width: project.canvas.document.bbox.width,
     },
     canvasLayers,
-    canvasRegionalLayersInFrame:
-      project.invocation.sourceId === 'canvas'
-        ? getRegionalLayersInFrame(project.canvas.document, canvasLayers)
-        : NO_REGIONAL_LAYERS,
+    canvasRegionalLayersInFrame: getRegionalLayersInFrame(project.canvas.document, canvasLayers),
     canvasRasterInFrame: measuresRaster && hasRasterContentInFrame(project.canvas.document),
     generateValues,
     upscaleValues: getProjectWidgetValues(project, 'upscale'),
