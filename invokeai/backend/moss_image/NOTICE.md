@@ -23,7 +23,9 @@ prompt-enhancer skill, https://github.com/OpenMOSS/MOSS-Image (file
 `LICENSE` is likewise the unmodified Apache-2.0 text. InvokeAI builds the layout items from canvas
 regions instead of compiling a whole draft; the differences are listed in the module docstring.
 `tests/backend/moss_image/test_layout.py` ports expectations from that skill's
-`test_compile_prompt.py`.
+`test_compile_prompt.py`. The seeded "MOSS-Image Prompt Enhancer" system prompt
+(`invokeai/app/services/shared/sqlite_migrator/migrations/migration_2026_10_28_add_moss_image_enhancer_system_prompt.py`)
+is derived from that skill's `SKILL.md` and `references/layout.md` at the same commit, under the same terms.
 
 The remaining modules in this package are original InvokeAI code that drives the vendored model
 in InvokeAI invocations.
