@@ -21,11 +21,11 @@ import {
   isBundledMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
-  isKrea2Qwen3VlEncoder,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
   isModelIdentifierConfig,
+  isQwen3Vl4bEncoder,
   isVaeCompatibleWithGenerateModel,
   isVaeModelConfig,
   isZImageQwen3Encoder,
@@ -190,7 +190,7 @@ const ANIMA_QWEN35_SLOT: UpscaleComponentSlot = {
 };
 // Krea-2 reads the 4B; Ideogram 4's 8B is the same model type and `krea2_model_loader` refuses it.
 const KREA2_QWEN3_VL_SLOT: UpscaleComponentSlot = {
-  accepts: isKrea2Qwen3VlEncoder,
+  accepts: isQwen3Vl4bEncoder,
   field: 'qwen3VlEncoderModel',
   label: 'Qwen3-VL 4B encoder',
 };

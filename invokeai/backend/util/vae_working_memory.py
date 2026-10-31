@@ -120,9 +120,10 @@ def _vae_mid_block_score_matrix_bytes(
 # for it: a line in the output's pixel count per operation and the dtype it runs in, `k_<operation>_<dtype>`
 # bytes per pixel plus `b_<operation>_<dtype>` bytes the process pays whatever the size, shipped per convolution
 # backend and allocator (`platform_for`). The values ship in `backend/working_memory/data/vae.json` with the points
-# they are fitted on (`backend/working_memory/fit.py`); `scripts/calibrate_flux2_working_memory.py --only vae`
-# measures a build against them. Every spec here declares that line (`fit.convolution_line`) and opts in to user
-# calibration (`user_calibrated`), so a calibration run's decode windows refit these lines per device.
+# they are fitted on (`backend/working_memory/fit.py`): calibration runs in a running server measure them on a card,
+# and `scripts/working_memory/build_shipped.py` turns their exports into shipped points. Every spec here declares that
+# line (`fit.convolution_line`) and opts in to user calibration (`user_calibrated`), so a calibration run's decode
+# windows refit these lines per device.
 #
 # None of the three scales out of the line. The demand does not follow the element size: on MIOpen fp16 needs about a
 # third of what bf16 does, and on both backends fp32 needs less per value byte than bf16. The allocator matters as
@@ -602,6 +603,28 @@ VAE_FLUX2_SPEC = register(
         user_calibrated=True,
     )
 )
+
+
+def flux2_vae_attention_materializes(image_tensor: torch.Tensor, vae: AutoencoderKLFlux2, device: torch.device) -> bool:
+    """Whether encoding ``image_tensor`` untiled would materialize the FLUX.2 VAE mid-block's score matrix.
+
+    False on CUDA, where a fused SDPA kernel takes the 512-wide head and the encode stays linear in area; true
+    on ROCm and MPS (see ``estimate_vae_working_memory_flux2``), where the matrix grows with the square of the
+    pixel count and only a tiled encode stays bounded.
+    """
+    seq_len = (image_tensor.shape[-2] // _FLUX2_VAE_SPATIAL_COMPRESSION) * (
+        image_tensor.shape[-1] // _FLUX2_VAE_SPATIAL_COMPRESSION
+    )
+    return (
+        sdpa_score_matrix_bytes(
+            device=device,
+            dtype=next(vae.parameters()).dtype,
+            num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
+            head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
+            seq_len=seq_len,
+        )
+        > 0
+    )
 
 
 def estimate_vae_working_memory_flux2(
