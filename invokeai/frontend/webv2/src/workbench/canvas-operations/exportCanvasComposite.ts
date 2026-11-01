@@ -1,4 +1,6 @@
 import type {
+  AdjustmentRefusal,
+  LayerUnreadable,
   CanvasDocumentCapability,
   CanvasExportCapability,
   CanvasLifecycleCapability,
@@ -9,7 +11,9 @@ export type CanvasCompositeRegion = 'canvas' | 'bbox';
 
 export type ExportCanvasCompositeResult =
   | { status: 'ok'; blob: Blob; rect: Rect }
-  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
+  | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
+  | AdjustmentRefusal;
 
 export type CanvasCompositeExportEngine = {
   readonly document: CanvasDocumentCapability;

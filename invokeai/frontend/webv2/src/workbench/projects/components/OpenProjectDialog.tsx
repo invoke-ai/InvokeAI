@@ -1,4 +1,4 @@
-import type { ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectWithWorkspaceDTO } from '@workbench/projects/api';
 
 import { Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -117,7 +117,7 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
   );
 
   const openImportedProject = useCallback(
-    (record: ProjectRecordDTO) => {
+    (record: ProjectWithWorkspaceDTO) => {
       const result = persistence.adoptProjectRecord(record);
 
       if (result.status === 'loaded') {

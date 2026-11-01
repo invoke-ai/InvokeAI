@@ -35,6 +35,9 @@ on:
 # the run id and never cancel each other. The group names the workflow literally
 # because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
 # several of these at once.
+permissions:
+  contents: read
+
 concurrency:
   group: python-tests-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: true
@@ -51,6 +54,8 @@ jobs:
           - linux-cpu
           - macos-default
           - windows-cpu
+          - windows-ffmpeg
+          - windows-arm64
         include:
           - platform: linux-cpu
             os: blacksmith-4vcpu-ubuntu-2404
@@ -59,26 +64,54 @@ jobs:
             pytest-workers: logical
             timeout-minutes: 30
           - platform: macos-default
-            os: macOS-14
+            os: blacksmith-6vcpu-macos-15
             github-env: $GITHUB_ENV
             pytest-workers: logical
             timeout-minutes: 30
           - platform: windows-cpu
+            os: blacksmith-8vcpu-windows-2025
+            github-env: $env:GITHUB_ENV
+            pytest-workers: logical
+            # This runner is Windows Server 2025 Core, which lacks the Video for Windows DLLs
+            # (AVICAP32, MSVFW32) every standard Windows ffmpeg build links against, so ffmpeg
+            # cannot start here. The `ffmpeg` tests run in windows-ffmpeg instead.
+            # Windows installs linux's dependency set, so a `platform_independent` test cannot fail differently
+            # here than on linux, which runs it. macOS runs a different torch without bitsandbytes and keeps them.
+            pytest-markers: 'not slow and not platform_independent and not ffmpeg'
+            prepare-server-core: true
+            # Job takes 10-15 min (runner prep ~3.5, pytest startup ~2, tests ~5-8); 30 leaves linux's and macOS's room.
+            timeout-minutes: 30
+          - platform: windows-ffmpeg
             os: windows-2022
             github-env: $env:GITHUB_ENV
-            # Half the vCPUs, not one worker each. The tests that spawn helper processes --
-            # ffmpeg decoders, installer subprocesses -- bring their own threads, which the
-            # per-worker `OMP_NUM_THREADS=1` below does not cap, so a full-width run leaves this
-            # runner with no spare core and the deadline-sensitive tests miss their budgets
-            # non-deterministically. Two workers keep that headroom.
+            # Half the vCPUs, not one worker each. The ffmpeg tests spawn decoders and encoders that
+            # bring their own threads, which the per-worker `OMP_NUM_THREADS=1` below does not cap,
+            # so a full-width run leaves this runner with no spare core and the deadline-sensitive
+            # tests miss their budgets non-deterministically. Two workers keep that headroom.
             pytest-workers: '2'
-            # Roughly 1.5x the pytest step's four-worker wall time (~13.5 min), plus the job's
-            # ~1.5 min of checkout and install, plus margin.
-            timeout-minutes: 45
+            pytest-markers: 'not slow and not platform_independent and ffmpeg'
+            # Roughly 1.5x the pytest step's two-worker wall time (~6 min), plus the job's ~1 min
+            # of checkout and install, plus margin.
+            timeout-minutes: 15
+          # Windows on ARM64 (NVIDIA RTX Spark). The lockfile's ARM64 fork is exercised nowhere else:
+          # torch 2.14.0+cu134 from NVIDIA's index (a 1.85 GB wheel, CPU-only on this runner), numpy 2,
+          # onnxruntime 1.31, sentencepiece 0.2.2 and the self-built opencv/blake3/tiktoken wheels. uv
+          # installs an x86_64 CPython on ARM64 Windows unless the request names the architecture.
+          - platform: windows-arm64
+            os: windows-11-arm
+            uv-python: cpython-3.12-windows-aarch64-none
+            github-env: $env:GITHUB_ENV
+            # Two workers for the same reason as windows-ffmpeg. The job also downloads the NVIDIA torch
+            # wheel and builds imageio-ffmpeg from its sdist (~18 min at four workers).
+            pytest-workers: '2'
+            # A per-test timeout turns a hang into a failure with a traceback, so pytest still reaches its summary
+            # inside the job timeout.
+            pytest-args: '--timeout=600'
+            # About 1.6x the slowest measured job (37 min, 31 of them pytest; another run took 28).
+            timeout-minutes: 60
     name: 'py${{ matrix.python-version }}: ${{ matrix.platform }}'
     runs-on: ${{ matrix.os }}
-    # Per platform: expected run time is 8-14 min on linux and macos, longer on windows, which
-    # runs fewer workers. See the matrix.
+    # Per platform: expected run time is 8-14 min on linux and macos. See the matrix for windows.
     timeout-minutes: ${{ matrix.timeout-minutes }}
     env:
       PIP_USE_PEP517: '1'
@@ -90,8 +123,21 @@ jobs:
 
     steps:
       - name: checkout
-        # https://github.com/nschloe/action-cached-lfs-checkout
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: restore LFS cache
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        run: git lfs pull
+        shell: bash
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -127,6 +173,10 @@ jobs:
               - 'invokeai/frontend/webv2/src/features/generation/core/__snapshots__/**'
               - 'invokeai/frontend/webv2/src/features/generation/core/__fixtures__/**'
               - 'invokeai/frontend/webv2/src/features/video/core/__snapshots__/**'
+              - 'invokeai/frontend/webv2/src/features/upscale/core/__snapshots__/**'
+              # test_shared_numerical_fixtures.py checks the Python image adjustments against the
+              # canvas spatial-adjustment kernels' shared fixtures.
+              - 'invokeai/frontend/webv2/src/workbench/canvas-engine/render/spatial/__fixtures__/**'
               # test_ideogram4_frontend_bounds.py reads the Ideogram 4 control bounds from here.
               - 'invokeai/frontend/webv2/src/features/generation/core/settings.ts'
               - 'tests/**'
@@ -136,11 +186,22 @@ jobs:
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
-          enable-cache: true
-          python-version: ${{ matrix.python-version }}
+          # The ARM64 lane's torch wheel unpacks to several GB of binaries; cached per lock hash it would crowd the
+          # other lanes out of the repository's cache, and re-downloading it costs a couple of minutes.
+          enable-cache: ${{ matrix.platform != 'windows-arm64' }}
+          python-version: ${{ matrix.uv-python || matrix.python-version }}
+
+      - name: prepare the ARM64 runner
+        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        # The imageio-ffmpeg sdist bundles no ffmpeg binary; the video tests find one on PATH. Chocolatey's
+        # package is an x64 build, which Windows on ARM runs under emulation.
+        run: |
+          uv run --no-project python -c "import platform, sys; assert platform.machine() == 'ARM64', platform.machine(); print(sys.version)"
+          choco install ffmpeg --version 9.0.2 -y --no-progress
+          ffmpeg -version | Select-Object -First 1
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
@@ -148,13 +209,34 @@ jobs:
           UV_INDEX: ${{ matrix.extra-index-url }}
         run: uv sync --no-progress --locked --extra test
 
+      # Windows Server Core lacks two things the suite imports. The non-headless opencv build needs
+      # Media Foundation at `import cv2`; the feature installs in ~30 s without a reboot. There is
+      # no audio stack either, so `import sounddevice` raises PortAudioError, which mediapipe does
+      # not catch (only ImportError/OSError). Removing the module turns that into the ImportError
+      # mediapipe falls back on. No test needs a real audio device.
+      - name: prepare server core
+        if: ${{ matrix.prepare-server-core && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        run: |
+          $result = Install-WindowsFeature -Name Server-Media-Foundation
+          Write-Output "Success: $($result.Success)  RestartNeeded: $($result.RestartNeeded)"
+          $result.FeatureResult | Format-Table -AutoSize | Out-String | Write-Output
+          if (-not $result.Success) { throw 'Installing Server-Media-Foundation failed' }
+          Remove-Item .venv\Lib\site-packages\sounddevice.py
+          uv run --no-sync python -c "import cv2, mediapipe; print(cv2.__version__, mediapipe.__version__)"
+          if ($LASTEXITCODE -ne 0) { throw 'cv2 or mediapipe still fails to import after preparing the runner' }
+
+      - name: import the self-built and platform-specific wheels
+        if: ${{ matrix.platform == 'windows-arm64' && (steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true) }}
+        # The suite never imports tiktoken, so a broken self-built wheel would otherwise pass unnoticed.
+        run: uv run --no-sync python -c "import blake3, cv2, onnxruntime, tiktoken, torch, torchvision; print(torch.__version__, torchvision.__version__, cv2.__version__, 'cuda available:', torch.cuda.is_available())"
+
       - name: run pytest
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}
         # `logical`, not `auto`: xdist's `auto` asks psutil for *physical* cores, which is half
         # the vCPUs a standard runner exposes. Much of the suite waits on timers and polls, so
         # one worker per vCPU is the right level where the runner has the headroom for it. The
-        # matrix carries the count, because windows needs a lower one.
-        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0
+        # matrix carries the count, because windows-ffmpeg and windows-arm64 need a lower one.
+        run: uv run --no-sync pytest -n ${{ matrix.pytest-workers }} --max-worker-restart=0 -m "${{ matrix.pytest-markers || 'not slow' }}" ${{ matrix.pytest-args }}
 
   # Decides whether the external-database job runs. That job's service containers start before any of its
   # steps, so the decision has to come from a job of its own: otherwise every pull request, frontend-only ones
@@ -168,7 +250,23 @@ jobs:
     steps:
       - name: checkout
         if: ${{ inputs.always_run != true }}
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: restore LFS cache
+        if: ${{ inputs.always_run != true }}
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        if: ${{ inputs.always_run != true }}
+        run: git lfs pull
+        shell: bash
 
       - name: check for changed python files
         if: ${{ inputs.always_run != true }}
@@ -228,10 +326,24 @@ jobs:
 
     steps:
       - name: checkout
-        uses: nschloe/action-cached-lfs-checkout@385a8ecc719e50b8c71af6ab01a624b486b7c3bc
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: restore LFS cache
+        uses: actions/cache@v5
+        with:
+          path: .git/lfs
+          # Checkout leaves LFS pointer files, so their hash is the content key.
+          key: lfs-${{ hashFiles('tests/test_model_probe/stripped_models/**', 'tests/model_identification/stripped_models/**') }}
+          restore-keys: lfs-
+
+      - name: pull LFS files
+        run: git lfs pull
+        shell: bash
 
       - name: setup uv
-        uses: astral-sh/setup-uv@v8.1.0
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
           version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true

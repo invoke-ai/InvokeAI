@@ -39,9 +39,11 @@ const snapshot = (state: WorkbenchState, savedAt = '2026-07-17T00:00:00.000Z'): 
 });
 
 const saveResult = (state: WorkbenchState, savedAt?: string): WorkbenchSaveResult => ({
+  awaitsDecision: false,
   conflicts: [],
   error: null,
   hasPendingChanges: false,
+  hasRetryablePendingChanges: false,
   localDraftStatus: 'ok',
   projectBoardAssignments: [],
   shouldRetry: false,
@@ -102,6 +104,7 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     reportLoadError: (error) => events.push(`load-error:${error}`),
     reportLoadUnavailable: (error) => events.push(`load-unavailable:${error}`),
     saveFailed: (error) => events.push(`save-failed:${error}`),
+    saveNeedsAttention: (savedAt) => events.push(`save-needs-attention:${savedAt}`),
     savePending: (error) => events.push(`save-pending:${error}`),
     saveScheduled: () => events.push('save-scheduled'),
     saveStarted: () => events.push('save-started'),
@@ -149,8 +152,12 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
 const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
   let pending = false;
   let closedSession = false;
+  let unloadWouldLose = false;
+  let unloadAtRisk = false;
   const sessionReopenedListeners = new Set<() => void>();
   const persistence: WorkbenchPersistencePort = {
+    hasChangesUnloadWouldLose: () => unloadWouldLose,
+    isUnloadAtRisk: () => unloadAtRisk,
     hasClosedSession: () => closedSession,
     hasPendingChanges: () => pending,
     journalBeforeUnload: vi.fn(() => ({ kind: 'nothing-to-journal' as const })),
@@ -176,12 +183,27 @@ const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
     setPending(next: boolean) {
       pending = next;
     },
+    /** Local recovery could lose an edit (a project too large for the journal is open, or storage is failing). */
+    setUnloadAtRisk(next: boolean) {
+      unloadAtRisk = next;
+    },
+    /** What local recovery reports after the latest journal: an unsaved document it could not take. */
+    setUnloadWouldLose(next: boolean) {
+      unloadWouldLose = next;
+    },
   };
 };
 
 const createPage = () => {
   let onHidden: (() => void) | null = null;
+  let shouldPrompt: (() => boolean) | null = null;
   const port: PageLifecyclePort = {
+    subscribeBeforeUnload: (listener) => {
+      shouldPrompt = listener;
+      return () => {
+        shouldPrompt = null;
+      };
+    },
     subscribeHidden: (listener) => {
       onHidden = listener;
       return () => {
@@ -189,7 +211,16 @@ const createPage = () => {
       };
     },
   };
-  return { hide: () => onHidden?.(), port };
+  return {
+    /** True when the browser would offer to stay on the page. */
+    beforeUnload: () => shouldPrompt?.() ?? false,
+    hide: () => onHidden?.(),
+    /** Whether a `beforeunload` listener is registered at all. */
+    get isListeningBeforeUnload() {
+      return shouldPrompt !== null;
+    },
+    port,
+  };
 };
 
 /** A draft an editor holds outside the aggregate until `commit` (the draft registry's flush) commits it. */
@@ -512,11 +543,76 @@ describe('Workbench persistence runtime', () => {
     expect(aggregate.events).toContain('save-succeeded:acknowledged');
   });
 
+  it('retries pending work that awaits no decision instead of asking for attention', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    // A newer draft was staged while the push was in flight: acknowledged, yet still pending, with nothing to resolve.
+    vi.mocked(persistence.saveWorkbench)
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'rebased'),
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
+      .mockResolvedValueOnce(saveResult(aggregate.state, 'acknowledged'));
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    runtime.start();
+    await flushPromises();
+    aggregate.edit();
+    clock.runAll();
+    await flushPromises();
+
+    expect(aggregate.events.some((event) => event.startsWith('save-needs-attention:'))).toBe(false);
+    expect(aggregate.events).not.toContain('save-succeeded:rebased');
+    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
+
+    clock.runAll();
+    await flushPromises();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    expect(aggregate.events.at(-1)).toBe('save-succeeded:acknowledged');
+  });
+
+  it("retries another project's pending work while one awaits a decision, then asks for attention", async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    vi.mocked(persistence.saveWorkbench)
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'first'),
+        awaitsDecision: true,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: true,
+      })
+      .mockResolvedValueOnce({
+        ...saveResult(aggregate.state, 'second'),
+        awaitsDecision: true,
+        hasPendingChanges: true,
+        hasRetryablePendingChanges: false,
+      });
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    runtime.start();
+    await flushPromises();
+    aggregate.edit();
+    clock.runAll();
+    await flushPromises();
+
+    expect(aggregate.events).toContain('save-pending:Autosave is pending and will retry.');
+    expect(aggregate.events).not.toContain('save-needs-attention:first');
+
+    clock.runAll();
+    await flushPromises();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+    expect(aggregate.events.at(-1)).toBe('save-needs-attention:second');
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
+  });
+
   it('leaves a non-retrying conflict save in an explicit attention state', async () => {
     const aggregate = createAggregate();
     const { persistence } = createPersistence(() => Promise.resolve(null));
     vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({
-      ...saveResult(aggregate.state),
+      ...saveResult(aggregate.state, 'conflicted'),
+      awaitsDecision: true,
       hasPendingChanges: true,
       shouldRetry: false,
     });
@@ -528,7 +624,8 @@ describe('Workbench persistence runtime', () => {
     clock.runAll();
     await flushPromises();
 
-    expect(aggregate.events).toContain('save-pending:Autosave requires your attention.');
+    expect(aggregate.events).toContain('save-needs-attention:conflicted');
+    expect(aggregate.events.some((event) => event.startsWith('save-pending:'))).toBe(false);
     expect(aggregate.events.some((event) => event.startsWith('save-succeeded:'))).toBe(false);
     clock.runAll();
     expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
@@ -1372,5 +1469,162 @@ describe('Workbench persistence runtime unload journal', () => {
     setClosedSession(false);
     page.hide();
     expect(journaledNames).toEqual(['Closing']);
+  });
+});
+
+describe('Workbench persistence runtime unload prompt', () => {
+  /** A journal that records what it was given; a project named `tooLarge` is one local recovery cannot take. */
+  const tooLarge = 'Too large to journal';
+  const journalTo = (fake: ReturnType<typeof createPersistence>) => {
+    const journaledNames: (string | undefined)[] = [];
+    fake.persistence.journalBeforeUnload = vi.fn((state: WorkbenchState) => {
+      const name = state.projects[0]?.name;
+      journaledNames.push(name);
+      fake.setUnloadWouldLose(name === tooLarge);
+      return {
+        kind: 'journaled' as const,
+        projectIds: name === tooLarge ? [] : [state.projects[0]!.id],
+        skippedOversizedProjectIds: name === tooLarge ? [state.projects[0]!.id] : [],
+        written: Promise.resolve(true),
+      };
+    });
+    return journaledNames;
+  };
+
+  it('listens for unloads only while local recovery reports a risk', async () => {
+    const page = createPage();
+    const loaded = await startLoaded({ page: page.port });
+    const { aggregate, clock, persistence, setUnloadAtRisk } = loaded;
+    expect(page.isListeningBeforeUnload).toBe(false);
+
+    // A project too large for the journal opens, say: the next persisted revision registers the listener.
+    setUnloadAtRisk(true);
+    aggregate.edit('Opened a large project');
+    expect(page.isListeningBeforeUnload).toBe(true);
+
+    // The save that settles it finds the risk gone (the project closed, or storage recovered).
+    const save = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => save.promise);
+    clock.runAll();
+    setUnloadAtRisk(false);
+    save.resolve(saveResult(aggregate.state));
+    await flushPromises();
+    expect(page.isListeningBeforeUnload).toBe(false);
+
+    // A journal that fails outright leaves nothing known about recovery, so it listens until one succeeds.
+    persistence.journalBeforeUnload = vi.fn(() => {
+      throw new Error('storage gone');
+    });
+    aggregate.edit('Unjournaled');
+    page.hide();
+    expect(page.isListeningBeforeUnload).toBe(true);
+    expect(page.beforeUnload()).toBe(true);
+  });
+
+  it('asks only when the journal could not take the unsaved revision, journaling it first', async () => {
+    const page = createPage();
+    const draft = createHeldDraft();
+    const loaded = await startLoaded({ commitDrafts: draft.commit, page: page.port });
+    const { aggregate, clock, persistence } = loaded;
+    draft.held.commitTo = aggregate;
+    const journaledNames = journalTo(loaded);
+    loaded.setUnloadAtRisk(true);
+    aggregate.edit('At risk');
+    clock.runAll();
+    await flushPromises();
+    expect(page.isListeningBeforeUnload).toBe(true);
+
+    expect(page.beforeUnload()).toBe(false);
+    expect(journaledNames).toEqual([]);
+
+    // An ordinary edit, still held in a debounced field: the journal keeps it, so leaving needs no prompt.
+    draft.held.name = 'Typed';
+    expect(page.beforeUnload()).toBe(false);
+    expect(journaledNames).toEqual(['Typed']);
+
+    draft.held.name = tooLarge;
+    expect(page.beforeUnload()).toBe(true);
+    // Asked again (the user stayed, then left once more) without journaling the same revision twice.
+    expect(page.beforeUnload()).toBe(true);
+    // The unload that follows has nothing new to journal.
+    const save = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => save.promise);
+    page.hide();
+    expect(journaledNames).toEqual(['Typed', tooLarge]);
+
+    // Once the server has it, nothing is left to lose.
+    save.resolve(saveResult(aggregate.state));
+    await flushPromises();
+    clock.runAll();
+    expect(page.beforeUnload()).toBe(false);
+  });
+
+  it('never listens before loading, while the session is closed, or after the account lifetime ended', async () => {
+    const page = createPage();
+    const aggregate = createAggregate();
+    const load = deferred<HydratedWorkbenchSnapshot | null>();
+    const fake = createPersistence(() => load.promise);
+    fake.setUnloadAtRisk(true);
+    fake.setUnloadWouldLose(true);
+    const controller = new AbortController();
+    const runtime = createWorkbenchPersistenceRuntime({
+      aggregate: aggregate.port,
+      clock: new FakeClock(),
+      page: page.port,
+      persistence: fake.persistence,
+      signal: controller.signal,
+    });
+    runtime.start();
+    aggregate.edit('While loading');
+    expect(page.isListeningBeforeUnload).toBe(false);
+
+    load.resolve(null);
+    await flushPromises();
+    expect(page.isListeningBeforeUnload).toBe(true);
+    aggregate.edit('Closing the last tab');
+    fake.setClosedSession(true);
+    expect(page.beforeUnload()).toBe(false);
+    aggregate.edit('Closed');
+    expect(page.isListeningBeforeUnload).toBe(false);
+    fake.reopenSession();
+    expect(page.beforeUnload()).toBe(true);
+
+    controller.abort();
+    expect(page.isListeningBeforeUnload).toBe(false);
+  });
+
+  it('listens while the exit checkpoint saves, but not for a checkpoint a newer editor superseded', async () => {
+    const page = createPage();
+    const loaded = await startLoaded({ page: page.port });
+    const { aggregate, persistence, runtime } = loaded;
+    const journaledNames = journalTo(loaded);
+    loaded.setUnloadAtRisk(true);
+    const checkpointSave = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => checkpointSave.promise);
+    aggregate.edit(tooLarge);
+
+    const exit = runtime.exit();
+    expect(page.beforeUnload()).toBe(true);
+    expect(journaledNames).toEqual([tooLarge]);
+
+    exit.supersede();
+    expect(page.isListeningBeforeUnload).toBe(false);
+
+    checkpointSave.resolve(saveResult(aggregate.state));
+    await exit.settled;
+    expect(page.isListeningBeforeUnload).toBe(false);
+  });
+
+  it('stops listening when the exit checkpoint settles', async () => {
+    const page = createPage();
+    const loaded = await startLoaded({ page: page.port });
+    loaded.setUnloadAtRisk(true);
+    loaded.aggregate.edit('Left the editor');
+    expect(page.isListeningBeforeUnload).toBe(true);
+
+    const exit = loaded.runtime.exit();
+    expect(page.isListeningBeforeUnload).toBe(true);
+    await expect(exit.settled).resolves.toBe('saved');
+    expect(page.isListeningBeforeUnload).toBe(false);
   });
 });

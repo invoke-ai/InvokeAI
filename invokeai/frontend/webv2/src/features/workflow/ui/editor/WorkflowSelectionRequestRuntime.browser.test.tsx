@@ -7,8 +7,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { requestWorkflowFitView, workflowFitViewRequestStore, type WorkflowFlowInstance } from './flowInstanceStore';
-import { requestNodeSelection, workflowSelectionStore } from './selectionStore';
+import {
+  requestWorkflowFitView,
+  WORKFLOW_FIT_PADDING,
+  workflowFitViewRequestStore,
+  type WorkflowFlowInstance,
+} from './flowInstanceStore';
+import { requestNodeSelection, revealWorkflowNode, workflowSelectionStore } from './selectionStore';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 
 const templates = vi.hoisted(() => ({
@@ -23,6 +28,12 @@ vi.mock('@features/workflow/react', () => ({
     templates.listeners.add(listener);
     return () => templates.listeners.delete(listener);
   },
+}));
+
+// The fits' padding is the editor view's concern; here a fit is the bounds it was asked for.
+vi.mock('./fitWorkflowBounds', () => ({
+  fitWorkflowBounds: (instance: WorkflowFlowInstance, bounds: unknown, _flow: unknown, duration: number) =>
+    instance.fitBounds(bounds as Parameters<WorkflowFlowInstance['fitBounds']>[0], { duration }),
 }));
 
 const SCOPE = { projectId: 'project-1', workflowId: 'workflow-1' };
@@ -68,7 +79,7 @@ describe('WorkflowSelectionRequestRuntime', () => {
     const fitView = vi.fn(() => Promise.resolve(true));
     const flowInstance = { fitView } as unknown as WorkflowFlowInstance;
     const selectNodes = vi.fn();
-    requestNodeSelection(['pending-node']);
+    revealWorkflowNode('pending-node');
 
     await act(() => {
       root?.render(
@@ -91,6 +102,7 @@ describe('WorkflowSelectionRequestRuntime', () => {
       duration: 300,
       maxZoom: 1.25,
       nodes: [{ id: 'pending-node' }],
+      padding: WORKFLOW_FIT_PADDING,
     });
 
     await act(() => {
@@ -110,7 +122,12 @@ describe('WorkflowSelectionRequestRuntime', () => {
     act(() => requestNodeSelection(['later-node']));
 
     expect(selectNodes).toHaveBeenLastCalledWith(['later-node']);
-    expect(fitView).toHaveBeenLastCalledWith({ duration: 0, maxZoom: 1.25, nodes: [{ id: 'later-node' }] });
+    expect(fitView).toHaveBeenLastCalledWith({
+      duration: 0,
+      maxZoom: 1.25,
+      nodes: [{ id: 'later-node' }],
+      padding: WORKFLOW_FIT_PADDING,
+    });
 
     await act(() => root?.unmount());
     root = null;

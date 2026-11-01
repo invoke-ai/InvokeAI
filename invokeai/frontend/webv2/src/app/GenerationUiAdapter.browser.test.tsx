@@ -1,14 +1,17 @@
+import type { GalleryBoard } from '@features/gallery/contracts';
 import type { GenerationUiAdapter } from '@features/generation/react';
 import type { QueueServerItemDTO } from '@features/queue/data/serverTypes';
 import type { Project } from '@workbench/projectContracts';
 import type { ReactNode } from 'react';
 
+import { galleryBoardsOptions } from '@features/gallery/queries';
 import { getQueueReadModelOptions } from '@features/queue';
 import { buildProjectQueueItemOriginPrefix } from '@features/queue/contracts';
 import { createQueueItemDTO, createQueueServer } from '@features/queue/data/queueServer.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { QueryClient, QueryClientProvider, QueryObserver } from '@tanstack/react-query';
+import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act } from 'react';
@@ -29,6 +32,7 @@ let root: Root;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 vi.mock('@features/generation/react', () => ({
+  clearGenerateModelSwitchConfirmation: () => undefined,
   GenerationUiProvider: ({ adapter: next, children }: { adapter: GenerationUiAdapter; children: ReactNode }) => {
     adapter = next;
     return children;
@@ -151,6 +155,7 @@ describe('Generation adapter queue insights', () => {
     await render(null);
     await invalidateQueue();
 
+    // Nor anything else: the board listing Save to Uploads is judged from is read as an upload starts, not observed.
     expect(server.requests).toEqual([]);
   });
 
@@ -278,5 +283,80 @@ describe('Generation adapter queue insights', () => {
 
     expect(itemIdReads()).toHaveLength(2);
     expect(adapter.queueInsights.getSnapshot().seedHistory).toBe(before.seedHistory);
+  });
+});
+
+describe('Generation adapter upload board', () => {
+  const board = (id: string, canAdd: boolean): GalleryBoard => ({
+    access: {
+      actions: canAdd ? ['read', 'add_media'] : ['read'],
+      adminOverride: false,
+      generalAccess: 'viewer',
+      role: 'viewer',
+    },
+    archived: false,
+    assetCount: 0,
+    assetVideoCount: 0,
+    id,
+    imageCount: 0,
+    isInbox: id === 'inbox',
+    kind: 'board',
+    name: id,
+    projectId: null,
+    videoCount: 0,
+  });
+  const listBoards = (sharedCanAdd: boolean) =>
+    queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, [
+      board('inbox', true),
+      board('shared', sharedCanAdd),
+    ]);
+
+  it('sends Save to Uploads to the auto-add board while its listing allows it, else to the project inbox', async () => {
+    const state = createInitialWorkbenchState();
+    state.projects[0]!.widgetInstances.gallery!.state.values = { autoAddBoardId: 'shared', projectBoardId: 'inbox' };
+    store = createWorkbenchStore(state);
+    listBoards(true);
+
+    await render(null);
+    await expect(adapter.gallery.getUploadBoardId()).resolves.toBe('shared');
+
+    // Access revoked: the next listing read says so, and the next upload follows it without a project change.
+    listBoards(false);
+    await expect(adapter.gallery.getUploadBoardId()).resolves.toBe('inbox');
+    // Both were judged from the cached listing: nothing was read for them.
+    expect(server.requests).toEqual([]);
+  });
+});
+
+describe('Generation adapter presets', () => {
+  const preset = (id: string) => ({ id, label: id, values: { steps: 12 } });
+  const savedIds = () => getWorkbenchPreferences().generatePresets.map((saved) => saved.id);
+
+  afterEach(() => patchWorkbenchPreferences({ generatePresets: [] }));
+
+  it('restores a deleted preset at its old position, appends past the end, and ignores one still saved', async () => {
+    await patchWorkbenchPreferences({ generatePresets: [preset('a'), preset('c')] });
+    await render(null);
+
+    act(() => adapter.presets.restore(preset('b'), 1));
+    expect(savedIds()).toEqual(['a', 'b', 'c']);
+
+    // Still saved (an Undo after it came back another way): nothing moves or doubles.
+    act(() => adapter.presets.restore({ ...preset('b'), label: 'stale' }, 0));
+    expect(getWorkbenchPreferences().generatePresets.map((saved) => saved.label)).toEqual(['a', 'b', 'c']);
+
+    // Presets deleted since leave its old index past the end.
+    act(() => adapter.presets.restore(preset('d'), 9));
+    expect(savedIds()).toEqual(['a', 'b', 'c', 'd']);
+
+    // Labels are not keys: a preset saved since under the same name keeps it, and the deleted one comes back too.
+    act(() => adapter.presets.restore({ ...preset('e'), label: 'a' }, 1));
+    expect(getWorkbenchPreferences().generatePresets.map((saved) => `${saved.id}:${saved.label}`)).toEqual([
+      'a:a',
+      'e:a',
+      'b:b',
+      'c:c',
+      'd:d',
+    ]);
   });
 });

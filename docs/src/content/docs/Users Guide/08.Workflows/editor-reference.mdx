@@ -23,7 +23,7 @@ A quicker way to add a node that is already connected: drag from a connection po
 
 To connect two nodes, drag from an output on the right of one node to an input on the left of another. Only compatible connection points accept the connection. An input takes one connection, but an output can feed as many inputs as you like. To reconnect, drag the end of a connection to another point; to disconnect, drag it away and release it over empty space, or select the connection and press **Delete**.
 
-Right-click a node to **Copy**, **Paste**, **Duplicate**, **Collapse** or **Delete** it, and double-click its title to rename it. The chevron in a node's title bar collapses it to keep a large graph tidy.
+Right-click a node to **Copy**, **Paste**, **Duplicate**, **Collapse** or **Delete** it, and double-click its title to rename it. The chevron in a node's title bar collapses it to keep a large graph tidy. Pasted nodes land at the pointer when the editor has focus and the pointer is over it, at the click point when you right-click empty space and choose **Paste**, and otherwise in the center of the visible view.
 
 The picker's **Utility** group has three special nodes:
 
@@ -35,13 +35,15 @@ The picker's **Utility** group has three special nodes:
 
 Connectors tidy up the wiring of a large graph. They pass a value straight through and are removed before the workflow runs, so they cannot change what it does. To add one, right-click empty space in the editor and choose **Add connector**, then connect to and from it. You can wire a connector's output first and its input later; it only accepts a source whose type matches what it feeds. Deleting a connector joins its incoming connection directly to everything it fed.
 
-A node's border shows its state: red when a required input is missing or the node failed, highlighted with a progress strip while it runs, and green when it has finished. After a run, **Latest output** on an image node shows its result.
+A node's border shows its state: red when a required input is missing or the node failed, highlighted with a progress strip while it runs, and green when it has finished. After a run, **Latest output** on an image node shows its result. A node whose type this installation does not have, usually from a node pack that is not installed, says so; select it for **Open Nodes Manager**, where you can install the pack (administrators only on a multi-user installation; others are asked to contact one).
+
+When the workflow cannot run, hovering or clicking **Invoke** lists why. Problems with a node, such as a missing required input, name the node and input, and choosing one selects that node and zooms the editor to it.
 
 ### Where results go
 
 Only nodes whose **Save to Gallery** box is checked, at the bottom of nodes that produce images, send their images to the Gallery. The images of other nodes are intermediate results that are used and then discarded. New nodes start with **Save to Gallery** turned off, so check it on the node that makes your final image.
 
-An image node's **Board** field chooses where its saved images go. **Auto**, the default, uses the Gallery's destination: the selected board, or the auto-add board if one is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). **None** saves to Uncategorized, and you can also pick a specific board. Images from nodes that have no Board field go to Uncategorized.
+An image node's **Board** field chooses where its saved images go. **Auto**, the default, uses the Gallery's destination, the board named under **Saving to** (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). **None** saves to Uncategorized, and you can also pick a specific board. Images from nodes that have no Board field go to Uncategorized.
 
 Beside it, **Use cache** lets InvokeAI reuse a node's previous result when its inputs have not changed, which speeds up repeated runs. On a multi-user installation, only administrators see this option.
 
@@ -53,9 +55,11 @@ Each project keeps its own workflows, and one of them is **active**: the one sho
 * **Browse** — the workflows that ship with InvokeAI, such as *Text to Image - SDXL*, *Flux Text to Image* and the video workflows. Opening one adds a copy to your project.
 * **Yours** — workflows you have saved to your library with **Save to library…**, for use in other projects.
 
+On **Yours**, **Sort by** orders the list by **Last updated**, **Last opened**, **Date created** or **Name**; **Browse** always lists by name. **Fill** shows each thumbnail filling its card, cropped at the edges, and **Fit** shows the whole image. The library remembers both choices the next time you open it.
+
 Opening a library workflow adds an independent copy to the project; the library's version is untouched. If the project already has a copy, opening the template asks what to do: **Open copy** switches to the existing copy, **Add new copy** makes another one, and **Replace copy** replaces the copy's graph with the library version while keeping its name. A replace can be undone in one step.
 
-Changes to a project's workflows never change the library by themselves. **Save to library…**, in the editor's header, saves the workflow as a new library template with the name you give it, including its form and its current settings as defaults. For a workflow opened from one of your own templates, **Update library template** replaces that template instead. If the template has changed since you opened it, you can save as a new template instead, or review the current one and replace it deliberately. Replacing a template also affects workflows that use it through the **Call Saved Workflow** node.
+Changes to a project's workflows never change the library by themselves. **Save to library…**, in the editor's header, saves the workflow as a new library template with the name you give it, including its form and its current settings as defaults. Owners can update their own linked saved workflow templates, and multi-user administrators can update any user's saved non-bundled template; bundled templates remain read-only. If the template has changed since you opened it, you can save as a new template instead, or review the current one and replace it deliberately. Replacing a template also affects workflows that use it through the **Call Saved Workflow** node.
 
 Add comma-separated tags, such as `portrait, SDXL, upscaling`, in the workflow's **Details**; they become filters in the library. Each workflow also keeps its own undo history while the project is open.
 
@@ -63,7 +67,7 @@ Add comma-separated tags, such as `portrait, SDXL, upscaling`, in the workflow's
 In InvokeAI 6, editing a workflow opened from the library saved every change straight back to the library. Workflows now belong to their project and autosave there; the library changes only when you choose **Save to library…** or **Update library template**.
 :::
 
-To share a workflow, use **Export workflow JSON** from the **⋯** menu; others can load it with **Import workflow JSON…**. An image made by a workflow also carries the workflow in its metadata: right-click the image and choose **Load Workflow**. **Download workflow as PNG** in the editor toolbar saves a picture of the whole graph, at up to twice screen resolution, for documentation or sharing. A large graph is saved at a lower resolution, with a notice when that falls below screen resolution; one too large to stay legible as a picture is not exported, so share its JSON instead. Closing the workflow editor while the picture is being prepared cancels the export.
+To share a workflow, use **Export workflow JSON** from the **⋯** menu; others can load it with **Import workflow JSON…**. If parts of a file cannot be loaded, such as nodes of an unknown kind, one notice lists everything that was skipped. An image made by a workflow also carries the workflow in its metadata: right-click the image and choose **Load Workflow**. **Download workflow as PNG** in the editor toolbar saves a picture of the whole graph, at up to twice screen resolution, for documentation or sharing. A large graph is saved at a lower resolution, with a notice when that falls below screen resolution; one too large to stay legible as a picture is not exported, so share its JSON instead. Closing the workflow editor while the picture is being prepared cancels the export.
 
 ## Common node patterns
 
@@ -88,11 +92,13 @@ These work while the workflow editor has focus. On macOS, use **Cmd** in place o
 |---|---|
 | **Shift+A** or **Space** | Add a node |
 | **Ctrl+C** / **Ctrl+V** | Copy / paste nodes, with the connections between them |
+| **Ctrl+Shift+V** | Paste nodes, keeping the connections that fed them from the rest of the graph |
 | **Ctrl+D** | Duplicate the selected nodes |
 | **Ctrl+A** | Select all nodes |
 | **Delete** / **Backspace** | Delete the selected nodes |
 | **Ctrl+Z** / **Ctrl+Shift+Z**, **Ctrl+Y** | Undo / redo |
 | **Shift**-drag | Box-select nodes |
+| Middle- or right-drag | Pan the view while the box select, lasso or eraser tool is active (with the pan tool, drag empty space) |
 | Hold **Ctrl** while dragging | Snap to the grid |
 | **Ctrl+Enter** | Invoke |
 

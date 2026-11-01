@@ -6,34 +6,33 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 
-import { Box } from '@chakra-ui/react';
+import { Box, Stack, Text } from '@chakra-ui/react';
 import { Toolbar, ToolbarButton } from '@platform/ui/Toolbar';
 import { GradientIcon } from '@platform/ui/VendoredIcon';
 import { useExtensionHotkeyDefinitions } from '@workbench/hotkeys/extensionHotkeys';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
+import { formatHotkeyLabel } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import {
   BrushIcon,
   CircleIcon,
   EraserIcon,
-  FrameIcon,
   HandIcon,
   LassoIcon,
   MousePointer2Icon,
   PenLineIcon,
   PentagonIcon,
-  Rotate3dIcon,
-  SquareDashedIcon,
+  ScalingIcon,
+  ScanIcon,
+  SquareDashedMousePointerIcon,
   SquareIcon,
   StarIcon,
   TriangleIcon,
   TypeIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, type ElementType } from 'react';
+import { useCallback, useEffect, useMemo, type ElementType, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { isCanvasToolEnabled } from './canvasInteractionLock';
 import { useCanvasActiveTool, useShapeOptions } from './engineStoreHooks';
 import { recordSelectFamilyTool, useSelectFamilyTool, type SelectFamilyTool } from './toolFamilyStore';
 import { ToolFamilyButton, type ToolFlyoutItem } from './ToolStripFlyout';
@@ -42,20 +41,43 @@ type ToolStripEngine = CanvasCoreStoreCapability & { readonly tools: CanvasToolC
 
 interface ToolStripButtonProps {
   engine: ToolStripEngine;
+  /** One help line under the title, for a tool whose key is not a plain binding (the Frame tool's C). */
+  description?: string;
+  /** The tool's first effective binding, shown with its name; none while unbound. */
+  hotkey?: string;
   icon: ElementType;
-  isInteractionLocked: boolean;
   label: string;
   toolId: ToolId;
 }
 
+/** A tool's tooltip: its name with the key that selects it, and an optional help line. */
+const useToolTooltip = (label: string, hotkey: string | undefined, description?: string): ReactNode => {
+  const { t } = useTranslation();
+  const title = hotkey ? t('widgets.canvas.tools.withHotkey', { hotkey: formatHotkeyLabel(hotkey), label }) : label;
+  return useMemo(
+    () =>
+      description ? (
+        <Stack gap="0.5" maxW="16rem">
+          <Text>{title}</Text>
+          <Text color="fg.muted" fontSize="sm">
+            {description}
+          </Text>
+        </Stack>
+      ) : (
+        title
+      ),
+    [description, title]
+  );
+};
+
 /** One sticky tool button: active state comes from core stores; click drives the tool capability. */
-const ToolStripButton = ({ engine, icon, isInteractionLocked, label, toolId }: ToolStripButtonProps) => {
+const ToolStripButton = ({ description, engine, hotkey, icon, label, toolId }: ToolStripButtonProps) => {
   const activeTool = useCanvasActiveTool(engine);
-  const isDisabled = !isCanvasToolEnabled(toolId, isInteractionLocked);
   const onClick = useCallback(() => engine.tools.setTool(toolId), [engine, toolId]);
+  const tooltip = useToolTooltip(label, hotkey, description);
 
   return (
-    <ToolbarButton disabled={isDisabled} icon={icon} isActive={activeTool === toolId} label={label} onClick={onClick} />
+    <ToolbarButton icon={icon} isActive={activeTool === toolId} label={label} tooltip={tooltip} onClick={onClick} />
   );
 };
 
@@ -78,24 +100,20 @@ const SHAPE_KIND_LABEL_KEYS: Record<ShapeToolKind, string> = {
 };
 
 /** The Shape slot: one tool id, the flyout switching which kind the next drag draws. */
-const ShapeFamilyButton = ({
-  engine,
-  isInteractionLocked,
-}: {
-  engine: ToolStripEngine;
-  isInteractionLocked: boolean;
-}) => {
+const ShapeFamilyButton = ({ engine, hotkey }: { engine: ToolStripEngine; hotkey: string | undefined }) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const options = useShapeOptions(engine);
   const items: ToolFlyoutItem[] = useMemo(
     () =>
       SHAPE_KIND_ORDER.map((kind) => ({
+        // One key selects the Shape tool and cycles its kinds; each entry shows it.
+        hotkeys: hotkey ? [hotkey] : undefined,
         icon: SHAPE_KIND_ICONS[kind],
         id: kind,
         label: t(SHAPE_KIND_LABEL_KEYS[kind]),
       })),
-    [t]
+    [hotkey, t]
   );
   const onActivate = useCallback(() => engine.tools.setTool('shape'), [engine]);
   const onSelectSubtool = useCallback(
@@ -108,7 +126,6 @@ const ShapeFamilyButton = ({
   return (
     <ToolFamilyButton
       currentId={options.kind}
-      disabled={!isCanvasToolEnabled('shape', isInteractionLocked)}
       icon={SHAPE_KIND_ICONS[options.kind]}
       isActive={activeTool === 'shape'}
       items={items}
@@ -120,27 +137,20 @@ const ShapeFamilyButton = ({
 };
 
 /**
- * A tool's first effective binding, remaps included, from the hotkeys the canvas widget registered; none outside a
+ * A tool's effective bindings, remaps included, from the hotkeys the canvas widget registered; none outside a
  * workbench or while unbound.
  */
-const toolShortcut = (
+const toolHotkeys = (
   definitions: readonly HotkeyDefinition[],
   customHotkeys: Record<string, string[]>,
   hotkeyId: string
 ): string[] | undefined => {
   const definition = definitions.find((hotkey) => hotkey.id === hotkeyId);
-  const key = definition ? applyCustomHotkeys(definition, customHotkeys).keys[0] : undefined;
-  return key ? formatHotkeyForPlatform(key) : undefined;
+  return definition ? applyCustomHotkeys(definition, customHotkeys).keys : undefined;
 };
 
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
-const SelectFamilyButton = ({
-  engine,
-  isInteractionLocked,
-}: {
-  engine: ToolStripEngine;
-  isInteractionLocked: boolean;
-}) => {
+const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const stored = useSelectFamilyTool();
@@ -156,16 +166,18 @@ const SelectFamilyButton = ({
   const items: ToolFlyoutItem[] = useMemo(
     () => [
       {
-        icon: SquareDashedIcon,
+        description: t('widgets.canvas.tools.marqueeHelp'),
+        icon: SquareDashedMousePointerIcon,
         id: 'marquee',
         label: t('widgets.canvas.tools.marquee'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.marquee'),
       },
       {
+        description: t('widgets.canvas.tools.lassoHelp'),
         icon: LassoIcon,
         id: 'lasso',
         label: t('widgets.canvas.tools.lasso'),
-        shortcut: toolShortcut(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
+        hotkeys: toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.lasso'),
       },
     ],
     [customHotkeys, hotkeyDefinitions, t]
@@ -181,8 +193,7 @@ const SelectFamilyButton = ({
   return (
     <ToolFamilyButton
       currentId={current}
-      disabled={!isCanvasToolEnabled(current, isInteractionLocked)}
-      icon={current === 'lasso' ? LassoIcon : SquareDashedIcon}
+      icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
       isActive={activeTool === 'marquee' || activeTool === 'lasso'}
       items={items}
       label={t(current === 'lasso' ? 'widgets.canvas.tools.lasso' : 'widgets.canvas.tools.marquee')}
@@ -199,77 +210,79 @@ const SelectFamilyButton = ({
  */
 const TOOL_STRIP_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
-/** Keep color picking alt-hold-only rather than exposing it as a sticky tool. */
-const ToolStripRoot = ({
-  engine,
-  isInteractionLocked = false,
-}: {
-  engine: ToolStripEngine;
-  isInteractionLocked?: boolean;
-}) => {
+/**
+ * Color picking stays a hold (Alt) or a key (I) rather than a strip button. Every tool stays available while a
+ * generation runs or its results wait for review.
+ */
+const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
+  const hotkeyDefinitions = useExtensionHotkeyDefinitions();
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+  const hotkeyFor = (hotkeyId: string) => toolHotkeys(hotkeyDefinitions, customHotkeys, hotkeyId)?.[0];
 
   return (
     <Box left="2" position="absolute" top={TOOL_STRIP_TOP} zIndex="2">
       <Toolbar aria-label={t('widgets.canvas.tools.label')}>
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.view')}
           icon={HandIcon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.view')}
           toolId="view"
         />
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.move')}
           icon={MousePointer2Icon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.move')}
           toolId="move"
         />
         <ToolStripButton
           engine={engine}
-          icon={Rotate3dIcon}
-          isInteractionLocked={isInteractionLocked}
+          hotkey={hotkeyFor('canvas.transformSelected')}
+          icon={ScalingIcon}
           label={t('widgets.canvas.tools.transform')}
           toolId="transform"
         />
         <ToolStripButton
+          description={t('widgets.canvas.tools.bboxHoldHelp')}
           engine={engine}
-          icon={FrameIcon}
-          isInteractionLocked={isInteractionLocked}
+          // C, held or tapped, is the engine's own key for the Frame tool; a custom binding shows first when set.
+          hotkey={hotkeyFor('canvas.tool.bbox') ?? 'c'}
+          icon={ScanIcon}
           label={t('widgets.canvas.tools.bbox')}
           toolId="bbox"
         />
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.brush')}
           icon={BrushIcon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.brush')}
           toolId="brush"
         />
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.eraser')}
           icon={EraserIcon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.eraser')}
           toolId="eraser"
         />
-        <ShapeFamilyButton engine={engine} isInteractionLocked={isInteractionLocked} />
+        <ShapeFamilyButton engine={engine} hotkey={hotkeyFor('canvas.tool.shape')} />
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.gradient')}
           icon={GradientIcon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.gradient')}
           toolId="gradient"
         />
         <ToolStripButton
           engine={engine}
+          hotkey={hotkeyFor('canvas.tool.text')}
           icon={TypeIcon}
-          isInteractionLocked={isInteractionLocked}
           label={t('widgets.canvas.tools.text')}
           toolId="text"
         />
-        <SelectFamilyButton engine={engine} isInteractionLocked={isInteractionLocked} />
+        <SelectFamilyButton engine={engine} />
       </Toolbar>
     </Box>
   );

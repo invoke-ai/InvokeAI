@@ -1,4 +1,11 @@
-import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef, GalleryView } from '@features/gallery';
+import type {
+  GalleryImageItem,
+  GalleryItem,
+  GalleryItemKey,
+  GalleryItemKind,
+  GalleryItemRef,
+  GalleryView,
+} from '@features/gallery';
 import type {
   GalleryItemsPage,
   GalleryNavigationEntry,
@@ -11,6 +18,7 @@ import type { QueueItem, QueueProgressSession } from '@features/queue/contracts'
 import {
   compareGalleryItems,
   gallerySemanticReferenceKey,
+  getGalleryItemView,
   getGalleryNavigationStep,
   getGallerySessionNavigationKey,
   toGalleryItemKey,
@@ -39,14 +47,22 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 
 const EMPTY_PREVIEW_ITEMS: GalleryItem[] = [];
 
+/**
+ * The page Preview opens on. An ordinary listing is the stamp's own, so its page holds. A ranked filmstrip follows the
+ * Gallery's live ranking, board and media kind; the stamped page is reused only while all three still match what it
+ * was stamped in, and otherwise Preview mirrors the Gallery's page.
+ */
 export const getPreviewSelectedPage = ({
   galleryPage,
   navigationBoardId,
+  navigationMediaKind,
   navigationSemanticKey,
   selectedImageQuery,
 }: {
   galleryPage: number;
   navigationBoardId: string;
+  /** The media kind Preview navigates; null lists both. */
+  navigationMediaKind: GalleryItemKind | null;
   navigationSemanticKey: string;
   selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
 }): number =>
@@ -54,7 +70,9 @@ export const getPreviewSelectedPage = ({
     ? selectedImageQuery.semanticKey === null
       ? selectedImageQuery.page
       : 0
-    : selectedImageQuery.boardId === navigationBoardId && selectedImageQuery.semanticKey === navigationSemanticKey
+    : selectedImageQuery.boardId === navigationBoardId &&
+        selectedImageQuery.semanticKey === navigationSemanticKey &&
+        selectedImageQuery.mediaKind === navigationMediaKind
       ? selectedImageQuery.page
       : galleryPage;
 
@@ -76,26 +94,27 @@ const getOrderedPreviewItems = (
     })
     .map(({ item }) => item);
 
-/**
- * Which gallery tab an item belongs to. Mirrors the category split the
- * gallery filters on: `general` is a gallery image, everything else (canvas
- * pixels, control layers, uploads) is an asset.
- */
-const getItemGalleryView = (item: GalleryItem): GalleryView => (item.category === 'general' ? 'images' : 'assets');
-
 const getOrderedLocalItems = ({
   boardId,
   galleryView,
   items,
   imageOrderDir,
+  mediaKind,
 }: {
   boardId: string;
   galleryView: GalleryView;
   items: GalleryItem[];
   imageOrderDir: 'ASC' | 'DESC';
+  /** The listing's media-kind restriction; null lists both. */
+  mediaKind: GalleryItemKind | null;
 }): GalleryItem[] =>
   getOrderedPreviewItems(
-    items.filter((item) => item.boardId === boardId && getItemGalleryView(item) === galleryView),
+    items.filter(
+      (item) =>
+        item.boardId === boardId &&
+        getGalleryItemView(item) === galleryView &&
+        (mediaKind === null || item.kind === mediaKind)
+    ),
     imageOrderDir,
     'newest-first'
   );
@@ -171,6 +190,11 @@ export interface PreviewNavigationState {
   navigationQueryKey: string;
   /** The page a selection of `item` is stamped with — see the action context's `getItemSelectionPage`. */
   getSelectionPage: (item: GalleryItem) => number;
+  /**
+   * The page `item` holds in the listing Preview navigates: its loaded page, else the page Preview opened on. Unlike
+   * `getSelectionPage`, an item not loaded yet never reads as the top of the listing.
+   */
+  getNavigatedPage: (item: GalleryItem) => number;
   /** Lazily fetch the full ordered listing when an action needs an item beyond the sparse loaded pages. */
   loadOrderedRefs: (signal: AbortSignal) => Promise<GalleryItemRef[]>;
   selectPreviewItem: (item: GalleryItem) => void;
@@ -186,6 +210,7 @@ export const usePreviewNavigation = ({
   progressSessions,
   queueItems,
   galleryBoardId,
+  galleryMediaKind,
   galleryPage,
   galleryPaginationMode,
   selectGalleryItem,
@@ -199,6 +224,8 @@ export const usePreviewNavigation = ({
   followSession: (sessionId: string) => void;
   /** The board the gallery grid shows; a ranked list ranks within it, as the grid does. */
   galleryBoardId: string;
+  /** The kinds the gallery grid lists (null for both); a ranked list follows it like the board. */
+  galleryMediaKind: GalleryItemKind | null;
   /** The page the gallery grid is on; a ranked list mirrors it (see below). */
   galleryPage: number;
   /** The gallery's own pagination mode, likewise mirrored by a ranked list. */
@@ -227,6 +254,9 @@ export const usePreviewNavigation = ({
   const navigationBoardId = navigationSemanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
   const navigationOrderDir = selectedImageQuery.imageOrderDir;
+  // Media kind follows the same rule as the ranking: a ranked filmstrip navigates the Gallery's live kind, a listing
+  // the stamp's. Host steps stamp exactly what was navigated (see the reducer's getRankingStampFields).
+  const navigationMediaKind = navigationSemanticQuery ? galleryMediaKind : selectedImageQuery.mediaKind;
   // The grid partitions: its listing is unstarred-only, with the starred
   // items in the strip above it, unless the starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
@@ -236,13 +266,14 @@ export const usePreviewNavigation = ({
   const selectedPage = getPreviewSelectedPage({
     galleryPage,
     navigationBoardId,
+    navigationMediaKind,
     navigationSemanticKey,
     selectedImageQuery,
   });
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
-  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
-  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationMediaKind ?? ''}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
   const queryClient = useQueryClient();
 
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
@@ -280,11 +311,19 @@ export const usePreviewNavigation = ({
       createdFrom: selectedImageSearch.range?.from,
       createdTo: selectedImageSearch.range?.to,
       galleryView: navigationGalleryView,
+      ...(navigationMediaKind ? { mediaKind: navigationMediaKind } : {}),
       orderDir: navigationOrderDir,
       searchTerm: selectedImageSearch.text,
       ...(navigationSemanticQuery ? { semanticQuery: navigationSemanticQuery } : {}),
     }),
-    [navigationBoardId, navigationGalleryView, navigationOrderDir, navigationSemanticQuery, selectedImageSearch]
+    [
+      navigationBoardId,
+      navigationGalleryView,
+      navigationMediaKind,
+      navigationOrderDir,
+      navigationSemanticQuery,
+      selectedImageSearch,
+    ]
   );
 
   const listingFilterWithStarred = useMemo(
@@ -399,6 +438,17 @@ export const usePreviewNavigation = ({
     (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),
     [boardPageResults, getSelectionPageIn]
   );
+  const getNavigatedPage = useCallback(
+    (item: GalleryItem) => {
+      const itemKey = toGalleryItemKey(item);
+      const page = boardPageResults.find(({ data }) =>
+        data.items.some((candidate) => toGalleryItemKey(candidate) === itemKey)
+      );
+
+      return page === undefined ? selectedPage : page.offset / GALLERY_PAGE_SIZE;
+    },
+    [boardPageResults, selectedPage]
+  );
   const selectPreviewItem = useCallback(
     (item: GalleryItem) => stampSelection(item, boardPageResults),
     [boardPageResults, stampSelection]
@@ -446,8 +496,9 @@ export const usePreviewNavigation = ({
         galleryView: navigationGalleryView,
         items: navigationLocalItems,
         imageOrderDir: navigationOrderDir,
+        mediaKind: navigationMediaKind,
       }),
-    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationOrderDir]
+    [navigationBoardId, navigationGalleryView, navigationLocalItems, navigationMediaKind, navigationOrderDir]
   );
   const previewLocalBoardItems = useMemo(() => {
     // A recent starred since it landed has moved to the strip.
@@ -988,6 +1039,7 @@ export const usePreviewNavigation = ({
     navigate,
     neighbors,
     navigationQueryKey,
+    getNavigatedPage,
     getSelectionPage,
     position,
     loadOrderedRefs,

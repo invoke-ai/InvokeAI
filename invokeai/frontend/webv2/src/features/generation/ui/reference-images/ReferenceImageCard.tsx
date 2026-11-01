@@ -7,19 +7,38 @@ import type {
 } from '@features/generation/core/types';
 import type { CSSProperties } from 'react';
 
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { FindInGalleryButton } from '@features/gallery/mediaSlot';
+import { isStrengthOnlyIPAdapterBase } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { GenerateIssueNotes } from '@features/generation/ui/shared/GenerateIssues';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
-import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { Button, IconButton, toaster, ToggleDot, Tooltip } from '@platform/ui';
+import {
+  ArrowDownIcon,
+  ArrowUpIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  CropIcon,
+  ImageIcon,
+  RulerIcon,
+  Trash2Icon,
+} from 'lucide-react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { formatWeight, getModeLabelKey } from './referenceImageConfig';
-import { ClipVisionSelect, FieldHeader, FluxReduxControls, IPAdapterControls } from './ReferenceImageControls';
+import {
+  ClipVisionSelect,
+  FieldHeader,
+  FluxReduxControls,
+  IPAdapterControls,
+  Krea2ReferenceModeControl,
+  Krea2StyleReferenceControls,
+} from './ReferenceImageControls';
 import { ReferenceImageCropDialog } from './ReferenceImageCropDialog';
 
 /** Reference image config variants that carry a selectable model. */
@@ -27,6 +46,8 @@ type ModelBackedConfig = Extract<
   GenerateReferenceImageConfig,
   { type: 'ip_adapter' | 'flux_redux' | 'flux_kontext_reference_image' }
 >;
+
+const ISSUE_NOTES_CSS = { '&:not(:empty)': { pb: '2' } };
 
 const THUMBNAIL_ACTIONS_CSS = {
   '&:focus-within .reference-image-actions, &:hover .reference-image-actions': {
@@ -41,6 +62,7 @@ const COVER_IMG_STYLE: CSSProperties = {
   objectFit: 'cover',
   width: '100%',
 };
+const PROMPT_TAG_COPIED_MS = 1500;
 const OVERLAY_GRADIENT_STYLE: CSSProperties = {
   background: 'linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent)',
 };
@@ -55,6 +77,8 @@ interface ReferenceImageCardProps {
   onPatch: (id: string, patch: Partial<GenerateReferenceImage>) => void;
   onRemove: (id: string) => void;
   onUseSize: (image: GenerateReferenceImageAsset) => void;
+  /** How the prompt names this reference, for models that address references by tag. */
+  promptTag?: string;
 }
 
 const ReferenceImageCardBase = ({
@@ -65,6 +89,7 @@ const ReferenceImageCardBase = ({
   onPatch,
   onRemove,
   onUseSize,
+  promptTag,
   referenceImage,
   selectedModel,
 }: ReferenceImageCardProps) => {
@@ -77,7 +102,10 @@ const ReferenceImageCardBase = ({
   const config = referenceImage.config;
   const isEnabled = referenceImage.isEnabled;
   const selectedBase = selectedModel?.base;
-  const title = `${t('widgets.generate.referenceImage')} #${index + 1}`;
+  const title = t('widgets.generate.referenceImageNumbered', { index: index + 1 });
+  const collapseLabel = isCollapsed
+    ? t('widgets.generate.expandReferenceImage')
+    : t('widgets.generate.collapseReferenceImage');
   const toggleLabel = isEnabled
     ? t('widgets.generate.disableReferenceImage')
     : t('widgets.generate.enableReferenceImage');
@@ -143,10 +171,25 @@ const ReferenceImageCardBase = ({
               {config.type === 'ip_adapter' ? (
                 <>
                   {' · '}
-                  {t(getModeLabelKey(config.method))}{' '}
+                  {isStrengthOnlyIPAdapterBase(selectedBase)
+                    ? t('widgets.generate.strength')
+                    : t(getModeLabelKey(config.method))}{' '}
                   <Text as="span" color="fg.subtle" fontFamily="mono">
                     {formatWeight(config.weight)}
                   </Text>
+                </>
+              ) : config.type === 'krea2_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.styleStrength')}{' '}
+                  <Text as="span" color="fg.subtle" fontFamily="mono">
+                    {formatWeight(config.styleStrength)}
+                  </Text>
+                </>
+              ) : config.type === 'krea2_edit_reference_image' ? (
+                <>
+                  {' · '}
+                  {t('widgets.generate.modeEdit')}
                 </>
               ) : null}
             </Text>
@@ -156,6 +199,8 @@ const ReferenceImageCardBase = ({
             {title}
           </Text>
         )}
+
+        {promptTag ? <PromptTagButton tag={promptTag} /> : null}
 
         <HStack gap="0.5">
           {/* Array order is conditioning order. */}
@@ -185,23 +230,17 @@ const ReferenceImageCardBase = ({
               <Icon as={ArrowDownIcon} />
             </IconButton>
           </Tooltip>
-          <IconButton
-            aria-label={
-              isCollapsed ? t('widgets.generate.expandReferenceImage') : t('widgets.generate.collapseReferenceImage')
-            }
-            color="fg.muted"
-            size="sm"
-            variant="ghost"
-            onClick={toggleCollapsed}
-          >
-            <Box
-              asChild
-              transform={isCollapsed ? 'rotate(-90deg)' : undefined}
-              transition="transform var(--wb-motion-duration-slow)"
-            >
-              <ChevronDownIcon size="14" />
-            </Box>
-          </IconButton>
+          <Tooltip content={collapseLabel}>
+            <IconButton aria-label={collapseLabel} color="fg.muted" size="sm" variant="ghost" onClick={toggleCollapsed}>
+              <Box
+                asChild
+                transform={isCollapsed ? 'rotate(-90deg)' : undefined}
+                transition="transform var(--wb-motion-duration-slow)"
+              >
+                <ChevronDownIcon size="14" />
+              </Box>
+            </IconButton>
+          </Tooltip>
           <Tooltip content={t('widgets.generate.removeReferenceImage')}>
             <IconButton
               aria-label={t('widgets.generate.removeReferenceImage')}
@@ -216,6 +255,11 @@ const ReferenceImageCardBase = ({
           </Tooltip>
         </HStack>
       </HStack>
+
+      {/* Shown collapsed too: a reference that blocks Invoke says so on its own card. */}
+      <Box css={ISSUE_NOTES_CSS} px="2">
+        <GenerateIssueNotes field="referenceImage" referenceImageId={referenceImage.id} section="guidance" />
+      </Box>
 
       {isCollapsed ? null : (
         <HStack align="flex-start" gap="3" pb="2" px="2">
@@ -232,6 +276,7 @@ const ReferenceImageCardBase = ({
                 key={config.model?.key ?? 'no-model'}
                 config={config}
                 disabled={!isEnabled}
+                strengthOnly={isStrengthOnlyIPAdapterBase(selectedBase)}
                 onChange={changeConfig}
               >
                 <ReferenceModelSelector
@@ -258,6 +303,13 @@ const ReferenceImageCardBase = ({
                 selectedBase={selectedBase}
                 onConfigChange={changeConfig}
               />
+            ) : config.type === 'krea2_reference_image' || config.type === 'krea2_edit_reference_image' ? (
+              <>
+                <Krea2ReferenceModeControl config={config} onChange={changeConfig} />
+                {config.type === 'krea2_reference_image' ? (
+                  <Krea2StyleReferenceControls config={config} disabled={!isEnabled} onChange={changeConfig} />
+                ) : null}
+              </>
             ) : null}
           </Stack>
         </HStack>
@@ -267,6 +319,67 @@ const ReferenceImageCardBase = ({
 };
 
 export const ReferenceImageCard = memo(ReferenceImageCardBase);
+
+const PromptTagButton = ({ tag }: { tag: string }) => {
+  const { t } = useTranslation();
+  const [hasCopied, setHasCopied] = useState(false);
+  const resetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (resetTimerRef.current !== null) {
+        clearTimeout(resetTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const copyTag = useCallback(() => {
+    copyText(tag)
+      .then(() => {
+        setHasCopied(true);
+        if (resetTimerRef.current !== null) {
+          clearTimeout(resetTimerRef.current);
+        }
+        resetTimerRef.current = setTimeout(() => setHasCopied(false), PROMPT_TAG_COPIED_MS);
+      })
+      .catch(() =>
+        toaster.create({ description: t('common.clipboardBlocked'), title: t('common.couldNotCopy'), type: 'error' })
+      );
+  }, [t, tag]);
+
+  const canCopy = canCopyText();
+  // Without a clipboard the button shows its own tooltip, the reason, so the explanation joins it there rather than
+  // opening a second tooltip; it leaves out the hint's "click to copy", which is untrue then.
+  const unavailableReason = canCopy
+    ? undefined
+    : `${t('widgets.generate.referenceImagePromptTagExplanation', { tag })} ${t('common.copyUnavailable')}`;
+  const button = (
+    <Button
+      aria-label={t('widgets.generate.copyReferenceImagePromptTag', { tag })}
+      color="fg.muted"
+      flexShrink="0"
+      fontFamily="mono"
+      fontWeight="normal"
+      size="xs"
+      unavailableReason={unavailableReason}
+      variant="subtle"
+      onClick={copyTag}
+    >
+      {hasCopied ? <Icon as={CheckIcon} color="green.solid" /> : null}
+      {tag}
+      <VisuallyHidden aria-live="polite">
+        {hasCopied ? t('widgets.generate.referenceImagePromptTagCopied', { tag }) : ''}
+      </VisuallyHidden>
+    </Button>
+  );
+
+  return canCopy ? (
+    <Tooltip content={t('widgets.generate.referenceImagePromptTagHint', { tag })}>{button}</Tooltip>
+  ) : (
+    button
+  );
+};
 
 const ReferenceModelSelector = ({
   config,
@@ -327,7 +440,7 @@ const ReferenceModelSelector = ({
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />
-        {config.type === 'ip_adapter' ? (
+        {config.type === 'ip_adapter' && !isStrengthOnlyIPAdapterBase(selectedBase) ? (
           <ClipVisionSelect
             key={config.model?.key ?? 'no-model'}
             config={config}

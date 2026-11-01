@@ -4,24 +4,28 @@ import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
-import { applyPromptTemplate, getPromptTemplateChunks } from '@features/generation/core/promptTemplates';
+import { supportsPromptAttentionSyntax } from '@features/generation/core/prompt/compel';
+import { getEffectivePositivePrompt, getPositivePromptTemplateChunks } from '@features/generation/core/promptTemplates';
 import { useRegisterGenerateDraftFlusher } from '@features/generation/ui/generateDraftRegistry';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
+import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { DropZone, Field } from '@platform/ui';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
+import type { PromptEditor } from './promptEditor';
+import type { PromptTemplateChange } from './PromptTemplatesButton';
 
+import { DynamicPromptsNotice } from './DynamicPromptsNotice';
 import {
   PositivePromptActions,
   PromptTriggerPopover,
   type PromptTemplateState,
   type SavedPromptModels,
 } from './PositivePromptActions';
-import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
-import { insertPromptText, registerPositivePromptElement } from './promptFocus';
+import { editTextareaText, insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
 import { PromptTextarea } from './PromptTextarea';
 import { usePromptImageDrop } from './usePromptImageDrop';
@@ -51,7 +55,7 @@ interface PositivePromptFieldProps {
   /** Replace the prompt and remove its template atomically; omit this action on non-template surfaces. */
   onFlattenPromptTemplate?: (prompt: string) => void;
   /** Apply or clear the active template. Absent on surfaces with no templates. */
-  onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null) => void;
+  onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null, change: PromptTemplateChange) => void;
   onResizeEnd: (heightPx: number) => void;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
   /** Where Expand and Image to Prompt save their model picks; absent keeps them for the session. */
@@ -84,7 +88,8 @@ export const PositivePromptField = ({
   const { t } = useTranslation();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const { knownNames: knownWildcards } = useWildcards();
-  const { commitDraftValue, draftValue, flushDraftValue, replaceDraftValue, setDraftValue } = useDebouncedDraftValue({
+  const readsAttentionSyntax = supportsPromptAttentionSyntax(selectedModel?.base);
+  const { commitDraftValue, draftValue, flushDraftValue, readDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: PROMPT_INPUT_DEBOUNCE_MS,
     onCommit: onChange,
     resetKey: projectId,
@@ -101,12 +106,35 @@ export const PositivePromptField = ({
     [setDraftValue]
   );
 
-  const commitPromptChangeImmediately = useCallback(
-    (nextValue: string) => {
+  /**
+   * Programmatic rewrites (Expand, Image to Prompt, history, dynamic prompt picks) go through the browser's editing so
+   * Ctrl+Z restores what was there; where that cannot happen (see `editTextareaText`) the value is written directly.
+   */
+  const writePrompt = useCallback(
+    (nextValue: string, { withoutFocus = false }: { withoutFocus?: boolean } = {}) => {
+      flushDraftValue();
       promptHistoryNavigation.reset();
-      commitDraftValue(nextValue);
+
+      if (!withoutFocus && editTextareaText(textareaRef.current, nextValue)) {
+        flushDraftValue();
+      } else {
+        commitDraftValue(nextValue);
+      }
     },
-    [commitDraftValue]
+    [commitDraftValue, flushDraftValue]
+  );
+  // Read by late results and Undo closures, which outlive the render that made them.
+  const projectIdRef = useRef(projectId);
+  // eslint-disable-next-line react/refs
+  projectIdRef.current = projectId;
+  const promptEditor = useMemo(
+    (): PromptEditor => ({
+      element: () => textareaRef.current,
+      isShowing: (id) => textareaRef.current?.isConnected === true && projectIdRef.current === id,
+      read: readDraftValue,
+      write: writePrompt,
+    }),
+    [readDraftValue, writePrompt]
   );
 
   // Preserve textarea identity for sizing/hotkeys; only an actual template makes it read-only.
@@ -152,12 +180,15 @@ export const PositivePromptField = ({
     [autocomplete]
   );
 
+  // The surface applies the whole entry (negative prompt included) from settings that hold the latest typing; the
+  // positive prompt then lands as an edit of its own.
   const handleUsePrompt = useCallback(
     (prompt: PromptHistoryItem) => {
-      replaceDraftValue(prompt.positivePrompt);
+      flushDraftValue();
       onUsePrompt(prompt);
+      writePrompt(prompt.positivePrompt);
     },
-    [onUsePrompt, replaceDraftValue]
+    [flushDraftValue, onUsePrompt, writePrompt]
   );
 
   const handleTextareaRef = useCallback((element: HTMLTextAreaElement | null) => {
@@ -174,18 +205,19 @@ export const PositivePromptField = ({
 
   // Merge against the live draft so expansion counts do not lag behind debounce.
   const effectivePositivePrompt = useMemo(
-    () => (promptTemplate ? applyPromptTemplate(promptTemplate.positivePrompt, draftValue) : draftValue),
+    () => getEffectivePositivePrompt(draftValue, promptTemplate),
     [draftValue, promptTemplate]
   );
 
   const flattenPromptTemplate = useCallback(
     (prompt: string) => {
-      promptHistoryNavigation.reset();
-      replaceDraftValue(prompt);
+      flushDraftValue();
       onFlattenPromptTemplate?.(prompt);
+      writePrompt(prompt);
     },
-    [onFlattenPromptTemplate, replaceDraftValue]
+    [flushDraftValue, onFlattenPromptTemplate, writePrompt]
   );
+  const expansion = useDynamicPrompts(effectivePositivePrompt, dynamicPrompts);
 
   const templateState = useMemo(
     (): PromptTemplateState => ({
@@ -201,37 +233,39 @@ export const PositivePromptField = ({
   const labelEnd = useMemo(
     () => (
       <PositivePromptActions
+        attentionSyntax={readsAttentionSyntax}
         batchCount={batchCount}
         droppedImage={droppedImage}
         dynamicPrompts={dynamicPrompts}
         expandPromptSuggestion={expandPromptSuggestion}
+        expansion={expansion}
         isPromptTriggerPickerOpen={triggerPicker.isOpen}
         showSyntaxHighlighting={showSyntaxHighlighting}
         onInsertText={insertTextAtCaret}
         loras={loras}
         positivePrompt={draftValue}
-        effectivePositivePrompt={effectivePositivePrompt}
+        promptEditor={promptEditor}
         template={templateState}
         projectId={projectId}
         savedPromptModels={savedPromptModels}
         selectedModel={selectedModel}
         onOpenPromptTriggerPicker={triggerPicker.open}
-        onPositivePromptChangeImmediate={commitPromptChangeImmediately}
         onUsePrompt={handleUsePrompt}
       />
     ),
     [
       batchCount,
-      commitPromptChangeImmediately,
       draftValue,
       dynamicPrompts,
-      effectivePositivePrompt,
       expandPromptSuggestion,
+      expansion,
       handleUsePrompt,
       droppedImage,
       insertTextAtCaret,
       loras,
       projectId,
+      promptEditor,
+      readsAttentionSyntax,
       savedPromptModels,
       selectedModel,
       showSyntaxHighlighting,
@@ -252,7 +286,7 @@ export const PositivePromptField = ({
   const handlePromptClick = useCallback(() => autocomplete.refresh(textareaRef.current), [autocomplete]);
 
   const templateChunks = useMemo(
-    () => (isViewingMerged ? getPromptTemplateChunks(draftValue, promptTemplate.positivePrompt) : null),
+    () => (isViewingMerged ? getPositivePromptTemplateChunks(draftValue, promptTemplate) : null),
     [draftValue, isViewingMerged, promptTemplate]
   );
 
@@ -263,14 +297,14 @@ export const PositivePromptField = ({
     <Field hint="positivePrompt" label={t('common.prompt')} labelEnd={labelEnd}>
       <Box ref={setImageDropRef} position="relative">
         <PromptTextarea
-          {...PROMPT_ATTENTION_TARGET_PROPS}
           {...autocomplete.comboboxProps}
           aria-label={t('widgets.generate.positivePrompt')}
+          attentionSyntax={readsAttentionSyntax ? 'edit' : 'none'}
           defaultHeightPx={heightPx}
           minHeightPx={96}
           resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
           fontFamily="mono"
-          highlightDynamicPrompts={dynamicPrompts !== null}
+          highlightDynamicPrompts={dynamicPrompts?.enabled === true}
           knownWildcards={knownWildcards}
           readOnly={isViewingMerged}
           showSyntaxHighlighting={showSyntaxHighlighting}
@@ -303,6 +337,9 @@ export const PositivePromptField = ({
           </DropZone>
         ) : null}
       </Box>
+      {dynamicPrompts ? (
+        <DynamicPromptsNotice config={dynamicPrompts} expansion={expansion} prompt={effectivePositivePrompt} />
+      ) : null}
       {autocomplete.element}
       {triggerPicker.dismissElement}
       {triggerPicker.isOpen ? (

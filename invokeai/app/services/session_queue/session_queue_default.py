@@ -1,8 +1,9 @@
 import asyncio
 import hashlib
 import json
-from datetime import timedelta
-from typing import Any, Literal, Optional
+import math
+from datetime import datetime, timedelta, timezone
+from typing import Any, Literal, Optional, cast
 
 from pydantic_core import to_jsonable_python
 
@@ -30,6 +31,10 @@ from invokeai.app.services.session_queue.session_queue_common import (
     ItemIdsResult,
     NodeFieldValue,
     PruneResult,
+    QueueItemDeliveryResult,
+    QueueItemLineage,
+    QueueItemOwner,
+    RetriedQueueItem,
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
@@ -46,7 +51,8 @@ from invokeai.app.services.session_queue.session_queue_common import (
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.queries.locks import DatabaseLock
-from invokeai.app.services.shared.database.queries.session_queue import Scope, SettledReceipt
+from invokeai.app.services.shared.database.queries.session_queue import ITEM_COLUMNS, Delivery, Scope, SettledReceipt
+from invokeai.app.services.shared.database.types import timestamp_text
 from invokeai.app.services.shared.execution_state_migration import dump_execution_state
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
 from invokeai.app.services.shared.pagination import CursorPaginatedResults, SQLiteDirection
@@ -66,6 +72,10 @@ AFFINITY_MAX_LOOKAHEAD = 32
 
 _FINISHED = ("completed", "failed", "canceled")
 
+# How long a browser's claim to stage a queue item's results holds it from other browsers, unless renewed: long
+# enough to stage them, short enough that a browser that went away holds them up only briefly.
+QUEUE_ITEM_DELIVERY_CLAIM_TTL = timedelta(seconds=120)
+
 # Every write that adds items takes the queue's admission lock, so that two of them neither both fit into its last
 # free places nor both write one enqueue receipt, and shares the media protection: the items' sessions make the media
 # they name active, which the intermediates cleanup must not delete between its check and its delete.
@@ -78,11 +88,55 @@ def _session_json(session: GraphExecutionState) -> str:
     return json.dumps(dump_execution_state(session), default=to_jsonable_python)
 
 
+def _held(delivery: Delivery, now: datetime) -> QueueItemDeliveryResult:
+    """Why a claim was refused: the results were delivered, or another claim holds them until it lapses."""
+    if delivery.delivered_at is not None:
+        return QueueItemDeliveryResult(status="delivered")
+    retry_after_ms = 1
+    # Without a claim it was released after the refusal: the claimant may try again at once.
+    if delivery.claimant is not None and delivery.claimed_at is not None:
+        lapses_at = datetime.fromisoformat(delivery.claimed_at).replace(tzinfo=timezone.utc)
+        remaining = lapses_at + QUEUE_ITEM_DELIVERY_CLAIM_TTL - now
+        retry_after_ms = max(1, math.ceil(remaining / timedelta(milliseconds=1)))
+    return QueueItemDeliveryResult(status="held", retry_after_ms=retry_after_ms)
+
+
 def _decode_enqueue_receipt(batch_id: str, requested: int, enqueued: int, item_ids_json: str) -> EnqueueBatchReceipt:
     item_ids = json.loads(item_ids_json)
     if not isinstance(item_ids, list) or not all(isinstance(item_id, int) for item_id in item_ids):
         raise RuntimeError("Stored queue enqueue receipt contains invalid item ids")
     return EnqueueBatchReceipt(batch_id=batch_id, requested=requested, enqueued=enqueued, item_ids=item_ids)
+
+
+def _payload_hash(batch: Batch, prepend: bool) -> str:
+    """What a key's receipt matches a repeat of its enqueue by."""
+    return hashlib.sha256(
+        json.dumps(
+            {"batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}), "prepend": prepend},
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+def _settled_result(
+    queue_id: str, batch: Batch, payload_hash: Optional[str], receipt: SettledReceipt
+) -> EnqueueBatchResult:
+    """The result a repeat of `batch`'s enqueue answers with: its key's settled receipt."""
+    if receipt.payload_hash != payload_hash:
+        raise EnqueueIdempotencyConflictError(
+            f"Idempotency key {batch.idempotency_key} is already used by another submission"
+        )
+    result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
+    return EnqueueBatchResult(
+        queue_id=queue_id,
+        requested=result.requested,
+        enqueued=result.enqueued,
+        batch=batch.model_copy(update={"batch_id": result.batch_id}),
+        priority=receipt.priority,
+        item_ids=result.item_ids,
+    )
 
 
 class SessionQueue(SessionQueueBase):
@@ -122,11 +176,11 @@ class SessionQueue(SessionQueueBase):
         return self._queries.session_queue.prune(queue_id, user_id=None, keep=keep)
 
     async def enqueue_batch(
-        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system", *, all_or_none: bool = False
     ) -> EnqueueBatchResult:
         # The route awaits this method, but every operation below is synchronous database/CPU work. Keep the
         # complete enqueue in one worker operation, off the event loop.
-        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id)
+        return await asyncio.to_thread(self._enqueue_batch, queue_id, batch, prepend, user_id, all_or_none)
 
     def acknowledge_enqueue(self, queue_id: str, idempotency_key: str, user_id: str = "system") -> None:
         self._queries.session_queue.acknowledge_receipt(queue_id, user_id, idempotency_key)
@@ -137,37 +191,24 @@ class SessionQueue(SessionQueueBase):
         receipt = self._queries.session_queue.enqueue_receipt(queue_id, user_id, idempotency_key)
         return _decode_enqueue_receipt(*receipt) if receipt is not None else None
 
-    def _enqueue_batch(self, queue_id: str, batch: Batch, prepend: bool, user_id: str) -> EnqueueBatchResult:
+    def replay_enqueue(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str = "system"
+    ) -> Optional[EnqueueBatchResult]:
+        key = batch.idempotency_key
+        if key is None:
+            raise ValueError("Only a batch with an idempotency key can be replayed")
+        receipt = self._queries.session_queue.settled_receipt(queue_id, user_id, key)
+        return _settled_result(queue_id, batch, _payload_hash(batch, prepend), receipt) if receipt is not None else None
+
+    def _enqueue_batch(
+        self, queue_id: str, batch: Batch, prepend: bool, user_id: str, all_or_none: bool = False
+    ) -> EnqueueBatchResult:
         requested_count = calc_session_count(batch=batch)
-        payload_hash = (
-            hashlib.sha256(
-                json.dumps(
-                    {
-                        "batch": batch.model_dump(mode="json", exclude={"batch_id", "idempotency_key"}),
-                        "prepend": prepend,
-                    },
-                    ensure_ascii=False,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ).encode("utf-8")
-            ).hexdigest()
-            if batch.idempotency_key is not None
-            else None
-        )
+        payload_hash = _payload_hash(batch, prepend) if batch.idempotency_key is not None else None
         key = batch.idempotency_key
 
         def settle(receipt: SettledReceipt) -> EnqueueBatchResult:
-            if receipt.payload_hash != payload_hash:
-                raise EnqueueIdempotencyConflictError(f"Idempotency key {key} is already used by another submission")
-            result = _decode_enqueue_receipt(receipt.batch_id, receipt.requested, receipt.enqueued, receipt.item_ids)
-            return EnqueueBatchResult(
-                queue_id=queue_id,
-                requested=result.requested,
-                enqueued=result.enqueued,
-                batch=batch.model_copy(update={"batch_id": result.batch_id}),
-                priority=receipt.priority,
-                item_ids=result.item_ids,
-            )
+            return _settled_result(queue_id, batch, payload_hash, receipt)
 
         def require_project(q: Queries) -> None:
             if batch.project_id is not None and q.projects.summary(user_id, batch.project_id) is None:
@@ -186,11 +227,12 @@ class SessionQueue(SessionQueueBase):
 
         # Preparing the values is CPU work, done outside a transaction; admission below takes what still fits.
         max_queue_size = self.__invoker.services.configuration.max_queue_size
+        room = max(0, max_queue_size - surveyed)
         prepared_values = prepare_values_to_insert(
             queue_id=queue_id,
             batch=batch,
             priority=0,
-            max_new_queue_items=max(0, max_queue_size - surveyed),
+            max_new_queue_items=0 if all_or_none and requested_count > room else room,
             user_id=user_id,
         )
 
@@ -203,6 +245,9 @@ class SessionQueue(SessionQueueBase):
             require_project(q)
 
             max_new_queue_items = max(0, max_queue_size - q.session_queue.pending_count(queue_id))
+            # Checked under the admission lock: the room the survey saw may have been taken meanwhile.
+            if all_or_none and min(len(prepared_values), max_new_queue_items) < requested_count:
+                max_new_queue_items = 0
             priority = q.session_queue.top_pending_priority(queue_id) + 1 if prepend else 0
             values_to_insert = prepared_values[:max_new_queue_items]
             if priority != 0:
@@ -426,16 +471,24 @@ class SessionQueue(SessionQueueBase):
         return self._hydrate_queue_item(raw_queue_item, quarantine=False)[0] if raw_queue_item is not None else None
 
     def _get_queue_item_by_status_for_api(
-        self, queue_id: str, status: Literal["pending", "in_progress"], origin_prefix: Optional[str]
+        self,
+        queue_id: str,
+        status: Literal["pending", "in_progress"],
+        origin_prefix: Optional[str],
+        owner_id: Optional[str],
     ) -> Optional[SessionQueueItem]:
-        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, status, origin_prefix)
+        raw_queue_item = self._queries.session_queue.item_by_status(queue_id, status, origin_prefix, owner_id)
         return self._project_queue_item_for_read(raw_queue_item) if raw_queue_item is not None else None
 
-    def get_current_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        return self._get_queue_item_by_status_for_api(queue_id, "in_progress", origin_prefix)
+    def get_current_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        return self._get_queue_item_by_status_for_api(queue_id, "in_progress", origin_prefix, owner_id)
 
-    def get_next_for_api(self, queue_id: str, origin_prefix: Optional[str] = None) -> Optional[SessionQueueItem]:
-        return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix)
+    def get_next_for_api(
+        self, queue_id: str, origin_prefix: Optional[str] = None, owner_id: Optional[str] = None
+    ) -> Optional[SessionQueueItem]:
+        return self._get_queue_item_by_status_for_api(queue_id, "pending", origin_prefix, owner_id)
 
     def _set_queue_item_status(
         self,
@@ -589,13 +642,16 @@ class SessionQueue(SessionQueueBase):
     def prune(self, queue_id: str, user_id: Optional[str] = None) -> PruneResult:
         return PruneResult(deleted=self._queries.session_queue.prune(queue_id, user_id=user_id))
 
-    def cancel_queue_item(self, item_id: int) -> SessionQueueItem:
+    def cancel_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         chain_item_ids = self._get_workflow_call_chain_item_ids(item_id)
         canceled_item: SessionQueueItem | None = None
         for chain_item_id in chain_item_ids:
-            queue_item = self._set_queue_item_status(item_id=chain_item_id, status="canceled")
-            if chain_item_id == item_id:
-                canceled_item = queue_item
+            own = chain_item_id == item_id
+            transitioned = self._set_queue_item_status(
+                item_id=chain_item_id, status="canceled", queue_item=queue_item if own else None
+            )
+            if own:
+                canceled_item = transitioned
         assert canceled_item is not None
         return canceled_item
 
@@ -621,6 +677,7 @@ class SessionQueue(SessionQueueBase):
         error_type: str,
         error_message: str,
         error_traceback: str,
+        queue_item: Optional[SessionQueueItem] = None,
     ) -> SessionQueueItem:
         return self._set_queue_item_status(
             item_id=item_id,
@@ -628,6 +685,7 @@ class SessionQueue(SessionQueueBase):
             error_type=error_type,
             error_message=error_message,
             error_traceback=error_traceback,
+            queue_item=queue_item,
         )
 
     def cancel_by_batch_ids(
@@ -719,6 +777,42 @@ class SessionQueue(SessionQueueBase):
 
     def get_queue_item_workflow_json(self, item_id: int) -> str | None:
         return self._queries.session_queue.workflow(item_id)
+
+    def get_queue_item_owner(self, item_id: int) -> QueueItemOwner:
+        owner = self._queries.session_queue.owner(item_id)
+        if owner is None:
+            raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+        return QueueItemOwner(queue_id=owner.queue_id, user_id=owner.user_id)
+
+    def claim_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        def claim(q: Queries) -> QueueItemDeliveryResult:
+            now = datetime.now(timezone.utc)
+            stale_before = timestamp_text(now - QUEUE_ITEM_DELIVERY_CLAIM_TTL)
+            if q.session_queue.claim_delivery(item_id, claimant, now=timestamp_text(now), stale_before=stale_before):
+                return QueueItemDeliveryResult(status="claimed")
+            delivery = q.session_queue.delivery(item_id)
+            if delivery is None:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+            return _held(delivery, now)
+
+        return self._queries.run(claim)
+
+    def confirm_queue_item_delivery(self, item_id: int) -> QueueItemDeliveryResult:
+        def confirm(q: Queries) -> None:
+            confirmed = q.session_queue.confirm_delivery(item_id, now=timestamp_text(datetime.now(timezone.utc)))
+            if not confirmed and q.session_queue.delivery(item_id) is None:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+
+        self._queries.run(confirm)
+        return QueueItemDeliveryResult(status="delivered")
+
+    def release_queue_item_delivery(self, item_id: int, claimant: str) -> QueueItemDeliveryResult:
+        def release(q: Queries) -> None:
+            if not q.session_queue.release_delivery(item_id, claimant) and q.session_queue.delivery(item_id) is None:
+                raise SessionQueueItemNotFoundError(f"No queue item with id {item_id}")
+
+        self._queries.run(release)
+        return QueueItemDeliveryResult(status="released")
 
     def _save_session(self, item_id: int, session: GraphExecutionState, *, only_unfinished: bool) -> bool:
         session_json = _session_json(session)
@@ -955,14 +1049,14 @@ class SessionQueue(SessionQueueBase):
         self,
         queue_id: str,
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
-        user_id: Optional[str] = None,
+        owner_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         limit: Optional[int] = None,
     ) -> ItemIdsResult:
         item_ids = self._queries.session_queue.item_ids(
             queue_id,
             descending=order_dir == SQLiteDirection.Descending,
-            user_id=user_id,
+            owner_id=owner_id,
             origin_prefix=origin_prefix,
             limit=limit,
         )
@@ -970,6 +1064,17 @@ class SessionQueue(SessionQueueBase):
 
     def has_active_queue_work(self) -> bool:
         return self._queries.session_queue.has_active_work()
+
+    def get_queue_item_lineage(self, queue_id: str, origin_prefix: str) -> list[QueueItemLineage]:
+        return [
+            QueueItemLineage(item_id, cast(QUEUE_ITEM_STATUS, status), origin, retried_from_item_id)
+            for item_id, status, origin, retried_from_item_id in self._queries.session_queue.lineage(
+                queue_id, origin_prefix
+            )
+        ]
+
+    def get_unfinished_origins(self, queue_id: str, origin_prefix: str) -> set[str]:
+        return set(self._queries.session_queue.unfinished_origins(queue_id, origin_prefix))
 
     def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
         if not item_ids:
@@ -987,13 +1092,16 @@ class SessionQueue(SessionQueueBase):
         acting_user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
         is_admin: bool = False,
+        owner_id: Optional[str] = None,
     ) -> SessionQueueStatus:
-        # Aggregate counts are global across all users within the requested scope. With user_id, the
-        # same snapshot also yields that user's own counts, for the per-user portion of the badge;
-        # they are returned in separate fields and never replace the global counts. Only the current
+        # Aggregate counts cover every user's items within the requested scope (only owner_id's, if
+        # given). With user_id, the same snapshot also yields that user's own counts, for the per-user
+        # portion of the badge; they are returned in separate fields and never replace the aggregate. Only the current
         # item's identifiers are read, not a full SessionQueueItem: this runs on every status poll and
         # every status change, and hydrating the item would deserialize its whole session graph.
-        counts, own_counts, current_item = self._queries.session_queue.status_counts(queue_id, user_id, origin_prefix)
+        counts, own_counts, current_item = self._queries.session_queue.status_counts(
+            queue_id, user_id, origin_prefix, owner_id
+        )
 
         user_pending: Optional[int] = None
         user_in_progress: Optional[int] = None
@@ -1003,17 +1111,19 @@ class SessionQueue(SessionQueueBase):
 
         # Redaction is decided from the same current_item snapshot used to embed identifiers,
         # so a concurrent transition (e.g. B finishing while A's status changes) cannot leave
-        # stale identifiers in the result. The aggregate counts stay global; only the current
+        # stale identifiers in the result. The aggregate counts are not redacted; only the current
         # item's identifiers are gated. acting_user_id (event path) takes precedence over
         # user_id (API path) when deciding the redaction owner; either being None means a
         # global caller who may see the current item. is_admin disables redaction outright so
         # admin callers can pass their user_id (for the per-user counts) without losing
         # visibility of other users' current item.
-        owner_user_id = user_id if acting_user_id is None else acting_user_id
+        redaction_subject = user_id if acting_user_id is None else acting_user_id
         current_item_id = None
         current_session_id = None
         current_batch_id = None
-        if current_item is not None and (is_admin or owner_user_id is None or current_item.user_id == owner_user_id):
+        if current_item is not None and (
+            is_admin or redaction_subject is None or current_item.user_id == redaction_subject
+        ):
             current_item_id = current_item.item_id
             current_session_id = current_item.session_id
             current_batch_id = current_item.batch_id
@@ -1151,24 +1261,62 @@ class SessionQueue(SessionQueueBase):
 
         clones = self._queries.run(survey, read_only=True)
 
-        def admit(q: Queries) -> Optional[list[tuple[int, str, ValueToInsertTuple]]]:
-            """The clones the queue had room for, inserted; None when it is full."""
+        # Whether the last run of `admit` reached its end: a run that raises before it rolls back. `run` repeats it
+        # after a conflict, so each run starts it over.
+        admit_ended = False
+
+        def admit(q: Queries) -> Optional[list[tuple[int, str, int]]]:
+            """The clones the queue had room for, inserted one by one for their ids; None when it is full."""
+            nonlocal admit_ended
+            admit_ended = False
             q.locks.acquire(*_ADMISSION, also_shared=_PROTECTING_MEDIA)
             max_new_queue_items = max_queue_size - q.session_queue.pending_count(queue_id)
-            if max_new_queue_items <= 0:
-                return None
-            admitted = clones[:max_new_queue_items]
-            q.session_queue.insert_items([values for _, _, values in admitted])
-            return admitted
+            inserted = (
+                None
+                if max_new_queue_items <= 0
+                else [
+                    (root_item_id, user_id, q.session_queue.insert_item(dict(zip(ITEM_COLUMNS, values, strict=True))))
+                    for root_item_id, user_id, values in clones[:max_new_queue_items]
+                ]
+            )
+            admit_ended = True
+            return inserted
 
-        admitted = self._queries.run(admit)
+        # A calibration attempt feeds a fit only if its store knows every retry of its items, also one canceled and
+        # pruned before anything else saw it. Announcing a retry cannot promise that: the server may stop before the
+        # announcement is handled. So the store counts the retries in flight before they commit and records them
+        # after, and a count left over keeps the attempt out.
+        calibration = self.__invoker.services.working_memory_calibration
+        in_flight = None
+        if calibration is not None:
+            origin_at, retried_from_at = ITEM_COLUMNS.index("origin"), ITEM_COLUMNS.index("retried_from_item_id")
+            in_flight = calibration.retries_starting(
+                {root_item_id: (values[origin_at], values[retried_from_at]) for root_item_id, _, values in clones}
+            )
+        try:
+            admitted = self._queries.run(admit)
+        except Exception:
+            if calibration is not None and in_flight is not None:
+                # A failure once `admit` ended can be the commit's own, which may have committed all the same (a lost
+                # connection to MySQL or MariaDB): which retries exist is unknown, and the count stays.
+                calibration.retries_committed(in_flight, None if admit_ended else [])
+            raise
+        if calibration is not None and in_flight is not None:
+            calibration.retries_committed(
+                in_flight,
+                [RetriedQueueItem(source_item_id=root, item_id=item_id) for root, _, item_id in admitted or []],
+            )
         if admitted is None:
             return RetryItemsResult(queue_id=queue_id, retried_item_ids=[])
         retried_item_ids_by_user: dict[str, list[int]] = {}
         for root_item_id, user_id, _ in admitted:
             retried_item_ids_by_user.setdefault(user_id, []).append(root_item_id)
         retry_result = RetryItemsResult(
-            queue_id=queue_id, retried_item_ids=[root_item_id for root_item_id, _, _ in admitted]
+            queue_id=queue_id,
+            retried_item_ids=[root_item_id for root_item_id, _, _ in admitted],
+            retried_items=[
+                RetriedQueueItem(source_item_id=root_item_id, item_id=item_id) for root_item_id, _, item_id in admitted
+            ],
         )
         self.__invoker.services.events.emit_queue_items_retried(
             retry_result,

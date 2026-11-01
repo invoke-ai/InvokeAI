@@ -1,14 +1,20 @@
 import type { GalleryView } from '@features/gallery';
-import type { GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItemRef, GalleryRevealAnnouncement } from '@features/gallery/contracts';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
-import { getGallerySettings, isGalleryNavigationCurrent, requestGalleryItemReveal } from '@features/gallery/contracts';
+import {
+  getGalleryItemView,
+  getGallerySettings,
+  isGalleryNavigationCurrent,
+  requestGalleryItemReveal,
+  toGalleryMediaKind,
+} from '@features/gallery/contracts';
 import { fetchVerifiedGalleryItemPage, GALLERY_PAGE_SIZE, galleryBoardsOptions } from '@features/gallery/queries';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
 
 /** Inject workbench dependencies so reveal loads on demand without adding gallery transfer code to editor boot. */
 export interface GalleryRevealContext {
@@ -25,8 +31,15 @@ export interface GalleryRevealContext {
 export interface GalleryRevealTicket {
   /** Account identity lifetime at the original gesture, before any lazy import or media fetch. */
   accountScope: AccountScope;
+  /** Announced in the Gallery's live region once the item is revealed; reveals the user asked for set none. */
+  announcement?: GalleryRevealAnnouncement;
   /** Canceled when a later Gallery navigation supersedes this locator. */
   locatorSignal?: AbortSignal;
+  /**
+   * A further condition checked wherever the ticket is, last immediately before the first Gallery change; false
+   * stands the reveal down. For reveals nobody on screen asked for.
+   */
+  mayApply?: () => boolean;
   /** The project the press belongs to; its writes may not land in another. */
   projectId: string;
   /** This navigation's place in the global ordering; see `claimGalleryNavigationSequence`. */
@@ -41,11 +54,14 @@ export interface GalleryRevealTicket {
 export const revealGalleryItem = (
   { commands, queries, queryClient }: GalleryRevealContext,
   ref: GalleryItemRef,
-  { accountScope, locatorSignal, projectId, sequence }: GalleryRevealTicket
+  { accountScope, announcement, locatorSignal, mayApply, projectId, sequence }: GalleryRevealTicket
 ): Promise<void> => {
   // Fence the network result to the gesture's project before clearing filters or selecting.
   const isCurrent = () =>
-    !accountScope.signal.aborted && isGalleryNavigationCurrent(sequence) && queries.isActiveProject(projectId);
+    !accountScope.signal.aborted &&
+    isGalleryNavigationCurrent(sequence) &&
+    queries.isActiveProject(projectId) &&
+    (mayApply?.() ?? true);
 
   if (!isCurrent()) {
     return Promise.resolve();
@@ -58,14 +74,27 @@ export const revealGalleryItem = (
       return;
     }
 
-    const getGalleryValues = () => getProjectWidgetValues(queries.getSnapshot().activeProject, 'gallery');
+    const targetView = getGalleryItemView(image);
+
+    // A Canvas-owned (`other`) item is in no view's listing, so there is nowhere to reveal it.
+    if (targetView === null) {
+      return;
+    }
+
+    const getGalleryValues = () => {
+      const snapshot = queries.getSnapshot();
+      return getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
+    };
     const settings = getGallerySettings(getGalleryValues());
-    const targetView: GalleryView = image.category === 'general' ? 'images' : 'assets';
     // Match the post-reveal listing filters and starred partition so prefetched pages enter the gallery's cache.
     const wantsStarredOnly = image.starred === true;
+    // A media filter that hides the item's kind is reset to both, like the other filters; one that shows it stays.
+    const currentMediaKind = toGalleryMediaKind(settings.mediaFilter);
+    const resetsMediaFilter = currentMediaKind !== undefined && currentMediaKind !== image.kind;
     const listingFilter = {
       boardId: image.boardId,
       galleryView: targetView,
+      ...(currentMediaKind && !resetsMediaFilter ? { mediaKind: currentMediaKind } : {}),
       orderDir: settings.imageOrderDir,
       searchTerm: '',
       starred: wantsStarredOnly,
@@ -97,10 +126,9 @@ export const revealGalleryItem = (
     const values = getGalleryValues();
     const settingsNow = getGallerySettings(values);
 
-    // The listing's ordering may have changed while the name list was
-    // in flight (sort direction); the computed index describes the old
-    // ordering, so the page landing is dropped.
-    if (settingsNow.imageOrderDir !== settings.imageOrderDir) {
+    // The listing's ordering or media filter may have changed while the locator was in flight; the computed index
+    // describes the old listing, so the page landing is dropped.
+    if (settingsNow.imageOrderDir !== settings.imageOrderDir || settingsNow.mediaFilter !== settings.mediaFilter) {
       return;
     }
 
@@ -120,10 +148,12 @@ export const revealGalleryItem = (
     // Clear filters to match the indexed listing and select the item's starred partition.
     if (
       hasSearch ||
+      resetsMediaFilter ||
       (values.starredOnly === true) !== wantsStarredOnly ||
       (values.semanticImageQuery !== null && values.semanticImageQuery !== undefined)
     ) {
       commands.widgets.patchValues('gallery', {
+        ...(resetsMediaFilter ? { mediaFilter: 'all' } : {}),
         searchTerm: '',
         semanticImageQuery: null,
         semanticSearchText: null,
@@ -147,7 +177,9 @@ export const revealGalleryItem = (
     }
 
     commands.gallery.selectItem(image, projectId, page ?? undefined);
-    if (boardIndex === null) {
+    if (announcement !== undefined) {
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex ?? undefined, announcement);
+    } else if (boardIndex === null) {
       requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal);
     } else {
       requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex);

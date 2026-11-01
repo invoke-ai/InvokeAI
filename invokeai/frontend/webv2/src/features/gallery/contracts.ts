@@ -1,23 +1,29 @@
 export type {
   GalleryBoard,
+  GalleryBoardAccess,
+  GalleryBoardAction,
   GalleryBoardDeletionResult,
   GalleryBoardKind,
   GalleryBoardOrderBy,
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,
   GeneratedVideoContract,
 } from './core/types';
+export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
 export {
   getGalleryBoardDestinationGroups,
   getGalleryBoardLabel,
+  getGalleryMoveTargets,
   type GalleryBoardDestinationGroup,
   type GalleryBoardTranslate,
 } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
+export { formatGalleryMediaCounts, type GalleryMediaCounts } from './core/mediaCounts';
 export {
   assertNeverGalleryItem,
   classifyGalleryUpload,
@@ -25,6 +31,7 @@ export {
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
   generatedVideoToGalleryItem,
+  getGalleryItemView,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
@@ -55,8 +62,11 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
-  GALLERY_AUTO_ADD_FOLLOW,
+  getGalleryMediaFilter,
   getGallerySettings,
+  isLegacyFollowAutoAdd,
+  toGalleryMediaKind,
+  type GalleryMediaFilter,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
@@ -64,17 +74,23 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryDefaultDestinationBoardId,
+  getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
   getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryView,
+  settleGallerySearchScope,
+  settleGalleryValues,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {
+  captureGalleryNavigation,
   claimGalleryNavigationSequence,
   getGalleryDeletionSuccessor,
   getGalleryNavigationStep,
@@ -82,8 +98,13 @@ export {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
   getSelectedGalleryItemFromValues,
+  hasGalleryListingSearch,
+  hasGalleryLocatorRequests,
   isGalleryNavigationCurrent,
+  isGalleryNavigationStateUnchanged,
   requestGalleryItemReveal,
+  type GalleryNavigationSnapshot,
+  type GalleryRevealAnnouncement,
   type GalleryNavigationDirection,
   type GalleryNavigationEntry,
 } from './core/selection';

@@ -1,11 +1,24 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, ReactNode } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Menu, Stack, Text, useMenuContext } from '@chakra-ui/react';
+import {
+  Box,
+  chakra,
+  HStack,
+  Icon,
+  Menu,
+  Portal,
+  Stack,
+  Text,
+  useMenuContext,
+  useMenuItemContext,
+} from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 
+import { IconButton, useUnavailableControl } from './Button';
+import { MiddleTruncate } from './MiddleTruncate';
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
@@ -18,16 +31,107 @@ export const MenuContent = (props: MenuContentProps) => {
   return stale ? null : <Menu.Content {...props} />;
 };
 
+export interface MenuHeadingGroupProps {
+  /** What the menu acts on, often a user's name: kept in its own case and middle-truncated. */
+  label: string;
+  /** Plain state text on the heading's row, such as "Unsaved changes". */
+  trailing?: ReactNode;
+  children: ReactNode;
+}
+
+/**
+ * A menu's title over the items it names. It keeps the group label's size, weight, padding and height so a titled
+ * menu reads like every other one, and labels the group, so assistive technology hears it without a focusable row.
+ */
+export const MenuHeadingGroup = ({ children, label, trailing }: MenuHeadingGroupProps) => (
+  <Menu.ItemGroup>
+    <Menu.ItemGroupLabel
+      alignItems="center"
+      color="fg.muted"
+      display="flex"
+      gap="2"
+      letterSpacing="normal"
+      textTransform="none"
+    >
+      <MiddleTruncate flex="1" text={label} />
+      {trailing ? (
+        <chakra.span color="fg.subtle" flexShrink={0} fontWeight="normal">
+          {trailing}
+        </chakra.span>
+      ) : null}
+    </Menu.ItemGroupLabel>
+    {children}
+  </Menu.ItemGroup>
+);
+
+const UNAVAILABLE_REASON_POSITIONING = { placement: 'right' } as const;
+
+/**
+ * The reason an unavailable item cannot act, shown while the item is highlighted, by pointer or keyboard alike: Zag
+ * highlights with `aria-activedescendant`, so the item never takes focus and a focus-opened tooltip would never show.
+ * The tooltip anchors to an overlay of the whole item, so the item's own children and layout stay as the caller wrote
+ * them, and the item keeps its Zag id (a tooltip trigger would take it over).
+ */
+const UnavailableReason = ({ label, reason }: { label: string | undefined; reason: string }) => {
+  const item = useMenuItemContext();
+  const content = useMemo(
+    () =>
+      label ? (
+        <Stack gap="0">
+          <Text>{label}</Text>
+          <Text color="fg.muted">{reason}</Text>
+        </Stack>
+      ) : (
+        reason
+      ),
+    [label, reason]
+  );
+  return (
+    <Tooltip content={content} open={item.highlighted} positioning={UNAVAILABLE_REASON_POSITIONING}>
+      <Box aria-hidden inset="0" pointerEvents="none" position="absolute" />
+    </Tooltip>
+  );
+};
+
+export type MenuItemProps = ComponentProps<typeof Menu.Item> & {
+  /**
+   * Why the item cannot act now (say, no clipboard on a plain-HTTP origin). It reads as disabled (`aria-disabled`,
+   * described by the reason) but stays highlightable, where Zag's `disabled` would skip it in keyboard navigation; no
+   * selection gets through (neither its handlers nor the menu root's `onSelect`, and the menu stays open); and the
+   * reason shows beside it while highlighted. An item named only by `aria-label` shows that name with the reason. The
+   * reason wins over `disabled`, which would make it unreachable.
+   */
+  unavailableReason?: string;
+};
+
+/** `Menu.Item`, plus the unavailable state. */
+export const MenuItem = ({ children, disabled, unavailableReason, ...props }: MenuItemProps) => {
+  const unavailable = useUnavailableControl(unavailableReason, props['aria-describedby']);
+
+  return (
+    <Menu.Item {...props} {...unavailable?.props} disabled={unavailable ? undefined : disabled}>
+      {children}
+      {unavailableReason ? <UnavailableReason label={props['aria-label']} reason={unavailableReason} /> : null}
+      {unavailable?.description}
+    </Menu.Item>
+  );
+};
+
 export interface MenuActionItemProps {
   value: string;
   label: string;
-  /** Second line under the label, for choices whose consequences are not obvious; top-aligns the icon. */
+  /**
+   * Second line under the label, for choices whose consequences are not obvious; top-aligns the icon. It describes the
+   * item (`aria-describedby`); the item's name stays the label.
+   */
   hint?: string;
   icon?: LucideIcon;
   /** CSS color for the icon (e.g. a swatch); the theme tone otherwise. */
   iconColor?: string;
   tone?: 'danger';
   disabled?: boolean;
+  /** See `MenuItem`. */
+  unavailableReason?: string;
   /** Trailing keycaps; the caller renders them, since key glyphs are a workbench concern. */
   shortcut?: ReactNode;
   onSelect: () => void;
@@ -45,15 +149,12 @@ export const MenuActionItem = ({
   onSelect,
   shortcut,
   tone,
+  unavailableReason,
   value,
-}: MenuActionItemProps) => (
-  <Menu.Item
-    {...(hint ? TWO_LINE_ITEM : undefined)}
-    data-danger={tone === 'danger' ? '' : undefined}
-    disabled={disabled}
-    value={value}
-    onSelect={onSelect}
-  >
+}: MenuActionItemProps) => {
+  const labelId = useId();
+  const hintId = useId();
+  const content = (
     <HStack alignItems={hint ? 'flex-start' : 'center'} gap={hint ? '2.5' : '2'} minW="0" w="full">
       {icon ? (
         <Icon
@@ -67,8 +168,8 @@ export const MenuActionItem = ({
       ) : null}
       {hint ? (
         <Stack flex="1" gap="0" minW="0">
-          <Text>{label}</Text>
-          <Text color="fg.subtle" fontSize="xs">
+          <Text id={labelId}>{label}</Text>
+          <Text id={hintId} color="fg.subtle" fontSize="xs">
             {hint}
           </Text>
         </Stack>
@@ -79,8 +180,23 @@ export const MenuActionItem = ({
       )}
       {shortcut}
     </HStack>
-  </Menu.Item>
-);
+  );
+
+  return (
+    <MenuItem
+      {...(hint ? TWO_LINE_ITEM : undefined)}
+      aria-describedby={hint ? hintId : undefined}
+      aria-labelledby={hint ? labelId : undefined}
+      data-danger={tone === 'danger' ? '' : undefined}
+      disabled={disabled}
+      unavailableReason={unavailableReason}
+      value={value}
+      onSelect={onSelect}
+    >
+      {content}
+    </MenuItem>
+  );
+};
 
 const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const ICON_ITEM_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
@@ -94,33 +210,151 @@ export interface MenuIconItemProps {
   iconFill?: string;
   tone?: 'danger';
   disabled?: boolean;
+  /** See `MenuItem`; the reason's tooltip names the item too. */
+  unavailableReason?: string;
   onSelect: () => void;
 }
 
 /** Wrap the icon, not Menu.Item: tooltip IDs would replace Zag's selection ID and prevent onSelect. */
-export const MenuIconItem = ({ disabled, icon, iconFill, label, onSelect, tone, value }: MenuIconItemProps) => (
-  <Menu.Item
-    aria-label={label}
-    data-danger={tone === 'danger' ? '' : undefined}
-    disabled={disabled}
-    flex="1"
-    justifyContent="center"
-    value={value}
-    onSelect={onSelect}
-  >
-    <Tooltip
-      showArrow
-      content={label}
-      contentProps={ICON_ITEM_TOOLTIP_CONTENT_PROPS}
-      openDelay={300}
-      positioning={ICON_ITEM_TOOLTIP_POSITIONING_PROPS}
+export const MenuIconItem = ({
+  disabled,
+  icon,
+  iconFill,
+  label,
+  onSelect,
+  tone,
+  unavailableReason,
+  value,
+}: MenuIconItemProps) => {
+  const glyph = (
+    <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
+      <Icon as={icon} boxSize="4" color={tone === 'danger' ? undefined : 'fg'} fill={iconFill ?? 'none'} />
+    </Box>
+  );
+
+  return (
+    <MenuItem
+      aria-label={label}
+      data-danger={tone === 'danger' ? '' : undefined}
+      disabled={disabled}
+      flex="1"
+      justifyContent="center"
+      unavailableReason={unavailableReason}
+      value={value}
+      onSelect={onSelect}
     >
-      <Box alignItems="center" display="flex" h="full" justifyContent="center" w="full">
-        <Icon as={icon} boxSize="4" color={tone === 'danger' ? undefined : 'fg'} fill={iconFill ?? 'none'} />
-      </Box>
-    </Tooltip>
-  </Menu.Item>
-);
+      {/* The reason's tooltip names an unavailable item, so the hover label would only repeat it. */}
+      {unavailableReason ? (
+        glyph
+      ) : (
+        <Tooltip
+          showArrow
+          content={label}
+          contentProps={ICON_ITEM_TOOLTIP_CONTENT_PROPS}
+          openDelay={300}
+          positioning={ICON_ITEM_TOOLTIP_POSITIONING_PROPS}
+        >
+          {glyph}
+        </Tooltip>
+      )}
+    </MenuItem>
+  );
+};
+
+export interface IconRadioMenuOption<Value extends string> {
+  value: Value;
+  label: string;
+  /** Also the trigger's icon while this option is chosen. */
+  icon: LucideIcon;
+}
+
+export interface IconRadioMenuProps<Value extends string> {
+  /** What is being chosen; heads the menu's options. */
+  label: string;
+  /** The trigger's accessible name; name the current choice, since the trigger shows only its icon. */
+  triggerLabel: string;
+  tooltip: ReactNode;
+  options: readonly IconRadioMenuOption<Value>[];
+  value: Value;
+  /** A choice that narrows what the surface shows reads as an active control. */
+  isActive?: boolean;
+  size?: 'sm' | 'md';
+  /** A stable id lets another surface hand focus to the trigger; a generated one otherwise. */
+  triggerId?: string;
+  triggerRef?: Ref<HTMLButtonElement>;
+  triggerAttributes?: Readonly<Record<`data-${string}`, string>>;
+  onValueChange: (value: Value) => void;
+}
+
+const ICON_RADIO_MENU_POSITIONING = { placement: 'bottom-end' } as const;
+
+/** A compact single-choice menu behind an icon trigger that shows the current choice. */
+export const IconRadioMenu = <Value extends string>({
+  isActive = false,
+  label,
+  onValueChange,
+  options,
+  size = 'sm',
+  tooltip,
+  triggerAttributes,
+  triggerId,
+  triggerLabel,
+  triggerRef,
+  value,
+}: IconRadioMenuProps<Value>) => {
+  const generatedId = useId();
+  // Shared ids let the tooltip ride the trigger without wrapping Menu.Trigger, which would swallow its anchor ref.
+  const ids = useMemo(() => ({ trigger: triggerId ?? generatedId }), [generatedId, triggerId]);
+  const current = options.find((option) => option.value === value) ?? options[0];
+  const handleValueChange = useCallback(
+    (event: { value: string }) => {
+      const next = options.find((option) => option.value === event.value);
+
+      if (next && next.value !== value) {
+        onValueChange(next.value);
+      }
+    },
+    [onValueChange, options, value]
+  );
+
+  return (
+    <Menu.Root ids={ids} positioning={ICON_RADIO_MENU_POSITIONING}>
+      <Tooltip content={tooltip} ids={ids}>
+        <Menu.Trigger asChild>
+          <IconButton
+            ref={triggerRef}
+            aria-label={triggerLabel}
+            color={isActive ? undefined : 'fg.muted'}
+            data-active={isActive ? '' : undefined}
+            flexShrink={0}
+            size={size}
+            variant={isActive ? 'solid' : 'ghost'}
+            {...triggerAttributes}
+          >
+            {current ? <Icon as={current.icon} boxSize="3.5" /> : null}
+          </IconButton>
+        </Menu.Trigger>
+      </Tooltip>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="10rem">
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel>{label}</Menu.ItemGroupLabel>
+              <Menu.RadioItemGroup value={value} onValueChange={handleValueChange}>
+                {options.map((option) => (
+                  <Menu.RadioItem key={option.value} value={option.value}>
+                    <Menu.ItemIndicator />
+                    <Menu.ItemText>{option.label}</Menu.ItemText>
+                  </Menu.RadioItem>
+                ))}
+              </Menu.RadioItemGroup>
+            </Menu.ItemGroup>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
 
 interface ContextMenuAnchor {
   x: number;

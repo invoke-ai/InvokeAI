@@ -1,6 +1,12 @@
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
-import type { GalleryImage, GalleryOrderDir, GeneratedImageContract, GeneratedVideoContract } from './types';
+import type {
+  GalleryImage,
+  GalleryOrderDir,
+  GalleryView,
+  GeneratedImageContract,
+  GeneratedVideoContract,
+} from './types';
 
 export type GalleryItemKind = 'image' | 'video';
 
@@ -34,6 +40,8 @@ export interface GalleryImageItem extends GalleryItemBase {
 export interface GalleryVideoItem extends GalleryItemBase {
   durationSeconds: number;
   fps?: number;
+  /** Whether the video embeds the workflow that made it. Video records say; the mixed-media listing does not. */
+  hasWorkflow?: boolean;
   kind: 'video';
   /** `audio_upload` identifies audio converted into a waveform video rather than footage. */
   mediaOrigin?: string;
@@ -58,6 +66,32 @@ export interface GalleryItemMutationResult {
 }
 
 export const toGalleryItemKey = ({ kind, name }: GalleryItemRef): GalleryItemKey => `${kind}:${name}`;
+
+/**
+ * The Gallery view that lists each category, mirroring the backend's `IMAGE_CATEGORIES` and `ASSETS_CATEGORIES`
+ * (`invokeai/app/services/image_records/image_records_common.py`). `other` is in neither: it marks pixels a Canvas
+ * layer owns, which the backend keeps durable but never lists or counts, so no view can show such an item.
+ */
+const galleryViewByCategory: Record<GalleryItemCategory, GalleryView | null> = {
+  control: 'assets',
+  general: 'images',
+  mask: 'assets',
+  other: null,
+  user: 'assets',
+};
+
+/**
+ * Which Gallery view lists an item, for images and videos alike; null for a Canvas-owned (`other`) item that no view
+ * lists. Callers must not open or navigate a view for a null item: the listing would never contain it.
+ */
+export const getGalleryItemView = ({ category }: Pick<GalleryItem, 'category'>): GalleryView | null =>
+  galleryViewByCategory[category];
+
+/** The categories a view's backend listing requests: the inverse of `getGalleryItemView`. */
+export const getGalleryViewCategories = (view: GalleryView): GalleryItemCategory[] =>
+  (Object.keys(galleryViewByCategory) as GalleryItemCategory[]).filter(
+    (category) => galleryViewByCategory[category] === view
+  );
 
 export const shouldStarSelection = (items: readonly GalleryItem[], refs: readonly GalleryItemRef[]): boolean => {
   if (refs.length === 0) {
@@ -94,7 +128,7 @@ const compareSqliteBinaryText = (a: string, b: string): number => (a === b ? 0 :
  * Normalize SQLite and ISO timestamps before comparing; their space/T separators otherwise misorder same-day
  * items.
  */
-const compareCreatedAt = (a: string, b: string): number =>
+export const compareCreatedAt = (a: string, b: string): number =>
   compareSqliteBinaryText(normalizeServerTimestamp(a), normalizeServerTimestamp(b));
 
 /** Mirrors the backend's time/kind/name order for mixed gallery items. */
@@ -280,5 +314,11 @@ export const classifyGalleryUpload = (file: Pick<File, 'name' | 'type'>): { kind
 
 /** Virtual "by date" boards (`by_date:<YYYY-MM-DD>`) list items but can never receive them. */
 export const DATE_BOARD_ID_PREFIX = 'by_date:';
+
+/**
+ * The listing scope of every board the caller may read plus their Uncategorized items, as the gallery endpoints take
+ * it for `board_id`. A scope, not a board: nothing is ever stored on it.
+ */
+export const ALL_READABLE_BOARDS_ID = 'all';
 
 export const isDateBoardId = (boardId: string): boolean => boardId.startsWith(DATE_BOARD_ID_PREFIX);

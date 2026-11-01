@@ -349,10 +349,11 @@ const CompactBottomWidget = ({
   const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
   const isRowActive = item.isPopover ? isPopoverOpen : isActive;
 
+  // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would
+  // replace the visible status text that speech-input users read off the chip (WCAG 2.5.3).
   const row = (
     <Row
       {...rowDragHandleProps}
-      aria-label={item.label}
       aria-pressed={item.isPopover ? undefined : isRowActive}
       color={isRowActive ? undefined : 'fg.muted'}
       cursor={isDragging ? 'grabbing' : 'default'}

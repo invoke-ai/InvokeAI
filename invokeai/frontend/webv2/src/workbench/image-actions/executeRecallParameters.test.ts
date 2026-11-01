@@ -3,7 +3,8 @@ import type { WorkbenchCommands } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
 import { accountLifecycle, captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const galleryApi = vi.hoisted(() => ({
   galleryImages: {
@@ -28,7 +29,20 @@ import { executeRecallParameters } from './executeRecallParameters';
 
 const sdxl = { base: 'sdxl', hash: 'h', key: 'sdxl-main', name: 'SDXL', type: 'main' } as ComponentModelConfig;
 const sd1 = { base: 'sd-1', hash: 'h1', key: 'sd1-main', name: 'SD 1', type: 'main' } as ComponentModelConfig;
-const t = ((key: string) => key) as unknown as TFunction;
+const englishCatalog = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+const instance = i18n.createInstance();
+const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+
+beforeAll(async () => {
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
+  });
+});
 
 /** Runs `fn` with the capability table absent, the way a failed boot fetch leaves it. */
 const withoutCapabilities = async <T>(fn: () => Promise<T>): Promise<T> => {
@@ -119,7 +133,7 @@ describe('executeRecallParameters', () => {
     expect(add).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: 'info',
-        message: 'refiner_model: not supported by the Generate panel',
+        message: 'refiner_model: not found (refiner)',
         title: 'Some recalled parameters were not applied',
       })
     );
@@ -159,7 +173,7 @@ describe('executeRecallParameters', () => {
       expect(setSettings).not.toHaveBeenCalled();
       expect(add).toHaveBeenCalledWith({
         kind: 'info',
-        message: 'widgets.generate.capabilitiesUnavailableForRecall',
+        message: t('widgets.generate.capabilitiesUnavailableForRecall'),
         title: 'Cannot apply recalled parameters',
       });
     });
@@ -200,7 +214,7 @@ describe('executeRecallParameters', () => {
       expect(setSettings).not.toHaveBeenCalled();
       expect(add).toHaveBeenCalledWith({
         kind: 'info',
-        message: 'widgets.generate.capabilitiesUnavailableForSetup',
+        message: t('widgets.generate.capabilitiesUnavailableForSetup'),
         title: 'Cannot apply recalled parameters',
       });
     });

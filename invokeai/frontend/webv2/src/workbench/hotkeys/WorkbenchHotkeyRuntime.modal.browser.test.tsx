@@ -16,7 +16,7 @@ import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, StrictMode, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 /**
@@ -36,6 +36,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));
@@ -77,6 +79,7 @@ const Scene = () => {
       {confirmHost ? (
         <ConfirmDialog
           body="Delete the selected image?"
+          cancelLabel="Cancel"
           confirmLabel="Delete"
           isOpen={confirm}
           title="Delete image"
@@ -225,6 +228,12 @@ describe('WorkbenchHotkeyRuntime under a modal dialog', () => {
   });
 
   it('runs nothing behind for the Escape or Enter that closes a dialog, and the next press reaches it', async () => {
+    // The next press lands while the closed dialog is still animating out; on a loaded machine a real-length exit
+    // animation can end before then, so it is held for the whole test.
+    const holdExit = document.createElement('style');
+    holdExit.textContent = '[role="alertdialog"][data-state="closed"] { animation-duration: 3600s !important; }';
+    document.head.append(holdExit);
+    onTestFinished(() => holdExit.remove());
     await openConfirm();
     await userEvent.keyboard('{Escape}');
     expect(ran).toEqual([]);
@@ -237,7 +246,10 @@ describe('WorkbenchHotkeyRuntime under a modal dialog', () => {
     await userEvent.keyboard('{Enter}');
     expect(confirmed).toBe(1);
     expect(ran).toEqual(['map.escape']);
-    dispatchKey({ key: 'Enter' });
+    // From outside any control: Enter on a focused button (focus may return to one) is the button's own press.
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Enter', key: 'Enter' })
+    );
     expect(ran).toEqual(['map.escape', 'map.enter']);
   });
 

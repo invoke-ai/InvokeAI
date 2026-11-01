@@ -1,0 +1,220 @@
+---
+title: Family E2E Runs
+lastUpdated: 2026-10-29
+---
+
+`scripts/family_e2e` runs model families end to end through the HTTP API of a server it launches itself. Per case and size it records the image, the run time, the time per denoise step and the VRAM the server process used, measured at driver level. The report compares them with an explicitly accepted reference and with the previous run of the same profile.
+
+It is a developer tool. It runs on Windows with NVIDIA and AMD (ROCm) GPUs, where it samples memory through WDDM, and on Linux with NVIDIA GPUs, where it reads NVML. AMD GPUs on Linux are not supported yet. The two samplers count differently, so keep one profile per machine, operating system and GPU, and never compare peaks across them (see [Limits](#limits)).
+
+## How a run works
+
+1. **Scratch root.** The template root's `invokeai.yaml` and a snapshot of its SQLite database go to `<data_dir>/scratch-roots/<run_id>-default/`. The template's database files (with a WAL left by an unclean stop) are copied, and the copy is backed up through InvokeAI's database layer, so the WAL's contents are included and the template's files are only read.
+   - The tool refuses while the database file is open in any process (Windows only), or while anything listens on the template's configured port. Either means its server is still running.
+   - It also refuses while a model install is unfinished (see [Shared paths](#shared-paths)).
+   - Stores whose files the database owns start empty in the scratch root: outputs, uploaded fonts, style preset images, workflow thumbnails and profiles. The scratch server reconciles them with its own database; at the template it would, for example, delete uploaded fonts its database does not list.
+   - Every other path setting points back at the template root as an absolute path, so models, custom nodes and memory settings are the template's own.
+   - The tool overrides a few settings: a free port on `127.0.0.1`, a plain-format log file in the run directory, the image index off, and the queue cleared at startup. SSL and `base_url` are dropped. On Linux the server sees only the selected GPU, as `cuda:0`, so a `device` of `cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto`.
+   - `INVOKEAI_*` variables of the calling environment are not passed on. Put settings the server needs into the manifest's `server.env`.
+2. **Server.** The tool checks that `server.python` imports `invokeai` from `server.code_dir`. It then starts `<python> <code_dir>/scripts/invokeai-web.py --root <scratch root>` and reads the actual port from the server log. Multiuser mode is refused.
+   - On Windows the server runs in a job object of the runner, so it dies with the runner however the runner ends. On Linux it runs in a session of its own. `stop`, an interrupt or a plain kill (SIGTERM) of the runner ends it; a runner killed with SIGKILL leaves it running. The runner writes the launched process into `heartbeat.json` before it waits for the server to start, so `stop` and `resume` also find a server whose runner was killed during the startup. While it holds more than 1 GiB on that GPU, `start` and `resume` name it as foreign load and refuse; `stop RUN` ends it. Otherwise the resumed runner stops it first, before it replaces `heartbeat.json`, which names the server for `stop`, or touches the scratch root and a calibration store in it. If it cannot stop the server, the runner refuses and leaves the scratch root with its store and the server's entries in `heartbeat.json` as they are; `runner.log` names the pid and the run shows as failed.
+3. **Graphs.** The real webv2 graph builders produce each case's batch through `pnpm graphs:export`, run in the tool checkout. Run `pnpm install` in `invokeai/frontend/webv2` there first.
+   - The runner disables the invocation cache on every node and saves the batch as `graphs/<case_key>.json`.
+   - It hashes the graph and its batch data. Uploaded image names are replaced by the input file's hash, so the graph hash changes only when the graph or an input changes.
+   - Init and control images enter the canvas compiler as finished layers. One whose size differs from the case size is resized (LANCZOS) into `runs/<run_id>/inputs/` before upload. Reference images are uploaded as they are.
+4. **Steps.** Per family the model cache is emptied first. Each case size then gets its warm-ups, then its measured runs.
+   - Per run, the tool waits up to 10 minutes for the queue to drain, samples the server's GPU memory, enqueues the batch and follows its socket events.
+   - When the run finishes, it saves the output image and the memory trace, reads the run's slice of the server log and appends a record to `records.jsonl`.
+   - If the server dies during a step, that step gets an error record and a new server starts on a new scratch root. A case whose steps crashed the server twice is given up; its remaining steps are not run again, not even by `resume`.
+5. **Report.** The server is stopped, the scratch root removed, and `report.html` and `summary.md` are written. The exit code is not 0 when a case fails, errors or is incomplete (see [Verdicts](#verdicts)).
+   - The scratch root goes, and a calibration run's store is copied from it, only once every process of the server is confirmed to have exited: its launcher and serving process as `heartbeat.json` names them, and each process of its tree or group that outlived the kill, checked again. This holds for every server lifetime, also one whose server crashed or failed to start. A process whose state the tool may not read counts as running.
+   - When the kill fails, a process outlives it (one stuck in the GPU driver, say), or the stop itself is interrupted, the runner keeps the scratch root with its store. `heartbeat.json` goes on naming the server and, under `server_survivors`, each further process that outlived the kill, such as a worker or a launcher the runner could not record. `runner.log` names the pids, and the run fails (an interrupted or stopped run stays stopped). End the processes, then `stop` or `resume`, which stop every process the heartbeat names before they touch the root.
+
+## Data directory
+
+```
+<data_dir>/inputs/                          input images the manifest refers to
+<data_dir>/references/<profile>/<case_key>/ image.png, reference.json (written by `accept` only)
+<data_dir>/runs/<run_id>/                   run.json, records.jsonl, heartbeat.json, runner.log, server-default.log,
+                                            run.lock, graphs/, images/, traces/<record_id>.csv.gz, report.html, summary.md,
+                                            calibration/ (calibration runs only), <run_id>.zip (written by `bundle` only)
+<data_dir>/scratch-roots/<run_id>-default/
+```
+
+A model's key belongs to the local database and means nothing on another machine. So `run.json` also records, per case key, the models its graph uses as `case_models`: name, base, type, format, variant and hash. The source is kept only when it names the model anywhere: an HF repo id, or an http(s) URL of a public host (no private, loopback or link-local address, no single-label or `.local` name) without credentials, `;params`, query or fragment. The model's path is never recorded. The report and `summary.md` list each case's models with the hash cut to 12 digits. Runs written before this field show no models.
+
+`run_id` is `YYYYMMDD-HHMMSS-<profile>`, and `case_key` is `<case id>@<width>x<height>`. The report looks for the previous run among the run directories whose name carries exactly its profile; it does not read the others, and notes an unreadable run of its own profile. A trace holds the raw samples as `series,t,bytes`: series `dedicated` or `shared` (Windows only), and `t` in seconds from the enqueue.
+
+One runner per GPU: a lock file per adapter lives in `%LOCALAPPDATA%\invokeai-family-e2e\locks\` (`~/.cache/invokeai-family-e2e/locks/` on Linux), shared by every data directory on the machine. Runs on different GPUs of one machine can run side by side; give each its own profile, since the profile's latest run and references are shared. On Windows that needs cards whose names differ: there is no LUID selector. Running side by side changes run times, not peaks or images, so compare times only between runs made with the same number of runs alongside. The runs share the machine's RAM, so lower `max_cache_ram_gb` in each template root.
+
+## Manifest
+
+A YAML file per machine, operating system and GPU, kept with the data rather than in the repository. Start from `scripts/family_e2e/manifest.example.yaml`. Relative paths are relative to the manifest file.
+
+| Field | Meaning |
+| --- | --- |
+| `profile` | Names runs and references. |
+| `data_dir` | The data directory above. |
+| `gpu` | Substring of the adapter name that matches exactly one adapter, e.g. `RTX 4090` or `9060`. `Radeon` alone also matches an AMD integrated GPU. On Linux it can also be an NVML UUID (`GPU-…`, listed by `nvidia-smi -L` and by the error for a name that matches several cards), which tells identical cards apart. A GPU NVML cannot query is left out with a warning. |
+| `server.template_root` | The root whose settings and database are copied. The scratch server shares its other paths; see [Shared paths](#shared-paths). |
+| `server.python` | The interpreter that runs the server. |
+| `server.code_dir` | The checkout the server runs. Defaults to the tool's checkout. |
+| `server.env` | Extra server environment, e.g. `HIP_VISIBLE_DEVICES`. On Linux the runner sets `CUDA_VISIBLE_DEVICES` to the selected GPU's UUID itself, so the server sees exactly that card, as `cuda:0`, and neither spreads its workers over the others nor borrows an idle one. A `CUDA_VISIBLE_DEVICES` here with any other value than that UUID is refused. The scratch root's `device: cuda:N` becomes `cuda:0` and a `generation_devices` list with a CUDA device becomes `auto` (see [How a run works](#how-a-run-works)). On Windows pin the server to the manifest's `gpu` here when the machine has several. Either way the first completed step fails the run when the server holds no memory on the selected card. |
+| `defaults` | `warmup` (at least 1), `repeats`, `seed`, `prompt`, `negative_prompt`, `psnr_min_db`, `time_tolerance` (relative), `peak_tolerance_mb`, `run_timeout_s`. |
+| `families[].cases[]` | `id`, `model` (key), `mode` (`txt2img`, `img2img` or `controlnet`), `sizes` (a list of `[width, height]`), `steps`, optional `seed` and `prompt`, `components` (component slot to model key), `loras`, `reference_images`, `init_image` (`path`, `strength`), `control` (`model`, `image`, `weight`, `begin`, `end`), `settings` (generate settings), per-case thresholds, and `expect`: `unchanged` (default) or `changed` for a case the code under test is meant to change (see [Verdicts](#verdicts)). |
+
+Input paths are relative to `<data_dir>/inputs` and must exist. `init_image` belongs to `img2img` cases only and `control` to `controlnet` cases only. The exporter rejects an unknown `settings` key, component slot or model key; that case then gets error records and the run goes on. Several `sizes` per case give a size sweep for working-memory calibration.
+
+## Commands
+
+Run the tool from the repository root with the checkout's environment, for example `uv run --no-sync python -m scripts.family_e2e …`.
+
+| Command | What it does |
+| --- | --- |
+| `start --manifest M [--family F]… [--case ID]… [--calibrate]` | Checks the GPU lock, the template's server, unfinished model installs and foreign GPU load. It then creates the run, starts its runner in the background, waits until the runner has registered, and prints the run id, the runner's pid and paths. `--calibrate` makes it a [calibration run](#working-memory-calibration). |
+| `status [RUN]` | Shows progress, the current step, the heartbeat age and whether the runner is alive, and for a calibration run the number of saved store exports. |
+| `stop [RUN]` | Marks the run stopped, then kills the runner and its server, saves a calibration run's store from its scratch roots and removes them. If a process of the run still runs after the kill, `stop` names its pids, keeps the scratch roots with their stores and exits with code 2; end it and `stop` again. |
+| `resume [RUN]` | Starts the runner of a stopped or crashed run again, and waits until it has registered. Refuses while the run's runner is alive. On Linux the runner first stops a server its killed predecessor left running (see [How a run works](#how-a-run-works)); a calibration run's runner then saves a store left in a scratch root (see [Working-memory calibration](#working-memory-calibration)). |
+| `report [RUN]` | Writes `report.html` and `summary.md` again. |
+| `accept [RUN] [--case KEY]…` | Makes the run's measured results the references of its profile. Nothing else writes references. |
+| `bundle [RUN] [--output PATH]` | Packs the run into a zip without this machine's paths, to attach to a PR or an issue (see [Bundle](#bundle)). |
+| `run --run-dir D` | The runner in the foreground: what `start` and `resume` launch. It leaves a run that is not `running` as it is and exits with 130, also when `stop` marks the run while it runs. |
+
+`RUN` is a run directory, or a run id together with `--manifest M`. Without it, the profile's latest run is used.
+
+A runner registers before it does anything else: it writes its process into `heartbeat.json`, which `stop`, `status` and `resume` read. `stop` marks the run stopped before it reads that file. The mark and a registration each hold `run.lock`, so they cannot interleave: a runner registered before `stop` is killed, and one that registers after it finds the run stopped and exits without touching it. The runner also spawns each server under `run.lock` and records it in `heartbeat.json` before it lets go, so `stop` kills every server started before its mark, and no server starts after it. A runner that `stop` could not kill exits before its next server or step; in a calibration run it first saves its server's store, which `run.json` lists without a change of status. It never overwrites a status other than `running`.
+
+On Windows the background runner breaks away from the caller's job object, so a terminal or an agent harness that kills its job's processes does not end a long run. Where breakaway is refused, the runner is created through WMI. It then starts with the user's default environment instead of the caller's.
+
+A resumed run skips every step that already has a final record and keeps the measures of the earlier sessions. Its new server starts with a cold model cache, so each case size with measures left first repeats its last warm-up, once. The manifest, the graphs, and the server's commit and dirty flag must not have changed since the run started; further edits to an already dirty checkout cannot be detected.
+
+## Working-memory calibration
+
+`start --calibrate` measures what each model operation of the cases needs on this GPU. It runs where the rest of the tool does: on Windows, and on Linux with NVIDIA GPUs, where the server's probe reads the driver's figure through NVML too. Every step compiles its graph as a normal run does, then submits it to `POST /api/v2/models/i/{model}/working_memory/calibrate` with the case's `model` key instead of `enqueue_batch`, stating each model of the graph as the config the case was compiled from has it (`graph_models`, from the run's `case_models`); the server refuses a step whose models changed since. The server runs it with its working-memory probe, which records a window per estimated model operation in its calibration store (see "Calibration runs" in the [model manager architecture](/development/architecture/model-manager/#calibration-runs)). Warm-ups and measures alike are submitted, and every window is kept.
+
+- **Before the steps.** The runner reads `GET /api/v2/models/working_memory/status`. With `available: false` (no GPU, several generation devices, an unusable store file) the run fails with the server's reason. The scratch server runs single-user, so the tool is an administrator.
+- **Refusals.** A 404 or 422 answer to a calibrate request (an unknown model, a graph the run cannot measure) gives that step an error record, and the run goes on. Any other error response ends the run with the server's detail, after its store was saved; fix the cause and `resume`.
+- **Records.** Each accepted step's record carries `calibration`: the calibration run id and the device class. The probe synchronizes and empties the allocator cache around every model operation, so time and VRAM are invalid with that reason; `status` shows it as a calibration marker rather than counting it, and images are still compared. A step foreign load spoiled is not repeated: the server keeps every window. `accept` refuses calibration runs, and reports of later runs do not compare against them.
+- **Exports.** Every server lifetime has its own scratch database and store, so the tool submits each attempt once and sends no retry key. When a lifetime's steps are done, the runner saves `calibration/<run_id>-<n>-<device_class_id>.json` (`GET /api/v2/models/working_memory/export`, byte for byte) and `calibration/<run_id>-<n>-status.json`; `n` counts the run's lifetimes. After a server crash, a runner failure or `stop`, the store file is copied from the scratch root instead, without a status. `run.json` lists them all under `calibration_exports`. When neither the export nor the copy can be saved (a full disk, say), the run fails, or a stop stays stopped, and the scratch root under `<data_dir>/scratch-roots/` is kept with the store: the only copy of that lifetime's windows. `stop` still marks the run stopped, names the kept root and exits with code 2. Fix the cause and `resume`: once a server the earlier runner left running is stopped (see [How a run works](#how-a-run-works)), since it may still write its store, the runner saves a store that runner left in a scratch root (a failed save, or a killed runner), then removes the root. Both come before the new server's scratch root is built. If that save fails too, the runner refuses to go on, `runner.log` names the root and the run shows as failed; move its store away or fix the cause first.
+
+On a machine the tool does not run on, an administrator takes the export of a server's own calibration runs from `GET /api/v2/models/working_memory/export?device_class_id=<id>`; `GET /api/v2/models/working_memory/status` lists the device class ids.
+
+### Building shipped data
+
+```
+uv run --no-sync python -m scripts.working_memory.build_shipped <data_dir>/runs/<run_id>/calibration [more exports or directories] [--points FILE ...] [--write]
+```
+
+`scripts/working_memory/build_shipped.py` reads the exports, and the point files `--points` names, and prints what it would change in `invokeai/backend/working_memory/data/`; `--write` writes it. A directory stands for the exports in it, in lifetime order. Then run `uv run --no-sync pytest tests/backend/working_memory`.
+
+- **Point files.** A calibration script such as `scripts/calibrate_z_image_working_memory.py` writes one JSON object per line: a `MeasuredPoint`'s fields (`estimator`, `version`, `platform`, `features`, `measured_bytes`, `method`, `device`, `provenance`) and whatever else it keeps, such as raw readings, which the builder ignores. These are fresh-process measurements, so they cap a line as well as raise it; a `probe_demand` record is refused. A check's record (a forced math kernel, a ControlNet, more blocks) says `in_fit: false`, and so does a fit-grid forward whose features its estimator's `line` does not admit (a score matrix the build's SDPA kernel materializes): it tests an analytic term or an assumption rather than the line, so it ships as an out-of-fit point that bounds its estimate from below only, and the data test's `OUT_OF_FIT` has to list it. It stays beside a fit point with the same features rather than replacing it, since being in the fit is part of what makes two points one measurement. A record's platform may name the OS anywhere and keeps it only where an entry names it. A measurement given twice keeps its larger reading.
+- **Points.** Every valid, fit-eligible window with a positive demand becomes a `probe_demand` point. Per card, estimator, version, platform and features it takes the largest `demand_bytes` of all windows given: repetitions, lifetimes, and several runs or machines with the same card. A card is a device class: vendor, name, memory size, backend and architecture. Cards of one name and another memory size stay apart: a point's `device` is the card's name and its device class id, e.g. `NVIDIA GeForce RTX 4060 Ti (0123456789abcdef)`. A window given twice (the same store in two files) counts once. The provenance names the card, the torch and runtime versions, the calibration run, item and node of the largest window, and its export file. Each point line shows its windows' demands in the order they ran and the largest over the first (`[3 windows, MiB 1960, 1820, 1820; max/first 1.00]`).
+- **Fragmentation.** A point whose reserved bytes grew by 10% or more from its first window to its largest while the allocated bytes stayed within 2% gets a `warning: fragmentation?` line with both series. That is the allocator's cache growing around the same tensors in a long-running server, not the operation needing more.
+- **Platforms.** A point's platform is the one `platform_for` gives on the machine that measured it, derived from the export's device class and its environment's hard facts (`platform_for_environment`), whatever machine the builder runs on. It names the OS only where an entry for that platform names it. A window whose environment lacks a fact the platform is read from is left out and counted.
+- **Bounds.** `probe_demand` points bound their estimates from below only: the estimate must cover them. They take no part in the fresh-process fit (`fit.upper_envelope`), but they can raise a line or a stand-in. The 1.3x upper bound and `max_ratio` stay with the fresh-process points, because the cold first run after a server start is the worst case.
+- **Merge and fit.** A point joins the data file that declares the estimator's coefficients; where a point of the same measurement (card, platform, method, features and whether it is in the fit) is there, the larger of the two stays, and a remeasurement below the shipped point prints `kept shipped <bytes> over remeasured <bytes>`. Each line is then refitted with `fit.py`:
+  - A fitted line starts from its fresh fit: the envelope of its fresh-process points alone, plus the 5% margin, rounded up (`fit.shipped_pair`). A stand-in starts from its values. A stand-in line is fitted from then on once its in-fit fresh-process points alone span two sizes twice apart.
+  - A line, or a stand-in, that already covers every point by the 5% margin is kept unchanged.
+  - Otherwise it gets the minimal raise (`fit.raised_pair`): of the lines as they ship, a whole byte of slope per unit of size and a whole MiB of base, whose slope and base each stay at or above its fresh fit (or the stand-in's values), cover every point by 5%, and keep every upper bound of the points priced on the line (`bounds.line_bounds`), the one with the lowest reservation over the size range of its fresh-process points. A probe point therefore never lowers a line, and one the line covers never moves it.
+  - A refitted entry's provenance gets a note, and so does a raised stand-in's. Every moved line gets a `line` row: old and new slope and base, whether it was raised, and its new points.
+- **Legacy entries.** A `legacy` entry (hand-set values, such as the Z-Image denoise's) is replaced by its fit once the points fit every line it carries within the upper bounds and each line has a fresh-process point, which holds the upper bound: its flag cleared, its provenance replaced by one that says it is the fit of the platform's points, its `unmeasured_floor` kept. Probe windows alone never replace hand-set values, since a warm window can read below the cold first run. The data test's `LEGACY_ENTRIES`, which lists the legacy entries by estimator and platform, then needs that entry removed. An entry the points do not fully measure keeps its values, with a `note:` line saying which lines lack a fit or a fresh-process point; its new points still have to pass their bounds against the hand-set values, which a fresh-process point well below them does not.
+- **Refusals.** An export or point of another estimator version than the registered one, features the estimator cannot evaluate, a platform `MEASURED` does not list, and a line whose points span less than twice its sizes: exit code 2. Exit code 1, with nothing written:
+  - no line or stand-in raise covers its points within the upper bounds; the error names the point that cannot be covered and the bound it conflicts with;
+  - any point of the result breaks its bounds (`working_memory/bounds.py`, the rule the data test applies); the error lists them;
+  - with `--write`, a line is raised on a point flagged as fragmentation, unless `--accept-fragmentation` is given.
+
+## Bundle
+
+`bundle` writes one zip that opens without this machine's data, by default `<run_dir>/<run_id>.zip`, and prints its path and size. Apart from that default zip, the run directory stays as it is. It refuses while the run's runner is alive. A stopped or failed run can be bundled, and its report states the status; a run whose runner died without recording it shows as interrupted.
+
+The zip holds one folder, `<run_id>/`, with:
+
+- `bundle.json`, which describes the zip itself:
+  - `format_version`: the layout of the zip and its files, now `2`. It changes when a reader such as an upload hub could misread a zip written the old way; a reader refuses a version it does not know. Version 2 adds the case statuses `CHANGED` and `BASELINE` to the report and summary. It covers both memory methods: a record's `memory.method` is `d3dkmt` (Windows) or `nvml` (Linux), and peaks of the two are not comparable.
+  - `tool_commit`: the commit of the tool checkout that started the run, as in `run.json`, or `null`.
+  - `created_at`: when the bundle was written, ISO 8601 in UTC with seconds and offset, e.g. `2026-10-21T01:30:00+00:00`, like the timestamps in `run.json`.
+- `report.html` and `summary.md`, rendered for the zip. Every image the report shows lies in the zip: this run's under `images/`, the reference as `reference/<case_key>/image.png`, the previous run's under `previous/<run_id>/images/`, and the differences under `diff/`.
+  - Pixels unchanged, metadata removed. The chunks that make up pixels and colours stay byte for byte (`IHDR`, `PLTE`, `IDAT`, `IEND`, `tRNS`, `gAMA`, `cHRM`, `sRGB`, `iCCP`, `sBIT`, `cICP`, `mDCv`, `cLLi`), so a recipient can recompute PSNR. Every other chunk goes: InvokeAI writes the generation's metadata and graph into text chunks, model paths included.
+  - `image_sha256` in the records and in each `reference.json` is of the original file.
+- `reference/<case_key>/reference.json` for each case whose accepted reference the report could read: the reference's run, graph hash, medians and environment, so a reader can tell `BASELINE` from `PASS` and redo the comparisons. A case without a readable reference has none; the file is optional in format version 2.
+- `run.json`, `records.jsonl`, `graphs/` and `traces/`.
+
+Logs, `heartbeat.json`, `inputs/`, `export/`, a calibration run's `calibration/`, scratch roots and images the report does not show stay out. On the way in:
+
+- **`run.json`.** A value that is an absolute path keeps only its last component: `manifest_path`, `code_dir`, `python`, `invokeai_file`, the paths in `server_cmd` and the path settings in `runtime_config`. `extra_env` keeps its variable names; its values become `<redacted>`. So do the `runtime_config` settings that hold a string, list or mapping under a name that looks like a credential (`token`, `secret`, `key`, `auth`, `credential`, `pass`, `api`, `proxy`, `db_url`); flags such as `log_tokenization` stay.
+- **`reference.json`.** Its environment is sanitized like those in `run.json`, and its `extra_env` credentials are removed from all text like the run's own.
+- **Records.** A foreign GPU process keeps its pid and memory; its name becomes `<process>`.
+- **Graphs.** Model configs lose `path`, `config_path` and `source_api_response`. `source` and `source_url` stay only under the rule for `case_models` above. `graph_hashes` and each record's `graph_hash` still describe the graphs as they ran.
+- **All text**, the rendered report included:
+  - The value of an `extra_env` variable whose name looks like a credential becomes `<NAME>` of the variable, if it has 8 or more characters. That holds for every value such a name has in the environments of the run, its references and the previous runs it is compared with, e.g. a token rotated in between; their code directories become `<code_dir>` too. Other values, such as an allocator setting, stay, so the verdicts match the report on disk.
+  - An http(s) URL loses its credentials, `;params`, query and fragment. A host of the local network (a private, loopback or link-local address, a single-label or `.local` name) becomes `<local host>`.
+  - The run directory, data directory, template root and code directory become `<run_dir>`, `<data_dir>`, `<template_root>` and `<code_dir>`, with either separator and in any case. The rest of a path below them stays. The template root comes from the run's manifest, or from `--manifest`.
+  - A path below the home directory becomes `<home>` and the path's last component.
+  - The local path, local source and `config_path` of each model in the graphs and in the exporter's request (`export/export-request.json`, which lists every model of the server) become `<model NAME>`, followed by the rest of a path below them. A path in the directory that holds a model becomes `<model dir>` and its last component. They are matched exactly, so model paths with spaces are covered.
+  - Any other absolute path with a drive letter, and any other absolute POSIX path of two or more components, keeps only its last component. The server's API and socket paths (`/api/…`, `/ws/…`), which the tool's errors quote, stay.
+- The report compares the run's environment with the reference's and the previous run's after the same sanitizing, so nothing removed reappears as a change.
+
+## Verdicts
+
+Each case size gets one status, judged by the final attempt of each step. The first that applies:
+
+| Status | When | Failure |
+| --- | --- | --- |
+| `ERROR` | A final step failed, errored or was canceled. | yes |
+| `INCOMPLETE` | A measure the run planned for the case is not final as the runner counts it: it has no record, or its last attempt awaits a repeat for foreign load. That is what `status` counts as left and `resume` would run, e.g. in a run that was stopped or failed before the case finished. | yes |
+| `FAIL` | An image does not have the requested size. | yes |
+| `INVALID` | No measured image is valid for PSNR (see [Validity](#validity)). | no |
+| `NO-REFERENCE` | No accepted reference, or it is unreadable. | no |
+| `FAIL` | An image cannot be compared with the reference. | yes |
+| `BASELINE` | The reference was accepted from this very run, so comparing with it says nothing; the report shows no deltas against it. Bundling a run after `accept` reports this. | no |
+| `INVALID` | run.json has no thresholds for the case. | no |
+| `CHANGED` | The case expects a change (`expect: changed`), and its minimum PSNR against the reference is below `psnr_min_db`. | no |
+| `FAIL` | The case expects a change, but its minimum PSNR is at or above `psnr_min_db`; or it expects none, and the minimum PSNR is below it. | yes |
+| `PASS` | Otherwise. | no |
+
+The comparison with the previous run is informational: its outliers and flags never change a status. `report` and the runner exit with 1 when a case is `ERROR`, `INCOMPLETE` or `FAIL`.
+
+## Validity
+
+A run's record can be complete and still unfit for some comparisons. Each invalid flag comes with its reason in `invalid_reasons`.
+
+- **Residency.** The model cache logs `Loaded model '…' … VRAM: … (P%)` whenever a lock moves weights or leaves a model short of fully resident. A warm run usually logs nothing, because its models stay resident. The tool therefore keeps the latest line per model since the last cache flush. Time and memory are invalid when:
+  - a line in the run's log slice is below 100 %, except a load under 1 MB such as a tokenizer, which has no weights to place and is logged at 0.0 %,
+  - a `VRAM budget … is short` warning appears, or
+  - no load of the graph's models with weights was seen since the flush ("residency unknown").
+- **fp8.** With fp8 weights in play, an incompletely resident run does not reproduce its image, so PSNR is invalid too. fp8 is in play when a graph model sets `fp8_storage` in its default settings, or when the server's `fp8_compute` is on. Model configs do not record which checkpoints are scaled fp8, so then every graph counts.
+- **Shared memory.** If the server's shared GPU memory grows by more than 256 MiB during a run, it paged to system memory: time and memory are invalid. Windows only; the Linux driver does not page video memory out, and NVML reports no shared usage.
+- **Foreign load.** Another process above 1 GiB of dedicated GPU memory at either end of the run, or grown by more than 256 MiB, invalidates time and memory. So does a queue that is still busy after the 10-minute wait. The run is repeated, up to three attempts. `start` refuses outright when another process holds more than 1 GiB.
+
+## Shared paths
+
+The scratch server uses the template root's models directory, model caches, legacy model configs, custom fonts, custom nodes and prompt files. Its startup touches them as starting the template's own server would:
+
+- `models/README.txt` is written.
+- Install claims (`*.invokeai_install_active`) of processes that no longer run are removed.
+- Missing model files are reported in the log.
+- `configs/` receives the legacy model configs of the server's code when they differ.
+- `fonts/README.txt` and `prompt_files/README.txt` are written when missing.
+- Models a node fetches on first use are cached in `models/.download_cache`.
+
+The server would also finish an incomplete install, but the model would then be registered in the scratch database only. So `start` and `resume` refuse while the models directory holds a `tmpinstall_*` entry: finish or cancel that install in the dev server first.
+
+Database migrations of a newer `code_dir` run against the scratch database only. A migration that also moves or rewrites files acts on the shared models directory and caches; keep that in mind before pointing a run at a checkout ahead of the template's own server.
+
+## Limits
+
+- Memory is sampled every 3 ms with `D3DKMTQueryVideoMemoryInfo`: shorter peaks are missed. It counts resident memory (`CurrentUsage`), not commit, including the CUDA or HIP context and every resident model. That is why records keep a baseline and a peak per node.
+- On Linux, memory is sampled every 5 ms from NVML: the `usedGpuMemory` that `nvmlDeviceGetComputeRunningProcesses_v3` lists for the serving interpreter, i.e. what the driver has allocated for it, its CUDA context included. The foreign-load checks also read the graphics processes. Records carry method `nvml` instead of `d3dkmt`. The two drivers size the context differently and count different things, so a peak on one is no baseline for the other.
+  - Only the serving interpreter is sampled: a child process of the server that holds CUDA memory of its own counts as foreign load, as on Windows.
+  - Where NVML does not attribute memory to processes (vGPU guests, MIG, some containers), the tool refuses with that reason: at `start` when a process already holds memory on the GPU, otherwise in the first step.
+  - In a container with its own PID namespace NVML can list the host's pids. The server then reads as holding no memory, and the run fails its device check.
+  - Under WSL, NVML runs on the Windows driver and reports no per-process memory, so the tool refuses; run it on Windows on that machine.
+- With PyTorch's native allocator, reserved memory stays allocated between nodes, so a node's peak can stem from an earlier node. Compare peaks only between runs with the same allocator configuration; the run records the runtime config.
+- On Windows with ROCm, HIP keeps freed blocks at driver level. Per-node peaks after the first large node are upper bounds there (observed on an RX 9060 XT).
+- Time per step comes from the preview frames, which the server throttles to one per 0.1 s; a step's number is read from its progress percentage.
+  - The step count comes from the compiled denoise node: its `steps` or `num_steps` field, which for most families is the case's `steps`. An Ideogram 4 node without `steps` runs its sampler preset's count.
+  - A node that denoises a window of its schedule (`denoising_start` above 0 or `denoising_end` below 1, as img2img and an SDXL refiner hand-over do) starts or stops at a family-specific step, so the count is inferred. When steps are faster than 0.2 s that inference can be off by a factor, so the time per step is left empty.
+- Ideogram 4 ignores `steps`; its step count follows `settings.ideogram4Steps` or `settings.ideogram4SamplerPreset`. `img2img` and `controlnet` are not available for ERNIE-Image and Ideogram 4. Dynamic prompts, canvas rasterization, video and upscale graphs are not covered.
+- A bundle finds other paths in free text by their drive letter, or as POSIX paths of two or more components that start after a space, a quote or a bracket. Such a path, and a path below the home directory, keeps what follows a space in one of its directory names; a POSIX path at the root (`/x`) or right after `:` stays. A UNC path in free text stays as it is. An `extra_env` credential shorter than 8 characters is redacted in `run.json` only.
+- A calibration run measures the windows of estimated model operations only, inside a running server: they are not a fresh process's first operation, as the `demand_peak` points are.
+- AMD GPUs on Linux and A/B runs of two checkouts are not available yet.

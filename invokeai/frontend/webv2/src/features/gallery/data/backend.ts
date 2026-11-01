@@ -3,6 +3,7 @@ import type {
   GalleryImageItem,
   GalleryItem,
   GalleryItemCategory,
+  GalleryItemKind,
   GalleryItemRef,
   GalleryItemsPage,
   GalleryVideoItem,
@@ -10,6 +11,7 @@ import type {
 import type { GallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
 import type {
   GalleryBoard,
+  GalleryGeneralAccess,
   GalleryBoardDeletionResult,
   GalleryBoardOrderBy,
   GalleryDeletionResult,
@@ -20,7 +22,13 @@ import type {
   GalleryView,
 } from '@features/gallery/core/types';
 
-import { DATE_BOARD_ID_PREFIX, isDateBoardId, parseGalleryItemKey } from '@features/gallery/core/items';
+import {
+  ALL_READABLE_BOARDS_ID,
+  DATE_BOARD_ID_PREFIX,
+  getGalleryViewCategories,
+  isDateBoardId,
+  parseGalleryItemKey,
+} from '@features/gallery/core/items';
 import { getExternalImageFile, getImageCluster } from '@features/gallery/core/semanticImageQuery';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import {
@@ -40,38 +48,9 @@ import {
 import { getGalleryImageThumbnailUrl } from './imageUrls';
 import { getGalleryVideoThumbnailUrl } from './videoUrls';
 
-interface BackendBoardDTO {
-  board_id: string;
-  board_name: string;
-  image_count: number;
-  asset_count: number;
-  /** Videos on the board. Counted separately from `image_count` by the backend. */
-  video_count?: number;
-  /** Asset-category (non-'general') videos on the board; uploaded videos are assets. */
-  asset_video_count?: number;
-  archived: boolean;
-  cover_image_name?: string | null;
-  /** Set instead of `cover_image_name` when the board's most recent item is a video. */
-  cover_video_name?: string | null;
-  created_at?: string | null;
-  /** Board owner's display name; populated only for admins on multi-user backends. */
-  owner_username?: string | null;
-  user_id?: string;
-  board_visibility?: 'private' | 'shared' | 'public';
-  /** The project this board belongs to; absent or null for a Library board. */
-  project_id?: string | null;
-  /** Its project's inbox, which only the project routes may rename, archive, move or delete. */
-  is_inbox?: boolean;
-}
+type BackendBoardDTO = components['schemas']['BoardDTO'];
 
-/**
- * 'board' is a real backend board; 'uncategorized' is the pseudo-board for
- * unassigned images (board_id 'none'); 'date' is a read-only virtual board
- * grouping images by creation date (id 'by_date:YYYY-MM-DD').
- */
-export const ALL_READABLE_BOARDS_ID = 'all';
-
-export { isDateBoardId };
+export { ALL_READABLE_BOARDS_ID, isDateBoardId };
 
 const getDateFromBoardId = (boardId: string): string => boardId.slice(DATE_BOARD_ID_PREFIX.length);
 
@@ -114,6 +93,7 @@ interface BackendVideoDTO {
   created_at: string;
   duration: number;
   fps?: number | null;
+  has_workflow?: boolean;
   height: number;
   is_intermediate: boolean;
   media_origin?: string | null;
@@ -132,9 +112,8 @@ interface ListImagesResponse {
   total: number;
 }
 
-/** Mirror backend gallery categories; canvas-owned `other` pixels belong to neither Images nor Assets. */
-const imageCategories = ['general'];
-const assetCategories = ['control', 'mask', 'user'];
+const imageCategories = getGalleryViewCategories('images');
+const assetCategories = getGalleryViewCategories('assets');
 
 const toSearchParams = (entries: Record<string, boolean | number | string | string[] | undefined>): string => {
   const params = new URLSearchParams();
@@ -162,9 +141,10 @@ const toSearchParams = (entries: Record<string, boolean | number | string | stri
  * kind the board's most recent item is. Both resolve to a static WebP thumbnail, so the cover
  * renders identically either way.
  */
-const getBoardCoverThumbnailUrl = (
-  board: Pick<BackendBoardDTO, 'cover_image_name' | 'cover_video_name'>
-): string | undefined => {
+const getBoardCoverThumbnailUrl = (board: {
+  cover_image_name?: string | null;
+  cover_video_name?: string | null;
+}): string | undefined => {
   if (board.cover_image_name) {
     return getGalleryImageThumbnailUrl(board.cover_image_name);
   }
@@ -185,11 +165,19 @@ const mapBoard = (board: BackendBoardDTO): GalleryBoard => ({
   isInbox: board.is_inbox ?? false,
   kind: 'board',
   name: board.board_name,
-  ownerId: board.user_id,
   ownerName: board.owner_username ?? null,
   projectId: board.project_id ?? null,
-  visibility: board.board_visibility,
   videoCount: board.video_count ?? 0,
+  ...(board.allowed_actions === undefined
+    ? {}
+    : {
+        access: {
+          actions: board.allowed_actions,
+          adminOverride: board.admin_override ?? false,
+          generalAccess: board.general_access ?? 'restricted',
+          role: board.my_role ?? null,
+        },
+      }),
 });
 
 const getGalleryTotal = async ({
@@ -310,6 +298,7 @@ const mapVideo = (video: BackendVideoDTO): GalleryVideoItem => {
     durationSeconds: video.duration,
     ...(video.fps === null || video.fps === undefined ? {} : { fps: video.fps }),
     fullUrl: absolutizeApiUrl(video.video_url),
+    ...(video.has_workflow === undefined ? {} : { hasWorkflow: video.has_workflow }),
     height: video.height,
     isIntermediate: video.is_intermediate,
     kind: 'video',
@@ -356,9 +345,9 @@ export const listGalleryBoards = async ({
     boardsBodyPromise,
     getGalleryTotal({ boardId: 'none', categories: imageCategories, signal }),
     getGalleryTotal({ boardId: 'none', categories: assetCategories, signal }),
-    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is
-    // assembled here, so its video totals need their own requests.
-    getGalleryVideoTotal({ boardId: 'none', signal }),
+    // Real boards carry `video_count` in their DTO, but the uncategorized pseudo-board is assembled here, so its
+    // video totals need their own requests. Like a board's, they count only what the Media and Uploads views list.
+    getGalleryVideoTotal({ boardId: 'none', categories: [...imageCategories, ...assetCategories], signal }),
     getGalleryVideoTotal({ boardId: 'none', categories: assetCategories, signal }),
   ]);
   const boards = Array.isArray(body) ? body : (body.items ?? []);
@@ -493,6 +482,8 @@ export const getGalleryVideoMetadata = async (
 /** The workflow and graph a piece of media embeds, each as stringified JSON, when it has them. */
 export interface GalleryMediaWorkflow {
   graph: string | null;
+  /** Image inputs resolved for this output; the full source graph remains available for workflow loading. */
+  resolved_inputs?: string | null;
   workflow: string | null;
 }
 
@@ -535,6 +526,7 @@ const listPaletteDateBoardImageNames = async ({
     createdFrom,
     createdTo,
     galleryView,
+    mediaKind: 'image',
     orderDir,
     searchTerm,
     signal,
@@ -559,6 +551,8 @@ interface GalleryItemNamesRequest {
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
+  /** Only this media kind; absent lists both. */
+  mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   signal?: AbortSignal;
@@ -576,6 +570,7 @@ export const listGalleryItemNames = async ({
   createdFrom,
   createdTo,
   galleryView,
+  mediaKind,
   orderDir,
   searchTerm,
   signal,
@@ -587,6 +582,7 @@ export const listGalleryItemNames = async ({
     created_from: createdFrom,
     created_to: createdTo,
     is_intermediate: false,
+    media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
     starred,
@@ -609,6 +605,7 @@ export const getGalleryItemLocation = ({
   createdTo,
   galleryView,
   kind,
+  mediaKind,
   name,
   orderDir,
   searchTerm,
@@ -622,6 +619,7 @@ export const getGalleryItemLocation = ({
     created_to: createdTo,
     is_intermediate: false,
     kind,
+    media_kind: mediaKind,
     order_dir: orderDir,
     name,
     search_term: searchTerm.trim() || undefined,
@@ -638,6 +636,7 @@ export const listGalleryDateBoardItemNames = async ({
   createdFrom,
   createdTo,
   galleryView,
+  mediaKind,
   orderDir,
   searchTerm,
   signal,
@@ -652,6 +651,7 @@ export const listGalleryDateBoardItemNames = async ({
 
   const query = toSearchParams({
     categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    media_kind: mediaKind,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
     starred,
@@ -751,6 +751,8 @@ interface GalleryListRequest {
   createdTo?: string;
   galleryView: GalleryView;
   limit?: number;
+  /** Only this media kind; absent lists both. Ignored by the image-only palette listing. */
+  mediaKind?: GalleryItemKind;
   offset?: number;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
@@ -770,6 +772,7 @@ export const listGalleryItems = async ({
   galleryView,
   isIntermediate = false,
   limit = 100,
+  mediaKind,
   offset = 0,
   orderDir = 'DESC',
   searchTerm,
@@ -783,6 +786,7 @@ export const listGalleryItems = async ({
     created_to: createdTo,
     is_intermediate: isIntermediate,
     limit,
+    media_kind: mediaKind,
     offset,
     order_dir: orderDir,
     search_term: searchTerm.trim() || undefined,
@@ -832,7 +836,8 @@ const toSemanticScopeParams = (boardId: string | undefined): { board_id?: string
 
 /**
  * Text and gallery-image searches use GET; URLs and registered files use POST. include_videos opts into kind-aware
- * result hydration. The server ranks within `boardId` before applying the limit.
+ * result hydration; a set `mediaKind` overrides it server-side and ranks only that kind. The server ranks within
+ * `boardId` before applying the limit.
  */
 export const searchGallerySemantic = async (
   query: Exclude<GallerySemanticQuery, { kind: 'cluster' }>,
@@ -840,10 +845,17 @@ export const searchGallerySemantic = async (
     boardId,
     includeVideos = true,
     limit = SEMANTIC_SEARCH_MAX_RESULTS,
+    mediaKind,
     signal,
-  }: { boardId?: string; includeVideos?: boolean; limit?: number; signal?: AbortSignal } = {}
+  }: {
+    boardId?: string;
+    includeVideos?: boolean;
+    limit?: number;
+    mediaKind?: GalleryItemKind;
+    signal?: AbortSignal;
+  } = {}
 ): Promise<GallerySemanticResult[]> => {
-  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit };
+  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit, media_kind: mediaKind };
 
   if (query.kind === 'url') {
     const params = toSearchParams({ image_url: query.url, ...scope });
@@ -916,25 +928,26 @@ export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<
 /** Kind-qualified refs retain relevance order for page hydration, range selection, and deletion neighbors. */
 export const listSemanticGalleryItemNames = async ({
   boardId,
+  mediaKind,
   query,
   signal,
 }: {
   boardId?: string;
+  mediaKind?: GalleryItemKind;
   query: GallerySemanticQuery;
   signal?: AbortSignal;
 }): Promise<GalleryItemNames> => {
   // A cluster query is an explicit member list held client-side (in proximity
   // order from the clicked map point); there is nothing to ask the server.
   if (query.kind === 'cluster') {
-    const itemKeys = getImageCluster(query.clusterId)?.itemKeys ?? [];
+    const items = (getImageCluster(query.clusterId)?.itemKeys ?? [])
+      .map(parseGalleryItemKey)
+      .filter((ref) => mediaKind === undefined || ref.kind === mediaKind);
 
-    return {
-      items: itemKeys.map(parseGalleryItemKey),
-      total: itemKeys.length,
-    };
+    return { items, total: items.length };
   }
 
-  const results = await searchGallerySemantic(query, { boardId, signal });
+  const results = await searchGallerySemantic(query, { boardId, mediaKind, signal });
 
   return {
     items: results.map((result) => result.ref),
@@ -1077,8 +1090,10 @@ export const getGalleryImageMetadata = async (
 };
 
 /**
- * Whether a board a project names still exists for this account: false only when the server answers that it does
- * not. A virtual board (Uncategorized, a date, every board) always exists; any other failure is thrown, unanswered.
+ * Whether a board a project names still exists: false only when the server answers 404, that there is no such board.
+ * A board the caller may no longer read answers 403: it exists, so the project keeps naming it, and access granted
+ * again brings it back. A virtual board (Uncategorized, a date, every board) always exists; any other failure is
+ * thrown, unanswered.
  */
 export const galleryBoardExists = async (boardId: string, signal?: AbortSignal): Promise<boolean> => {
   if (getUploadBoardId(boardId) === undefined) {
@@ -1090,8 +1105,8 @@ export const galleryBoardExists = async (boardId: string, signal?: AbortSignal):
 
     return true;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      return false;
+    if (error instanceof ApiError && (error.status === 404 || error.status === 403)) {
+      return error.status === 403;
     }
 
     throw error;
@@ -1113,7 +1128,7 @@ export const createGalleryBoard = async (
 /** `projectId` moves the board: a project id, or null for the Library. Undefined, like the others, means unchanged. */
 export const updateGalleryBoard = async (
   boardId: string,
-  changes: { name?: string; archived?: boolean; projectId?: string | null },
+  changes: { name?: string; archived?: boolean; generalAccess?: GalleryGeneralAccess; projectId?: string | null },
   signal?: AbortSignal
 ): Promise<GalleryBoard> => {
   const body = await apiFetchJson<BackendBoardDTO>(`/api/v1/boards/${encodeURIComponent(boardId)}`, {
@@ -1121,6 +1136,7 @@ export const updateGalleryBoard = async (
     body: JSON.stringify({
       archived: changes.archived,
       board_name: changes.name,
+      general_access: changes.generalAccess,
       ...(changes.projectId !== undefined ? { project_id: changes.projectId } : {}),
     }),
     method: 'PATCH',

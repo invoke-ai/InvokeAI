@@ -1,13 +1,17 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { FieldInputTemplate } from '@features/workflow/contracts';
 
 import { ChakraProvider, Field } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
+import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { getWorkflowFieldInvalidReason } from '@features/workflow/utility';
 import { toaster } from '@platform/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { createInstance, type i18n as I18nInstance } from 'i18next';
 import { act, cloneElement, startTransition, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server, userEvent } from 'vitest/browser';
 
@@ -55,8 +59,8 @@ vi.mock('@features/gallery/picker', () => ({
 
 vi.mock('@features/gallery', () => ({
   formatGalleryVideoDuration: (seconds: number) => `${seconds}s`,
-  galleryDestinations: { list: () => Promise.resolve([]) },
   galleryItems: { resolve: (...args: unknown[]) => resolveItemMock(...args) },
+  isGalleryBoardAttachable: (boardId: string) => boardId !== 'none' && !boardId.startsWith('by_date:'),
   galleryTransfers: {
     upload: (...args: unknown[]) => uploadImageMock(...args),
     uploadVideo: (...args: unknown[]) => uploadVideoMock(...args),
@@ -250,18 +254,21 @@ const renderField = async (
   value: unknown,
   onChange: (value: unknown) => void,
   nodeId?: string,
-  seedProps: Pick<WorkflowFieldInputProps, 'onSeedModeChange' | 'seedMode'> = {}
+  seedProps: Pick<WorkflowFieldInputProps, 'onSeedModeChange' | 'seedMode'> = {},
+  /** Renders the English copy, for tests that tell rows apart by their translated names. */
+  i18n?: I18nInstance
 ) => {
+  const field = (
+    <ChakraProvider value={system}>
+      <QueryClientProvider client={queryClient}>
+        <DndContext>
+          <WorkflowFieldInput nodeId={nodeId} template={template} value={value} onChange={onChange} {...seedProps} />
+        </DndContext>
+      </QueryClientProvider>
+    </ChakraProvider>
+  );
   await act(() => {
-    root.render(
-      <ChakraProvider value={system}>
-        <QueryClientProvider client={queryClient}>
-          <DndContext>
-            <WorkflowFieldInput nodeId={nodeId} template={template} value={value} onChange={onChange} {...seedProps} />
-          </DndContext>
-        </QueryClientProvider>
-      </ChakraProvider>
-    );
+    root.render(i18n ? <I18nextProvider i18n={i18n}>{field}</I18nextProvider> : field);
   });
 };
 
@@ -318,7 +325,7 @@ describe('WorkflowFieldInput boolean', () => {
     const control = host.querySelector('[data-scope="switch"][data-part="control"]');
 
     if (!(control instanceof HTMLElement)) {
-      throw new Error('Switch control not rendered');
+      throw new TypeError('Switch control not rendered');
     }
 
     await act(async () => {
@@ -344,6 +351,89 @@ describe('WorkflowFieldInput textarea', () => {
 
     await act(() => handle.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
     expect(getComputedStyle(textarea).height).toBe('108px');
+  });
+});
+
+describe('WorkflowFieldInput authored form controls', () => {
+  const renderWithSettings = async (
+    template: FieldInputTemplate,
+    value: unknown,
+    onChange: (value: unknown) => void,
+    formSettings: WorkflowFieldInputProps['formSettings']
+  ) => {
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <DndContext>
+              <WorkflowFieldInput formSettings={formSettings} template={template} value={value} onChange={onChange} />
+            </DndContext>
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+  };
+
+  it('restricts a dropdown string field to the authored options and commits the option value', async () => {
+    const onChange = vi.fn();
+    await renderWithSettings(fullTemplate('StringField'), 'slow', onChange, {
+      component: 'dropdown',
+      kind: 'string',
+      options: [
+        { label: 'Fast', value: 'fast' },
+        { label: '', value: 'slow' },
+      ],
+    });
+
+    expect(host.querySelector('input:not([type="hidden"]), textarea')).toBeNull();
+    const trigger = host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]')!;
+    expect(trigger.textContent).toContain('slow');
+
+    await act(() => userEvent.click(trigger));
+    const items = Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]'));
+    expect(items.map((item) => item.textContent)).toEqual(['Fast', 'slow']);
+
+    await act(() => userEvent.click(items[0]!));
+    expect(onChange).toHaveBeenCalledWith('fast');
+  });
+
+  it('shows a slider for a bounded number field and keeps the input when an end is open', async () => {
+    const bounded = fullTemplate('IntegerField', { maximum: 20, minimum: 4, multipleOf: 4 });
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('4');
+    expect(slider.getAttribute('aria-valuemax')).toBe('20');
+    expect(slider.getAttribute('aria-valuenow')).toBe('8');
+    expect(host.querySelector('input[type="number"]')).toBeNull();
+
+    await renderWithSettings(bounded, 8, vi.fn(), { component: 'number-input-and-slider', kind: 'number' });
+    expect(host.querySelector('[role="slider"]')).not.toBeNull();
+    expect(host.querySelector<HTMLInputElement>('[data-scope="number-input"] input')?.value).toBe('8');
+
+    await renderWithSettings(fullTemplate('IntegerField', { minimum: 0 }), 8, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe('8');
+  });
+
+  it('ends the slider track on the step multiples the node accepts', async () => {
+    // Bounds 1–100 with a step of 8 admit 8…96; a track from 1 would offer stops such as 49 that validation rejects.
+    const misaligned = fullTemplate('IntegerField', { maximum: 100, minimum: 1, multipleOf: 8 });
+    await renderWithSettings(misaligned, 16, vi.fn(), { component: 'slider', kind: 'number' });
+
+    const slider = host.querySelector<HTMLElement>('[role="slider"]')!;
+    expect(slider.getAttribute('aria-valuemin')).toBe('8');
+    expect(slider.getAttribute('aria-valuemax')).toBe('96');
+
+    await renderWithSettings(fullTemplate('IntegerField', { maximum: 7, minimum: 1, multipleOf: 8 }), 0, vi.fn(), {
+      component: 'slider',
+      kind: 'number',
+    });
+    expect(host.querySelector('[role="slider"]')).toBeNull();
+    expect(host.querySelector('input[type="number"]')).not.toBeNull();
   });
 });
 
@@ -520,7 +610,7 @@ describe('WorkflowFieldInput saved workflows', () => {
     );
 
     if (!(sharedItem instanceof HTMLElement)) {
-      throw new Error('Shared workflow option not rendered');
+      throw new TypeError('Shared workflow option not rendered');
     }
 
     await act(async () => {
@@ -545,14 +635,14 @@ describe('WorkflowFieldInput media inputs', () => {
       );
     });
 
-    expect(host.textContent).not.toContain('Connection only');
+    expect(host.textContent).not.toContain('nodes.inputModes.connection');
     expect(findButton('widgets.gallery.picker.chooseVideo').disabled).toBe(false);
   });
 
   it('renders a direct-input widget for VideoField instead of falling back to connection-only', async () => {
     await renderField(VIDEO_TEMPLATE, undefined, vi.fn());
 
-    expect(host.textContent).not.toContain('Connection only');
+    expect(host.textContent).not.toContain('nodes.inputModes.connection');
     expect(findButton('widgets.gallery.picker.chooseVideo').disabled).toBe(false);
     expect(pickerState.accept).toEqual(['video']);
     expect(findButton('Upload').disabled).toBe(false);
@@ -587,7 +677,7 @@ describe('WorkflowFieldInput media inputs', () => {
 
     await renderField(collectionTemplate, [{ image_name: 'a.png' }, { image_name: 'b.png' }], onChange);
 
-    expect(host.textContent).not.toContain('Connection only');
+    expect(host.textContent).not.toContain('nodes.inputModes.connection');
     expect(host.querySelectorAll('img')).toHaveLength(2);
     expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.multiple).toBe(true);
 
@@ -666,7 +756,7 @@ describe('WorkflowFieldInput media inputs', () => {
 
     await renderField(collectionTemplate, undefined, vi.fn());
 
-    expect(host.textContent).toContain('Connection only');
+    expect(host.textContent).toContain('nodes.inputModes.connection');
     expect(host.querySelector('input[type="file"]')).toBeNull();
   });
 
@@ -747,7 +837,7 @@ describe('WorkflowFieldInput media inputs', () => {
 
     expect(host.querySelector('input[type="number"]')).not.toBeNull();
     expect(host.querySelector('video')).toBeNull();
-    expect(host.textContent).toContain("Set this node's Video field to preview frames.");
+    expect(host.textContent).toContain('nodes.framePreviewNoVideo');
   });
 
   it('falls back to a hint when the video has no probed frame rate', async () => {
@@ -757,7 +847,7 @@ describe('WorkflowFieldInput media inputs', () => {
     await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
 
     await vi.waitFor(() => {
-      expect(host.textContent).toContain('no probed frame rate');
+      expect(host.textContent).toContain('nodes.framePreviewNoFrameRate');
     });
     expect(host.querySelector('video')).toBeNull();
   });
@@ -779,7 +869,7 @@ describe('WorkflowFieldInput media inputs', () => {
 
     await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
 
-    expect(host.textContent).toContain('comes from a graph connection');
+    expect(host.textContent).toContain('nodes.framePreviewConnected');
     expect(host.querySelector('video')).toBeNull();
     expect(resolveItemMock).not.toHaveBeenCalled();
   });
@@ -805,7 +895,7 @@ describe('WorkflowFieldInput media inputs', () => {
     await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
 
     await vi.waitFor(() => {
-      expect(host.textContent).toContain('could not be loaded');
+      expect(host.textContent).toContain('nodes.framePreviewLoadFailed');
     });
     expect(host.querySelector('video')).toBeNull();
   });
@@ -815,7 +905,7 @@ describe('WorkflowFieldInput media inputs', () => {
 
     await renderField(FRAME_INDEX_TEMPLATE, 0, vi.fn(), 'frame-node');
 
-    expect(host.textContent).toContain("Set this node's Video field to preview frames.");
+    expect(host.textContent).toContain('nodes.framePreviewNoVideo');
     expect(resolveItemMock).not.toHaveBeenCalled();
   });
 
@@ -862,6 +952,192 @@ describe('WorkflowFieldInput media inputs', () => {
   });
 });
 
+describe('WorkflowFieldInput board field', () => {
+  const BOARD_TEMPLATE = {
+    name: 'board',
+    title: 'Board',
+    type: { cardinality: 'SINGLE', name: 'BoardField' },
+  } as unknown as FieldInputTemplate;
+  const boardDto = (boardId: string, overrides: Record<string, unknown> = {}) => ({
+    admin_override: false,
+    allowed_actions: ['read', 'add_media', 'manage_items', 'rename', 'set_cover', 'archive', 'move', 'delete'],
+    archived: false,
+    asset_count: 0,
+    board_id: boardId,
+    board_name: boardId,
+    created_at: '2026-01-01T00:00:00.000Z',
+    image_count: 1,
+    is_inbox: false,
+    my_role: 'owner',
+    owner_username: 'Me',
+    project_id: null,
+    video_count: 0,
+    ...overrides,
+  });
+  const listing = [
+    boardDto('mine'),
+    boardDto('team', { allowed_actions: ['read', 'add_media'], my_role: 'contributor', owner_username: 'Ana' }),
+    boardDto('viewed', { allowed_actions: ['read'], my_role: 'viewer', owner_username: 'Ben' }),
+  ];
+  const i18n = createInstance();
+  beforeAll(async () => {
+    // Through the provider only: registering it globally would translate the raw keys later suites assert on.
+    await i18n.init({
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+    });
+  });
+  /** Opens the board select and reads its options and group headings, as the gallery would label them. */
+  const renderBoardField = async (
+    boardSharing: boolean | undefined,
+    galleryHost: Partial<GalleryUiAdapter> = {},
+    onChange: (value: unknown) => void = vi.fn()
+  ) => {
+    const adapter = { boardSharing, ...galleryHost } as unknown as GalleryUiAdapter;
+    await act(() => {
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <GalleryUiProvider adapter={adapter}>
+                <WorkflowFieldInput template={BOARD_TEMPLATE} value="auto" onChange={onChange} />
+              </GalleryUiProvider>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+    const trigger = host.querySelector<HTMLElement>('[data-scope="select"][data-part="trigger"]');
+    if (!trigger) {
+      throw new Error('Board trigger not rendered');
+    }
+    await vi.waitFor(() => {
+      expect(queryClient.getQueryCache().findAll({ queryKey: ['gallery', 'boards'] })[0]?.state.status).toBe('success');
+    });
+    await act(() => userEvent.click(trigger));
+    const texts = (part: string) =>
+      Array.from(document.querySelectorAll<HTMLElement>(`[data-scope="select"][data-part="${part}"]`))
+        .map((element) => element.textContent?.trim())
+        .filter(Boolean);
+
+    return { groups: texts('item-group-label'), items: texts('item') };
+  };
+
+  beforeEach(() => {
+    workflowApiMock.apiFetchJson.mockResolvedValue(listing);
+  });
+
+  afterEach(() => {
+    delete galleryValues.autoAddBoardId;
+    delete galleryValues.projectBoardId;
+    delete galleryValues.selectedBoardId;
+  });
+
+  it("offers the boards the caller may add to under the gallery's own groups", async () => {
+    expect(await renderBoardField(true)).toEqual({
+      groups: ['Library', 'Shared with me'],
+      items: ['Auto (Uncategorized)', 'Uncategorized', 'mine', 'team'],
+    });
+  });
+
+  it('folds every board into the caller’s own on a host without board sharing', async () => {
+    expect(await renderBoardField(false)).toEqual({
+      groups: ['Library'],
+      items: ['Auto (Uncategorized)', 'Uncategorized', 'mine', 'team'],
+    });
+  });
+
+  it('names the board Auto resolves to, with the gallery’s label for the project inbox', async () => {
+    const project = { projectId: 'project-1', projectName: 'Portraits', projects: [] };
+    workflowApiMock.apiFetchJson.mockResolvedValue([
+      boardDto('inbox', { board_name: 'Portraits', is_inbox: true, project_id: 'project-1' }),
+      ...listing,
+    ]);
+    galleryValues.projectBoardId = 'inbox';
+
+    expect(await renderBoardField(true, project)).toEqual({
+      groups: ['Portraits', 'Library', 'Shared with me'],
+      items: ['Auto (Inbox)', 'Uncategorized', 'Inbox', 'mine', 'team'],
+    });
+
+    // Close the first menu completely, so the second read sees only the reopened one.
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.querySelector('[data-scope="select"][data-part="item"]')).toBeNull());
+    galleryValues.autoAddBoardId = 'mine';
+    expect((await renderBoardField(true, project)).items[0]).toBe('Auto (mine)');
+  });
+
+  it('names an archived auto-add board as compilation resolves it, not the inbox', async () => {
+    const archived = boardDto('kept', { archived: true, board_name: 'Kept results' });
+    workflowApiMock.apiFetchJson.mockImplementation((url: string) =>
+      Promise.resolve(url.includes('include_archived=true') ? [...listing, archived] : listing)
+    );
+    galleryValues.projectBoardId = 'mine';
+    galleryValues.autoAddBoardId = 'kept';
+
+    await renderBoardField(true);
+
+    // Archived boards stay out of the choices; Auto still sends results to the one chosen on purpose.
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-scope="select"][data-part="item"]')?.textContent?.trim()).toBe(
+        'Auto (Kept results)'
+      )
+    );
+    expect(
+      [...document.querySelectorAll('[data-scope="select"][data-part="item"]')].map((item) => item.textContent?.trim())
+    ).not.toContain('Kept results');
+  });
+
+  it('writes a picked board as its id', async () => {
+    const onChange = vi.fn();
+
+    await renderBoardField(true, {}, onChange);
+    const mine = Array.from(document.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="item"]')).find(
+      (item) => item.textContent?.trim() === 'mine'
+    )!;
+    await act(() => userEvent.click(mine));
+
+    expect(onChange).toHaveBeenCalledWith({ board_id: 'mine' });
+  });
+
+  it('sends an upload to the project inbox when the selected board is not in the live listing', async () => {
+    uploadImageMock.mockResolvedValue({ imageName: 'uploaded.png' });
+    galleryValues.selectedBoardId = 'restricted';
+    galleryValues.projectBoardId = 'inbox';
+    workflowApiMock.apiFetchJson.mockResolvedValue([boardDto('inbox', { is_inbox: true, project_id: 'project-1' })]);
+    const onChange = vi.fn();
+    const imageTemplate = {
+      name: 'image',
+      title: 'Image',
+      type: { name: 'ImageField' },
+    } as unknown as FieldInputTemplate;
+
+    try {
+      await renderField(imageTemplate, undefined, onChange);
+      await act(() => findButton('Upload').click());
+      const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(['data'], 'a.png', { type: 'image/png' }));
+      fileInput.files = transfer.files;
+      await act(() => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
+
+      await vi.waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith({ image_name: 'uploaded.png' });
+      });
+      // The listing was read before the destination was chosen; the board it lacks is no destination.
+      expect(workflowApiMock.apiFetchJson).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/boards/'),
+        expect.anything()
+      );
+      expect(uploadImageMock.mock.calls[0]?.[1]).toBe('inbox');
+    } finally {
+      delete galleryValues.selectedBoardId;
+      delete galleryValues.projectBoardId;
+    }
+  });
+});
+
 /** Feed committed values back through an owning parent to expose keystroke rerenders and blur clamping. */
 const StatefulLoRAField = ({ initial, onCommit }: { initial: unknown; onCommit: (value: unknown) => void }) => {
   const [value, setValue] = useState(initial);
@@ -877,16 +1153,26 @@ const StatefulLoRAField = ({ initial, onCommit }: { initial: unknown; onCommit: 
 };
 
 describe('WorkflowFieldInput LoRA collection', () => {
+  const i18n = createInstance();
+  beforeAll(async () => {
+    await i18n.init({
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+    });
+  });
   const renderStatefulLoras = async (initial: unknown, onCommit: (value: unknown) => void) => {
     await act(() => {
       root.render(
-        <ChakraProvider value={system}>
-          <QueryClientProvider client={queryClient}>
-            <DndContext>
-              <StatefulLoRAField initial={initial} onCommit={onCommit} />
-            </DndContext>
-          </QueryClientProvider>
-        </ChakraProvider>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient}>
+              <DndContext>
+                <StatefulLoRAField initial={initial} onCommit={onCommit} />
+              </DndContext>
+            </QueryClientProvider>
+          </ChakraProvider>
+        </I18nextProvider>
       );
     });
     await vi.waitFor(
@@ -898,7 +1184,7 @@ describe('WorkflowFieldInput LoRA collection', () => {
   };
 
   const renderLoras = async (value: unknown, onChange: (value: unknown) => void) => {
-    await renderField(LORA_COLLECTION_TEMPLATE, value, onChange);
+    await renderField(LORA_COLLECTION_TEMPLATE, value, onChange, undefined, {}, i18n);
     // The picker is lazy; wait for Suspense to resolve it before asserting on the mounted widget.
     await vi.waitFor(
       () => {
@@ -1057,7 +1343,7 @@ describe('WorkflowFieldInput LoRA collection', () => {
   it('renders a single stored LoRAField as a one-row list rather than falling back', async () => {
     await renderLoras(loraEntry(), vi.fn());
 
-    expect(host.textContent).not.toContain('Connection only');
+    expect(host.textContent).not.toContain('nodes.inputModes.connection');
     expect(host.querySelectorAll('input')).toHaveLength(1);
   });
 });
@@ -1994,6 +2280,11 @@ describe('WorkflowFieldInput scalar collections', () => {
 });
 
 describe('WorkflowFieldInput record pickers', () => {
+  // The pickers are a lazy chunk; load it up front so the first test is not timing a cold transform.
+  beforeAll(async () => {
+    await import('./RecordPickerInput');
+  });
+
   const STYLE_PRESET = fullTemplate('StringField', {
     title: 'Style Preset',
     type: { batch: false, cardinality: 'SINGLE', name: 'StylePresetField' },

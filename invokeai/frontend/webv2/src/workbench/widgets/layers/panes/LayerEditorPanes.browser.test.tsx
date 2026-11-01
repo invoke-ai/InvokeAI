@@ -5,6 +5,7 @@ import type {
   CanvasLayerSourceContract,
   PreparedDocumentEdit,
 } from '@workbench/canvas-engine/api';
+import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
@@ -14,12 +15,13 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createDocumentModel, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { IDLE_CONTROL_DETECTION_STATUS } from '@workbench/canvas-operations/api';
 import {
   createEngineRegistry,
   type EngineDeps,
@@ -38,6 +40,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { page, userEvent } from 'vitest/browser';
 
 const harness = vi.hoisted(() => ({
+  /** History tests let edits land in the harness project, as the reducer would; other suites keep it fixed. */
+  appliesMutations: false,
   engine: null as unknown,
   listeners: new Set<() => void>(),
   project: null as Project | null,
@@ -77,8 +81,21 @@ vi.mock('@workbench/WorkbenchContext', async () => {
     };
     harness.listeners.forEach((listener) => listener());
   };
-  const commands = { widgets: { patchValues } };
-  const queries = { getSnapshot: () => ({ activeProject: harness.project! }) };
+  const { applyCanvasProjectMutation } = await import('@workbench/canvasProjectMutations');
+  const applyCanvas = (projectId: string, mutation: Parameters<typeof applyCanvasProjectMutation>[1]) => {
+    const project = harness.project;
+    if (!project || project.id !== projectId) {
+      return false;
+    }
+    harness.project = applyCanvasProjectMutation(project, mutation);
+    harness.listeners.forEach((listener) => listener());
+    return harness.project.canvas !== project.canvas;
+  };
+  const commands = { canvas: { apply: applyCanvas }, widgets: { patchValues } };
+  const queries = {
+    getProject: (projectId: string) => (harness.project?.id === projectId ? harness.project : undefined),
+    getSnapshot: () => ({ activeProject: harness.project! }),
+  };
   return {
     useActiveProjectId: () => harness.project!.id,
     useActiveProjectSelector: (selector: (project: Project) => unknown) => {
@@ -94,6 +111,11 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => true,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
+// Recovery looks the project's engine up when it acts; the harness engine is the project's.
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof CanvasOperationsApi>()),
+  getCanvasEngine: () => harness.engine,
+}));
 
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
@@ -121,9 +143,21 @@ beforeAll(async () => {
 const createEngineDeps = (): EngineDeps => {
   const mutationPort: CanvasProjectMutationPort = {
     commitEdit: () => undefined,
-    dispatch: () => false,
+    dispatch: (mutation) => {
+      if (!harness.appliesMutations || !harness.project) {
+        return false;
+      }
+      const before = harness.project.canvas;
+      harness.project = applyCanvasProjectMutation(harness.project, mutation);
+      harness.listeners.forEach((listener) => listener());
+      return harness.project.canvas !== before;
+    },
     getCanvasState: () => harness.project?.canvas ?? createEmptyCanvasState(64, 64),
-    subscribe: () => () => undefined,
+    // Harness project changes reach the engine's document mirror, as reducer dispatches do in the app.
+    subscribe: (listener) => {
+      harness.listeners.add(listener);
+      return () => harness.listeners.delete(listener);
+    },
   };
   return {
     getMainModelBase: () => null,
@@ -179,6 +213,8 @@ const createFakeOperations = () => {
     subscribeOperation: subscribe,
     subscribeSamSession: subscribe,
     updateFilterOperation: vi.fn(),
+    getControlDetectionStatus: () => IDLE_CONTROL_DETECTION_STATUS,
+    subscribeControlDetectionStatus: () => () => undefined,
   };
 };
 
@@ -199,7 +235,7 @@ const settle = () =>
 
 const IDENTITY = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
 
-type Selection = 'none' | 'layer' | 'group' | 'mask' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
+type Selection = 'none' | 'layer' | 'group' | 'mask' | 'control' | 'shape' | 'stroked-shape' | 'gradient' | 'text';
 
 const SHAPE_SOURCE = {
   fill: '#ff0000',
@@ -232,7 +268,11 @@ const GRADIENT_SOURCE = {
   width: 10,
 } satisfies Extract<CanvasLayerSourceContract, { type: 'gradient' }>;
 
-const mount = async (View: typeof PropertiesPane, selection: Selection = 'none') => {
+const mount = async (
+  View: typeof PropertiesPane,
+  selection: Selection = 'none',
+  { extraNodes = [], width = 450 }: { extraNodes?: Parameters<typeof stacksFrom>[0]; width?: number } = {}
+) => {
   const base = { ...createInitialWorkbenchState().projects[0]!, id: 'p' };
   const nodes =
     selection === 'none'
@@ -252,17 +292,19 @@ const mount = async (View: typeof PropertiesPane, selection: Selection = 'none')
               ? [layerContract('l0', 'raster', { name: 'My Text', source: TEXT_SOURCE })]
               : selection === 'mask'
                 ? [layerContract('m0', 'inpaint_mask', { name: 'Mask' })]
-                : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
+                : selection === 'control'
+                  ? [layerContract('l0', 'control', { name: 'Control Layer 1' })]
+                  : [groupContract('g0', [layerContract('l0', 'raster', { name: 'Paint' })], { name: 'Folder' })];
   harness.project = applyCanvasProjectMutation(base, {
     document: {
       ...createEmptyCanvasDocument(),
       selectedLayerId: selection === 'none' ? null : selection === 'mask' ? 'm0' : selection === 'group' ? 'g0' : 'l0',
-      stacks: stacksFrom(nodes),
+      stacks: stacksFrom([...nodes, ...extraNodes]),
     },
     type: 'replaceCanvasDocument',
   });
   host = document.createElement('div');
-  host.style.cssText = 'width:450px;height:600px;';
+  host.style.cssText = `width:${width}px;height:600px;`;
   document.body.append(host);
   root = createRoot(host);
   registry = createEngineRegistry({ gracePeriodMs: 0 });
@@ -285,6 +327,7 @@ const mount = async (View: typeof PropertiesPane, selection: Selection = 'none')
 };
 
 afterEach(async () => {
+  harness.appliesMutations = false;
   await act(() => root?.unmount());
   host?.remove();
   registry?.releaseEngine('p');
@@ -325,6 +368,16 @@ describe('Properties pane', () => {
     await expect
       .element(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }))
       .toBeVisible();
+
+    // The eraser shares the group but exposes width only: pressure never modulates erase strength.
+    await act(() => engine!.tools.setTool('eraser'));
+    await settle();
+    const eraserWidth = page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects width' });
+    await expect.element(eraserWidth).toBeChecked();
+    expect(page.getByRole('checkbox', { exact: true, name: 'Pen pressure affects opacity' }).query()).toBeNull();
+    await act(() => userEvent.click(page.getByText('Pen pressure affects width', { exact: true })));
+    expect(engine!.interaction.get('eraserOptions').pressureAffectsWidth).toBe(false);
+    expect(engine!.interaction.get('brushOptions').pressureAffectsWidth).toBe(true);
 
     await act(() => engine!.tools.setTool('view'));
     await settle();
@@ -583,6 +636,23 @@ describe('Properties pane', () => {
     await act(() => operations!.start(false));
     await settle();
     expect(host!.querySelector('[inert]')).toBeNull();
+  });
+});
+
+describe('Control layer properties', () => {
+  it('fits a 320 px pane without horizontal overflow or clipped text', async () => {
+    await mount(PropertiesPane, 'control', { width: 320 });
+    await expect.element(page.getByRole('combobox', { exact: true, name: 'Type' })).toBeVisible();
+
+    const overflowing = [host!, ...host!.querySelectorAll<HTMLElement>('*')].filter(
+      (element) =>
+        element.scrollWidth > element.clientWidth + 1 &&
+        getComputedStyle(element).overflowX !== 'visible' &&
+        // Screen-reader-only labels are clipped on purpose.
+        getComputedStyle(element).position !== 'absolute'
+    );
+    expect(overflowing.map((element) => element.outerHTML.slice(0, 80))).toEqual([]);
+    expect(host!.scrollWidth).toBeLessThanOrEqual(320);
   });
 });
 
@@ -1019,11 +1089,138 @@ describe('Segment tab strip', () => {
 });
 
 describe('History pane', () => {
+  const steps = () =>
+    [...page.getByRole('list', { name: 'Edit history' }).element().querySelectorAll('button')].map(
+      (button) => button.textContent
+    );
+
   it('shows the empty state with undo and redo disabled', async () => {
     await mount(HistoryPane);
     await expect.element(page.getByText('No edits yet.', { exact: true })).toBeVisible();
     await expect.element(page.getByRole('button', { exact: true, name: 'Undo canvas edit' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Redo canvas edit' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Clear history' })).toBeDisabled();
+    expect(steps()).toEqual(['Start']);
+  });
+
+  it('jumps back to the start, and clears history only once that is confirmed', async () => {
+    harness.appliesMutations = true;
+    await mount(HistoryPane, 'layer');
+    const bbox = harness.project!.canvas.document.bbox;
+    await act(() => {
+      engine!.layers.commitStructural(
+        'Move frame',
+        { bbox: { ...bbox, x: 8 }, type: 'setCanvasBbox' },
+        {
+          bbox,
+          type: 'setCanvasBbox',
+        }
+      );
+    });
+    expect(steps()).toEqual(['Start', 'Move frame']);
+
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Start' })));
+    await expect.poll(() => engine!.history.getEntries().future).toEqual(['Move frame']);
+
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Clear history' })));
+    const dialog = page.getByRole('alertdialog');
+    await expect.element(dialog).toBeVisible();
+    expect(dialog.element().textContent).toContain('Discards the 1 undo step for this canvas.');
+    await act(() => userEvent.click(dialog.getByRole('button', { exact: true, name: 'Clear history' })));
+    await expect.poll(() => engine!.history.getEntries().future).toEqual([]);
+    expect(steps()).toEqual(['Start']);
+  });
+
+  it('lists restore points newest first and says what each brings back', async () => {
+    await mount(HistoryPane);
+    const document = harness.project!.canvas.document;
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
+            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
+          ],
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+    const points = page.getByRole('list', { name: 'Restore points' });
+    await expect.element(points).toBeVisible();
+    const names = [...points.element().querySelectorAll('li')].map((item) => item.querySelector('p')?.textContent);
+    expect(names).toEqual(['Discarded', 'Before clearing']);
+    await expect.element(points.getByRole('button', { name: 'Restore' }).first()).toBeEnabled();
+  });
+
+  it('restores a canvas point, keeping the canvas it replaced as a point in its place', async () => {
+    harness.appliesMutations = true;
+    await mount(HistoryPane, 'layer');
+    const document = {
+      ...harness.project!.canvas.document,
+      selectedLayerId: 'restored',
+      stacks: stacksFrom([layerContract('restored', 'raster', { name: 'Restored' })]),
+    };
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Earlier' },
+          ],
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+
+    await act(() =>
+      userEvent.click(page.getByRole('list', { name: 'Restore points' }).getByRole('button', { name: 'Restore' }))
+    );
+    await expect
+      .poll(() => getDocumentLeaves(harness.project!.canvas.document).map((layer) => layer.id))
+      .toEqual(['restored']);
+    const kept = harness.project!.canvas.snapshots;
+    expect(kept.map((point) => point.name)).toEqual(['Before restoring “Earlier”']);
+    expect(getDocumentLeaves(kept[0]!.document).map((layer) => layer.id)).toEqual(['l0']);
+  });
+
+  it('holds a canvas restore while results wait for review, but re-stages a Discard all point', async () => {
+    await mount(HistoryPane);
+    const document = harness.project!.canvas.document;
+    const staged = {
+      height: 64,
+      imageName: 'staged.png',
+      imageUrl: '',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'q',
+      thumbnailUrl: '',
+      width: 64,
+    };
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
+            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
+          ],
+          stagingArea: {
+            ...harness.project!.canvas.stagingArea,
+            pendingImageIds: ['staged.png'],
+            pendingImages: [staged],
+          },
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+    const restores = page.getByRole('list', { name: 'Restore points' }).getByRole('button', { name: 'Restore' });
+    // Newest first: the Discard all point, then the cleared canvas.
+    await expect.element(restores.nth(0)).not.toHaveAttribute('aria-disabled', 'true');
+    await expect.element(restores.nth(1)).toHaveAttribute('aria-disabled', 'true');
   });
 });
 
@@ -1044,5 +1241,105 @@ describe('Overview pane', () => {
     await settle();
     const after = viewport.getState().pan;
     expect(after.x === before.x && after.y === before.y).toBe(false);
+  });
+
+  it('shows content beyond the frame and centres the view on the clicked point there', async () => {
+    // Outpainted pixels left of the default 1024² frame at the origin.
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 = (-1024,0) 2048×1024.
+    expect(canvas.width).toBeGreaterThan(0);
+    expect(canvas.width / canvas.height).toBeCloseTo(2, 1);
+    const unitsPerPx = 2048 / canvas.width;
+    const viewport = engine!.viewport.getViewport();
+    engine!.surface.resize(400, 300, 1);
+
+    const offset = { x: 3, y: 3 };
+    await act(async () => {
+      await userEvent.click(canvas, { position: offset });
+    });
+    await settle();
+
+    const centre = viewport.screenToDocument({ x: 200, y: 150 });
+    const expected = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
+    expect(expected.x).toBeLessThan(0);
+    expect(Math.abs(centre.x - expected.x)).toBeLessThan(unitsPerPx);
+    expect(Math.abs(centre.y - expected.y)).toBeLessThan(unitsPerPx);
+    // The outline is centred where the click landed on the bitmap.
+    const outline = pan.element().querySelector('div')!;
+    await expect
+      .poll(() => parseFloat(outline.style.left) + parseFloat(outline.style.width) / 2)
+      .toBeCloseTo(offset.x, 0);
+    await expect
+      .poll(() => parseFloat(outline.style.top) + parseFloat(outline.style.height) / 2)
+      .toBeCloseTo(offset.y, 0);
+  });
+
+  it('zooms the view around the document point under the wheel', async () => {
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, x: -1024 },
+    });
+    await mount(OverviewHarness, 'none', { extraNodes: [outpaint] });
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    const unitsPerPx = 2048 / canvas.width;
+    const viewport = engine!.viewport.getViewport();
+    engine!.surface.resize(400, 300, 1);
+    const offset = { x: 10, y: 20 };
+    // Frame (0,0) 1024×1024 ∪ content (-1024,0) 1024×512 puts document (-1024,0) at the overview's top-left.
+    const documentPoint = { x: -1024 + offset.x * unitsPerPx, y: offset.y * unitsPerPx };
+    const anchor = viewport.documentToScreen(documentPoint);
+    const zoomBefore = viewport.getZoom();
+
+    const bounds = canvas.getBoundingClientRect();
+    act(() => {
+      pan.element().dispatchEvent(
+        new WheelEvent('wheel', {
+          bubbles: true,
+          cancelable: true,
+          clientX: bounds.left + offset.x,
+          clientY: bounds.top + offset.y,
+          deltaY: -100,
+        })
+      );
+    });
+
+    expect(viewport.getZoom()).toBeGreaterThan(zoomBefore);
+    const anchored = viewport.documentToScreen(documentPoint);
+    expect(Math.abs(anchored.x - anchor.x)).toBeLessThan(0.5);
+    expect(Math.abs(anchored.y - anchor.y)).toBeLessThan(0.5);
+  });
+
+  it('redraws to the new extent when a document edit moves content after mount', async () => {
+    await mount(OverviewHarness);
+    const pan = page.getByRole('button', { exact: true, name: 'Pan the canvas view' });
+    await expect.element(pan).toBeVisible();
+    const canvas = pan.element().querySelector('canvas')!;
+    // The empty document shows only its 1024² frame.
+    expect(canvas.width / canvas.height).toBeCloseTo(1, 1);
+
+    // Content 1024×512 placed above the frame: (0,-512)..(1024,1024) = 1024×1536.
+    const outpaint = layerContract('outpaint', 'raster', {
+      source: { bitmap: { height: 512, imageName: 'outpaint', width: 1024 }, type: 'paint' },
+      transform: { ...IDENTITY, y: -512 },
+    });
+    act(() => {
+      const project = harness.project!;
+      harness.project = applyCanvasProjectMutation(project, {
+        document: { ...project.canvas.document, stacks: stacksFrom([outpaint]) },
+        type: 'replaceCanvasDocument',
+      });
+      harness.listeners.forEach((listener) => listener());
+    });
+
+    await expect.poll(() => canvas.width / canvas.height, { timeout: 2000 }).toBeCloseTo(1024 / 1536, 1);
   });
 });

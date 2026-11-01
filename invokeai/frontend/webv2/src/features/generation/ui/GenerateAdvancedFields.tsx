@@ -1,27 +1,40 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
+import type {
+  GenerateModelConfig,
+  GenerateSettings,
+  QwenImageEncoderQuantization,
+} from '@features/generation/core/types';
 
-import { Badge, createListCollection, HStack, Stack } from '@chakra-ui/react';
-import { getDefaultGenerateSettings, getGenerationUiPolicy } from '@features/generation/core/baseGenerationPolicies';
+import { Badge, Box, chakra, createListCollection, HStack, Stack, useRecipe } from '@chakra-ui/react';
+import {
+  getDefaultGenerateSettings,
+  getGenerationUiPolicy,
+  getKrea2EditLoraState,
+} from '@features/generation/core/baseGenerationPolicies';
 import { isPidMode, MAX_PID_STEPS, MIN_PID_STEPS } from '@features/generation/core/pid';
 import {
   DEFAULT_HIDIFFUSION_T1_RATIO,
   DEFAULT_HIDIFFUSION_T2_RATIO,
+  isQwenImageEncoderQuantization,
   isVaeModelConfig,
   MAX_HIDIFFUSION_RATIO,
   MIN_HIDIFFUSION_T1_RATIO,
+  QWEN_IMAGE_ENCODER_QUANTIZATIONS,
 } from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field, Select } from '@platform/ui';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { useMemo } from 'react';
+import { fieldLabelRecipe } from '@theme/recipes';
+import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateAdvancedFieldsProps {
@@ -38,6 +51,12 @@ const VAE_PRECISION_COLLECTION = createListCollection({
   ] as const,
 });
 
+const ENCODER_QUANTIZATION_LABEL_KEYS: Record<QwenImageEncoderQuantization, string> = {
+  int8: 'widgets.generate.encoderQuantizationInt8',
+  nf4: 'widgets.generate.encoderQuantizationNf4',
+  none: 'widgets.generate.encoderQuantizationNone',
+};
+
 const selectAdvancedSettings = pickGenerateSettings([
   'cfgRescaleMultiplier',
   'clipSkip',
@@ -47,13 +66,21 @@ const selectAdvancedSettings = pickGenerateSettings([
   'hiDiffusionT1Ratio',
   'hiDiffusionT2Ratio',
   'hiDiffusionWindowAttentionEnabled',
+  'krea2ReferenceKvCache',
   'pidMode',
   'pidSteps',
+  'qwenImageEncoderQuantization',
   'seamlessXAxis',
   'seamlessYAxis',
   'vae',
   'vaePrecision',
 ]);
+
+const KREA2_REFERENCE_KV_CACHE_HELP_KEYS = {
+  noEditReferences: 'widgets.generate.krea2ReferenceKvCacheNeedsEditReferences',
+  noLora: 'widgets.generate.krea2ReferenceKvCacheNeedsLora',
+  ready: 'widgets.generate.krea2ReferenceKvCacheHelp',
+} as const;
 
 export const GenerateAdvancedFields = ({
   draft,
@@ -62,7 +89,15 @@ export const GenerateAdvancedFields = ({
   selectedModel,
 }: GenerateAdvancedFieldsProps) => {
   const { t } = useTranslation();
+  const fieldLabel = useRecipe({ recipe: fieldLabelRecipe });
+  const seamlessLabelId = useId();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectAdvancedSettings);
+  // A string, so editing a reference or a concept re-renders this section only when the K/V cache starts or stops
+  // applying.
+  const krea2EditLoraState = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, (current: GenerateSettings) =>
+    getKrea2EditLoraState(selectedModel, current)
+  );
+  const krea2ReferenceKvCacheApplies = krea2EditLoraState === 'ready';
   const modelBase = selectedModel?.base;
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const policy = getGenerationUiPolicy(selectedModel);
@@ -80,6 +115,16 @@ export const GenerateAdvancedFields = ({
           { label: t('widgets.generate.pidFit'), value: 'fit' },
           { label: t('widgets.generate.pidNative'), value: 'native' },
         ],
+      }),
+    [t]
+  );
+  const encoderQuantizationCollection = useMemo(
+    () =>
+      createListCollection({
+        items: QWEN_IMAGE_ENCODER_QUANTIZATIONS.map((value) => ({
+          label: t(ENCODER_QUANTIZATION_LABEL_KEYS[value]),
+          value,
+        })),
       }),
     [t]
   );
@@ -109,7 +154,9 @@ export const GenerateAdvancedFields = ({
     !policy.hiDiffusionVisible &&
     !policy.clipSkipMax &&
     !policy.cfgRescaleVisible &&
-    !policy.pidVisible
+    !policy.pidVisible &&
+    !policy.encoderQuantizationVisible &&
+    !policy.krea2ReferenceKvCacheVisible
   ) {
     return null;
   }
@@ -124,6 +171,9 @@ export const GenerateAdvancedFields = ({
     policy.colorCompensationVisible && settings.colorCompensation,
     policy.hiDiffusionVisible && settings.hiDiffusionEnabled,
     policy.pidVisible && settings.pidMode !== 'off',
+    policy.encoderQuantizationVisible && settings.qwenImageEncoderQuantization !== 'none',
+    // The graph sends the switch only with edit references and a LoRA, so it is no override without them.
+    policy.krea2ReferenceKvCacheVisible && krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache,
   ].filter(Boolean).length;
 
   const badges =
@@ -136,6 +186,9 @@ export const GenerateAdvancedFields = ({
       badges={badges}
       sectionId="advanced"
     >
+      <Stack _empty={{ display: 'none' }} p="2" pb="0">
+        <GenerateIssueNotes section="advanced" />
+      </Stack>
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
         <HStack alignItems="flex-start" gap="2" p="2">
           {policy.sdVaeVisible ? (
@@ -194,6 +247,7 @@ export const GenerateAdvancedFields = ({
         <Stack gap="2" p="2">
           {policy.clipSkipMax ? (
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.clipSkip')}
               copyValue={() => String(settings.clipSkip)}
               isAtDefault={modelDefaults !== null && settings.clipSkip === modelDefaults.clipSkip}
               onReset={modelDefaults ? () => onCommit({ clipSkip: modelDefaults.clipSkip }) : undefined}
@@ -212,6 +266,7 @@ export const GenerateAdvancedFields = ({
           ) : null}
           {policy.cfgRescaleVisible ? (
             <GenerateFieldContextMenu
+              fieldLabel={t('widgets.generate.cfgRescale')}
               copyValue={() => String(settings.cfgRescaleMultiplier)}
               isAtDefault={
                 modelDefaults !== null && settings.cfgRescaleMultiplier === modelDefaults.cfgRescaleMultiplier
@@ -237,32 +292,28 @@ export const GenerateAdvancedFields = ({
 
       {policy.hiDiffusionVisible ? (
         <Stack gap="2" p="2">
-          <Field hint="hidiffusion" label={t('widgets.generate.hiDiffusion')}>
-            <GenerateToggleSwitch
-              checked={settings.hiDiffusionEnabled}
-              label={t('widgets.generate.hiDiffusion')}
-              onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
-            />
-          </Field>
-          <HStack alignItems="flex-start" gap="2">
-            <Field flex="1" hint="hidiffusionRauNet" label={t('widgets.generate.hiDiffusionRauNet')}>
-              <GenerateToggleSwitch
-                checked={settings.hiDiffusionRauNetEnabled}
-                disabled={!settings.hiDiffusionEnabled}
-                label={t('widgets.generate.hiDiffusionRauNet')}
-                onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
-              />
-            </Field>
-            <Field flex="1" hint="hidiffusionWindowAttn" label={t('widgets.generate.hiDiffusionWindowAttn')}>
-              <GenerateToggleSwitch
-                checked={settings.hiDiffusionWindowAttentionEnabled}
-                disabled={!settings.hiDiffusionEnabled}
-                label={t('widgets.generate.hiDiffusionWindowAttn')}
-                onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
-              />
-            </Field>
-          </HStack>
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionEnabled}
+            hint="hidiffusion"
+            label={t('widgets.generate.hiDiffusion')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionEnabled: checked })}
+          />
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionRauNetEnabled}
+            disabled={!settings.hiDiffusionEnabled}
+            hint="hidiffusionRauNet"
+            label={t('widgets.generate.hiDiffusionRauNet')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionRauNetEnabled: checked })}
+          />
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionWindowAttentionEnabled}
+            disabled={!settings.hiDiffusionEnabled}
+            hint="hidiffusionWindowAttn"
+            label={t('widgets.generate.hiDiffusionWindowAttn')}
+            onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
+          />
           <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.hiDiffusionT1Ratio')}
             copyValue={() => String(settings.hiDiffusionT1Ratio)}
             isAtDefault={settings.hiDiffusionT1Ratio === DEFAULT_HIDIFFUSION_T1_RATIO}
             onReset={() => onCommit({ hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO })}
@@ -280,6 +331,7 @@ export const GenerateAdvancedFields = ({
             />
           </GenerateFieldContextMenu>
           <GenerateFieldContextMenu
+            fieldLabel={t('widgets.generate.hiDiffusionT2Ratio')}
             copyValue={() => String(settings.hiDiffusionT2Ratio)}
             isAtDefault={settings.hiDiffusionT2Ratio === DEFAULT_HIDIFFUSION_T2_RATIO}
             onReset={() => onCommit({ hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO })}
@@ -300,13 +352,14 @@ export const GenerateAdvancedFields = ({
       ) : null}
 
       {policy.colorCompensationVisible ? (
-        <Field hint="colorCompensation" label={t('widgets.generate.colorCompensation')} p="2">
+        <Box p="2">
           <GenerateToggleSwitch
             checked={settings.colorCompensation}
+            hint="colorCompensation"
             label={t('widgets.generate.colorCompensation')}
             onCheckedChange={(checked) => onCommit({ colorCompensation: checked })}
           />
-        </Field>
+        </Box>
       ) : null}
 
       {policy.pidVisible ? (
@@ -339,23 +392,64 @@ export const GenerateAdvancedFields = ({
         </Stack>
       ) : null}
 
+      {policy.encoderQuantizationVisible ? (
+        <Field
+          hint="encoderQuantization"
+          label={t('widgets.generate.encoderQuantization')}
+          helpText={t('widgets.generate.encoderQuantizationHelp')}
+          p="2"
+        >
+          <Select
+            aria-label={t('widgets.generate.encoderQuantization')}
+            collection={encoderQuantizationCollection}
+            value={[settings.qwenImageEncoderQuantization]}
+            onValueChange={({ value }) => {
+              const quantization = value[0];
+
+              if (isQwenImageEncoderQuantization(quantization)) {
+                onCommit({ qwenImageEncoderQuantization: quantization });
+              }
+            }}
+          />
+        </Field>
+      ) : null}
+
+      {policy.krea2ReferenceKvCacheVisible ? (
+        <Box p="2">
+          {/* Shown off while it is not sent; the stored value stays and is back once it applies again. */}
+          <GenerateToggleSwitch
+            checked={krea2ReferenceKvCacheApplies && settings.krea2ReferenceKvCache}
+            disabled={!krea2ReferenceKvCacheApplies}
+            helpText={t(KREA2_REFERENCE_KV_CACHE_HELP_KEYS[krea2EditLoraState])}
+            hint="krea2ReferenceKvCache"
+            label={t('widgets.generate.krea2ReferenceKvCache')}
+            onCheckedChange={(checked) => onCommit({ krea2ReferenceKvCache: checked })}
+          />
+        </Box>
+      ) : null}
+
       {policy.seamlessVisible ? (
-        <Field hint="seamlessTiling" label={t('widgets.generate.seamlessTiling')} p="2">
-          <HStack gap="4">
+        // A heading over its rows: more room below it than between the rows, so it does not read as a third row.
+        <Stack aria-labelledby={seamlessLabelId} gap="3" p="2" role="group" {...FEATURE_HINT_FIELD_PROPS}>
+          {/* The hint trigger takes over its child's id, so it wraps the text inside the named heading. */}
+          <chakra.span css={fieldLabel()} id={seamlessLabelId}>
+            <FeatureHint hint="seamlessTiling">
+              <chakra.span>{t('widgets.generate.seamlessTiling')}</chakra.span>
+            </FeatureHint>
+          </chakra.span>
+          <Stack gap="2">
             <GenerateToggleSwitch
               checked={settings.seamlessXAxis}
               label={t('widgets.generate.xAxis')}
-              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessXAxis: checked })}
             />
             <GenerateToggleSwitch
               checked={settings.seamlessYAxis}
               label={t('widgets.generate.yAxis')}
-              labelVisible
               onCheckedChange={(checked) => onCommit({ seamlessYAxis: checked })}
             />
-          </HStack>
-        </Field>
+          </Stack>
+        </Stack>
       ) : null}
     </GenerateCollapsibleSection>
   );

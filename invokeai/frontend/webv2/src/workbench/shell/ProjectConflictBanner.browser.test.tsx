@@ -15,7 +15,7 @@ const harness = vi.hoisted(() => ({
   closeProject: vi.fn<() => ProjectCommandResult>(() => ({ ok: true })),
   conflict: undefined as
     | { detectedAt: string; kind: 'deleted' }
-    | { detectedAt: string; kind: 'revision'; serverRevision: number }
+    | { detectedAt: string; half?: 'workspace'; kind: 'revision'; serverRevision: number }
     | undefined,
   createProject: vi.fn(),
   deleteRecoverableDraft: vi.fn(() => Promise.resolve()),
@@ -23,6 +23,7 @@ const harness = vi.hoisted(() => ({
   getRecoverableDraftDocument: vi.fn(() => Promise.resolve('{"documentSchemaVersion":3}')),
   project: {} as Project,
   replaceProjectFromServer: vi.fn(),
+  librarySummaries: [] as { id: string; name: string }[],
   recoverableDrafts: [] as Array<{
     editorSessionId: string;
     generation: number;
@@ -50,15 +51,18 @@ vi.mock('@platform/browser/downloadBlob', () => ({ downloadText: harness.downloa
 // it closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
   ConfirmDialog: ({
+    body,
     isOpen,
     onClose,
     onConfirm,
   }: {
+    body: string;
     isOpen: boolean;
     onClose(): void;
     onConfirm(): Promise<void> | void;
   }) => (
     <div data-open={String(isOpen)} data-testid="resolution-dialog">
+      {isOpen ? <p>{body}</p> : null}
       {isOpen ? (
         <button
           data-testid="confirm-resolution"
@@ -75,6 +79,11 @@ vi.mock('@platform/ui/ConfirmDialog', () => ({
       ) : null}
     </div>
   ),
+}));
+vi.mock('@workbench/projects/library', () => ({
+  useProjectLibrarySelector: <Selected,>(
+    selector: (snapshot: { summaries: typeof harness.librarySummaries }) => Selected
+  ) => selector({ summaries: harness.librarySummaries }),
 }));
 vi.mock('@workbench/projects/syncStore', () => ({
   useProjectSyncSelector: (selector: (snapshot: unknown) => unknown) =>
@@ -107,7 +116,11 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     resolveConflictUseServer: harness.resolveConflictUseServer,
   }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, values?: Record<string, unknown>) => (values ? `${key}:${JSON.stringify(values)}` : key),
+  }),
+}));
 
 import { ProjectConflictBanner } from './ProjectConflictBanner';
 
@@ -119,6 +132,7 @@ beforeEach(() => {
   harness.project = { ...createDraftProject([]), id: 'project-1', name: 'Project' };
   harness.conflict = undefined;
   harness.recoverableDrafts = [];
+  harness.librarySummaries = [];
   harness.downloadText.mockClear();
   harness.deleteRecoverableDraft.mockClear();
   harness.getRecoverableDraftDocument.mockClear();
@@ -218,6 +232,27 @@ describe('ProjectConflictBanner', () => {
     );
   });
 
+  it('says a conflict of the caller’s settings keeps their project edits when they take the server’s', async () => {
+    harness.conflict = {
+      detectedAt: '2026-09-03T12:00:00.000Z',
+      half: 'workspace',
+      kind: 'revision',
+      serverRevision: 2,
+    };
+    await renderBanner();
+
+    expect(document.body.textContent).toContain('shell.projectConflict.workspaceRevisionTitle');
+    expect(document.body.textContent).not.toContain('shell.projectConflict.revisionTitle');
+    const useServer = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent === 'shell.projectConflict.useServer'
+    );
+    await act(() => userEvent.click(useServer!));
+
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain('shell.projectConflict.workspaceUseServerConfirmBody')
+    );
+  });
+
   it('keeps the confirmation mounted to animate out after resolving clears the banner', async () => {
     harness.conflict = { detectedAt: '2026-09-03T12:00:00.000Z', kind: 'revision', serverRevision: 2 };
     harness.replaceProjectFromServer.mockImplementationOnce(() => {
@@ -310,6 +345,25 @@ describe('ProjectConflictBanner', () => {
       'future-project.json',
       'application/json'
     );
+  });
+
+  it('names an unopenable draft by its library name, never by its id', async () => {
+    harness.recoverableDrafts = [
+      { editorSessionId: 'newest-editor', generation: 2, projectId: 'newest-project', updatedAt: 2 },
+      { editorSessionId: 'older-editor', generation: 1, projectId: 'older-project', updatedAt: 1 },
+    ];
+    harness.librarySummaries = [{ id: 'newest-project', name: 'Portraits' }];
+    await renderBanner();
+
+    expect(document.body.textContent).toContain(
+      'shell.projectConflict.recoverableDraftDescription:{"project":"Portraits"}'
+    );
+    const next = Array.from(document.querySelectorAll('button')).find(
+      (candidate) => candidate.textContent === 'shell.projectConflict.nextDraft'
+    );
+    await act(() => userEvent.click(next!));
+    expect(document.body.textContent).toContain('shell.projectConflict.recoverableDraftDescriptionUnnamed');
+    expect(document.body.textContent).not.toContain('older-project');
   });
 
   it('lets every newer-format draft be selected and exported', async () => {

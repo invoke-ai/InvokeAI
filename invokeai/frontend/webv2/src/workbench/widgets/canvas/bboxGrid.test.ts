@@ -8,7 +8,9 @@ import {
 } from '@features/generation/core/architectureCapabilities.testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { DEFAULT_MODEL_GRID, gridSizeForModelBase, resolveModelGrid } from './bboxGrid';
+import { DEFAULT_MODEL_GRID, gridSizeForModelBase, resizeBboxAroundCentre, resolveModelGrid } from './bboxGrid';
+
+const bbox = (width: number, height: number, x = 0, y = 0) => ({ height, width, x, y });
 
 describe('gridSizeForModelBase', () => {
   seedArchitectureCapabilities();
@@ -65,8 +67,10 @@ describe('resolveModelGrid before the capability table arrives', () => {
 
   it('answers for an external generator too, which will never get a row to wait for', () => {
     // A writer holds off on `null`, so answering it here would stop the bbox <-> dims sync for
-    // external providers for the whole session.
-    expect(resolveModelGrid('external')).toBe(DEFAULT_MODEL_GRID);
+    // external providers for the whole session. Providers bucket to their own size tables, so the
+    // bbox is pixel-exact rather than snapped to a local model grid.
+    expect(resolveModelGrid('external')).toBe(1);
+    expect(gridSizeForModelBase('external')).toBe(1);
   });
 
   it('keeps the default for readers that must show something', () => {
@@ -99,5 +103,21 @@ describe('the grid a variant declares', () => {
   it('falls back to the architecture row for a variant that declares nothing of its own', () => {
     expect(gridSizeForModelBase('wan', 'a14b')).toBe(16);
     expect(gridSizeForModelBase('sdxl', 'inpaint')).toBe(8);
+  });
+});
+
+describe('resizeBboxAroundCentre (pure)', () => {
+  it('keeps the centre of the frame', () => {
+    // Centre (516, 708); a 1024 square around it starts at (4, 196).
+    expect(resizeBboxAroundCentre(bbox(832, 1216, 100, 100), { height: 1024, width: 1024 })).toEqual(
+      bbox(1024, 1024, 4, 196)
+    );
+  });
+
+  it('rounds a half-pixel offset from an odd size difference to whole pixels', () => {
+    // 10 + (513 - 512) / 2 = 10.5 and 20 + (512 - 515) / 2 = 18.5.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 10, 20), { height: 515, width: 512 })).toEqual(bbox(512, 515, 11, 19));
+    // -0.5 rounds to zero, not negative zero.
+    expect(resizeBboxAroundCentre(bbox(513, 512, 0, 0), { height: 512, width: 514 }).x).toBe(0);
   });
 });

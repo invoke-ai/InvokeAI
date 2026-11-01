@@ -1,15 +1,19 @@
 import type { GalleryBoard } from './types';
 
+import { canOnBoard, isOtherUsersGalleryBoard, isOwnGalleryBoard, isSharedGalleryBoard } from './boardAccess';
+import { ALL_READABLE_BOARDS_ID } from './items';
+
 export type GalleryBoardTranslate = (key: string) => string;
 
 /**
  * Resolves the localized display label for synthesized and stored boards. An inbox is labelled as such: every
- * surface that lists it also names its project, as a section, a group or the open project itself.
+ * surface that lists one of the caller's also names its project, as a section, a group or the open project itself.
+ * Someone else's inbox, which only an admin sees, keeps its stored name, the project's: nothing else names it.
  */
 export const getGalleryBoardLabel = (board: GalleryBoard, t: GalleryBoardTranslate): string =>
   board.kind === 'uncategorized'
     ? t('widgets.gallery.uncategorized')
-    : board.isInbox
+    : board.isInbox && isOwnGalleryBoard(board)
       ? t('widgets.gallery.inbox')
       : board.name;
 
@@ -39,8 +43,9 @@ export interface GalleryBoardDestinationGroup {
 }
 
 /**
- * The tiers a flat "move to board" menu offers, in the panel's order: the open project, the Library, then each
- * other project under its own name. Empty groups are dropped so a menu never shows a bare heading.
+ * The tiers a flat "move to board" menu offers, in the panel's order: the open project, the Library, boards shared
+ * with the caller, other users' boards (admins), then each other project under its own name. Only boards the caller
+ * may add media to are destinations. Empty groups are dropped so a menu never shows a bare heading.
  */
 export const getGalleryBoardDestinationGroups = ({
   boards,
@@ -56,8 +61,11 @@ export const getGalleryBoardDestinationGroups = ({
   t: GalleryBoardTranslate;
 }): GalleryBoardDestinationGroup[] => {
   const otherProjects = new Map<string, GalleryBoard[]>();
+  const destinations = boards.filter((board) => canOnBoard(board, 'add_media'));
+  const own = destinations.filter(isOwnGalleryBoard);
+  const byName = (left: GalleryBoard, right: GalleryBoard) => left.name.localeCompare(right.name);
 
-  for (const board of boards) {
+  for (const board of own) {
     if (board.projectId !== null && board.projectId !== projectId) {
       const group = otherProjects.get(board.projectId);
 
@@ -71,14 +79,24 @@ export const getGalleryBoardDestinationGroups = ({
 
   const groups: GalleryBoardDestinationGroup[] = [
     {
-      boards: inboxFirst(boards.filter((board) => projectId !== null && board.projectId === projectId)),
+      boards: inboxFirst(own.filter((board) => projectId !== null && board.projectId === projectId)),
       id: 'project',
       label: projectName,
     },
     {
-      boards: boards.filter((board) => board.projectId === null),
+      boards: own.filter((board) => board.projectId === null),
       id: 'library',
       label: t('widgets.gallery.boardGroups.library'),
+    },
+    {
+      boards: destinations.filter(isSharedGalleryBoard).sort(byName),
+      id: 'shared',
+      label: t('widgets.gallery.boardGroups.shared'),
+    },
+    {
+      boards: destinations.filter(isOtherUsersGalleryBoard).sort(byName),
+      id: 'other-users',
+      label: t('widgets.gallery.boardGroups.otherUsers'),
     },
     ...[...otherProjects]
       .map(([otherProjectId, group]) => ({
@@ -90,4 +108,41 @@ export const getGalleryBoardDestinationGroups = ({
   ];
 
   return groups.filter((group) => group.boards.length > 0);
+};
+
+/**
+ * Where a set of items can be moved, shared by the selection bar and the item menus: stored boards that are not
+ * archived (date and Uncategorized entries are not boards), less the one board every item is already on. Removing
+ * from a board is offered only while some item may be on one. Items no loaded page holds sit on the listing's board;
+ * where that is unknown (no listing named, or a search of every board) they could be on any board.
+ */
+export const getGalleryMoveTargets = (
+  boards: readonly GalleryBoard[],
+  {
+    itemBoardIds,
+    listingBoardId = null,
+    unloadedCount = 0,
+  }: {
+    /** The board of each item a loaded page holds. */
+    itemBoardIds: readonly string[];
+    /** The board the listing the items were selected in reads. */
+    listingBoardId?: string | null;
+    /** Selected items no loaded page holds. */
+    unloadedCount?: number;
+  }
+): { boards: GalleryBoard[]; canRemoveFromBoard: boolean } => {
+  const sources = new Set(itemBoardIds);
+  const isUnloadedBoardKnown = listingBoardId !== null && listingBoardId !== ALL_READABLE_BOARDS_ID;
+
+  if (unloadedCount > 0 && isUnloadedBoardKnown) {
+    sources.add(listingBoardId);
+  }
+
+  const isAnyBoardUnknown = unloadedCount > 0 && !isUnloadedBoardKnown;
+  const sharedSource = !isAnyBoardUnknown && sources.size === 1 ? [...sources][0] : undefined;
+
+  return {
+    boards: boards.filter((board) => board.kind === 'board' && !board.archived && board.id !== sharedSource),
+    canRemoveFromBoard: isAnyBoardUnknown || [...sources].some((boardId) => boardId !== 'none'),
+  };
 };

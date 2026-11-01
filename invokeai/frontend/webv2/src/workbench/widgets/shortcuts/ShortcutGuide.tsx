@@ -3,7 +3,7 @@ import type { ShortcutHint, ShortcutHintSnapshot } from '@workbench/hotkeys/hint
 import type { ResolvedShortcutHint } from '@workbench/hotkeys/shortcutHints';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
-import { Box, Flex, Icon, Popover, Stack, Text, usePopoverContext } from '@chakra-ui/react';
+import { Box, Flex, Icon, Popover, Stack, Text, usePopoverContext, VisuallyHidden } from '@chakra-ui/react';
 import { Button } from '@platform/ui';
 import { useCurrentWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
@@ -48,6 +48,12 @@ const SURFACE_HINTS: Record<string, ShortcutHintSnapshot> = {
     titleKey: 'widgets.labels.workflow',
     hints: [
       { commandId: 'workflows.addNode', labelKey: 'workbench.shortcuts.actions.addNode' },
+      // The editor pans on a middle or right drag; a left drag selects.
+      {
+        labelKey: 'workbench.shortcuts.actions.pan',
+        parts: [],
+        pointerKey: 'workbench.shortcuts.pointer.middleOrRightDrag',
+      },
       { commandId: 'workflows.selectAll', labelKey: 'workbench.shortcuts.actions.selectNodes' },
     ],
   },
@@ -126,7 +132,15 @@ const ConnectedShortcutGuide = ({
 const Hint = ({ hint, compact = false }: { hint: ResolvedShortcutHint; compact?: boolean }) => {
   const { t } = useTranslation();
   return (
-    <Flex align="center" flexShrink={0} gap="1" whiteSpace={compact ? 'nowrap' : undefined}>
+    // Compact hints are a visual preview inside the status-bar chip, whose name stays "Shortcuts"; the popover lists
+    // the same hints for assistive technology.
+    <Flex
+      aria-hidden={compact || undefined}
+      align="center"
+      flexShrink={0}
+      gap="1"
+      whiteSpace={compact ? 'nowrap' : undefined}
+    >
       {hint.parts.length > 0 ? <ShortcutKeycaps parts={hint.parts} /> : null}
       {hint.pointerKey ? (
         <Text as="span" fontSize="xs">
@@ -269,8 +283,13 @@ export const ShortcutGuideContent = ({
         ))}
       </Flex>
       <Flex align="center" gap="2" h="full" justify="flex-start" minW="0">
+        {/* The status-bar chip takes its name from this content: the guide's name, whether its visible label, the
+            preview hints, or only the icon show. */}
+        {visibleCount > 0 || !showFallbackLabel ? (
+          <VisuallyHidden>{t('workbench.shortcuts.title')}</VisuallyHidden>
+        ) : null}
         {visibleCount > 0 ? (
-          <Text color="fg.muted" flexShrink={0} fontSize="xs">
+          <Text aria-hidden color="fg.muted" flexShrink={0} fontSize="xs">
             {title}
           </Text>
         ) : (

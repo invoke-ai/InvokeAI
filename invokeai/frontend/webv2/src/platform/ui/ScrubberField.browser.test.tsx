@@ -7,13 +7,15 @@ import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+import { getHintCard, openHintCard, parkPointer } from './hints/featureHint.testing';
+import { type FeatureHintsAdapter, FeatureHintsProvider } from './hints/hintsContext';
 import { ScrubberField, type ScrubberFieldProps } from './ScrubberField';
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
   lng: 'en',
-  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}' } } } } },
+  resources: { en: { translation: { common: { scrubber: { editValue: 'Edit {{label}}: {{value}}' } } } } },
 });
 
 let host: HTMLDivElement | null = null;
@@ -136,7 +138,8 @@ describe('ScrubberField', () => {
     expect(slider.getAttribute('aria-valuenow')).toBe('30');
     expect(slider.getAttribute('aria-valuetext')).toBe('30%');
     expect(valueButton()?.textContent).toBe('30%');
-    expect(valueButton()?.getAttribute('aria-label')).toBe('Edit Steps');
+    // The name carries the visible value (WCAG 2.5.3).
+    await expect.element(valueButton()!).toHaveAccessibleName('Edit Steps: 30%');
   });
 
   it('fills the frame at the maximum and still frames the thumb at the minimum', async () => {
@@ -151,7 +154,10 @@ describe('ScrubberField', () => {
     host?.remove();
 
     const empty = await mount({ value: 0 });
-    expect(part(empty.frame, 'fill').right).toBeGreaterThan(part(empty.frame, 'thumb').right);
+    const emptyClearance = part(empty.frame, 'fill').right - part(empty.frame, 'thumb').right;
+    // The fill's rounded end wraps the thumb but stays close to it.
+    expect(emptyClearance).toBeGreaterThan(0);
+    expect(emptyClearance).toBeLessThanOrEqual(3.5);
   });
 
   it('scrubs relative to the current value from wherever the press lands, snapped to the step', async () => {
@@ -802,5 +808,102 @@ describe('ScrubberField log scale and value-dependent steps', () => {
     await act(() => userEvent.keyboard('{ArrowLeft}{ArrowLeft}{PageDown}{Shift>}{ArrowUp}{/Shift}{End}'));
 
     expect(steps().slice(3)).toEqual([1, 0.99, 0.89, 0.99, 100]);
+  });
+});
+
+describe('ScrubberField hints', () => {
+  const HINT_RESOURCES = {
+    hints: { steps: { heading: 'Steps', paragraphs: ['Number of steps that will be performed.'] } },
+  };
+
+  i18n.addResourceBundle('en', 'translation', HINT_RESOURCES, true, false);
+
+  const HINTS_ON: FeatureHintsAdapter = { enabled: true, onDisable: null };
+  const HINTS_OFF: FeatureHintsAdapter = { enabled: false, onDisable: null };
+  /** Inset from the parked pointer, and narrow enough to leave room for the card beside the field. */
+  const HOST_CSS = 'width:120px;margin:120px 0 0 8px';
+
+  const mountWithHints = async (enabled: boolean) => {
+    const onChange = vi.fn();
+
+    host = document.createElement('div');
+    host.style.cssText = HOST_CSS;
+    document.body.append(host);
+    root = createRoot(host);
+
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <FeatureHintsProvider adapter={enabled ? HINTS_ON : HINTS_OFF}>
+              <ScrubberField hint="steps" label="Steps" max={100} min={0} step={1} value={30} onChange={onChange} />
+            </FeatureHintsProvider>
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+
+    const frame = host.querySelector<HTMLDivElement>('[data-scope="scrubber"]')!;
+    const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+    const label = host.querySelector<HTMLElement>('[data-part="label"]')!;
+
+    return { frame, label, onChange, slider };
+  };
+
+  it('opens the hint card from the label beside the field, keeping the slider named by the label', async () => {
+    const { frame, label, slider } = await mountWithHints(true);
+    const card = await openHintCard(label.querySelector('[data-part="trigger"]')!);
+
+    expect(getHintCard()?.textContent).toContain('Number of steps that will be performed.');
+    // Beside the frame, not over the track and value the hint explains.
+    expect(card.left).toBeGreaterThanOrEqual(frame.getBoundingClientRect().right);
+    expect(document.getElementById(slider.getAttribute('aria-labelledby') ?? '')?.textContent).toBe('Steps');
+  });
+
+  it('closes the card when a press on the field starts other work', async () => {
+    const { label } = await mountWithHints(true);
+
+    await openHintCard(label.querySelector('[data-part="trigger"]')!);
+    // The value sits between the label and the card, inside the corridor to the card.
+    await act(() => userEvent.click(valueButton()!));
+    // Past the close delay, short of the corridor's grace window.
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 500);
+      });
+    });
+
+    expect(getHintCard()).toBeNull();
+  });
+
+  it('opens no card while hints are off', async () => {
+    const { label } = await mountWithHints(false);
+
+    await parkPointer();
+    await act(() => userEvent.hover(label));
+    // Past the hint's open delay.
+    await act(async () => {
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 900);
+      });
+    });
+
+    expect(document.querySelector('[data-scope="hover-card"]')).toBeNull();
+  });
+
+  it('still scrubs from a press on the hinted label', async () => {
+    const { frame, label, onChange } = await mountWithHints(true);
+    const { left, top } = label.getBoundingClientRect();
+
+    await pointer(label, 'pointerdown', { clientX: left + 4, clientY: top + 4 });
+
+    expect(frame.hasAttribute('data-dragging')).toBe(true);
+
+    const trackWidth = frame.getBoundingClientRect().width - TRACK_INSET_PX * 2;
+
+    await pointer(window, 'pointermove', { clientX: left + 4 + trackWidth * 0.2 });
+
+    expect(onChange).toHaveBeenLastCalledWith(50);
+    await pointer(window, 'pointerup', {});
   });
 });

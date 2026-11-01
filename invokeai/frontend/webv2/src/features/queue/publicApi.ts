@@ -10,9 +10,10 @@ import type {
 import type { QueueModelLoadPort, QueueNodeExecutionPort } from './runtime/coordinator';
 
 import { queueBackend } from './data/httpRealtimeQueueBackend';
-import { queueReadModelOptions } from './data/queries';
+import { queueItemDetailOptions, queueReadModelOptions } from './data/queries';
 import { createQueueRealtimeRuntime } from './data/realtimeRuntime';
 import { createQueueRuntime } from './runtime';
+import { queueCancelRequests } from './runtime/cancelRequests';
 import { createQueueReceiptAcknowledgements, type QueueReceiptStorePort } from './runtime/receiptAcknowledgements';
 
 export const createProductionQueueReceiptAcknowledgements = (store: QueueReceiptStorePort, isActive: () => boolean) =>
@@ -23,12 +24,14 @@ export const createProductionQueueReceiptAcknowledgements = (store: QueueReceipt
   });
 
 export const queueCommands: QueueFeatureCommands = {
+  cancelBatch: queueBackend.cancelBatch,
   cancelCurrentItem: queueBackend.cancelCurrentItem,
   cancelItem: async (itemId) => {
     await queueBackend.cancelItem(itemId);
   },
   cancelScopedItems: queueBackend.cancelScopedItems,
   clearFailedItems: queueBackend.clearFailedItems,
+  clearFinishedItems: queueBackend.clearFinishedItems,
   clearItems: queueBackend.clearItems,
   pauseProcessor: async () => {
     await queueBackend.pauseProcessor();
@@ -36,7 +39,10 @@ export const queueCommands: QueueFeatureCommands = {
   resumeProcessor: async () => {
     await queueBackend.resumeProcessor();
   },
+  retryItems: queueBackend.retryItems,
 };
+
+export const getQueueItemDetailOptions = (itemId: number) => queueItemDetailOptions(queueBackend, itemId);
 
 export const getQueueReadModelOptions = (scope: QueueQueryScope, onRead?: (model: QueueReadModel) => void) =>
   queueReadModelOptions(queueBackend, scope, onRead);
@@ -63,6 +69,7 @@ export const createProductionQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
+  viewerUserId,
 }: {
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -72,9 +79,11 @@ export const createProductionQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
+  viewerUserId: string | null;
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
+    cancelRequests: queueCancelRequests,
     destinations,
     ensureProjectPersisted,
     ensureTemplatesLoaded,
@@ -83,4 +92,5 @@ export const createProductionQueueRuntime = ({
     locks,
     modelLoads,
     nodeExecution,
+    viewerUserId,
   });

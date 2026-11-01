@@ -1,11 +1,14 @@
-import type { GalleryBoard } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
-import { HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
-import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
+import { chakra, Checkbox, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
+import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -15,12 +18,14 @@ import {
   PencilIcon,
   SquareArrowDownIcon,
   Trash2Icon,
+  UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { canMoveGalleryBoard, isManagedGalleryBoard } from './galleryBoardGroups';
+import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
+import { getBoardCounts, getGalleryIntendedDestinationId } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export interface GalleryBoardMenuTarget {
@@ -41,17 +46,33 @@ export const GalleryBoardMenu = ({
   onClose: () => void;
 }) => {
   const { t } = useTranslation();
-  const { actions, currentUserId, gallery } = useGalleryWidget();
+  const { actions, boardSharing = false, gallery } = useGalleryWidget();
   const [renameTarget, setRenameTarget] = useState<GalleryBoard | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<GalleryBoard | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const accessHeaderId = useId();
   const targetRef = useRef(target);
 
   // eslint-disable-next-line react/refs
   targetRef.current = target;
 
   const board = target?.board ?? null;
+  // Other than an inbox, a real board is managed as far as the server allows the caller.
   const isManagedBoard = board !== null && isManagedGalleryBoard(board, gallery.projectBoardId);
+  const can = (action: GalleryBoardAction) => board !== null && isManagedBoard && canOnBoard(board, action);
+  // A dialog stays open only while the board is listed and still allows its action: a refetch after a revocation
+  // or a deletion elsewhere closes it, for good, rather than leaving a change that would only be refused or reopening
+  // it with what was typed when access returns.
+  const isStillAllowed = (dialogBoard: GalleryBoard, action: GalleryBoardAction) => {
+    const listed = gallery.boards.find((candidate) => candidate.id === dialogBoard.id);
+    return Boolean(listed && canOnBoard(listed, action));
+  };
+  if (renameTarget !== null && !isStillAllowed(renameTarget, 'rename')) {
+    setRenameTarget(null);
+  }
+  if (deleteTarget !== null && !isStillAllowed(deleteTarget, 'delete')) {
+    setDeleteTarget(null);
+  }
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => {
@@ -112,26 +133,21 @@ export const GalleryBoardMenu = ({
 
   const handleCancelDelete = useCallback(() => setDeleteTarget(null), []);
 
-  const handleDeleteBoardOnly = useCallback(() => {
-    if (deleteTarget) {
-      void actions.deleteBoard(deleteTarget.id, false);
-    }
+  const handleDelete = useCallback(
+    (includeMedia: boolean) => {
+      if (deleteTarget) {
+        void actions.deleteBoard(deleteTarget.id, includeMedia);
+      }
 
-    setDeleteTarget(null);
-  }, [actions, deleteTarget]);
-
-  const handleDeleteBoardAndImages = useCallback(() => {
-    if (deleteTarget) {
-      void actions.deleteBoard(deleteTarget.id, true);
-    }
-
-    setDeleteTarget(null);
-  }, [actions, deleteTarget]);
+      setDeleteTarget(null);
+    },
+    [actions, deleteTarget]
+  );
 
   return (
     <>
       <Menu.Root
-        key={board ? board.id : 'closed'}
+        key={board ? `menu:${board.id}` : 'menu:closed'}
         lazyMount
         open={target !== null}
         positioning={positioning}
@@ -141,26 +157,41 @@ export const GalleryBoardMenu = ({
         <Portal>
           <Menu.Positioner>
             {board && (
-              <MenuContent minW="12rem">
-                {board.isInbox && board.projectId !== null && (
+              <MenuContent
+                // Focus moves to the items, outside the header's group: the menu itself is described by it, so
+                // whose board it is and what the caller may do is announced as the menu opens.
+                aria-describedby={hasAccessHeader(board) ? accessHeaderId : undefined}
+                minW="12rem"
+              >
+                <BoardAccessHeader board={board} id={accessHeaderId} />
+                {board.isInbox && board.projectId !== null && isOwnGalleryBoard(board) && (
                   <>
                     <BoardExportProjectMenuItem board={board} />
                     <Menu.Separator />
                   </>
                 )}
-                {board.id === gallery.settings.autoAddBoardId ? (
-                  <BoardAutoAddMenuItem boardId={GALLERY_AUTO_ADD_FOLLOW} label={t('widgets.gallery.stopAutoAdd')} />
-                ) : board.kind !== 'date' && !board.archived ? (
+                {!gallery.settings.followSelectedBoard && board.id === gallery.settings.autoAddBoardId ? (
+                  // Back to the default destination; the default itself has nothing to stop.
+                  <BoardAutoAddMenuItem boardId={null} label={t('widgets.gallery.stopAutoAdd')} />
+                ) : (gallery.settings.followSelectedBoard || board.id !== getGalleryIntendedDestinationId(gallery)) &&
+                  board.kind !== 'date' &&
+                  !board.archived &&
+                  canOnBoard(board, 'add_media') ? (
                   <BoardAutoAddMenuItem boardId={board.id} label={t('widgets.gallery.autoAddToBoard')} />
                 ) : null}
                 <BoardDownloadMenuItem board={board} />
-                {isManagedBoard && (
+                {can('rename') && (
+                  <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
+                )}
+                {boardSharing && can('set_general_access') && <BoardGeneralAccessSubMenu board={board} />}
+                {isMovableGalleryBoard(board, gallery.projectBoardId) && (
+                  <BoardMoveSubMenu board={board} onBoardMoved={onBoardRelocated} />
+                )}
+                {can('archive') && (
+                  <BoardArchiveMenuItem archived={board.archived} boardId={board.id} onArchive={onBoardRelocated} />
+                )}
+                {can('delete') && (
                   <>
-                    <BoardRenameMenuItem board={board} onRename={setRenameTarget} onRenameValue={setRenameValue} />
-                    {canMoveGalleryBoard(board, gallery.projectBoardId, currentUserId) && (
-                      <BoardMoveSubMenu board={board} onBoardMoved={onBoardRelocated} />
-                    )}
-                    <BoardArchiveMenuItem archived={board.archived} boardId={board.id} onArchive={onBoardRelocated} />
                     <Menu.Separator />
                     <BoardDeleteMenuItem board={board} onDelete={setDeleteTarget} />
                   </>
@@ -205,46 +236,144 @@ export const GalleryBoardMenu = ({
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-      <Dialog.Root open={deleteTarget !== null} role="alertdialog" onOpenChange={handleDeleteDialogOpenChange}>
-        <Portal>
-          <Dialog.Backdrop />
-          <Dialog.Positioner>
-            <Dialog.Content>
-              <Dialog.Header>
-                <Dialog.Title>
-                  {t('widgets.gallery.deleteBoardQuestion', { name: deleteTarget?.name ?? '' })}
-                </Dialog.Title>
-              </Dialog.Header>
-              <Dialog.Body>
-                <Stack gap="2">
-                  <Text color="fg.subtle" fontSize="md">
-                    {t('widgets.gallery.deleteBoardDescription')}
-                  </Text>
-                  <Text color="fg.subtle" fontSize="xs">
-                    {t('widgets.gallery.boardItemCounts', {
-                      assets: t('widgets.gallery.assetCount', { count: deleteTarget?.assetCount ?? 0 }),
-                      images: t('widgets.gallery.imageCount', { count: deleteTarget?.imageCount ?? 0 }),
-                      videos: t('widgets.gallery.videoCount', { count: deleteTarget?.videoCount ?? 0 }),
-                    })}
-                  </Text>
-                </Stack>
-              </Dialog.Body>
-              <Dialog.Footer>
-                <Button variant="ghost" onClick={handleCancelDelete}>
-                  {t('common.cancel')}
-                </Button>
-                <Button colorPalette="red" variant="outline" onClick={handleDeleteBoardOnly}>
-                  {t('widgets.gallery.deleteBoardOnly')}
-                </Button>
-                <Button colorPalette="red" onClick={handleDeleteBoardAndImages}>
-                  {t('widgets.gallery.deleteBoardAndMedia')}
-                </Button>
-              </Dialog.Footer>
-            </Dialog.Content>
-          </Dialog.Positioner>
-        </Portal>
-      </Dialog.Root>
+      <BoardDeleteDialog
+        board={deleteTarget}
+        onCancel={handleCancelDelete}
+        onDelete={handleDelete}
+        onOpenChange={handleDeleteDialogOpenChange}
+      />
     </>
+  );
+};
+
+/** From this many items, also deleting them needs the board's name typed, not only a tick. */
+export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
+
+/**
+ * Deleting a board keeps its media by default: it moves to Uncategorized in the Library, where the server puts what a
+ * deleted board held. Deleting the media too is the opt-in, behind a checkbox and, for many items, the typed name.
+ */
+const BoardDeleteDialog = ({
+  board,
+  onCancel,
+  onDelete,
+  onOpenChange,
+}: {
+  board: GalleryBoard | null;
+  onCancel: () => void;
+  onDelete: (includeMedia: boolean) => void;
+  onOpenChange: (event: { open: boolean }) => void;
+}) => {
+  const { t } = useTranslation();
+  // The board and the choices stay shown while the dialog animates out; the choices belong to one opening and start
+  // over with the next one, for the same board too. The dialog is not remounted, which would cut the exit animation.
+  const [shownBoard, setShownBoard] = useState(board);
+  const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
+  const [choices, setChoices] = useState({ includeMedia: false, typedName: '' });
+  if (board !== null && board !== shownBoard) {
+    setShownBoard(board);
+  }
+  if ((board?.id ?? null) !== openedBoardId) {
+    setOpenedBoardId(board?.id ?? null);
+    if (board !== null) {
+      setChoices({ includeMedia: false, typedName: '' });
+    }
+  }
+  const { includeMedia, typedName } = choices;
+  const cancelRef = useRef<HTMLButtonElement | null>(null);
+  const mediaHintId = useId();
+  const nameInputId = useId();
+  const boardName = shownBoard ? getGalleryBoardLabel(shownBoard, t) : '';
+  const counts = shownBoard ? getBoardCounts(shownBoard) : null;
+  const itemCount = counts?.items ?? 0;
+  const media = formatGalleryMediaCounts(t, {
+    images: counts?.images ?? 0,
+    uploads: counts?.uploads ?? 0,
+    videos: counts?.videos ?? 0,
+  });
+  const needsTypedName = includeMedia && itemCount >= BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS;
+  const canDelete = !needsTypedName || typedName.trim() === boardName.trim();
+  const handleIncludeMediaChange = useCallback(
+    (details: { checked: boolean | 'indeterminate' }) =>
+      setChoices((current) => ({ ...current, includeMedia: details.checked === true })),
+    []
+  );
+  const handleTypedNameChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const typed = event.currentTarget.value;
+
+    setChoices((current) => ({ ...current, typedName: typed }));
+  }, []);
+  const getInitialFocus = useCallback(() => cancelRef.current, []);
+  const handleConfirm = useCallback(() => onDelete(includeMedia), [includeMedia, onDelete]);
+
+  return (
+    // Cancel takes focus, not the checkbox that would delete the media.
+    <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
+      <Portal>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Dialog.Title>{t('widgets.gallery.deleteBoardQuestion', { name: boardName })}</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap="3">
+                <Text fontSize="md">
+                  {itemCount === 0
+                    ? t('widgets.gallery.deleteBoardEmptyDescription')
+                    : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
+                </Text>
+                {itemCount > 0 ? (
+                  <Stack gap="1">
+                    <Checkbox.Root
+                      checked={includeMedia}
+                      colorPalette="red"
+                      size="sm"
+                      onCheckedChange={handleIncludeMediaChange}
+                    >
+                      <Checkbox.HiddenInput aria-describedby={mediaHintId} />
+                      <Checkbox.Control>
+                        <Checkbox.Indicator />
+                      </Checkbox.Control>
+                      <Checkbox.Label fontSize="md">
+                        {t('widgets.gallery.deleteBoardIncludeMedia', { count: itemCount })}
+                      </Checkbox.Label>
+                    </Checkbox.Root>
+                    <Text color="fg.muted" fontSize="sm" id={mediaHintId} ps="5">
+                      {t('widgets.gallery.deleteBoardIncludeMediaHint')}
+                    </Text>
+                  </Stack>
+                ) : null}
+                {needsTypedName ? (
+                  <Stack gap="1">
+                    <chakra.label fontSize="md" htmlFor={nameInputId}>
+                      {t('widgets.gallery.deleteBoardTypeName', { name: boardName })}
+                    </chakra.label>
+                    <Input
+                      autoComplete="off"
+                      id={nameInputId}
+                      spellCheck={false}
+                      value={typedName}
+                      onChange={handleTypedNameChange}
+                    />
+                  </Stack>
+                ) : null}
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button ref={cancelRef} variant="ghost" onClick={onCancel}>
+                {t('common.cancel')}
+              </Button>
+              <Button colorPalette="red" disabled={!canDelete} onClick={handleConfirm}>
+                {includeMedia
+                  ? t('widgets.gallery.deleteBoardAndMedia', { count: itemCount })
+                  : t('widgets.gallery.deleteBoard')}
+              </Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Portal>
+    </Dialog.Root>
   );
 };
 
@@ -272,8 +401,8 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
 const SUBMENU_POSITIONING = { gutter: 2, placement: 'right-start' } as const;
 
 /**
- * Where a board can go: the Library, the open project, then the account's other projects by name — every tier
- * but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
+ * Where a board can go: the Library, then under a Projects heading the open project and the account's other projects
+ * by name — every tier but the one it is in. Nested so the board menu keeps its one-level shape for the common actions.
  */
 const BoardMoveSubMenu = ({
   board,
@@ -292,20 +421,17 @@ const BoardMoveSubMenu = ({
     },
     [actions, onBoardMoved]
   );
-  const destinations = useMemo(() => {
+  const projects = useMemo(() => {
     const others = [...projectNames]
       .filter(([id]) => id !== projectId && id !== board.projectId)
       .map(([id, name]) => ({ id, label: name }))
       .sort((left, right) => left.label.localeCompare(right.label));
 
-    return [
-      ...(board.projectId !== null ? [{ id: null, label: t('widgets.gallery.boardGroups.library') }] : []),
-      ...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []),
-      ...others,
-    ];
-  }, [board.projectId, projectId, projectName, projectNames, t]);
+    return [...(board.projectId !== projectId ? [{ id: projectId, label: projectName }] : []), ...others];
+  }, [board.projectId, projectId, projectName, projectNames]);
+  const canMoveToLibrary = board.projectId !== null;
 
-  if (destinations.length === 0) {
+  if (!canMoveToLibrary && projects.length === 0) {
     return null;
   }
 
@@ -322,17 +448,31 @@ const BoardMoveSubMenu = ({
       </Menu.TriggerItem>
       <Portal>
         <Menu.Positioner>
-          <MenuContent maxH="18rem" minW="12rem" overflowY="auto">
-            {destinations.map((destination) => (
+          <ScrollableMenuContent minW="12rem">
+            {canMoveToLibrary ? (
               <BoardMoveMenuItem
-                key={destination.id ?? 'library'}
                 boardId={board.id}
-                destinationId={destination.id}
-                label={destination.label}
+                destinationId={null}
+                label={t('widgets.gallery.boardGroups.library')}
                 onMove={handleMove}
               />
-            ))}
-          </MenuContent>
+            ) : null}
+            {canMoveToLibrary && projects.length > 0 ? <Menu.Separator /> : null}
+            {projects.length > 0 ? (
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>{t('widgets.gallery.boardGroups.projects')}</Menu.ItemGroupLabel>
+                {projects.map((destination) => (
+                  <BoardMoveMenuItem
+                    key={destination.id}
+                    boardId={board.id}
+                    destinationId={destination.id}
+                    label={destination.label}
+                    onMove={handleMove}
+                  />
+                ))}
+              </Menu.ItemGroup>
+            ) : null}
+          </ScrollableMenuContent>
         </Menu.Positioner>
       </Portal>
     </Menu.Root>
@@ -362,10 +502,13 @@ const BoardMoveMenuItem = ({
   );
 };
 
-/** Sets the auto-add board; `follow` hands results back to the selected board. */
-const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string; label: string }) => {
+/** Fixes where new results go, which stops following the selected board; null returns them to the default. */
+const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string | null; label: string }) => {
   const { actions } = useGalleryWidget();
-  const handleClick = useCallback(() => actions.updateSettings({ autoAddBoardId: boardId }), [actions, boardId]);
+  const handleClick = useCallback(
+    () => actions.updateSettings({ autoAddBoardId: boardId, followSelectedBoard: false }),
+    [actions, boardId]
+  );
 
   return <BoardMenuItem icon={SquareArrowDownIcon} label={label} value="auto-add-board" onClick={handleClick} />;
 };
@@ -378,7 +521,11 @@ const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {
   return (
     <BoardMenuItem
       icon={DownloadIcon}
-      label={t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })}
+      label={
+        board.videoCount > 0
+          ? t('widgets.gallery.downloadBoardWithOmission', { count: board.videoCount })
+          : t('widgets.gallery.downloadBoard')
+      }
       value="download-board"
       onClick={handleClick}
     />
@@ -479,3 +626,122 @@ const BoardMenuItem = ({
     </HStack>
   </Menu.Item>
 );
+
+/**
+ * Whose board someone else's board is and what the caller may do with it, above its actions: the menu offers only
+ * what is allowed, so this says why the rest is missing and whom to ask. Nothing on the caller's own boards.
+ */
+const hasAccessHeader = (board: GalleryBoard) => board.access !== undefined && board.access.role !== 'owner';
+
+const BoardAccessHeader = ({ board, id }: { board: GalleryBoard; id: string }) => {
+  const { t } = useTranslation();
+  const { access } = board;
+
+  if (access === undefined || !hasAccessHeader(board)) {
+    return null;
+  }
+
+  const owner = board.ownerName ?? t('widgets.gallery.boardAccess.deletedOwner');
+  const level = access.adminOverride || access.role === null ? 'admin' : access.role;
+
+  return (
+    <Menu.ItemGroup>
+      <Menu.ItemGroupLabel color="fg.muted" fontSize="sm" fontWeight="normal" maxW="18rem" textTransform="none">
+        <Stack gap="0.5" id={id}>
+          <Text>{t(`widgets.gallery.boardAccess.header.${level}`, { owner })}</Text>
+          {level === 'viewer' ? <Text>{t('widgets.gallery.boardAccess.askToAdd', { owner })}</Text> : null}
+        </Stack>
+      </Menu.ItemGroupLabel>
+      <Menu.Separator />
+    </Menu.ItemGroup>
+  );
+};
+
+const GENERAL_ACCESS_OPTIONS: readonly GalleryGeneralAccess[] = ['restricted', 'viewer', 'contributor'];
+
+/** Who else may open the board, for its owner and admins: applied at once, and reported. */
+const BoardGeneralAccessSubMenu = ({ board }: { board: GalleryBoard }) => {
+  const { t } = useTranslation();
+  const { actions } = useGalleryWidget();
+  const current = board.access?.generalAccess ?? 'restricted';
+  const handleValueChange = useCallback(
+    ({ value }: { value: string }) => {
+      if (value !== current && GENERAL_ACCESS_OPTIONS.includes(value as GalleryGeneralAccess)) {
+        void actions.setBoardGeneralAccess(board.id, value as GalleryGeneralAccess);
+      }
+    },
+    [actions, board.id, current]
+  );
+  const describe = (option: GalleryGeneralAccess) =>
+    option !== 'restricted'
+      ? t(`widgets.gallery.boardAccess.general.${option}Description`)
+      : isOwnGalleryBoard(board)
+        ? t('widgets.gallery.boardAccess.general.restrictedDescription')
+        : t('widgets.gallery.boardAccess.general.restrictedDescriptionOther', {
+            owner: board.ownerName ?? t('widgets.gallery.boardAccess.deletedOwner'),
+          });
+
+  return (
+    <Menu.Root positioning={SUBMENU_POSITIONING}>
+      <Menu.TriggerItem>
+        <HStack gap="2" minW="0" w="full">
+          <Icon as={UsersIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Text flex="1" fontSize="md">
+            {t('widgets.gallery.boardAccess.menu')}
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            {t(`widgets.gallery.boardAccess.general.${current}`)}
+          </Text>
+          <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+        </HStack>
+      </Menu.TriggerItem>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent maxW="20rem" minW="16rem">
+            <Menu.RadioItemGroup value={current} onValueChange={handleValueChange}>
+              <Menu.ItemGroupLabel color="fg.muted" fontSize="sm" fontWeight="normal" textTransform="none">
+                {t('widgets.gallery.boardAccess.general.label')}
+              </Menu.ItemGroupLabel>
+              {GENERAL_ACCESS_OPTIONS.map((option) => (
+                <GeneralAccessOption
+                  key={option}
+                  description={describe(option)}
+                  label={t(`widgets.gallery.boardAccess.general.${option}`)}
+                  value={option}
+                />
+              ))}
+            </Menu.RadioItemGroup>
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+/** One choice, named by its label alone and described by its consequence, so each is announced distinctly. */
+const GeneralAccessOption = ({
+  description,
+  label,
+  value,
+}: {
+  description: string;
+  label: string;
+  value: GalleryGeneralAccess;
+}) => {
+  const labelId = useId();
+  const descriptionId = useId();
+
+  return (
+    <Menu.RadioItem alignItems="flex-start" aria-describedby={descriptionId} aria-labelledby={labelId} value={value}>
+      <Menu.ItemIndicator mt="1" />
+      <Stack gap="0.5" minW="0">
+        <Menu.ItemText fontSize="md" id={labelId}>
+          {label}
+        </Menu.ItemText>
+        <Text color="fg.muted" fontSize="sm" id={descriptionId} whiteSpace="normal">
+          {description}
+        </Text>
+      </Stack>
+    </Menu.RadioItem>
+  );
+};

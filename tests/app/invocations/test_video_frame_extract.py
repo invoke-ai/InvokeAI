@@ -20,11 +20,13 @@ from invokeai.app.util.video_thumbnails import decoder_frame_count
 def _write_mp4(tmp_path, n_frames: int):
     """Encode a tiny synthetic MP4 with exactly ``n_frames`` frames at 8 fps."""
     path = tmp_path / "synth.mp4"
-    frames = [np.full((32, 32, 3), 64 + i * 8, dtype=np.uint8) for i in range(n_frames)]
+    # Wrap explicitly: numpy 2 refuses to cast 256 into uint8 (numpy 1 wrapped it silently).
+    frames = [np.full((32, 32, 3), (64 + i * 8) % 256, dtype=np.uint8) for i in range(n_frames)]
     iio.imwrite(path, frames, plugin="FFMPEG", codec="libx264", fps=8.0, macro_block_size=1)
     return path
 
 
+@pytest.mark.ffmpeg
 class TestDecoderFrameCountExact:
     """decoder_frame_count returns the actual decoded count from the container."""
 
@@ -42,6 +44,7 @@ class TestDecoderFrameCountGracefulFallback:
         # Either iio raises (caught) or returns props without shape — both must yield None.
         assert decoder_frame_count(bogus) is None
 
+    @pytest.mark.ffmpeg
     def test_non_video_file_returns_none(self, tmp_path) -> None:
         not_a_video = tmp_path / "junk.mp4"
         not_a_video.write_bytes(b"not actually an mp4")

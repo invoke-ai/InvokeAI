@@ -2,12 +2,16 @@ import type { ResizableTextareaProps } from '@platform/ui';
 import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
+import { PROMPT_ATTENTION_TARGET_PROPS } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
+import { getTextareaWrapWidth } from '@features/generation/ui/promptFields/promptCaret';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
 import { PROMPT_FONT_SIZE } from '@theme/scale';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
+/** Layout moves in 1/64 px steps; a smaller difference in the parsed width is not a resize. */
+const WRAP_WIDTH_EPSILON_PX = 0.01;
 // Use literal lengths; fractional Chakra spacing variables fail inside calc.
 const PROMPT_TEXTAREA_PX = '0.625rem';
 const PROMPT_TEXTAREA_PY = '0.5rem';
@@ -23,7 +27,15 @@ const PROMPT_TEXTAREA_HIGHLIGHTED_CSS = {
   WebkitTextFillColor: 'transparent',
 };
 
+/**
+ * What the prompt does with Compel attention syntax. `edit` highlights it and lets the weighting keys rewrite it;
+ * `highlight` only highlights it, for text not yet bound to a model; `none` leaves it plain because the model reads
+ * the prompt as written.
+ */
+type PromptAttentionSyntax = 'edit' | 'highlight' | 'none';
+
 interface PromptTextareaProps extends Omit<ResizableTextareaProps, 'underlay'> {
+  attentionSyntax?: PromptAttentionSyntax;
   /** Enable dynamic highlighting only for prompts that actually expand syntax. */
   highlightDynamicPrompts?: boolean;
   /** Resolvable wildcard names; an unknown `__name__` is underlined as an error. */
@@ -50,6 +62,7 @@ const setRef = (ref: Ref<HTMLTextAreaElement> | undefined, element: HTMLTextArea
 };
 
 export const PromptTextarea = ({
+  attentionSyntax = 'highlight',
   fontFamily = 'mono',
   fontSize,
   highlightDynamicPrompts = false,
@@ -65,10 +78,11 @@ export const PromptTextarea = ({
 }: PromptTextareaProps) => {
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
-  const [textareaClientWidth, setTextareaClientWidth] = useState<number | null>(null);
+  const [textareaWrapWidth, setTextareaWrapWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
+  const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
   // Template chunk emphasis is independent of the syntax-highlighting preference.
-  const shouldHighlight = (showSyntaxHighlighting || templateChunks !== null) && isWithinHighlightBudget;
+  const shouldHighlight = (highlightsSyntax || templateChunks !== null) && isWithinHighlightBudget;
   const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
@@ -76,8 +90,8 @@ export const PromptTextarea = ({
   const paddingInlineStart = showLineNumbers ? `calc(${PROMPT_TEXTAREA_PX} + ${gutterCh}ch)` : undefined;
 
   const highlightOptions = useMemo(
-    () => ({ dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
-    [highlightDynamicPrompts, knownWildcards]
+    () => ({ attentionSyntax: attentionSyntax !== 'none', dynamicPrompts: highlightDynamicPrompts, knownWildcards }),
+    [attentionSyntax, highlightDynamicPrompts, knownWildcards]
   );
 
   const needsMirror = shouldHighlight || showLineNumbers;
@@ -88,20 +102,25 @@ export const PromptTextarea = ({
     }
 
     const textarea = localTextareaRef.current;
-    const syncClientWidth = () => {
-      const nextWidth = textarea.clientWidth;
+    // Live: it reflects later layout, so one lookup serves every measurement of this run.
+    const computed = window.getComputedStyle(textarea);
+    // Re-run on value: typing can add or remove a vertical scrollbar, which narrows the wrap box.
+    const syncWrapWidth = () => {
+      const nextWidth = getTextareaWrapWidth(textarea, computed);
 
-      setTextareaClientWidth((currentWidth) => (currentWidth === nextWidth ? currentWidth : nextWidth));
+      setTextareaWrapWidth((currentWidth) =>
+        currentWidth !== null && Math.abs(currentWidth - nextWidth) < WRAP_WIDTH_EPSILON_PX ? currentWidth : nextWidth
+      );
     };
-    const resizeObserver = new ResizeObserver(syncClientWidth);
+    const resizeObserver = new ResizeObserver(syncWrapWidth);
 
-    syncClientWidth();
+    syncWrapWidth();
     resizeObserver.observe(textarea);
-    window.addEventListener('resize', syncClientWidth);
+    window.addEventListener('resize', syncWrapWidth);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', syncClientWidth);
+      window.removeEventListener('resize', syncWrapWidth);
     };
   }, [needsMirror, value]);
 
@@ -123,15 +142,15 @@ export const PromptTextarea = ({
 
   const lineNumberMetrics = useMemo(
     () => ({
-      clientWidth: textareaClientWidth,
       fontFamily,
       fontSize: effectiveFontSize,
       lineHeight: effectiveLineHeight,
       paddingBlock: PROMPT_TEXTAREA_PY,
       paddingInline: PROMPT_TEXTAREA_PX,
       scrollTop: scroll.top,
+      wrapWidth: textareaWrapWidth,
     }),
-    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaClientWidth]
+    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaWrapWidth]
   );
 
   const highlightUnderlay = useMemo(
@@ -163,14 +182,14 @@ export const PromptTextarea = ({
             paddingInlineStart={paddingInlineStart}
             transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
             whiteSpace="pre-wrap"
-            w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
+            w={textareaWrapWidth ? `${textareaWrapWidth}px` : '100%'}
           >
             {templateChunks ? (
               <>
                 <Box as="span" color="fg.subtle">
                   {templateChunks[0]}
                 </Box>
-                {showSyntaxHighlighting ? (
+                {highlightsSyntax ? (
                   <HighlightedPrompt options={highlightOptions} prompt={templateChunks[1]} />
                 ) : (
                   templateChunks[1]
@@ -191,13 +210,13 @@ export const PromptTextarea = ({
       effectiveLineHeight,
       fontFamily,
       highlightOptions,
+      highlightsSyntax,
       paddingInlineStart,
       scroll.left,
       scroll.top,
       shouldHighlight,
-      showSyntaxHighlighting,
       templateChunks,
-      textareaClientWidth,
+      textareaWrapWidth,
       value,
     ]
   );
@@ -216,6 +235,7 @@ export const PromptTextarea = ({
   return (
     <ResizableTextarea
       {...props}
+      {...(attentionSyntax === 'edit' ? PROMPT_ATTENTION_TARGET_PROPS : null)}
       bg={shouldHighlight ? 'transparent' : props.bg}
       caretColor={shouldHighlight ? 'fg' : props.caretColor}
       color={shouldHighlight ? 'transparent' : props.color}

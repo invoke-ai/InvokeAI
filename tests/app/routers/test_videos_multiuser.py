@@ -38,9 +38,14 @@ from invokeai.app.api.routers.videos import (
 )
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.video_ingest import MediaProbe
+from tests.fixtures.sqlite_database import sqlite_cursor
 
 
 class MockApiDependencies(ApiDependencies):
@@ -94,7 +99,7 @@ def enable_multiuser_for_videos(monkeypatch: Any, mock_invoker: Invoker):
     # the payloads here — only whether the route runs the board-access guard *before* the
     # service call. A return value of "any non-error response" is enough.
     mock_videos = MagicMock()
-    mock_videos.get_many.return_value = {"items": [], "offset": 0, "limit": 10, "total": 0}
+    mock_videos.get_many.return_value = OffsetPaginatedResults[VideoDTO](items=[], offset=0, limit=10, total=0)
     mock_videos.get_video_names.return_value = {"video_names": [], "starred_count": 0, "total_count": 0}
     mock_invoker.services.videos = mock_videos
 
@@ -190,6 +195,61 @@ def test_get_video_names_forbidden_for_other_users_private_board(
         headers={"Authorization": f"Bearer {user2_token}"},
     )
     assert response.status_code == status.HTTP_403_FORBIDDEN
+
+
+def test_list_video_dtos_on_a_missing_board_is_a_404_for_a_non_admin(client: TestClient, user2_token: str):
+    """Absence still reads as absence: only a board that exists but is closed to the caller answers 403."""
+    response = client.get("/api/v1/videos/?board_id=no-such-board", headers={"Authorization": f"Bearer {user2_token}"})
+    assert response.status_code == status.HTTP_404_NOT_FOUND
+    assert response.json()["detail"] == "Board not found"
+
+
+def test_a_videos_project_is_shown_only_to_its_uploader_and_admins(
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    user1_token: str,
+    user2_token: str,
+    admin_token: str,
+):
+    """A member of a shared board learns nothing about the project a video was made in, whether they read it or star
+    it: `project_id` is theirs to see only when it names one of their own projects."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+    assert user1 is not None and user2 is not None
+    project_id = mock_invoker.services.project_records.create(user_id=user1.user_id, name="Mine", data={}).project_id
+    shared = client.post("/api/v1/boards/?board_name=Shared", headers={"Authorization": f"Bearer {user1_token}"})
+    client.patch(
+        f"/api/v1/boards/{shared.json()['board_id']}",
+        json={"general_access": "viewer"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    # An editor: starring another member's video is a board role's to do, and answers with the video's DTO.
+    with sqlite_cursor(mock_sqlite_database) as cursor:
+        cursor.execute(
+            "INSERT INTO board_members (board_id, user_id, role) VALUES (?, ?, 'editor')",
+            (shared.json()["board_id"], user2.user_id),
+        )
+    mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = shared.json()["board_id"]
+    # A fresh DTO per answer: the routes redact in place.
+    mock_invoker.services.videos.get_dto.side_effect = lambda name: _uploaded_video_dto().model_copy(
+        update={"project_id": project_id}
+    )
+    mock_invoker.services.videos.update.side_effect = lambda name, changes: _uploaded_video_dto().model_copy(
+        update={"project_id": project_id, "starred": True}
+    )
+
+    def shown_to(token: str) -> tuple[str | None, str | None]:
+        headers = {"Authorization": f"Bearer {token}"}
+        read = client.get("/api/v1/videos/i/uploaded.mp4", headers=headers)
+        starred = client.patch("/api/v1/videos/i/uploaded.mp4", json={"starred": True}, headers=headers)
+        assert (read.status_code, starred.status_code) == (status.HTTP_200_OK, status.HTTP_200_OK)
+        return read.json().get("project_id"), starred.json().get("project_id")
+
+    assert shown_to(user1_token) == (project_id, project_id)
+    assert shown_to(admin_token) == (project_id, project_id)
+    assert shown_to(user2_token) == (None, None)
 
 
 def test_owner_can_list_videos_on_their_private_board(client: TestClient, user1_private_board: str, user1_token: str):
@@ -291,10 +351,43 @@ def test_unreadable_storage_does_not_read_as_a_deleted_video(
 
     mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
-    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
-    # rendering it. Either way it must not be the 404 that clears the user's reference.
-    with pytest.raises(sqlite3.OperationalError):
-        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+    # Must be a retryable 500, not the 404 that clears the user's reference.
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        "/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_unreadable_storage_does_not_read_as_missing_video_metadata(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    """Clients cache a metadata/workflow 404 as "nothing recorded", so a busy database must not answer it."""
+    import sqlite3
+
+    setattr(
+        mock_invoker.services.videos,
+        service_method,
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        f"/api/v1/videos/i/unreadable.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_video_deleted_mid_request_answers_metadata_404(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    setattr(mock_invoker.services.videos, service_method, MagicMock(side_effect=VideoRecordNotFoundException))
+
+    response = client.get(f"/api/v1/videos/i/gone.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
@@ -336,7 +429,7 @@ def test_unreadable_board_does_not_read_as_unavailable_for_videos(
 
     mock_invoker.services.video_records.get_user_id.return_value = "someone-else"
     mock_invoker.services.board_video_records.get_board_for_video.return_value = "board-1"
-    mock_invoker.services.board_records.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
+    mock_invoker.services.board_access.get = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
     # The storage error leaves the route uncaught, which is a 500 in production; the test client
     # re-raises unhandled server exceptions instead of rendering them. Either way the one thing
@@ -530,6 +623,7 @@ def test_video_star_endpoints_dedupe_names_and_report_partial_failures(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -585,6 +679,7 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     assert not leaked, f"tmp files leaked after 415: {leaked}"
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
@@ -680,6 +775,7 @@ def _make_fixture_media(path: Path, *args: str) -> Path:
     return path
 
 
+@pytest.mark.ffmpeg
 def test_upload_h264_mov_is_remuxed_and_created(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -715,6 +811,7 @@ def test_upload_h264_mov_is_remuxed_and_created(
     assert stored_was_mp4 == [True]
 
 
+@pytest.mark.ffmpeg
 def test_upload_audio_file_is_wrapped_and_marked(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -743,6 +840,7 @@ def test_upload_audio_file_is_wrapped_and_marked(
     assert (create_kwargs["width"], create_kwargs["height"]) == (640, 360)
 
 
+@pytest.mark.ffmpeg
 def test_upload_mp4_with_non_aac_audio_gets_audio_normalized(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1010,57 +1108,49 @@ def test_remove_video_from_board_succeeds_for_board_owner_of_non_owned_video(
 ):
     """user1 owns the board; user2 owns the video sitting on it. user1 must be able to
     detach the foreign video from their board even though they are not the video owner."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     user2 = mock_invoker.services.users.get_by_email("user2@test.com")
     assert user1 is not None and user2 is not None
 
+    board_id = mock_invoker.services.board_records.save("User1 board", user1.user_id).board_id
     mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
-    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = board_id
 
-    # _assert_board_write_access reads the lightweight board record to check ownership/visibility.
-    fake_board = MagicMock()
-    fake_board.user_id = user1.user_id
-    fake_board.board_visibility = BoardVisibility.Private
-    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
-        response = client.request(
-            "DELETE",
-            "/api/v1/videos/board",
-            json={"video_name": "stranded.mp4"},
-            headers={"Authorization": f"Bearer {user1_token}"},
-        )
+    response = client.request(
+        "DELETE",
+        "/api/v1/videos/board",
+        json={"video_name": "stranded.mp4"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
     assert response.status_code == status.HTTP_200_OK
     mock_invoker.services.board_video_records.remove_video_from_board.assert_called_once_with(video_name="stranded.mp4")
 
 
-def test_remove_video_from_board_rejects_third_party(
-    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+@pytest.mark.parametrize("general_access", ["restricted", "viewer", "contributor"])
+def test_remove_video_from_board_rejects_anyone_below_editor(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str, general_access: str
 ):
-    """A user who is neither the video owner nor a board write-access holder must be
-    rejected — the relaxed path is a stranded-contributor escape hatch, not an open door."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
+    """Removing someone else's video from a board takes an editor: a viewer or contributor may not, and on a board
+    they cannot open the answer is a refusal all the same."""
+    from invokeai.app.services.board_access.board_access_common import GeneralAccess
+    from invokeai.app.services.board_records.board_records_common import BoardChanges
 
     admin = mock_invoker.services.users.get_by_email("admin@test.com")
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert admin is not None and user1 is not None
+    board_id = mock_invoker.services.board_records.save("User1 board", user1.user_id).board_id
+    mock_invoker.services.board_records.update(board_id, BoardChanges(general_access=GeneralAccess(general_access)))
 
-    # Video is owned by admin; board is owned by user1 and is Private.
+    # The video is the admin's, on user1's board; user2 has only what general access gives.
     mock_invoker.services.video_records.get_user_id.return_value = admin.user_id
-    mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
+    mock_invoker.services.board_video_records.get_board_for_video.return_value = board_id
 
-    fake_board = MagicMock()
-    fake_board.user_id = user1.user_id
-    fake_board.board_visibility = BoardVisibility.Private
-
-    # user2 has no claim to either resource.
-    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
-        response = client.request(
-            "DELETE",
-            "/api/v1/videos/board",
-            json={"video_name": "not_mine.mp4"},
-            headers={"Authorization": f"Bearer {user2_token}"},
-        )
+    response = client.request(
+        "DELETE",
+        "/api/v1/videos/board",
+        json={"video_name": "not_mine.mp4"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
     assert response.status_code == status.HTTP_403_FORBIDDEN
     mock_invoker.services.board_video_records.remove_video_from_board.assert_not_called()
 
@@ -1086,7 +1176,7 @@ def test_get_video_workflow_returns_workflow_and_graph_for_owner(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}'}
+    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}', "resolved_inputs": None}
 
 
 def test_get_video_workflow_returns_nulls_when_video_has_none(
@@ -1104,14 +1194,14 @@ def test_get_video_workflow_returns_nulls_when_video_has_none(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": None, "graph": None}
+    assert response.json() == {"workflow": None, "graph": None, "resolved_inputs": None}
 
 
 def test_get_video_workflow_missing_video_returns_404(client: TestClient, mock_invoker: Invoker, user1_token: str):
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
-    mock_invoker.services.videos.get_workflow.side_effect = Exception("video file not found")
+    mock_invoker.services.videos.get_workflow.side_effect = VideoFileNotFoundException()
 
     response = client.get(
         "/api/v1/videos/i/mine_a.mp4/workflow",
@@ -1249,6 +1339,7 @@ def _upload(client: TestClient, token: str, body: bytes, metadata: str | None = 
         )
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1283,6 +1374,7 @@ def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     assert kwargs["graph"] == tags["invokeai_graph"]
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_client_metadata_wins_over_the_embedded_copy(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1311,6 +1403,7 @@ def test_upload_video_without_embedded_tags_stores_no_metadata(
     assert (kwargs["metadata"], kwargs["workflow"], kwargs["graph"]) == (None, None, None)
 
 
+@pytest.mark.ffmpeg
 def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1353,6 +1446,7 @@ def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     assert stored_tags == [{}]
 
 
+@pytest.mark.ffmpeg
 def test_upload_ignores_an_embedded_metadata_record_over_the_form_field_cap(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

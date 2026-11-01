@@ -177,7 +177,7 @@ describe('createSemanticImagesProvider', () => {
 });
 
 describe('createModelsProvider', () => {
-  it('lists only supported Generate models and applies one before opening the widget', async () => {
+  it('lists only supported Generate models and switches to one before opening the widget', async () => {
     const supported = model('supported-sdxl', 'sdxl');
     const external = model('external-provider', 'external', 'external_image_generator');
     const models = [
@@ -189,23 +189,24 @@ describe('createModelsProvider', () => {
       model('vae', 'sdxl', 'vae'),
     ];
     const order: string[] = [];
-    const applyModel = vi.fn((_selected: GenerationModelCatalogItem, _models: readonly ModelConfig[]) => {
-      order.push('apply');
+    const selectModel = vi.fn((_selected: GenerationModelCatalogItem, _models: readonly ModelConfig[]) => {
+      order.push('select');
     });
     const openGenerateWidget = vi.fn(() => {
       order.push('open');
     });
     const openModelManager = vi.fn();
     getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
-    const provider = createModelsProvider({ applyModel, openGenerateWidget, openModelManager, t });
+    const provider = createModelsProvider({ openGenerateWidget, openModelManager, selectModel, t });
 
     const entries = await provider.search({ text: '' }, searchContext());
 
     expect(entries.map((entry) => entry.title)).toEqual(['supported-sdxl', 'external-provider']);
 
     entries[0]?.run();
-    expect(applyModel).toHaveBeenCalledWith(supported, models);
-    expect(order).toEqual(['apply', 'open']);
+    // The widget opens after the switch, so a switch waiting for confirmation finds its model card.
+    expect(selectModel).toHaveBeenCalledWith(supported, models);
+    expect(order).toEqual(['select', 'open']);
 
     entries[0]?.secondary?.run();
     expect(openModelManager).toHaveBeenCalledOnce();
@@ -215,9 +216,9 @@ describe('createModelsProvider', () => {
     const models = [model('cinematic-xl', 'sdxl'), model('fast-flux', 'flux')];
     getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
     const provider = createModelsProvider({
-      applyModel: vi.fn(),
       openGenerateWidget: vi.fn(),
       openModelManager: vi.fn(),
+      selectModel: vi.fn(),
       t,
     });
 

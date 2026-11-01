@@ -6,6 +6,7 @@ export type {
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,
@@ -48,10 +49,8 @@ import {
   getGalleryImagesByNames,
   getGalleryImageWorkflow,
   getGalleryItemByRef,
-  getGalleryVideoMetadata,
   getGalleryVideoWorkflow,
   isInvalidGalleryBoardDestination,
-  listGalleryBoards,
   makeImageCanvasAsset,
   makeImageDurable,
   moveGalleryVideoItemsToBoard,
@@ -82,7 +81,6 @@ export const galleryItems = {
 
 /** Focused read-only details needed by mixed-media preview surfaces. */
 export const galleryVideos = {
-  metadata: getGalleryVideoMetadata,
   workflow: getGalleryVideoWorkflow,
 } as const;
 
@@ -245,11 +243,6 @@ export const galleryItemOrganization = {
       (names, requestSignal) => setGalleryVideoItemsStarred(names, starred, requestSignal),
       signal
     ),
-} as const;
-
-/** Destination choices for callers such as Workflow fields. */
-export const galleryDestinations = {
-  list: listGalleryBoards,
 } as const;
 
 /** Virtual boards and none cannot receive attachments; organization transports no-op for these destinations. */

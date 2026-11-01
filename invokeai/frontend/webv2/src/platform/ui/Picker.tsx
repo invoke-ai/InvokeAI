@@ -433,8 +433,8 @@ const PickerListbox = <T,>({
     paddingStart: LIST_PADDING_PX,
     rangeExtractor,
     scrollPaddingStart: headerHeight,
-    // A mount-time scroll event would make flushSync a React error; useSyncExternalStore already commits
-    // scroll snapshots synchronously.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
   const { measureElement, scrollToIndex, virtualItems } = virtualizer;

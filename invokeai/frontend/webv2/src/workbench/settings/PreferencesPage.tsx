@@ -16,16 +16,15 @@ import type { SettingsSection } from './catalog';
 
 import { browseSettings } from './catalog';
 import { SettingsBrowseBody, SettingsSearchField } from './SettingsBrowseBody';
-import { focusSettingsSearchOnSlash } from './settingsSearchShortcut';
 import { useAvailableSettings } from './useAvailableSettings';
 
-const GROUPS = ['application', 'project', 'widgets', 'system'] as const;
+const GROUPS = ['application', 'widgets', 'system'] as const;
 const ALL_RESULTS_KEY = 'all-results';
 
 type ListEntry = { kind: 'all' } | { kind: 'section'; section: SettingsSection };
 
 /**
- * Launchpad preferences: the settings that need no open project, in the managers' list/detail layout. The
+ * Launchpad preferences, in the managers' list/detail layout. Per-project settings edit the user's defaults here. The
  * section lives in the route; the query stays in the page, which the Launchpad keeps mounted between visits.
  */
 export const PreferencesPage = () => {
@@ -152,14 +151,7 @@ export const PreferencesPage = () => {
   }
 
   return (
-    <Flex
-      aria-label={t('launchpad.sections.preferences')}
-      role="region"
-      h="full"
-      minH="0"
-      w="full"
-      onKeyDown={focusSettingsSearchOnSlash}
-    >
+    <Flex aria-label={t('launchpad.sections.preferences')} role="region" h="full" minH="0" w="full">
       <ManagerLayout
         backLabel={t('settingsDialog.backToList')}
         detail={

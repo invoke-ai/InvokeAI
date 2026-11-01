@@ -10,6 +10,8 @@ export const CONTROL_ADAPTER_KINDS = [
   'control_lora',
   'z_image_control',
   'anima_lllite',
+  'qwen_image_control',
+  'flux2_control',
 ] as const;
 export type ControlAdapterKind = (typeof CONTROL_ADAPTER_KINDS)[number];
 
@@ -17,6 +19,11 @@ export type ControlAdapterKind = (typeof CONTROL_ADAPTER_KINDS)[number];
 export const CONTROL_VALIDATION_REASONS = [
   'capabilities_unavailable',
   'missing_model',
+  'missing_type',
+  'choose_model',
+  'no_model_for_type',
+  'no_control_models',
+  'models_unavailable',
   'switch_adapter_kind',
   'unsupported_adapter',
   'incompatible_base',
@@ -26,8 +33,12 @@ export const CONTROL_VALIDATION_REASONS = [
   'invalid_adapter_values',
   'control_lora_limit',
   'z_image_control_limit',
+  'qwen_image_control_limit',
+  'flux2_control_limit',
   'duplicate_lllite_model',
   'flux_fill_control_lora',
+  'qwen_image_edit_control',
+  'flux2_klein_control',
 ] as const;
 export type ControlValidationReason = (typeof CONTROL_VALIDATION_REASONS)[number];
 
@@ -39,9 +50,19 @@ export interface ControlAdapterModelFacts {
   cond_in_channels?: number | null;
 }
 
-/** Z-Image control and Anima ControlNet-LLLite models install with the `controlnet` model type. */
+/** The Fun-style control nodes: a 0..2 context scale, one layer per generation, a `controlnet` model. */
+const isFunControlKind = (kind: ControlAdapterKind): boolean =>
+  kind === 'z_image_control' || kind === 'qwen_image_control' || kind === 'flux2_control';
+
+/** Z-Image, Qwen-Image and FLUX.2 control and Anima ControlNet-LLLite models install with the `controlnet` type. */
 const getControlAdapterModelType = (kind: ControlAdapterKind): string =>
-  kind === 'z_image_control' || kind === 'anima_lllite' ? 'controlnet' : kind;
+  isFunControlKind(kind) || kind === 'anima_lllite' ? 'controlnet' : kind;
+
+/**
+ * The lowest weight a kind accepts: the Z-Image, Qwen-Image and FLUX.2 control nodes take a 0..2 context scale, the
+ * other adapters keep the legacy -1 floor. Validation, persisted-value repair and the weight input share it.
+ */
+export const getControlAdapterMinWeight = (kind: ControlAdapterKind): number => (isFunControlKind(kind) ? 0 : -1);
 
 /** The backend owns kind support; count and Fill constraints are frontend policy. */
 export const isControlKindSupportedForBase = (base: string, kind: ControlAdapterKind): boolean =>
@@ -79,6 +100,16 @@ export const getControlModelUnusableReason = (
   return null;
 };
 
+/**
+ * Whether an Anima ControlNet-LLLite model is the inpainting adapter the canvas inpaint/outpaint graphs feed with
+ * the raster image and mask. The 4-channel (RGB + mask) variants are inpaint adapters; an install that predates
+ * `cond_in_channels` reads null, and only the inpaint variant predates the field, so it counts too (legacy
+ * `isAnimaInpaintControlNetModelConfig`). Control layers reject the same models through
+ * {@link getControlModelUnusableReason}.
+ */
+export const isAnimaInpaintAdapterModel = (model: ControlAdapterModelFacts): boolean =>
+  model.type === 'controlnet' && model.base === 'anima' && model.cond_in_channels !== 3;
+
 export const getControlValidationReason = (params: {
   adapterModel: ControlAdapterModelFacts | null;
   beginEndStepPct: [number, number];
@@ -88,17 +119,24 @@ export const getControlValidationReason = (params: {
   mainVariant?: string;
   weight: number;
   zImageControlIndex?: number;
+  qwenImageControlIndex?: number;
+  flux2ControlIndex?: number;
   /** An earlier contributing Anima LLLite layer already applies this model; the denoiser applies each once. */
   lliteModelInUse?: boolean;
+  /** Why model resolution found no model, reported in place of `missing_model`. */
+  unresolvedModel?: ControlValidationReason | null;
 }): ControlValidationReason | null => {
   const {
     adapterModel,
     beginEndStepPct,
     controlLoraIndex,
+    flux2ControlIndex = 0,
     kind,
     lliteModelInUse = false,
     mainBase,
     mainVariant,
+    qwenImageControlIndex = 0,
+    unresolvedModel,
     weight,
     zImageControlIndex = 0,
   } = params;
@@ -108,11 +146,16 @@ export const getControlValidationReason = (params: {
   if (capabilitiesLoaded && !isControlKindSupportedForBase(mainBase, kind)) {
     return getSuggestedControlKind(mainBase) ? 'switch_adapter_kind' : 'unsupported_adapter';
   }
+  // Capabilities are per base, and FLUX.2's Fun-ControlNet is FLUX.2 [dev]'s alone: `flux2_denoise` refuses it on
+  // Klein, and so does an unknown variant. No model or value fixes that, only another main model, so it comes first.
+  if (kind === 'flux2_control' && mainBase === 'flux2' && mainVariant !== 'dev') {
+    return 'flux2_klein_control';
+  }
   if (!areControlAdapterValuesValid(kind, weight, beginEndStepPct)) {
     return 'invalid_adapter_values';
   }
   if (!adapterModel) {
-    return 'missing_model';
+    return unresolvedModel ?? 'missing_model';
   }
   // Unavailable capability data is distinct from unsupported adapters.
   if (!capabilitiesLoaded) {
@@ -131,22 +174,36 @@ export const getControlValidationReason = (params: {
   if (kind === 'z_image_control' && zImageControlIndex > 0) {
     return 'z_image_control_limit';
   }
+  if (kind === 'qwen_image_control' && qwenImageControlIndex > 0) {
+    return 'qwen_image_control_limit';
+  }
+  if (kind === 'flux2_control' && flux2ControlIndex > 0) {
+    return 'flux2_control_limit';
+  }
   if (kind === 'anima_lllite' && lliteModelInUse) {
     return 'duplicate_lllite_model';
   }
   if (kind === 'control_lora' && mainBase === 'flux' && mainVariant === 'dev_fill') {
     return 'flux_fill_control_lora';
   }
+  if (kind === 'qwen_image_control' && mainBase === 'qwen-image' && mainVariant === 'edit') {
+    // Both ControlNet designs were trained beside the generation transformer; `qwen_image_denoise` refuses either on
+    // an Edit transformer.
+    return 'qwen_image_edit_control';
+  }
   return null;
 };
 
 /**
- * Validates control layers in generation order. Per-generation limits (one Control LoRA, one Z-Image control, each
- * LLLite model once) count only layers that passed, so an invalid layer never consumes a later layer's slot.
+ * Validates control layers in generation order. Per-generation limits (one Control LoRA, one Z-Image control, one
+ * Qwen-Image control, one FLUX.2 control, each LLLite model once) count only layers that passed, so an invalid layer
+ * never consumes a later layer's slot.
  */
 export const createControlValidationSequence = (main: { base: string; variant?: string | null }) => {
   let controlLoraCount = 0;
   let zImageControlCount = 0;
+  let qwenImageControlCount = 0;
+  let flux2ControlCount = 0;
   const lliteModelKeys = new Set<string>();
 
   return (layer: {
@@ -154,16 +211,20 @@ export const createControlValidationSequence = (main: { base: string; variant?: 
     beginEndStepPct: [number, number];
     kind: ControlAdapterKind;
     weight: number;
+    unresolvedModel?: ControlValidationReason | null;
   }): ControlValidationReason | null => {
     const { adapterModel, kind } = layer;
     const reason = getControlValidationReason({
       adapterModel,
       beginEndStepPct: layer.beginEndStepPct,
       controlLoraIndex: kind === 'control_lora' ? controlLoraCount : 0,
+      flux2ControlIndex: kind === 'flux2_control' ? flux2ControlCount : 0,
       kind,
       lliteModelInUse: kind === 'anima_lllite' && adapterModel !== null && lliteModelKeys.has(adapterModel.key),
       mainBase: main.base,
       mainVariant: main.variant ?? undefined,
+      qwenImageControlIndex: kind === 'qwen_image_control' ? qwenImageControlCount : 0,
+      unresolvedModel: layer.unresolvedModel,
       weight: layer.weight,
       zImageControlIndex: kind === 'z_image_control' ? zImageControlCount : 0,
     });
@@ -174,6 +235,10 @@ export const createControlValidationSequence = (main: { base: string; variant?: 
       controlLoraCount += 1;
     } else if (kind === 'z_image_control') {
       zImageControlCount += 1;
+    } else if (kind === 'qwen_image_control') {
+      qwenImageControlCount += 1;
+    } else if (kind === 'flux2_control') {
+      flux2ControlCount += 1;
     } else if (kind === 'anima_lllite' && adapterModel) {
       lliteModelKeys.add(adapterModel.key);
     }
@@ -187,7 +252,7 @@ export const areControlAdapterValuesValid = (
   weight: unknown,
   beginEndStepPct: unknown
 ): beginEndStepPct is [number, number] => {
-  const minWeight = kind === 'z_image_control' ? 0 : -1;
+  const minWeight = getControlAdapterMinWeight(kind);
   if (typeof weight !== 'number' || !Number.isFinite(weight) || weight < minWeight || weight > 2) {
     return false;
   }

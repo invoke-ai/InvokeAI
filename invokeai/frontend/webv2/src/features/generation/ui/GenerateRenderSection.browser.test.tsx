@@ -1,10 +1,11 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
-import type { GenerateSettings, MainModelConfig } from '@features/generation/core/types';
+import type { GenerateModelConfig, GenerateSettings, MainModelConfig } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
-import { createExternalStoreCore } from '@platform/state/externalStoreCore';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { createExternalStoreCore, type ExternalStoreCore } from '@platform/state/externalStoreCore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -12,6 +13,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { CanvasDenoisingStrengthProps } from './GenerationUiContext';
 
@@ -48,7 +50,7 @@ void i18n.use(initReactI18next).init({
       translation: {
         common: {
           newSeed: 'New seed',
-          scrubber: { editValue: 'Edit {{label}}' },
+          scrubber: { editValue: 'Edit {{label}}: {{value}}' },
           seed: 'Seed',
           seedMode: {
             decrement: 'Decrement',
@@ -71,13 +73,35 @@ void i18n.use(initReactI18next).init({
             ideogram4ColorPalette: 'Color palette',
             ideogram4GuidanceScale: 'Guidance',
             ideogram4Mu: 'Mu',
-            ideogram4MuHelp: 'Timestep shift. Higher values spend more of the schedule at high noise.',
+            ideogram4MuHelp:
+              'Timestep shift. Higher values spend more of the schedule at high noise. Set by the sampler preset unless overridden.',
             ideogram4PresetDerived: 'Set by the sampler preset unless overridden.',
             ideogram4SamplerPreset: 'Sampler preset',
             ideogram4Steps: 'Steps',
-            override: 'Override',
+            dypeExponent: 'DyPE exponent (λt)',
+            dypePreset: 'DyPE',
+            dypePreset4k: '4K optimized',
+            dypePresetArea: 'Area (auto)',
+            dypePresetAuto: 'Auto (above 1536px)',
+            dypePresetManual: 'Manual',
+            dypePresetOff: 'Off',
+            dypeScale: 'DyPE scale (λs)',
+            mossImageSkipLayers: 'Skip layers (negative branch)',
+            mossImageSkipLayersCfgOff: 'Takes effect with CFG above 1, which runs the negative pass.',
+            mossImageSkipLayersHelp:
+              'Transformer blocks the negative pass skips, comma-separated from 0 to {{max}}. ' +
+              'Default: {{defaultLayers}}. Empty skips none.',
+            mossImageSkipLayersInvalid: 'Enter comma-separated whole numbers from 0 to {{max}}.',
+            seedVariance: 'Seed variance',
+            seedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
+            seedVarianceRandomize: 'Randomized channels',
+            seedVarianceStrength: 'Variance strength',
+            timestepShift: 'Shift',
+            qwenImageShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
+            timestepShiftHelp: 'Auto derives the schedule shift from the image size.',
             recentSeeds: 'Recent seeds',
             render: 'Render',
+            resetToDefault: 'Reset to default',
             scheduler: 'Scheduler',
             seedSummary: '{{mode}} · {{seed}}',
             steps: 'Steps',
@@ -128,9 +152,35 @@ const ideogram4Model: MainModelConfig = {
 };
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1', name: 'SD 1.5', type: 'main' };
+const mossImageModel: MainModelConfig = {
+  base: 'moss-image',
+  format: 'diffusers',
+  key: 'moss-image',
+  name: 'MOSS-Image',
+  type: 'main',
+};
+const fluxDevModel: MainModelConfig = { base: 'flux', key: 'flux-dev', name: 'FLUX.1 dev', type: 'main' };
+const zImageModel: MainModelConfig = {
+  base: 'z-image',
+  format: 'diffusers',
+  key: 'z-image',
+  name: 'Z-Image',
+  type: 'main',
+};
+const qwenImageModel: MainModelConfig = {
+  base: 'qwen-image',
+  format: 'diffusers',
+  key: 'qwen-image',
+  name: 'Qwen Image',
+  type: 'main',
+};
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+/** The rendered section's draft, for changes that arrive from outside the field, as a recall does. */
+let draftStore: ExternalStoreCore<GenerateSettings> | null = null;
+/** The rendered section's immediate commits, which discrete edits use instead of the debounced `onCommit`. */
+let onCommitImmediate: ReturnType<typeof vi.fn<(patch: Partial<GenerateSettings>) => void>> | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const settle = (action: () => void): Promise<void> =>
@@ -141,11 +191,21 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-const render = async (model: MainModelConfig, settings: Partial<GenerateSettings> = {}) => {
+/** `applyCommits` writes committed patches back to the draft, as the panel does, for fields that read them back. */
+const render = async (model: GenerateModelConfig, settings: Partial<GenerateSettings> = {}, applyCommits = false) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const onCommit = vi.fn();
+  const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings });
+  draftStore = draft;
+  const applyCommit = (patch: Partial<GenerateSettings>) => {
+    if (applyCommits) {
+      draft.patchSnapshot(patch);
+    }
+  };
+  const onCommit = vi.fn(applyCommit);
+  const commitImmediate = vi.fn(applyCommit);
+  onCommitImmediate = commitImmediate;
 
   await settle(() => {
     root?.render(
@@ -154,10 +214,10 @@ const render = async (model: MainModelConfig, settings: Partial<GenerateSettings
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <GenerateRenderSection
-              draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
+              draft={draft}
               selectedModel={model}
               onCommit={onCommit}
-              onCommitImmediate={vi.fn()}
+              onCommitImmediate={commitImmediate}
             />
           </I18nextProvider>
         </ChakraProvider>
@@ -183,6 +243,8 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  draftStore = null;
+  onCommitImmediate = null;
 });
 
 describe('GenerateRenderSection seed field', () => {
@@ -286,6 +348,22 @@ describe('GenerateRenderSection denoising strength', () => {
     expect(guidanceIndex).toBeGreaterThan(-1);
     expect(controls[guidanceIndex + 1]?.getAttribute('data-testid')).toBe('strength-field');
   });
+
+  it('adds no strength for a hosted provider, which edits the canvas composite at its own', async () => {
+    harness.invocationSourceId = 'canvas';
+    await render({
+      base: 'external',
+      capabilities: { modes: ['txt2img', 'img2img'] },
+      format: 'external_api',
+      key: 'gpt-image',
+      name: 'GPT Image',
+      provider_id: 'openai',
+      type: 'external_image_generator',
+    });
+
+    expect(host?.querySelector('[data-testid="strength-field"]')).toBeNull();
+    expect(host?.querySelector('[data-testid="strength-badge"]')).toBeNull();
+  });
 });
 
 /** Resolve names through both aria-labelledby and aria-label. */
@@ -384,6 +462,14 @@ describe('GenerateRenderSection guidance field', () => {
       ['2', '100'],
     ]);
     expect(ranges('Mu')).toEqual([['-4', '4']]);
+
+    // Off hands Mu to the sampler preset, and its description says so.
+    const muInput = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
+      (input) => document.getElementById(input.getAttribute('aria-labelledby') ?? '')?.textContent === 'Mu'
+    );
+    expect(document.getElementById(muInput?.getAttribute('aria-describedby') ?? '')?.textContent).toContain(
+      'Set by the sampler preset unless overridden.'
+    );
   });
 
   it('names the broken bound on the field, not only in the Invoke button tooltip', async () => {
@@ -422,5 +508,242 @@ describe('GenerateRenderSection before the capability table arrives', () => {
     await openAndBlurEditor('CFG');
 
     expect(onCommit).not.toHaveBeenCalled();
+  });
+});
+
+describe('GenerateRenderSection model-family tuning', () => {
+  seedArchitectureCapabilities();
+
+  /** Select triggers are named by `aria-labelledby`, so resolve them through the field label. */
+  const selectTrigger = (label: string): HTMLElement | null =>
+    [...(host?.querySelectorAll<HTMLElement>('[data-scope="select"][data-part="trigger"]') ?? [])].find((trigger) => {
+      const labelId = trigger.getAttribute('aria-labelledby');
+
+      return labelId !== null && host?.querySelector(`#${CSS.escape(labelId)}`)?.textContent === label;
+    }) ?? null;
+  const switchNamed = (label: string): HTMLElement | null =>
+    [...(host?.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="root"]') ?? [])].find(
+      (element) => element.textContent === label
+    ) ?? null;
+
+  it('offers DyPE only for FLUX.1, revealing scale and exponent under the manual preset', async () => {
+    await render(sd1Model);
+    expect(selectTrigger('DyPE')).toBeNull();
+
+    await settle(() => root?.unmount());
+    await render(fluxDevModel, { fluxDypePreset: 'auto' });
+    expect(selectTrigger('DyPE')?.textContent).toContain('Auto (above 1536px)');
+    expect(slidersNamed('DyPE scale (λs)')).toHaveLength(0);
+
+    await settle(() => root?.unmount());
+    await render(fluxDevModel, { fluxDypePreset: 'manual' });
+    expect(slidersNamed('DyPE scale (λs)')[0]?.getAttribute('aria-valuemax')).toBe('8');
+    expect(slidersNamed('DyPE exponent (λt)')).toHaveLength(1);
+  });
+
+  it('offers the shift override to Z-Image and Qwen Image, and seed variance to Z-Image only', async () => {
+    const onCommit = await render(zImageModel);
+    const override = switchNamed('Shift');
+
+    expect(override).not.toBeNull();
+    expect(slidersNamed('Shift')).toHaveLength(0);
+    expect(switchNamed('Seed variance')).not.toBeNull();
+
+    // Turning the override on starts at the Lightning shift rather than an empty field.
+    await settle(() => override?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ zImageShift: 3 });
+
+    await settle(() => root?.unmount());
+    const onOverriddenCommit = await render(zImageModel, { zImageShift: 2.5 });
+    expect(slidersNamed('Shift')[0]?.getAttribute('aria-valuenow')).toBe('2.5');
+    // Turning the override off hands the shift back to the node, rather than leaving the last value in place.
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onOverriddenCommit).toHaveBeenCalledWith({ zImageShift: null });
+
+    await settle(() => root?.unmount());
+    const onQwenCommit = await render(qwenImageModel);
+    expect(switchNamed('Seed variance')).toBeNull();
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onQwenCommit).toHaveBeenCalledWith({ qwenImageShift: 3 });
+
+    await settle(() => root?.unmount());
+    await render(sd1Model);
+    expect(switchNamed('Shift')).toBeNull();
+  });
+
+  it('toggles the shift override from its label without handing focus to the slider it pairs with', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 2.5 }, true);
+    const label = () => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="label"]');
+    const shiftInput = host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    expect(shiftInput).not.toBeNull();
+    await act(() => userEvent.click(label()!));
+
+    expect(onCommit).toHaveBeenCalledWith({ zImageShift: null });
+    expect(document.activeElement).not.toBe(shiftInput);
+    expect(slidersNamed('Shift')).toHaveLength(0);
+
+    await act(() => userEvent.click(label()!));
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 3 });
+  });
+
+  it('keeps the shift override while a typed value passes outside its bounds', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 3 });
+    const input = () => host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('0.5'));
+
+    // "0" and "0." on the way to 0.5 are below the minimum, and committing them would read as auto.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).not.toContain(0);
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 0.5 });
+
+    onCommit.mockClear();
+    await settle(() => input()?.select());
+    await act(() => userEvent.keyboard('12'));
+
+    // "1" is in bounds; "12" is above the maximum and would read as auto too.
+    expect(onCommit.mock.calls.map(([patch]) => patch.zImageShift)).toEqual([1]);
+  });
+
+  describe('MOSS-Image skip layers', () => {
+    const input = () => host?.querySelector<HTMLInputElement>('input[aria-label="Skip layers (negative branch)"]');
+    const alert = () => host?.querySelector('[role="alert"]')?.textContent ?? null;
+    const typeOver = async (text: string) => {
+      await settle(() => input()?.select());
+      await act(() => userEvent.keyboard(text));
+    };
+
+    const stored = () => draftStore?.getSnapshot().mossImageUncondSkipLayers;
+
+    it('commits a typed list only when the field loses focus, then shows it unique and ascending', async () => {
+      const onCommit = await render(mossImageModel, {}, true);
+
+      expect(input()?.value).toBe('22');
+      expect(input()?.disabled).toBe(false);
+      expect(host?.textContent).toContain('Default: 22. Empty skips none.');
+
+      await typeOver('26, 22,24');
+
+      // Typing commits nothing, so no prefix typed on the way reaches the settings.
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+      expect(stored()).toEqual([22]);
+      expect(input()?.value).toBe('26, 22,24');
+
+      await settle(() => input()?.blur());
+      expect(onCommitImmediate).toHaveBeenCalledExactlyOnceWith({ mossImageUncondSkipLayers: [22, 24, 26] });
+      expect(input()?.value).toBe('22, 24, 26');
+
+      // Clearing the field is a choice too: the negative branch then skips no block.
+      await typeOver('{Backspace}');
+      await settle(() => input()?.blur());
+      expect(onCommitImmediate).toHaveBeenLastCalledWith({ mossImageUncondSkipLayers: [] });
+      expect(input()?.getAttribute('aria-invalid')).toBeNull();
+      expect(onCommit).not.toHaveBeenCalled();
+    });
+
+    it.each(['42', '22, 50', '22, x'])(
+      'names %j while editing, and restores the list from before on blur',
+      async (typed) => {
+        await render(mossImageModel, { mossImageUncondSkipLayers: [24] }, true);
+
+        await typeOver(typed);
+        expect(input()?.getAttribute('aria-invalid')).toBe('true');
+        expect(alert()).toBe('Enter comma-separated whole numbers from 0 to 41.');
+
+        await settle(() => input()?.blur());
+        expect(input()?.value).toBe('24');
+        expect(alert()).toBeNull();
+        expect(stored()).toEqual([24]);
+        expect(onCommitImmediate).not.toHaveBeenCalled();
+      }
+    );
+
+    it('commits a valid list when drafts flush before Invoke, without leaving the field', async () => {
+      await render(mossImageModel, { mossImageUncondSkipLayers: [24] }, true);
+
+      await typeOver('26, 22');
+      await settle(() => flushWorkbenchDrafts());
+
+      expect(document.activeElement).toBe(input());
+      expect(stored()).toEqual([22, 26]);
+      expect(input()?.value).toBe('22, 26');
+    });
+
+    it('restores the list from before when drafts flush over text that is not one', async () => {
+      await render(mossImageModel, { mossImageUncondSkipLayers: [24] }, true);
+
+      await typeOver('22, 50');
+      expect(alert()).not.toBeNull();
+
+      await settle(() => flushWorkbenchDrafts());
+      expect(input()?.value).toBe('24');
+      expect(alert()).toBeNull();
+      expect(stored()).toEqual([24]);
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+    });
+
+    it('replaces typed text when the list changes from elsewhere', async () => {
+      await render(mossImageModel, {}, true);
+
+      await typeOver('22, x');
+      // A recall or preset writes the draft without going through the field.
+      await settle(() => draftStore?.patchSnapshot({ mossImageUncondSkipLayers: [24] }));
+
+      expect(input()?.value).toBe('24');
+      expect(alert()).toBeNull();
+
+      // The stale text is gone for good: leaving the field commits nothing over the new list.
+      await settle(() => input()?.blur());
+      expect(stored()).toEqual([24]);
+      expect(onCommitImmediate).not.toHaveBeenCalled();
+    });
+
+    it('resets to the default list from the field menu', async () => {
+      await render(mossImageModel, { mossImageUncondSkipLayers: [26] }, true);
+      const resetItem = () =>
+        [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+          (item) => item.textContent === 'Reset to default'
+        );
+
+      await settle(() => input()?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+      expect(resetItem()?.getAttribute('aria-disabled')).toBeNull();
+      await act(() => userEvent.click(resetItem()!));
+
+      expect(onCommitImmediate).toHaveBeenLastCalledWith({ mossImageUncondSkipLayers: [22] });
+      expect(input()?.value).toBe('22');
+    });
+
+    it('rests disabled without CFG, and is offered to MOSS-Image only', async () => {
+      await render(mossImageModel, { cfgScale: 1, mossImageUncondSkipLayers: [42] });
+
+      expect(input()?.disabled).toBe(true);
+      // The list has no effect without CFG, so it raises no error there.
+      expect(alert()).toBeNull();
+      expect(host?.textContent).toContain('Takes effect with CFG above 1, which runs the negative pass.');
+
+      await settle(() => root?.unmount());
+      await render(sd1Model);
+      expect(input()).toBeNull();
+    });
+  });
+
+  it('commits Z-Image seed variance to the Z-Image settings', async () => {
+    const onCommit = await render(zImageModel);
+
+    await settle(() => switchNamed('Seed variance')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    expect(onCommit).toHaveBeenCalledWith({ zImageSeedVarianceEnabled: true });
+
+    await settle(() => root?.unmount());
+    const onEnabledCommit = await render(zImageModel, {
+      zImageSeedVarianceEnabled: true,
+      zImageSeedVarianceRandomizePercent: 50,
+      zImageSeedVarianceStrength: 0.1,
+    });
+    await pressOnSlider('Variance strength', 'ArrowRight');
+    await pressOnSlider('Randomized channels', 'ArrowRight');
+
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceStrength: expect.closeTo(0.15) });
+    expect(onEnabledCommit).toHaveBeenCalledWith({ zImageSeedVarianceRandomizePercent: 51 });
   });
 });

@@ -1,11 +1,12 @@
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type {
-  ProjectSettings,
   ProjectSortId,
   ProjectsViewId,
+  ScopedDefaults,
   StoredGeneratePreset,
   StoredRebalancePreset,
   WorkbenchPreferences,
+  WorkflowLibrarySortId,
 } from '@workbench/settings/contracts';
 
 import { getUserStorageScope } from '@features/identity';
@@ -24,6 +25,7 @@ import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
+import { getLayeredKeys } from '@workbench/settings/projectSettings';
 
 export { WORKBENCH_LANGUAGES } from '@platform/i18n/languages';
 
@@ -35,16 +37,13 @@ export const DEVELOPER_LOG_LEVELS: readonly LogLevel[] = LOG_LEVELS;
 
 export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 
-export const DEFAULT_PROJECT_SETTINGS: ProjectSettings = {
-  antialiasProgressImages: false,
-  showProgressImagesInViewer: true,
-  useCpuNoise: true,
-};
-
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
+  antialiasProgressImages: false,
   autoSwitchInvocationRoute: true,
+  canvasToolMemory: {},
   confirmImageDeletion: true,
+  controlModelMemory: {},
   customHotkeys: {},
   developerConsoleOutputEnabled: false,
   developerLogEnabled: true,
@@ -53,9 +52,13 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   developerPerformanceTimingsEnabled: false,
   enableInformationalPopovers: true,
   enableModelDescriptions: true,
+  exportIncludesWorkspace: true,
+  galleryDestinationNoticeShown: false,
   generatePresets: [],
+  generatePresetsIncludePrompts: true,
   generateSectionsOpen: {},
   highContrast: false,
+  installInPlace: true,
   krea2RebalancePresets: [],
   language: 'en',
   launchpadPinnedProjectIds: [],
@@ -66,13 +69,18 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
+  scopedDefaults: {},
+  selectObjectAutoProcess: false,
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
+  startupDestination: 'launchpad',
   themeId: DEFAULT_THEME_ID,
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
+  workflowLibrarySort: 'updated',
+  workflowLibraryThumbnailFit: 'cover',
   workflowShowMinimap: true,
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
@@ -145,6 +153,9 @@ const isProjectsViewId = (value: unknown): value is ProjectsViewId => value === 
 
 const isProjectSortId = (value: unknown): value is ProjectSortId =>
   value === 'edited' || value === 'created' || value === 'name';
+
+const isWorkflowLibrarySortId = (value: unknown): value is WorkflowLibrarySortId =>
+  value === 'updated' || value === 'opened' || value === 'created' || value === 'name';
 
 const normalizePinnedProjectIds = (values: unknown): string[] =>
   Array.isArray(values) ? [...new Set(values.filter((value): value is string => typeof value === 'string'))] : [];
@@ -253,37 +264,123 @@ const normalizeGeneratePresets = (values: unknown): StoredGeneratePreset[] => {
   return presets;
 };
 
-export const normalizeProjectSettings = (settings?: Partial<ProjectSettings>): ProjectSettings => ({
-  antialiasProgressImages:
-    typeof settings?.antialiasProgressImages === 'boolean'
-      ? settings.antialiasProgressImages
-      : DEFAULT_PROJECT_SETTINGS.antialiasProgressImages,
-  showProgressImagesInViewer:
-    typeof settings?.showProgressImagesInViewer === 'boolean'
-      ? settings.showProgressImagesInViewer
-      : DEFAULT_PROJECT_SETTINGS.showProgressImagesInViewer,
-  useCpuNoise: typeof settings?.useCpuNoise === 'boolean' ? settings.useCpuNoise : DEFAULT_PROJECT_SETTINGS.useCpuNoise,
-});
+/**
+ * `${base}:${controlType}`. The control types are spelled out because importing them from the canvas engine would
+ * pull it into Launchpad's bundle; a store test keeps the list in step with `CONTROL_TYPES`.
+ */
+const CONTROL_MODEL_MEMORY_KEY = /^[^:]+:(?:pose|depth|edges|softedge|lineart|sketch|color|tile)$/;
+const CONTROL_MODEL_MEMORY_MAX_ENTRIES = 256;
+const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
+
+const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
+const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
+
+/**
+ * Keeps only the known tools' plain records, so the synced blob cannot grow with stray keys. An already-valid record
+ * comes back as is, keeping its identity across unrelated preference patches.
+ */
+const normalizeCanvasToolMemoryRecord = (value: unknown): Readonly<Record<string, unknown>> => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.canvasToolMemory;
+  }
+  const keys = Object.keys(value);
+  if (keys.every((key) => (CANVAS_TOOL_MEMORY_KEYS as readonly string[]).includes(key) && isPlainRecord(value[key]))) {
+    return value;
+  }
+  return Object.fromEntries(
+    CANVAS_TOOL_MEMORY_KEYS.flatMap((key) => (isPlainRecord(value[key]) ? [[key, value[key]]] : []))
+  );
+};
+
+/**
+ * Keeps each owner's layerable keys (`getLayeredKeys`): a key no owner layers, or an owner nobody knows, is dropped,
+ * so nothing stray reaches resolution. Owners normalize their values on read. An already-clean record comes back as
+ * is, so resolved widget values keep their identity across unrelated preference patches.
+ */
+const normalizeScopedDefaults = (value: unknown): ScopedDefaults => {
+  if (!isPlainRecord(value)) {
+    return DEFAULT_PREFERENCES.scopedDefaults;
+  }
+  let changed = false;
+  const kept: Record<string, Readonly<Record<string, unknown>>> = {};
+  for (const [ownerId, record] of Object.entries(value)) {
+    const layered = getLayeredKeys(ownerId);
+    if (!layered || !isPlainRecord(record)) {
+      changed = true;
+      continue;
+    }
+    const entries = Object.entries(record);
+    const layeredEntries = entries.filter(([key]) => Object.hasOwn(layered, key));
+    if (layeredEntries.length !== entries.length) {
+      changed = true;
+    }
+    if (layeredEntries.length > 0) {
+      kept[ownerId] = layeredEntries.length === entries.length ? record : Object.fromEntries(layeredEntries);
+    } else if (entries.length > 0) {
+      changed = true;
+    }
+  }
+  return changed ? kept : (value as ScopedDefaults);
+};
+
+/**
+ * Keeps well-formed entries, the newest {@link CONTROL_MODEL_MEMORY_MAX_ENTRIES} (a pick is re-inserted last), so the
+ * synced blob stays bounded. An already-valid record comes back as is, so patching another preference keeps its
+ * identity and does not re-run selectors that read it (Invoke readiness).
+ */
+const normalizeControlModelMemory = (values: unknown): Record<string, string> => {
+  if (!values || typeof values !== 'object' || Array.isArray(values)) {
+    return {};
+  }
+
+  const entries = Object.entries(values);
+  const kept = entries
+    .filter(
+      (entry): entry is [string, string] =>
+        CONTROL_MODEL_MEMORY_KEY.test(entry[0]) &&
+        typeof entry[1] === 'string' &&
+        entry[1].length > 0 &&
+        entry[1].length <= CONTROL_MODEL_KEY_MAX_LENGTH
+    )
+    .slice(-CONTROL_MODEL_MEMORY_MAX_ENTRIES);
+
+  return kept.length === entries.length ? (values as Record<string, string>) : Object.fromEntries(kept);
+};
 
 type WorkbenchPreferencesInput = Omit<
   Partial<WorkbenchPreferences>,
-  'launchpadProjectsSort' | 'launchpadProjectsView' | 'queueJobsScope' | 'workflowEdgeStyle'
+  | 'launchpadProjectsSort'
+  | 'launchpadProjectsView'
+  | 'queueJobsScope'
+  | 'startupDestination'
+  | 'workflowEdgeStyle'
+  | 'workflowLibrarySort'
+  | 'workflowLibraryThumbnailFit'
 > & {
   launchpadProjectsSort?: unknown;
   launchpadProjectsView?: unknown;
   queueJobsScope?: unknown;
+  startupDestination?: unknown;
   workflowEdgeStyle?: unknown;
+  workflowLibrarySort?: unknown;
+  workflowLibraryThumbnailFit?: unknown;
 };
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
+  antialiasProgressImages: preferences?.antialiasProgressImages === true,
   autoSwitchInvocationRoute:
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'
       ? preferences.autoSwitchInvocationRoute
       : DEFAULT_PREFERENCES.autoSwitchInvocationRoute,
+  canvasToolMemory: normalizeCanvasToolMemoryRecord(preferences?.canvasToolMemory),
   confirmImageDeletion:
     typeof preferences?.confirmImageDeletion === 'boolean'
       ? preferences.confirmImageDeletion
       : DEFAULT_PREFERENCES.confirmImageDeletion,
+  controlModelMemory: normalizeControlModelMemory(preferences?.controlModelMemory),
   customHotkeys: normalizeCustomHotkeys(preferences?.customHotkeys),
   developerLogEnabled:
     typeof preferences?.developerLogEnabled === 'boolean'
@@ -309,8 +406,15 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.enableModelDescriptions === 'boolean'
       ? preferences.enableModelDescriptions
       : DEFAULT_PREFERENCES.enableModelDescriptions,
+  exportIncludesWorkspace:
+    typeof preferences?.exportIncludesWorkspace === 'boolean'
+      ? preferences.exportIncludesWorkspace
+      : DEFAULT_PREFERENCES.exportIncludesWorkspace,
   generatePresets: normalizeGeneratePresets(preferences?.generatePresets),
+  generatePresetsIncludePrompts: preferences?.generatePresetsIncludePrompts !== false,
   generateSectionsOpen: normalizeGenerateSectionsOpen(preferences?.generateSectionsOpen),
+  installInPlace:
+    typeof preferences?.installInPlace === 'boolean' ? preferences.installInPlace : DEFAULT_PREFERENCES.installInPlace,
   krea2RebalancePresets: normalizeRebalancePresets(preferences?.krea2RebalancePresets),
   language: normalizeWorkbenchLanguage(preferences?.language) ?? DEFAULT_PREFERENCES.language,
   launchpadPinnedProjectIds: normalizePinnedProjectIds(preferences?.launchpadPinnedProjectIds),
@@ -343,8 +447,14 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.alphaNoticeAcknowledged === 'boolean'
       ? preferences.alphaNoticeAcknowledged
       : DEFAULT_PREFERENCES.alphaNoticeAcknowledged,
+  galleryDestinationNoticeShown: preferences?.galleryDestinationNoticeShown === true,
   reduceMotion:
     typeof preferences?.reduceMotion === 'boolean' ? preferences.reduceMotion : DEFAULT_PREFERENCES.reduceMotion,
+  scopedDefaults: normalizeScopedDefaults(preferences?.scopedDefaults),
+  selectObjectAutoProcess:
+    typeof preferences?.selectObjectAutoProcess === 'boolean'
+      ? preferences.selectObjectAutoProcess
+      : DEFAULT_PREFERENCES.selectObjectAutoProcess,
   showFocusRegionHighlight:
     typeof preferences?.showFocusRegionHighlight === 'boolean'
       ? preferences.showFocusRegionHighlight
@@ -353,6 +463,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.showPromptSyntaxHighlighting === 'boolean'
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
+  startupDestination:
+    preferences?.startupDestination === 'launchpad' || preferences?.startupDestination === 'recentProject'
+      ? preferences.startupDestination
+      : DEFAULT_PREFERENCES.startupDestination,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
   whatsNewSeenVersion:
     typeof preferences?.whatsNewSeenVersion === 'string'
@@ -372,6 +486,13 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowGroupNodesByCategory === 'boolean'
       ? preferences.workflowGroupNodesByCategory
       : DEFAULT_PREFERENCES.workflowGroupNodesByCategory,
+  workflowLibrarySort: isWorkflowLibrarySortId(preferences?.workflowLibrarySort)
+    ? preferences.workflowLibrarySort
+    : DEFAULT_PREFERENCES.workflowLibrarySort,
+  workflowLibraryThumbnailFit:
+    preferences?.workflowLibraryThumbnailFit === 'contain'
+      ? 'contain'
+      : DEFAULT_PREFERENCES.workflowLibraryThumbnailFit,
   workflowShowMinimap:
     typeof preferences?.workflowShowMinimap === 'boolean'
       ? preferences.workflowShowMinimap
@@ -615,6 +736,9 @@ export const useWorkbenchPreferenceSelector = <Selected>(
 
 export const getWorkbenchPreferences = (): WorkbenchPreferences => store.getSnapshot().preferences;
 
+/** Whether the preferences read are the account's, hydrated, rather than the defaults that stand in until then. */
+export const areWorkbenchPreferencesReady = (): boolean => store.getSnapshot().status === 'ready';
+
 /** Non-React runtimes use this to keep infrastructure configuration current. */
 export const subscribeWorkbenchPreferences = (listener: (preferences: WorkbenchPreferences) => void): (() => void) => {
   listener(store.getSnapshot().preferences);
@@ -660,6 +784,41 @@ export const patchWorkbenchPreferences = async (preferences: Partial<WorkbenchPr
         status: 'error',
       });
     }
+  });
+};
+
+/** Remembers (or, with null, forgets) the control model picked for `key` (see `controlModelMemoryKey`). */
+export const patchControlModelMemory = (key: string, modelKey: string | null): Promise<void> => {
+  const controlModelMemory = { ...store.getSnapshot().preferences.controlModelMemory };
+  delete controlModelMemory[key];
+  if (modelKey !== null) {
+    controlModelMemory[key] = modelKey;
+  }
+  return patchWorkbenchPreferences({ controlModelMemory });
+};
+
+/** Sets the user's defaults for `values`' keys under `ownerId`, keeping the owner's other defaults. */
+export const patchScopedDefault = (ownerId: string, values: Readonly<Record<string, unknown>>): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  return patchWorkbenchPreferences({
+    scopedDefaults: { ...scopedDefaults, [ownerId]: { ...scopedDefaults[ownerId], ...values } },
+  });
+};
+
+/** Forgets the user's defaults for `keys` under `ownerId`; an owner left with none is dropped. */
+export const clearScopedDefault = (ownerId: string, keys: readonly string[]): Promise<void> => {
+  const { scopedDefaults } = store.getSnapshot().preferences;
+  const current = scopedDefaults[ownerId];
+  if (!current || !keys.some((key) => Object.hasOwn(current, key))) {
+    return Promise.resolve();
+  }
+  const owner = { ...current };
+  for (const key of keys) {
+    delete owner[key];
+  }
+  const { [ownerId]: _cleared, ...others } = scopedDefaults;
+  return patchWorkbenchPreferences({
+    scopedDefaults: Object.keys(owner).length > 0 ? { ...others, [ownerId]: owner } : others,
   });
 };
 

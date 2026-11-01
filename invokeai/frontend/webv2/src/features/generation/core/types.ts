@@ -30,18 +30,43 @@ export type MainModelConfig = ModelIdentifierConfig & {
   } | null;
 };
 
+export type ExternalGenerationMode = 'txt2img' | 'img2img' | 'inpaint';
+
+export interface ExternalImageSize {
+  width: number;
+  height: number;
+}
+
+/** A provider's named size at one aspect ratio, e.g. Gemini's `1K` at `16:9`. */
+export interface ExternalResolutionPreset {
+  label: string;
+  aspect_ratio: string;
+  image_size: string;
+  width: number;
+  height: number;
+}
+
+/** The capability matrix the backend records for an external model (`ExternalModelCapabilities`). */
+export interface ExternalModelCapabilities {
+  modes?: string[];
+  supports_seed?: boolean;
+  supports_negative_prompt?: boolean;
+  supports_reference_images?: boolean;
+  max_reference_images?: number | null;
+  max_images_per_request?: number | null;
+  max_image_size?: ExternalImageSize | null;
+  allowed_aspect_ratios?: string[] | null;
+  /** Fixed output size per aspect ratio, for providers that accept no free-form dimensions. */
+  aspect_ratio_sizes?: Record<string, ExternalImageSize> | null;
+  resolution_presets?: ExternalResolutionPreset[] | null;
+}
+
 export type ExternalImageGeneratorModelConfig = ModelIdentifierConfig & {
   base: 'external';
   type: 'external_image_generator';
   format: 'external_api';
   provider_id?: string;
-  capabilities?: {
-    modes?: string[];
-    supports_seed?: boolean;
-    supports_negative_prompt?: boolean;
-    supports_reference_images?: boolean;
-    max_reference_images?: number | null;
-  } | null;
+  capabilities?: ExternalModelCapabilities | null;
   default_settings?: {
     width?: number | null;
     height?: number | null;
@@ -140,6 +165,14 @@ export type GenerateReferenceImageConfig =
     }
   | { type: 'flux2_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'qwen_image_reference_image'; image: GenerateReferenceImageAsset | null }
+  /** Krea-2 training-free style transfer: no adapter model, a single reference, `styleStrength` 0–2 (0 bypasses). */
+  | { type: 'krea2_reference_image'; image: GenerateReferenceImageAsset | null; styleStrength: number }
+  /**
+   * Krea-2 edit reference for ai-toolkit edit LoRAs, read by the encoder's vision tower and joined to the denoise as
+   * clean image tokens. Up to three, in list order; never combined with a style reference.
+   */
+  | { type: 'krea2_edit_reference_image'; image: GenerateReferenceImageAsset | null }
+  | { type: 'qwen_image_2_1_reference_image'; image: GenerateReferenceImageAsset | null }
   | { type: 'external_reference_image'; image: GenerateReferenceImageAsset | null };
 
 export interface GenerateReferenceImage {
@@ -185,6 +218,11 @@ export interface GenerateSettings {
   promptTemplate: PromptTemplateSnapshot | null;
   /** Show the merged prompt read-only instead of the authored text. */
   promptTemplateViewMode: boolean;
+  /**
+   * Expand dynamic prompt syntax (`{a|b}`, `__wildcards__`, `#` comments) on the backend before generating. Off keeps
+   * the prompt exactly as typed. Projects saved before the toggle read as on.
+   */
+  dynamicPromptsEnabled: boolean;
   /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */
@@ -233,6 +271,14 @@ export interface GenerateSettings {
   qwen3VLEncoderModel: ComponentModelConfig | null;
   /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
   qwen35EncoderModel: ComponentModelConfig | null;
+  /**
+   * Anima's optional 4-channel ControlNet-LLLite inpainting adapter. The canvas feeds it the raster image and the
+   * inpaint mask while inpainting or outpainting; Generate and the other canvas modes ignore it.
+   */
+  animaInpaintAdapterModel: ComponentModelConfig | null;
+  /** Off skips the adapter on the canvas and keeps the selected model and weight. */
+  animaInpaintAdapterEnabled: boolean;
+  animaInpaintAdapterWeight: number;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */
@@ -262,6 +308,28 @@ export interface GenerateSettings {
   krea2SeedVarianceEnabled: boolean;
   krea2SeedVarianceStrength: number;
   krea2SeedVarianceRandomizePercent: number;
+  /** Runs Krea-2 edit references once through the transformer, for edit LoRAs trained with isolated references. */
+  krea2ReferenceKvCache: boolean;
+  /** FLUX.1 DyPE position extrapolation for sizes above the training resolution. `off` sends nothing. */
+  fluxDypePreset: FluxDypePreset;
+  /** DyPE magnitude (λs) and decay speed (λt); the denoise node reads them only under the `manual` preset. */
+  fluxDypeScale: number;
+  fluxDypeExponent: number;
+  /** Z-Image sigma-schedule shift; null lets the node derive it from the image size. */
+  zImageShift: number | null;
+  /** Perturbs Z-Image conditioning for variety between seeds. Default off. */
+  zImageSeedVarianceEnabled: boolean;
+  zImageSeedVarianceStrength: number;
+  zImageSeedVarianceRandomizePercent: number;
+  /** Qwen-Image sigma-schedule shift (Lightning LoRAs train at 3); null keeps the model's dynamic shift. */
+  qwenImageShift: number | null;
+  /** BitsAndBytes quantization applied to the Qwen2.5-VL encoder on load, trading quality for VRAM. */
+  qwenImageEncoderQuantization: QwenImageEncoderQuantization;
+  /**
+   * Transformer blocks MOSS-Image's negative branch skips, unique and ascending; empty skips none. CFG 1 runs no
+   * negative branch, so the list has no effect there.
+   */
+  mossImageUncondSkipLayers: number[];
   /** PiD replaces VAE decode with caption-conditioned 4× output; requires a PiD decoder and Gemma-2 encoder. */
   pidMode: PidMode;
   /** PiD decoder checkpoint. Trained per backbone, so it must match the main model's base. */
@@ -269,7 +337,33 @@ export interface GenerateSettings {
   /** The shared Gemma-2 caption encoder PiD conditions its decode on. */
   gemma2EncoderModel: ComponentModelConfig | null;
   pidSteps: number;
+  /** A provider's named size (e.g. `1K`); sent only when the selected model lists it in a resolution preset. */
+  externalImageSize: string | null;
+  openaiQuality: OpenAIImageQuality;
+  openaiBackground: OpenAIImageBackground;
+  /** Null lets OpenAI pick; only meaningful with image inputs. */
+  openaiInputFidelity: OpenAIInputFidelity | null;
+  /** Null uses the provider default. */
+  geminiTemperature: number | null;
+  geminiThinkingLevel: GeminiThinkingLevel | null;
+  seedreamWatermark: boolean;
+  seedreamOptimizePrompt: boolean;
+  /** SDXL only: a refiner-family main model that finishes the schedule from `refinerStart`; null runs none. */
+  refinerModel: MainModelConfig | null;
+  refinerSteps: number;
+  refinerCfgScale: number;
+  refinerScheduler: string;
+  /** Aesthetic-score conditioning for the refiner's positive and negative prompts, 1 to 10. */
+  refinerPositiveAestheticScore: number;
+  refinerNegativeAestheticScore: number;
+  /** Fraction of the schedule at which the base model hands its latents to the refiner. */
+  refinerStart: number;
 }
+
+export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
+export type OpenAIImageBackground = 'auto' | 'transparent' | 'opaque';
+export type OpenAIInputFidelity = 'low' | 'high';
+export type GeminiThinkingLevel = 'minimal' | 'high';
 
 /**
  * - `off`: ordinary VAE decode.
@@ -281,6 +375,12 @@ export type PidMode = 'off' | 'fit' | 'native';
 
 /** Use preset defaults unless steps, guidance, or mu is explicitly overridden. */
 export type Ideogram4SamplerPreset = 'V4_QUALITY_48' | 'V4_DEFAULT_20' | 'V4_TURBO_12';
+
+/** `flux_denoise.dype_preset`: `auto` turns on above 1536px, `area` by image area, `4k` is a fixed tuning. */
+export type FluxDypePreset = 'off' | 'manual' | 'auto' | 'area' | '4k';
+
+/** `qwen_image_text_encoder.quantization`. */
+export type QwenImageEncoderQuantization = 'none' | 'int8' | 'nf4';
 
 export interface GenerateWidgetValues extends GenerateSettings {
   model: GenerateModelConfig;

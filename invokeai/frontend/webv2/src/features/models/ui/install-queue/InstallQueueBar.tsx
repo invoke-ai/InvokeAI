@@ -1,6 +1,6 @@
 import type { ModelInstallJob } from '@features/models/core/types';
 
-import { Badge, Box, Flex, HStack, Icon, Menu, Portal, Separator, Spinner, Text } from '@chakra-ui/react';
+import { Icon, Menu, Portal, Separator } from '@chakra-ui/react';
 import {
   cancelModelInstall,
   pauseModelInstall,
@@ -9,7 +9,11 @@ import {
 } from '@features/models/data/api';
 import {
   ensureInstallsLoaded,
+  dismissInstallJob,
+  dismissInstallJobs,
+  projectInstallCancelled,
   refreshInstalls,
+  replaceInstallJob,
   useInstallProgress,
   useInstallsSelector,
 } from '@features/models/data/installsStore';
@@ -18,28 +22,25 @@ import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { getErrorMessage, useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { Button, Group, IconButton, Tooltip, useTooltipTriggerIds } from '@platform/ui';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Button, IconButton } from '@platform/ui/Button';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Group } from '@platform/ui/Group';
 import {
-  ChevronDownIcon,
-  ChevronUpIcon,
-  Maximize2Icon,
-  Minimize2Icon,
-  PauseIcon,
-  PlayIcon,
-  RefreshCcwIcon,
-  Trash2Icon,
-  TriangleAlertIcon,
-  XIcon,
-} from 'lucide-react';
-import { useCallback, useId, useMemo } from 'react';
+  ManagerQueueChip,
+  ManagerQueueFeatured,
+  ManagerQueueFooter,
+  ManagerQueueSummaryText,
+} from '@platform/ui/ManagerQueue';
+import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { ChevronDownIcon, CircleStopIcon, PauseIcon, PlayIcon, RefreshCcwIcon } from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { InstallQueueRow, InstallQueueSummary } from './queueModel';
 
-import { InstallProgressBar, useInstallProgressCaption } from './InstallProgressCell';
+import { getInstallProgressValue, useInstallProgressCaption } from './InstallProgressCell';
 import { InstallQueueTable } from './InstallQueueTable';
 import {
   buildInstallQueueRows,
@@ -49,17 +50,15 @@ import {
   resolveInstallProgress,
   summarizeInstallQueue,
 } from './queueModel';
+import { useConfirmedInstallCancel } from './useConfirmedInstallCancel';
 import { useInstallJobActions } from './useInstallJobActions';
 
-const DOCKED_HEIGHT = 'min(30rem, 60dvh)';
-const TOGGLE_HOVER = { color: 'fg' } as const;
 const BULK_MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /** Install queue docked to the bottom of the detail pane: a summary bar collapsed, a table expanded. */
 export const InstallQueueBar = () => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const contentId = useId();
   const bulkMenuIds = useTooltipTriggerIds();
   const error = useInstallsSelector((snapshot) => snapshot.error);
   const jobs = useInstallsSelector((snapshot) => snapshot.jobs);
@@ -76,7 +75,6 @@ export const InstallQueueBar = () => {
   const summary = useMemo(() => summarizeInstallQueue(rows), [rows]);
   const finishedCount = useMemo(() => countFinishedInstallJobs(jobs), [jobs]);
   const featured = rows[0] && isActiveRowStatus(rows[0].status) ? rows[0] : null;
-  const isMaximized = queueExpanded && queueMaximized;
 
   const pausableJobs = useMemo(() => jobs.filter((job) => job.status === 'downloading'), [jobs]);
   const pausedJobs = useMemo(() => jobs.filter((job) => job.status === 'paused'), [jobs]);
@@ -95,14 +93,20 @@ export const InstallQueueBar = () => {
   const runBulk = useCallback(
     (
       run: ReturnType<typeof useScopedAction>['run'],
-      call: (id: number, signal: AbortSignal) => Promise<unknown>,
-      targets: ModelInstallJob[]
+      call: (id: number, signal: AbortSignal) => Promise<ModelInstallJob | null>,
+      targets: ModelInstallJob[],
+      onSucceeded?: (id: number, result: ModelInstallJob | null) => void
     ) =>
       run(
         async (owner) => {
           // allSettled: one failure must not hide the others' outcomes, and the rest still deserve a fresh list.
           const results = await Promise.allSettled(targets.map((job) => call(job.id, owner.signal)));
           assertAccountScopeCurrent(owner);
+          results.forEach((result, index) => {
+            if (result.status === 'fulfilled') {
+              onSucceeded?.(targets[index]!.id, result.value);
+            }
+          });
           await refreshInstalls(owner);
           assertAccountScopeCurrent(owner);
 
@@ -130,51 +134,70 @@ export const InstallQueueBar = () => {
   const handlePrune = () =>
     runPrune(
       async (owner) => {
-        await pruneCompletedModelInstalls(owner.signal);
+        const prunedJobIds = await pruneCompletedModelInstalls(owner.signal);
         assertAccountScopeCurrent(owner);
+        dismissInstallJobs(prunedJobIds);
         await refreshInstalls(owner);
       },
-      (message) => notify.error(t('models.pruneFailed'), message)
+      (message) => {
+        notify.error(t('models.pruneFailed'), message);
+        void refreshInstalls();
+      }
     );
 
+  const hasBulkTargets = pausableJobs.length + pausedJobs.length + cancellableJobs.length > 0;
+  // The jobs the confirmation named: a job that starts meanwhile is not cancelled by a count it was not part of.
+  const [cancelAllTargets, setCancelAllTargets] = useState<ModelInstallJob[] | null>(null);
+  const openCancelAllConfirm = () => setCancelAllTargets(cancellableJobs);
+  const closeCancelAllConfirm = () => setCancelAllTargets(null);
+  const cancelAll = (targets: ModelInstallJob[]) =>
+    runBulk(runCancelAll, cancelModelInstall, targets, (id, result) => {
+      if (result === null) {
+        dismissInstallJob(id);
+      } else {
+        replaceInstallJob(result);
+        if (!['completed', 'error', 'cancelled'].includes(result.status)) {
+          projectInstallCancelled(id);
+        }
+      }
+    });
+
   return (
-    <Flex
-      bg="bg.subtle"
-      borderTopWidth={1}
-      direction="column"
-      flex={isMaximized ? '1' : undefined}
-      flexShrink={0}
-      minH="0"
-    >
-      <HStack flexWrap="wrap" gap="2" minH="2.5rem" px="3" py="1">
-        <Button
-          aria-controls={contentId}
-          aria-expanded={queueExpanded}
-          color="fg.muted"
-          flexShrink={0}
-          gap="1.5"
-          ms="-2"
-          ps="2"
-          pe="3"
-          variant="ghost"
-          _hover={TOGGLE_HOVER}
-          onClick={() => setQueueExpanded(!queueExpanded)}
-        >
-          <Icon as={queueExpanded ? ChevronDownIcon : ChevronUpIcon} boxSize="3.5" />
-          <Text color="fg" fontWeight="700">
-            {t('models.installQueue')}
-          </Text>
-        </Button>
-
-        {queueExpanded ? (
-          <SummaryChips summary={summary} />
-        ) : (
-          <CollapsedSummary featured={featured} jobCount={rows.length} summary={summary} />
-        )}
-
-        {queueExpanded ? (
-          <HStack flexShrink={0} gap="1">
-            {pausableJobs.length + pausedJobs.length + cancellableJobs.length > 0 ? (
+    <>
+      <ManagerQueueFooter
+        collapsedActions={featured ? <FeaturedActions row={featured} /> : null}
+        collapsedChips={
+          <>
+            <ManagerQueueChip
+              count={summary.queued}
+              label={t('models.queueMoreQueued', { count: summary.queued })}
+              palette="gray"
+            />
+            <ManagerQueueChip
+              count={summary.attention}
+              icon="alert"
+              label={t('models.queueAttentionCount', { count: summary.attention })}
+              palette="red"
+            />
+          </>
+        }
+        collapsedSummary={
+          featured ? (
+            <FeaturedJob row={featured} />
+          ) : (
+            <ManagerQueueSummaryText>
+              {summary.paused > 0
+                ? t('models.queuePausedCount', { count: summary.paused })
+                : rows.length > 0
+                  ? t('models.installJobSummary', { count: rows.length })
+                  : t('models.noInstallsYet')}
+            </ManagerQueueSummaryText>
+          )
+        }
+        expanded={queueExpanded}
+        expandedActions={
+          <>
+            {hasBulkTargets ? (
               <Group attached>
                 {pausedJobs.length > 0 ? (
                   <Button
@@ -211,11 +234,11 @@ export const InstallQueueBar = () => {
                       <MenuContent minW="10rem">
                         <MenuActionItem
                           disabled={cancellableJobs.length === 0 || isCancellingAll}
-                          icon={XIcon}
-                          label={t('models.cancelAll')}
+                          icon={CircleStopIcon}
+                          label={t('models.cancelAllWithEllipsis')}
                           tone="danger"
                           value="cancel-all"
-                          onSelect={() => void runBulk(runCancelAll, cancelModelInstall, cancellableJobs)}
+                          onSelect={openCancelAllConfirm}
                         />
                       </MenuContent>
                     </Menu.Positioner>
@@ -223,128 +246,82 @@ export const InstallQueueBar = () => {
                 </Menu.Root>
               </Group>
             ) : null}
-            {pausableJobs.length + pausedJobs.length + cancellableJobs.length > 0 ? (
-              <Separator h="4" mx="1" orientation="vertical" />
-            ) : null}
+            {hasBulkTargets ? <Separator h="4" mx="1" orientation="vertical" /> : null}
             <Button loading={isRefreshing} size="sm" variant="ghost" onClick={() => runRefresh(refreshInstalls)}>
               <Icon as={RefreshCcwIcon} boxSize="3" />
               {t('common.refresh')}
             </Button>
-            <Button disabled={finishedCount === 0} loading={isPruning} size="sm" variant="ghost" onClick={handlePrune}>
-              <Icon as={Trash2Icon} boxSize="3" />
-              {t('models.clearFinished')}
-            </Button>
-            <Tooltip content={queueMaximized ? t('models.restoreQueueTooltip') : t('models.maximizeQueueTooltip')}>
-              <Button size="sm" variant="ghost" onClick={() => setQueueMaximized(!queueMaximized)}>
-                <Icon as={queueMaximized ? Minimize2Icon : Maximize2Icon} boxSize="3" />
-                {queueMaximized ? t('models.restoreQueue') : t('models.maximizeQueue')}
-              </Button>
-            </Tooltip>
-          </HStack>
-        ) : (
-          <HStack flexShrink={0} gap="0.5">
-            {featured ? <FeaturedActions row={featured} /> : null}
-            {featured && finishedCount > 0 ? <Separator h="4" mx="1" orientation="vertical" /> : null}
-            {finishedCount > 0 ? (
-              <Tooltip content={t('models.clearFinished')}>
-                <IconButton
-                  aria-label={t('models.clearFinished')}
-                  loading={isPruning}
-                  size="sm"
-                  variant="ghost"
-                  onClick={handlePrune}
-                >
-                  <Icon as={Trash2Icon} boxSize="3.5" />
-                </IconButton>
-              </Tooltip>
-            ) : null}
-          </HStack>
-        )}
-      </HStack>
-
-      {queueExpanded ? (
-        <Box
-          borderTopWidth={1}
-          flex={isMaximized ? '1' : undefined}
-          h={isMaximized ? undefined : DOCKED_HEIGHT}
-          id={contentId}
-          minH="0"
-        >
-          <InstallQueueTable error={error} rows={rows} status={status} />
-        </Box>
-      ) : null}
-    </Flex>
+          </>
+        }
+        expandedSummary={<SummaryChips summary={summary} />}
+        finishedCount={finishedCount}
+        isClearingFinished={isPruning}
+        maximizeTooltip={t('models.maximizeQueueTooltip')}
+        maximized={queueMaximized}
+        restoreTooltip={t('models.restoreQueueTooltip')}
+        title={t('models.installQueue')}
+        onClearFinished={handlePrune}
+        onExpandedChange={setQueueExpanded}
+        onMaximizedChange={setQueueMaximized}
+      >
+        <InstallQueueTable error={error} rows={rows} status={status} />
+      </ManagerQueueFooter>
+      <ConfirmDialog
+        body={t('models.cancelAllBody', { count: cancelAllTargets?.length ?? 0 })}
+        cancelLabel={t('models.keepInstalling')}
+        confirmLabel={t('models.cancelAllConfirm', { count: cancelAllTargets?.length ?? 0 })}
+        isOpen={cancelAllTargets !== null}
+        title={t('models.cancelAllQuestion', { count: cancelAllTargets?.length ?? 0 })}
+        onClose={closeCancelAllConfirm}
+        onConfirm={async () => {
+          if (cancelAllTargets) {
+            await cancelAll(cancelAllTargets);
+          }
+        }}
+      />
+    </>
   );
 };
 
-const CountChip = ({
-  count,
-  labelKey,
-  palette,
-  icon,
-}: {
-  count: number;
-  labelKey: string;
-  palette: string;
-  icon?: 'dot' | 'alert';
-}) => {
+const SummaryChips = ({ summary }: { summary: InstallQueueSummary }) => {
   const { t } = useTranslation();
 
-  if (count === 0) {
-    return null;
-  }
-
   return (
-    <Badge colorPalette={palette} flexShrink={0} fontSize="xs" gap="1.5" rounded="full" size="lg" variant="surface">
-      {icon === 'dot' ? <Box bg="colorPalette.solid" boxSize="1.5" rounded="full" /> : null}
-      {icon === 'alert' ? <Icon as={TriangleAlertIcon} boxSize="3" /> : null}
-      {t(labelKey, { count })}
-    </Badge>
-  );
-};
-
-// A real basis lets the header actions wrap beneath the chips instead of starving them in narrow panes.
-const SummaryChips = ({ summary }: { summary: InstallQueueSummary }) => (
-  <HStack flex="1 1 18rem" flexWrap="wrap" gap="1" minW="0">
-    <CountChip count={summary.downloading} icon="dot" labelKey="models.queueDownloadingCount" palette="accent" />
-    <CountChip count={summary.installing} icon="dot" labelKey="models.queueInstallingCount" palette="accent" />
-    <CountChip count={summary.queued} labelKey="models.queueQueuedCount" palette="gray" />
-    <CountChip count={summary.paused} labelKey="models.queuePausedCount" palette="gray" />
-    <CountChip count={summary.attention} icon="alert" labelKey="models.queueAttentionCount" palette="red" />
-    <CountChip count={summary.installed} labelKey="models.queueInstalledCount" palette="green" />
-  </HStack>
-);
-
-const CollapsedSummary = ({
-  featured,
-  jobCount,
-  summary,
-}: {
-  featured: InstallQueueRow | null;
-  jobCount: number;
-  summary: InstallQueueSummary;
-}) => {
-  const { t } = useTranslation();
-
-  // Chips wrap under the featured job before anything overlaps in a narrow pane.
-  return (
-    <HStack flex="1 1 16rem" flexWrap="wrap" gap="2" minW="0">
-      {featured ? (
-        <FeaturedJob row={featured} />
-      ) : (
-        <Text color="fg.muted" flex="1 1 10rem" minW="0" truncate>
-          {summary.paused > 0
-            ? t('models.queuePausedCount', { count: summary.paused })
-            : jobCount > 0
-              ? t('models.installJobSummary', { count: jobCount })
-              : t('models.noInstallsYet')}
-        </Text>
-      )}
-      <HStack flexShrink={0} gap="1">
-        <CountChip count={summary.queued} labelKey="models.queueMoreQueued" palette="gray" />
-        <CountChip count={summary.attention} icon="alert" labelKey="models.queueAttentionCount" palette="red" />
-      </HStack>
-    </HStack>
+    <>
+      <ManagerQueueChip
+        count={summary.downloading}
+        icon="dot"
+        label={t('models.queueDownloadingCount', { count: summary.downloading })}
+        palette="accent"
+      />
+      <ManagerQueueChip
+        count={summary.installing}
+        icon="dot"
+        label={t('models.queueInstallingCount', { count: summary.installing })}
+        palette="accent"
+      />
+      <ManagerQueueChip
+        count={summary.queued}
+        label={t('models.queueQueuedCount', { count: summary.queued })}
+        palette="gray"
+      />
+      <ManagerQueueChip
+        count={summary.paused}
+        label={t('models.queuePausedCount', { count: summary.paused })}
+        palette="gray"
+      />
+      <ManagerQueueChip
+        count={summary.attention}
+        icon="alert"
+        label={t('models.queueAttentionCount', { count: summary.attention })}
+        palette="red"
+      />
+      <ManagerQueueChip
+        count={summary.installed}
+        label={t('models.queueInstalledCount', { count: summary.installed })}
+        palette="green"
+      />
+    </>
   );
 };
 
@@ -361,29 +338,20 @@ const FeaturedJob = ({ row }: { row: InstallQueueRow }) => {
   });
 
   return (
-    <HStack flex="1 1 14rem" gap="2" minW="0" overflow="hidden">
-      <Spinner borderWidth="1.5px" boxSize="3.5" color="accent.solid" flexShrink={0} />
-      <MiddleTruncate
-        flexShrink={1}
-        fontSize="md"
-        fontWeight="600"
-        maxW="18rem"
-        minW="5rem"
-        text={getInstallJobDisplayName(row.job)}
-      />
-      <Box flexShrink={1} maxW="10rem" minW="3rem" w="full">
-        <InstallProgressBar label={t('models.downloadProgress')} progress={progress} status={row.status} />
-      </Box>
-      <Text color="fg.muted" flexShrink={3} fontFamily="mono" fontSize="xs" minW="0" truncate>
-        {caption}
-      </Text>
-    </HStack>
+    <ManagerQueueFeatured
+      caption={caption}
+      name={getInstallJobDisplayName(row.job)}
+      progressLabel={t('models.downloadProgress')}
+      progressValue={getInstallProgressValue(progress, row.status)}
+    />
   );
 };
 
 const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
   const { t } = useTranslation();
   const actions = useInstallJobActions(row.job);
+  const progress = resolveInstallProgress(row.job, useInstallProgress(row.job.id));
+  const cancel = useConfirmedInstallCancel(row.job, progress, actions.cancel);
 
   return (
     <>
@@ -407,11 +375,12 @@ const FeaturedActions = ({ row }: { row: InstallQueueRow }) => {
           disabled={actions.isBusy}
           size="sm"
           variant="ghost"
-          onClick={actions.cancel}
+          onClick={cancel.requestCancel}
         >
-          <Icon as={XIcon} boxSize="3.5" />
+          <Icon as={CircleStopIcon} boxSize="3.5" />
         </IconButton>
       </Tooltip>
+      {cancel.dialog}
     </>
   );
 };

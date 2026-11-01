@@ -8,8 +8,17 @@ import { createContext, use, useMemo } from 'react';
 export interface VideoUiAdapter {
   /** Reveal this media's board, page, and cell in Gallery and show Preview. */
   findInGallery(ref: GalleryItemRef): void;
-  /** Read the selected upload board at upload time without subscribing to board changes. */
-  getUploadBoardId(): string;
+  /**
+   * Where an upload made from the panel lands, resolved when the upload starts from the listing of every readable
+   * board: the Gallery's auto-add board while that listing lets the account add to it, else the project's inbox;
+   * `none` is Uncategorized.
+   */
+  getUploadBoardId(): Promise<string>;
+  /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
+  notifications: {
+    info(title: string): void;
+    undoable(title: string, notice: { onUndo: () => void; supersedes: string }): void;
+  };
   /** Functional patches run synchronously against the originating project's latest normalized values. */
   patchValues(
     values: Partial<VideoWidgetValues> | ((current: VideoWidgetValues) => Partial<VideoWidgetValues>),
@@ -24,6 +33,8 @@ export interface VideoUiAdapter {
   rawValues: Record<string, unknown>;
   /** Read this project's raw panel values at call time without subscribing, for writes that complete asynchronously. */
   readValues(): Record<string, unknown>;
+  /** A board refused an upload or is gone: read the listing uploads are routed by again, at once. */
+  refreshBoardDestinations(): void;
   reportError(message: string): void;
   showPromptSyntaxHighlighting: boolean;
   touchGalleryImages(): void;
@@ -51,9 +62,11 @@ export type VideoUiActions = Pick<
   VideoUiAdapter,
   | 'findInGallery'
   | 'getUploadBoardId'
+  | 'notifications'
   | 'patchValues'
   | 'playVideoSpanInPreview'
   | 'readValues'
+  | 'refreshBoardDestinations'
   | 'reportError'
   | 'touchGalleryImages'
   | 'videoSpanPlayback'
@@ -67,9 +80,11 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
   const {
     findInGallery,
     getUploadBoardId,
+    notifications,
     patchValues,
     playVideoSpanInPreview,
     readValues,
+    refreshBoardDestinations,
     reportError,
     touchGalleryImages,
     videoSpanPlayback,
@@ -78,9 +93,11 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     () => ({
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
+      refreshBoardDestinations,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,
@@ -88,9 +105,11 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     [
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
+      refreshBoardDestinations,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,

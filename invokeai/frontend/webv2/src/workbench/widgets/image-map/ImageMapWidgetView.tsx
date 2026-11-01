@@ -3,6 +3,8 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import type { ReactNode } from 'react';
 
 import { Box, Button, Center, Link, Spinner, Stack, Text } from '@chakra-ui/react';
+import { getGalleryMediaFilter, toGalleryMediaKind } from '@features/gallery/contracts';
+import { useCapabilities } from '@features/identity';
 import {
   ensureStartersLoaded,
   getStarterModelInstallSources,
@@ -15,21 +17,25 @@ import {
   getImageMapClickSelectsCluster,
   getImageMapClusterEps,
   getImageMapShowClusterLabels,
+  IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID,
 } from '@workbench/image-map/imageMapSettings';
 import {
   attachImageMapStatusPolling,
+  attachImageMapViewer,
   ensureImageMapLoaded,
   imageMapStore,
   refreshImageIndexStatus,
   refreshImageMapPoints,
   setClusterEps,
   setClusterLabelsEnabled,
+  setImageMapMediaKind,
 } from '@workbench/image-map/imageMapStore';
 import { isIndexing } from '@workbench/image-map/indexProgress';
-import { useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import { useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
+import { Trans, useTranslation } from 'react-i18next';
 
-import { CLEAR_CLUSTER_SELECTION_LABEL, ClusterSelectionChip } from './ClusterSelectionChip';
+import { ClusterSelectionChip } from './ClusterSelectionChip';
 import { ImageIndexActivityBadge, ImageIndexProgressPanel } from './ImageIndexProgress';
 import { useClearClusterSelection } from './useSelectMapImage';
 
@@ -65,10 +71,20 @@ const plotLoadingFallback = (
 
 /** Show backend embeddings projected by UMAP and colored by cluster; point selection drives Gallery and Preview. */
 export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
+  const { t } = useTranslation();
+  // Server configuration and installed models are the administrator's; others are told whom to ask.
+  const { canManageAppConfig, canManageModels } = useCapabilities();
   const { data, error, indexCounts, indexUpdatedAt, loadState, renderError } = imageMapStore.useSnapshot();
   const clickSelectsCluster = useWidgetValuesSelector('image-map', getImageMapClickSelectsCluster);
   const clusterEps = useWidgetValuesSelector('image-map', getImageMapClusterEps);
   const showClusterLabels = useWidgetValuesSelector('image-map', getImageMapShowClusterLabels);
+  const mediaFilter = useWidgetValuesSelector('gallery', getGalleryMediaFilter);
+  const { gallery: galleryCommands } = useWorkbenchCommands();
+  // The button leaves with the empty state; focus moves to the header control that owns the filter.
+  const handleShowAllMedia = useCallback(() => {
+    document.getElementById(IMAGE_MAP_MEDIA_FILTER_TRIGGER_ID)?.focus();
+    galleryCommands.updateSettings({ mediaFilter: 'all' });
+  }, [galleryCommands]);
   const clearClusterSelection = useClearClusterSelection();
 
   // Esc while the map owns focus, the keyboard path to the chip's clear. Also
@@ -78,25 +94,26 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   const { commands: runtimeCommands, hotkeys: runtimeHotkeys } = runtime;
 
   useEffect(() => {
+    const clearClusterSelectionLabel = t('widgets.imageMap.clearClusterSelection');
     const disposers = [
       runtimeCommands.register({
         handler: clearClusterSelection,
         id: CLEAR_CLUSTER_SELECTION_COMMAND,
-        title: CLEAR_CLUSTER_SELECTION_LABEL,
+        title: clearClusterSelectionLabel,
       }),
       runtimeHotkeys.register({
         allowInEditable: false,
         commandId: CLEAR_CLUSTER_SELECTION_COMMAND,
         defaultKeys: ['esc'],
         id: CLEAR_CLUSTER_SELECTION_COMMAND,
-        title: CLEAR_CLUSTER_SELECTION_LABEL,
+        title: clearClusterSelectionLabel,
       }),
     ];
 
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [clearClusterSelection, runtimeCommands, runtimeHotkeys]);
+  }, [clearClusterSelection, runtimeCommands, runtimeHotkeys, t]);
 
   // Before the first load, so it carries the chosen strength rather than
   // fetching at the default and immediately refetching.
@@ -105,9 +122,18 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   }, [clusterEps]);
 
   useMountEffect(() => {
-    ensureImageMapLoaded();
+    const detachViewer = attachImageMapViewer();
 
-    return attachImageMapStatusPolling();
+    // Before the first load, like the strength: a cold start under a media filter must not cluster both kinds first.
+    // Later changes reach the store through the data runtime.
+    setImageMapMediaKind(toGalleryMediaKind(mediaFilter));
+    ensureImageMapLoaded();
+    const detachPolling = attachImageMapStatusPolling();
+
+    return () => {
+      detachPolling();
+      detachViewer();
+    };
   });
 
   // Pushed into the store so turning labels off stops the request, not just the
@@ -120,10 +146,10 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   if (renderError) {
     return (
       <CenteredMessage
-        actionLabel="Retry"
+        actionLabel={t('common.retry')}
         detail={renderError}
         onAction={handleRefresh}
-        title="Image map unavailable"
+        title={t('widgets.imageMap.unavailableTitle')}
       />
     );
   }
@@ -170,7 +196,8 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     );
   }
 
-  const retainedDataError = loadState === 'error' ? (error ?? 'Failed to load the image map.') : null;
+  const loadFailed = error ?? t('widgets.imageMap.loadFailed');
+  const retainedDataError = loadState === 'error' ? loadFailed : null;
 
   // Ahead of the loading spinner, unlike every other message: a refresh from
   // this state flips `loadState` to `loading`, and flashing a spinner over the
@@ -178,21 +205,29 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   // download lands" watcher with it. The diagnosis is also what a refresh is
   // least likely to change.
   if (data?.state === 'model_missing') {
+    const modelName = data.modelName?.trim() || DEFAULT_IMAGE_INDEX_MODEL;
+
     return (
       <CenteredMessage
         // Keep a standing refresh action to discover newly installed encoders while the indexer is otherwise
         // inert.
-        actionLabel={retainedDataError ? 'Retry' : 'Check again'}
+        actionLabel={retainedDataError ? t('common.retry') : t('widgets.imageMap.checkAgain')}
         detail={
-          <>
-            To enable image indexing, install the image encoder model{' '}
-            <ImageIndexModelInstallLink modelName={data.modelName?.trim() || DEFAULT_IMAGE_INDEX_MODEL} /> from the
-            Model Manager to build a semantic index of your gallery.
-          </>
+          canManageModels ? (
+            // oxlint-disable-next-line react-perf/jsx-no-jsx-as-prop -- one message on a cold state.
+            <Trans
+              // oxlint-disable-next-line react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-object-as-prop -- the link sits inside the sentence.
+              components={{ model: <ImageIndexModelInstallLink modelName={modelName} /> }}
+              i18nKey="widgets.imageMap.modelMissingAdmin"
+              t={t}
+            />
+          ) : (
+            t('widgets.imageMap.modelMissingMember', { name: modelName })
+          )
         }
         errorDetail={retainedDataError}
         onAction={handleRefresh}
-        title="Embedding model not installed"
+        title={t('widgets.imageMap.modelMissingTitle')}
       />
     );
   }
@@ -208,10 +243,10 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   if (loadState === 'error' && !data) {
     return (
       <CenteredMessage
-        actionLabel="Retry"
-        detail={error ?? 'Failed to load the image map.'}
+        actionLabel={t('common.retry')}
+        detail={loadFailed}
         onAction={handleRefresh}
-        title="Image map unavailable"
+        title={t('widgets.imageMap.unavailableTitle')}
       />
     );
   }
@@ -219,11 +254,11 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   if (!data || data.state === 'disabled') {
     return (
       <CenteredMessage
-        actionLabel={retainedDataError ? 'Retry' : undefined}
-        detail="To enable image indexing, set `image_index_enabled: true` in the server configuration file and restart the server to build a semantic index of your gallery."
+        actionLabel={retainedDataError ? t('common.retry') : undefined}
+        detail={canManageAppConfig ? t('widgets.imageMap.indexingOffAdmin') : t('widgets.imageMap.indexingOffMember')}
         errorDetail={retainedDataError}
         onAction={retainedDataError ? handleRefresh : undefined}
-        title="Image indexing is off"
+        title={t('widgets.imageMap.indexingOffTitle')}
       />
     );
   }
@@ -235,7 +270,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
       <Center h="full" p="6">
         <ImageIndexProgressPanel
           counts={indexCounts}
-          error={loadState === 'error' ? (error ?? 'Failed to load the image map.') : null}
+          error={retainedDataError}
           updatedAt={indexUpdatedAt}
           onRetry={handleRefresh}
         />
@@ -249,10 +284,10 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
         <Stack align="center" gap="3">
           <Spinner size="2xl" />
           <Text color="fg.muted" fontSize="lg">
-            Computing your image map…
+            {t('widgets.imageMap.computing')}
           </Text>
           <Button onClick={handleRefresh} variant="outline">
-            Check again
+            {t('widgets.imageMap.checkAgain')}
           </Button>
         </Stack>
       </Center>
@@ -262,20 +297,35 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   if (loadState === 'error') {
     return (
       <CenteredMessage
-        actionLabel="Retry"
-        detail={error ?? 'Failed to load the image map.'}
+        actionLabel={t('common.retry')}
+        detail={loadFailed}
         onAction={handleRefresh}
-        title="Image map unavailable"
+        title={t('widgets.imageMap.unavailableTitle')}
       />
     );
   }
 
-  return (
-    <CenteredMessage
-      detail="Generate or import images and videos and they will appear here, clustered by visual similarity."
-      title="Nothing to map yet"
-    />
-  );
+  // The shared media filter can empty a map that has points of the other kind.
+  if (mediaFilter !== 'all') {
+    return (
+      <CenteredMessage
+        actionLabel={t('widgets.imageMap.showAllMedia')}
+        detail={
+          mediaFilter === 'video'
+            ? t('widgets.imageMap.filteredVideosDetail')
+            : t('widgets.imageMap.filteredImagesDetail')
+        }
+        onAction={handleShowAllMedia}
+        title={
+          mediaFilter === 'video'
+            ? t('widgets.imageMap.filteredVideosTitle')
+            : t('widgets.imageMap.filteredImagesTitle')
+        }
+      />
+    );
+  }
+
+  return <CenteredMessage detail={t('widgets.imageMap.emptyDetail')} title={t('widgets.imageMap.emptyTitle')} />;
 };
 
 const CenteredMessage = ({
@@ -318,6 +368,7 @@ const CenteredMessage = ({
  * does not carry it, while it downloads, or for sessions that cannot manage models.
  */
 const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
+  const { t } = useTranslation();
   const starterModels = useStartersSelector(selectStarterModels);
   const activeInstallSources = useActiveInstallSources();
   const openAddModelsSearch = useOpenAddModelsSearch();
@@ -351,8 +402,7 @@ const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
   if (sources.length === 0 || installing || !openAddModelsSearch) {
     return (
       <Text as="span" fontWeight="medium">
-        {modelName}
-        {installing ? ' (installing…)' : ''}
+        {installing ? t('widgets.imageMap.modelInstalling', { name: modelName }) : modelName}
       </Text>
     );
   }

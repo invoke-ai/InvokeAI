@@ -11,7 +11,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
@@ -30,8 +30,17 @@ vi.mock('@features/queue/react', () => ({
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { language: 'en' },
-    t: (key: string, values?: Record<string, unknown>) =>
-      key === 'widgets.gallery.selectionCount' ? `${String(values?.count)} selected` : key,
+    t: (key: string, values?: Record<string, unknown>) => {
+      if (key === 'widgets.gallery.selectionCount') {
+        return `${String(values?.count)} selected`;
+      }
+
+      if (key === 'widgets.gallery.filterAndSortMediaValue') {
+        return `${key}: ${String(values?.media)}, ${String(values?.order)}`;
+      }
+
+      return key;
+    },
   }),
 }));
 
@@ -70,8 +79,10 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     compareImageKey: null,
     galleryView: 'images',
     items: [createItem('a.png'), createItem('b.png')],
+    listingBoardId: overrides.selectedBoardId ?? 'dogs',
     pendingPlaceholders: [],
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     selectedItemKey: 'image:a.png',
@@ -121,7 +132,6 @@ const contextBase = {
   boardsState: READY,
   filter: { boardId: 'dogs', galleryView: 'images', searchTerm: '' },
   gallery,
-  isWindowTruncated: false,
   listing: READY,
   starredStrip: EMPTY_GALLERY_STARRED_STRIP,
   itemActions: {
@@ -418,6 +428,111 @@ describe('gallery layout shells', () => {
         ranked?.click();
       });
       expect(contextBase.actions.setStarredOnly).not.toHaveBeenCalled();
+    }
+  });
+
+  it('offers one media filter and sort menu beside the separate starred toggle in both shells', async () => {
+    const updateSettings = contextBase.actions.updateSettings as ReturnType<typeof vi.fn>;
+
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      updateSettings.mockClear();
+      setGallery(createGallery());
+      await renderLayout(Layout);
+
+      const toolbarButtons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+      const starIndex = toolbarButtons.findIndex(
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
+      );
+      const trigger = toolbarButtons[starIndex + 1];
+
+      // The starred filter stays a toggle of its own; one menu trigger follows it, then upload.
+      expect(toolbarButtons[starIndex]?.getAttribute('aria-pressed')).toBe('false');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterAll, widgets.gallery.newest'
+      );
+      expect(toolbarButtons[starIndex + 2]?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.upload/);
+
+      trigger?.focus();
+      await userEvent.keyboard('{Enter}');
+
+      const show = page.getByRole('group', { name: 'widgets.gallery.showMedia' });
+      const sort = page.getByRole('group', { name: 'widgets.gallery.sortBy' });
+      const videos = show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
+      const oldest = sort.getByRole('menuitemradio', { name: 'widgets.gallery.oldest' });
+
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
+        .toHaveAttribute('aria-checked', 'true');
+      await expect
+        .element(show.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterImages' }))
+        .toBeVisible();
+      await expect
+        .element(sort.getByRole('menuitemradio', { name: 'widgets.gallery.newest' }))
+        .toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(videos);
+      expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
+
+      // The menu stays open, so the sort can be set in the same visit.
+      setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+      await expect.element(videos).toHaveAttribute('aria-checked', 'true');
+
+      await userEvent.click(oldest);
+      expect(updateSettings).toHaveBeenCalledTimes(2);
+      expect(updateSettings).toHaveBeenLastCalledWith({ imageOrderDir: 'ASC' });
+
+      setGallery(
+        createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC', mediaFilter: 'video' } })
+      );
+      await renderLayout(Layout);
+      await expect.element(oldest).toHaveAttribute('aria-checked', 'true');
+      expect(trigger?.getAttribute('aria-label')).toBe(
+        'widgets.gallery.filterAndSortMediaValue: widgets.gallery.mediaFilterVideos, widgets.gallery.oldest'
+      );
+
+      await userEvent.keyboard('{Escape}');
+      await expect.element(videos).not.toBeInTheDocument();
+      expect(document.activeElement).toBe(trigger);
+    }
+  });
+
+  it('brightens the media menu trigger while a media kind is restricted, not for the sort order', async () => {
+    const triggerColor = () =>
+      getComputedStyle(
+        host!.querySelector<HTMLElement>('button[aria-label^="widgets.gallery.filterAndSortMediaValue"]')!
+      ).color;
+
+    await renderLayout(GalleryWideLayout);
+    const defaultColor = triggerColor();
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, imageOrderDir: 'ASC' } }));
+    await renderLayout(GalleryWideLayout);
+    expect(triggerColor()).toBe(defaultColor);
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'image' } }));
+    await renderLayout(GalleryWideLayout);
+    expect(triggerColor()).not.toBe(defaultColor);
+  });
+
+  it('moves focus to the media menu trigger when Show all media removes the empty state, in both shells', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      setGallery(createGallery({ items: [], settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+
+      const showAll = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+        (button) => button.textContent === 'widgets.gallery.showAllMedia'
+      );
+
+      expect(showAll, 'Show all media did not render').toBeDefined();
+      showAll?.focus();
+      await act(() => {
+        showAll?.click();
+      });
+
+      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+      expect(document.activeElement?.getAttribute('aria-label')).toMatch(/^widgets\.gallery\.filterAndSortMediaValue:/);
     }
   });
 

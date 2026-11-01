@@ -2,18 +2,42 @@ import type { CanvasStateContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { EngineDeps, EngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
+import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { system } from '@theme/system';
 import { createEngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
-import { act, StrictMode, useRef } from 'react';
+import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
+import { createWorkbenchStore } from '@workbench/workbenchStore';
+import { act, StrictMode, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
+/** The surface reads the workbench only for key ownership: the active project and its widget placement. */
+const workbench = vi.hoisted(() => ({ store: null as unknown as WorkbenchInternalStore }));
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchContextModule>()),
+  useWorkbenchInternalStore: () => workbench.store,
+  useWorkbenchQueries: () => workbench.store.queries,
+  useWorkbenchSubscription: () => workbench.store.subscribe,
+}));
+
 import { CanvasSurface } from './CanvasSurface';
+
+workbench.store = createWorkbenchStore();
+
+/** Focus for the surface outside the workbench shell; ownership itself is covered under a real provider below. */
+const TestFocus = ({ children }: { children: ReactNode }) => {
+  const [controller] = useState(() => createTestFocusController());
+  return <FocusRegionProvider controller={controller}>{children}</FocusRegionProvider>;
+};
 
 type Cleanup = () => void | Promise<void>;
 
@@ -103,9 +127,11 @@ const nextFrame = (): Promise<void> =>
 const StrictCanvasHarness = ({ engine }: { engine: CanvasEngine }) => (
   <StrictMode>
     <ChakraProvider value={system}>
-      <div data-testid="surface-bounds" style={{ height: 120, width: 160 }}>
-        <CanvasSurface engine={engine} />
-      </div>
+      <TestFocus>
+        <div data-testid="surface-bounds" style={{ height: 120, width: 160 }}>
+          <CanvasSurface engine={engine} instanceId="canvas" />
+        </div>
+      </TestFocus>
     </ChakraProvider>
   </StrictMode>
 );
@@ -220,22 +246,24 @@ const ResizeDragHarness = ({ engine, showCanvas = true }: { engine: CanvasEngine
 
   return (
     <ChakraProvider value={system}>
-      <div style={{ display: 'flex' }}>
-        <div ref={paneRef} style={{ width: 100 }} />
-        <ResizeHandle
-          label="Resize pane"
-          max={300}
-          min={50}
-          orientation="vertical"
-          pane="before"
-          paneRef={paneRef}
-          value={100}
-          onCommit={ignoreCommit}
-        />
-        <div data-testid="surface-bounds" style={{ height: 120, width: 160 }}>
-          {showCanvas ? <CanvasSurface engine={engine} /> : null}
+      <TestFocus>
+        <div style={{ display: 'flex' }}>
+          <div ref={paneRef} style={{ width: 100 }} />
+          <ResizeHandle
+            label="Resize pane"
+            max={300}
+            min={50}
+            orientation="vertical"
+            pane="before"
+            paneRef={paneRef}
+            value={100}
+            onCommit={ignoreCommit}
+          />
+          <div data-testid="surface-bounds" style={{ height: 120, width: 160 }}>
+            {showCanvas ? <CanvasSurface engine={engine} instanceId="canvas" /> : null}
+          </div>
         </div>
-      </div>
+      </TestFocus>
     </ChakraProvider>
   );
 };
@@ -342,5 +370,151 @@ describe('CanvasSurface keyboard ownership', () => {
     await userEvent.keyboard('{Space>}');
     expect(tool()).toBe('brush');
     await userEvent.keyboard('{/Space}');
+  });
+});
+
+/** The shell's layout in miniature: the canvas, the Generate panel and the Layers panel, each a focus region. */
+const WorkbenchHarness = ({ engine }: { engine: CanvasEngine }) => (
+  <ChakraProvider value={system}>
+    <WorkbenchFocusProvider>
+      <Region instanceId="canvas" region="center" typeId="canvas">
+        <div style={{ height: 120, width: 160 }}>
+          <CanvasSurface engine={engine} instanceId="canvas" />
+        </div>
+      </Region>
+      <Region instanceId="generate" region="left" typeId="generate">
+        <span>Model</span>
+        <input aria-label="Prompt" />
+      </Region>
+      <Region instanceId="layers" region="right" typeId="layers">
+        <div role="tree">
+          <div aria-selected="true" role="treeitem" tabIndex={0}>
+            Layer
+          </div>
+        </div>
+      </Region>
+    </WorkbenchFocusProvider>
+  </ChakraProvider>
+);
+
+const Region = ({
+  children,
+  instanceId,
+  region,
+  typeId,
+}: {
+  children: ReactNode;
+  instanceId: string;
+  region: 'center' | 'left' | 'right';
+  typeId: string;
+}) => (
+  <div
+    {...useFocusRegionProps(region)}
+    data-hotkey-widget-instance-id={instanceId}
+    data-hotkey-widget-region={region}
+    data-hotkey-widget-type-id={typeId}
+  >
+    {children}
+  </div>
+);
+
+describe('CanvasSurface key owner', () => {
+  const mount = async () => {
+    const registry = createTrackedRegistry(20);
+    const projectId = workbench.store.getSnapshot().activeProject.id;
+    const { engine } = acquireTrackedEngine(registry, projectId, createEngineDeps(createEmptyCanvasState(64, 64)));
+    const host = document.createElement('div');
+    document.body.append(host);
+    const { root } = createTrackedRoot(host);
+    await act(async () => {
+      root.render(<WorkbenchHarness engine={engine} />);
+      await nextFrame();
+    });
+    const overlay = host.querySelectorAll('canvas')[1]!;
+    return {
+      clickCanvas: () => userEvent.click(overlay, { position: { x: 4, y: 4 } }),
+      clickGenerate: () => userEvent.click(host.querySelector('span')!),
+      clickLayersRow: () => userEvent.click(host.querySelector('[role="treeitem"]')!),
+      engine,
+      hasSelection: () => engine.interaction.get('hasSelection'),
+      overlay,
+      prompt: host.querySelector('input')!,
+      tool: () => engine.interaction.get('activeTool'),
+    };
+  };
+
+  it('keeps Escape and C from the canvas after a click in another widget', async () => {
+    const view = await mount();
+    view.engine.tools.setTool('view');
+    view.engine.selection.selectAll();
+    await view.clickGenerate();
+
+    await userEvent.keyboard('{Escape}');
+    await userEvent.keyboard('c');
+    expect(view.hasSelection()).toBe(true);
+    expect(view.tool()).toBe('view');
+  });
+
+  it('lets Escape and C act from the canvas and from a Layers row', async () => {
+    const view = await mount();
+    view.engine.tools.setTool('view');
+    view.engine.selection.selectAll();
+    await view.clickLayersRow();
+
+    await userEvent.keyboard('{Escape}');
+    expect(view.hasSelection()).toBe(false);
+    // Away from the canvas, a C tap selects the frame tool.
+    await userEvent.keyboard('c');
+    expect(view.tool()).toBe('bbox');
+
+    view.engine.tools.setTool('view');
+    view.engine.selection.selectAll();
+    await view.clickCanvas();
+    await userEvent.keyboard('{Escape}');
+    expect(view.hasSelection()).toBe(false);
+    await userEvent.keyboard('{c>}');
+    expect(view.tool()).toBe('bbox');
+    await userEvent.keyboard('{/c}');
+  });
+
+  it('applies Enter only from the canvas itself', async () => {
+    const view = await mount();
+    view.engine.tools.setTool('lasso');
+    view.engine.interaction.set('lassoOptions', { ...view.engine.interaction.get('lassoOptions'), shape: 'polygon' });
+    for (const position of [
+      { x: 20, y: 20 },
+      { x: 120, y: 20 },
+      { x: 120, y: 100 },
+    ]) {
+      await userEvent.click(view.overlay, { position });
+    }
+
+    await view.clickLayersRow();
+    await userEvent.keyboard('{Enter}');
+    await view.clickGenerate();
+    await userEvent.keyboard('{Enter}');
+    expect(view.hasSelection()).toBe(false);
+
+    await userEvent.click(view.overlay, { position: { x: 20, y: 100 } });
+    await userEvent.keyboard('{Enter}');
+    expect(view.hasSelection()).toBe(true);
+  });
+
+  it('keeps the Space hold over the hovered canvas after a click elsewhere, and never takes typing', async () => {
+    const view = await mount();
+    view.engine.tools.setTool('brush');
+    await view.clickGenerate();
+
+    await userEvent.hover(view.overlay);
+    await userEvent.keyboard('{Space>}');
+    expect(view.tool()).toBe('view');
+    await userEvent.keyboard('{/Space}');
+    expect(view.tool()).toBe('brush');
+
+    await userEvent.click(view.prompt);
+    await userEvent.hover(view.overlay);
+    await userEvent.keyboard('c');
+    expect(view.prompt.value).toBe('c');
+    expect(view.tool()).toBe('brush');
   });
 });

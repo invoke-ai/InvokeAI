@@ -1,11 +1,9 @@
-import os
 import re
 import traceback
 from enum import Enum
 from pathlib import Path
-from typing import Literal, Optional, Set, Union
+from typing import TYPE_CHECKING, Literal, Optional, Set, Union
 
-import psutil
 from pydantic import BaseModel, Field, PrivateAttr, field_validator
 from pydantic.networks import AnyHttpUrl
 from typing_extensions import Annotated
@@ -16,15 +14,14 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.metadata import AnyModelRepoMetadata
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 
+if TYPE_CHECKING:
+    from invokeai.app.services.model_install.install_staging_ledger import InstallStaging
+
 
 class InvalidModelConfigException(Exception):
     """Raised when a model configuration is invalid."""
 
     pass
-
-
-INSTALL_RECOVERY_SENTINEL = ".invokeai_install_recovery_required"
-INSTALL_ACTIVE_SENTINEL = ".invokeai_install_active"
 
 
 class InstallCancellationConflictError(RuntimeError):
@@ -37,63 +34,6 @@ class InstallDownloadConflictError(RuntimeError):
 
 class InstallRecoveryRequiredError(InstallCancellationConflictError):
     """Install transfer could not be safely rolled back; preserve both recovery roots."""
-
-
-def recovery_sentinel_path(root: Path) -> Path:
-    """Return the sidecar marker path that protects an install recovery root."""
-    return root.parent / f".{root.name}{INSTALL_RECOVERY_SENTINEL}"
-
-
-def active_install_sentinel_path(root: Path) -> Path:
-    """Return the sidecar marker used to coordinate an active install with orphan cleanup."""
-    return root.parent / f".{root.name}{INSTALL_ACTIVE_SENTINEL}"
-
-
-def has_recovery_sentinel(root: Path) -> bool:
-    """Return whether an install recovery root has a durable preservation marker."""
-    return recovery_sentinel_path(root).exists()
-
-
-def has_active_install_sentinel(root: Path) -> bool:
-    """Return whether a live install or orphan deletion has claimed this path."""
-    return active_install_sentinel_path(root).exists()
-
-
-def create_active_install_sentinel(root: Path) -> None:
-    """Atomically claim a path against concurrent install or orphan-delete operations."""
-    path = active_install_sentinel_path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    created = False
-    try:
-        with open(path, "xb") as f:
-            created = True
-            process = psutil.Process()
-            f.write(f"{process.pid} {process.create_time()!r}\n".encode("ascii"))
-            f.flush()
-            os.fsync(f.fileno())
-    except Exception:
-        if created:
-            path.unlink(missing_ok=True)
-        raise
-
-
-def delete_active_install_sentinel(root: Path) -> None:
-    """Release an active install or orphan-delete claim."""
-    try:
-        active_install_sentinel_path(root).unlink()
-    except FileNotFoundError:
-        pass
-
-
-def is_recovery_protected_path(path: Path, boundary: Path) -> bool:
-    """Return whether a path is protected by an active install claim or recovery marker."""
-    boundary = boundary.resolve()
-    current = path.resolve()
-    while current != boundary and current.is_relative_to(boundary):
-        if has_recovery_sentinel(current) or has_active_install_sentinel(current):
-            return True
-        current = current.parent
-    return False
 
 
 class InstallStatus(str, Enum):
@@ -273,20 +213,20 @@ class ModelInstallJob(BaseModel):
         default=None, description="On an error condition, this field will contain the exception traceback"
     )
     # internal flags and transitory settings
-    _install_tmpdir: Optional[Path] = PrivateAttr(default=None)
-    _install_tmpdir_active_sentinel_created: bool = PrivateAttr(default=False)
-    _install_tmpdir_claim_conflict: bool = PrivateAttr(default=False)
-    _install_tmpdir_recovery_sentinel_created: bool = PrivateAttr(default=False)
+    # The install's staging directory, local source claim and recovery marks; the installer owns its lifecycle.
+    _staging: Optional["InstallStaging"] = PrivateAttr(default=None)
     _multifile_job: Optional[MultiFileDownloadJob] = PrivateAttr(default=None)
     _exception: Optional[Exception] = PrivateAttr(default=None)
     _resume_metadata: Optional[dict] = PrivateAttr(default=None)
+    # Repository revision the download is pinned to, so a resume or retry cannot mix files from a newer commit.
+    _source_revision: Optional[str] = PrivateAttr(default=None)
+    # Direct HF file URLs retain the mirror that was trusted when their marker was written.
+    _source_hf_endpoint: Optional[str] = PrivateAttr(default=None)
+    # The pinned revision vanished and the staged files were given up: nothing of this job can be restarted.
+    _pinned_revision_vanished: bool = PrivateAttr(default=False)
     _recovery_required: bool = PrivateAttr(default=False)
     _cancel_requested: bool = PrivateAttr(default=False)
     _install_phase: Optional[str] = PrivateAttr(default=None)
-    _source_protection_root: Optional[Path] = PrivateAttr(default=None)
-    _source_active_sentinel_created: bool = PrivateAttr(default=False)
-    _source_recovery_sentinel_created: bool = PrivateAttr(default=False)
-    _source_recovery_sentinel_preexisting: bool = PrivateAttr(default=False)
 
     def set_error(self, e: Exception) -> None:
         """Record the error and traceback from an exception."""

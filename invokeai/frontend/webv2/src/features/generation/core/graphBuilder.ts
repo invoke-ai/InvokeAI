@@ -41,6 +41,77 @@ export const addEdge = (
   return edge;
 };
 
+/** Rename every matching node ID and edge reference. */
+export const renameNode = (graph: BackendGraphContract, oldId: string, newId: string): BackendInvocationContract => {
+  const node = graph.nodes[oldId];
+  if (!node) {
+    throw new Error(`Could not find the "${oldId}" node to rename.`);
+  }
+  delete graph.nodes[oldId];
+  node.id = newId;
+  graph.nodes[newId] = node;
+  for (const edge of graph.edges) {
+    if (edge.source.node_id === oldId) {
+      edge.source.node_id = newId;
+    }
+    if (edge.destination.node_id === oldId) {
+      edge.destination.node_id = newId;
+    }
+  }
+  return node;
+};
+
+/**
+ * Makes `output` the graph's `canvas_output`, the node result hydration follows. The node that held the id is renamed
+ * to `retiredId` and made intermediate, and its metadata edge moves to `output` so the saved record stays on the node
+ * that emits the final image. Edges into `output` are the caller's; the retired node keeps its edges under its new id.
+ */
+export const replaceCanvasOutput = (
+  graph: BackendGraphContract,
+  retiredId: string,
+  output: { type: string; [key: string]: unknown }
+): { output: BackendInvocationContract; retired: BackendInvocationContract } => {
+  const retired = renameNode(graph, 'canvas_output', retiredId);
+  retired.is_intermediate = true;
+
+  const next = addNode(graph, { ...output, id: 'canvas_output' });
+  const metadataEdge = graph.edges.find(
+    (edge) => edge.destination.node_id === retiredId && edge.destination.field === 'metadata'
+  );
+  if (metadataEdge) {
+    metadataEdge.destination.node_id = next.id;
+  }
+
+  return { output: next, retired };
+};
+
+/**
+ * Chains the project's optional output filters after the image the graph ends on. Each filter in turn takes over
+ * `canvas_output`, so the last one is the durable result and the unfiltered image becomes intermediate.
+ */
+export const addOutputPostprocessors = (
+  graph: BackendGraphContract,
+  projectSettings: Pick<GenerationProjectSettings, 'useNsfwChecker' | 'useWatermark'>,
+  outputIsIntermediate: boolean
+): void => {
+  const filters = [
+    ...(projectSettings.useNsfwChecker ? ['img_nsfw'] : []),
+    ...(projectSettings.useWatermark ? ['img_watermark'] : []),
+  ];
+  let retiredId = 'canvas_unfiltered_output';
+
+  for (const type of filters) {
+    const { output, retired } = replaceCanvasOutput(graph, retiredId, {
+      is_intermediate: outputIsIntermediate,
+      type,
+      use_cache: false,
+    });
+
+    addEdge(graph, retired, 'image', output, 'image');
+    retiredId = `canvas_${type}`;
+  }
+};
+
 export const getActiveCompatibleLoras = (
   settings: Pick<GenerateSettings, 'loras'>,
   model: GenerateModelConfig
@@ -74,7 +145,7 @@ export const addMetadata = (
   generationMode: string | null,
   projectSettings: GenerationProjectSettings & { randDevice?: string },
   extras: Record<string, unknown> = {}
-) => {
+): BackendInvocationContract => {
   const loadedLoras = getLoadedLoras(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const metadata = addNode(graph, {
@@ -103,6 +174,7 @@ export const addMetadata = (
     addEdge(graph, graph.nodes.negative_prompt, 'value', metadata, 'negative_prompt');
   }
   addEdge(graph, metadata, 'metadata', outputNode, 'metadata');
+  return metadata;
 };
 
 export const toGraphContract = (backendGraph: BackendGraphContract, label: string) => ({

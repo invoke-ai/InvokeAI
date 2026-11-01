@@ -49,7 +49,6 @@ export interface FilterOperationSessionDeps {
   isGuardCurrent(guard: LayerExportGuard): boolean;
   isDraftValid(draft: LayerFilterSettings): boolean;
   makeDurable(imageName: string): Promise<void>;
-  canCommit(): boolean;
   commit(options: {
     draft: LayerFilterSettings;
     guard: LayerExportGuard;
@@ -67,11 +66,9 @@ export interface FilterOperationSession {
   updateDraft(draft: LayerFilterSettings): void;
   setAutoProcess(value: boolean): void;
   process(): Promise<CanvasOperationRunResult>;
-  interruptProcessing(): void;
   reset(settings: Record<string, unknown>): void;
   /** On 'committed' the canvas operation stays active; the owner must dispose the session to end it. */
   commit(target: FilterCommitTarget): Promise<'committed' | 'blocked' | 'stale'>;
-  blockCommit(): void;
   cancel(): void;
   dispose(): void;
 }
@@ -180,11 +177,15 @@ export const createFilterOperationSession = (
         const exported = await deps.exportPixels();
         if (exported.status !== 'ok') {
           refusal =
-            exported.status === 'over-budget'
-              ? 'source-over-budget'
-              : exported.status === 'aborted'
-                ? 'not-ready'
-                : exported.status;
+            exported.status === 'adjustment-refused'
+              ? `source-adjustment-${exported.reason}`
+              : exported.status === 'over-budget'
+                ? 'source-over-budget'
+                : exported.status === 'unreadable'
+                  ? 'source-unreadable'
+                  : exported.status === 'aborted'
+                    ? 'not-ready'
+                    : exported.status;
           throw new Error(`The filter source is ${exported.status}.`);
         }
         try {
@@ -255,9 +256,6 @@ export const createFilterOperationSession = (
     if (disposed || !preview || state.status === 'processing' || state.status === 'committing') {
       return 'stale';
     }
-    if (!deps.canCommit()) {
-      return 'blocked';
-    }
     clearAutoProcess();
     cancelCommit();
     const token = commitToken;
@@ -265,17 +263,7 @@ export const createFilterOperationSession = (
     commitController = controller;
     publish({ ...state, error: null, status: 'committing' });
     try {
-      if (!deps.canCommit()) {
-        publish({ ...state, error: null, status: 'ready' });
-        return 'blocked';
-      }
       await deps.makeDurable(preview.imageName);
-      if (!deps.canCommit()) {
-        if (!disposed && token === commitToken) {
-          publish({ ...state, error: null, status: 'ready' });
-        }
-        return 'blocked';
-      }
       if (disposed || token !== commitToken || controller.signal.aborted || !deps.isGuardCurrent(guard)) {
         return 'stale';
       }
@@ -325,13 +313,11 @@ export const createFilterOperationSession = (
     publish({ ...state, error: null, preview: null, status: 'ready' });
   };
 
+  // Auto-process covers the starting draft, not only later edits: the footer hides Process while it is on, so without
+  // this run Apply waits on a preview that never comes and only Reset and Cancel stay enabled.
+  scheduleAutoProcess();
+
   return {
-    blockCommit: () => {
-      if (commitController) {
-        cancelCommit();
-        publish({ ...state, error: null, status: 'ready' });
-      }
-    },
     cancel,
     commit,
     dispose: () => {
@@ -345,17 +331,6 @@ export const createFilterOperationSession = (
       listeners.clear();
     },
     getSnapshot: () => state,
-    interruptProcessing: () => {
-      if (disposed) {
-        return;
-      }
-      clearAutoProcess();
-      if (state.status !== 'processing') {
-        return;
-      }
-      operation.interruptProcessing();
-      publish({ ...state, error: null, preview: null, status: 'ready' });
-    },
     process,
     reset: (settings) => {
       if (disposed) {

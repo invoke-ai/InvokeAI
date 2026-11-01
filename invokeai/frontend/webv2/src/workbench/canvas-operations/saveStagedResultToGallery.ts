@@ -1,5 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
+import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { galleryDurability, galleryOrganization } from '@features/gallery';
 import {
@@ -8,7 +9,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-import { getCanvasSaveBoardId } from './saveCanvasToGallery';
+import { resolveCanvasSaveBoardId } from './saveCanvasToGallery';
 
 /** `boardId` is where the image is meant to be; `'none'` is Uncategorized. */
 export type SaveStagedResultOutcome =
@@ -50,19 +51,21 @@ const assignBoard = async (
 /**
  * Promote a staged canvas result into the gallery with the same destination as a canvas save: a board the image is
  * already on stays; otherwise the project's auto-add board, else Uncategorized. The destination is read from the
- * project before anything is awaited, so switching projects mid-save cannot redirect it. A failed promotion throws;
+ * `project` snapshot handed in, so switching projects mid-save cannot redirect it. A failed promotion throws;
  * a failed board assignment is reported as such, since the image is in the gallery either way.
  */
 export const saveStagedResultToGallery = async (
-  { imageName, project }: { imageName: string; project: Project },
+  { imageName, project, scopedDefaults }: { imageName: string; project: Project; scopedDefaults: ScopedDefaults },
   transports: StagedResultTransports = {}
 ): Promise<SaveStagedResultOutcome> => {
   const owner = captureAccountScope();
-  const canvasBoardId = getCanvasSaveBoardId(project) ?? 'none';
   const { promote = galleryDurability.save } = transports;
+  let canvasBoardId: string;
   let record: GalleryImage;
 
   try {
+    canvasBoardId = (await resolveCanvasSaveBoardId(project, scopedDefaults)) ?? 'none';
+    assertAccountScopeCurrent(owner);
     record = await promote(imageName);
     assertAccountScopeCurrent(owner);
   } catch (error) {

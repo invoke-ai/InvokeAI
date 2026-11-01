@@ -8,7 +8,7 @@ import {
 } from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
-import { classifyStoredCredential, readTokenUserId } from './core/storedCredential';
+import { classifyStoredCredential, readTokenExpiry, readTokenUserId } from './core/storedCredential';
 import { browserIdentityTokenAdapter, type CredentialRotationMarker } from './core/tokenStorage';
 import {
   getAuthStatus,
@@ -40,14 +40,23 @@ export interface AuthSession {
   user: UserDTO | null;
   /** Set when a stored token is rejected mid-session; shown on the login screen. */
   sessionExpired: boolean;
+  /**
+   * The account whose session expired, until the next sign-in or deliberate sign-out: a sign-in by that same account may
+   * return where it was; any other account starts at Home. Null when unknown or not expired.
+   */
+  expiredUserId: string | null;
+  /** While this tab follows another tab's sign-in to a different account (the old lifetime already ended). */
+  switchingAccount: boolean;
 }
 
 const store = createExternalStore<AuthSession>({
   accountEpoch: 0,
   multiuserEnabled: false,
+  expiredUserId: null,
   phase: 'unknown',
   sessionExpired: false,
   setupRequired: false,
+  switchingAccount: false,
   strictPasswordChecking: false,
   user: null,
 });
@@ -79,6 +88,15 @@ export const useAuthSession = (): AuthSession => store.useSnapshot();
 
 /** Workbench imperative reads follow route-guard resolution; changing users remounts the route. */
 export const getAuthSession = (): AuthSession => store.getSnapshot();
+
+/**
+ * The user id that owns this session's socket events. Single-user servers tag events with a system user id, so
+ * only multi-user sessions can be fenced.
+ */
+export const getSessionUserId = (): string | null => {
+  const session = getAuthSession();
+  return session.multiuserEnabled ? (session.user?.user_id ?? null) : null;
+};
 
 /** Stable subscription for App-composed capability read ports. */
 export const subscribeAuthSession = (listener: () => void): (() => void) => store.subscribe(listener);
@@ -419,6 +437,77 @@ const subscribeCredential = (listener: () => void): (() => void) => {
   };
 };
 
+/** How long before a known expiry the session warns. Sliding renewal means only an idle session gets that close. */
+export const SESSION_EXPIRY_WARNING_LEAD_MS = 5 * 60_000;
+const MAX_TIMER_DELAY_MS = 2 ** 31 - 1;
+
+export interface SessionExpiryWarning {
+  expiresAt: number;
+  /** Aborts once the warning is moot: the token was renewed or replaced, or its lifetime ended. */
+  signal: AbortSignal;
+}
+
+/**
+ * Calls `onWarning` once per held token when it comes within `leadMs` of the expiry its claim names. A token without
+ * one never warns; renewal or a new lifetime re-arms for the new token and aborts the old warning. Returns the stop.
+ */
+export const watchSessionExpiry = (
+  onWarning: (warning: SessionExpiryWarning) => void,
+  { leadMs = SESSION_EXPIRY_WARNING_LEAD_MS, now = Date.now }: { leadMs?: number; now?: () => number } = {}
+): (() => void) => {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let watched: { controller: AbortController; credential: HttpCredential } | null = null;
+
+  const disarm = (): void => {
+    clearTimeout(timer);
+    watched?.controller.abort();
+    watched = null;
+  };
+  const reconcile = (): void => {
+    const credential = captureCredential();
+
+    if (
+      watched &&
+      watched.credential.token === credential.token &&
+      watched.credential.identity === credential.identity
+    ) {
+      return;
+    }
+
+    disarm();
+    const expiresAt = credential.token === null ? null : readTokenExpiry(credential.token);
+
+    if (expiresAt === null) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const arm = (): void => {
+      const remaining = expiresAt - leadMs - now();
+
+      if (remaining > 0) {
+        // Timers cap near 25 days; a longer wait re-arms when it fires.
+        timer = setTimeout(arm, Math.min(remaining, MAX_TIMER_DELAY_MS));
+      } else if (expiresAt > now() && !controller.signal.aborted) {
+        onWarning({ expiresAt, signal: controller.signal });
+      }
+    };
+
+    watched = { controller, credential };
+    arm();
+  };
+  const unsubscribeCredential = subscribeCredential(reconcile);
+  const unsubscribeSession = store.subscribe(reconcile);
+
+  reconcile();
+
+  return () => {
+    unsubscribeCredential();
+    unsubscribeSession();
+    disarm();
+  };
+};
+
 /** Selected by the App composition root as the HTTP transport's only source of credentials. */
 export const identityTransportAuthAdapter: HttpAuthAdapter = {
   capture: captureCredential,
@@ -575,15 +664,19 @@ const endLifetime = (): number => {
   return epoch;
 };
 
-/** End the authenticated lifetime locally; `forget` decides what happens to the stored token. */
+/**
+ * End the authenticated lifetime locally; `forget` decides what happens to the stored token. An expiry remembers the
+ * account that was signed in here, so its own sign-in can return where it was; never another tab's account.
+ */
 const signOut = (sessionExpired: boolean, forget: (token: string | null) => void): void => {
   const token = getHeldToken();
+  const expiredUserId = sessionExpired ? (store.getSnapshot().user?.user_id ?? null) : null;
   const accountEpoch = endLifetime();
 
   heldCredential = null;
   forget(token);
   setActiveUserScope(null);
-  store.patchSnapshot({ accountEpoch, sessionExpired, user: null });
+  store.patchSnapshot({ accountEpoch, expiredUserId, sessionExpired, switchingAccount: false, user: null });
 };
 
 const publishUnavailableSession = (): AuthSession => {
@@ -596,6 +689,7 @@ const publishUnavailableSession = (): AuthSession => {
     phase: 'unavailable',
     setupRequired: false,
     strictPasswordChecking: false,
+    switchingAccount: false,
     user: null,
   });
 
@@ -671,6 +765,7 @@ const resolveSession = async (): Promise<AuthSession> => {
   let user: UserDTO | null = null;
   let token: string | null = null;
   let sessionExpired = false;
+  let expiredUserId: string | null = null;
 
   if (status.multiuser_enabled) {
     observedStoredToken = tokenStore.read();
@@ -693,11 +788,12 @@ const resolveSession = async (): Promise<AuthSession> => {
       heldCredential = null;
       forgetStoredToken(token);
       sessionExpired = true;
+      expiredUserId = token === null ? null : readTokenUserId(token);
     }
   } else if (authenticates) {
     // Preserve an expiry raised while auth status was unavailable so recovery
     // can explain why the remembered session returned to the login screen.
-    sessionExpired = store.getSnapshot().sessionExpired;
+    ({ expiredUserId, sessionExpired } = store.getSnapshot());
   }
 
   let accountEpoch: number;
@@ -715,6 +811,7 @@ const resolveSession = async (): Promise<AuthSession> => {
   store.patchSnapshot({
     accountEpoch,
     multiuserEnabled: status.multiuser_enabled,
+    expiredUserId: user === null ? expiredUserId : null,
     phase: 'ready',
     sessionExpired,
     setupRequired: status.setup_required,
@@ -754,7 +851,13 @@ const followStoredPrincipal = async (token: string): Promise<void> => {
 
   setActiveUserScope(null);
   bindHeldToken(token);
-  store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
+  store.patchSnapshot({
+    accountEpoch: invalidatedEpoch,
+    expiredUserId: null,
+    sessionExpired: false,
+    switchingAccount: true,
+    user: null,
+  });
 
   const principal = await resolvePrincipal(transition.controller.signal);
 
@@ -778,7 +881,13 @@ const followStoredPrincipal = async (token: string): Promise<void> => {
 
   if (principal.kind === 'user') {
     const accountEpoch = activateAccount(principal.user, token);
-    store.patchSnapshot({ accountEpoch, sessionExpired: false, setupRequired: false, user: principal.user });
+    store.patchSnapshot({
+      accountEpoch,
+      sessionExpired: false,
+      setupRequired: false,
+      switchingAccount: false,
+      user: principal.user,
+    });
   } else if (principal.kind === 'rejected') {
     signOut(true, forgetStoredToken);
   } else {
@@ -944,7 +1053,7 @@ export const loginWithCredentials = async (email: string, password: string, reme
   const invalidatedEpoch = endLifetime();
   heldCredential = null;
   setActiveUserScope(null);
-  store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
+  store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, switchingAccount: false, user: null });
 
   try {
     const result = await login({ email, password, remember_me: rememberMe }, attempt.controller.signal);
@@ -955,7 +1064,7 @@ export const loginWithCredentials = async (email: string, password: string, reme
 
     persistToken(result.token);
     const accountEpoch = activateAccount(result.user, result.token);
-    store.patchSnapshot({ accountEpoch, sessionExpired: false, user: result.user });
+    store.patchSnapshot({ accountEpoch, expiredUserId: null, sessionExpired: false, user: result.user });
   } catch (error) {
     if (!isCurrentTransition(attempt)) {
       throw new LoginAttemptSupersededError();

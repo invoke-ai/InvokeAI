@@ -10,15 +10,18 @@ import type {
 
 import { Box, chakra, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { FeatureHint } from '@platform/ui/hints';
+import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe, scrubberInteraction } from '@theme/recipes';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Track inset from the frame edge; the text padding clears it so the thumb never crosses a glyph. */
 const TRACK_INSET_PX = 10;
-/** At the track's start the fill runs this far past the thumb so its rounded end frames it. */
-const FILL_OVERHANG_PX = 6;
+/**
+ * At the track's start the fill ends this far past the thumb's centre, just enough for its rounded end to frame the
+ * 2px thumb without drifting away from it.
+ */
+const FILL_OVERHANG_PX = 4;
 /** Clearance between the fill and the frame's border. */
 const FILL_INSET_PX = 1.5;
 /** Shift-drag moves the value this fraction of the pointer's track distance. */
@@ -687,7 +690,7 @@ export const ScrubberField = ({
   );
 
   return (
-    <Stack gap="1.5" minW="0" w="full" {...stackProps}>
+    <Stack gap="1.5" minW="0" w="full" {...(hint ? FEATURE_HINT_FIELD_PROPS : undefined)} {...stackProps}>
       <Box
         ref={observeText}
         css={ROOT_CSS}
@@ -746,7 +749,7 @@ export const ScrubberField = ({
         ) : (
           <button
             ref={observeText}
-            aria-label={t('common.scrubber.editValue', { label })}
+            aria-label={t('common.scrubber.editValue', { label, value: formatted })}
             data-part="value"
             disabled={disabled}
             // One tab stop per field: the slider opens the editor with Enter or a digit.

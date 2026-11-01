@@ -82,19 +82,6 @@ describe('getFilterActionEligibility', () => {
     });
   });
 
-  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
-    const eligibility = getFilterActionEligibility(state(), true);
-    expect(eligibility).toEqual({
-      canApply: false,
-      canCancel: true,
-      canEdit: false,
-      canProcess: false,
-      canReset: false,
-      canSave: false,
-    });
-    expect(getFilterSaveTargetEligibility(eligibility)).toEqual({ control: false, raster: false });
-  });
-
   it('disables Process for Spandrel until a compatible model is selected', () => {
     expect(
       getFilterActionEligibility(state({ draft: { settings: { model: null }, type: 'spandrel_filter' } }))
@@ -156,7 +143,11 @@ describe('getFilterErrorTranslationKey', () => {
     'not-ready': true,
     'over-budget': true,
     'process-failed': true,
+    'source-adjustment-error': true,
+    'source-adjustment-over-budget': true,
+    'source-adjustment-too-large': true,
     'source-over-budget': true,
+    'source-unreadable': true,
     stale: true,
     unsupported: true,
   };
@@ -198,12 +189,10 @@ const renderRegions = (session: FilterOperationSessionState) => {
     );
   const [choose, params] = filterOperationForm.groups;
   return {
-    choose: render(createElement(choose!.body, { engine: engine as never, isSurfaceInteractionLocked: false })),
-    footer: render(
-      createElement(filterOperationForm.footer, { engine: engine as never, isExternalInteractionLocked: false })
-    ),
+    choose: render(createElement(choose!.body, { engine: engine as never })),
+    footer: render(createElement(filterOperationForm.footer, { engine: engine as never })),
     operations,
-    params: render(createElement(params!.body, { engine: engine as never, isSurfaceInteractionLocked: false })),
+    params: render(createElement(params!.body, { engine: engine as never })),
   };
 };
 
@@ -223,9 +212,11 @@ describe('filter operation form', () => {
 
     expect(footer).toContain('Portrait · Raster layer');
     expect(footer).toContain('role="status"');
-    // Auto-process on: no Process verb; Reset then Apply then Cancel.
+    // Auto-process on: no Process verb; Reset settings then Apply then Cancel.
     expect(footer).not.toContain('>Process<');
-    expect(footer.indexOf('>Reset<')).toBeLessThan(footer.indexOf('>Apply<'));
+    expect(footer).not.toContain('>Reset<');
+    expect(footer.indexOf('>Reset settings<')).toBeGreaterThan(-1);
+    expect(footer.indexOf('>Reset settings<')).toBeLessThan(footer.indexOf('>Apply<'));
     expect(footer.indexOf('>Apply<')).toBeLessThan(footer.indexOf('>Cancel<'));
   });
 

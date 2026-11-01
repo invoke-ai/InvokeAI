@@ -44,7 +44,10 @@ const deferred = <T>() => {
   return { promise, resolve };
 };
 
-const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {}) => {
+const createHarness = (
+  overrides: Partial<SelectObjectSessionDeps<string>> = {},
+  { initialAutoProcess }: { initialAutoProcess?: boolean } = {}
+) => {
   let currentGuard: LayerExportGuard | null = guard;
   let controllerSubscriber: (() => void) | null = null;
   const unsubscribe = vi.fn();
@@ -84,7 +87,7 @@ const createHarness = (overrides: Partial<SelectObjectSessionDeps<string>> = {})
   if (!operation) {
     throw new Error('expected Select Object operation');
   }
-  const session = createSelectObjectSession({ deps, operation });
+  const session = createSelectObjectSession({ deps, initialAutoProcess, operation });
   session.update({ input: { prompt: 'cat', type: 'prompt' } });
   return {
     controller,
@@ -284,6 +287,19 @@ describe('createSelectObjectSession', () => {
     notReady.setCurrentGuard(null);
     await expect(notReady.session.process()).resolves.toBe('error');
     expect(notReady.session.getSnapshot().error).toEqual({ code: 'not-ready' });
+
+    const refused = createHarness({
+      exportSource: vi.fn(() =>
+        Promise.resolve({
+          ownerId: 'layer',
+          ownerName: 'Layer',
+          reason: 'too-large',
+          status: 'adjustment-refused',
+        } as const)
+      ),
+    });
+    await expect(refused.session.process()).resolves.toBe('error');
+    expect(refused.session.getSnapshot().error).toEqual({ code: 'adjustment-too-large' });
   });
 
   it('maps output dimensions and decode failures to typed errors', async () => {
@@ -575,6 +591,17 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot().sourceGuard).toBe(replacementGuard);
   });
 
+  it('starts from the seeded auto-process preference and runs the first valid input after the debounce', async () => {
+    vi.useFakeTimers();
+    const harness = createHarness({}, { initialAutoProcess: true });
+
+    expect(harness.session.getSnapshot()).toMatchObject({ autoProcess: true, status: 'scheduled' });
+    await vi.advanceTimersByTimeAsync(999);
+    expect(harness.deps.exportSource).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    await vi.waitFor(() => expect(harness.deps.runGraph).toHaveBeenCalledOnce());
+  });
+
   it('debounces auto-processing for one second and manual processing runs immediately', async () => {
     vi.useFakeTimers();
     const harness = createHarness();
@@ -787,65 +814,6 @@ describe('createSelectObjectSession', () => {
     }
   );
 
-  it.each(['export', 'upload', 'queue', 'decode'] as const)(
-    'interrupts processing at the %s boundary while preserving inputs and the active operation',
-    async (boundary) => {
-      const wait = deferred<unknown>();
-      const harness = createHarness({
-        decodePreview:
-          boundary === 'decode'
-            ? vi.fn(() => wait.promise as Promise<string>)
-            : vi.fn(({ image }) => Promise.resolve(`decoded:${image.imageName}`)),
-        exportSource:
-          boundary === 'export'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['exportSource']>)
-            : vi.fn(() => Promise.resolve({ blob, guard, rect, status: 'ok' as const })),
-        runGraph:
-          boundary === 'queue'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['runGraph']>)
-            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 })),
-        uploadIntermediate:
-          boundary === 'upload'
-            ? vi.fn(() => wait.promise as ReturnType<SelectObjectSessionDeps<string>['uploadIntermediate']>)
-            : vi.fn(() => Promise.resolve({ height: 12, imageName: 'input.png', width: 16 })),
-      });
-      harness.session.update({ input: { prompt: 'keep me', type: 'prompt' }, invert: true });
-      const pending = harness.session.process();
-      await vi.waitFor(() => {
-        const fn =
-          boundary === 'export'
-            ? harness.deps.exportSource
-            : boundary === 'upload'
-              ? harness.deps.uploadIntermediate
-              : boundary === 'queue'
-                ? harness.deps.runGraph
-                : harness.deps.decodePreview;
-        expect(fn).toHaveBeenCalledOnce();
-      });
-
-      harness.session.interruptProcessing();
-      if (boundary === 'export') {
-        wait.resolve({ blob, guard, rect, status: 'ok' });
-      } else if (boundary === 'upload') {
-        wait.resolve({ height: 12, imageName: 'input.png', width: 16 });
-      } else if (boundary === 'queue') {
-        wait.resolve({ height: 12, imageName: 'result.png', origin: 'test', width: 16 });
-      } else {
-        wait.resolve('decoded');
-      }
-
-      await expect(pending).resolves.toBe('stale');
-      expect(harness.deps.publishPreview).not.toHaveBeenCalled();
-      expect(harness.session.getSnapshot()).toMatchObject({
-        input: { prompt: 'keep me', type: 'prompt' },
-        invert: true,
-        preview: null,
-        status: 'ready',
-      });
-      expect(harness.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
-    }
-  );
-
   it('suppresses a decoded preview when the source guard becomes stale', async () => {
     const decode = deferred<string>();
     const harness = createHarness({ decodePreview: vi.fn(() => decode.promise) });
@@ -860,7 +828,7 @@ describe('createSelectObjectSession', () => {
     expect(harness.session.getSnapshot()).toMatchObject({ preview: null, sourceGuard: null, status: 'ready' });
   });
 
-  it('reset cancels work and scheduling, clears preview/cache, and restores defaults', async () => {
+  it('reset cancels work and scheduling, clears preview/cache, and restores defaults except auto-process', async () => {
     vi.useFakeTimers();
     const graph = deferred<{ height: number; imageName: string; origin: string; width: number }>();
     const harness = createHarness({ runGraph: vi.fn(() => graph.promise) });
@@ -874,7 +842,7 @@ describe('createSelectObjectSession', () => {
     await expect(pending).resolves.toBe('stale');
     expect(harness.session.getSnapshot()).toEqual({
       applyPolygonRefinement: false,
-      autoProcess: false,
+      autoProcess: true,
       error: null,
       input: { prompt: '', type: 'prompt' },
       invert: false,

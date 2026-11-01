@@ -1,6 +1,7 @@
 """FLUX.2 starter models."""
 
 from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
     flux2_dev_cow_mistral_q4,
     flux2_dev_cow_mistral_q8,
     flux2_klein_qwen3_4b_encoder,
@@ -71,6 +72,15 @@ flux2_vae = StarterModel(
     source="black-forest-labs/FLUX.2-klein-4B::vae",
     description="FLUX.2 VAE (16-channel, same architecture as FLUX.1 VAE). ~168MB",
     type=ModelType.VAE,
+)
+
+taef2 = StarterModel(
+    name="TAEF2 (FLUX.2 preview decoder)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/madebyollin/taef2/resolve/bd244ebfe4398c84fbf312a2f1c868c676b500e3/taef2.safetensors",
+    description=f"Sharp live previews for FLUX.2 and ERNIE-Image. {TINY_AUTOENCODER_NOTE} ~11MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 flux2_klein_4b = StarterModel(
@@ -266,4 +276,14 @@ flux2_dev_gguf_q8_0 = StarterModel(
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
     dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+# region FLUX.2 [dev] ControlNet
+flux2_dev_fun_controlnet_union = StarterModel(
+    name="FLUX.2 [dev] ControlNet Union",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/alibaba-pai/FLUX.2-dev-Fun-Controlnet-Union/resolve/main/FLUX.2-dev-Fun-Controlnet-Union-2602.safetensors",
+    description="Unified ControlNet for FLUX.2 [dev] (not Klein) supporting Canny, HED, Depth, Pose, MLSD, Scribble and "
+    "Gray control images, plus inpainting. Works best at weights 0.65-0.80. FLUX [dev] Non-Commercial License. ~8.2GB",
+    type=ModelType.ControlNet,
 )

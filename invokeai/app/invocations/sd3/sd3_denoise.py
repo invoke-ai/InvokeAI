@@ -270,18 +270,19 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         step_callback = self._build_step_callback(context)
 
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps[0]),
-                latents=latents,
-            ),
-        )
-
         with transformer_info.model_on_device() as (cached_weights, transformer):
             assert isinstance(transformer, SD3Transformer2DModel)
+
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps[0]),
+                    latents=latents,
+                ),
+            )
 
             # 6. Denoising loop
             for step_idx, (t_curr, t_prev) in tqdm(

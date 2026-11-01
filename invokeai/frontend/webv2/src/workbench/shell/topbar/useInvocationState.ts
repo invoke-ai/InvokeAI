@@ -6,12 +6,15 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { useDynamicPrompts } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
+  describeDynamicPromptsFailure,
+  describeGenerationIssue,
   getEffectivePrompts,
   normalizeGenerateSettings,
   sanitizeBatchCount,
   sanitizeDynamicPromptsConfig,
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { isUpscaleBatchCountFixed } from '@features/upscale';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -25,6 +28,7 @@ import {
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
+import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -34,34 +38,46 @@ import {
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getInvocationIssueTarget, type InvocationIssue } from './invokeIssueTargets';
+
+export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTargets';
+
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
- * Include capability and template snapshots in route selection so either load independently clears its readiness
- * gate.
+ * Include capability, template and remembered control-model snapshots in route selection so each change
+ * independently re-evaluates its readiness gate.
  */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
   const unsubscribeTemplates = subscribeInvocationTemplates(listener);
+  const unsubscribePreferences = subscribeWorkbenchPreferences(listener);
 
   return () => {
     unsubscribeCapabilities();
     unsubscribeTemplates();
+    unsubscribePreferences();
   };
 };
 
 let routeSources: {
   capabilities: ReturnType<typeof getArchitectureCapabilitiesSnapshot>;
+  controlModelMemory: ReturnType<typeof getWorkbenchPreferences>['controlModelMemory'];
   templates: ReturnType<typeof getInvocationTemplatesSnapshot>;
 } | null = null;
 
-/** Referentially stable until one of the two stores publishes a new snapshot. */
+/** Referentially stable until one of the stores publishes a new snapshot. */
 const getRouteSourcesSnapshot = () => {
   const capabilities = getArchitectureCapabilitiesSnapshot();
+  const controlModelMemory = getWorkbenchPreferences().controlModelMemory;
   const templates = getInvocationTemplatesSnapshot();
 
-  if (routeSources?.capabilities !== capabilities || routeSources.templates !== templates) {
-    routeSources = { capabilities, templates };
+  if (
+    routeSources?.capabilities !== capabilities ||
+    routeSources.controlModelMemory !== controlModelMemory ||
+    routeSources.templates !== templates
+  ) {
+    routeSources = { capabilities, controlModelMemory, templates };
   }
 
   return routeSources;
@@ -72,6 +88,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
+  enabled: values.dynamicPromptsEnabled,
   maxPrompts: values.dynamicPromptsMaxPrompts,
   resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
@@ -84,11 +101,16 @@ const readEffectivePositivePrompt = (values: Record<string, unknown>): string =>
   return settings ? getEffectivePrompts(settings).positivePrompt : '';
 };
 
-export const getBatchCount = (values: Record<string, unknown>): number => sanitizeBatchCount(values.batchCount);
+export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): boolean =>
+  sourceId === 'upscale' && isUpscaleBatchCountFixed(values);
+
+export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
+  isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
 
 export interface InvocationState {
   batchCount: number;
-  blockingReasons: string[];
+  /** Every reason Invoke cannot run right now, in the order the tooltip lists them. */
+  issues: InvocationIssue[];
   invocation: InvocationRoute;
   /** Sessions one workflow run produces through batch nodes; absent without batch nodes, null while unresolved. */
   workflowBatchSize?: number | null;
@@ -99,7 +121,13 @@ export interface InvocationState {
   placedTypeIds: ReadonlySet<WidgetTypeId>;
   promptExpansion: DynamicPromptsExpansion;
   sourceValues: Record<string, unknown>;
-  invoke: (destinationOverride?: ResultDestination) => Promise<void>;
+  invoke: (options?: InvokeOptions) => Promise<void>;
+}
+
+export interface InvokeOptions {
+  destinationOverride?: ResultDestination;
+  /** Queue ahead of the user's other pending work, as Invoke Front does. */
+  prepend?: boolean;
 }
 
 export const useInvocationState = (): InvocationState => {
@@ -147,27 +175,33 @@ export const useInvocationState = (): InvocationState => {
       : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule.
-  const expansionReason = promptExpansion.isError
-    ? 'The prompt could not be expanded.'
-    : (promptExpansion.error ?? null);
+  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
+  const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
-  const blockingReasons = useMemo(
-    () => [
-      ...(isConnected ? [] : ['The backend is disconnected.']),
-      ...(expansionReason === null ? [] : [expansionReason]),
-      ...resolvedRoute.validationReasons.map((reason) => localizeInvocationValidationReason(reason, t)),
+  const issues = useMemo(
+    (): InvocationIssue[] => [
+      ...(isConnected
+        ? []
+        : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
+      ...(expansionReason === null ? [] : [{ message: expansionReason, target: { kind: 'prompt' } } as const]),
+      ...resolvedRoute.validationReasons.map((reason) => ({
+        message: localizeInvocationValidationReason(reason, t),
+        target: getInvocationIssueTarget(reason, invocation.sourceId),
+      })),
     ],
-    [expansionReason, isConnected, resolvedRoute.validationReasons, t]
+    [expansionReason, invocation.sourceId, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
   const invoke = useCallback(
-    (destinationOverride?: ResultDestination) =>
+    ({ destinationOverride, prepend }: InvokeOptions = {}) =>
       submitActiveInvocation({
         commands,
         destinationOverride,
+        prepend,
         formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+        formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
         getModels: () => availabilityModels,
         queries,
       }),
@@ -175,10 +209,10 @@ export const useInvocationState = (): InvocationState => {
   );
 
   return {
-    batchCount: getBatchCount(sourceValues),
-    blockingReasons,
+    batchCount: getBatchCount(invocation.sourceId, sourceValues),
     invocation,
     invoke,
+    issues,
     isPreparing,
     isValid,
     placedTypeIds,

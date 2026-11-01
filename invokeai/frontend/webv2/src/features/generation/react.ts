@@ -10,9 +10,15 @@ export { flushGenerateDrafts, useRegisterGenerateDraftFlusher } from './ui/gener
 export { useDebouncedDraftValue } from './ui/useDebouncedDraftValue';
 export { useDynamicPrompts, type DynamicPromptsExpansion } from './ui/useDynamicPrompts';
 export { createGenerateFormValuesSelector } from './ui/generateFormViewModel';
-export { notifyGenerateModelSelectionCleared } from './ui/modelSelectionNotice';
+export {
+  clearGenerateModelSwitchConfirmation,
+  notifyGenerateModelSwitched,
+  requestGenerateModelSwitchConfirmation,
+} from './ui/modelSelectionNotice';
 export { adjustFocusedPromptAttention } from './ui/promptFields/promptAttentionHotkeys';
 export { focusPositivePrompt } from './ui/promptFields/promptFocus';
+export { revealGenerateIssue } from './ui/revealGenerateIssue';
+export { getGeneratePromptUndoKey } from './ui/generateUndo';
 export { promptHistoryNavigation } from './ui/promptFields/promptHistoryNavigation';
 export { setPendingPromptTemplateDraft } from './ui/promptTemplateDraftStore';
 export { LLMTaskProgressRuntime } from './ui/LLMTaskProgressRuntime';

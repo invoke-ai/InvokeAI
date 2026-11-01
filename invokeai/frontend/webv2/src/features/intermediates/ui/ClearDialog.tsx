@@ -12,11 +12,10 @@ import { Dialog } from '@platform/ui/Dialog';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const CONFIRM_WORD = 'DELETE';
-
 const AFFECTED_DOCUMENT_LABELS = {
   client_state: 'intermediates.dialog.affectedClientState',
   project: 'intermediates.dialog.affectedProject',
+  project_workspace: 'intermediates.dialog.affectedProjectWorkspace',
   quarantined_project: 'intermediates.dialog.affectedQuarantinedProject',
   workflow: 'intermediates.dialog.affectedWorkflow',
 } as const satisfies Record<IntermediatesAffectedDocumentKind, string>;
@@ -160,6 +159,8 @@ export const ClearDialog = ({
   state,
 }: ClearDialogProps) => {
   const { t } = useTranslation();
+  // In the active language: the word is shown to be typed, so it must read as one.
+  const confirmWord = t('intermediates.dialog.confirmWord');
   // The acknowledgement and typed word belong to one preview; a re-preview (mode switch, retry) starts over.
   const [confirmation, setConfirmation] = useState<{ previewId: string; acknowledged: boolean; typed: string }>({
     acknowledged: false,
@@ -177,7 +178,7 @@ export const ClearDialog = ({
   const setTyped = (value: string) =>
     setConfirmation({ acknowledged, previewId: preview?.previewId ?? '', typed: value });
   const nothingToDelete = preview !== null && preview.impact.deleteImages + preview.impact.deleteVideos === 0;
-  const forceReady = !isForce || (acknowledged && typed.trim() === CONFIRM_WORD);
+  const forceReady = !isForce || (acknowledged && typed.trim() === confirmWord);
   const canConfirm = preview !== null && !nothingToDelete && forceReady && !state?.isStarting;
 
   const handleOpenChange = useCallback(
@@ -283,7 +284,7 @@ export const ClearDialog = ({
                     </Checkbox.Root>
                     <Stack gap="1">
                       <chakra.label fontSize="md" htmlFor={confirmInputId}>
-                        {t('intermediates.dialog.typeToConfirm', { word: CONFIRM_WORD })}
+                        {t('intermediates.dialog.typeToConfirm', { word: confirmWord })}
                       </chakra.label>
                       <Input
                         autoComplete="off"

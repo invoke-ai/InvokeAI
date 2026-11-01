@@ -93,7 +93,7 @@ def _worker(vae_path: str, operation: str, h: int, w: int, dtype_name: str, tile
     else:
         x = torch.randn(1, 3, h, w, device="cuda", dtype=dtype)
 
-    estimate = estimate_vae_working_memory_flux(operation, x, vae, tile_size=tile)
+    estimate = estimate_vae_working_memory_flux(operation, x, vae, tile_size=tile).reservation_bytes
 
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
@@ -218,8 +218,8 @@ def main() -> None:
             print(f"    {r['operation']} {r['h']}x{r['w']} tile={r['tile']}  headroom {r['headroom']:.2f}x")
         print()
         print("  The cache under-reserves here, so it keeps other models resident and the VAE can")
-        print("  OOM in the last step of a generation. The constants in `vae_working_memory.py` need")
-        print("  a backend branch, the way `estimate_vae_working_memory_qwen_image` already has one.")
+        print("  OOM in the last step of a generation. The vae.flux coefficients for this convolution")
+        print("  backend in `invokeai/backend/working_memory/data/vae.json` need refitting.")
     else:
         worst = min(measured, key=lambda r: r["headroom"]) if measured else None
         if worst:

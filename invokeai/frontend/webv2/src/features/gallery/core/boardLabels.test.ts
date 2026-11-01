@@ -1,8 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import type { GalleryBoard } from './types';
+import type { GalleryBoard, GalleryBoardAction } from './types';
 
-import { getGalleryBoardDestinationGroups, getGalleryBoardLabel, getGalleryProjectGroupLabel } from './boardLabels';
+import {
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
+  getGalleryMoveTargets,
+  getGalleryProjectGroupLabel,
+} from './boardLabels';
 
 const createBoard = (overrides: Partial<GalleryBoard> = {}): GalleryBoard => ({
   archived: false,
@@ -47,6 +52,21 @@ describe('getGalleryBoardLabel for inboxes', () => {
   });
 });
 
+describe('getGalleryBoardLabel for someone else’s inbox', () => {
+  it('keeps its stored name, the project’s, which nothing else on screen names', () => {
+    const access = {
+      actions: ['read' as const],
+      adminOverride: true,
+      generalAccess: 'restricted' as const,
+      role: null,
+    };
+
+    expect(getGalleryBoardLabel(createBoard({ access, isInbox: true, name: 'Their project' }), t)).toBe(
+      'Their project'
+    );
+  });
+});
+
 describe('getGalleryProjectGroupLabel', () => {
   const inbox = createBoard({ id: 'inbox', isInbox: true, name: 'Stored name', projectId: 'p2' });
 
@@ -84,6 +104,35 @@ describe('getGalleryBoardDestinationGroups', () => {
     ]);
   });
 
+  it('offers only boards the caller may add to, other people’s apart from their own', () => {
+    const access = (role: 'viewer' | 'contributor' | null, actions: GalleryBoardAction[]) => ({
+      access: { actions, adminOverride: role === null, generalAccess: 'viewer' as const, role },
+    });
+    const withShared = [
+      ...boards,
+      createBoard({ id: 'moodboard', name: 'Moodboard', ...access('contributor', ['read', 'add_media']) }),
+      createBoard({ id: 'references', name: 'References', ...access('viewer', ['read']) }),
+      createBoard({ id: 'theirs', name: 'Theirs', projectId: 'their-project', ...access(null, ['read', 'add_media']) }),
+    ];
+
+    expect(
+      getGalleryBoardDestinationGroups({
+        boards: withShared,
+        projectId: 'p1',
+        projectName: 'Mine',
+        projectNames: new Map(),
+        t,
+      }).map((group) => [group.id, group.boards.map((board) => board.id)])
+    ).toEqual([
+      ['project', ['mine', 'mine-member']],
+      ['library', ['cats']],
+      ['shared', ['moodboard']],
+      ['other-users', ['theirs']],
+      ['project:pa', ['apple-member']],
+      ['project:pz', ['zebra', 'zebra-member']],
+    ]);
+  });
+
   it('drops empty tiers and treats every project as other where none is open', () => {
     expect(groupsOf(null)).toEqual([
       ['Library', ['cats']],
@@ -94,5 +143,42 @@ describe('getGalleryBoardDestinationGroups', () => {
     expect(
       getGalleryBoardDestinationGroups({ boards: [], projectId: 'p1', projectName: 'Mine', projectNames: new Map(), t })
     ).toEqual([]);
+  });
+});
+
+describe('getGalleryMoveTargets', () => {
+  const boards = [
+    createBoard({ id: 'dogs' }),
+    createBoard({ id: 'cats', name: 'cats' }),
+    createBoard({ archived: true, id: 'old', name: 'old' }),
+    createBoard({ id: 'by_date:2026-07-30', kind: 'date', name: '30 July' }),
+    createBoard({ id: 'none', kind: 'uncategorized', name: '' }),
+  ];
+  const ids = (targets: ReturnType<typeof getGalleryMoveTargets>) => targets.boards.map((board) => board.id);
+
+  it('offers stored, unarchived boards, less the one every item is on', () => {
+    expect(ids(getGalleryMoveTargets(boards, { itemBoardIds: ['dogs', 'dogs'] }))).toEqual(['cats']);
+  });
+
+  it('keeps every board when the items are spread over several', () => {
+    expect(ids(getGalleryMoveTargets(boards, { itemBoardIds: ['dogs', 'cats'] }))).toEqual(['dogs', 'cats']);
+  });
+
+  it("places unloaded items on the listing's board, and on any board when that is unknown", () => {
+    const unloaded = { itemBoardIds: ['dogs'], unloadedCount: 2 };
+
+    expect(ids(getGalleryMoveTargets(boards, { ...unloaded, listingBoardId: 'dogs' }))).toEqual(['cats']);
+    expect(ids(getGalleryMoveTargets(boards, { ...unloaded, listingBoardId: 'all' }))).toEqual(['dogs', 'cats']);
+    expect(ids(getGalleryMoveTargets(boards, unloaded))).toEqual(['dogs', 'cats']);
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none'], unloadedCount: 1 }).canRemoveFromBoard).toBe(true);
+  });
+
+  it('offers removing from a board only while some item may be on one', () => {
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none', 'none'] }).canRemoveFromBoard).toBe(false);
+    expect(
+      getGalleryMoveTargets(boards, { itemBoardIds: ['none'], listingBoardId: 'none', unloadedCount: 3 })
+        .canRemoveFromBoard
+    ).toBe(false);
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none', 'dogs'] }).canRemoveFromBoard).toBe(true);
   });
 });

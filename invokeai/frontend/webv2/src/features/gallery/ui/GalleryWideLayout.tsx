@@ -7,8 +7,8 @@ import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryItemFilterMenu } from './GalleryItemFilterMenu';
 import { GalleryItemSearch } from './GalleryItemSearch';
-import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
 import { GalleryUploadButton } from './GalleryUploadButton';
@@ -23,6 +23,9 @@ export const GalleryWideLayout = () => {
   const { boardPanelCollapsed, boardPanelWidthPx } = gallery.settings;
   const viewTabsIdBase = useId();
   const boardPanelRef = useRef<HTMLDivElement>(null);
+
+  // The grid's "Show all media" hands focus here when it removes itself.
+  const mediaFilterTriggerRef = useRef<HTMLButtonElement>(null);
 
   const handleCommitWidth = useCallback(
     (boardPanelWidthPx: number) => actions.updateSettings({ boardPanelWidthPx }),
@@ -46,16 +49,20 @@ export const GalleryWideLayout = () => {
           >
             <GalleryBoardsPanel />
           </Flex>
-          <ResizeHandle
-            label={t('widgets.gallery.resizeBoardPanel')}
-            max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
-            min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
-            orientation="vertical"
-            pane="before"
-            paneRef={boardPanelRef}
-            value={boardPanelWidthPx}
-            onCommit={handleCommitWidth}
-          />
+          {/* Inset like the panel: the handle paints above the center chrome islands, so a full-height line would
+              cross them. */}
+          <Flex flexShrink={0} pb="2" pt={CHROME_INSET_PADDING_TOP}>
+            <ResizeHandle
+              label={t('widgets.gallery.resizeBoardPanel')}
+              max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
+              min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
+              orientation="vertical"
+              pane="before"
+              paneRef={boardPanelRef}
+              value={boardPanelWidthPx}
+              onCommit={handleCommitWidth}
+            />
+          </Flex>
         </>
       )}
       <Stack flex="1" gap="0" minH="0" minW="0">
@@ -66,10 +73,10 @@ export const GalleryWideLayout = () => {
             <GalleryItemSearch />
           </Box>
           <GalleryStarredFilterToggle />
-          <GalleryItemSortMenu />
+          <GalleryItemFilterMenu triggerRef={mediaFilterTriggerRef} />
           <GalleryUploadButton
             boards={gallery.boards}
-            selectedBoardId={gallery.selectedBoardId}
+            selectedBoardId={gallery.listingBoardId}
             onUploadFiles={actions.uploadFiles}
           />
         </HStack>
@@ -84,7 +91,7 @@ export const GalleryWideLayout = () => {
           ps="3"
           role="tabpanel"
         >
-          <GalleryImageGrid />
+          <GalleryImageGrid mediaFilterTriggerRef={mediaFilterTriggerRef} />
         </Box>
         <GallerySelectionBar />
       </Stack>

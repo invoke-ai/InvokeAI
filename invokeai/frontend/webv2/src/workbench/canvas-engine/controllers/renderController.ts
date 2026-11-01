@@ -1,3 +1,4 @@
+import type { CanvasKeyOwner, CanvasSurfaceAttachOptions } from '@workbench/canvas-engine/capabilities';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { RenderScheduler, RenderSchedulerDeps } from '@workbench/canvas-engine/render/scheduler';
 
@@ -55,7 +56,6 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
   readonly onPageHide: () => void;
   readonly onWindowBlur: () => void;
   readonly onVisibilityChange: () => void;
-  readonly clearPreview: () => void;
   readonly applyCursor: (value: string) => void;
   readonly updateCursor: () => void;
   readonly updateAnimation: () => void;
@@ -70,6 +70,7 @@ export class RenderController {
   private overlay: RasterSurface | null = null;
   private input: HTMLCanvasElement | null = null;
   private keyboardRoot: HTMLElement | null = null;
+  private resolveKeyOwner: ((event: KeyboardEvent) => CanvasKeyOwner) | null = null;
   private disposed = false;
 
   constructor(private readonly options: RenderControllerOptions) {
@@ -92,7 +93,17 @@ export class RenderController {
     return this.keyboardRoot;
   }
 
-  attach(screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement, keyboardRoot?: HTMLElement): void {
+  /** The host's key-owner judge from the current attach; null when detached or none was given. */
+  getKeyOwnerResolver(): ((event: KeyboardEvent) => CanvasKeyOwner) | null {
+    return this.resolveKeyOwner;
+  }
+
+  attach(
+    screenCanvas: HTMLCanvasElement,
+    overlayCanvas: HTMLCanvasElement,
+    keyboardRoot?: HTMLElement,
+    options?: CanvasSurfaceAttachOptions
+  ): void {
     if (this.disposed || this.options.isEngineDisposed()) {
       return;
     }
@@ -103,6 +114,7 @@ export class RenderController {
     this.overlay = wrapCanvasSurface(overlayCanvas);
     this.input = overlayCanvas;
     this.keyboardRoot = keyboardRoot ?? overlayCanvas;
+    this.resolveKeyOwner = options?.resolveKeyOwner ?? null;
     const handlers = this.options.getInputHandlers();
     this.input.addEventListener('pointerdown', handlers.onPointerDown);
     this.input.addEventListener('pointermove', handlers.onPointerMove);
@@ -151,13 +163,13 @@ export class RenderController {
       document.removeEventListener('visibilitychange', this.options.onVisibilityChange);
     }
     handlers.reset();
-    this.options.clearPreview();
     this.scheduler.pause();
     this.options.setViewportReady(false);
     this.screen = null;
     this.overlay = null;
     this.input = null;
     this.keyboardRoot = null;
+    this.resolveKeyOwner = null;
     this.options.updateAnimation();
   }
 

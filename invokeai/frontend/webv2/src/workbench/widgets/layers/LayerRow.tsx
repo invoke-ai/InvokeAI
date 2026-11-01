@@ -8,6 +8,7 @@ import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { isGroupNode, isHideableLayer, isNodeHidden, isOverlayStack } from '@workbench/canvas-engine/api';
 import {
   ChevronRightIcon,
+  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderIcon,
@@ -16,15 +17,16 @@ import {
   LockIcon,
   LockOpenIcon,
 } from 'lucide-react';
-import { memo, useCallback, useLayoutEffect, useMemo, useRef } from 'react';
+import { memo, useCallback, useId, useLayoutEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 import type { LayerTreeRow } from './layerTreeRows';
 
+import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
-import { ControlLayerWarningIcon } from './ControlLayerWarningIcon';
-import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
+import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
+import { TREE_ROW_FOCUS } from './LayerActiveDot';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { anchorFromPoint } from './layerRowCommands';
@@ -114,6 +116,11 @@ const LayerRowComponent = ({
     },
     [setDragRef, setDropRef]
   );
+  // Keyed by node id, so a row re-renders only for its own owner's status.
+  const adjustmentStatus = useAdjustmentStatus(engine, node.id);
+  const adjustmentStatusId = useId();
+  // The warning icon is pointer-only like every row control; focusing the row reads its explanation instead.
+  const adjustmentWarned = adjustmentStatus !== 'idle' && adjustmentStatus !== 'computing';
   const nameInput = useRef<HTMLInputElement | null>(null);
   // Escape abandons the draft; the blur that follows refocusing the row must not commit it.
   const renameCancelled = useRef(false);
@@ -163,8 +170,11 @@ const LayerRowComponent = ({
     [commands, row.id]
   );
   const handleToggleVisible = useCallback(
-    (checked: boolean) => commands.setEnabled(row.id, checked),
-    [commands, row.id]
+    (event: { stopPropagation: () => void }) => {
+      event.stopPropagation();
+      commands.setEnabled(row.id, !node.isEnabled);
+    },
+    [commands, node.isEnabled, row.id]
   );
   const handleToggleHidden = useCallback(
     (event: { stopPropagation: () => void }) => {
@@ -286,6 +296,7 @@ const LayerRowComponent = ({
       ref={setRowRef}
       {...dragListeners}
       aria-current={primary ? 'true' : undefined}
+      aria-describedby={adjustmentWarned ? adjustmentStatusId : undefined}
       aria-expanded={group ? row.expanded : childCount > 0 ? childrenExpanded : undefined}
       aria-label={node.name}
       aria-level={vm.depth + 2}
@@ -323,15 +334,32 @@ const LayerRowComponent = ({
         />
       ) : null}
       <LayerRowSurface active={tone} cursor={drag === 'source' ? 'grabbing' : 'default'} indentStyle={indentStyle}>
-        <LayerActiveDot
-          checked={node.isEnabled}
-          disabled={editingLocked}
-          gated={disabledByAncestor}
-          label={t('widgets.layers.actions.toggleActive')}
-          tooltip={disabledByAncestor ? t('widgets.layers.actions.groupDisabled') : undefined}
-          onCheckedChange={handleToggleVisible}
-          onKeepRowFocus={keepRowFocus}
-        />
+        {/* One visibility control: a hidden layer is off the canvas and out of generation alike. */}
+        <Box display="flex" flexShrink={0} onClick={stopPropagation} onMouseDown={keepRowFocus}>
+          <Tooltip
+            content={
+              disabledByAncestor
+                ? t('widgets.layers.actions.groupDisabled')
+                : node.isEnabled
+                  ? t('widgets.layers.actions.hideLayerTooltip')
+                  : t('widgets.layers.actions.showLayerTooltip')
+            }
+          >
+            <IconButton
+              aria-label={t('widgets.layers.actions.toggleActive')}
+              aria-pressed={node.isEnabled}
+              color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
+              disabled={editingLocked}
+              size="sm"
+              tabIndex={-1}
+              variant="ghost"
+              onClick={handleToggleVisible}
+              onPointerDown={stopPropagation}
+            >
+              {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
+            </IconButton>
+          </Tooltip>
+        </Box>
         {group ? (
           <GroupPreview engine={engine} expanded={row.expanded} node={node} thumbnails={thumbnails} />
         ) : !thumbnails ? (
@@ -434,19 +462,25 @@ const LayerRowComponent = ({
             />
           )}
         </Box>
-        {layer ? <ControlLayerWarningIcon contributing={vm.contributionEnabled} layer={layer} /> : null}
+        <AdjustmentStatusIcon descriptionId={adjustmentStatusId} status={adjustmentStatus} />
+        {layer?.type === 'control' ? (
+          <ControlLayerStatusIcon contributing={vm.contributionEnabled} engine={engine} layer={layer} />
+        ) : null}
         {/* One control cluster on the same rhythm as the stack header; slots a row cannot use are held open. */}
         <HStack flexShrink="0" gap="0.5" onClick={stopPropagation} onMouseDown={keepRowFocus}>
-          {hideable ? (
+          {hideable && vm.documentHidden && vm.contributionEnabled ? (
+            // Hidden on the canvas only (an overlay put out of the way): it still shapes generation. The row menu
+            // sets it; this says so and brings it back.
             <Tooltip
               content={
-                hiddenByAncestor ? t('widgets.layers.actions.groupHidden') : t('widgets.layers.actions.toggleHidden')
+                hiddenByAncestor
+                  ? t('widgets.layers.actions.groupHidden')
+                  : t('widgets.layers.actions.canvasHiddenTooltip')
               }
             >
               <IconButton
-                aria-label={t('widgets.layers.actions.toggleHidden')}
-                aria-pressed={!ownHidden}
-                color={vm.documentHidden ? 'fg.muted' : 'fg'}
+                aria-label={t('widgets.layers.actions.showOnCanvas')}
+                color="fg.muted"
                 disabled={editingLocked || hiddenByAncestor}
                 size="sm"
                 tabIndex={-1}
@@ -454,7 +488,7 @@ const LayerRowComponent = ({
                 onClick={handleToggleHidden}
                 onPointerDown={stopPropagation}
               >
-                {vm.documentHidden ? <EyeOffIcon /> : <EyeIcon />}
+                <EyeClosedIcon />
               </IconButton>
             </Tooltip>
           ) : (

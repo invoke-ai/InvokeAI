@@ -5,6 +5,7 @@ import { Box, Flex, Icon, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Row } from '@platform/ui/Row';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
@@ -16,7 +17,7 @@ import { useProjectActionsMenu, useProjectActionsMenuTrigger } from './ProjectAc
 import { ProjectCompatibilityBadge } from './ProjectCompatibilityBadge';
 import { ProjectCover } from './ProjectCover';
 
-const LINK_STYLE = { cursor: 'default', inset: 0, position: 'absolute' } as const;
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
 const REVEAL_ON_HOVER = { opacity: 1 } as const;
 const THUMBNAIL_WIDTH = '14';
 
@@ -34,6 +35,7 @@ export const ProjectRow = ({
   const isCompatible = isProjectSummaryCompatible(summary);
 
   const projectSearch = useMemo(() => ({ project: summary.id }), [summary.id]);
+  const pinLabel = isPinned ? t('projects.unpin') : t('projects.pin');
   const menuTarget = useMemo(() => ({ isPinned, onTogglePin, summary }), [isPinned, onTogglePin, summary]);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => menu.openAtPointer(event, menuTarget),
@@ -43,24 +45,28 @@ export const ProjectRow = ({
   const handleTogglePin = useCallback(() => onTogglePin(summary.id), [onTogglePin, summary.id]);
 
   return (
-    <Row className="group" gap="3" h="full" position="relative" px="2.5" rounded="md" onContextMenu={handleContextMenu}>
+    <Row
+      className="group"
+      // A project this build cannot open does not light up under the pointer as if it would open.
+      data-static={isCompatible ? undefined : ''}
+      gap="3"
+      h="full"
+      position="relative"
+      px="2.5"
+      rounded="md"
+      onContextMenu={handleContextMenu}
+    >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
+        // The row's primary control: the row recipe draws its focus ring around the whole row.
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
+          data-list-primary=""
           search={projectSearch}
           style={LINK_STYLE}
           to="/app"
         />
-      ) : (
-        <Box
-          aria-disabled="true"
-          aria-label={`${t('projects.openProjectLabel', { name: summary.name })}. ${t('projects.file.updateClient')}`}
-          role="link"
-          style={LINK_STYLE}
-          tabIndex={0}
-          title={t('projects.file.updateClient')}
-        />
-      )}
+      ) : null}
       <Box flexShrink={0} overflow="hidden" pointerEvents="none" rounded="sm" w={THUMBNAIL_WIDTH}>
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>
@@ -72,20 +78,21 @@ export const ProjectRow = ({
         </Text>
       </Flex>
       <Flex flexShrink={0} gap="0.5" pointerEvents="auto" zIndex="1">
-        <IconButton
-          aria-label={isPinned ? t('projects.unpin') : t('projects.pin')}
-          aria-pressed={isPinned}
-          color={isPinned ? 'fg' : 'fg.muted'}
-          opacity={isPinned ? 1 : 0}
-          size="sm"
-          title={isPinned ? t('projects.unpin') : t('projects.pin')}
-          variant="ghost"
-          _focusVisible={REVEAL_ON_HOVER}
-          _groupHover={REVEAL_ON_HOVER}
-          onClick={handleTogglePin}
-        >
-          <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
-        </IconButton>
+        <Tooltip content={pinLabel}>
+          <IconButton
+            aria-label={pinLabel}
+            aria-pressed={isPinned}
+            color={isPinned ? 'fg' : 'fg.muted'}
+            opacity={isPinned ? 1 : 0}
+            size="sm"
+            variant="ghost"
+            _focusVisible={REVEAL_ON_HOVER}
+            _groupHover={REVEAL_ON_HOVER}
+            onClick={handleTogglePin}
+          >
+            <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
+          </IconButton>
+        </Tooltip>
         <IconButton
           aria-expanded={menuTrigger.isExpanded}
           aria-haspopup="menu"

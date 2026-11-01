@@ -5,12 +5,13 @@ import type { TFunction } from 'i18next';
 
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
-import { getGallerySettings } from '@features/gallery/core/settings';
+import { getGalleryRevealRequest, subscribeGalleryRevealRequests } from '@features/gallery/core/selection';
+import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useEffect, useEffectEvent, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryReadState, GalleryReadStatus, GalleryStateView } from './galleryStateView';
@@ -24,6 +25,7 @@ import {
   getGalleryPage,
   getGalleryProjectBoardId,
   getGalleryRawSelectedBoardId,
+  getGallerySearchScope,
   getGallerySearchTerm,
   getGallerySemanticImageQuery,
   getGalleryStarredOnly,
@@ -90,7 +92,7 @@ export const useGallerySemanticImageQuery = (value: unknown) =>
 
 export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidgetProps) => {
   const {
-    currentUserId,
+    boardSharing = false,
     gallery: galleryCommands,
     galleryValues,
     generateValues,
@@ -110,9 +112,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,
+    mediaKind: toGalleryMediaKind(settings.mediaFilter),
     page,
     projectBoardId: getGalleryProjectBoardId(galleryValues),
     recentImages,
+    searchScope: getGallerySearchScope(galleryValues),
     searchTerm,
     selectedBoardId: getGalleryRawSelectedBoardId(galleryValues),
     semanticQuery,
@@ -248,12 +252,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     >
       <GalleryWidgetContent
         actions={actions}
+        boardSharing={boardSharing}
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
-        isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
-        currentUserId={currentUserId ?? null}
         loadedItems={loadedItems}
         projectId={projectId}
         projectName={projectName}
@@ -301,11 +304,10 @@ const getGalleryFailureAnnouncement = (
 
 const GalleryWidgetContent = ({
   actions,
+  boardSharing,
   boardsState,
-  currentUserId,
   filter,
   gallery,
-  isWindowTruncated,
   listing,
   loadedItems,
   pinRevealIndex,
@@ -319,13 +321,12 @@ const GalleryWidgetContent = ({
   starredStrip,
 }: {
   actions: GalleryActions;
+  boardSharing: boolean;
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
-  isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
-  currentUserId: string | null;
   pinRevealIndex: GalleryData['pinRevealIndex'];
   projectId: string;
   projectName: string;
@@ -338,15 +339,21 @@ const GalleryWidgetContent = ({
 }) => {
   const { t } = useTranslation();
   const itemActions = useGalleryItemActions();
+  const revealRequest = useSyncExternalStore(subscribeGalleryRevealRequests, getGalleryRevealRequest);
+  // Reveals requested before this mount were announced by an earlier one, or by none; a remount must not repeat them.
+  const [mountRevealToken] = useState(() => getGalleryRevealRequest()?.token ?? 0);
+  const revealAnnouncement =
+    revealRequest?.announcement === 'external-generation' && revealRequest.token > mountRevealToken
+      ? { message: t('widgets.gallery.externalGenerationRevealed'), token: revealRequest.token }
+      : null;
   const projectNames = useMemo(() => new Map(projects.map((project) => [project.id, project.name])), [projects]);
   const contextValue = useMemo<GalleryWidgetContextValue>(
     () => ({
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
-      isWindowTruncated,
       itemActions,
       listing,
       loadedItems,
@@ -362,11 +369,10 @@ const GalleryWidgetContent = ({
     }),
     [
       actions,
+      boardSharing,
       boardsState,
-      currentUserId,
       filter,
       gallery,
-      isWindowTruncated,
       itemActions,
       listing,
       loadedItems,
@@ -387,6 +393,16 @@ const GalleryWidgetContent = ({
       <GalleryBoardDragMonitor />
       <GalleryLayout region={region} />
       <GalleryAnnouncer message={getGalleryFailureAnnouncement({ boardsState, listing, starredStrip }, t)} />
+      {/*
+       * Each reveal request has its own token. Alternating regions by token parity makes consecutive identical
+       * announcements a change in an existing region, so each is read; any later reveal request blanks both.
+       */}
+      {[0, 1].map((parity) => (
+        <GalleryAnnouncer
+          key={parity}
+          message={revealAnnouncement && revealAnnouncement.token % 2 === parity ? revealAnnouncement.message : ''}
+        />
+      ))}
     </GalleryWidgetContext>
   );
 };

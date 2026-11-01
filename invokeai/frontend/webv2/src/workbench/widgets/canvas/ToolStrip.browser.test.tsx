@@ -1,13 +1,33 @@
+import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import type * as projectsApi from '@workbench/projects/api';
+import type * as workbenchContext from '@workbench/WorkbenchContext';
 import type { ComponentProps } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import i18n from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { initReactI18next } from 'react-i18next';
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+
+/** The hotkeys the Canvas widget registered, as the workbench provides them; none unless a test installs some. */
+const workbench = vi.hoisted(() => ({ extensions: null as ExtensionRegistry | null }));
+
+// Saving the remap below would otherwise sync to a backend the browser tests do not run.
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectsApi>()),
+  setClientStateValue: async () => {},
+}));
+
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof workbenchContext>()),
+  useOptionalWorkbenchExtensions: () => workbench.extensions,
+}));
 
 import { recordSelectFamilyTool } from './toolFamilyStore';
 import { ToolStrip } from './ToolStrip';
@@ -89,13 +109,15 @@ describe('tool strip family slots', () => {
   });
 
   afterEach(async () => {
+    workbench.extensions = null;
+    accountLifecycle.invalidate();
     await act(() => root?.unmount());
     container?.remove();
     container = null;
     root = null;
   });
 
-  const renderStrip = async (props: Partial<ComponentProps<typeof ToolStrip>> = {}) => {
+  const renderStrip = async () => {
     const fake = createFakeEngine();
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -103,7 +125,7 @@ describe('tool strip family slots', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <ToolStrip engine={fake.engine} {...props} />
+          <ToolStrip engine={fake.engine} />
         </ChakraProvider>
       );
     });
@@ -296,6 +318,91 @@ describe('tool strip family slots', () => {
     await expect.poll(() => document.activeElement).toBe(shape);
   });
 
+  it('chooses an entry by the binding its keycaps show, remaps included, and closes the menu', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({
+      customHotkeys: { 'canvas.tool.lasso': ['k'] },
+    });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.marquee', 'm'],
+      ['canvas.tool.lasso', 'l'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
+
+    try {
+      const fake = await renderStrip();
+      const select = (await button('Marquee select').element()) as HTMLElement;
+      await openByContextMenu(select);
+      const lasso = (await page.getByRole('menuitemradio', { name: /^Lasso select/ }).element()) as HTMLElement;
+      // The keycap shows the remap, not the default L.
+      expect(lasso.textContent).toBe('Lasso selectk');
+
+      // The workbench hotkeys listen on window; the chosen entry's press must not also run there.
+      const windowKeys: string[] = [];
+      const recordKey = (event: KeyboardEvent) => windowKeys.push(event.key);
+      window.addEventListener('keydown', recordKey);
+      await act(() => userEvent.keyboard('k'));
+      window.removeEventListener('keydown', recordKey);
+
+      expect(fake.activeTool).toBe('lasso');
+      expect(windowKeys).toEqual([]);
+      await expect.element(menu()).not.toBeInTheDocument();
+      await expect.poll(() => document.activeElement).toBe(select);
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
+  });
+
+  /** Hover the slot fresh, so its tooltip opens with the current title. */
+  const hoverSlot = async (slot: HTMLElement) => {
+    await act(() => userEvent.unhover(slot));
+    await act(() => userEvent.hover(slot));
+  };
+  const tooltipText = () => document.querySelector('[role="tooltip"]')?.textContent ?? null;
+  const MARQUEE_HELP =
+    "Drag a rectangle or ellipse to select pixels on the active layer. Fill, erase, or move them to a new layer. Doesn't change the generation frame.";
+  const LASSO_HELP =
+    "Draw a freehand or polygon outline to select pixels on the active layer. Fill, erase, or move them to a new layer. Doesn't change the generation frame.";
+
+  it('titles the selection slot with the current tool’s effective key and its help line, remaps included', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.lasso': ['k'] } });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.marquee', 'm'],
+      ['canvas.tool.lasso', 'l'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
+
+    try {
+      await renderStrip();
+      const marquee = (await button('Marquee select').element()) as HTMLElement;
+      await hoverSlot(marquee);
+      await expect.poll(tooltipText).toBe(`Marquee select (M)${MARQUEE_HELP}`);
+
+      await openByContextMenu(marquee);
+      await act(() => userEvent.click(page.getByRole('menuitemradio', { name: /^Lasso select/ })));
+      // The lasso key was remapped from L to K; the title follows the effective binding.
+      await hoverSlot((await button('Lasso select').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe(`Lasso select (K)${LASSO_HELP}`);
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
+  });
+
+  it('titles a slot without a binding by its label alone', async () => {
+    await renderStrip();
+    await hoverSlot((await button('Marquee select').element()) as HTMLElement);
+    await expect.poll(tooltipText).toBe(`Marquee select${MARQUEE_HELP}`);
+  });
+
   it('remembers the last-used selection tool across tool switches', async () => {
     const fake = await renderStrip();
     await act(() => userEvent.click(button('Marquee select')));
@@ -313,35 +420,35 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('lasso');
   });
 
-  it('disables the open menu entries when an interaction lock engages', async () => {
-    const fake = await renderStrip();
-    const shape = (await button('Shape').element()) as HTMLElement;
-    await openByContextMenu(shape);
-    await act(() => {
-      root?.render(
-        <ChakraProvider value={system}>
-          <ToolStrip isInteractionLocked engine={fake.engine} />
-        </ChakraProvider>
-      );
-    });
-    await expect.element(entry('Star')).toHaveAttribute('aria-disabled', 'true');
-    await act(() => userEvent.click(entry('Star'), { force: true }));
-    expect(fake.shapeKind).toBe('rect');
-  });
+  it('names the key that selects each tool in its tooltip, remaps included', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.eraser': ['q'] } });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, key] of [
+      ['canvas.tool.brush', 'b'],
+      ['canvas.tool.eraser', 'e'],
+      ['canvas.transformSelected', 'shift+t'],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [key], id, source, title: id });
+    }
+    workbench.extensions = extensions;
 
-  it('disables the family slots under an interaction lock, hold included', async () => {
-    await renderStrip({ isInteractionLocked: true });
-    const shape = (await button('Shape').element()) as HTMLElement;
-    expect((shape as HTMLButtonElement).disabled).toBe(true);
-    const at = centre(shape);
-    await act(() => {
-      shape.dispatchEvent(pointerAt('pointerdown', at.x, at.y));
-    });
-    await act(() => wait(450));
-    expect(document.querySelector('[role="menu"]')).toBeNull();
-    await act(() => {
-      shape.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
-    });
-    expect(document.querySelector('[role="menu"]')).toBeNull();
+    try {
+      await renderStrip();
+      await hoverSlot((await button('Brush').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Brush (B)');
+      await hoverSlot((await button('Eraser').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Eraser (Q)');
+      await hoverSlot((await button('Transform').element()) as HTMLElement);
+      await expect.poll(tooltipText).toBe('Transform (Shift+T)');
+      // The frame tool's key is C, held or tapped, which its help line explains.
+      await hoverSlot((await button('Generation frame').element()) as HTMLElement);
+      await expect
+        .poll(tooltipText)
+        .toBe('Generation frame (C)Hold C to use it until you let go; tap C to stay on it.');
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
   });
 });
