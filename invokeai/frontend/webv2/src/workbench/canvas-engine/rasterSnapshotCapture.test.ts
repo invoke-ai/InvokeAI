@@ -422,3 +422,87 @@ describe('snapshot lifetime', () => {
     expect(harness.memory.getAvailableBytes()).toBe(before);
   });
 });
+
+describe('region capture accounting and cleanup', () => {
+  it.each(['stale', 'aborted'] as const)('releases a read lease returned after capture becomes %s', async (status) => {
+    const controller = new AbortController();
+    const live = okPixels('a');
+    const pin = harness.memory.pin('a');
+    if (live.status !== 'ok') {
+      throw new Error('expected live pixels');
+    }
+    live.release = vi.fn(() => pin.release());
+    harness.rasterize.mockImplementation(() => {
+      if (status === 'stale') {
+        harness.state.directPixelEpoch++;
+      } else {
+        controller.abort();
+      }
+      return Promise.resolve(live);
+    });
+    const capture = createRasterSnapshotCapture(harness.deps);
+    const result = await capture.captureRasterSnapshot(capture.captureDocumentSnapshot()!, ['a'], {
+      region: { x: 0, y: 0, width: 1, height: 1 },
+      signal: controller.signal,
+    });
+    expect(result.status).toBe(status);
+    expect(live.release).toHaveBeenCalledOnce();
+    expect(harness.memory.isPinned('a')).toBe(false);
+    expect(harness.memory.snapshot()).toMatchObject({ reservedBytes: 0, detachedBytes: 0 });
+  });
+
+  it.each([100, 1000])(
+    'tops up an underestimated source before allocating a cropped surface with a %i byte budget',
+    async (budget) => {
+      const memory = new RasterMemoryBudgetController({ budgetBytes: budget });
+      const createSurface = vi.fn((width: number, height: number) => surface(width, height));
+      const h = makeHarness({ createSurface }, memory);
+      const live = okPixels('a', 20);
+      if (live.status !== 'ok') {
+        throw new Error('expected live pixels');
+      }
+      h.currentGuards.add(live.guard);
+      h.rasterize.mockResolvedValue(live);
+      const capture = createRasterSnapshotCapture(h.deps);
+      const result = await capture.captureRasterSnapshot(capture.captureDocumentSnapshot()!, ['a', 'a'], {
+        region: { x: 10, y: 10, width: 8, height: 8 },
+      });
+      expect(h.rasterize).toHaveBeenCalledOnce();
+      if (budget === 100) {
+        expect(result.status).toBe('over-budget');
+        expect(createSurface).not.toHaveBeenCalled();
+      } else {
+        expect(result.status).toBe('ok');
+        if (result.status !== 'ok') {
+          throw new Error('expected captured pixels');
+        }
+        expect(result.snapshot.layerSurfaces.get('a')?.rect).toEqual({ x: 9, y: 9, width: 10, height: 10 });
+        expect(memory.snapshot().detachedBytes).toBe(400);
+        result.snapshot.release();
+      }
+      expect(live.release).toHaveBeenCalledOnce();
+      expect(memory.isPinned('a')).toBe(false);
+      expect(memory.snapshot()).toMatchObject({ reservedBytes: 0, detachedBytes: 0 });
+    }
+  );
+
+  it('represents a disjoint layer without copying its pixels or losing its original bounds', async () => {
+    const createSurface = vi.fn((width: number, height: number) => surface(width, height));
+    const h = makeHarness({ createSurface });
+    const capture = createRasterSnapshotCapture(h.deps);
+    const result = await capture.captureRasterSnapshot(capture.captureDocumentSnapshot()!, ['a'], {
+      region: { x: 100, y: 100, width: 10, height: 10 },
+    });
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') {
+      throw new Error('expected captured pixels');
+    }
+    const layer = result.snapshot.layerSurfaces.get('a')!;
+    expect(layer.rect).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+    expect(layer.sourceRect).toEqual({ x: 0, y: 0, width: 4, height: 4 });
+    expect(createSurface).toHaveBeenCalledWith(1, 1);
+    expect(layer.surface.ctx.drawImage).not.toHaveBeenCalled();
+    expect(h.memory.snapshot().detachedBytes).toBe(4);
+    result.snapshot.release();
+  });
+});

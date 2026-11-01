@@ -116,6 +116,31 @@ const createImages = (count) =>
     };
   });
 
+/**
+ * Wan text-to-video metadata in the shape the video graph builders record (`core_metadata`), so Preview Details
+ * parses rows and the media menu offers recall. The mock catalog serves no Wan main, so the model is a plausible
+ * identifier that recall reports as not installed.
+ */
+const wanT2vMetadata = (positivePrompt, seed) => ({
+  cfg_scale: 5,
+  fps: 16,
+  generation_mode: 'wan_t2v',
+  height: 480,
+  model: {
+    base: 'wan',
+    hash: 'blake3:fixture-wan-2-2-t2v-a14b',
+    key: 'fixture-wan-t2v-a14b',
+    name: 'Wan 2.2 T2V A14B',
+    type: 'main',
+  },
+  negative_prompt: 'blurry, low quality, static frame',
+  num_frames: 81,
+  positive_prompt: positivePrompt,
+  seed,
+  steps: 30,
+  width: 832,
+});
+
 const createVideos = () => [
   {
     board_id: null,
@@ -125,7 +150,7 @@ const createVideos = () => [
     graph: '{"nodes":[{"id":"fixture-video-output","type":"wan_l2v"}]}',
     height: 64,
     is_intermediate: false,
-    metadata: { codec: 'h264', prompt: 'wan fixture' },
+    metadata: wanT2vMetadata('wan fixture', 1234567),
     owner_user_id: 'fixture-user',
     starred: true,
     thumbnail_url: `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}/thumbnail`,
@@ -144,7 +169,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'board cover fixture' },
+    metadata: wanT2vMetadata('board cover fixture', 2345678),
     owner_user_id: 'fixture-user',
     starred: true,
     thumbnail_url: '/api/v1/videos/i/fixture-video-board.mp4/thumbnail',
@@ -221,7 +246,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'project board fixture' },
+    metadata: wanT2vMetadata('project board fixture', 3456789),
     owner_user_id: 'fixture-user',
     starred: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-project.mp4/thumbnail',
@@ -259,7 +284,7 @@ const createVideos = () => [
     graph: null,
     height: 64,
     is_intermediate: false,
-    metadata: { prompt: 'previous-day fixture' },
+    metadata: wanT2vMetadata('previous-day fixture', 4567890),
     owner_user_id: 'fixture-user',
     starred: false,
     thumbnail_url: '/api/v1/videos/i/fixture-video-old.mp4/thumbnail',

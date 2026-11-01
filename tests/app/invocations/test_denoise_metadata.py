@@ -21,6 +21,7 @@ from invokeai.app.invocations.flux.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.flux2.flux2_control import Flux2ControlField
 from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
+from invokeai.app.invocations.flux3.flux3_denoise import Flux3DenoiseInvocation
 from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
 from invokeai.app.invocations.krea2.krea2_denoise import Krea2DenoiseInvocation
 from invokeai.app.invocations.ltx2.ltx2_denoise import LTX2DenoiseInvocation, LTX2DenoiseOutput
@@ -114,7 +115,7 @@ def _discover_denoise_invocations() -> list[type[BaseInvocation]]:
 
 def test_all_denoise_invocations_conform_to_metadata_contract() -> None:
     denoise_classes = _discover_denoise_invocations()
-    assert len(denoise_classes) >= 22  # 18 active denoise nodes + 4 deprecated *_meta wrappers
+    assert len(denoise_classes) >= 23  # 19 active denoise nodes + 4 deprecated *_meta wrappers
 
     for cls in denoise_classes:
         node_type = cls.get_type()
@@ -411,6 +412,54 @@ def test_flux_and_flux2_denoise_build_metadata() -> None:
     assert len(flux2_md["loras"]) == 1
     assert len(flux2_md["controlnets"]) == 1
     assert flux2_md["seed"] == 202
+
+    flux3_tf_id = _make_model_id(key="flux3-tf", base=BaseModelType.Flux3)
+    flux3_lora_id = _make_model_id(key="flux3-lora", base=BaseModelType.Flux3, model_type=ModelType.LoRA)
+    flux3_node = Flux3DenoiseInvocation.model_construct(
+        latents=None,
+        denoise_mask=None,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        add_noise=True,
+        transformer=TransformerField(transformer=flux3_tf_id, loras=[LoRAField(lora=flux3_lora_id, weight=0.75)]),
+        cfg_scale=3.5,
+        width=1024,
+        height=768,
+        steps=16,
+        seed=303,
+        vae=VAEField(vae=vae_id),
+        metadata=None,
+    )
+    flux3_md = flux3_node._build_metadata().root
+    assert flux3_md["generation_mode"] == "flux3_txt2img"
+    assert flux3_md["width"] == 1024
+    assert flux3_md["height"] == 768
+    assert flux3_md["steps"] == 16
+    assert flux3_md["cfg_scale"] == 3.5
+    assert flux3_md["denoising_start"] == 0.0
+    assert flux3_md["denoising_end"] == 1.0
+    assert flux3_md["add_noise"] is True
+    assert flux3_md["seed"] == 303
+    assert flux3_md["model"] == flux3_tf_id
+    assert flux3_md["vae"] == vae_id
+    assert len(flux3_md["loras"]) == 1
+    assert (
+        flux3_node.model_copy(update={"latents": LatentsField(latents_name="f3-lat")})
+        ._build_metadata()
+        .root["generation_mode"]
+        == "flux3_img2img"
+    )
+    assert (
+        flux3_node.model_copy(
+            update={
+                "latents": LatentsField(latents_name="f3-lat"),
+                "denoise_mask": DenoiseMaskField(mask_name="f3-mask"),
+            }
+        )
+        ._build_metadata()
+        .root["generation_mode"]
+        == "flux3_inpaint"
+    )
 
 
 def test_sd3_cogview4_zimage_anima_denoise_build_metadata() -> None:

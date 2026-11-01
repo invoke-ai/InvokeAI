@@ -1,33 +1,25 @@
 import type { CanvasDocumentSnapshot, LayerExportGuard } from '@workbench/canvas-engine/capabilities';
-import type {
-  CanvasDocumentContractV3,
-  CanvasLayerContract,
-  CanvasStateContractV3,
-} from '@workbench/canvas-engine/contracts';
+import type { CanvasStateContractV3 } from '@workbench/canvas-engine/contracts';
 import type { ExportLayerPixelsResult } from '@workbench/canvas-engine/controllers/rasterExportController';
 import type { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
-import type { CanvasRasterSnapshot, CaptureRasterSnapshotResult } from '@workbench/canvas-engine/rasterTransactions';
+import type {
+  CanvasDetachedLayerSurface,
+  CanvasRasterSnapshot,
+  CaptureRasterSnapshotOptions,
+  CaptureRasterSnapshotResult,
+} from '@workbench/canvas-engine/rasterTransactions';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
+import { getRasterSnapshotCaptureRect } from '@workbench/canvas-engine/render/rasterComposite';
 
 const BYTES_PER_PIXEL = 4;
 
-/** Reserve source-estimated raster bytes before capture; top up with actual layer costs after rasterization. */
-const estimatedLayerBytes = (layer: CanvasLayerContract, document: CanvasDocumentContractV3): number => {
-  const source = renderableSourceOf(layer);
-  if (source?.type === 'image') {
-    return source.image.width * source.image.height * BYTES_PER_PIXEL;
-  }
-  if (source?.type === 'paint' && source.bitmap) {
-    return source.bitmap.width * source.bitmap.height * BYTES_PER_PIXEL;
-  }
-  const contentRect = getSourceContentRect(layer, document);
-  return contentRect.width * contentRect.height * BYTES_PER_PIXEL;
-};
+// A disjoint layer keeps a transparent pixel so downstream Canvas2D drawing remains valid.
+const rectBytes = (rect: Rect): number => Math.max(1, rect.width) * Math.max(1, rect.height) * BYTES_PER_PIXEL;
 
 export interface CreateRasterSnapshotCaptureDeps {
   readonly memory: Pick<RasterMemoryBudgetController, 'pin' | 'reserve' | 'trackDetached'>;
@@ -53,7 +45,7 @@ export interface RasterSnapshotCapture {
   captureRasterSnapshot(
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
+    options?: CaptureRasterSnapshotOptions
   ): Promise<CaptureRasterSnapshotResult>;
   /** Releases every snapshot still held, for engine teardown. */
   releaseActiveSnapshots(): void;
@@ -93,7 +85,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
   const captureRasterSnapshot = async (
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
+    options?: CaptureRasterSnapshotOptions
   ): Promise<CaptureRasterSnapshotResult> => {
     if (options?.signal?.aborted) {
       return { status: 'aborted' };
@@ -108,6 +100,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
 
     const document = documentSnapshot.canvas.document;
     const uniqueLayerIds = [...new Set(layerIds)];
+    const estimatedBytes = new Map<string, number>();
     let requestedBytes = 0;
     for (const layerId of uniqueLayerIds) {
       const layer = lookupDocumentLayer(document, layerId);
@@ -115,7 +108,11 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       if (!layer || !source || !isSupportedExportSource(source)) {
         return { status: 'not-ready' };
       }
-      requestedBytes += estimatedLayerBytes(layer, document);
+      const content = getSourceContentRect(layer, document);
+      const rect = getRasterSnapshotCaptureRect(document, layer, options?.region, content);
+      const bytes = options?.region ? rectBytes(rect) : content.width * content.height * BYTES_PER_PIXEL;
+      estimatedBytes.set(layerId, bytes);
+      requestedBytes += bytes;
     }
 
     const reservation = reserveBytes(requestedBytes, captureLifecycleGeneration);
@@ -125,7 +122,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
     const reservationLeases: { release(): void }[] = [reservation.lease];
     // Earlier layers stay resident while later ones rasterize, so the final guard check cannot fail spuriously.
     const pinLeases = uniqueLayerIds.map((layerId) => memory.pin(layerId));
-    const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
+    const layerSurfaces = new Map<string, CanvasDetachedLayerSurface>();
     const emptyLayerIds = new Set<string>();
     const capturedGuards: LayerExportGuard[] = [];
     let actualDetachedBytes = 0;
@@ -142,9 +139,15 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
           signal: options?.signal,
         });
         if (options?.signal?.aborted) {
+          if (liveResult.status === 'ok') {
+            liveResult.release();
+          }
           return { status: 'aborted' };
         }
         if (!isDocumentSnapshotCurrent(documentSnapshot)) {
+          if (liveResult.status === 'ok') {
+            liveResult.release();
+          }
           return { status: 'stale' };
         }
         if (liveResult.status === 'empty') {
@@ -167,11 +170,20 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
         }
         capturedGuards.push(live.guard);
         try {
-          const actualBytes = live.surface.width * live.surface.height * BYTES_PER_PIXEL;
+          const rect = getRasterSnapshotCaptureRect(
+            document,
+            lookupDocumentLayer(document, layerId)!,
+            options?.region,
+            {
+              ...live.rect,
+              width: live.surface.width,
+              height: live.surface.height,
+            }
+          );
+          const actualBytes = rectBytes(rect);
           // The up-front reservation was an estimate from the source; a surface
           // that rasterized larger has to be paid for before it is detached.
-          const snapshotLayer = lookupDocumentLayer(document, layerId)!;
-          const additionalBytes = Math.max(0, actualBytes - estimatedLayerBytes(snapshotLayer, document));
+          const additionalBytes = Math.max(0, actualBytes - estimatedBytes.get(layerId)!);
           if (additionalBytes > 0) {
             const additional = reserveBytes(additionalBytes, captureLifecycleGeneration);
             if (additional.status === 'over-budget') {
@@ -179,11 +191,17 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
             }
             reservationLeases.push(additional.lease);
           }
-          const detached = deps.createSurface(live.surface.width, live.surface.height);
+          const detached = deps.createSurface(Math.max(1, rect.width), Math.max(1, rect.height));
           detached.ctx.setTransform(1, 0, 0, 1, 0, 0);
           detached.ctx.clearRect(0, 0, detached.width, detached.height);
-          detached.ctx.drawImage(live.surface.canvas, 0, 0);
-          layerSurfaces.set(layerId, { rect: { ...live.rect }, surface: detached });
+          if (rect.width > 0 && rect.height > 0) {
+            detached.ctx.drawImage(live.surface.canvas, live.rect.x - rect.x, live.rect.y - rect.y);
+          }
+          layerSurfaces.set(layerId, {
+            rect: options?.region ? rect : { ...live.rect },
+            ...(options?.region ? { sourceRect: { ...live.rect } } : {}),
+            surface: detached,
+          });
           actualDetachedBytes += actualBytes;
         } finally {
           live.release();

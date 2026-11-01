@@ -44,6 +44,32 @@ const waitFor = async <Value,>(assertion: () => Value): Promise<Value> => {
   return value as Value;
 };
 
+/**
+ * Zag commits measurements from timers through React state, which an open act scope holds back; poll between short
+ * act scopes so every check sees committed layout.
+ */
+const waitForCommittedLayout = async (assertion: () => void, timeoutMs = 2000): Promise<void> => {
+  const startedAt = Date.now();
+
+  for (;;) {
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 50);
+        })
+    );
+
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt > timeoutMs) {
+        throw error;
+      }
+    }
+  }
+};
+
 const waitForDebounce = () =>
   act(
     () =>
@@ -376,6 +402,46 @@ describe('CommandPaletteDialog interaction', () => {
     expect(document.body.textContent).not.toContain('Old result');
     await act(() => userEvent.keyboard('{Enter}'));
     expect(oldRun).not.toHaveBeenCalled();
+  });
+
+  it('resizes and hides the results scrollbar as a query narrows the rows', async () => {
+    const { input } = await renderPalette({
+      entries: [
+        ...Array.from({ length: 40 }, (_, index) => entry(`command-${index}`, `Command ${index}`)),
+        ...Array.from({ length: 12 }, (_, index) => entry(`zebra-${index}`, `Zebra ${index}`)),
+      ],
+    });
+    const listbox = document.getElementById('command-palette-results')!;
+    const viewport = listbox.parentElement!;
+    const scrollbar = viewport.parentElement!.querySelector<HTMLElement>(':scope > [data-part="scrollbar"]')!;
+    const thumb = scrollbar.querySelector<HTMLElement>('[data-part="thumb"]')!;
+    /** Zag sizes the thumb to the visible share of the track. */
+    const expectThumbToMatchContent = () =>
+      expect(thumb.getBoundingClientRect().height).toBeCloseTo(
+        (scrollbar.clientHeight * viewport.clientHeight) / viewport.scrollHeight,
+        -1
+      );
+
+    await act(() => userEvent.fill(input, 'Command'));
+    await waitForCommittedLayout(() => {
+      expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight * 3);
+      expect(scrollbar.hasAttribute('data-overflow-y')).toBe(true);
+      expectThumbToMatchContent();
+    });
+
+    // Fewer rows that still overflow: the viewport stays at its cap, so only the content resizes.
+    await act(() => userEvent.fill(input, 'Zebra'));
+    await waitForCommittedLayout(() => {
+      expect(viewport.scrollHeight).toBeLessThan(viewport.clientHeight * 2);
+      expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+      expectThumbToMatchContent();
+    });
+
+    await act(() => userEvent.fill(input, 'Zebra 1'));
+    await waitForCommittedLayout(() => {
+      expect(viewport.scrollHeight).toBeLessThanOrEqual(viewport.clientHeight);
+      expect(scrollbar.hasAttribute('data-overflow-y')).toBe(false);
+    });
   });
 
   it('renders no interactive descendants inside listbox options', async () => {

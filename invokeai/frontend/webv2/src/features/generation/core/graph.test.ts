@@ -15,6 +15,7 @@ import type {
 import { getDefaultGenerateSettings, isSupportedGenerateModel } from './baseGenerationPolicies';
 import { compileGenerateGraph, resolveGenerateSeed } from './graph';
 import { generateGraphCases, satisfiedSettingsFor } from './graphCoverage.testing';
+import { getReferenceImagePromptTags } from './referenceImage';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const sd2Model: MainModelConfig = { base: 'sd-2', key: 'sd2-model', name: 'SD 2', type: 'main' };
@@ -582,7 +583,7 @@ describe('compileGenerateGraph', () => {
   });
 
   it('rejects dimensions that are not on the selected model family grid', () => {
-    expect(() => compile(flux2Model, { height: 888 })).toThrow('Generate height must be a multiple of 16.');
+    expect(() => compile(flux2Model, { height: 888 })).toThrow('Height must be a multiple of 16.');
   });
 
   it('builds an Anima graph with required components', () => {
@@ -718,7 +719,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('Reference Image #1 is not supported by anima model.');
+      ).toThrow('cannot use reference image 1');
     });
   });
 
@@ -1272,6 +1273,13 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
     expect(getEdge(graph, 'pos_cond', 'prompt')?.source.node_id).toBe('caption_builder');
+    // Metadata records the encoded caption next to the prompt the user typed, which recall restores.
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+    expect(getEdge(graph, metadata.id, 'ideogram4_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'caption_builder',
+    });
+    expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
     // Ideogram 4's denoise node has no negative conditioning input at all.
     expect(graph.nodes.neg_cond).toBeUndefined();
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
@@ -1459,6 +1467,66 @@ describe('Qwen-Image-2.1 graphs', () => {
   });
 });
 
+describe('FLUX.3 graphs', () => {
+  const kleinModel: MainModelConfig = {
+    base: 'flux3',
+    format: 'diffusers',
+    key: 'flux3-klein',
+    name: 'FLUX.3 Klein',
+    type: 'main',
+    variant: 'flux3_klein',
+  };
+  const kleinBaseModel: MainModelConfig = {
+    ...kleinModel,
+    key: 'flux3-klein-base',
+    name: 'FLUX.3 Klein Base',
+    variant: 'flux3_klein_base',
+  };
+  const reference = (id: string, isEnabled = true): GenerateReferenceImage => ({
+    config: {
+      image: { original: { image: { height: 512, image_name: `${id}.png`, width: 512 } } },
+      type: 'flux2_reference_image',
+    },
+    id,
+    isEnabled,
+  });
+
+  /** The reference images in the order the denoiser receives them, walking the collect chain back from it. */
+  const denoiserReferenceOrder = (graph: ReturnType<typeof compile>): string[] => {
+    const names: string[] = [];
+    let collect = getEdge(graph, 'denoise_latents', 'kontext_conditioning')?.source.node_id;
+    while (collect) {
+      const kontextId = getEdge(graph, collect, 'item')?.source.node_id;
+      const kontext = kontextId ? graph.nodes[kontextId] : undefined;
+      names.unshift((kontext as { image?: { image_name: string } } | undefined)?.image?.image_name ?? '?');
+      collect = getEdge(graph, collect, 'collection')?.source.node_id;
+    }
+    return names;
+  };
+
+  it('hands the denoiser the references in the order their prompt tags number them', () => {
+    const referenceImages = [reference('a'), reference('off', false), reference('b')];
+
+    const graph = compile(kleinModel, { referenceImages });
+
+    expect(denoiserReferenceOrder(graph)).toEqual(['a.png', 'b.png']);
+    expect([...getReferenceImagePromptTags('flux3', referenceImages)]).toEqual([
+      ['a', '<ref_image_0>'],
+      ['b', '<ref_image_1>'],
+    ]);
+  });
+
+  it('compiles the negative branch only for Klein Base at its CFG default', () => {
+    const klein = compile(kleinModel);
+    const kleinBase = compile(kleinBaseModel);
+
+    expect(getEdge(klein, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
+    expect(getNodeByType(klein, 'flux3_denoise')).toMatchObject({ cfg_scale: 1, steps: 16 });
+    expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
+    expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
+  });
+});
+
 describe('ERNIE-Image graphs', () => {
   const ernieModel: MainModelConfig = {
     base: 'ernie-image',
@@ -1562,6 +1630,24 @@ describe('MOSS-Image graphs', () => {
     expect(getEdge(graph, 'canvas_output', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getEdge(graph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getNodeByType(graph, 'core_metadata')?.generation_mode).toBe('moss_image_txt2img');
+  });
+
+  it('routes the positive prompt through the layout node, which compiles a layout draft at the denoise size', () => {
+    const graph = compile(mossDiffusers, { height: 768, width: 1280 });
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+
+    expect(graph.nodes.layout_prompt).toMatchObject({
+      height: 768,
+      regions: [],
+      type: 'moss_image_layout_prompt',
+      width: 1280,
+    });
+    expect(getEdge(graph, 'layout_prompt', 'prompt')?.source).toEqual({ field: 'value', node_id: 'positive_prompt' });
+    expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    expect(getEdge(graph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
   });
 
   it('encodes the negative prompt only while CFG runs the negative branch', () => {
@@ -1801,7 +1887,7 @@ describe('PiD decode', () => {
 
   it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
     // Reject unsupported PiD rather than silently use ordinary decode.
-    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/does not support PiD/);
   });
 
   it('requires both PiD models before compiling', () => {

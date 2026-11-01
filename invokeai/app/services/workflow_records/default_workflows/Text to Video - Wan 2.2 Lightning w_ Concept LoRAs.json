@@ -1,7 +1,7 @@
 {
   "name": "Text to Video - Wan 2.2 Lightning w/ Concept LoRAs",
   "author": "InvokeAI",
-  "description": "Fast text-to-video generation with Wan 2.2 T2V A14B + the Lightning LoRA pair. Distillation lets the model converge in 4 steps with CFG 1.0 (no negative branch), roughly 20x faster than the standard T2V workflow at the cost of some image quality. Pick the high-noise Lightning LoRA on 'Apply LoRA (High)' and the low-noise one on 'Apply LoRA (Low)' — the 'auto' target routes each to the right expert when the LoRAs are tagged. Defaults: 832x480, 81 frames @ 16 FPS (~5 s).",
+  "description": "Fast text-to-video generation with Wan 2.2 T2V A14B + the Lightning LoRA pair. Distillation lets the model converge in 4 steps with CFG 1.0 (no negative branch), roughly 20x faster than the standard T2V workflow at the cost of some image quality. Pick the high-noise Lightning LoRA on 'Apply LoRA (High)' and the low-noise one on 'Apply LoRA (Low)' \u2014 the 'auto' target routes each to the right expert when the LoRAs are tagged. Defaults: 832x480, 81 frames @ 16 FPS (~5 s).",
   "version": "1.0.0",
   "contact": "",
   "tags": "wan2.2, text to video, video, lightning, lora",
@@ -221,7 +221,7 @@
       "type": "invocation",
       "data": {
         "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "",

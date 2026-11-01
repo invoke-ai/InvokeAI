@@ -6,7 +6,11 @@ import type {
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { getDocumentLeaves } from '@workbench/canvas-engine/api';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  documentFrom,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
@@ -27,7 +31,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { EngineDeps, RegistryTimers } from './engineRegistry';
 
-import { createEngineRegistry, getCanvasEngine, getOrCreateEngine } from './engineRegistry';
+import { createEngineRegistry, getCanvasEngine, getOrCreateEngine, isBlankCanvasDocument } from './engineRegistry';
+import { TOOL_MEMORY_WRITE_DELAY_MS } from './toolMemory';
 
 const createDeferred = <T>() => {
   let resolve!: (value: T) => void;
@@ -233,6 +238,94 @@ describe('createEngineRegistry', () => {
     expect(registry.getEngine('p1')).toBeUndefined();
   });
 
+  it('starts a blank canvas with nothing selected on the Brush, and one with content or a selected mask on View', () => {
+    const registry = createEngineRegistry();
+    expect(registry.getOrCreateEngine('blank', createFakeDeps()).interaction.get('activeTool')).toBe('brush');
+    const deps = createFakeDeps();
+    deps.mutationPort.dispatch({ document: documentFrom([layerContract('r1')]), type: 'replaceCanvasDocument' });
+    expect(registry.getOrCreateEngine('painted', deps).interaction.get('activeTool')).toBe('view');
+    // Older projects keep their empty inpaint mask selected: a first stroke must not paint it unasked.
+    const maskDeps = createFakeDeps();
+    const blank = createEmptyCanvasDocument();
+    const mask = layerContract('mask', 'inpaint_mask');
+    maskDeps.mutationPort.dispatch({
+      document: { ...blank, selectedLayerId: mask.id, stacks: stacksFrom([mask]) },
+      type: 'replaceCanvasDocument',
+    });
+    expect(isBlankCanvasDocument(maskDeps.mutationPort.getCanvasState()!.document)).toBe(true);
+    expect(registry.getOrCreateEngine('selected-mask', maskDeps).interaction.get('activeTool')).toBe('view');
+    registry.disposeAll();
+  });
+
+  it('hands a disposed engine’s tool, bookmark and dropped undo steps to its project’s next engine', async () => {
+    const fakeTimers = createFakeTimers();
+    const registry = createEngineRegistry({ gracePeriodMs: 30_000, timers: fakeTimers.timers });
+    const deps = createFakeDeps();
+    const engine = registry.getOrCreateEngine('p1', deps);
+    engine.tools.setTool('eraser');
+    engine.interaction.set('layerQuickSwitch', { bookmarkedLayerId: 'kept', previousLayerId: null });
+    const bbox = deps.mutationPort.getCanvasState()!.document.bbox;
+    for (const x of [8, 16]) {
+      engine.layers.commitStructural(
+        'Move frame',
+        { bbox: { ...bbox, x }, type: 'setCanvasBbox' },
+        {
+          bbox,
+          type: 'setCanvasBbox',
+        }
+      );
+    }
+    expect(engine.history.getEntries().dropped).toBeUndefined();
+
+    registry.releaseEngine('p1');
+    fakeTimers.flush();
+    await drainUntil(() => registry.getEngine('p1') === undefined);
+    expect(registry.getEngine('p1')).toBeUndefined();
+
+    const next = registry.getOrCreateEngine('p1', deps);
+    expect(next).not.toBe(engine);
+    expect(next.interaction.get('activeTool')).toBe('eraser');
+    expect(next.interaction.get('layerQuickSwitch').bookmarkedLayerId).toBe('kept');
+    expect(next.history.getEntries().dropped).toBe(2);
+    // Only the engine that followed the disposal says so; another project's engine dropped nothing.
+    expect(registry.getOrCreateEngine('p2', createFakeDeps()).history.getEntries().dropped).toBeUndefined();
+    // Clearing the history ends the note with the steps it was about.
+    next.history.clearHistory();
+    expect(next.history.getEntries().dropped).toBeUndefined();
+    registry.disposeAll();
+  });
+
+  it.each(['sam', 'transform'] as const)('reopens a canvas closed on the %s tool on View', async (tool) => {
+    const fakeTimers = createFakeTimers();
+    const registry = createEngineRegistry({ gracePeriodMs: 30_000, timers: fakeTimers.timers });
+    const deps = createFakeDeps();
+    deps.mutationPort.dispatch({ document: documentFrom([layerContract('r1')]), type: 'replaceCanvasDocument' });
+    const engine = registry.getOrCreateEngine('p1', deps);
+    engine.tools.setTool(tool);
+    expect(engine.interaction.get('activeTool')).toBe(tool);
+
+    registry.releaseEngine('p1');
+    fakeTimers.flush();
+    await drainUntil(() => registry.getEngine('p1') === undefined);
+
+    expect(registry.getOrCreateEngine('p1', deps).interaction.get('activeTool')).toBe('view');
+    registry.disposeAll();
+  });
+
+  it('records a frame resize asked for outside the canvas as one canvas undo step', () => {
+    const registry = createEngineRegistry();
+    const liveEngines = createLiveCanvasEngines();
+    const deps = createFakeDeps();
+    const engine = registry.getOrCreateEngine('p1', { ...deps, liveEngines });
+    const from = deps.mutationPort.getCanvasState()!.document.bbox;
+    const to = { ...from, width: from.width / 2, x: from.width / 4 };
+
+    expect(liveEngines.commitFrame('p1', from, to, 'Resize frame')).toBe(true);
+    expect(deps.mutationPort.getCanvasState()!.document.bbox).toEqual(to);
+    expect(engine.history.getEntries().past).toEqual(['Resize frame']);
+    registry.disposeAll();
+  });
+
   it('retains a dirty engine and retries cooldown before disposing it', async () => {
     const fakeTimers = createFakeTimers();
     const registry = createEngineRegistry({ gracePeriodMs: 30_000, timers: fakeTimers.timers });
@@ -259,6 +352,45 @@ describe('createEngineRegistry', () => {
 
     expect(registry.getEngine('p1')).toBeUndefined();
     expect(disposeSpy).toHaveBeenCalledOnce();
+  });
+
+  it('keeps tool options in step between a warm engine and the canvas opened meanwhile (A, B, back to A)', () => {
+    vi.useFakeTimers();
+    try {
+      let stored: Readonly<Record<string, unknown>> = {};
+      const listeners = new Set<() => void>();
+      const toolMemory: NonNullable<EngineDeps['toolMemory']> = {
+        read: () => stored,
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+        // As the preferences store does: the changed tools merge into the stored record.
+        write: (changed) => {
+          stored = { ...stored, ...changed };
+          listeners.forEach((listener) => listener());
+        },
+      };
+      const registry = createEngineRegistry({ timers: createFakeTimers().timers });
+      const a = registry.getOrCreateEngine('a', { ...createFakeDeps(), toolMemory });
+      a.interaction.set('brushOptions', { ...a.interaction.get('brushOptions'), size: 64 });
+      vi.advanceTimersByTime(TOOL_MEMORY_WRITE_DELAY_MS);
+      registry.releaseEngine('a');
+
+      const b = registry.getOrCreateEngine('b', { ...createFakeDeps(), toolMemory });
+      expect(b.interaction.get('brushOptions').size).toBe(64);
+      b.interaction.set('shapeOptions', { ...b.interaction.get('shapeOptions'), strokeWidth: 9 });
+      vi.advanceTimersByTime(TOOL_MEMORY_WRITE_DELAY_MS);
+      registry.releaseEngine('b');
+
+      // Still warm: A is reused, with B's shape, and B's save kept A's brush.
+      expect(registry.getOrCreateEngine('a', { ...createFakeDeps(), toolMemory })).toBe(a);
+      expect(a.interaction.get('shapeOptions').strokeWidth).toBe(9);
+      expect(stored).toMatchObject({ brush: { size: 64 }, shape: { strokeWidth: 9 } });
+      registry.disposeAll();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('cancels the pending disposal when the engine is re-acquired', () => {

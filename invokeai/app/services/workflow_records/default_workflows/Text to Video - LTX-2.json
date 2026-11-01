@@ -289,7 +289,7 @@
       "type": "invocation",
       "data": {
         "id": "denoise_latents",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "The four guidance scales here are the released Dev recipe (CFG 3 arrives over an edge, Audio CFG 7, STG 1, modality 3). Each scale away from its off value (1, or 0 for STG) costs one extra model evaluation per step.",

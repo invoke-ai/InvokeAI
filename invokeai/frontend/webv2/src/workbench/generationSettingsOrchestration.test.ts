@@ -31,47 +31,80 @@ const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE
 seedArchitectureCapabilities();
 
 describe('selectProjectGenerateModel', () => {
-  it('atomically stores reconciled model settings and returns cleared labels', () => {
+  it('stores a switch that loses nothing at once, with a revert patch for its Undo', () => {
     const currentModel = createModel('sdxl');
     const model = createModel('flux');
     const setSettings = vi.fn();
-    const currentValues = createSettings(currentModel, {
-      batchCount: 3,
-      loras: [{ isEnabled: true, model: sdxlLora, weight: 1 }],
-      positivePrompt: 'a lighthouse',
-      vae: sdxlVae,
-    });
+    const loras = [{ isEnabled: true, model: sdxlLora, weight: 1 }];
+    const currentValues = {
+      ...createSettings(currentModel, { batchCount: 3, loras, positivePrompt: 'a lighthouse' }),
+      model: currentModel,
+    };
 
-    const result = selectProjectGenerateModel({
+    const selection = selectProjectGenerateModel({
       isCanvasFrame: false,
       currentValues,
       generation: { setSettings },
       model,
-      models: [currentModel, model, sdxlLora, sdxlVae],
+      models: [currentModel, model, sdxlLora],
       projectId: 'project-1',
     });
 
-    expect(setSettings).toHaveBeenCalledOnce();
-    expect(setSettings).toHaveBeenCalledWith(
-      expect.objectContaining({
-        batchCount: 3,
-        loras: [],
-        model,
-        modelKey: model.key,
-        positivePrompt: 'a lighthouse',
-        seed: 7,
-        vae: null,
-      }),
+    expect(setSettings).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ batchCount: 3, loras, model, modelKey: model.key, positivePrompt: 'a lighthouse' }),
       'project-1'
     );
-    expect(result.clearedLabels).toEqual(expect.arrayContaining(['LoRAs', 'VAE']));
+    expect(selection).toMatchObject({ result: { changes: [{ count: 1, kind: 'turnedOff', subject: 'concepts' }] } });
+    expect(selection.status === 'switched' && selection.revertPatch).toMatchObject({
+      model: currentModel,
+      modelKey: currentModel.key,
+    });
+    expect(selection.status === 'switched' && selection.revertPatch).not.toHaveProperty('positivePrompt');
+  });
+
+  it('leaves a switch that removes something to the model card to confirm', () => {
+    const currentModel = createModel('sdxl');
+    const setSettings = vi.fn();
+
+    const selection = selectProjectGenerateModel({
+      isCanvasFrame: false,
+      currentValues: { ...createSettings(currentModel, { vae: sdxlVae }), model: currentModel },
+      generation: { setSettings },
+      model: createModel('flux'),
+      models: [currentModel, sdxlVae],
+      projectId: 'project-1',
+    });
+
+    expect(selection).toMatchObject({ status: 'needsConfirmation' });
+    expect(selection.status === 'needsConfirmation' && selection.result.changes).toContainEqual({
+      kind: 'removed',
+      subject: 'vae',
+    });
+    expect(setSettings).not.toHaveBeenCalled();
+  });
+
+  it('writes nothing when the project already uses the model, so no pointless Undo is offered', () => {
+    const model = createModel('sdxl');
+    const setSettings = vi.fn();
+
+    expect(
+      selectProjectGenerateModel({
+        isCanvasFrame: false,
+        currentValues: { ...createSettings(model), model },
+        generation: { setSettings },
+        model,
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).toEqual({ status: 'unchanged' });
+    expect(setSettings).not.toHaveBeenCalled();
   });
 
   it('initializes complete settings when the project has no Generate values', () => {
     const model = createModel('sdxl');
     const setSettings = vi.fn();
 
-    const result = selectProjectGenerateModel({
+    const selection = selectProjectGenerateModel({
       isCanvasFrame: false,
       currentValues: {},
       generation: { setSettings },
@@ -80,7 +113,11 @@ describe('selectProjectGenerateModel', () => {
       projectId: 'project-empty',
     });
 
-    expect(result.settings).toMatchObject({ height: 1024, modelKey: model.key, width: 1024 });
+    expect(selection).toMatchObject({
+      result: { settings: { height: 1024, modelKey: model.key, width: 1024 } },
+      revertPatch: null,
+      status: 'switched',
+    });
     expect(setSettings).toHaveBeenCalledWith(
       expect.objectContaining({ height: 1024, model, modelKey: model.key, width: 1024 }),
       'project-empty'

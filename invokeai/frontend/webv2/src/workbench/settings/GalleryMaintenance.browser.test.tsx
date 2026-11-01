@@ -72,7 +72,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => ({
 }));
 vi.mock('@workbench/palette/PaletteButton', () => ({ PaletteButton: () => null }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
-vi.mock('@workbench/shell/topbar/useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutLabel: () => null }));
 vi.mock('./store', async (importOriginal) => ({
   ...(await importOriginal<typeof SettingsStoreModule>()),
   useWorkbenchSettingsSelector: (selector: (snapshot: never) => unknown) => selector({ scope: 'user' } as never),
@@ -299,7 +299,6 @@ describe('gallery maintenance in Data & workspace settings', () => {
     }
     expect(host.textContent).toContain('settings.databaseMaintenance.compactDatabase');
     expect(host.textContent).toContain('settings.catalog.manageIntermediates');
-    expect(host.textContent).toContain('Clear saved data');
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
 
     mocks.canManageAppConfig = false;
@@ -307,7 +306,6 @@ describe('gallery maintenance in Data & workspace settings', () => {
     for (const action of operations) {
       expect(getButton(action.button)).toBeUndefined();
     }
-    expect(host.textContent).toContain('Clear saved data');
   });
 
   it.each(operations)('$operation previews before confirmation and cancel sends no execute request', async (action) => {
@@ -410,7 +408,7 @@ describe('gallery maintenance in Data & workspace settings', () => {
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(confirmButton.disabled).toBe(true);
     const cancelButton = [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')].find(
-      (button) => button.textContent?.includes('Cancel')
+      (button) => button.textContent?.includes('common.cancel')
     )!;
     expect(cancelButton.disabled).toBe(true);
     expect(getButton(operations[0].button)?.disabled).toBe(true);

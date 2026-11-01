@@ -137,6 +137,29 @@
         "string"
       ]
     },
+    "flux3": {
+      "componentsFilled": {
+        "klein-diffusers": [],
+        "klein-standalone": [
+          "qwen3VLEncoderModel",
+          "vae"
+        ],
+        "klein-base-diffusers": []
+      },
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "flux2_vae_decode",
+        "flux3_denoise",
+        "flux3_model_loader",
+        "flux3_text_encoder",
+        "flux_kontext",
+        "img_nsfw",
+        "img_watermark",
+        "integer",
+        "string"
+      ]
+    },
     "cogview4": {
       "componentsFilled": {
         "diffusers": [],
@@ -352,6 +375,7 @@
         "img_watermark",
         "integer",
         "moss_image_denoise",
+        "moss_image_layout_prompt",
         "moss_image_model_loader",
         "moss_image_text_encoder",
         "string"
@@ -624,6 +648,8 @@
     },
     "core_metadata": {
       "inputs": [
+        "ideogram4_caption",
+        "moss_image_layout_prompt",
         "negative_prompt",
         "positive_prompt",
         "seed"
@@ -661,6 +687,7 @@
           "ernie_image_txt2img",
           "flux_txt2img",
           "flux2_txt2img",
+          "flux3_txt2img",
           "ideogram4_txt2img",
           "krea2_txt2img",
           "moss_image_txt2img",
@@ -779,6 +806,7 @@
           false
         ],
         "steps": [
+          16,
           28,
           30,
           35,
@@ -1269,6 +1297,83 @@
         "image"
       ]
     },
+    "flux3_denoise": {
+      "inputs": [
+        "kontext_conditioning",
+        "negative_conditioning",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "vae"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          3.5
+        ],
+        "denoising_end": [
+          1
+        ],
+        "denoising_start": [
+          0
+        ],
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "steps": [
+          16,
+          50
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "flux3_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "qwen3_vl_encoder_model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": []
+      },
+      "outputs": [
+        "qwen3_vl_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "flux3_text_encoder": {
+      "inputs": [
+        "prompt",
+        "qwen3_vl_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
     "ideogram4_caption_builder": {
       "inputs": [
         "prompt"
@@ -1678,6 +1783,29 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "moss_image_layout_prompt": {
+      "inputs": [
+        "prompt"
+      ],
+      "literalInputs": {
+        "height": [
+          1024
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "regions": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1024
+        ]
+      },
+      "outputs": [
+        "value"
       ]
     },
     "moss_image_model_loader": {

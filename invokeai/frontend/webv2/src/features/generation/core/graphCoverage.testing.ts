@@ -52,6 +52,12 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
     { label: 'klein-9b-standalone', overrides: { format: 'gguf_quantized', variant: 'klein_9b' } },
   ],
+  // FLUX.3 Klein samples without CFG; Klein Base compiles the negative branch at its CFG default.
+  flux3: [
+    { label: 'klein-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein' } },
+    { label: 'klein-standalone', overrides: { format: 'gguf_quantized', variant: 'flux3_klein' } },
+    { label: 'klein-base-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein_base' } },
+  ],
 };
 
 const shapesForBase = (base: SupportedGenerateBase): readonly ModelShape[] => SHAPE_OVERRIDES[base] ?? DEFAULT_SHAPES;

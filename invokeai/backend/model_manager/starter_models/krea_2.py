@@ -57,6 +57,30 @@ krea2_turbo_nvfp4 = StarterModel(
     dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
 )
 
+krea2_turbo_fp8 = StarterModel(
+    name="Krea-2 Turbo (fp8)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/diffusion_models/krea2_turbo_fp8_scaled.safetensors",
+    description="Krea-2 Turbo transformer in Comfy-Org's scaled fp8 build. FP8 Storage is switched on when it is "
+    "installed, so its fp8 layers stay fp8, about 13.1GB once loaded. Ships only the transformer, so the Qwen-Image "
+    "VAE and Qwen3-VL encoder are installed as dependencies. ~13.1GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
+krea2_turbo_int8 = StarterModel(
+    name="Krea-2 Turbo (int8)",
+    base=BaseModelType.Krea2,
+    source="https://huggingface.co/Comfy-Org/Krea-2/resolve/1171f4dc7e325bf3734586942e737872506c73e1/diffusion_models/krea2_turbo_int8_convrot.safetensors",
+    description="Krea-2 Turbo transformer in Comfy-Org's int8_convrot build. Its int8 layers stay int8 on every "
+    "supported GPU, about 13.5GB once loaded; int8 Compute can run them on NVIDIA int8 tensor cores. Ships only the "
+    "transformer, so the Qwen-Image VAE and Qwen3-VL encoder are installed as dependencies. ~13.5GB",
+    type=ModelType.Main,
+    variant=Krea2VariantType.Turbo,
+    dependencies=[qwen_image_vae, qwen3_vl_encoder_4b],
+)
+
 krea2_turbo_gguf_q8_0 = StarterModel(
     name="Krea-2 Turbo (Q8_0 GGUF)",
     base=BaseModelType.Krea2,

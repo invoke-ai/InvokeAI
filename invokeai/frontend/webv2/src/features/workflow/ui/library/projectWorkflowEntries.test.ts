@@ -7,11 +7,13 @@ import { isUpdatableSource } from './projectWorkflowEntries';
 
 const session = (overrides: Partial<AuthSession> = {}): AuthSession => ({
   accountEpoch: 1,
+  expiredUserId: null,
   multiuserEnabled: true,
   phase: 'ready',
   sessionExpired: false,
   setupRequired: false,
   strictPasswordChecking: false,
+  switchingAccount: false,
   user: {
     created_at: '',
     display_name: null,

@@ -46,5 +46,9 @@ register(
         dimension_grid=16,
         guidance_label="Guidance",
         scheduler_set="flow",
+        # Regions are not masked: each becomes an `obj` element with a normalized bbox in the structured
+        # caption (`ideogram4_caption_builder`), which has no negative counterpart, so `regional_negative`
+        # keeps its False default.
+        supports_regional_guidance=True,
     ),
 )

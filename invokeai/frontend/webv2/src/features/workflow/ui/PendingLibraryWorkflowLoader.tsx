@@ -7,7 +7,7 @@ import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { requestLibraryCopyChoice } from '@features/workflow/ui/workflowUiStore';
-import { parseWorkflowJson } from '@features/workflow/utility';
+import { parseWorkflowJson, summarizeWorkflowLoadWarnings } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
   assertAccountScopeCurrent,
@@ -103,8 +103,10 @@ export const PendingWorkflowLoader = () => {
           });
         }
 
-        for (const warning of warnings) {
-          notify.info(t('commandPalette.workflowLoad.warning'), warning);
+        const warningSummary = summarizeWorkflowLoadWarnings(warnings);
+
+        if (warningSummary) {
+          notify.info(t('commandPalette.workflowLoad.warning'), warningSummary);
         }
       } catch (error) {
         if (!isAccountScopeCurrent(owner)) {

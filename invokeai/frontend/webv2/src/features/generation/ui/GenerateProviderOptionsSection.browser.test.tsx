@@ -10,6 +10,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
 
@@ -31,7 +32,6 @@ void i18n.use(initReactI18next).init({
         common: { scrubber: { editValue: 'Edit {{label}}' } },
         widgets: {
           generate: {
-            override: 'Override',
             overridesCount_one: '{{count}} override',
             overridesCount_other: '{{count}} overrides',
             providerOptions: {
@@ -185,7 +185,15 @@ describe('GenerateProviderOptionsSection', () => {
     expect(watermark?.checked).toBe(true);
     expect(optimizePrompt?.checked).toBe(false);
 
-    await settle(() => optimizePrompt?.click());
+    // Each switch is named by, and toggled from, its own visible label.
+    const labelOf = (input: HTMLInputElement | undefined) =>
+      document.getElementById(input?.getAttribute('aria-labelledby') ?? '');
+
+    expect(labelOf(watermark)?.textContent).toBe('Watermark');
+    expect(labelOf(optimizePrompt)?.textContent).toBe('Optimize prompt');
+
+    await act(() => userEvent.click(labelOf(optimizePrompt)!));
     expect(onCommit).toHaveBeenCalledWith({ seedreamOptimizePrompt: true });
+    expect(onCommit).not.toHaveBeenCalledWith({ seedreamWatermark: false });
   });
 });

@@ -1,9 +1,9 @@
 ---
 title: Qwen-Image-2.1
-description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders or a GGUF transformer, including transparent (RGBA) output.
-lastUpdated: 2026-10-22
+description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders, a GGUF or an int8 transformer, including transparent (RGBA) output.
+lastUpdated: 2026-11-01
 sidebar:
-  order: 8
+  order: 9
 ---
 ## Qwen-Image-2.1
 
@@ -24,7 +24,7 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 ### Installing Qwen-Image-2.1
 
-The starter models install the complete Diffusers folders, which carry the transformer, the VAE and the Qwen3-VL 8B encoder:
+The Diffusers starter models install the complete folders, which carry the transformer, the VAE and the Qwen3-VL 8B encoder:
 
 - [`Qwen/Qwen-Image-2.1`](https://huggingface.co/Qwen/Qwen-Image-2.1) — the base model, ~31 GB.
 - [`Qwen/Qwen-Image-2.1-Turbo`](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) — the Turbo variant, ~30 GB.
@@ -40,6 +40,8 @@ A GGUF or single-file transformer carries only the transformer. Pick the other t
 
 The **Qwen-Image-2.1 (Q4_K_M GGUF)** starter model, from [`unsloth/Qwen-Image-2.1-GGUF`](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF), installs the VAE and the 8B encoder with it, ~15 GB in all. Other quantization levels from that repository load the same way.
 
+The **Qwen-Image-2.1 (int8)** and **Qwen-Image-2.1 Turbo (int8)** starter models, Comfy-Org's `int8_convrot` builds (~7.3 GB each), install the same VAE and 8B encoder. Their int8 layers stay int8 on every supported GPU, and [int8 Compute](/configuration/optimization/int8-compute/) can run them on NVIDIA int8 tensor cores.
+
 Single-file transformers in bf16, scaled fp8 or `int8_convrot` (ComfyUI repackages) load as well. nvfp4 files, torchao-quantized files (such as unsloth's FP8 build), and int8 files without ComfyUI's `int8_convrot` marker, are refused at install. GGUF files with int8 layers (ComfyUI-GGUF's `Q8_CR`) are refused too.
 
 The Turbo variant is recognized from the filename: a single file or GGUF whose name contains `turbo` installs as Turbo, anything else as the base model. If a file was detected as the wrong variant, edit the model in the Model Manager and change its **Variant**. The default settings were chosen at install, so also set **Steps** under **Default Settings**: 8 for Turbo, 40 for the base model.
@@ -52,6 +54,7 @@ Measured on an RTX 4090 at 1024×1024:
 |---|---|---|
 | bf16 (Diffusers) | 13.9 GB during denoising | 0.62 s per step, about 25 s for 40 steps |
 | GGUF Q4_K_M | 4.0 GB | about 40 s for 40 steps |
+| int8 (`int8_convrot`) | 7.3 GB | about 37 s for 40 steps |
 
 The text encoder runs first and is unloaded from the GPU when the transformer needs the room. At 2048×2048 the bf16 transformer needs 15.5 GB and 3.7 s per step.
 

@@ -1,7 +1,7 @@
 /** Lead tab titles with progress because background tabs hide other indicators and truncate labels from the right. */
 
 /** Mirrors the static `<title>` in index.html, which is what we restore to. */
-export const DOCUMENT_TITLE_BASE = 'Invoke V7 Workbench';
+export const DOCUMENT_TITLE_BASE = 'Invoke Workbench';
 
 /** Shorten the running title's product label to leave room for progress in crowded tabs. */
 export const DOCUMENT_TITLE_PRODUCT = 'Invoke';

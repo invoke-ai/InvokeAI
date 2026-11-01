@@ -4,11 +4,20 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ImageMapWidgetFooter } from './ImageMapWidgetFooter';
+
+// The components read the global instance; give it the English catalog.
+await i18next.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -96,7 +105,7 @@ describe('ImageMapWidgetFooter', () => {
 
     expect(host?.textContent).toContain('6 points');
     expect(host?.textContent).toContain(
-      'Cluster count: 2, Largest cluster: 3 media points, Unclustered: 1 media point'
+      'Cluster count: 2, largest cluster: 3 media points, unclustered: 1 media point'
     );
   });
 
@@ -129,7 +138,7 @@ describe('ImageMapWidgetFooter', () => {
 
     const tooltip = document.querySelector('[role="tooltip"]');
 
-    expect(tooltip?.textContent).toBe('Cluster count: 2, Largest cluster: 3 media points, Unclustered: 1 media point');
+    expect(tooltip?.textContent).toBe('Cluster count: 2, largest cluster: 3 media points, unclustered: 1 media point');
   });
 
   it('says so when nothing clustered', async () => {
@@ -137,7 +146,7 @@ describe('ImageMapWidgetFooter', () => {
     await renderFooter([-1, -1, -1]);
 
     expect(host?.textContent).toContain(
-      'Cluster count: 0, Largest cluster: 0 media points, Unclustered: 3 media points'
+      'Cluster count: 0, largest cluster: 0 media points, unclustered: 3 media points'
     );
   });
 });

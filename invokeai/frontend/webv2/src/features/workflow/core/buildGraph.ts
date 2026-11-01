@@ -28,9 +28,9 @@ import {
   ForLoopGraphValidationError,
   getCanonicalWorkflowEdges,
   validateForLoopGraph,
-  type ForLoopValidationReason,
 } from './forLoops';
 import { getFormFieldTemplate } from './formFieldSettings';
+import { createWorkflowIssue, type WorkflowIssueReason, type WorkflowReadinessReason } from './readinessIssues';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';
 
@@ -104,7 +104,7 @@ const resolveBoardSentinel = (
 
 export interface ProjectGraphReadiness {
   canInvoke: boolean;
-  reasons: Array<string | ForLoopValidationReason>;
+  reasons: WorkflowReadinessReason[];
   /** Sessions one run produces through batch nodes; size is null while an async generator is unresolved. */
   batch: { size: number | null } | null;
 }
@@ -117,9 +117,9 @@ export interface ProjectGraphReadinessOptions {
 }
 
 /** The reason a batch of `sessions` sessions cannot be queued, or null while it fits. */
-export const getWorkflowBatchCapReason = (sessions: number): string | null =>
+export const getWorkflowBatchCapReason = (sessions: number): WorkflowIssueReason | null =>
   sessions > WORKFLOW_BATCH_MAX_ITEMS
-    ? `This batch would queue ${sessions.toLocaleString('en-US')} sessions; the queue accepts at most ${WORKFLOW_BATCH_MAX_ITEMS.toLocaleString('en-US')}.`
+    ? createWorkflowIssue('batchCap', { max: WORKFLOW_BATCH_MAX_ITEMS, sessions })
     : null;
 
 export const getProjectGraphReadiness = (
@@ -128,11 +128,11 @@ export const getProjectGraphReadiness = (
   options: ProjectGraphReadinessOptions = {}
 ): ProjectGraphReadiness => {
   if (templatesSnapshot.status === 'error') {
-    return { batch: null, canInvoke: false, reasons: ['Node definitions failed to load from the backend.'] };
+    return { batch: null, canInvoke: false, reasons: [createWorkflowIssue('templatesFailed')] };
   }
 
   if (templatesSnapshot.status !== 'loaded') {
-    return { batch: null, canInvoke: false, reasons: ['Node definitions are still loading.'] };
+    return { batch: null, canInvoke: false, reasons: [createWorkflowIssue('templatesLoading')] };
   }
 
   const templates = templatesSnapshot.templates;
@@ -140,25 +140,25 @@ export const getProjectGraphReadiness = (
   const canonicalEdges = getCanonicalWorkflowEdges(document);
 
   if (getExecutableNodes(document).length === 0) {
-    return {
-      batch: null,
-      canInvoke: false,
-      reasons: ['The project graph has no nodes. Add nodes in the Workflow view.'],
-    };
+    return { batch: null, canInvoke: false, reasons: [createWorkflowIssue('noNodes')] };
   }
 
-  const reasons: Array<string | ForLoopValidationReason> = [];
+  const reasons: WorkflowReadinessReason[] = [];
   const connectedInputs = new Set(
     canonicalEdges.map((edge) => `${edge.destination.node_id}:${edge.destination.field}`)
   );
 
   for (const node of invocationNodes) {
     const template = templates[node.data.type];
+    const onNode = { nodeId: node.id };
 
     if (!template) {
-      reasons.push(`Unknown node type "${node.data.type}".`);
+      reasons.push(createWorkflowIssue('unknownNodeType', { type: node.data.type }, onNode));
       continue;
     }
+
+    const nodeName = getNodeDisplayName(node, templates);
+    const onField = (fieldName: string) => ({ fieldName, nodeId: node.id });
 
     // The batch planner judges a batch node's own list (size, connections); the field rules would only repeat it.
     const batchCollectionField = getWorkflowBatchCollectionField(node.data.type);
@@ -167,17 +167,17 @@ export const getProjectGraphReadiness = (
       const workflowId = node.data.inputs.workflow_id?.value;
 
       if (typeof workflowId !== 'string' || workflowId.trim() === '') {
-        reasons.push('Call Saved Workflow requires a saved workflow.');
+        reasons.push(createWorkflowIssue('savedWorkflowRequired', { node: nodeName }, onField('workflow_id')));
         continue;
       }
 
       if (node.data.callSavedWorkflowStatus === 'loading' || node.data.callSavedWorkflowStatus === undefined) {
-        reasons.push('Call Saved Workflow inputs are still loading.');
+        reasons.push(createWorkflowIssue('savedWorkflowLoading', { node: nodeName }, onNode));
         continue;
       }
 
       if (node.data.callSavedWorkflowStatus === 'error') {
-        reasons.push('The selected saved workflow is unavailable or incompatible.');
+        reasons.push(createWorkflowIssue('savedWorkflowUnavailable', { node: nodeName }, onField('workflow_id')));
         continue;
       }
     }
@@ -192,7 +192,13 @@ export const getProjectGraphReadiness = (
         const list = node.data.inputs[inputTemplate.name]?.value;
 
         if (Array.isArray(list) && !list.every((item) => isWorkflowCollectionItemValid(inputTemplate, item))) {
-          reasons.push(`"${getNodeDisplayName(node, templates)}" has invalid input "${inputTemplate.title}".`);
+          reasons.push(
+            createWorkflowIssue(
+              'invalidInput',
+              { field: inputTemplate.title, node: nodeName },
+              onField(inputTemplate.name)
+            )
+          );
         }
 
         continue;
@@ -201,7 +207,11 @@ export const getProjectGraphReadiness = (
       if (inputTemplate.input === 'connection') {
         if (inputTemplate.required && !options.externallySatisfiedInputs?.has(`${node.id}:${inputTemplate.name}`)) {
           reasons.push(
-            `"${getNodeDisplayName(node, templates)}" is missing a connection for "${inputTemplate.title}".`
+            createWorkflowIssue(
+              'missingConnection',
+              { field: inputTemplate.title, node: nodeName },
+              onField(inputTemplate.name)
+            )
           );
         }
         continue;
@@ -214,9 +224,21 @@ export const getProjectGraphReadiness = (
       });
 
       if (inputTemplate.required && isMissingValue(node.data.inputs[inputTemplate.name]?.value)) {
-        reasons.push(`"${getNodeDisplayName(node, templates)}" is missing required input "${inputTemplate.title}".`);
+        reasons.push(
+          createWorkflowIssue(
+            'missingInput',
+            { field: inputTemplate.title, node: nodeName },
+            onField(inputTemplate.name)
+          )
+        );
       } else if (invalidReason) {
-        reasons.push(`"${getNodeDisplayName(node, templates)}" has invalid input "${inputTemplate.title}".`);
+        reasons.push(
+          createWorkflowIssue(
+            'invalidInput',
+            { field: inputTemplate.title, node: nodeName },
+            onField(inputTemplate.name)
+          )
+        );
       }
     }
   }
@@ -234,7 +256,7 @@ export const getProjectGraphReadiness = (
       }))
     )
   ) {
-    reasons.push('The project graph contains a cycle.');
+    reasons.push(createWorkflowIssue('cycle'));
   }
 
   const forLoopError = validateForLoopGraph(document);
