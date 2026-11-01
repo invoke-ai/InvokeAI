@@ -158,5 +158,9 @@ Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
 For SD 1.x / 2.x and FLUX.2, LyCORIS LoKr files may store either Kronecker operand whole or as a
 factorized `_a` / `_b` pair. FLUX.2 also accepts LoHA files in the same BFL and kohya layouts.
 
+Plain Qwen-Image LoRAs also load in ComfyUI's `diffusion_model.` key layout and as raw PEFT adapters
+(`base_model.model.`) when they train the blocks' modulation or MLP layers; see the
+[family page](/users-guide/models/local-models/qwen-image/#lora).
+
 [PiD decoders](/users-guide/image-generation/advanced-topics/pid-decode/) load for FLUX.1, FLUX.2, SD 3, SDXL and
 Qwen-Image (v1 and v1.5, bf16 and int8 builds). FLUX.3 and MOSS-Image use the FLUX.2 decoders.

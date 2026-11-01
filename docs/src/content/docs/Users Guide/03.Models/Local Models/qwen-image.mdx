@@ -145,6 +145,14 @@ Image**; connect an **Image to Latents - Qwen Image** node to the **Reference La
 Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer.
 In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**.
 
+Plain LoRAs saved in ComfyUI's layout, whose keys start with `diffusion_model.`, and raw PEFT adapters
+(`base_model.model.`) load as well, provided they train the blocks' modulation or MLP layers (`img_mod`,
+`txt_mod`, `img_mlp`, `txt_mlp`), as LoRAs in these layouts usually do. Other model families use the same key
+prefixes, so a LoRA in these layouts that trains only attention layers is not recognized and installs as an
+unknown model, and so do LoKR, LoHA and DoRA files in these layouts. A raw PEFT adapter's strength is set in
+its `adapter_config.json`, which is not read, so an adapter trained with `lora_alpha` different from `r`, or
+with rsLoRA, applies at a different strength.
+
 ## ControlNet
 
 Two ControlNets are starter models, both a single model for several conditions (~3.5 GB each, Apache 2.0):
