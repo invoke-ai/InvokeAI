@@ -1,13 +1,13 @@
 """The single-file Qwen3-VL encoder loader keeps Comfy's nvfp4 builds packed.
 
 `qwen3vl_8b_nvfp4.safetensors` (Comfy-Org, Ideogram 4) packs all seven projections of every layer, names them only in
-`.comfy_quant` markers, and keeps the token embedding and the LM head in scaled fp8. Community 4B repacks follow
-either that marker convention or name their layers in the safetensors header, one of the latter packing the visual
-tower too. Both reach the loader shared by Krea-2 and Ideogram 4. What these tests pin is the order: the packed
-layers leave the state dict before either side-channel branch reads a scale, come back packed under the transformers
-paths of a real `Qwen3VLModel`, are counted in the one reservation as they are held, and a folded scaled embedding is
-not re-quantized without its scale -- while the Linears an MXFP8 build folds still go to fp8 storage as before. The
-compute dtype is bf16, as in production: the packed global scale must not be cast with it.
+`.comfy_quant` markers, and keeps the token embedding and the LM head in scaled fp8. Community 4B repacks name their
+layers in `.comfy_quant` markers too; the safetensors header is ComfyUI's other way to name nvfp4 layers, which the
+loader honours as well. Both reach the loader shared by Krea-2 and Ideogram 4. What these tests pin is the order: the
+packed layers leave the state dict before either side-channel branch reads a scale, come back packed under the
+transformers paths of a real `Qwen3VLModel`, are counted in the one reservation as they are held, and a folded scaled
+embedding is not re-quantized without its scale -- while the Linears an MXFP8 build folds still go to fp8 storage as
+before. The compute dtype is bf16, as in production: the packed global scale must not be cast with it.
 """
 
 import json
@@ -49,7 +49,8 @@ PROJECTIONS = {
     "model.layers.0.mlp.up_proj": (INTERMEDIATE, HIDDEN),
     "model.layers.0.mlp.down_proj": (HIDDEN, INTERMEDIATE),
 }
-# A packed visual layer, as the header-named 4B repack ships one. The tower is dropped before anything reads it.
+# A packed visual layer, added in the header case. The tower is dropped before anything reads it, so the layer is
+# neither installed nor reserved for.
 VISUAL = "model.visual.blocks.0.mlp.linear_fc1"
 # The bf16 the folded embedding and the norms (two per layer, q/k norms, the final one) are held in.
 DENSE_ELEMENTS = VOCAB * HIDDEN + 2 * HIDDEN + 2 * HEAD_DIM + HIDDEN

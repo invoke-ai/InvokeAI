@@ -301,6 +301,21 @@ def _qwen3vl_tower_key(key: str) -> str:
     return qwen3vl_target_key(key)[len("visual.") :]
 
 
+def _remap_qwen3vl_tower_keys(entries: dict[str, Any], *, key_map: dict[str, str] | None = None) -> dict[str, Any]:
+    """Re-key tower tensors, or nvfp4 payloads by layer path, relative to the tower, refusing collisions.
+
+    `key_map` records old key -> new key when given, for `resolve_quantized_module_paths`.
+    """
+    out: dict[str, Any] = {}
+    source_of: dict[Any, Any] = {}
+    for key, value in entries.items():
+        new_key = _qwen3vl_tower_key(key)
+        _put_unique_key(out, new_key, value, source=key, source_of=source_of, what="Qwen3-VL vision tower")
+        if key_map is not None:
+            key_map[key] = new_key
+    return out
+
+
 def _load_qwen3vl_visual_tower(
     files: list[Path],
     vision_config: Any,
@@ -313,10 +328,11 @@ def _load_qwen3vl_visual_tower(
     Serves `SubModelType.VisionEncoder`: the encoders here drop their tower (see `drop_qwen3vl_visual_tower`),
     and Krea-2's edit mode loads it as its own cache entry, only when a prompt has reference images.
 
-    The tower ends up at the compute dtype whatever the container. Every single file seen so far stores it in
-    BF16, the fp8_scaled ones included; a ComfyUI ``int8_tensorwise`` repack quantizes its Linears too, and
-    those stay int8 as `Int8ConvrotLinear`, as on the encoder path. A scaled-fp8 tower would be folded to the
-    compute dtype: at ~0.8 GiB it does not earn an fp8 matmul path of its own.
+    The tower ends up at the compute dtype whatever the container, except for its quantized Linears, which are
+    handled as on the encoder path: a ComfyUI ``int8_tensorwise`` repack's stay int8 as `Int8ConvrotLinear`, and
+    Comfy ``nvfp4`` layers stay packed as `NVFP4Linear`. The single files seen so far, fp8_scaled and both nvfp4
+    builds, store the tower in BF16, so the nvfp4 path is for repacks that pack the tower too. A scaled-fp8 tower
+    would be folded to the compute dtype: at ~0.8 GiB it does not earn an fp8 matmul path of its own.
     """
     from transformers.models.qwen3_vl.modeling_qwen3_vl import Qwen3VLVisionModel
 
@@ -328,20 +344,27 @@ def _load_qwen3vl_visual_tower(
             "cannot read Krea-2 edit reference images. Use the Krea-2 Diffusers model's own encoder, or a Qwen3-VL "
             "single file or folder that includes the vision weights (e.g. qwen3vl_4b_bf16 or qwen3vl_4b_fp8_scaled)."
         )
+    # The nvfp4 layers leave first, as on the encoder path: the sidecar drop below strips the markers that name
+    # them, and the fp8 extraction discards their block scales. Each header names its layers in the key space `sd`
+    # is still in. Identification ignores the tower, so this is where an undecodable tower layer is refused.
+    header_layers: dict[str, Any] = {}
+    for path in files:
+        header_layers.update(parse_quantization_metadata(read_safetensors_metadata(path)))
+    try:
+        nvfp4_payloads = pop_nvfp4_layers(sd, header_layers=header_layers)
+    except ValueError as e:
+        raise ValueError(f"The {what}, which Krea-2 edit needs for reference images, cannot be loaded: {e}") from e
     # Markers are read in the checkpoint's key space, before the rename, as on the encoder path.
     int8_markers = extract_int8_convrot_markers(sd)
     reject_unmarked_int8_weights(sd, int8_markers, what)
     sd = drop_unconsumed_quantization_sidecars(sd)
     key_map: dict[str, str] = {}
-    renamed: dict[str, Any] = {}
-    source_of: dict[Any, Any] = {}
-    for key, value in sd.items():
-        key_map[key] = _qwen3vl_tower_key(key)
-        _put_unique_key(renamed, key_map[key], value, source=key, source_of=source_of, what=what)
-    sd = renamed
+    sd = _remap_qwen3vl_tower_keys(sd, key_map=key_map)
+    nvfp4_payloads = _remap_qwen3vl_tower_keys(nvfp4_payloads)
 
     with accelerate.init_empty_weights():
         tower = Qwen3VLVisionModel._from_config(vision_config)
+    skip_patterns = _model_declared_skip_patterns(tower)
 
     if int8_markers:
         install_int8_convrot_layers(
@@ -351,15 +374,27 @@ def _load_qwen3vl_visual_tower(
             dtype,
             architecture=what,
             reserve=reserve,
-            skip_patterns=_model_declared_skip_patterns(tower),
+            skip_patterns=skip_patterns,
+            # The branch's only reservation, and the nvfp4 layers are no longer in `sd`.
+            extra_reserved_bytes=predict_nvfp4_install_size(tower, nvfp4_payloads, dtype, skip_patterns),
         )
     else:
         # Whole keys were renamed, so each `.weight_scale` still sits beside its `.weight`.
         fp8_layers = extract_fp8_scaled_layers(sd)
-        reserve_for_load(reserve, sd, dtype, keep_fp8=False, model=tower, fp8_layers=fp8_layers, nvfp4_payloads={})
+        reserve_for_load(
+            reserve,
+            sd,
+            dtype,
+            keep_fp8=False,
+            model=tower,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads=nvfp4_payloads,
+            skip_patterns=skip_patterns,
+        )
         dequantize_fp8_scaled(sd, fp8_layers, dtype)
         cast_state_dict(sd, dtype, keep_fp8=False, model=tower)
 
+    install_nvfp4_layers(tower, sd, nvfp4_payloads, dtype, skip_patterns)
     load_state_dict_ignoring_extras(tower, sd, source=what, assign=True, allow_missing=True)
     _reject_incomplete_load(tower, what=what)
     return tower
