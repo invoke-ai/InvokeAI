@@ -1,7 +1,7 @@
 ---
 title: FLUX.1
 description: Generate and edit images with FLUX.1 dev, schnell, Krea dev and Kontext, plus FLUX Fill, Redux, IP-Adapter, ControlNets and Control LoRAs.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-01
 sidebar:
   order: 4
 ---
@@ -34,8 +34,9 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 See the [System Requirements](/start-here/system-requirements/) table. FLUX.1 needs about **10 GB of
 VRAM** and **32 GB of system RAM** at 1024×1024. Download totals with dependencies are roughly **12 GB**
-for the NF4 and GGUF Q4 builds, **18 GB** for the int8 build and **33 GB** for bfloat16. The int8
-transformer occupies about 11.5 GB on any supported GPU, so it streams on a 10 GB card.
+for the NF4 and GGUF Q4 builds, **18 GB** for the dev int8 and Krea dev fp8 builds, **20 GB** for the Krea
+dev int8 build and **33 GB** for bfloat16. The dev int8 transformer occupies about 11.5 GB on any supported
+GPU, so it streams on a 10 GB card.
 
 To fit a full-precision checkpoint in less memory, see [FP8 Storage](/configuration/optimization/fp8-storage/)
 and [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
@@ -60,6 +61,8 @@ Individual starter models for the main model:
 | FLUX.1 schnell (SDNQ uint4 + SVD) | [SDNQ](/configuration/optimization/sdnq-quantization/) Diffusers pipeline | ~15 GB, self-contained |
 | FLUX.1 Kontext dev (quantized) | GGUF Q4_K_M | ~12 GB with dependencies |
 | FLUX.1 Krea dev / Krea dev (quantized) | single file / GGUF Q4_K_M | ~29 GB / ~12 GB with dependencies |
+| FLUX.1 Krea dev (fp8) | Comfy-Org scaled fp8 single file | ~18 GB with dependencies; FP8 Storage is switched on at install, about 11.9 GB once loaded |
+| FLUX.1 Krea dev (int8) | int8 single file (community repack) | ~20 GB with dependencies; stays int8 on every supported GPU, about 14.1 GB once loaded |
 | FLUX Fill | single file | Inpainting model |
 
 Except for the self-contained SDNQ pipeline, a FLUX.1 main model is only the transformer, and needs three
