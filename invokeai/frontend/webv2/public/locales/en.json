@@ -343,7 +343,7 @@
     "profileDisplayNameHelp": "Shown instead of your email across the workspace.",
     "sessionExpired": "Your session expired. Sign in again to pick up where you left off.",
     "sessionEndingTitle": "Your session ends soon",
-    "sessionEndingDescription": "You'll be signed out at {{time}} unless you make a change before then. Signing back in returns you here.",
+    "sessionEndingDescription": "You'll be signed out at {{time}} if nothing is edited, saved or queued before then. Signing back in returns you here.",
     "setupFooter": "You can add more users later from Users in the Launchpad.",
     "setupSubtitle": "Create the administrator account to get started.",
     "setupTitle": "Set up Invoke",
