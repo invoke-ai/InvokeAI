@@ -648,6 +648,7 @@
     },
     "core_metadata": {
       "inputs": [
+        "ideogram4_caption",
         "moss_image_layout_prompt",
         "negative_prompt",
         "positive_prompt",
