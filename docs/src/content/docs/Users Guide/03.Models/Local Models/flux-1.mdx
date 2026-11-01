@@ -141,7 +141,9 @@ recommended.
 
 FLUX.1 LoRAs can be applied from the Generate tab or with the **Apply LoRA - FLUX** and **Apply LoRA
 Collection - FLUX** nodes. They patch the transformer and, where the LoRA includes text-encoder layers, the
-CLIP and T5 encoders.
+CLIP and T5 encoders. Supported layouts include LyCORIS, Diffusers/PEFT, OMI and ComfyUI/OneTrainer PEFT files
+whose module names start with `diffusion_model.`. Per-layer `.alpha` values in these `diffusion_model.` files set
+the LoRA scale.
 
 ## PiD super-resolution decode
 

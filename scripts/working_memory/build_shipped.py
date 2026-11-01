@@ -15,16 +15,22 @@ the line says `in_fit: false`: a check's (a forced math kernel, a ControlNet, mo
 features its estimator's line does not admit (`fit.Line.fits`), such as one with a materialized score matrix. It ships
 as an out-of-fit point that bounds its estimate from below only.
 
-A point joins the data file that declares its estimator's coefficients, keeping the larger of itself and a shipped
-point of the same measurement (`point_identity`), and says which it kept; the carried values are then refitted with
-`fit.py`. A stand-in stays one until fresh-process points at two sizes far enough apart measure its line:
-`probe_demand` points can raise it, never lower it. A `legacy` entry is replaced by its fit where the points fit every line it carries and each line has a point
-that holds the upper bound, a fresh-process one: probe windows alone never replace hand-set values. It keeps them
-otherwise.
+A point joins the data file that declares its estimator's coefficients, keeping the larger of itself and a shipped point
+of the same measurement (`point_identity`), and says which it kept; the carried values are then refitted with `fit.py`.
+A stand-in stays one until fresh-process points at two sizes far enough apart measure its line: `probe_demand` points
+can raise it, never lower it. A line that already covers its points by the shipped margin stays as it is; one that does
+not is raised by the least that keeps the upper bounds of the points priced on it (`fit.raised_pair`,
+`bounds.line_bounds`); a stand-in line that sits on another, a tiled VAE operation's, to the fit of its points read
+above their offsets (`fit.point_reading`), with its assembly line. A `legacy` entry is replaced by its fit where the points fit every line it carries within those
+bounds and each line has a point that holds the upper bound, a fresh-process one: probe windows alone never replace
+hand-set values. It keeps them otherwise.
 
-Without `--write` the changes are printed only. An export or point of another estimator version than the registered
-spec, or features the spec's terms cannot evaluate, is refused. So is a result any point's bounds
-(`working_memory/bounds.py`, the data test's rule) reject, and a line raised on a point flagged as fragmentation unless
+Without `--write` the changes are printed only. Exit status 2 refuses input the build cannot use: an export or point of
+another estimator version than the registered spec, features the spec's terms cannot evaluate, a platform
+`platform.MEASURED` does not list, or fresh-process points too few for a line. Exit status 1 refuses data that conflicts
+with the bounds, after printing the changes it would make, and writes nothing: points no line at or above the fit can
+cover within those upper bounds, with the points that conflict named; a result any point's bounds
+(`working_memory/bounds.py`, the data test's rule) reject; and a line raised on a point flagged as fragmentation unless
 `--accept-fragmentation` is given.
 """
 
@@ -48,7 +54,7 @@ from invokeai.app.services.working_memory_calibration.working_memory_calibration
     CalibrationPoint,
     CalibrationStoreFile,
 )
-from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, point_id
+from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, line_bounds, point_id
 from invokeai.backend.working_memory.coefficients import (
     CoefficientEntry,
     MeasuredPoint,
@@ -59,6 +65,9 @@ from invokeai.backend.working_memory.estimate import FeatureValue
 from invokeai.backend.working_memory.fit import (
     EntryKey,
     FitPoint,
+    LineBound,
+    LineConflict,
+    LineKey,
     base_values,
     capping_spans,
     entry_fit,
@@ -66,6 +75,7 @@ from invokeai.backend.working_memory.fit import (
     fit_points,
     fitted_values,
     point_reading,
+    raised_pair,
     shipped_pair,
     shipped_two_phase,
 )
@@ -97,6 +107,11 @@ PointIdentity = tuple[str, int, str, str, str, str, bool]
 
 class BuildError(ValueError):
     pass
+
+
+class BoundConflict(BuildError):
+    """Points no line can cover within the upper bounds of the points priced on it (`fit.LineConflict`): the data
+    conflicts with the bounds, which `main` refuses as it refuses a result the bounds reject, not as unusable input."""
 
 
 @dataclass(frozen=True)
@@ -442,15 +457,17 @@ carries."""
 
 def legacy_fit(
     entry: CoefficientEntry,
-    groups: Mapping[tuple[EntryKey, str], Sequence[FitPoint]],
+    groups: Mapping[LineKey, Sequence[FitPoint]],
     bases: Mapping[EntryKey, Mapping[str, float]],
-) -> tuple[dict[str, int], dict[str, str]]:
-    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups`, a line that sits on
-    another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not fit it, as its
-    capping points do not span (`fit.capping_spans`), or none of them holds the upper bound
-    (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never caps one, so probe windows alone never
-    replace hand-set values."""
-    values, problems = entry_fit(entry, groups, bases)
+    bounds: Mapping[LineKey, Sequence[LineBound]],
+) -> tuple[dict[str, float], dict[str, str]]:
+    """The fit that would replace a `legacy` entry's hand-set values (`fit.entry_fit` on `groups` within `bounds`, a
+    line that sits on another priced with `bases`, `fit.base_values`), and per line why its points cannot: they do not
+    fit it, as its capping points do not span (`fit.capping_spans`) or no raise keeps the bounds (`fit.LineConflict`),
+    or none of them holds the upper bound (`MeasuredPoint.holds_upper_bound`). A probe window raises a line but never
+    caps one, so probe windows alone never replace hand-set values."""
+    values, problems, conflicts = entry_fit(entry, groups, bases, bounds)
+    problems |= conflicts
     for suffix in problems:
         line = groups.get((entry_key(entry), suffix), [])
         if line and not any(point.caps for point in line):
@@ -464,9 +481,15 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
     requires. Any other stays a stand-in, raised where the fit of its points lies above it: `probe_demand` points bound
     it from below only, so they never lower it. A `legacy` entry whose points fit every line it carries, each line
     with a point that holds the upper bound (`legacy_fit`), is fitted from then on too; one they do not keeps its
-    hand-set values."""
+    hand-set values.
+
+    Every fit and raise of a line that sits on none keeps the upper bounds the points set (`bounds.line_bounds`): a
+    stand-in that covers its points by the shipped margin is kept, and one that does not is raised by the least the
+    bounds allow (`fit.raised_pair`). A stand-in that sits on another rises to the fit of its points read above their
+    offsets, with its assembly line, and the bounds are checked on the result (`bound_violations`). Raises `BoundConflict` where no line keeps the bounds, `BuildError` where the points cannot fit a line."""
     groups = fit_points(data.values(), specs)
-    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
+    ceilings = line_bounds(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups, ceilings)
     replaced: set[EntryKey] = set()
 
     def raised_stand_ins(entry: CoefficientEntry, bases: Mapping[EntryKey, Mapping[str, float]]) -> dict[str, float]:
@@ -478,9 +501,19 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
             raised[f"b_{suffix}"] = max(values[f"b_{suffix}"], pair[1])
 
         for suffix in sorted({name[2:] for name in entry.stand_ins}):
-            line = groups.get((entry_key(entry), suffix))
+            key = (entry_key(entry), suffix)
+            line = groups.get(key)
             # An assembly line is raised with the line whose second phase it prices.
             if not line or any(point.assembly == suffix for point in line):
+                continue
+            if not any(point.base for point in line):
+                floor = (values[f"k_{suffix}"], values[f"b_{suffix}"])
+                try:
+                    raised[f"k_{suffix}"], raised[f"b_{suffix}"] = raised_pair(floor, line, ceilings.get(key, ()))
+                except LineConflict as e:
+                    raise BoundConflict(
+                        f"the points cannot raise a stand-in: {entry.estimator} on {entry.platform}, {suffix}: {e}"
+                    ) from e
                 continue
             # Read as the fit reads them: a line that sits on another covers its points above their offsets.
             readings = [point_reading(point, bases) for point in line]
@@ -504,7 +537,7 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         entry = entry.model_copy(update={"stand_ins": stand_ins})
         if not entry.legacy:
             return entry
-        values, problems = legacy_fit(entry, groups, bases)
+        values, problems = legacy_fit(entry, groups, bases, ceilings)
         if not values or problems:
             return entry
         replaced.add(entry_key(entry))
@@ -515,11 +548,15 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
         for name, file in data.items()
     }
     try:
-        fitted = fitted_values(staged_data.values(), specs)
+        fitted = fitted_values(staged_data.values(), specs, ceilings)
+    except LineConflict as e:
+        raise BoundConflict(f"the points cannot fit a line: {e}") from e
     except ValueError as e:
         raise BuildError(f"the points cannot fit a line: {e}") from e
     # What the lines beneath price a raised stand-in's points at: the staged entries', as the fit prices them.
-    staged_bases = base_values([entry for file in staged_data.values() for entry in file.coefficients], groups)
+    staged_bases = base_values(
+        [entry for file in staged_data.values() for entry in file.coefficients], groups, ceilings
+    )
 
     def refitted(entry: CoefficientEntry) -> CoefficientEntry:
         if entry.values is None:
@@ -554,7 +591,8 @@ def legacy_notes(
     measures its platform, or the lines its points cannot replace (`legacy_fit`)."""
     measured = {point.estimator for point in new_points}
     groups = fit_points(data.values(), specs)
-    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups)
+    ceilings = line_bounds(data.values(), specs)
+    bases = base_values([entry for file in data.values() for entry in file.coefficients], groups, ceilings)
     notes = []
     for entry in (entry for file in data.values() for entry in file.coefficients):
         if not entry.legacy or entry.estimator not in measured:
@@ -562,7 +600,7 @@ def legacy_notes(
         if not any(key == entry_key(entry) for key, _ in groups):
             reasons = "no in-fit point measures this platform"
         else:
-            _, problems = legacy_fit(entry, groups, bases)
+            _, problems = legacy_fit(entry, groups, bases, ceilings)
             reasons = "; ".join(f"{suffix}: {problem}" for suffix, problem in problems.items())
         notes.append(f"note: {entry.estimator} {entry.platform} stays legacy: {reasons}")
     return notes
@@ -774,9 +812,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         build = build_points(exports, specs, entries)
         fresh = read_point_files(args.points, specs, entries)
         new_points = [*build.points, *fresh.points]
-        after = refit(merge_points(before, new_points), specs)
-        violations = bound_violations(after, specs)
-        reviews = review_lines(before, after, new_points, specs)
+        merged = merge_points(before, new_points)
+        conflict: BoundConflict | None = None
+        try:
+            after = refit(merged, specs)
+        except BoundConflict as e:
+            # The points still show, with their windows, so the conflict can be read against them.
+            after, conflict = merged, e
     except BuildError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
@@ -801,6 +843,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                 f": reserved MiB {', '.join(map(_mib, spread.reserved))} while allocated MiB "
                 f"{', '.join(map(_mib, spread.allocated))}; max/first {spread.first_to_max:.2f}"
             )
+    if conflict is not None:
+        print(f"error: not written: the points conflict with the bounds: {conflict}", file=sys.stderr)
+        return 1
+    violations = bound_violations(after, specs)
+    reviews = review_lines(before, after, new_points, specs)
     for change in reviews:
         (old_k, old_b), (new_k, new_b) = change.old, change.new
         flagged = change.fragmented(build.spreads)

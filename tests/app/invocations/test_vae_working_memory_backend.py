@@ -38,7 +38,13 @@ from invokeai.backend.util.vae_working_memory import (
     sd_vae_run_dtype,
 )
 from invokeai.backend.working_memory import platform as platform_module
-from invokeai.backend.working_memory.bounds import bound_violation, evaluate_point, fitted_decides, point_id
+from invokeai.backend.working_memory.bounds import (
+    bound_violation,
+    evaluate_point,
+    fitted_decides,
+    line_bounds,
+    point_id,
+)
 from invokeai.backend.working_memory.coefficients import ResolvedCoefficients, shipped_coefficients, shipped_data
 from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import base_values, carrier_of, entry_key, fit_points, point_reading
@@ -975,8 +981,9 @@ def test_the_fit_reads_every_shipped_point_its_floor_decides_at_what_it_reserves
     specs = {spec.id: spec for spec in (VAE_SD_SPEC, VAE_FLUX_SPEC, VAE_FLUX2_SPEC)}
     data = list(shipped_data().values())
     entries = [entry for file in data for entry in file.coefficients]
-    groups = fit_points(data, import_estimator_modules())
-    bases = base_values(entries, groups)
+    all_specs = import_estimator_modules()
+    groups = fit_points(data, all_specs)
+    bases = base_values(entries, groups, line_bounds(data, all_specs))
     decided = set()
     for point in (point for file in data for point in file.points):
         line = specs[point.estimator].line(point.features) if point.estimator in specs else None
