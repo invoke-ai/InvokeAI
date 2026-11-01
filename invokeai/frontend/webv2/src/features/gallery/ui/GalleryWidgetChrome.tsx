@@ -41,6 +41,17 @@ const LABEL_CLIP_CSS = { overflow: 'clip', overflowClipMargin: '4px' } as const;
 const DESTINATION_MAX_WIDTH = 'min(18rem, max(6.5rem, 50cqi - 3rem))';
 /** On a narrow header the trigger shows only the board; its accessible name still starts with "Saving to". */
 const DESTINATION_PREFIX_CSS = { '@container (width < 30rem)': { display: 'none' } } as const;
+/**
+ * Rails shrink with the viewport, past the size a drag can set. Measured on the header's content box (its border box
+ * less 20px of padding): below 20rem the label drops "Gallery /" so the board keeps room to name itself; below 15rem
+ * (a 920px window's rail) the destination also drops its name, keeping its icon and the chevron that marks it as a
+ * menu rather than a download button. Both accessible names stay whole.
+ */
+const NARROW_HEADER_HIDDEN_CSS = { '@container (width < 20rem)': { display: 'none' } } as const;
+const COMPACT_HEADER = '@container (width < 15rem)';
+const COMPACT_HIDDEN_CSS = { [COMPACT_HEADER]: { display: 'none' } } as const;
+/** Icon and chevron, inset like the header's icon buttons. */
+const DESTINATION_COMPACT_CSS = { [COMPACT_HEADER]: { px: '1' } } as const;
 /** The boards sidebar sits at the inline start, so its panel icon flips with the text direction. */
 const MIRRORED_IN_RTL = { transform: 'scaleX(-1)' } as const;
 
@@ -87,11 +98,11 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   return (
     <HStack css={LABEL_CLIP_CSS} flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       {region === 'center' ? null : (
-        <Text flexShrink={0} fontWeight="700" pe="2">
+        <Text css={NARROW_HEADER_HIDDEN_CSS} flexShrink={0} fontWeight="700" pe="2">
           {t('widgets.labels.gallery')}
         </Text>
       )}
-      <Text color="fg.subtle" flexShrink={0}>
+      <Text color="fg.subtle" css={region === 'center' ? undefined : NARROW_HEADER_HIDDEN_CSS} flexShrink={0}>
         /
       </Text>
       {/* No tooltip: it renders over the button and steals its hover. */}
@@ -197,6 +208,7 @@ export const GalleryWidgetHeaderActions = () => {
             // board, or the board alone on a narrow header) is contained in it, so label-in-name holds in every
             // language and a speech user can say what the button shows.
             aria-label={`${t('widgets.gallery.savingTo')} ${destinationName}. ${t('widgets.gallery.destinationTriggerHint')}`}
+            css={DESTINATION_COMPACT_CSS}
             data-gallery-destination={destination.boardId}
             maxW={DESTINATION_MAX_WIDTH}
             minW="0"
@@ -206,7 +218,7 @@ export const GalleryWidgetHeaderActions = () => {
             <Icon as={SquareArrowDownIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
             {/* One run of text, label and board joined by a space, so the visible text reads as the start of the
                 accessible name ("Saving to Inbox"); separate flex items would read as "Saving toInbox". */}
-            <HStack as="span" gap="0" minW="0">
+            <HStack as="span" css={COMPACT_HIDDEN_CSS} gap="0" minW="0">
               <Text as="span" color="fg.muted" css={DESTINATION_PREFIX_CSS} flexShrink={0} whiteSpace="pre">
                 {`${t('widgets.gallery.savingTo')} `}
               </Text>

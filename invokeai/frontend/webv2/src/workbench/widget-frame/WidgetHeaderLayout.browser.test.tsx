@@ -126,8 +126,10 @@ const intersects = (left: DOMRect, right: DOMRect) =>
   left.left < right.right && right.left < left.right && left.top < right.bottom && right.top < left.bottom;
 
 describe('gallery widget header', () => {
-  // 350px is the narrowest a side rail gets; 600px leaves room for every part.
-  it.each([350, 420, 600])(
+  // Rails shrink with the viewport below the size a drag can set. 205px and 250px are rails at 820px and 920px windows,
+  // where Saving to shows only its icon; at 260px and 300px the label has dropped "Gallery /" but Saving to keeps its
+  // name; 350px hides only the "Saving to" prefix; 600px leaves room for every part.
+  it.each([205, 250, 260, 300, 350, 420, 600])(
     'keeps the board and the destination apart at %ipx, truncating their names',
     async (width) => {
       await renderGalleryHeader(width, 'Mahogany House concept explorations', 'Client review selects for April');
@@ -144,10 +146,21 @@ describe('gallery widget header', () => {
       }
       expect(destinationRect.right).toBeLessThanOrEqual(settings.getBoundingClientRect().left);
       expect(settings.getBoundingClientRect().right).toBeLessThanOrEqual(header.right);
+      const boardName = boardButton.querySelector<HTMLElement>('[title="Mahogany House concept explorations"]')!;
+      expect(boardName.clientWidth).toBeGreaterThan(0);
+      expect(boardName.getBoundingClientRect().right).toBeLessThanOrEqual(destinationRect.left);
+      const destinationName = destination.querySelector<HTMLElement>('[title="Client review selects for April"]')!;
+      // The header's 20px of inline padding sits outside the container query's 15rem.
+      const isCompact = width - 20 < 240;
+      if (isCompact) {
+        // Saving to shows only its icon and chevron, so the board keeps the room to name itself.
+        expect(destinationName.getClientRects()).toHaveLength(0);
+        expect(destinationRect.width).toBeLessThanOrEqual(44);
+      }
       // Neither long name fits: both truncate inside their buttons.
       for (const [button, name] of [
         [boardButton, 'Mahogany House concept explorations'],
-        [destination, 'Client review selects for April'],
+        ...(isCompact ? [] : [[destination, 'Client review selects for April'] as const]),
       ] as const) {
         const text = button.querySelector<HTMLElement>(`[title="${name}"]`)!;
         // The head gives way with an ellipsis; the tail stays whole.
@@ -169,5 +182,23 @@ describe('gallery widget header', () => {
     await renderGalleryHeader(350, 'Concepts', 'Selects');
     expect(prefix()!.getClientRects()).toHaveLength(0);
     expect(destinationTrigger().getAttribute('aria-label')).toMatch(/^Saving to Selects\./);
+
+    await renderGalleryHeader(205, 'Concepts', 'Selects');
+    expect(destinationTrigger().getAttribute('aria-label')).toMatch(/^Saving to Selects\./);
+  });
+
+  it('drops the "Gallery" title on a narrow rail and keeps the board named', async () => {
+    const title = () => [...host!.querySelectorAll('p')].find((element) => element.textContent === 'Gallery');
+
+    for (const width of [350, 420]) {
+      await renderGalleryHeader(width, 'Concepts', 'Selects');
+      expect(title()!.getClientRects()).toHaveLength(1);
+    }
+
+    for (const width of [205, 250, 260, 300]) {
+      await renderGalleryHeader(width, 'Concepts', 'Selects');
+      expect(title()!.getClientRects()).toHaveLength(0);
+      expect(host!.querySelector('button[aria-label^="Toggle"]')!.getAttribute('aria-label')).toContain('Concepts');
+    }
   });
 });
