@@ -18,6 +18,11 @@ vi.mock('@dnd-kit/core', () => ({ useDndMonitor: () => undefined }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => harness.project!.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project!),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      Object.values(harness.project!.widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ??
+        {}
+    ),
   useWorkbenchSubscription: () => () => () => {},
   useOptionalWorkbenchCommands: () => null,
   useWorkbenchCommands: () => ({
@@ -98,7 +103,7 @@ const renderView = (): string =>
   );
 
 const getAcceptButtonTag = (markup: string): string => {
-  const labelIndex = markup.indexOf('Accept to Layer');
+  const labelIndex = markup.indexOf('Accept to layer');
   const buttonIndex = markup.lastIndexOf('<button', labelIndex);
   return markup.slice(buttonIndex, markup.indexOf('>', buttonIndex) + 1);
 };

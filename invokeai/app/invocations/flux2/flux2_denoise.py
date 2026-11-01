@@ -34,11 +34,11 @@ from invokeai.backend.flux.schedulers import FLUX_SCHEDULER_LABELS, FLUX_SCHEDUL
 from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.denoise_working_memory import estimate_flux2_denoise_working_memory
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
+from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     generate_img_ids_flux2,
-    get_flux2_bn_stats,
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
@@ -176,53 +176,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
     def _get_bn_stats(self, context: InvocationContext) -> Optional[Tuple[torch.Tensor, torch.Tensor]]:
         """Extract the latent BN statistics (bn_mean, bn_std) from the wired FLUX.2 VAE, or None if it has none."""
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            return get_flux2_bn_stats(vae)
-
-    def _bn_normalize(
-        self,
-        x: torch.Tensor,
-        bn_mean: torch.Tensor,
-        bn_std: torch.Tensor,
-    ) -> torch.Tensor:
-        """Apply BN normalization to packed latents.
-
-        BN formula (affine=False): y = (x - mean) / std
-
-        Args:
-            x: Packed latents of shape (B, seq, 128).
-            bn_mean: BN running mean of shape (128,).
-            bn_std: BN running std of shape (128,).
-
-        Returns:
-            Normalized latents of same shape.
-        """
-        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
-        bn_mean = bn_mean.to(x.device, x.dtype)
-        bn_std = bn_std.to(x.device, x.dtype)
-        return (x - bn_mean) / bn_std
-
-    def _bn_denormalize(
-        self,
-        x: torch.Tensor,
-        bn_mean: torch.Tensor,
-        bn_std: torch.Tensor,
-    ) -> torch.Tensor:
-        """Apply BN denormalization to packed latents (inverse of normalization).
-
-        Inverse BN (affine=False): x = y * std + mean
-
-        Args:
-            x: Packed latents of shape (B, seq, 128).
-            bn_mean: BN running mean of shape (128,).
-            bn_std: BN running std of shape (128,).
-
-        Returns:
-            Denormalized latents of same shape.
-        """
-        # x: (B, seq, 128), params: (128,) -> broadcast over batch and sequence dims
-        bn_mean = bn_mean.to(x.device, x.dtype)
-        bn_std = bn_std.to(x.device, x.dtype)
-        return x * bn_std + bn_mean
+            return read_vae_bn_stats(vae)
 
     def _prepare_normalized_start_latents(
         self,
@@ -254,7 +208,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
             Tuple of (start latents, normalized init latents), both of shape (B, seq, 128).
         """
         if bn_mean is not None and bn_std is not None:
-            init_latents_packed = self._bn_normalize(init_latents_packed, bn_mean, bn_std)
+            init_latents_packed = bn_normalize(init_latents_packed, bn_mean, bn_std)
 
         if self.add_noise:
             assert noise_packed is not None
@@ -424,7 +378,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # this output would divide it by bn_std a second time.
         if len(timesteps) <= 1:
             if bn_mean is not None and bn_std is not None:
-                x = self._bn_denormalize(x, bn_mean, bn_std)
+                x = bn_denormalize(x, bn_mean, bn_std)
             return unpack_flux2(x.float(), self.height, self.width)
 
         # Prepare inpaint extension
@@ -608,7 +562,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # The diffusers Flux2KleinPipeline applies: latents = latents * bn_std + bn_mean
         # This transforms latents from normalized space to VAE's expected input space
         if bn_mean is not None and bn_std is not None:
-            x = self._bn_denormalize(x, bn_mean, bn_std)
+            x = bn_denormalize(x, bn_mean, bn_std)
 
         x = unpack_flux2(x.float(), self.height, self.width)
         return x

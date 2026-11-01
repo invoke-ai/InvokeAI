@@ -8,6 +8,7 @@ import type {
 } from '@features/workflow/contracts';
 import type { InvocationTemplatesSnapshot } from '@features/workflow/react';
 import type { Project } from '@workbench/projectContracts';
+import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
 import type { GraphBearingSurfaceContract } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
@@ -25,6 +26,8 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 export interface GraphPreviewSourceDeps {
   models: readonly ModelConfig[] | undefined;
   project: Project;
+  /** The project's settings with the user's defaults applied (`getEffectiveProjectSettings`). */
+  projectSettings: EffectiveProjectSettings;
   surface: GraphBearingSurfaceContract;
   t: TFunction;
   templates: InvocationTemplatesSnapshot;
@@ -91,6 +94,7 @@ const buildWorkflowSource = (
 
 const buildGenerateSource = (
   project: Project,
+  projectSettings: EffectiveProjectSettings,
   models: readonly ModelConfig[] | undefined,
   t: TFunction
 ): GraphPreviewSourceWithoutDestination => {
@@ -101,7 +105,7 @@ const buildGenerateSource = (
     result = compileGeneratePreviewGraph({
       destination: project.invocation.destination,
       models: models ?? [],
-      projectSettings: project.settings,
+      projectSettings,
       storedValues: getProjectWidgetValues(project, 'generate'),
     });
   } catch (error) {
@@ -160,6 +164,7 @@ const buildWidgetGraphSource = (
 export const buildGraphPreviewSource = ({
   models,
   project,
+  projectSettings,
   surface,
   t,
   templates,
@@ -170,7 +175,7 @@ export const buildGraphPreviewSource = ({
     case 'workflow':
       return { ...buildWorkflowSource(project, templates), destinationLabel };
     case 'generate':
-      return { ...buildGenerateSource(project, models, t), destinationLabel };
+      return { ...buildGenerateSource(project, projectSettings, models, t), destinationLabel };
     case 'upscale':
     case 'video':
     case 'canvas':

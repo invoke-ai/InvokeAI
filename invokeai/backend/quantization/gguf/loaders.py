@@ -176,11 +176,12 @@ def parse_gguf_convrot_markers(fields: Mapping[str, Any], source: str) -> dict[s
       two per byte and an F16 scale, always rotated. The JSON's ``orig_shape`` gives the unpacked shape. It
       comes back as an ``int4_tensorwise`` marker, which is what :mod:`int8_convrot` decodes it as.
 
-    ``fields`` maps metadata keys to their string values; other keys are ignored. Returns the markers keyed by
-    weight name, in the form :mod:`int8_convrot` reads. Raises ``ValueError`` for anything else the converter
-    writes: ``int4_cr`` without the w4a4 backing (its retired W4A16 form, with group-wise scales) and the retired
-    ``int4_pytorch``. Those tensors are ``I8`` too, and nothing here decodes them. Model identification turns
-    that into the installer's refusal, so a file is refused for the same reason at install and at load.
+    ``fields`` maps metadata keys to their values: the file's whole metadata at install, its prefixed fields at
+    load. Keys without the prefix are ignored. Returns the markers keyed by weight name, in the form
+    :mod:`int8_convrot` reads. Raises ``ValueError`` for anything else the converter writes: ``int4_cr`` without
+    the w4a4 backing (its retired W4A16 form, with group-wise scales) and the retired ``int4_pytorch``. Those
+    tensors are ``I8`` too, and nothing here decodes them. Model identification turns that into the installer's
+    refusal, so a file is refused for the same reason at install and at load.
     """
     layers: dict[str, dict[str, Any]] = {}
     for key, value in fields.items():

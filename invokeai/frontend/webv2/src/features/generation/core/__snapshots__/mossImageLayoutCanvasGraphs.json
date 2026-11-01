@@ -64,6 +64,16 @@
       },
       {
         "destination": {
+          "field": "prompt",
+          "node_id": "pos_cond"
+        },
+        "source": {
+          "field": "value",
+          "node_id": "layout_prompt"
+        }
+      },
+      {
+        "destination": {
           "field": "positive_conditioning",
           "node_id": "denoise_latents"
         },
@@ -154,6 +164,16 @@
       },
       {
         "destination": {
+          "field": "moss_image_layout_prompt",
+          "node_id": "core_metadata_0_i"
+        },
+        "source": {
+          "field": "value",
+          "node_id": "layout_prompt"
+        }
+      },
+      {
+        "destination": {
           "field": "vae",
           "node_id": "canvas_i2l"
         },
@@ -221,26 +241,6 @@
           "field": "image",
           "node_id": "expand_mask"
         }
-      },
-      {
-        "destination": {
-          "field": "prompt",
-          "node_id": "pos_cond"
-        },
-        "source": {
-          "field": "value",
-          "node_id": "layout_prompt"
-        }
-      },
-      {
-        "destination": {
-          "field": "moss_image_layout_prompt",
-          "node_id": "core_metadata_0_i"
-        },
-        "source": {
-          "field": "value",
-          "node_id": "layout_prompt"
-        }
       }
     ],
     "id": "moss_image_layout_canvas_inpaint",
@@ -302,6 +302,47 @@
         "uncond_skip_layers": [
           22
         ],
+        "width": 768
+      },
+      "layout_prompt": {
+        "is_intermediate": true,
+        "use_cache": true,
+        "height": 1024,
+        "id": "layout_prompt",
+        "regions": [
+          {
+            "bbox": [
+              0,
+              0,
+              512,
+              256
+            ],
+            "caption": "a hand-lettered cafe sign",
+            "kind": "text",
+            "text": "一杯温暖\n一刻从容"
+          },
+          {
+            "bbox": [
+              64,
+              128,
+              256,
+              384
+            ],
+            "caption": "a barista pouring latte art",
+            "kind": "character"
+          },
+          {
+            "bbox": [
+              512,
+              640,
+              768,
+              1024
+            ],
+            "caption": "a steaming ceramic cup",
+            "kind": "object"
+          }
+        ],
+        "type": "moss_image_layout_prompt",
         "width": 768
       },
       "core_metadata_0_i": {
@@ -379,47 +420,6 @@
         },
         "type": "invokeai_img_blend",
         "id": "canvas_output"
-      },
-      "layout_prompt": {
-        "is_intermediate": true,
-        "use_cache": true,
-        "height": 1024,
-        "id": "layout_prompt",
-        "regions": [
-          {
-            "bbox": [
-              0,
-              0,
-              512,
-              256
-            ],
-            "caption": "a hand-lettered cafe sign",
-            "kind": "text",
-            "text": "一杯温暖\n一刻从容"
-          },
-          {
-            "bbox": [
-              64,
-              128,
-              256,
-              384
-            ],
-            "caption": "a barista pouring latte art",
-            "kind": "character"
-          },
-          {
-            "bbox": [
-              512,
-              640,
-              768,
-              1024
-            ],
-            "caption": "a steaming ceramic cup",
-            "kind": "object"
-          }
-        ],
-        "type": "moss_image_layout_prompt",
-        "width": 768
       }
     }
   },
@@ -483,6 +483,16 @@
         "source": {
           "field": "value",
           "node_id": "positive_prompt"
+        }
+      },
+      {
+        "destination": {
+          "field": "prompt",
+          "node_id": "pos_cond"
+        },
+        "source": {
+          "field": "value",
+          "node_id": "layout_prompt"
         }
       },
       {
@@ -573,16 +583,6 @@
         "source": {
           "field": "metadata",
           "node_id": "core_metadata_0_i"
-        }
-      },
-      {
-        "destination": {
-          "field": "prompt",
-          "node_id": "pos_cond"
-        },
-        "source": {
-          "field": "value",
-          "node_id": "layout_prompt"
         }
       },
       {
@@ -663,34 +663,6 @@
         "id": "canvas_output",
         "type": "flux2_vae_decode"
       },
-      "core_metadata_0_i": {
-        "is_intermediate": true,
-        "use_cache": true,
-        "cfg_scale": 3,
-        "cfg_rescale_multiplier": 0,
-        "generation_mode": "moss_image_txt2img",
-        "height": 1024,
-        "id": "core_metadata_0_i",
-        "model": {
-          "base": "moss-image",
-          "format": "diffusers",
-          "key": "moss-image-model",
-          "name": "MOSS-Image",
-          "type": "main",
-          "hash": "blake3:moss"
-        },
-        "rand_device": "cpu",
-        "scheduler": "euler",
-        "seamless_x": false,
-        "seamless_y": false,
-        "steps": 50,
-        "type": "core_metadata",
-        "width": 768,
-        "moss_image_uncond_skip_layers": [
-          22
-        ],
-        "clip_skip": 0
-      },
       "layout_prompt": {
         "is_intermediate": true,
         "use_cache": true,
@@ -731,6 +703,34 @@
         ],
         "type": "moss_image_layout_prompt",
         "width": 768
+      },
+      "core_metadata_0_i": {
+        "is_intermediate": true,
+        "use_cache": true,
+        "cfg_scale": 3,
+        "cfg_rescale_multiplier": 0,
+        "generation_mode": "moss_image_txt2img",
+        "height": 1024,
+        "id": "core_metadata_0_i",
+        "model": {
+          "base": "moss-image",
+          "format": "diffusers",
+          "key": "moss-image-model",
+          "name": "MOSS-Image",
+          "type": "main",
+          "hash": "blake3:moss"
+        },
+        "rand_device": "cpu",
+        "scheduler": "euler",
+        "seamless_x": false,
+        "seamless_y": false,
+        "steps": 50,
+        "type": "core_metadata",
+        "width": 768,
+        "moss_image_uncond_skip_layers": [
+          22
+        ],
+        "clip_skip": 0
       }
     }
   }

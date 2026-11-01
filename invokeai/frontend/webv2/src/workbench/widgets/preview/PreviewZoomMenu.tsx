@@ -1,8 +1,8 @@
-import { HStack, Menu, Portal, Text } from '@chakra-ui/react';
+import { Menu, Portal, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
-import { ChevronDownIcon } from 'lucide-react';
+import { ChevronDownIcon, ZoomInIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -13,33 +13,43 @@ const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 
 /**
  * Expose fitted/actual zoom and keyboard presets in the header; the stage owns wheel, pinch, and double-click
- * gestures.
+ * gestures. A `full` header shows the magnifier and, only while zoomed, the percent, so the fit readout does not cost
+ * the widget title its width; the tooltip and accessible name always carry the percent. A `compact` header (a narrow
+ * view, down to 280px) keeps only the readout and chevron.
  */
-export const PreviewZoomMenu = ({ zoom }: { zoom: PreviewZoomControls }) => {
+export const PreviewZoomMenu = ({
+  density = 'full',
+  zoom,
+}: {
+  density?: 'compact' | 'full';
+  zoom: PreviewZoomControls;
+}) => {
   const { t } = useTranslation();
   const percent = zoom.percent;
   const label = percent === null ? '—' : t('widgets.preview.zoomPercent', { percent });
   const ids = useTooltipTriggerIds();
+  const accessibleLabel = percent === null ? t('widgets.preview.zoom') : t('widgets.preview.zoomLevel', { percent });
+  const showsReadout = density === 'compact' || zoom.isZoomed;
 
   return (
     <Menu.Root ids={ids} positioning={MENU_POSITIONING}>
-      <Tooltip content={t('widgets.preview.zoom')} ids={ids}>
+      <Tooltip content={accessibleLabel} ids={ids}>
         <Menu.Trigger asChild>
           <Button
-            aria-label={percent === null ? t('widgets.preview.zoom') : t('widgets.preview.zoomLevel', { percent })}
+            aria-label={accessibleLabel}
             color="fg.muted"
             fontVariantNumeric="tabular-nums"
-            minW="0"
-            px="1.5"
             size="sm"
             variant="ghost"
           >
-            <HStack gap="1">
-              <Text fontSize="md" fontWeight="600">
+            {density === 'full' ? <ZoomInIcon aria-hidden /> : null}
+            {/* Wide enough for "1600%" in tabular digits, so the trigger keeps its width as the zoom changes. */}
+            {showsReadout ? (
+              <Text fontSize="md" minW={density === 'full' ? '6ch' : undefined} textAlign="center">
                 {label}
               </Text>
-              <ChevronDownIcon size={12} />
-            </HStack>
+            ) : null}
+            <ChevronDownIcon size={12} />
           </Button>
         </Menu.Trigger>
       </Tooltip>

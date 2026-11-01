@@ -355,7 +355,9 @@ class Int8ConvrotLinear(DequantizingLinear):
     def _dequantized_weight(self, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
         # `.to(device)` is a no-op in the intended fully-resident regime; under partial load
         # the model cache may leave these buffers on the CPU, in which case this call streams
-        # the int8 weight to the compute device per forward (see the class docstring).
+        # the int8 weight to the compute device per forward (see the class docstring). The move
+        # and the cast stay two steps: a single `.to(device=, dtype=)` from the CPU converts on
+        # the CPU first and then copies the widened weight (~5x slower per streamed bf16 layer on an RTX 4090).
         #
         # Dequant + derotation run directly in the compute dtype: int8 values are exact in
         # bf16/fp16, the scale multiply adds ~0.2% relative rounding vs the ~0.4-0.8% int8
@@ -363,8 +365,6 @@ class Int8ConvrotLinear(DequantizingLinear):
         # per-call transient at ~two weight-sized tensors (~620 MB peak for the fused-SwiGLU
         # fc1 in bf16) instead of tripling through an fp32 intermediate (~1.5 GiB). An fp32
         # compute dtype still gets the exact fp32 path for free.
-        # Moved before it is widened: a cross-device `.to(device, dtype)` converts on the host, so under partial load
-        # the bf16 copy would cross the bus instead of the int8 codes.
         return _scale_and_derotate(
             self.weight.to(device).to(dtype=dtype), self.weight_scale, self.convrot, self.group_size
         )
@@ -397,8 +397,8 @@ class Int8ConvrotLinear(DequantizingLinear):
         alongside the matmul's output. Without convrot that step does not exist and one weight is the peak; the
         second is kept as margin rather than tracking a layout the published builds do not use.
 
-        Under partial load the int8 weight is additionally streamed to the device per call, adding up to
-        half a weight again; the resident-model regime this scheme targets pays nothing for that. Verified
+        Under partial load the int8 weight is additionally streamed to the device per call. That copy is at
+        most half a weight and is freed once widened, before the derotation allocates, so the peak stays at two. Verified
         against the real `z_image_turbo_int8_convrot` checkpoint: exact for most shapes, and 2 MiB under on
         the two that make cuBLAS take a workspace (10240x3840 and 3840x10240), against a 3 GiB reservation
         floor.

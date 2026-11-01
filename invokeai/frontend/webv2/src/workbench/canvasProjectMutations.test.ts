@@ -1,8 +1,9 @@
-import type { CanvasAdjustmentEntry } from '@workbench/canvas-engine/contracts';
+import type { CanvasAdjustmentEntry, CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
 
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { describe, expect, it } from 'vitest';
 
+import { createEmptyCanvasDocument } from './canvasMigration';
 import { applyCanvasProjectMutation } from './canvasProjectMutations';
 import { createEmptyPaintLayer } from './widgets/layers/layerOps';
 import { createDraftProject } from './workbenchState';
@@ -70,5 +71,82 @@ describe('canvas schema adoption', () => {
     });
     expect(adjusted.canvas.version).toBe(5);
     expect(adjusted.canvas.document.version).toBe(5);
+  });
+});
+
+describe('restore points across document sessions', () => {
+  const result: CanvasStagingCandidateContract = {
+    height: 64,
+    imageName: 'result.png',
+    imageUrl: '/api/v1/images/i/result.png/full',
+    placement: { height: 64, opacity: 1, width: 64, x: 8, y: 8 },
+    queuedAt: '2026-10-30T00:00:00.000Z',
+    sourceQueueItemId: 'queue-1',
+    thumbnailUrl: '/api/v1/images/i/result.png/thumbnail',
+    width: 64,
+  };
+
+  /** A canvas with a Clear canvas point, then a Discard all point of `result`, its staging discarded since. */
+  const withBothPoints = () => {
+    const draft = createDraftProject([]);
+    let project = {
+      ...draft,
+      canvas: {
+        ...draft.canvas,
+        stagingArea: { ...draft.canvas.stagingArea, pendingImageIds: [result.imageName], pendingImages: [result] },
+      },
+    };
+    for (const kind of ['clear-canvas', 'discard-results'] as const) {
+      project = applyCanvasProjectMutation(project, {
+        createdAt: 'now',
+        id: kind,
+        includeStaging: true,
+        kind,
+        name: kind,
+        type: 'saveCanvasSnapshot',
+      });
+    }
+    return applyCanvasProjectMutation(project, { type: 'discardAllStagedImages' });
+  };
+  const pointIds = (project: ReturnType<typeof createDraftProject>) => project.canvas.snapshots.map(({ id }) => id);
+
+  it('drops Discard all points with the document they belong to, keeping Clear canvas points', () => {
+    const replaced = applyCanvasProjectMutation(withBothPoints(), {
+      document: createEmptyCanvasDocument(),
+      type: 'replaceCanvasDocument',
+    });
+    expect(pointIds(replaced)).toEqual(['clear-canvas']);
+
+    const moved = applyCanvasProjectMutation(withBothPoints(), {
+      height: 1024,
+      offsetX: 16,
+      offsetY: 0,
+      type: 'resizeCanvasDocument',
+      width: 1024,
+    });
+    expect(moved.canvas.document.width).toBe(1024);
+    expect(pointIds(moved)).toEqual(['clear-canvas']);
+    const grown = applyCanvasProjectMutation(withBothPoints(), {
+      height: 1024,
+      type: 'resizeCanvasDocument',
+      width: 1024,
+    });
+    expect(grown.canvas.document.width).toBe(1024);
+    expect(pointIds(grown)).toEqual(['clear-canvas', 'discard-results']);
+
+    const kept = applyCanvasProjectMutation(withBothPoints(), {
+      keepCurrentAs: { createdAt: 'now', id: 'undo', name: 'Before restoring' },
+      snapshotId: 'clear-canvas',
+      type: 'restoreCanvasSnapshot',
+    });
+    expect(pointIds(kept)).toEqual(['undo']);
+
+    const restored = applyCanvasProjectMutation(withBothPoints(), {
+      snapshotId: 'clear-canvas',
+      type: 'restoreCanvasSnapshot',
+    });
+    expect(pointIds(restored)).toEqual(['clear-canvas']);
+    // The results come back only with the document they were placed on.
+    expect(restored.canvas.stagingArea.pendingImages).toEqual([result]);
   });
 });

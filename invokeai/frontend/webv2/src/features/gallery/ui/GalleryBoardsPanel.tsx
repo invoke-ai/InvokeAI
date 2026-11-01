@@ -34,8 +34,9 @@ import {
 } from './galleryDnd';
 import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
 import { GalleryProjectGroup } from './GalleryProjectGroup';
-import { getGalleryRedirectedDestination } from './galleryStateView';
+import { useOptionalGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGalleryDestination } from './useGalleryDestination';
 
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
 const CREATE_ROW_COVER = <BoardCoverIcon icon={PlusIcon} />;
@@ -147,12 +148,14 @@ export const GalleryBoardsPanel = () => {
   const createProjectBoardFromSearch = useCallback(() => createBoardFromSearch('project'), [createBoardFromSearch]);
   const createLibraryBoardFromSearch = useCallback(() => createBoardFromSearch('library'), [createBoardFromSearch]);
 
+  const noteBoardBrowsed = useOptionalGalleryUi()?.noteBoardBrowsed;
   const handleSelectBoard = useCallback(
     (boardId: string) => {
       setSearchTerm('');
       actions.selectBoard(boardId);
+      noteBoardBrowsed?.(boardId);
     },
-    [actions]
+    [actions, noteBoardBrowsed]
   );
 
   const openBoardMenu = useCallback((board: GalleryBoard, x: number, y: number) => {
@@ -202,27 +205,55 @@ export const GalleryBoardsPanel = () => {
     relocatingBoardIdRef.current = boardId;
   }, []);
   const handleBoardMenuClose = useCallback(() => {
+    const menuBoardId = boardMenuTarget?.board.id ?? null;
     setBoardMenuTarget(null);
     const relocatedBoardId = relocatingBoardIdRef.current;
     relocatingBoardIdRef.current = null;
 
-    if (relocatedBoardId !== null && document.activeElement?.closest('[data-scope="menu"]')) {
-      focusBoardRow(relocatedBoardId);
+    if (!document.activeElement?.closest('[data-scope="menu"]')) {
+      return;
     }
-  }, [focusBoardRow]);
 
-  // Results the selected or auto-add board refuses (someone else's, view-only) go to the inbox, and its row says so.
-  const redirected = getGalleryRedirectedDestination(gallery);
+    if (relocatedBoardId !== null) {
+      focusBoardRow(relocatedBoardId);
+      return;
+    }
+
+    // The menu has no trigger of its own to hand focus back to (it opens at the pointer or beside the row's ⋮): a
+    // dismissal returns focus to the row's ⋮, and a dialog the menu opens returns it there when it closes.
+    const actionsButton =
+      menuBoardId === null
+        ? null
+        : boardsViewportRef.current?.querySelector<HTMLElement>(
+            `[data-board-row="${CSS.escape(menuBoardId)}"] .board-row-actions`
+          );
+
+    if (actionsButton) {
+      actionsButton.focus();
+    } else if (menuBoardId !== null) {
+      focusBoardRow(menuBoardId);
+    }
+  }, [boardMenuTarget, focusBoardRow]);
+
+  // Where new results go, as submissions decide it: a board that refuses them (someone else's, view-only, or gone)
+  // sends them to the inbox, whose row says so and names it.
+  const destination = useGalleryDestination(gallery);
+  const refusedBoard =
+    destination.refusedBoardId === null ? undefined : destination.getBoard(destination.refusedBoardId);
   const renderRow = (board: GalleryBoard, accessibleName?: string) => (
     <GalleryBoardRow
       key={board.id}
       accessibleName={accessibleName}
       autoAddRedirectedFrom={
-        redirected?.boardId === board.id ? getGalleryBoardLabel(redirected.refusedBoard, t) : undefined
+        destination.refusedBoardId !== null && destination.boardId === board.id
+          ? refusedBoard
+            ? getGalleryBoardLabel(refusedBoard, t)
+            : t('widgets.gallery.unknownBoard')
+          : undefined
       }
       board={board}
       dragScope={canDragBoards && isMovableGalleryBoard(board, gallery.projectBoardId) ? region : undefined}
-      isAutoAddTarget={redirected ? board.id === redirected.boardId : board.id === gallery.settings.autoAddBoardId}
+      isAutoAddTarget={board.id === destination.boardId}
       isMenuOpen={boardMenuTarget?.board.id === board.id}
       isSelected={board.id === gallery.selectedBoardId}
       loadedItemBoardIds={loadedItemBoardIds}

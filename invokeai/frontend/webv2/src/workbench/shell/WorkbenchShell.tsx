@@ -51,6 +51,7 @@ import {
   TOUCH_DRAG_HOLD_DELAY_MS,
   TOUCH_DRAG_MOVE_TOLERANCE_PX,
 } from './holdToDragSensor';
+import { LayoutUndoNotices } from './LayoutUndoNotices';
 import { WorkbenchNotificationToaster } from './notifications';
 import { LeftPanel, RightPanel } from './Panels';
 import { PasteMediaRuntime } from './PasteMediaRuntime';
@@ -299,6 +300,7 @@ export const WorkbenchShell = () => {
       <GalleryDragScope value>
         <Flex direction="column" h="100vh" w="100vw">
           <WorkbenchNotificationToaster />
+          <LayoutUndoNotices />
           <DocumentTitleProgress />
           <TopBar />
           <ProjectConflictBanner />

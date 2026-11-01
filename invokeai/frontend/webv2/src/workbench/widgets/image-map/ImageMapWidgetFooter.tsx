@@ -7,6 +7,7 @@ import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from '@
 import { isIndexing } from '@workbench/image-map/indexProgress';
 import { RefreshCwIcon } from 'lucide-react';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { ImageIndexProgressInline } from './ImageIndexProgress';
 
@@ -20,13 +21,14 @@ const handleRefresh = () => {
 };
 
 export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
+  const { t } = useTranslation();
   const { data, indexCounts, indexUpdatedAt, loadState } = imageMapStore.useSnapshot();
   // Before the early return, and keyed on the array the store swaps wholesale.
   // The footer re-renders on every index-progress tick, and those patch other
   // snapshot keys and leave `data` identity intact — so the count runs once per
   // points refresh rather than once per tick, which matters at 170k points.
   const points = data?.points ?? NO_POINTS;
-  const clusterSummary = useMemo(() => describeClusters(summarizeClusters(points)), [points]);
+  const clusterSummary = useMemo(() => describeClusters(summarizeClusters(points), t), [points, t]);
 
   // Show footer controls only with a rendered map; other data states own their explanations and retry controls.
   if (loadState === 'idle' || !data || data.state !== 'ready') {
@@ -40,7 +42,9 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
   return (
     <HStack borderTopWidth="1px" color="fg.muted" fontSize="xs" gap="2" justify="space-between" px="3" py="1" w="full">
       <HStack gap="2" minW="0">
-        <Text whiteSpace="nowrap">{data.pointCount.toLocaleString()} points</Text>
+        <Text whiteSpace="nowrap">
+          {t('widgets.imageMap.pointCount', { count: data.pointCount, formatted: data.pointCount.toLocaleString() })}
+        </Text>
         {/* Every sibling in this row is nowrap, so this is the only segment
             flex can shrink and it absorbs all of the row's overflow: below
             roughly 500px the numbers are clipped off the page and the tooltip
@@ -48,7 +52,7 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
         <Tooltip content={clusterSummary}>
           <Text truncate>· {clusterSummary}</Text>
         </Tooltip>
-        {data.stale ? <Text whiteSpace="nowrap">· updating…</Text> : null}
+        {data.stale ? <Text whiteSpace="nowrap">· {t('widgets.imageMap.updating')}</Text> : null}
         {indexing ? (
           <>
             <Text>·</Text>
@@ -56,13 +60,25 @@ export const ImageMapWidgetFooter = (_props: WidgetViewProps) => {
           </>
         ) : null}
         {skipped ? (
-          <Tooltip content="These items repeatedly failed to embed and were given up on.">
-            <Text truncate>· {indexCounts.failed} skipped</Text>
+          <Tooltip content={t('widgets.imageMap.skippedHint')}>
+            <Text truncate>
+              ·{' '}
+              {t('widgets.imageMap.skipped', {
+                count: indexCounts.failed,
+                formatted: indexCounts.failed.toLocaleString(),
+              })}
+            </Text>
           </Tooltip>
         ) : null}
       </HStack>
-      <Tooltip content="Refresh map">
-        <IconButton aria-label="Refresh map" color="fg.muted" size="sm" variant="ghost" onClick={handleRefresh}>
+      <Tooltip content={t('widgets.imageMap.refresh')}>
+        <IconButton
+          aria-label={t('widgets.imageMap.refresh')}
+          color="fg.muted"
+          size="sm"
+          variant="ghost"
+          onClick={handleRefresh}
+        >
           <Icon as={RefreshCwIcon} boxSize="3" />
         </IconButton>
       </Tooltip>

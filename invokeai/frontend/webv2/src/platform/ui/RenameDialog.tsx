@@ -1,6 +1,6 @@
 import { chakra, Input, Portal, Stack } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import { useCallback, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
 import { Dialog } from './Dialog';
@@ -9,6 +9,7 @@ import { Field } from './Field';
 /** Submit only changed, nonempty names; async failures keep the dialog open and callers surface the error. */
 export const RenameDialog = ({
   cancelLabel = 'Cancel',
+  children,
   finalFocusEl,
   initialName,
   isOpen,
@@ -21,6 +22,8 @@ export const RenameDialog = ({
   title = 'Rename project',
 }: {
   cancelLabel?: string;
+  /** Further options under the name, such as what a save includes; the host reads their state on submit. */
+  children?: ReactNode;
   finalFocusEl?: () => HTMLElement | null;
   initialName: string;
   isOpen: boolean;
@@ -108,6 +111,7 @@ export const RenameDialog = ({
                   <Field label={text.label}>
                     <Input autoFocus defaultValue={initialName} name="renameValue" size="lg" />
                   </Field>
+                  {children}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>

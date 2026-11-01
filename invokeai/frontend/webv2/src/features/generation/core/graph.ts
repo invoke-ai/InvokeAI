@@ -12,9 +12,7 @@ import type {
   ComponentModelConfig,
   GenerateLora,
   GenerateModelConfig,
-  GenerateReferenceImage,
   GenerateReferenceImageAsset,
-  GenerateReferenceImageConfig,
   GenerateSettings,
   MainModelConfig,
 } from './types';
@@ -38,8 +36,8 @@ import {
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
-  isKrea2Qwen3VlEncoder,
   isMossImageQwen35Encoder,
+  isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
   isVaeCompatibleWithGenerateModel,
   isZImageQwen3Encoder,
@@ -64,7 +62,7 @@ import {
 import { addKrea2ConditioningEnhancers } from './krea2Conditioning';
 import { addPidDecode, getPidDenoiseSize, getPidMetadata, isPidDecodeNodeType, shouldUsePidDecode } from './pidGraph';
 import { getCompelPromptNodeType } from './prompt/compel';
-import { getEffectiveReferenceImage } from './referenceImage';
+import { getEffectiveReferenceImage, getEnabledReferenceImages } from './referenceImage';
 import { getActiveRefiner, getBaseDenoisingRange } from './sdxlRefiner';
 import { addSDXLRefinerStage, getRefinerMetadata } from './sdxlRefinerGraph';
 
@@ -86,17 +84,6 @@ const getCompatibleComponent = (
 const toImageField = (image: GenerateReferenceImageAsset) => ({
   image_name: getEffectiveReferenceImage(image).image_name,
 });
-
-const getEnabledReferenceImages = <T extends GenerateReferenceImageConfig['type']>(
-  settings: GenerateSettings,
-  type: T
-): Array<GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> }> =>
-  settings.referenceImages.filter(
-    (
-      referenceImage
-    ): referenceImage is GenerateReferenceImage & { config: Extract<GenerateReferenceImageConfig, { type: T }> } =>
-      referenceImage.isEnabled && referenceImage.config.type === type && referenceImage.config.image !== null
-  );
 
 const addReferenceImageMetadata = (
   graph: BackendGraphContract,
@@ -129,7 +116,7 @@ const addIPAdapterReferenceImages = (
 ) => {
   const strengthOnly = isStrengthOnlyIPAdapterBase(model.base);
   // Anima drops a strength-0 adapter anyway; sending one would still encode the image, or install the encoder.
-  const refs = getEnabledReferenceImages(settings, 'ip_adapter').filter(
+  const refs = getEnabledReferenceImages(settings.referenceImages, 'ip_adapter').filter(
     (ref) => ref.config.model?.base === model.base && !(strengthOnly && ref.config.weight === 0)
   );
 
@@ -184,7 +171,9 @@ const addFluxReduxReferenceImages = (
   model: MainModelConfig,
   denoise: BackendInvocationContract
 ) => {
-  const refs = getEnabledReferenceImages(settings, 'flux_redux').filter((ref) => ref.config.model?.base === model.base);
+  const refs = getEnabledReferenceImages(settings.referenceImages, 'flux_redux').filter(
+    (ref) => ref.config.model?.base === model.base
+  );
 
   if (refs.length === 0) {
     return;
@@ -219,7 +208,7 @@ const addFluxKontextReferenceImages = (
   denoise: BackendInvocationContract,
   type: 'flux2_reference_image' | 'flux_kontext_reference_image'
 ) => {
-  const refs = getEnabledReferenceImages(settings, type);
+  const refs = getEnabledReferenceImages(settings.referenceImages, type);
 
   if (refs.length === 0) {
     return;
@@ -1058,7 +1047,7 @@ const buildQwenImageGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   const qwenReferenceImages =
-    model.variant === 'edit' ? getEnabledReferenceImages(settings, 'qwen_image_reference_image') : [];
+    model.variant === 'edit' ? getEnabledReferenceImages(settings.referenceImages, 'qwen_image_reference_image') : [];
 
   if (qwenReferenceImages.length > 0) {
     let prevCollect: BackendInvocationContract | null = null;
@@ -1367,7 +1356,7 @@ const buildKrea2Graph = (
   // Standalone Krea needs a separate VAE/encoder without a component source.
   const isDiffusers = model.format === 'diffusers';
   const vaeModel = getCompatibleVae(settings, model);
-  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isKrea2Qwen3VlEncoder);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
 
   if (!isDiffusers) {
     requireComponent(vaeModel, 'Krea-2 VAE');
@@ -1430,14 +1419,14 @@ const buildKrea2Graph = (
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
   // Validation keeps edit and style references apart; the denoise refuses the two together.
-  const editReferenceImages = getEnabledReferenceImages(settings, 'krea2_edit_reference_image').flatMap(({ config }) =>
-    config.image ? [toImageField(config.image)] : []
+  const editReferenceImages = getEnabledReferenceImages(settings.referenceImages, 'krea2_edit_reference_image').flatMap(
+    ({ config }) => (config.image ? [toImageField(config.image)] : [])
   );
   // Shared-KV reference attention takes exactly one reference; zero strength is a full bypass, so it is not run.
   const styleReference =
     editReferenceImages.length > 0
       ? undefined
-      : getEnabledReferenceImages(settings, 'krea2_reference_image').find(
+      : getEnabledReferenceImages(settings.referenceImages, 'krea2_reference_image').find(
           (referenceImage) => referenceImage.config.styleStrength > 0
         );
 
@@ -1569,7 +1558,7 @@ const addQwenImage21ReferenceImages = (
     modelLoader: BackendInvocationContract;
   }
 ): void => {
-  const referenceImages = getEnabledReferenceImages(settings, 'qwen_image_2_1_reference_image');
+  const referenceImages = getEnabledReferenceImages(settings.referenceImages, 'qwen_image_2_1_reference_image');
   if (referenceImages.length === 0) {
     return;
   }
@@ -1674,7 +1663,18 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout
+  // prompt at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows
+  // through `positive_prompt`.
+  const layoutPrompt = addNode(graph, {
+    height: denoiseSize.height,
+    id: 'layout_prompt',
+    regions: [],
+    type: 'moss_image_layout_prompt',
+    width: denoiseSize.width,
+  });
+  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1690,6 +1690,89 @@ const buildMossImageGraph = (
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
+  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+  }
+
+  return graph;
+};
+
+const buildFlux3Graph = (
+  settings: GenerateSettings,
+  model: MainModelConfig,
+  outputIsIntermediate: boolean,
+  projectSettings: GenerationProjectSettings
+): BackendGraphContract => {
+  // A single-file or GGUF FLUX.3 model is the transformer alone; a Diffusers one bundles the VAE and encoder.
+  const isDiffusers = model.format === 'diffusers';
+  const vaeModel = getCompatibleVae(settings, model);
+  const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl4bEncoder);
+
+  if (!isDiffusers) {
+    requireComponent(vaeModel, 'FLUX.3 VAE');
+    requireComponent(qwen3VlEncoderModel, 'Qwen3-VL Encoder');
+  }
+
+  const graph: BackendGraphContract = { edges: [], id: createId('flux3_graph'), nodes: {} };
+  const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+  // Klein Base takes CFG with a negative prompt; Klein (the flow map) samples at CFG 1 and takes neither.
+  const useCfg = settings.cfgScale > 1;
+  const modelLoader = addNode(graph, {
+    id: 'model_loader',
+    model,
+    qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    type: 'flux3_model_loader',
+    vae_model: vaeModel ?? undefined,
+  });
+  const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
+  const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
+  const denoiseSize = getDenoiseSize(settings, model);
+  const denoise = addNode(graph, {
+    cfg_scale: settings.cfgScale,
+    denoising_end: 1,
+    denoising_start: 0,
+    height: denoiseSize.height,
+    id: 'denoise_latents',
+    steps: settings.steps,
+    type: 'flux3_denoise',
+    width: denoiseSize.width,
+  });
+  // FLUX.3 decodes with the FLUX.2 VAE, so it reuses FLUX.2's decode node and PiD decoders.
+  const output = addDecodeOutput({
+    denoise,
+    graph,
+    l2iType: 'flux2_vae_decode',
+    model,
+    outputIsIntermediate,
+    positivePrompt,
+    seed,
+    settings,
+    vaeSource: modelLoader,
+  });
+
+  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
+  addEdge(graph, modelLoader, 'vae', denoise, 'vae');
+  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
+
+  if (negCond) {
+    addEdge(graph, modelLoader, 'qwen3_vl_encoder', negCond, 'qwen3_vl_encoder');
+    addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
+    addEdge(graph, negCond, 'conditioning', denoise, 'negative_conditioning');
+  }
+
+  addEdge(graph, seed, 'value', denoise, 'seed');
+  addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
+    // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
+    scheduler: 'euler',
+    qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    vae: vaeModel ?? undefined,
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
+  });
+  addReferenceImageMetadata(graph, output, settings);
 
   return graph;
 };
@@ -1754,7 +1837,7 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+  const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
     ideogram4_mu: settings.ideogram4Mu ?? undefined,
@@ -1765,6 +1848,8 @@ const buildIdeogram4Graph = (
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  // Record the caption the encoder saw; the positive prompt alone does not show regions or palette.
+  addEdge(graph, captionBuilder, 'value', metadata, 'ideogram4_caption');
 
   return graph;
 };
@@ -1931,6 +2016,7 @@ export const GRAPH_BUILDERS = {
   'ideogram-4': buildIdeogram4Graph,
   'krea-2': buildKrea2Graph,
   'qwen-image-2-1': buildQwenImage21Graph,
+  flux3: buildFlux3Graph,
   anima: buildAnimaGraph,
   'moss-image': buildMossImageGraph,
   wan: buildWanGraph,

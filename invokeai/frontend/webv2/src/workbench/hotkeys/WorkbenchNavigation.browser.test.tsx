@@ -191,15 +191,22 @@ it('moves between visible regions in all four directions, preserving widget sele
   expect(project()).toBe(before);
 });
 
-it('skips hidden regions, stops at edges, and enters the center without an initial target', async () => {
+it('moves from the center before anything is focused, skips hidden regions, and stops at edges', async () => {
   await press(regionChord('ArrowLeft'));
-  await expectFocusedRegion('center');
+  await expectFocusedRegion('left');
   regionElement('center').style.display = 'none';
+  await press(regionChord('ArrowRight'));
+  await expectFocusedRegion('right');
+  await press(regionChord('ArrowRight'));
+  await expectFocusedRegion('right');
+});
+
+it('enters the center when the focused region has left the screen', async () => {
   await focusRegion('left');
+  await expectFocusedRegion('left');
+  regionElement('left').style.display = 'none';
   await press(regionChord('ArrowRight'));
-  await expectFocusedRegion('right');
-  await press(regionChord('ArrowRight'));
-  await expectFocusedRegion('right');
+  await expectFocusedRegion('center');
 });
 
 it('switches instances of the same type from a text field, wraps, and transfers actual focus', async () => {

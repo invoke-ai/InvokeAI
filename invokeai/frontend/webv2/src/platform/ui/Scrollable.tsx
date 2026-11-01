@@ -7,8 +7,12 @@ import { useCallback, useRef } from 'react';
 import { useScrollAreaPhantomHeal } from './useScrollAreaPhantomHeal';
 
 type ScrollAreaRootProps = ComponentProps<typeof ScrollArea.Root>;
-type ScrollAreaContentProps = ComponentProps<typeof ScrollArea.Content>;
-type ScrollAreaViewportProps = ComponentProps<typeof ScrollArea.Viewport>;
+/**
+ * Zag finds the viewport and content by their generated ids: an overridden content id silently disables its content
+ * ResizeObserver, and an overridden viewport id disables thumb measuring. Rename them through the root's `ids` prop.
+ */
+type ScrollAreaContentProps = Omit<ComponentProps<typeof ScrollArea.Content>, 'id'>;
+type ScrollAreaViewportProps = Omit<ComponentProps<typeof ScrollArea.Viewport>, 'id'>;
 
 /**
  * Override Zag's inline min-width in vertical areas; long unbroken content would otherwise create unreachable

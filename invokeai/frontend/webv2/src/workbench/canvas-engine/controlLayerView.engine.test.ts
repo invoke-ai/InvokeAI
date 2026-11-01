@@ -302,12 +302,9 @@ describe('setControlLayerView', () => {
     expect(h.held()).toEqual(NOTHING_HELD);
   });
 
-  it.each<[string, (h: Harness) => void]>([
-    ['an operation holds the document', (h) => h.engine.stores.documentEditingLocked.set(true)],
-    ['a generation locks the canvas', (h) => h.engine.tools.setInteractionLocked(true)],
-  ])('refuses a view while %s', async (_case, lock) => {
+  it('refuses a view while an operation holds the document', async () => {
     const h = createHarness();
-    lock(h);
+    h.engine.stores.documentEditingLocked.set(true);
 
     await expect(h.show('original')).resolves.toBe('locked');
     expect(h.view()).toBeNull();
@@ -426,7 +423,6 @@ describe('setControlLayerView', () => {
     ['cooldown', (h) => h.engine.lifecycle.beginCooldown()],
     ['a cache clear', (h) => h.engine.diagnostics.clearCaches()],
     ['an operation taking the document', (h) => h.engine.stores.documentEditingLocked.set(true)],
-    ['a generation locking the canvas', (h) => h.engine.tools.setInteractionLocked(true)],
     ['disposal', (h) => h.engine.lifecycle.dispose()],
   ])('returns to the map on %s', async (_case, act) => {
     const h = createHarness();

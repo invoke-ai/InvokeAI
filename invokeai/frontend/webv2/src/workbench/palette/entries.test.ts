@@ -17,6 +17,7 @@ import {
   buildScopeRows,
   buildSettingsEntries,
   buildStageEntries,
+  buildWidgetEntries,
   SEARCH_SCOPE_GROUP,
   searchPaletteRows,
   getNavigablePaletteRows,
@@ -78,13 +79,69 @@ describe('buildCatalogCommandEntries', () => {
       t,
     });
 
-  it('surfaces implemented app commands with palette-facing titles and groups', () => {
+  it('surfaces app commands with palette-facing titles and groups', () => {
     const entries = build(new Set());
     const invoke = entries.find((entry) => entry.id === 'app.invoke');
-    const generateTab = entries.find((entry) => entry.id === 'app.selectGenerateTab');
 
     expect(invoke).toMatchObject({ group: 'Generation', title: 'Invoke' });
-    expect(generateTab).toMatchObject({ group: 'Navigation', showInEmptyState: true, title: 'Go to Generate' });
+    expect(entries.find((entry) => entry.id === 'app.selectWorkflowsTab')).toMatchObject({
+      group: 'Navigation',
+      showInEmptyState: true,
+      title: 'Open Workflow editor',
+    });
+  });
+
+  // One entry per widget: a widget's open command becomes its Show entry, keeping the command's id and key.
+  it('offers each widget once, under its open command where it has one', () => {
+    const show = vi.fn();
+    const commands = build(new Set()).map((entry) => entry.id);
+    const widgetEntries = buildWidgetEntries({
+      catalog: firstPartyHotkeyCatalog,
+      customHotkeys: { 'app.selectGenerateTab': ['g'] },
+      formatHotkey: formatHotkeyForPlatform,
+      show,
+      t,
+      widgets: [
+        { label: 'Generate', typeId: 'generate' },
+        { label: 'Image Map', typeId: 'image-map' },
+      ],
+    });
+
+    expect(commands).not.toContain('app.selectGenerateTab');
+    expect(
+      widgetEntries.map(({ group, id, keys, showInEmptyState }) => ({ group, id, keys, showInEmptyState }))
+    ).toEqual([
+      { group: 'Navigation', id: 'app.selectGenerateTab', keys: ['g'], showInEmptyState: true },
+      { group: 'Layout', id: 'widget.show.image-map', keys: undefined, showInEmptyState: false },
+    ]);
+    widgetEntries[0]!.run();
+    expect(show).toHaveBeenCalledWith('generate');
+  });
+
+  // Preview registers its item arrows and zoom only while it shows something to step through or zoom.
+  it('leaves out widget commands nothing handles right now', () => {
+    const ids = buildCatalogCommandEntries({
+      catalog: firstPartyHotkeyCatalog,
+      customHotkeys: {},
+      execute: noop,
+      formatHotkey: formatHotkeyForPlatform,
+      isHandled: (commandId) => commandId !== 'viewer.zoomToFit',
+      presentWidgetTypeIds: new Set(['preview']),
+      t,
+    }).map((entry) => entry.id);
+
+    expect(ids).toContain('viewer.toggleMetadata');
+    expect(ids).not.toContain('viewer.zoomToFit');
+  });
+
+  it('offers layout history and the widgets list under Layout', () => {
+    const entries = build(new Set());
+
+    expect(entries.find((entry) => entry.id === 'app.undoLayoutChange')).toMatchObject({
+      group: 'Layout',
+      title: 'Undo layout change',
+    });
+    expect(entries.find((entry) => entry.id === 'app.openWidgets')).toMatchObject({ group: 'Layout' });
   });
 
   it('titles front-of-queue invoke from the topbar catalog', () => {
@@ -114,10 +171,10 @@ describe('buildCatalogCommandEntries', () => {
     expect(entries.find((entry) => entry.id === 'app.selectComposePreset')?.title).toBe('Writing layout');
   });
 
-  it('hides unimplemented and hotkey-only commands', () => {
+  it('hides hotkey-only commands', () => {
     const ids = build(new Set(['canvas', 'gallery', 'preview', 'workflow'])).map((entry) => entry.id);
 
-    expect(ids).not.toContain('app.selectUpscalingTab');
+    expect(ids).not.toContain('canvas.nudgeLeft');
     expect(ids).not.toContain('gallery.galleryNavLeft');
     expect(ids).not.toContain('app.promptWeightUp');
     expect(ids).not.toContain('app.openCommandPalette');

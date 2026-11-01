@@ -1,12 +1,10 @@
 import type { CanvasDocumentContractV3, Rect } from '@workbench/canvas-engine/api';
 
-import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { describe, expect, it, vi, type Mock } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   applyFitBbox,
-  confirmNewCanvas,
   executeCanvasHeaderCommand,
   zoomAtViewportCentre,
   type CanvasHeaderCommandContext,
@@ -100,32 +98,6 @@ describe('applyFitBbox', () => {
     applyFitBbox(contextOf({ editingLocked: true, engine }), FIT_LAYERS, true);
     expect(engine.layers.commitStructural).not.toHaveBeenCalled();
     expect(engine.viewport.fitToView).not.toHaveBeenCalled();
-  });
-});
-
-describe('confirmNewCanvas', () => {
-  const replaced = (engine: ReturnType<typeof createEngine>['engine']) =>
-    (engine.document.replaceDocument as Mock).mock.calls[0]?.[0] as CanvasDocumentContractV3;
-
-  it('replaces the document at the current dimensions through the engine', () => {
-    const { engine } = createEngine();
-    confirmNewCanvas({ document: { height: 512, width: 768 }, editingLocked: false, engine });
-    expect(engine.document.replaceDocument).toHaveBeenCalledTimes(1);
-    expect(replaced(engine).width).toBe(768);
-    expect(replaced(engine).height).toBe(512);
-  });
-
-  it('seeds exactly one empty inpaint mask', () => {
-    const { engine } = createEngine();
-    confirmNewCanvas({ document: { height: 64, width: 64 }, editingLocked: false, engine });
-    expect(getDocumentLeaves(replaced(engine))).toHaveLength(1);
-    expect(getDocumentLeaves(replaced(engine))[0]?.type).toBe('inpaint_mask');
-  });
-
-  it('refuses while editing is locked — the second gate behind the confirm dialog', () => {
-    const { engine } = createEngine();
-    confirmNewCanvas({ document: { height: 512, width: 768 }, editingLocked: true, engine });
-    expect(engine.document.replaceDocument).not.toHaveBeenCalled();
   });
 });
 

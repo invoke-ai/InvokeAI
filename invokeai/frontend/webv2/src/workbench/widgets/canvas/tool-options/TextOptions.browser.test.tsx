@@ -177,7 +177,7 @@ describe('custom font controls', () => {
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <QueryClientProvider client={queryClient}>
-              <FontGroup engine={engine} isSurfaceInteractionLocked={false} />
+              <FontGroup engine={engine} />
             </QueryClientProvider>
           </I18nextProvider>
         </ChakraProvider>
@@ -218,7 +218,7 @@ describe('custom font controls', () => {
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <QueryClientProvider client={queryClient}>
-              <FontGroup engine={engine} isSurfaceInteractionLocked={false} />
+              <FontGroup engine={engine} />
             </QueryClientProvider>
           </I18nextProvider>
         </ChakraProvider>
@@ -262,7 +262,7 @@ describe('custom font controls', () => {
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <QueryClientProvider client={queryClient}>
-              <FontGroup engine={engine} isSurfaceInteractionLocked={false} />
+              <FontGroup engine={engine} />
             </QueryClientProvider>
           </I18nextProvider>
         </ChakraProvider>
@@ -305,7 +305,7 @@ describe('custom font controls', () => {
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <QueryClientProvider client={queryClient}>
-              <FontGroup engine={engine} isSurfaceInteractionLocked={false} />
+              <FontGroup engine={engine} />
             </QueryClientProvider>
           </I18nextProvider>
         </ChakraProvider>
@@ -363,7 +363,7 @@ describe('custom font controls', () => {
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <QueryClientProvider client={queryClient}>
-              <FontGroup engine={engine} isSurfaceInteractionLocked={false} />
+              <FontGroup engine={engine} />
             </QueryClientProvider>
           </I18nextProvider>
         </ChakraProvider>
