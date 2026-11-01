@@ -138,9 +138,11 @@ describe('ConfirmDialog', () => {
       );
       await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
       const dialog = document.querySelector('[role="alertdialog"]')!;
-      const paragraph = [...dialog.querySelectorAll('*')].find(
+      const paragraph = [...dialog.querySelectorAll<HTMLElement>('*')].find(
         (element) => element.childElementCount === 0 && element.textContent === BODY
       )!;
+      // The wrap depends on the loaded font's metrics.
+      await document.fonts.ready;
       const style = getComputedStyle(paragraph);
       const read = {
         describes: dialog.getAttribute('aria-describedby') === paragraph.id,
@@ -148,7 +150,8 @@ describe('ConfirmDialog', () => {
           color: style.color,
           fontSize: style.fontSize,
           fontWeight: style.fontWeight,
-          height: paragraph.getBoundingClientRect().height,
+          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would include.
+          height: paragraph.offsetHeight,
           letterSpacing: style.letterSpacing,
           lineHeight: style.lineHeight,
           margin: style.margin,
