@@ -59,7 +59,8 @@ it('puts iterations after left-side Invoke with matching joins and preserves inp
     );
   });
   const input = host.querySelector<HTMLInputElement>('input')!;
-  const iterations = input.closest<HTMLElement>('[data-scope="number-input"][data-part="root"]')!;
+  // NumberInput.Input is a direct child of the field root; Ark does not expose scope/part attributes on that root.
+  const iterations = input.parentElement!;
   const invoke = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Invoke')!;
   expect(iterations.getBoundingClientRect().left).toBeLessThan(invoke.getBoundingClientRect().left);
   expect(getComputedStyle(input).borderTopLeftRadius).not.toBe('0px');

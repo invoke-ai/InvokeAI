@@ -75,17 +75,21 @@ it.each([1024, 1280])(
     const queue = page.getByRole('button', { name: 'Queue', exact: true }).element();
     const input = host.querySelector('input[aria-label="Iterations"]')!;
     const setting = page.getByRole('checkbox', { name: 'Show Invoke button on the left', exact: true });
+    const settingLabel = page.getByText('Show Invoke button on the left', { exact: true });
+    await expect.element(setting).not.toBeChecked();
     expect(group.dataset.invocationSide).toBe('right');
     expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
 
-    await act(() => userEvent.click(setting));
+    await act(() => userEvent.click(settingLabel));
+    await expect.element(setting).toBeChecked();
     expect(group.dataset.invocationSide).toBe('left');
     expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
     expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(project.getBoundingClientRect().left);
     expect(host.querySelector('input[aria-label="Iterations"]')).toBe(input);
     expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
 
-    await act(() => userEvent.click(setting));
+    await act(() => userEvent.click(settingLabel));
+    await expect.element(setting).not.toBeChecked();
     expect(group.dataset.invocationSide).toBe('right');
     expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
     expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
