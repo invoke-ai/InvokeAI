@@ -83,13 +83,23 @@ export interface IndexProgressDescription {
 }
 
 /**
- * Shared panel/footer progress wording. `sinceMs` reports inactivity without claiming whether the worker is paused
+ * Shared panel/footer progress wording, in the language `t` translates to. `sinceMs` reports inactivity without claiming whether the worker is paused
  * for generation or has failed.
  */
-export const describeIndexProgress = (counts: ImageIndexCounts, sinceMs = 0): IndexProgressDescription => ({
+export const describeIndexProgress = (
+  counts: ImageIndexCounts,
+  t: (key: string, values: Record<string, unknown>) => string,
+  sinceMs = 0
+): IndexProgressDescription => ({
   compact: `${formatCount(getProcessed(counts))}/${formatCount(counts.total)}`,
-  counts: `${formatCount(getProcessed(counts))} of ${formatCount(counts.total)} images`,
+  counts: t('widgets.imageMap.progress.counts', {
+    processed: formatCount(getProcessed(counts)),
+    total: formatCount(counts.total),
+  }),
   percent: getDisplayPercent(counts),
-  skipped: counts.failed > 0 ? `${formatCount(counts.failed)} skipped after repeated failures` : null,
-  stale: sinceMs >= STALE_AFTER_MS ? `No progress reported for ${formatDuration(sinceMs / 1000)}` : null,
+  skipped: counts.failed > 0 ? t('widgets.imageMap.progress.skipped', { formatted: formatCount(counts.failed) }) : null,
+  stale:
+    sinceMs >= STALE_AFTER_MS
+      ? t('widgets.imageMap.progress.stale', { duration: formatDuration(sinceMs / 1000) })
+      : null,
 });

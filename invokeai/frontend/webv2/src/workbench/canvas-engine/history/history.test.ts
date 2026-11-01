@@ -36,7 +36,7 @@ describe('createHistory: replay ordering', () => {
     await history.redo();
 
     expect(log).toEqual(['undo:b', 'undo:a', 'redo:a']);
-    expect(history.entries()).toEqual({ future: ['b'], past: ['a'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['b'], past: ['a'] });
   });
 
   it('reports empty stacks without replaying', async () => {
@@ -53,7 +53,7 @@ describe('createHistory: replay ordering', () => {
     push(history, makeEntry('b', log));
 
     expect(history.canRedo()).toBe(false);
-    expect(history.entries()).toEqual({ future: [], past: ['b'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: ['b'] });
   });
 });
 
@@ -61,25 +61,25 @@ describe('createHistory: entries', () => {
   it('lists past oldest-first and future next-redo-first, tracking every mutation', async () => {
     const log: string[] = [];
     const history = createHistory();
-    expect(history.entries()).toEqual({ future: [], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: [] });
 
     push(history, makeEntry('a', log));
     push(history, makeEntry('b', log));
     push(history, makeEntry('c', log));
-    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'c'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: ['a', 'b', 'c'] });
 
     await history.undo();
     await history.undo();
-    expect(history.entries()).toEqual({ future: ['b', 'c'], past: ['a'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['b', 'c'], past: ['a'] });
 
     await history.redo();
-    expect(history.entries()).toEqual({ future: ['c'], past: ['a', 'b'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['c'], past: ['a', 'b'] });
 
     push(history, makeEntry('d', log));
-    expect(history.entries()).toEqual({ future: [], past: ['a', 'b', 'd'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: ['a', 'b', 'd'] });
 
     history.clear();
-    expect(history.entries()).toEqual({ future: [], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: [] });
   });
 });
 
@@ -94,7 +94,7 @@ describe('createHistory: admission', () => {
     const admission = history.admit(10);
 
     expect(admission).not.toBeNull();
-    expect(history.entries()).toEqual({ future: ['undone'], past: ['kept'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['undone'], past: ['kept'] });
     admission!.release();
     admission!.release();
     expect(history.admit(10)).not.toBeNull();
@@ -181,6 +181,10 @@ describe('createHistory: eviction', () => {
     }
     expect(history.entries().past).toHaveLength(HISTORY_MAX_ENTRIES);
     expect(history.entries().past[0]).toBe('entry-1');
+    // The History pane says older steps are gone; a clear starts the count again.
+    expect(history.entries().evicted).toBe(1);
+    history.clear();
+    expect(history.entries().evicted).toBe(0);
   });
 
   it('evicts oldest entries until under the byte budget, never the newest', () => {
@@ -190,6 +194,7 @@ describe('createHistory: eviction', () => {
     push(history, makeEntry('c', [], 4));
 
     expect(history.entries().past).toEqual(['b', 'c']);
+    expect(history.entries().evicted).toBe(1);
     expect(history.byteSize()).toBe(8);
     expect(HISTORY_BYTE_BUDGET).toBe(256 * 1024 * 1024);
   });
@@ -238,11 +243,11 @@ describe('createHistory: failure-atomic asynchronous replay', () => {
     push(history, { ...makeEntry('stroke', []), undo });
 
     await expect(history.undo()).resolves.toMatchObject({ label: 'stroke', status: 'failed' });
-    expect(history.entries()).toEqual({ future: [], past: ['stroke'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: ['stroke'] });
 
     fail = false;
     await expect(history.undo()).resolves.toEqual({ status: 'applied' });
-    expect(history.entries()).toEqual({ future: ['stroke'], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['stroke'], past: [] });
     expect(undo).toHaveBeenCalledTimes(2);
   });
 
@@ -252,7 +257,7 @@ describe('createHistory: failure-atomic asynchronous replay', () => {
     await history.undo();
 
     await expect(history.redo()).resolves.toMatchObject({ status: 'failed' });
-    expect(history.entries()).toEqual({ future: ['merge'], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['merge'], past: [] });
     expect(history.byteSize()).toBe(1);
   });
 
@@ -274,7 +279,7 @@ describe('createHistory: failure-atomic asynchronous replay', () => {
     finish();
     await expect(pending).resolves.toEqual({ status: 'applied' });
     expect(history.isReplaying()).toBe(false);
-    expect(history.entries()).toEqual({ future: ['b'], past: ['a'] });
+    expect(history.entries()).toEqual({ evicted: 0, future: ['b'], past: ['a'] });
   });
 
   it('lets a replay that clears history win instead of resurrecting its entry', async () => {
@@ -283,7 +288,7 @@ describe('createHistory: failure-atomic asynchronous replay', () => {
 
     await history.undo();
 
-    expect(history.entries()).toEqual({ future: [], past: [] });
+    expect(history.entries()).toEqual({ evicted: 0, future: [], past: [] });
   });
 });
 

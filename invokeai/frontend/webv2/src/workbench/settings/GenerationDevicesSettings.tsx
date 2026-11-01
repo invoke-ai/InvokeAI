@@ -1,4 +1,5 @@
 import type { GenerationDevicesSetting } from '@features/queue/devices';
+import type { SettingLayer } from '@platform/ui/settings/contracts';
 
 import { HStack, Spinner, Stack, Switch, Text } from '@chakra-ui/react';
 import { useCapabilities } from '@features/identity';
@@ -9,11 +10,19 @@ import {
   useGenerationDevices,
 } from '@features/queue/devices';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+/**
+ * Changed from the built-in (every device). Only marked: the "Use every available accelerator" switch on the same row
+ * is the way back, and an admin's reset would be an async save that loses the dot's focus.
+ */
+const CHANGED_LAYER: SettingLayer = { state: 'default' };
 
 /** Generation devices are admin-only server configuration and take effect after restart. */
 export const GenerationDevicesSettings = () => {
+  const { t } = useTranslation();
   const { canManageAppConfig } = useCapabilities();
   const { error, loadState, options, setting } = useGenerationDevices();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -30,15 +39,18 @@ export const GenerationDevicesSettings = () => {
     [options, setting]
   );
 
-  const save = useCallback(async (next: GenerationDevicesSetting) => {
-    setSaveError(null);
-    try {
-      await updateGenerationDevices(next);
-      setDidChange(true);
-    } catch (saveFailure) {
-      setSaveError(saveFailure instanceof Error ? saveFailure.message : 'Could not save generation devices.');
-    }
-  }, []);
+  const save = useCallback(
+    async (next: GenerationDevicesSetting) => {
+      setSaveError(null);
+      try {
+        await updateGenerationDevices(next);
+        setDidChange(true);
+      } catch (saveFailure) {
+        setSaveError(saveFailure instanceof Error ? saveFailure.message : t('settings.generationDevices.couldNotSave'));
+      }
+    },
+    [t]
+  );
 
   const toggleAuto = useCallback(
     (checked: boolean) => {
@@ -60,13 +72,13 @@ export const GenerationDevicesSettings = () => {
       // The backend rejects an empty list, and a config with no devices would fail on
       // the next startup — so refuse locally rather than surfacing a 422.
       if (next.length === 0) {
-        setSaveError('Select at least one generation device.');
+        setSaveError(t('settings.generationDevices.selectAtLeastOne'));
         return;
       }
 
       void save(next);
     },
-    [options, save, selectedDevices]
+    [options, save, selectedDevices, t]
   );
 
   if (loadState === 'loading' || loadState === 'idle') {
@@ -86,10 +98,12 @@ export const GenerationDevicesSettings = () => {
       <HStack align="start" gap="2">
         <Text color="fg.muted" fontSize="md">
           {options.length === 1
-            ? `Generation runs on ${labels[options[0].device] ?? options[0].device}. Parallel generation needs more than one accelerator.`
-            : 'No accelerators were detected, so generation runs on a single device.'}
+            ? t('settings.generationDevices.singleDevice', { device: labels[options[0].device] ?? options[0].device })
+            : t('settings.generationDevices.noAccelerators')}
         </Text>
-        {!isAuto ? <ModifiedSettingIndicator label="Generation devices" /> : null}
+        {!isAuto ? (
+          <SettingLayerIndicator label={t('settings.catalog.generationDevices.label')} layer={CHANGED_LAYER} />
+        ) : null}
       </HStack>
     );
   }
@@ -100,13 +114,15 @@ export const GenerationDevicesSettings = () => {
         <HStack gap="2">
           <Text color="fg" fontSize="md">
             {isAuto
-              ? 'Every available accelerator is used for generation.'
+              ? t('settings.generationDevices.usingAll')
               : selectedDevices.map((device) => labels[device] ?? device).join(', ')}
           </Text>
-          {!isAuto ? <ModifiedSettingIndicator label="Generation devices" /> : null}
+          {!isAuto ? (
+            <SettingLayerIndicator label={t('settings.catalog.generationDevices.label')} layer={CHANGED_LAYER} />
+          ) : null}
         </HStack>
         <Text color="fg.muted" fontSize="md">
-          Only an administrator can change which accelerators are used.
+          {t('settings.generationDevices.adminOnly')}
         </Text>
       </Stack>
     );
@@ -116,9 +132,9 @@ export const GenerationDevicesSettings = () => {
     <Stack gap="3">
       <DeviceSwitch
         checked={isAuto}
-        description="New accelerators are picked up automatically."
-        label="Use every available accelerator"
-        isModified={!isAuto}
+        description={t('settings.generationDevices.useAllDescription')}
+        label={t('settings.generationDevices.useAll')}
+        layer={isAuto ? undefined : CHANGED_LAYER}
         onChange={toggleAuto}
       />
       {isAuto ? null : (
@@ -141,7 +157,7 @@ export const GenerationDevicesSettings = () => {
       ) : null}
       {didChange ? (
         <Text color="fg.muted" fontSize="md">
-          Restart InvokeAI for changes to take effect.
+          {t('settings.generationDevices.restartRequired')}
         </Text>
       ) : null}
     </Stack>
@@ -173,13 +189,13 @@ const DeviceSwitch = ({
   checked,
   description,
   label,
-  isModified,
+  layer,
   onChange,
 }: {
   checked: boolean;
   description?: string;
   label: string;
-  isModified?: boolean;
+  layer?: SettingLayer;
   onChange: (checked: boolean) => void;
 }) => {
   const handleCheckedChange = useCallback(
@@ -202,7 +218,7 @@ const DeviceSwitch = ({
           <Switch.Label color="fg" fontSize="lg" fontWeight="500">
             {label}
           </Switch.Label>
-          {isModified ? <ModifiedSettingIndicator label={label} /> : null}
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
         </HStack>
         {description ? (
           <Text color="fg.muted" fontSize="md">

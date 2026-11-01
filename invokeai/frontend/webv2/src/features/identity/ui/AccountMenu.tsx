@@ -3,7 +3,7 @@ import { logoutSession, useAuthSession } from '@features/identity/session';
 import { MenuContent } from '@platform/ui';
 import { useNavigate } from '@tanstack/react-router';
 import { ChevronDownIcon, LogOutIcon, UserRoundCogIcon, UsersIcon } from 'lucide-react';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ProfileDialog } from './ProfileDialog';
@@ -28,6 +28,9 @@ export const AccountMenu = () => {
 
   const openProfile = useCallback(() => setIsProfileOpen(true), []);
   const closeProfile = useCallback(() => setIsProfileOpen(false), []);
+  // The menu item that opened the dialog is gone by the time it closes; focus returns to the menu's own button.
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const getTrigger = useCallback(() => triggerRef.current, []);
 
   if (!session.multiuserEnabled || session.user === null) {
     return;
@@ -41,6 +44,7 @@ export const AccountMenu = () => {
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
           <chakra.button
+            ref={triggerRef}
             alignItems="center"
             color="fg"
             display="flex"
@@ -101,7 +105,7 @@ export const AccountMenu = () => {
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ProfileDialog isOpen={isProfileOpen} user={user} onClose={closeProfile} />
+      <ProfileDialog finalFocusEl={getTrigger} isOpen={isProfileOpen} user={user} onClose={closeProfile} />
     </>
   );
 };

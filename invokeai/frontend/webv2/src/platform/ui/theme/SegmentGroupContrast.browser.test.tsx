@@ -1,10 +1,13 @@
-import { ChakraProvider, SegmentGroup, Text } from '@chakra-ui/react';
+import { Box, ChakraProvider, SegmentGroup, Text } from '@chakra-ui/react';
+import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
+import { THEMES } from '@theme/themes';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
-import { getContrastRatio } from './contrastRatio.testing';
+import { compositeColors, getContrastRatio } from './contrastRatio.testing';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -13,11 +16,16 @@ let root: Root | null = null;
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
+  applyThemeToRoot('classic');
   host = null;
   root = null;
 });
 
-const renderSegments = async (): Promise<{ checked: HTMLElement; count: HTMLElement; indicator: HTMLElement }> => {
+// Segment groups sit on panels and on the subtle card surface inside them.
+const SURFACES = ['bg.panel', 'bg.subtle'] as const;
+const VALUES = ['media', 'assets', 'all', 'none'];
+
+const renderSegments = async (surface: string) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -25,48 +33,67 @@ const renderSegments = async (): Promise<{ checked: HTMLElement; count: HTMLElem
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <SegmentGroup.Root value="media">
-          <SegmentGroup.Indicator data-testid="indicator" />
-          {['media', 'assets'].map((value) => (
-            <SegmentGroup.Item key={value} data-testid={value} value={value}>
-              <SegmentGroup.ItemHiddenInput />
-              <SegmentGroup.ItemText display="flex" gap="1.5">
-                {value}
-                <Text as="span" color="currentColor" data-testid={`${value}-count`} opacity="0.8">
-                  12
-                </Text>
-              </SegmentGroup.ItemText>
-            </SegmentGroup.Item>
-          ))}
-        </SegmentGroup.Root>
+        <Box bg={surface} data-testid="surface" p="2">
+          <SegmentGroup.Root value="media">
+            <SegmentGroup.Indicator data-testid="indicator" />
+            {VALUES.map((value) => (
+              <SegmentGroup.Item key={value} data-testid={value} value={value}>
+                <SegmentGroup.ItemHiddenInput />
+                <SegmentGroup.ItemText display="flex" gap="1.5">
+                  {value}
+                  <Text as="span" color="currentColor" data-testid={`${value}-count`} opacity="0.8">
+                    12
+                  </Text>
+                </SegmentGroup.ItemText>
+              </SegmentGroup.Item>
+            ))}
+          </SegmentGroup.Root>
+        </Box>
       </ChakraProvider>
     );
   });
 
-  return {
-    checked: host.querySelector<HTMLElement>('[data-testid="media"]')!,
-    count: host.querySelector<HTMLElement>('[data-testid="media-count"]')!,
-    indicator: host.querySelector<HTMLElement>('[data-testid="indicator"]')!,
-  };
+  const byId = (id: string) => host!.querySelector<HTMLElement>(`[data-testid="${id}"]`)!;
+  // The indicator is translucent, so measure against what it composites to over the surface beneath.
+  const checkedBg = compositeColors(
+    getComputedStyle(byId('indicator')).backgroundColor,
+    getComputedStyle(byId('surface')).backgroundColor
+  );
+
+  return { byId, checkedBg };
 };
 
+const dividerOpacity = (item: HTMLElement) => getComputedStyle(item, '::before').opacity;
+
 describe('segmentGroup checked contrast', () => {
-  // Measure checked text against the accent indicator, not the panel.
-  it('renders the checked label against the accent fill at AA contrast', async () => {
-    const { checked, indicator } = await renderSegments();
+  for (const theme of THEMES) {
+    for (const surface of SURFACES) {
+      it(`keeps checked labels readable on ${surface} in ${theme.id}`, async () => {
+        applyThemeToRoot(theme.id);
+        const { byId, checkedBg } = await renderSegments(surface);
+        const count = getComputedStyle(byId('media-count'));
 
-    const ratio = getContrastRatio(getComputedStyle(checked).color, getComputedStyle(indicator).backgroundColor, 1);
+        expect(getContrastRatio(getComputedStyle(byId('media')).color, checkedBg, 1)).toBeGreaterThanOrEqual(4.5);
+        // Secondary text derives from currentColor, so dimming keeps it readable on the selection.
+        expect(getContrastRatio(count.color, checkedBg, Number(count.opacity))).toBeGreaterThanOrEqual(4.5);
+      });
+    }
+  }
+});
 
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+describe('segmentGroup dividers', () => {
+  it('separates unchecked neighbours and hides dividers beside the checked item', async () => {
+    const { byId } = await renderSegments('bg.panel');
+
+    // The first item has no divider and the second touches the checked item.
+    expect(VALUES.map((value) => dividerOpacity(byId(value)))).toEqual(['0', '0', '1', '1']);
   });
 
-  it('keeps text that inherits the item colour readable when dimmed', async () => {
-    const { count, indicator } = await renderSegments();
-    const style = getComputedStyle(count);
+  it('hides the dividers on both sides of a hovered item', async () => {
+    const { byId } = await renderSegments('bg.panel');
 
-    // Derive secondary text from currentColor; fixed muted gray loses contrast on selected accent fills.
-    const ratio = getContrastRatio(style.color, getComputedStyle(indicator).backgroundColor, Number(style.opacity));
+    await userEvent.hover(byId('all'));
 
-    expect(ratio).toBeGreaterThanOrEqual(4.5);
+    await expect.poll(() => VALUES.map((value) => dividerOpacity(byId(value)))).toEqual(['0', '0', '0', '0']);
   });
 });

@@ -67,7 +67,7 @@ export interface CreateSelectObjectSessionOptions<T> {
   operation: CanvasOperationSession;
 }
 
-export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'blocked' | 'deduped' | 'invalid';
+export type SelectObjectSessionProcessResult = CanvasOperationRunResult | 'deduped' | 'invalid';
 
 export interface SelectObjectSession<T> {
   getSnapshot(): SelectObjectSessionState<T>;
@@ -81,7 +81,6 @@ export interface SelectObjectSession<T> {
     >
   ): void;
   process(): Promise<SelectObjectSessionProcessResult>;
-  interruptProcessing(): void;
   reportError(error: SamSessionError | string): void;
   reset(): void;
   cancel(): void;
@@ -502,19 +501,6 @@ export const createSelectObjectSession = <T>(options: CreateSelectObjectSessionO
       listeners.clear();
     },
     getSnapshot: () => state,
-    interruptProcessing: () => {
-      clearTimer();
-      if (disposed || state.status === 'ready' || state.status === 'error') {
-        return;
-      }
-      requestToken += 1;
-      pendingHash = null;
-      pendingPhase = null;
-      pendingProcess = null;
-      lastPublishedHash = null;
-      operation.interruptProcessing();
-      publishState({ ...state, error: null, preview: null, status: 'ready' });
-    },
     process,
     reportError: (error) => {
       if (!disposed) {

@@ -10,7 +10,7 @@ export const canvasSettingsContribution: SettingsContribution = {
     id: setting.key,
     kind: 'boolean',
     label: (t) => t(setting.labelKey),
-    scope: 'instance',
+    scope: 'project',
     keywords: setting.key === 'showCheckerboard' ? 'transparency background' : undefined,
   })),
   quick: CANVAS_SETTINGS.map((setting) => setting.key),

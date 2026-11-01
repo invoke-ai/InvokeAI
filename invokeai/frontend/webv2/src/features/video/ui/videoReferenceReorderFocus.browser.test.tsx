@@ -47,6 +47,7 @@ let root: Root;
 
 const adapter = {
   getUploadBoardId: () => Promise.resolve('none'),
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: vi.fn(),
   reportError: vi.fn(),
   refreshBoardDestinations: vi.fn(),

@@ -1,5 +1,5 @@
 import type { CanvasInteractionState } from '@workbench/canvas-engine/api';
-import type { ToolFooterProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
+import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
@@ -55,11 +55,11 @@ const createEngine = () => {
       state.pendingTransformLayerId = layerId;
       listeners.get('pendingTransformLayerId')?.forEach((listener) => listener());
     });
-  return { engine: engine as unknown as ToolFooterProps['engine'], setPending };
+  return { engine: engine as unknown as ToolFormProps['engine'], setPending };
 };
 
 /** Renders the footer `width` px wide. */
-const renderFooter = async (engine: ToolFooterProps['engine'], width = 320) => {
+const renderFooter = async (engine: ToolFormProps['engine'], width = 320) => {
   const Footer = transformForm.footer!;
   host = document.createElement('div');
   host.style.width = `${width}px`;
@@ -69,7 +69,7 @@ const renderFooter = async (engine: ToolFooterProps['engine'], width = 320) => {
     root!.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Footer engine={engine} isExternalInteractionLocked={false} />
+          <Footer engine={engine} />
         </ChakraProvider>
       </I18nextProvider>
     )

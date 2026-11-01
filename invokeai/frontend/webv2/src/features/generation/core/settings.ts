@@ -16,6 +16,7 @@ import type {
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  ModelIdentifierConfig,
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
@@ -100,6 +101,7 @@ export const getDynamicPromptsConfig = (
   settings: Pick<
     GenerateSettings,
     | 'dynamicPromptsCombinatorial'
+    | 'dynamicPromptsEnabled'
     | 'dynamicPromptsMaxPrompts'
     | 'dynamicPromptsResample'
     | 'dynamicPromptsSampleSeed'
@@ -107,6 +109,7 @@ export const getDynamicPromptsConfig = (
   >
 ): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
+  enabled: settings.dynamicPromptsEnabled,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
   resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
@@ -533,6 +536,19 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+/**
+ * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
+ * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
+ * a file registered differently is not taken for it.
+ */
+export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  Boolean(saved.hash) &&
+  candidate.hash === saved.hash &&
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
+/** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
   const modelsByKey = new Map<string, LoraModelConfig>();
 
@@ -542,9 +558,23 @@ export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: reado
     }
   }
 
+  // Keys the list holds, and keys a rematch in this pass has given out: two removed concepts with the same file must
+  // not both become the one reinstalled concept.
+  const claimedKeys = new Set(loras.map((lora) => lora.model.key));
+  const findReinstalled = (saved: LoraModelConfig): LoraModelConfig | undefined => {
+    for (const model of modelsByKey.values()) {
+      if (isSameModelFile(model, saved) && !claimedKeys.has(model.key)) {
+        claimedKeys.add(model.key);
+        return model;
+      }
+    }
+
+    return undefined;
+  };
+
   let didSync = false;
   const syncedLoras = loras.map((lora) => {
-    const currentModel = modelsByKey.get(lora.model.key);
+    const currentModel = modelsByKey.get(lora.model.key) ?? findReinstalled(lora.model);
 
     if (!currentModel || areModelSnapshotsEqual(currentModel, lora.model)) {
       return lora;
@@ -776,6 +806,25 @@ export const GENERATE_TOOL_MODEL_PICK_KEYS = [
   'imageToPromptModelKey',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
+/**
+ * What reverts `after` back to `before`: the earlier value of every key the change touched, the model included. Keys
+ * the change left alone stay out, so an Undo keeps edits made since (a prompt typed after a model switch). Batch count
+ * belongs to the top bar and is never reverted.
+ */
+export const getGenerateValuesRevertPatch = (before: object, after: object): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  const beforeValues = before as Readonly<Record<string, unknown>>;
+  const afterValues = after as Readonly<Record<string, unknown>>;
+
+  for (const key of new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])) {
+    if (key !== 'batchCount' && !areJsonValuesStructurallyEqual(beforeValues[key], afterValues[key])) {
+      patch[key] = beforeValues[key];
+    }
+  }
+
+  return patch;
+};
+
 /** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
 export const GENERATE_UI_STATE_KEYS = {
   aspectRatioIsLocked: true,
@@ -848,6 +897,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     ),
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
+    dynamicPromptsEnabled: values.dynamicPromptsEnabled !== false,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
     dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
     dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,

@@ -1,7 +1,7 @@
 ---
 title: Ideogram 4
 description: Generate images with the Ideogram 4 text-to-image models.
-lastUpdated: 2026-10-08
+lastUpdated: 2026-10-29
 sidebar:
   order: 7
 ---
@@ -86,10 +86,12 @@ Ideogram 4 keeps both transformer branches loaded for the whole generation. With
 When an Ideogram 4 model is selected, Invoke builds the structured JSON prompt automatically:
 
 - The **positive prompt** becomes the overall scene description.
-- Each enabled **Regional Guidance** layer on the Canvas contributes one element: its drawn box becomes the region's bounding box and its prompt becomes that region's description. Draw a box where you want something and describe it there.
-- To drive the model directly, paste a **raw JSON** object into the prompt box — anything starting with `{` is passed through unchanged.
+- Each enabled **Regional Guidance** layer on the Canvas contributes one object element. The layer's **Positive prompt** describes it, and its box is the rectangle around everything painted on the layer inside the generation frame. The shape does not matter, and separate painted areas on one layer share one box. A layer without a positive prompt is left out.
+- To drive the model directly, paste a **raw JSON** object into the prompt box — anything starting with `{` is passed through unchanged, and regional guidance layers are ignored.
 
-The exact JSON that was encoded is stored in the image metadata as **Structured Caption**, and can be recalled straight back into the prompt box from the metadata viewer.
+When a layer with a positive prompt has paint inside the generation frame, the main prompt cannot be blank: Invoke is disabled with *Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.* Every region is an object, so the layer offers no **Region type**. Regional negative prompts, auto-negative and regional reference images are not used with Ideogram 4; the layer hides its negative prompt and auto-negative controls.
+
+The caption is built when the generation runs, so dynamic prompts and batches vary the description inside it. The exact JSON that was encoded is saved in the image's metadata as `ideogram4_caption`; recalling the image restores the prompt you typed.
 
 :::note[No negative prompt]
 Ideogram 4 does not use a negative prompt — it has a dedicated unconditional branch instead, so the negative prompt box has no effect.

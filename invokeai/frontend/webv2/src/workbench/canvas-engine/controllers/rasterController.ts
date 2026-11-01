@@ -246,22 +246,13 @@ export class RasterController {
     }
   }
 
-  async decodeBlob(
-    blob: Blob,
-    dimensions?: { width: number; height: number; scale?: boolean }
-  ): Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }> {
+  async decodeBlob(blob: Blob): Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }> {
     const bitmap = await this.backend.createImageBitmap(blob);
     try {
-      const width = dimensions?.width ?? bitmap.width;
-      const height = dimensions?.height ?? bitmap.height;
-      const surface = this.backend.createSurface(width, height);
+      const surface = this.backend.createSurface(bitmap.width, bitmap.height);
       surface.ctx.setTransform(1, 0, 0, 1, 0, 0);
-      surface.ctx.clearRect(0, 0, width, height);
-      if (dimensions?.scale) {
-        surface.ctx.drawImage(bitmap, 0, 0, width, height);
-      } else {
-        surface.ctx.drawImage(bitmap, 0, 0);
-      }
+      surface.ctx.clearRect(0, 0, bitmap.width, bitmap.height);
+      surface.ctx.drawImage(bitmap, 0, 0);
       return { decodedHeight: bitmap.height, decodedWidth: bitmap.width, surface };
     } finally {
       bitmap.close();

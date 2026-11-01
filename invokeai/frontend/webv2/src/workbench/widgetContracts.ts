@@ -19,7 +19,6 @@ export type FirstPartyWidgetTypeId =
   | 'layers'
   | 'notifications'
   | 'preview'
-  | 'project'
   | 'queue'
   | 'queue-status'
   | 'server-status'
@@ -146,9 +145,17 @@ export interface WidgetDiagnosticsApi {
   logger: (namespace: LogNamespace) => Logger;
 }
 
+/**
+ * The instance's values. Reads and writes are not symmetric: `getSnapshot` returns resolved values (the project's pins
+ * over the user's defaults), while `set` replaces the raw pins. `set({ ...getSnapshot(), x })` would therefore pin
+ * every default the user has; write with `patch`, which pins only the keys given.
+ */
 export interface WidgetRuntimeStateApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  /** The values the widget reads with: pins over the user's defaults. */
   getSnapshot: () => Readonly<State>;
+  /** Pins `values`' keys, leaving the rest as they are. */
   patch: (values: Partial<State>) => void;
+  /** Replaces every pin with `values`; prefer `patch`. */
   set: (values: State) => void;
 }
 

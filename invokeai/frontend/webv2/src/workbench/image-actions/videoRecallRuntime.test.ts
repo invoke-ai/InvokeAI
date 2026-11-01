@@ -4,6 +4,7 @@ import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -11,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const galleryApi = vi.hoisted(() => ({
   galleryImages: { metadata: vi.fn(), resolveMany: vi.fn() },
   galleryItems: { resolve: vi.fn() },
-  galleryVideos: { metadata: vi.fn() },
+  galleryVideos: { workflow: vi.fn() },
 }));
 const modelsApi = vi.hoisted(() => ({ ensureModelsLoaded: vi.fn(), getModelsSnapshot: vi.fn() }));
 
@@ -179,7 +180,9 @@ describe('createVideoRecallRuntime', () => {
     await flush();
 
     expect(videoValues()).toMatchObject({ firstFrameImage: heldFrame, positivePrompt: 'a heron', seed: 99 });
-    expect(lastNotice()).toEqual(expect.objectContaining({ kind: 'success', title: 'Recalled video data' }));
+    expect(lastNotice()).toEqual(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.videoTitles.all' })
+    );
     expect(videoShown()).toBe(true);
 
     runtime.dispose();
@@ -200,7 +203,7 @@ describe('createVideoRecallRuntime', () => {
       const { projectId, runtime, socket, store, videoValues } = setup(LTX2);
       store.commands.widgets.patchValues('video', { conditioningClip: pictureClip }, projectId);
       // The record's own clip is gone, so only its frame lands.
-      galleryApi.galleryItems.resolve.mockRejectedValue(new Error('gone'));
+      galleryApi.galleryItems.resolve.mockRejectedValue(new ApiError('Not Found', 404));
 
       socket.emit(parametersEvent({ last_frame_image: { image_name: 'last.png' }, ...recalledClip('audio') }));
       await flush();
@@ -245,7 +248,9 @@ describe('createVideoRecallRuntime', () => {
     socket.emit(parametersEvent({ positive_prompt: 'a heron' }, { mode: 'remix' }));
     await flush();
 
-    expect(lastNotice()).toEqual(expect.objectContaining({ title: 'Remixed video' }));
+    expect(lastNotice()).toEqual(
+      expect.objectContaining({ title: 'widgets.gallery.itemActions.recall.videoTitles.remix' })
+    );
 
     runtime.dispose();
   });
