@@ -1,6 +1,5 @@
 import type {
   ToolFormProps,
-  ToolFooterProps,
   ToolPropertyForm,
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
@@ -41,7 +40,7 @@ const usePaintOptions = (engine: ToolFormProps['engine']) => {
   return { defaults: isEraser ? DEFAULT_ERASER_OPTIONS : DEFAULT_BRUSH_OPTIONS, isEraser, options, set };
 };
 
-const PaintPreview = ({ engine }: ToolFooterProps) => {
+const PaintPreview = ({ engine }: ToolFormProps) => {
   const { isEraser, options } = usePaintOptions(engine);
   const pair = useActiveColorPair();
   return (

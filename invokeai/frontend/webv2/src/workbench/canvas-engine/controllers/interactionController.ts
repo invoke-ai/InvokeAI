@@ -6,7 +6,6 @@ export interface InteractionControllerOptions {
   readonly initialToolId?: ToolId;
   readonly getTool: (toolId: ToolId) => Tool | undefined;
   readonly getToolContext: () => ToolContext;
-  readonly isLocked: () => boolean;
   /** Cancels an in-flight gesture through the still-active outgoing tool. */
   readonly cancelGesture?: () => void;
   readonly beforeSwitch?: (from: ToolId, to: ToolId, options?: { temporary?: boolean }) => void;
@@ -43,7 +42,7 @@ export class InteractionController {
   }
 
   setTool(toolId: ToolId, switchOptions?: { temporary?: boolean }): void {
-    if (this.disposed || (this.options.isLocked() && toolId !== 'view') || toolId === this.activeToolId) {
+    if (this.disposed || toolId === this.activeToolId) {
       return;
     }
     if (!switchOptions?.temporary) {

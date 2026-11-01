@@ -15,7 +15,7 @@ import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
+import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { applyToPoint, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { Tool, ToolContext } from './tool';
@@ -142,10 +142,12 @@ export const createGradientTool = (): Tool => {
       const selected = leaf?.layer;
 
       if (leaf && selected && selected.type === 'raster' && selected.source.type === 'gradient') {
-        // Edit the selected gradient layer — unless it's locked/disabled (no-op).
-        const local = isLeafEditable(leaf)
-          ? toLayerLocal(selected.transform, current.startDoc, input.documentPoint)
-          : null;
+        // Edit the selected gradient layer, unless it is locked or hidden (refused with a notice).
+        const refusal = leafEditRefusal(leaf);
+        if (refusal) {
+          ctx.reportEditRefusal?.({ layerId: selected.id, layerName: selected.name, status: refusal });
+        }
+        const local = refusal ? null : toLayerLocal(selected.transform, current.startDoc, input.documentPoint);
         if (!local) {
           clearPreview(ctx);
           return;

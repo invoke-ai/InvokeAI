@@ -552,7 +552,7 @@ describe('image storage settings', () => {
 
     await act(() => userEvent.click(button('settings.imageStorage.recover')!));
     await expect.poll(() => dialog()).not.toBeNull();
-    await act(() => userEvent.click(confirmIn('Cancel')!));
+    await act(() => userEvent.click(confirmIn('common.cancel')!));
     await expect.poll(() => dialog()).toBeNull();
     await expect.poll(() => document.activeElement).toBe(button('settings.imageStorage.recover'));
 

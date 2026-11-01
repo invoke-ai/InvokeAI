@@ -320,7 +320,7 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
 
   await exportPage.getByRole('button', { exact: true, name: 'Board actions for Inbox' }).click();
   await exportPage.getByRole('menuitem', { exact: true, name: 'Export project (.invk)' }).waitFor();
-  await exportPage.getByRole('menuitem', { name: /^Download Board/ }).waitFor();
+  await exportPage.getByRole('menuitem', { name: /^Download board/ }).waitFor();
   await exportPage.keyboard.press('Escape');
 
   const downloadPromise = exportPage.waitForEvent('download');

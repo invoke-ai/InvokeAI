@@ -929,9 +929,7 @@ describe('runCanvasInvocation', () => {
     const harness = makeHarness({ model });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices().map((notice) => notice.message)).toEqual([
-      'OpenAI Image supports a maximum size of 32×64.',
-    ]);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['OpenAI Image supports at most 32×64.']);
   });
 
   it('counts the captured init image against the Seedream budget before enqueue', async () => {

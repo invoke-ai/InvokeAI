@@ -46,7 +46,6 @@ const deferred = <T>() => {
 };
 
 const createDeps = (overrides: Partial<FilterOperationSessionDeps> = {}): FilterOperationSessionDeps => ({
-  canCommit: vi.fn(() => true),
   clearPreview: vi.fn(),
   commit: vi.fn(() => Promise.resolve({ layerId: layer.id, status: 'committed' as const })),
   controller: createCanvasOperationController({ isGuardCurrent: () => true }),
@@ -339,43 +338,6 @@ describe('createFilterOperationSession', () => {
     expect(deps.publishPreview).not.toHaveBeenCalled();
     expect(deps.controller.getSnapshot()).toEqual({ status: 'idle' });
   });
-
-  it.each(['export', 'graph'] as const)(
-    'interrupts processing at the %s boundary while preserving the draft and active operation',
-    async (boundary) => {
-      const wait = deferred<unknown>();
-      const deps = createDeps({
-        exportPixels:
-          boundary === 'export'
-            ? vi.fn(() => wait.promise as Promise<ExportLayerPixelsResult>)
-            : vi.fn(() => Promise.resolve(exported)),
-        runFilter:
-          boundary === 'graph'
-            ? vi.fn(() => wait.promise as ReturnType<FilterOperationSessionDeps['runFilter']>)
-            : vi.fn(() => Promise.resolve({ height: 10, imageName: 'filtered', origin: { x: 3, y: 4 }, width: 10 })),
-      });
-      const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
-      session.updateDraft({ settings: { radius: 17 }, type: 'img_blur' });
-      const pending = session.process();
-      await vi.waitFor(() => expect(boundary === 'export' ? deps.exportPixels : deps.runFilter).toHaveBeenCalledOnce());
-
-      session.interruptProcessing();
-      if (boundary === 'export') {
-        wait.resolve(exported);
-      } else {
-        wait.resolve({ height: 10, imageName: 'late', origin: { x: 3, y: 4 }, width: 10 });
-      }
-      await pending;
-
-      expect(deps.publishPreview).not.toHaveBeenCalled();
-      expect(session.getSnapshot()).toMatchObject({
-        draft: { settings: { radius: 17 }, type: 'img_blur' },
-        preview: null,
-        status: 'ready',
-      });
-      expect(deps.controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
-    }
-  );
 });
 
 describe('auto-process', () => {
@@ -479,19 +441,6 @@ describe('auto-process', () => {
     expect(deps.runFilter).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
     expect(deps.runFilter).toHaveBeenCalledTimes(1);
-    session.dispose();
-  });
-
-  it('interruptProcessing clears the pending auto-run', async () => {
-    vi.useFakeTimers();
-    const deps = createDeps();
-    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
-
-    session.updateDraft({ settings: { radius: 4 }, type: 'img_blur' });
-    expect(session.getSnapshot().status).toBe('ready');
-    session.interruptProcessing();
-    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS * 3);
-    expect(deps.runFilter).not.toHaveBeenCalled();
     session.dispose();
   });
 

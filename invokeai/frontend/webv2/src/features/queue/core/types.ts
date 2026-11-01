@@ -187,6 +187,8 @@ export interface QueueItemReadModel {
   userDisplayName?: string | null;
   userEmail?: string | null;
   userId?: string;
+  /** The name of the workflow submitted with the item; absent for Generate runs, which submit none. */
+  workflowName?: string | null;
 }
 
 /**

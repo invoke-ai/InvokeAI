@@ -8,20 +8,25 @@ export interface ClusterStats {
   unclustered: number;
 }
 
-const count = (value: number, noun: string): string => `${value.toLocaleString()} ${noun}${value === 1 ? '' : 's'}`;
-
 /**
  * The footer's one-line readout of a clustering.
  *
  * Lives beside the arithmetic so the sentence and the numbers cannot drift,
  * and so a test can assert the wording without mounting a widget.
  */
-export const describeClusters = (stats: ClusterStats): string =>
-  [
-    `Cluster count: ${stats.clusterCount.toLocaleString()}`,
-    `Largest cluster: ${count(stats.largestCluster, 'media point')}`,
-    `Unclustered: ${count(stats.unclustered, 'media point')}`,
-  ].join(', ');
+export const describeClusters = (
+  stats: ClusterStats,
+  t: (key: string, values: Record<string, unknown>) => string
+): string => {
+  const mediaPoints = (count: number) =>
+    t('widgets.imageMap.mediaPoints', { count, formatted: count.toLocaleString() });
+
+  return t('widgets.imageMap.clusterSummary', {
+    clusters: stats.clusterCount.toLocaleString(),
+    largest: mediaPoints(stats.largestCluster),
+    unclustered: mediaPoints(stats.unclustered),
+  });
+};
 
 /**
  * Cluster sizes over the points as drawn, for the footer's readout.

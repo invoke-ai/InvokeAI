@@ -166,6 +166,8 @@ const CommandPaletteContent = ({
           <HStack
             borderBottomWidth="1px"
             borderColor="border.emphasized"
+            // Inside the content's 1px border, so the focus outline follows its rounded top corners.
+            borderTopRadius="calc({radii.l3} - 1px)"
             flexShrink={0}
             gap="2.5"
             h="12"

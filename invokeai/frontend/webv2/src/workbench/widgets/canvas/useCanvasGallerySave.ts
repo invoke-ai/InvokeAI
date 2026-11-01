@@ -1,4 +1,3 @@
-import type { ToastAction } from '@platform/ui/toaster';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { invalidateGallery, invalidateGalleryBoardDestinations } from '@features/gallery/queries';
@@ -10,8 +9,13 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
 import { ApiError } from '@platform/transport/http';
+import { ACTION_TOAST_DURATION_MS, createActionToast, type ToastAction } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { saveCanvasToGallery, type CanvasGallerySaveRegion } from '@workbench/canvas-operations/api';
+import {
+  resolveCanvasSaveBoardId,
+  saveCanvasToGallery,
+  type CanvasGallerySaveRegion,
+} from '@workbench/canvas-operations/api';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useNotify } from '@workbench/useNotify';
 import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
@@ -19,7 +23,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCanvasGallerySaveErrorAction, withMatchingCanvasProject } from './canvasGallerySaveState';
-import { ACTION_TOAST_DURATION_MS, announce, describeBoard } from './gallerySaveToast';
+import { describeBoard } from './gallerySaveToast';
 import { describeAdjustmentRefusal } from './useStructuralCommit';
 
 type CanvasGallerySaveEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'lifecycle' | 'projectId'>;
@@ -30,7 +34,12 @@ registerAccountOwnedResource({ clear: () => savingProjects.clear(), name: 'canva
 
 export const useCanvasGallerySave = (
   engine: CanvasGallerySaveEngine | null
-): { isSaving: boolean; save: (region: CanvasGallerySaveRegion) => Promise<void> } => {
+): {
+  /** Names the board a save started now would go to, as the save resolves it; null when it cannot be named. */
+  describeDestination: () => Promise<string | null>;
+  isSaving: boolean;
+  save: (region: CanvasGallerySaveRegion) => Promise<void>;
+} => {
   const { t } = useTranslation();
   const notify = useNotify();
   const queries = useWorkbenchQueries();
@@ -41,7 +50,7 @@ export const useCanvasGallerySave = (
 
   const save = useCallback(
     async (region: CanvasGallerySaveRegion): Promise<void> => {
-      const project = queries.getSnapshot().activeProject;
+      const { activeProject: project, scopedDefaults } = queries.getSnapshot();
       if (savingProjects.get(project.id)) {
         return;
       }
@@ -51,12 +60,18 @@ export const useCanvasGallerySave = (
         savingProjects.set(project.id, true);
 
         try {
-          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region });
+          const result = await saveCanvasToGallery({ engine: matchedEngine, project, region, scopedDefaults });
 
           assertAccountScopeCurrent(owner);
           if (result.status === 'saved') {
             void invalidateGallery(queryClient, owner);
-            const board = await describeBoard(queryClient, project, result.boardId, t);
+            const board = await describeBoard(
+              queryClient,
+              project,
+              queries.getSnapshot().scopedDefaults,
+              result.boardId,
+              t
+            );
 
             if (!isAccountScopeCurrent(owner)) {
               return;
@@ -74,7 +89,8 @@ export const useCanvasGallerySave = (
             };
             const showActions = queries.isActiveProject(project.id) ? [showInGallery] : [];
 
-            announce(owner, {
+            createActionToast({
+              signal: owner.signal,
               actions: showActions,
               description: t('widgets.canvas.staging.savedDescription', { name: result.imageName }),
               ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
@@ -119,5 +135,17 @@ export const useCanvasGallerySave = (
     [engine, findGalleryItem, notifications, notify, queries, queryClient, t]
   );
 
-  return { isSaving, save };
+  const describeDestination = useCallback(async (): Promise<string | null> => {
+    const { activeProject: project, scopedDefaults } = queries.getSnapshot();
+    const owner = captureAccountScope();
+    try {
+      const boardId = (await resolveCanvasSaveBoardId(project, scopedDefaults)) ?? 'none';
+      const board = await describeBoard(queryClient, project, scopedDefaults, boardId, t);
+      return isAccountScopeCurrent(owner) && board.kind === 'named' ? board.label : null;
+    } catch {
+      return null;
+    }
+  }, [queries, queryClient, t]);
+
+  return { describeDestination, isSaving, save };
 };
