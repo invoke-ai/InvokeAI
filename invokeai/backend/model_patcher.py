@@ -11,6 +11,7 @@ from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
 from invokeai.backend.util.devices import TorchDevice
@@ -70,7 +71,10 @@ class ModelPatcher:
             # but a pickle roundtrip was found to be much faster (1 sec vs. 0.05 secs).
             ti_tokenizer = pickle.loads(pickle.dumps(tokenizer))
             ti_manager = TextualInversionManager(ti_tokenizer)
-            init_tokens_count = text_encoder.resize_token_embeddings(None, pad_to_multiple_of).num_embeddings
+            # Even padding and teardown can construct an Embedding. Exclude process-global
+            # construction patches at every resize, but not across tokenizer work or inference.
+            with MODEL_LOAD_LOCK.write_lock():
+                init_tokens_count = text_encoder.resize_token_embeddings(None, pad_to_multiple_of).num_embeddings
 
             def _get_trigger(ti_name: str, index: int) -> str:
                 trigger = ti_name
@@ -101,7 +105,7 @@ class ModelPatcher:
             # resize_token_embeddings(...) constructs a new torch.nn.Embedding internally. Initializing the weights of
             # this embedding is slow and unnecessary, so we wrap this step in skip_torch_weight_init() to save some
             # time.
-            with skip_torch_weight_init():
+            with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
                 text_encoder.resize_token_embeddings(init_tokens_count + new_tokens_added, pad_to_multiple_of)
             model_embeddings = text_encoder.get_input_embeddings()
 
@@ -137,7 +141,8 @@ class ModelPatcher:
 
         finally:
             if init_tokens_count and new_tokens_added:
-                text_encoder.resize_token_embeddings(init_tokens_count, pad_to_multiple_of)
+                with MODEL_LOAD_LOCK.write_lock():
+                    text_encoder.resize_token_embeddings(init_tokens_count, pad_to_multiple_of)
 
     @classmethod
     @contextmanager
