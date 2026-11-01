@@ -51,7 +51,7 @@ const POPOVER_POSITIONING = { placement: 'bottom-end', gutter: 6 } as const;
 const FOCUS_WAIT_FRAMES = 10;
 /** Hover previews the issues after a beat, and forgives a short trip from the button to the card. */
 const PREVIEW_OPEN_DELAY_MS = 250;
-const PREVIEW_CLOSE_DELAY_MS = 200;
+export const PREVIEW_CLOSE_DELAY_MS = 200;
 
 /**
  * `preview` follows hover and keyboard focus and leaves focus where it is; `pinned` stays until dismissed. The blocked
@@ -475,6 +475,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             ref={contentRef}
             // The card's title names it, so the route the description points to is what the dialog announces.
             aria-labelledby={titleId}
+            // Preview and pinned look alike; tests read the mode to tell which one a press or leave will end.
+            data-invoke-card-mode={mode}
             p="3"
             onKeyDown={handleContentKeyDown}
             onPointerDown={pinPreview}

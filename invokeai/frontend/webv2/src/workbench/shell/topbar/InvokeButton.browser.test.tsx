@@ -68,7 +68,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-import { InvokeButton } from './InvokeButton';
+import { InvokeButton, PREVIEW_CLOSE_DELAY_MS } from './InvokeButton';
 
 const invocation: InvocationRoute = {
   destination: 'gallery',
@@ -490,6 +490,15 @@ describe('InvokeButton route card', () => {
   };
   const sourceGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.source' });
   const destinationGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.destination' });
+  const cardMode = () => document.querySelector('[data-invoke-card-mode]')?.getAttribute('data-invoke-card-mode');
+  /** Past the leave's close delay, so a preview would have closed by now. */
+  const waitPastCloseDelay = () =>
+    act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, PREVIEW_CLOSE_DELAY_MS + 150);
+        })
+    );
 
   it('announces no popup while activation queues, but names the route and the way into it', async () => {
     const { button } = await renderInvokeButton();
@@ -552,11 +561,20 @@ describe('InvokeButton route card', () => {
     const { button } = await renderInvokeButton({ invoke });
     const contextMenu = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
 
+    await act(() => userEvent.hover(button));
     await act(() => button.dispatchEvent(contextMenu));
 
     expect(contextMenu.defaultPrevented).toBe(true);
     await expect.element(destinationGroup()).toBeVisible();
+    expect(cardMode()).toBe('pinned');
     expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
+
+    // Pinned: the pointer leaving does not close it.
+    await act(() => userEvent.unhover(button));
+    await act(() => userEvent.hover(document.body));
+    await waitPastCloseDelay();
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(cardMode()).toBe('pinned');
     expect(invoke).not.toHaveBeenCalled();
   });
 
@@ -578,14 +596,33 @@ describe('InvokeButton route card', () => {
 
     await act(() => userEvent.hover(button));
     await expect.element(destinationGroup()).toBeVisible();
+    expect(cardMode()).toBe('preview');
     expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
 
     await act(() => destinationGroup().getByText('Canvas').click());
+    expect(cardMode()).toBe('pinned');
     await act(() => userEvent.unhover(destinationGroup()));
     await act(() => userEvent.hover(document.body));
+    await waitPastCloseDelay();
 
     await expect.element(destinationGroup()).toBeVisible();
+    expect(cardMode()).toBe('pinned');
     expect(harness.destinations).toEqual(['canvas']);
+  });
+
+  it('closes a hover preview once the pointer leaves, after the close delay', async () => {
+    const { button } = await renderInvokeButton();
+
+    await act(() => userEvent.hover(button));
+    await expect.element(destinationGroup()).toBeVisible();
+    expect(cardMode()).toBe('preview');
+    await act(() => userEvent.unhover(button));
+    await act(() => userEvent.hover(document.body));
+    await waitPastCloseDelay();
+
+    // Closed by now; the card leaves the page once its exit animation ends.
+    expect(cardMode()).toBe('closed');
+    await expect.element(destinationGroup()).not.toBeInTheDocument();
   });
 
   it('locks the route from the card and marks a locked route on Invoke itself', async () => {
