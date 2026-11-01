@@ -3,8 +3,8 @@
 The loader conformance work needs real key layouts: invented names fall through the converters'
 format probes as "no match", the converter becomes a no-op, and a test written against them asserts
 nothing. But everything such a fixture records -- key names, shapes, dtypes, scale spellings, the
-`_quantization_metadata` header block and the per-layer `.comfy_quant` markers -- lives in the
-safetensors *header*, which is a few kilobytes at the front of the file. So a layout nobody here
+header's metadata with its `_quantization_metadata` block, and the per-layer `.comfy_quant` markers --
+lives in the safetensors *header*, which is a few kilobytes at the front of the file. So a layout nobody here
 owns is still a layout that can be reproduced: point this at a URL and it reads the header over an
 HTTP range request.
 
@@ -42,7 +42,11 @@ from typing import Any, Iterable, Mapping, Protocol
 import httpx
 from huggingface_hub.utils import build_hf_headers
 
-from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
+from invokeai.backend.quantization.fp8_scaled import (
+    COMFY_QUANT_SUFFIX,
+    QUANT_METADATA_KEY,
+    parse_quantization_metadata,
+)
 from invokeai.backend.quantization.int8_convrot import parse_comfy_quant_bytes
 
 # Not read from the environment on purpose: `HF_ENDPOINT` often points at a caching proxy here, and
@@ -291,6 +295,7 @@ def render_module(
     chosen: Mapping[str, int],
     layer_hints: Mapping[str, Any],
     markers: Mapping[str, Any],
+    metadata: Mapping[str, Any] | None = None,
 ) -> str:
     """The fixture module, in the shape the state_dicts fixtures beside it already have."""
     if chosen:
@@ -337,6 +342,16 @@ def render_module(
         lines += [f"    {_py(name)}: {_py(marker)}," for name, marker in sorted(markers.items())]
         lines.append("}")
 
+    if metadata:
+        lines += [
+            "",
+            "# The rest of the header's `__metadata__`, as the producer wrote it. A producer that names its scheme",
+            "# only here -- NVIDIA ModelOpt's `quantization` -- is told apart by these alone.",
+            "metadata: dict[str, str] = {",
+        ]
+        lines += [f"    {_py(key)}: {_py(value)}," for key, value in sorted(metadata.items())]
+        lines.append("}")
+
     return "\n".join(lines) + "\n"
 
 
@@ -366,6 +381,7 @@ def capture(source_argument: str, *, block: int | None, subset: bool, want_marke
         source=str(source),
         tensors=subsetted,
         chosen=chosen,
+        metadata={key: value for key, value in metadata.items() if key != QUANT_METADATA_KEY},
         layer_hints=layer_hints,
         markers=markers,
     )

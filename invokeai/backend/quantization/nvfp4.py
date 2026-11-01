@@ -24,6 +24,12 @@ its conditioning slightly worse -- which is why tests pin the layout against the
 and a slice of a real checkpoint. Nothing guarantees that another producer writing the same key names
 shares these conventions, so a layer is only read when a Comfy marker or header entry names it nvfp4.
 
+One other producer's conventions are known: NVIDIA ModelOpt's, in Black Forest Labs' FLUX.3 nvfp4 build.
+Same key names and the same numbers in another byte layout, named once in the safetensors metadata. A
+loader that finds one (:func:`is_modelopt_nvfp4`) names its layers with
+:func:`modelopt_nvfp4_header_layers` and re-lays the popped layers out into ComfyUI's with
+:func:`relayout_modelopt_nvfp4_payloads`.
+
 Loaders keep the layers packed: :func:`pop_nvfp4_layers` takes them out of the state dict before any fp8
 handling, and :func:`install_nvfp4_layers` swaps :class:`NVFP4Linear` modules in before the load. A layer
 then occupies about 0.56 bytes per weight element against bf16's 2 and dequantizes per forward.
@@ -33,20 +39,33 @@ plain decode would produce wrong weights.
 """
 
 import functools
-from collections.abc import Iterable, Mapping
+from collections.abc import Collection, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
 import torch
 import torch.nn.functional as F
 
-from invokeai.backend.quantization.block_scale_tiles import TILE_ROWS, check_tile_layout, unblock_scale_grid
+from invokeai.backend.quantization.block_scale_tiles import (
+    TILE_ROWS,
+    block_scale_grid,
+    check_tile_layout,
+    unblock_scale_grid,
+)
 from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
-from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, INPUT_SCALE_SUFFIXES, iter_weight_scale_pairs
+from invokeai.backend.quantization.fp8_scaled import (
+    COMFY_QUANT_SUFFIX,
+    INPUT_SCALE_SUFFIXES,
+    QUANT_METADATA_KEY,
+    iter_weight_scale_pairs,
+)
 from invokeai.backend.quantization.int8_convrot import parse_comfy_quant_marker
 
 NVFP4_FORMAT = "nvfp4"
 NVFP4_BLOCK_SIZE = 16
+
+# Where a ModelOpt export names its scheme: once, in the safetensors metadata, as `"quantization": "nvfp4"`.
+MODELOPT_QUANTIZATION_METADATA_KEY = "quantization"
 
 WEIGHT_SCALE_2_SUFFIX = ".weight_scale_2"
 PRE_QUANT_SCALE_SUFFIX = ".pre_quant_scale"
@@ -193,14 +212,23 @@ class NVFP4Payload:
         return sum(t.nelement() * t.element_size() for t in (self.weight, self.weight_scale, self.weight_scale_2))
 
 
-def _find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | None) -> list[str]:
+def find_nvfp4_layers(
+    sd: Mapping[str, Any],
+    header_layers: Mapping[str, Any] | None = None,
+    *,
+    markers: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[str]:
     """Every nvfp4 layer in ``sd``, after refusing what this module would read wrong. Mutates nothing.
 
     Detection is structural -- a ``weight_scale_2`` beside the weight -- and decided per layer, never per
     file. Refused, naming the layers: AWQ layers; markers that contradict their tensors; packed weights
-    with a ``weight_scale`` but no ``weight_scale_2``; malformed layers; and layers that neither a
-    ``.comfy_quant`` marker nor a ``_quantization_metadata`` entry (``header_layers``, in ``sd``'s key
-    space) names as nvfp4.
+    with a ``weight_scale`` but no ``weight_scale_2``; malformed layers, a grid that is not whole scale
+    tiles among them; and layers that neither a ``.comfy_quant`` marker nor a ``_quantization_metadata``
+    entry (``header_layers``, in ``sd``'s key space) names as nvfp4.
+
+    Only names, dtypes and shapes are read, so identification asks this of a header's meta tensors too.
+    It passes the decoded markers by layer as ``markers``, read from the file's bytes, since a meta tensor
+    has none to decode; a loader leaves them to be decoded from ``sd``.
     """
     layers = sorted(
         k[: -len(WEIGHT_SCALE_2_SUFFIX)] for k in sd if isinstance(k, str) and k.endswith(WEIGHT_SCALE_2_SUFFIX)
@@ -215,10 +243,15 @@ def _find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] |
             "wrong weights."
         )
 
+    if markers is None:
+        markers = {
+            key[: -len(COMFY_QUANT_SUFFIX)]: parse_comfy_quant_marker(sd[key])
+            for key in sd
+            if isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX)
+        }
     marked: dict[str, Any] = {}
-    for key in [k for k in sd if isinstance(k, str) and k.endswith(COMFY_QUANT_SUFFIX)]:
-        path = key[: -len(COMFY_QUANT_SUFFIX)]
-        marked[path] = parse_comfy_quant_marker(sd[key]).get("format")
+    for path, marker in markers.items():
+        marked[path] = marker.get("format")
         if marked[path] == NVFP4_FORMAT and path not in claimed:
             raise ValueError(f"nvfp4 layer '{path}' has no weight_scale_2, so it cannot be decoded.")
         if path in claimed and marked[path] not in (None, NVFP4_FORMAT):
@@ -285,7 +318,7 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
 
     Detection is the union of two structural tests: a ``weight_scale_2`` beside the weight, which is
     what the decode keys on, and a packed ``uint8`` weight carrying a block scale without one, which
-    is the half-state :func:`_find_nvfp4_layers` refuses by name. Keying on the first alone would
+    is the half-state :func:`find_nvfp4_layers` refuses by name. Keying on the first alone would
     miss the second, and the fold takes it just as readily.
 
     Narrower than the decode in one way worth knowing: at the Wan seam a bundled nvfp4 text encoder
@@ -299,7 +332,7 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
         and key.endswith(WEIGHT_SCALE_2_SUFFIX)
         and f"{key[: -len(WEIGHT_SCALE_2_SUFFIX)]}.weight" in sd
     }
-    # A packed weight with a block scale and no global one is the half-state `_find_nvfp4_layers`
+    # A packed weight with a block scale and no global one is the half-state `find_nvfp4_layers`
     # refuses by name. Keying on `weight_scale_2` alone would miss it, and the fold takes it just as
     # readily -- so the detection here is the union, not the narrower test.
     half = {
@@ -316,6 +349,58 @@ def reject_nvfp4_layers_a_plain_fold_cannot_decode(sd: Mapping[str, Any], what: 
         )
 
 
+def is_modelopt_nvfp4(metadata: Mapping[str, Any] | None, keys: Iterable[Any]) -> bool:
+    """Whether a checkpoint is an NVIDIA ModelOpt nvfp4 export, whose layers :func:`relayout_modelopt_nvfp4_payloads`
+    re-lays out.
+
+    Strictly: the metadata says ``"quantization": "nvfp4"``, and the file carries nothing of ComfyUI's way of
+    naming its layers, neither a ``_quantization_metadata`` entry nor a ``.comfy_quant`` marker. A ComfyUI file is
+    therefore never re-laid out, and a file mixing the two is held to ComfyUI's rule, which refuses every layer it
+    does not name. ``keys`` are the checkpoint's tensor names.
+    """
+    if not metadata or metadata.get(MODELOPT_QUANTIZATION_METADATA_KEY) != NVFP4_FORMAT:
+        return False
+    if metadata.get(QUANT_METADATA_KEY):
+        return False
+    return not any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in keys)
+
+
+def modelopt_nvfp4_header_layers(metadata: Mapping[str, Any] | None, keys: Collection[Any]) -> dict[str, Any]:
+    """The layers a ModelOpt export's metadata names, as ComfyUI's ``_quantization_metadata`` names them: every
+    ``weight_scale_2`` layer, nvfp4. Empty for any other file (:func:`is_modelopt_nvfp4`). ``keys`` are the
+    checkpoint's tensor names, in the key space the entries are wanted in."""
+    if not is_modelopt_nvfp4(metadata, keys):
+        return {}
+    return {
+        key[: -len(WEIGHT_SCALE_2_SUFFIX)]: {"format": NVFP4_FORMAT}
+        for key in keys
+        if isinstance(key, str) and key.endswith(WEIGHT_SCALE_2_SUFFIX)
+    }
+
+
+def relayout_modelopt_nvfp4_payloads(payloads: dict[str, NVFP4Payload]) -> None:
+    """Re-lay the popped nvfp4 layers of a ModelOpt export out the way ComfyUI stores them, in place.
+
+    ModelOpt packs element ``2j`` into the *lower* nibble and stores the block-scale grid row-major, where this
+    module decodes ComfyUI's layout: upper nibble first, grid in cuBLAS tiles. The numbers are the same: Black Forest
+    Labs' FLUX.3 ``variants/nvfp4`` file, re-laid out this way, is byte for byte Comfy-Org's nvfp4 file of the same
+    model, global and input scales included.
+
+    For payloads :func:`pop_nvfp4_layers` took out, whose layout it has checked. What happens to them before -- the
+    checks, a split into row ranges, a swap of halves -- cuts whole 128-row bands, which leaves either grid layout
+    whole, so this can run last: after the loader has reserved room. Every payload is replaced by a new copy, so the
+    pass allocates what the packed layers occupy, which is what the reservation counts for them; a payload's stored
+    tensors are released as its copy replaces it, unless something else still holds them.
+    """
+    for path in list(payloads):
+        payload = payloads[path]
+        payloads[path] = NVFP4Payload(
+            weight=(payload.weight << 4) | (payload.weight >> 4),
+            weight_scale=block_scale_grid(payload.weight_scale.view(torch.uint8)).view(payload.weight_scale.dtype),
+            weight_scale_2=payload.weight_scale_2,
+        )
+
+
 def pop_nvfp4_layers(sd: dict[str, Any], header_layers: Mapping[str, Any] | None = None) -> dict[str, NVFP4Payload]:
     """Take every nvfp4 layer's packed tensors out of ``sd`` and drop the rest of its side channel.
 
@@ -326,7 +411,7 @@ def pop_nvfp4_layers(sd: dict[str, Any], header_layers: Mapping[str, Any] | None
     is touched.
     """
     payloads: dict[str, NVFP4Payload] = {}
-    for path in _find_nvfp4_layers(sd, header_layers):
+    for path in find_nvfp4_layers(sd, header_layers):
         payloads[path] = NVFP4Payload(
             weight=sd.pop(f"{path}.weight"),
             weight_scale=sd.pop(f"{path}.weight_scale"),

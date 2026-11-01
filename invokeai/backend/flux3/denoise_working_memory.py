@@ -102,10 +102,12 @@ The analytic terms:
   calibration script, whose models are always resident, declares them so (`weights_resident`), and the term is zero.
 - Where SDPA has no fused kernel for these shapes it materializes the score matrices, shaped (batch, heads, S, S) over
   the joint sequence: `sdpa_score_matrix_bytes` prices them only where they are really built. No mask is passed.
-- The dequantization copy a GGUF build materializes per quantized linear and forward, alive alongside the activations
-  and invisible to them (`peak_dequant_transient_bytes`); zero for every other build.
-- The compute-dtype copies of a layer's float8-stored weights that FP8 Storage widens per forward
-  (`peak_fp8_cast_transient_bytes`); zero for every other build.
+- The dequantization copy a GGUF, int8 or nvfp4 build materializes per quantized linear and forward, alive alongside
+  the activations and invisible to them (`peak_dequant_transient_bytes`); zero for a build that keeps no layer
+  quantized.
+- The compute-dtype copies of a layer's float8-stored weights that FP8 Storage widens per forward, or that a kept
+  scaled-fp8 checkpoint (BFL's fp8r) dequantizes with its scale (`peak_fp8_cast_transient_bytes`); zero for a build
+  that holds no float8 weight.
 """
 
 from collections.abc import Mapping

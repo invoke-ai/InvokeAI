@@ -4,7 +4,8 @@ No expected value here comes from `nvfp4.py` itself. Nibble order and the E2M1 t
 against literal bytes; the block-scale layout against the index formula measured on real checkpoints,
 written out as arithmetic; and the whole decode against a slice of a real Comfy-Org checkpoint and its
 bf16 build. That slice is one tile row high: it pins the layout inside a row of tiles against real data,
-while the order of the tile rows rests on the formula test.
+while the order of the tile rows rests on the formula test. The ModelOpt re-layout is held to the same
+layer encoded both ways by index formulas of their own.
 """
 
 from pathlib import Path
@@ -24,13 +25,20 @@ from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.quantization.nvfp4 import (
     NVFP4Linear,
+    NVFP4Payload,
     dequantize_nvfp4_weight,
     install_nvfp4_layers,
     pop_nvfp4_layers,
     predict_nvfp4_install_size,
+    relayout_modelopt_nvfp4_payloads,
     split_nvfp4_rows,
 )
-from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_tensors, stored_layout
+from tests.fixtures.quantized_payloads import (
+    comfy_quant_marker,
+    nvfp4_modelopt_tensors,
+    nvfp4_tensors,
+    stored_layout,
+)
 
 FIXTURE = Path(__file__).parent / "data" / "z_image_turbo_nvfp4_slices.safetensors"
 
@@ -99,6 +107,48 @@ def test_a_real_checkpoint_slice_decodes_to_its_bf16_build(layer: str) -> None:
     x = torch.randn(2, 128)
     module = NVFP4Linear(weight, scale, scale_2)
     assert torch.equal(module(x), torch.nn.functional.linear(x, decoded.view(128, 128)))
+
+
+def test_a_modelopt_layer_is_re_laid_out_into_the_bytes_comfyui_stores() -> None:
+    """NVIDIA ModelOpt (Black Forest Labs' FLUX.3 nvfp4 build) and ComfyUI store the same layer two ways: ModelOpt
+    packs element ``2j`` into the low nibble and keeps the block-scale grid row-major, ComfyUI packs it high and tiles
+    the grid. Each encoding is written by an index formula of its own (`nvfp4_modelopt_tensors`, and `nvfp4_tensors`
+    over `stored_layout`), not by the code under test. Every E2M1 code appears, neighbours always differ, and the grid
+    varies along rows and blocks, so a skipped nibble swap, a skipped tiling or a tiling along the wrong axes changes
+    bytes."""
+    rows, blocks = 128, 4
+    codes = (torch.arange(rows * blocks * 16) * 5 % 16).reshape(rows, blocks * 16).to(torch.uint8)
+    # Finite, positive e4m3 bit patterns (0x01-0x7E), different in neighbouring rows and blocks.
+    grid_bytes = (torch.arange(rows).unsqueeze(1) * 7 + torch.arange(blocks).unsqueeze(0) * 31) % 126 + 1
+    grid = grid_bytes.to(torch.uint8).view(torch.float8_e4m3fn).float()
+    modelopt = nvfp4_modelopt_tensors("layer", codes, grid=grid, global_scale=0.25)
+    comfy = nvfp4_tensors("layer", codes, block_scale=stored_layout(grid), global_scale=0.25)
+    assert not torch.equal(modelopt["layer.weight"], comfy["layer.weight"])
+    assert not torch.equal(
+        modelopt["layer.weight_scale"].view(torch.uint8), comfy["layer.weight_scale"].view(torch.uint8)
+    )
+
+    payloads = {
+        "layer": NVFP4Payload(
+            modelopt["layer.weight"], modelopt["layer.weight_scale"], modelopt["layer.weight_scale_2"]
+        )
+    }
+
+    relayout_modelopt_nvfp4_payloads(payloads)
+
+    relaid = payloads["layer"]
+    assert torch.equal(relaid.weight, comfy["layer.weight"])
+    assert relaid.weight_scale.dtype is torch.float8_e4m3fn
+    # As bytes: `torch.equal` is not implemented for float8 on the CPU.
+    assert torch.equal(relaid.weight_scale.view(torch.uint8), comfy["layer.weight_scale"].view(torch.uint8))
+    # And what both mean, from the E2M1 table and the row-major grid: every product here is exact in float32.
+    e2m1 = torch.tensor([0.0, 0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 6.0, -0.0, -0.5, -1.0, -1.5, -2.0, -3.0, -4.0, -6.0])
+    expected = e2m1[codes.long()] * grid.repeat_interleave(16, dim=1) * 0.25
+    for weight, scale, scale_2 in (
+        (relaid.weight, relaid.weight_scale, relaid.weight_scale_2),
+        (comfy["layer.weight"], comfy["layer.weight_scale"], comfy["layer.weight_scale_2"]),
+    ):
+        assert torch.equal(dequantize_nvfp4_weight(weight, scale, scale_2, torch.float32), expected)
 
 
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16, torch.float32])

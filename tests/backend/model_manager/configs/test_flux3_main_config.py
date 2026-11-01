@@ -20,8 +20,15 @@ from invokeai.backend.model_manager.configs.main import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import Flux3VariantType, ModelFormat
 from tests.backend.flux3.flux3_fixture import tiny_flux3_model, to_native, write_flux3_gguf
-from tests.backend.model_manager.load.state_dicts import flux3_klein_base_keys, flux3_klein_keys
-from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
+from tests.backend.model_manager.load.state_dicts import (
+    flux3_klein_base_keys,
+    flux3_klein_fp8r_keys,
+    flux3_klein_int8_convrot_keys,
+    flux3_klein_keys,
+    flux3_klein_nvfp4_bfl_keys,
+    flux3_klein_nvfp4_comfy_keys,
+)
+from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors, write_shrunk_safetensors
 
 # The released folder's JSON files (black-forest-labs/flux-3-image-klein, 2026-10-15), shortened where nothing
 # reads the rest. The root `config.json` is BFL's own package config, which sits beside the pipeline.
@@ -113,31 +120,172 @@ def test_a_released_single_file_installs_as_flux3(tmp_path: Path, fixture, varia
     assert result.config.variant is variant
 
 
-# What each quantized release changes on one linear, reduced to the header entries the refusal reads.
-_QUANTIZED_LAYERS = {
-    # BFL `variants/fp8r`: per-row E4M3 with a scale vector.
-    "fp8r": {"weight": ([3072, 3072], "F8_E4M3"), "weight_scale": ([3072], "F32")},
-    # A plain fp8 cast with no side channel.
-    "fp8-raw": {"weight": ([3072, 3072], "F8_E4M3")},
-    # ComfyUI `int8_convrot`: int8 weights tagged by a `.comfy_quant` marker.
-    "int8-convrot": {"weight": ([3072, 3072], "I8"), "comfy_quant": ([16], "U8")},
-    # nvfp4 (ComfyUI and ModelOpt): two values per byte, block and tensor scales.
-    "nvfp4": {"weight": ([3072, 1536], "U8"), "weight_scale": ([3072, 192], "F8_E4M3"), "weight_scale_2": ([], "F32")},
+_RELEASED_QUANTIZED = {
+    "int8-convrot": flux3_klein_int8_convrot_keys,
+    "nvfp4-comfy": flux3_klein_nvfp4_comfy_keys,
+    "nvfp4-bfl": flux3_klein_nvfp4_bfl_keys,
+    "fp8r": flux3_klein_fp8r_keys,
 }
 
 
-@pytest.mark.parametrize("layout", sorted(_QUANTIZED_LAYERS))
-def test_a_quantized_single_file_is_refused_with_a_reason(tmp_path: Path, layout: str) -> None:
+def _write_release(path: Path, fixture, *, base: bool = False) -> Path:
+    """A captured release as a small complete file: identification reads its markers' bytes and its metadata, the
+    `_quantization_metadata` block included, beyond the tensor entries. Klein Base's builds are Klein's layout
+    without the flow-map embedder `ref_time_in` (checked on their headers)."""
+    metadata = dict(fixture.metadata)
+    if layer_hints := getattr(fixture, "layer_hints", None):
+        metadata["_quantization_metadata"] = json.dumps({"layers": layer_hints})
+    keys = {
+        key: entry for key, entry in fixture.state_dict_keys.items() if not (base and key.startswith("ref_time_in."))
+    }
+    return write_shrunk_safetensors(path, keys, markers=getattr(fixture, "markers", None), metadata=metadata)
+
+
+@pytest.mark.parametrize("base", [False, True], ids=["klein", "base"])
+@pytest.mark.parametrize("name", _RELEASED_QUANTIZED)
+def test_a_released_quantized_single_file_installs_as_flux3(tmp_path: Path, name: str, base: bool) -> None:
+    result = _identify(_write_release(tmp_path / "flux3.safetensors", _RELEASED_QUANTIZED[name], base=base))
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Main_Checkpoint_Flux3_Config)
+    assert result.config.variant is (Flux3VariantType.KleinBase if base else Flux3VariantType.Klein)
+    # FP8 Storage comes on at install for the fp8 build, which then stays fp8; an int8 build has no fp8 to keep.
+    # (The nvfp4 builds get it too, from their fp8 block scales, and the loader skips it: a known issue of the shared
+    # install default, documented on the FLUX.3 page.)
+    fp8_storage = getattr(result.config.default_settings, "fp8_storage", None)
+    if name == "fp8r":
+        assert fp8_storage is True
+    elif name == "int8-convrot":
+        assert fp8_storage is not True
+
+
+_INT8 = {"weight": ([3072, 3072], "I8"), "weight_scale": ([3072, 1], "F32"), "comfy_quant": ([72], "U8")}
+_INT8_MARKER = {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": 256}
+_NVFP4 = {"weight": ([3072, 1536], "U8"), "weight_scale": ([3072, 192], "F8_E4M3"), "weight_scale_2": ([], "F32")}
+_FP8_SCALED = {"weight": ([3072, 3072], "F8_E4M3"), "weight_scale": ([], "F32")}
+
+
+def _header_naming(*layers: str) -> dict[str, str]:
+    return {"_quantization_metadata": json.dumps({"layers": {layer: {"format": "nvfp4"} for layer in layers}})}
+
+
+def _with(layers: dict[str, dict[str, tuple[list[int], str]]]) -> dict[str, tuple[list[int], str]]:
+    """The released Klein layout with each of `layers` stored as its entries instead."""
     keys = dict(flux3_klein_keys.state_dict_keys)
-    for suffix, entry in _QUANTIZED_LAYERS[layout].items():
-        keys[f"single_blocks.0.q_proj.{suffix}"] = entry
-    path = write_header_only_safetensors(tmp_path / f"flux3_{layout}.safetensors", keys)
+    for layer, entries in layers.items():
+        keys = {key: entry for key, entry in keys.items() if not key.startswith(f"{layer}.")}
+        keys.update({f"{layer}.{suffix}": entry for suffix, entry in entries.items()})
+    return keys
+
+
+@pytest.mark.parametrize(
+    ("layers", "markers"),
+    [
+        # A plain fp8 cast, no scale.
+        ({"single_blocks.0.q_proj": {"weight": ([3072, 3072], "F8_E4M3")}}, None),
+        # Per-tensor scaled fp8, as ComfyUI writes it.
+        ({"single_blocks.0.q_proj": _FP8_SCALED}, None),
+        # nvfp4 named by ComfyUI's per-layer marker rather than its header.
+        (
+            {"single_blocks.0.q_proj": {**_NVFP4, "comfy_quant": ([18], "U8")}},
+            {"single_blocks.0.q_proj": {"format": "nvfp4"}},
+        ),
+    ],
+    ids=["fp8-raw", "fp8-per-tensor", "nvfp4-comfy-marker"],
+)
+def test_the_other_loadable_quantizations_install_as_flux3(tmp_path: Path, layers, markers) -> None:
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", _with(layers), markers=markers))
+
+    assert result.match_count == 1, [type(match).__name__ for match in result.all_matches]
+    assert isinstance(result.config, Main_Checkpoint_Flux3_Config)
+
+
+_Q, _K = "single_blocks.0.q_proj", "single_blocks.0.k_proj"
+
+# What the loader cannot build, each on a layer or two of the released layout: the layers, their markers, the file's
+# metadata, and the reason the refusal must give.
+_REFUSED = {
+    "int8-unmarked": (
+        {_Q: {"weight": ([3072, 3072], "I8"), "weight_scale": ([3072, 1], "F32")}},
+        {},
+        {},
+        "no `comfy_quant` marker",
+    ),
+    "int8-group-size": ({_Q: _INT8}, {_Q: {**_INT8_MARKER, "convrot_groupsize": 512}}, {}, "groups of 512"),
+    "torchao": (
+        {_Q: {"_weight_qdata": ([3072, 3072], "F8_E4M3"), "_weight_scale": ([3072, 1], "F32")}},
+        {},
+        {},
+        "torchao",
+    ),
+    # bitsandbytes NF4 flattens the packed weight and keeps its state beside it.
+    "bitsandbytes": (
+        {_Q: {"weight": ([4718592, 1], "U8"), "weight.absmax": ([147456], "F32"), "weight.quant_map": ([16], "F32")}},
+        {},
+        {},
+        "bitsandbytes 4-bit quantization state",
+    ),
+    "packed-without-global-scale": ({_Q: {"weight": ([3072, 1536], "U8")}}, {}, {}, "without an nvfp4 global scale"),
+    "awq": ({_Q: {**_NVFP4, "pre_quant_scale": ([3072], "F32")}}, {}, _header_naming(_Q), "AWQ"),
+    "fp8-unparsed-scale": (
+        {_Q: {"weight": ([3072, 3072], "F8_E4M3"), "weight_scale_inv": ([3072], "F32")}},
+        {},
+        {},
+        "a spelling InvokeAI does not read",
+    ),
+    "nvfp4-unnamed": ({_Q: _NVFP4}, {}, {}, "no ComfyUI `comfy_quant` marker"),
+    # 100 rows are no whole 128-row scale tile.
+    "nvfp4-misaligned": (
+        {_Q: {"weight": ([100, 1536], "U8"), "weight_scale": ([100, 192], "F8_E4M3"), "weight_scale_2": ([], "F32")}},
+        {},
+        _header_naming(_Q),
+        "tile layout",
+    ),
+    "int8-with-nvfp4": ({_Q: _INT8, _K: _NVFP4}, {_Q: _INT8_MARKER}, _header_naming(_K), "mixes int8 and nvfp4"),
+    "int8-with-scaled-fp8": ({_Q: _INT8, _K: _FP8_SCALED}, {_Q: _INT8_MARKER}, {}, "scaled fp8"),
+    "packed-embedder": (
+        {
+            "txt_in": {
+                "weight": ([3072, 10240], "U8"),
+                "weight_scale": ([3072, 1280], "F8_E4M3"),
+                "weight_scale_2": ([], "F32"),
+            }
+        },
+        {},
+        _header_naming("txt_in"),
+        "stores 'txt_in.weight' packed",
+    ),
+}
+
+
+@pytest.mark.parametrize("layout", sorted(_REFUSED))
+def test_a_quantized_single_file_the_loader_cannot_build_is_refused(tmp_path: Path, layout: str) -> None:
+    layers, markers, metadata, reason = _REFUSED[layout]
+    path = write_shrunk_safetensors(tmp_path / "flux3.safetensors", _with(layers), markers=markers, metadata=metadata)
 
     result = _identify(path)
 
     # Refused outright: neither installed as FLUX.3 nor taken by another config, nor registered as unknown.
     assert result.config is None
-    assert any("quantized" in str(error) for error in result.invalid_matches)
+    assert any(reason in str(error) for error in result.invalid_matches), result.invalid_matches
+
+
+def test_a_torchao_export_is_refused_rather_than_installed_as_unknown(tmp_path: Path) -> None:
+    """torchao quantizes every linear, the modulation the fingerprint looks at included, and stores each one without
+    a `.weight`; the file must still be recognized as FLUX.3 for its refusal to be reached."""
+    keys: dict[str, tuple[list[int], str]] = {}
+    for key, (shape, dtype) in flux3_klein_keys.state_dict_keys.items():
+        if key.endswith(".weight") and len(shape) == 2:
+            layer = key[: -len(".weight")]
+            keys[f"{layer}._weight_qdata"] = (shape, "F8_E4M3")
+            keys[f"{layer}._weight_scale"] = ([shape[0], 1], "F32")
+        else:
+            keys[key] = (shape, dtype)
+
+    result = _identify(write_shrunk_safetensors(tmp_path / "flux3.safetensors", keys))
+
+    assert result.config is None
+    assert any("torchao" in str(error) for error in result.invalid_matches), result.all_matches
 
 
 def test_a_lora_with_flux3_names_is_not_a_main_model(tmp_path: Path) -> None:

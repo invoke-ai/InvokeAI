@@ -31319,7 +31319,11 @@ export type components = {
         };
         /**
          * Main_Checkpoint_Flux3_Config
-         * @description Model config for FLUX.3 Image single-file transformers (BFL `model.safetensors`, ComfyUI bf16).
+         * @description Model config for FLUX.3 Image single-file transformers.
+         *
+         *     BFL's `model.safetensors` and its quantized `variants/fp8r` (per-row scaled fp8) and `variants/nvfp4` (NVIDIA
+         *     ModelOpt layout), and Comfy-Org's bf16, `int8_convrot` and nvfp4 repackages. The record is the same for all of
+         *     them: the loader reads the scheme off the file.
          */
         Main_Checkpoint_Flux3_Config: {
             /**

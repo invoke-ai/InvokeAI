@@ -32,7 +32,7 @@ Others are recognized by their layer names and fail, or misbehave, only when the
 | [SD 3](/users-guide/models/local-models/sd-3/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [FLUX.1](/users-guide/models/local-models/flux-1/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✓ |
 | [FLUX.2](/users-guide/models/local-models/flux-2/) | ✓ | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | inside the Diffusers folder (FLUX.2 [dev]) |
-| [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | R | R | R | – | ✓ | – | – |
+| [FLUX.3](/users-guide/models/local-models/flux-3/) | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | – | – |
 | [CogView4](/users-guide/models/local-models/cogview4/) | ✓ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ | ✗ |
 | [Z-Image](/users-guide/models/local-models/z-image/) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | [Qwen-Image](/users-guide/models/local-models/qwen-image/) | ✓ | ✓ | ✓ | ✗ | ✓ | ✓ | ✓ | ✗ | ✗ |
@@ -48,9 +48,11 @@ Others are recognized by their layer names and fail, or misbehave, only when the
 
 - **int8** means ComfyUI's `int8_convrot` (`int8_tensorwise`) builds; on NVIDIA GPUs, [int8 Compute](/configuration/optimization/int8-compute/)
   runs them on the int8 tensor cores. **nvfp4** and **fp8 scaled** mean ComfyUI's
-  checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. For Qwen-Image-2.1,
-  torchao exports such as unsloth's FP8 build are refused at install. MOSS-Image refuses every quantized
-  transformer at install, unscaled fp8 included.
+  checkpoint layouts; other exports of the same schemes (AWQ, ModelOpt) fail when the model loads. FLUX.3 also loads
+  Black Forest Labs' own builds: the nvfp4 export in NVIDIA ModelOpt's layout and `fp8r` (fp8 with one scale per row).
+  It refuses AWQ and other producers' nvfp4 at install. For Qwen-Image-2.1 and FLUX.3, torchao exports such as
+  unsloth's FP8 builds are refused at install. MOSS-Image refuses every quantized transformer at install, unscaled
+  fp8 included.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` files load
   for Krea-2 only; for every other model with GGUF support the install fails.
 - LTX-2.0/2.3 files, GGUF builds included, fail to install with a message. Wan 2.1, Wan Animate, S2V, Fun-Control

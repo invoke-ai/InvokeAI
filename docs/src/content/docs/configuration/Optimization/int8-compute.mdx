@@ -19,6 +19,7 @@ Measured on an RTX 4090 (BF16, model fully in VRAM), the denoising step takes:
 | Z-Image Turbo | 8 | 5.04 s → 2.93 s (1.72×) | 12.78 s → 8.95 s (1.43×) | 26.62 s → 20.71 s (1.29×) |
 | FLUX.1 dev | 20 | 15.25 s → 7.85 s (1.94×) | 36.20 s → 23.88 s (1.52×) | |
 | Krea-2 Turbo | 8 | 9.22 s → 4.51 s (2.04×) | 21.64 s → 12.32 s (1.76×) | |
+| FLUX.3 Klein | 16 | 7.01 s → 4.07 s (1.72×) | | |
 
 The gain shrinks at higher resolutions because attention, which `int8_compute` does not touch, takes a larger share of
 each step. Other int8 families use the same layers but have not been measured. A convrot int8 text encoder
@@ -30,9 +31,10 @@ streamed (`max_cache_vram_gb: 3`, 0 % in VRAM), 8 steps at 1024² took 34.43 s b
 `int8_compute` (3.81×), and the image was bit-identical to the fully resident one.
 
 It is **opt-in**, because quantizing the inputs changes the numbers: images made with `int8_compute` are not
-pixel-identical to the default path at the same seed. In the measurements above they were visually equivalent (PSNR
-30–46 dB against the default path). Each path is bit-identical from run to run, and how much of the model is in VRAM
-does not change the image.
+pixel-identical to the default path at the same seed. In the Z-Image, FLUX.1 and Krea-2 measurements above they were
+visually equivalent (PSNR 30–46 dB against the default path). FLUX.3 Klein was compared with bf16 instead: a mean
+PSNR of 34.5 dB with `int8_compute` and 33.2 dB without. Each path is bit-identical from run to run, and how much of
+the model is in VRAM does not change the image.
 
 ## Requirements
 

@@ -4,15 +4,18 @@ Mirrors `tests/backend/patches/lora_conversions/lora_state_dicts/utils.py`: a fi
 exports `state_dict_keys`, key name -> shape (or `(shape, dtype)` for the layouts
 `scripts/capture_state_dict_fixture.py` captures from a real checkpoint's header). Tests expand it to a
 mock state dict with `keys_to_mock_state_dict()`, or write it back as a header with
-`write_header_only_safetensors()`.
+`write_header_only_safetensors()`, or as a small complete file with `write_shrunk_safetensors()`.
 """
 
 import json
 import math
 import struct
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import torch
+from safetensors.torch import save_file
 
 
 def keys_to_mock_state_dict(keys: dict[str, list[int]]) -> dict[str, torch.Tensor]:
@@ -53,3 +56,62 @@ def write_header_only_safetensors(path: Path, keys: dict[str, tuple[list[int], s
     encoded += b" " * (-len(encoded) % 8)
     path.write_bytes(struct.pack("<Q", len(encoded)) + encoded)
     return path
+
+
+_TORCH_DTYPES = {
+    "F32": torch.float32,
+    "F16": torch.float16,
+    "BF16": torch.bfloat16,
+    "F8_E4M3": torch.float8_e4m3fn,
+    "F8_E5M2": torch.float8_e5m2,
+    "I64": torch.int64,
+    "I8": torch.int8,
+    "U8": torch.uint8,
+}
+
+
+def keys_to_meta_state_dict(keys: Mapping[str, tuple[list[int], str]]) -> dict[str, torch.Tensor]:
+    """A captured layout as meta tensors of its real shapes and dtypes: what identification and a conversion see of
+    a file, at no memory cost."""
+    return {key: torch.empty(shape, dtype=_TORCH_DTYPES[dtype], device="meta") for key, (shape, dtype) in keys.items()}
+
+
+def write_shrunk_safetensors(
+    path: Path,
+    keys: Mapping[str, tuple[list[int], str]],
+    *,
+    markers: Mapping[str, Mapping[str, Any]] | None = None,
+    metadata: Mapping[str, str] | None = None,
+) -> Path:
+    """Write a fixture's layout as a complete safetensors file, every tensor zeros at `token_extents`.
+
+    For identification that reads more of a file than its tensor entries. The header's metadata comes through
+    `safe_open`, which refuses a file whose data a header-only write left out, and a `.comfy_quant` marker is read
+    from its bytes: each marker the fixture decoded (`markers`, keyed by layer) is written back as its JSON.
+
+    One layout keeps a size, because identification checks it: a packed nvfp4 weight and its block-scale grid keep
+    one whole scale tile of rows and blocks (`_NVFP4_TILE`), so a released layer stays a valid one and a misaligned
+    one stays misaligned. Nothing else that reads a size may use this.
+    """
+    tensors: dict[str, torch.Tensor] = {}
+    for key, (shape, dtype) in keys.items():
+        layer = key.removesuffix(".comfy_quant")
+        if markers is not None and layer != key and layer in markers:
+            raw = json.dumps(dict(markers[layer])).encode("utf-8")
+            tensors[key] = torch.frombuffer(bytearray(raw), dtype=torch.uint8).clone()
+        else:
+            tensors[key] = torch.zeros(_shrunk_extents(key, shape, dtype), dtype=_TORCH_DTYPES[dtype])
+    save_file(tensors, str(path), metadata=dict(metadata) if metadata else None)
+    return path
+
+
+# One cuBLAS scale tile of an nvfp4 layer: 128 rows by 4 blocks of 16 elements, two elements packed per byte.
+_NVFP4_TILE = {"U8": (128, 32), "F8_E4M3": (128, 4)}
+
+
+def _shrunk_extents(key: str, shape: list[int], dtype: str) -> list[int]:
+    """`token_extents`, except for an nvfp4 layer's packed weight and grid, which keep at most one scale tile."""
+    nvfp4_part = (dtype == "U8" and key.endswith(".weight")) or (dtype == "F8_E4M3" and key.endswith(".weight_scale"))
+    if len(shape) == 2 and nvfp4_part:
+        return [min(extent, limit) for extent, limit in zip(shape, _NVFP4_TILE[dtype], strict=True)]
+    return token_extents(shape)
