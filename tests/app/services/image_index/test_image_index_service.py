@@ -6,13 +6,14 @@ import time
 import weakref
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Callable
+from typing import Callable, Iterator
 from unittest.mock import patch
 
 import numpy as np
 import pytest
 import torch
 from PIL import Image
+from sqlalchemy import event
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import ImageIndexStatusEvent, ImageIndexUpdatedEvent
@@ -2678,6 +2679,93 @@ def search_scope_users(
     return owner.user_id, other.user_id
 
 
+@pytest.fixture
+def embedding_blob_selects(db: Database) -> Iterator[list[str]]:
+    selects: list[str] = []
+
+    def record_select(conn, cursor, statement, parameters, context, executemany):
+        if statement.lstrip().upper().startswith("SELECT") and "image_embeddings.embedding" in statement:
+            selects.append(statement)
+
+    event.listen(db.engine, "before_cursor_execute", record_select)
+    try:
+        yield selects
+    finally:
+        event.remove(db.engine, "before_cursor_execute", record_select)
+
+
+@pytest.mark.parametrize("all_images", [False, True], ids=["owner", "all"])
+def test_search_cache_retires_previous_gallery_versions_during_growth(
+    all_images: bool,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 4096)
+    service.get_accessible_embeddings(other)
+    user_id = None if all_images else owner
+    names = ["a.png", "b.png", "c.png", "d.png"] if all_images else ["a.png"]
+    axes = [0, 1, 2, 3] if all_images else [0]
+    query = np.arange(DIM, 0, -1, dtype=np.float32)
+    for refresh in range(4):
+        if refresh:
+            # Grow the real gallery AFTER startup and each preceding refresh, as new embeddings land.
+            name = f"new-{refresh}.png"
+            axis = refresh + 3
+            image_records.save(
+                image_name=name,
+                image_origin=ResourceOrigin.INTERNAL,
+                image_category=ImageCategory.GENERAL,
+                width=16,
+                height=16,
+                has_workflow=False,
+                user_id=owner,
+            )
+            index_records.upsert_embedding(IndexedItem("image", name), MODEL_ID, np.eye(DIM, dtype=np.float32)[axis])
+            names.append(name)
+            axes.append(axis)
+        items, matrix = service.get_accessible_embeddings(user_id)
+        assert items == imgs(*names)
+        np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[axes])
+        assert service.search_similar(user_id, query, 10) == [
+            (IndexedItem("image", name), float(DIM - axis)) for name, axis in zip(names, axes, strict=True)
+        ]
+        assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
+        assert len(embedding_blob_selects) == refresh + 2
+        assert service._search_cache_bytes == 96 + len(names) * 32
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == service._search_cache_bytes
+        assert len(service._search_cache) == 2
+
+
+@pytest.mark.parametrize("all_images", [False, True], ids=["owner", "all"])
+def test_search_cache_empty_gallery_retires_its_previous_matrix(
+    all_images: bool,
+    search_scope_users: tuple[str, str],
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+) -> None:
+    owner, other = search_scope_users
+    service.get_accessible_embeddings(other)
+    user_id = None if all_images else owner
+    previous_items, _ = service.get_accessible_embeddings(user_id)
+    for item in previous_items:
+        index_records.delete_embedding(item)
+    for _ in range(2):
+        items, matrix = service.get_accessible_embeddings(user_id)
+        assert items == []
+        assert matrix.shape == (0, 0)
+        assert service.search_similar(user_id, _unit_vec(), 10) == []
+        assert len(embedding_blob_selects) == 2
+        assert len(service._search_cache) == 1
+        assert service._search_cache_bytes == 96
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 96
+
+
 def test_search_cache_reuses_three_scopes_within_byte_budget(
     search_scope_users: tuple[str, str],
     index_records: ImageIndexRecords,
@@ -2686,7 +2774,7 @@ def test_search_cache_reuses_three_scopes_within_byte_budget(
 ) -> None:
     owner, other = search_scope_users
     # All three differently sized matrices fit exactly; entry count must not evict them.
-    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 256, raising=False)
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 256)
     query = np.array([1, 0.5, -0.5, -1, 0, 0, 0, 0], dtype=np.float32)
     cases = [
         (owner, imgs("a.png"), [[1, 0, 0, 0, 0, 0, 0, 0]], [1]),
@@ -2743,38 +2831,47 @@ def test_search_cache_evicts_lru_by_matrix_bytes(
         service.get_accessible_embeddings(None)  # 128 bytes: evict one or both existing matrices.
         assert reads.call_count == 3
         assert service._search_cache_bytes == retained_after_admin
-        assert sum(matrix.nbytes for _, matrix in service._search_cache.values()) == retained_after_admin
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == retained_after_admin
         service.get_accessible_embeddings(owner)
         assert reads.call_count == (4 if budget == 128 else 3)
         service.get_accessible_embeddings(other)
         assert reads.call_count == final_reads
         assert service._search_cache_bytes == 128
-        assert sum(matrix.nbytes for _, matrix in service._search_cache.values()) == 128
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
 
 
-def test_search_cache_bypasses_oversized_matrix_without_evicting_small_scope(
+def test_search_cache_retains_latest_oversized_matrix_alone(
     search_scope_users: tuple[str, str],
     index_records: ImageIndexRecords,
     service: ImageIndexService,
+    embedding_blob_selects: list[str],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     owner, other = search_scope_users
     monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 96)
     with patch.object(index_records, "get_embeddings", wraps=index_records.get_embeddings) as reads:
         service.get_accessible_embeddings(owner)
-        for _ in range(2):
+        for _ in range(3):
             items, matrix = service.get_accessible_embeddings(None)
             assert items == imgs("a.png", "b.png", "c.png", "d.png")
             assert matrix.nbytes == 128
-            assert service._search_cache_bytes == 32
+            np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[:4])
+            assert service.search_similar(None, np.arange(DIM, 0, -1, dtype=np.float32), 10) == list(
+                zip(imgs("a.png", "b.png", "c.png", "d.png"), [8, 7, 6, 5], strict=True)
+            )
+            assert service._search_cache_bytes == 128
+            assert len(service._search_cache) == 1
+            assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
+            assert reads.call_count == len(embedding_blob_selects) == 2
         service.get_accessible_embeddings(owner)
         assert reads.call_count == 3
+        assert service._search_cache_bytes == 32
         # Equality with the cap is admissible and evicts the smaller old entry.
         items, matrix = service.get_accessible_embeddings(other)
         assert items == imgs("b.png", "c.png", "d.png")
         assert matrix.nbytes == service._search_cache_bytes == 96
         service.get_accessible_embeddings(other)
-        assert reads.call_count == 4
+        assert reads.call_count == len(embedding_blob_selects) == 4
         assert len(service._search_cache) == 1
 
 
@@ -2800,6 +2897,79 @@ def test_search_cache_does_not_retain_empty_matrices_after_embeddings_disappear(
         assert matrix.shape == (0, 0)
         assert service._search_cache == {}
         assert service._search_cache_bytes == 0
+
+
+@pytest.mark.parametrize("newer_finishes_first", [False, True])
+def test_search_cache_out_of_order_gallery_fills_keep_one_version_per_owner(
+    newer_finishes_first: bool,
+    search_scope_users: tuple[str, str],
+    image_records: ImageRecordStorage,
+    index_records: ImageIndexRecords,
+    service: ImageIndexService,
+    embedding_blob_selects: list[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    owner, other = search_scope_users
+    monkeypatch.setattr(image_index_default, "_SEARCH_CACHE_MAX_BYTES", 256)
+    service.get_accessible_embeddings(other)
+    entered = [threading.Event(), threading.Event()]
+    release = [threading.Event(), threading.Event()]
+    get_embeddings = index_records.get_embeddings
+    calls = 0
+
+    def read_then_wait(items, model_id):
+        nonlocal calls
+        # Submissions are gated by entered, so the first two reads have a deterministic order.
+        index = calls
+        calls += 1
+        result = get_embeddings(items, model_id)
+        if index < 2:
+            entered[index].set()
+            assert release[index].wait(timeout=10)
+        return result
+
+    with patch.object(index_records, "get_embeddings", side_effect=read_then_wait):
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            try:
+                older = pool.submit(service.get_accessible_embeddings, owner)
+                assert entered[0].wait(timeout=10)
+                image_records.save(
+                    image_name="new.png",
+                    image_origin=ResourceOrigin.INTERNAL,
+                    image_category=ImageCategory.GENERAL,
+                    width=16,
+                    height=16,
+                    has_workflow=False,
+                    user_id=owner,
+                )
+                index_records.upsert_embedding(imgs("new.png")[0], MODEL_ID, np.eye(DIM, dtype=np.float32)[4])
+                newer = pool.submit(service.get_accessible_embeddings, owner)
+                assert entered[1].wait(timeout=10)
+                futures = [older, newer]
+                for index in [1, 0] if newer_finishes_first else [0, 1]:
+                    release[index].set()
+                    items, matrix = futures[index].result(timeout=10)
+                    assert items == (imgs("a.png", "new.png") if index else imgs("a.png"))
+                    np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[[0, 4] if index else [0]])
+                    assert len(service._search_cache) == 2
+                    assert service._search_cache_bytes == 96 + (64 if index else 32)
+                    assert (
+                        sum(entry[-1].nbytes for entry in service._search_cache.values()) == service._search_cache_bytes
+                    )
+            finally:
+                for pending in release:
+                    pending.set()
+        # A late old fill may replace the newer matrix, but must keep its OLD fingerprint:
+        # the next current-gallery request must never hit the old rows as if they were current.
+        for _ in range(2):
+            items, matrix = service.get_accessible_embeddings(owner)
+            assert items == imgs("a.png", "new.png")
+            np.testing.assert_array_equal(matrix, np.eye(DIM, dtype=np.float32)[[0, 4]])
+            assert service._search_cache_bytes == 160
+            assert service.get_accessible_embeddings(other)[0] == imgs("b.png", "c.png", "d.png")
+        assert len(embedding_blob_selects) == (4 if newer_finishes_first else 3)
 
 
 def test_search_cache_concurrent_same_scope_fills_are_charged_once(
@@ -2848,7 +3018,7 @@ def test_search_cache_concurrent_same_scope_fills_are_charged_once(
         assert first_result[1].nbytes == second_result[1].nbytes == 96
         assert len(service._search_cache) == 2
         assert service._search_cache_bytes == 128
-        assert sum(matrix.nbytes for _, matrix in service._search_cache.values()) == 128
+        assert sum(entry[-1].nbytes for entry in service._search_cache.values()) == 128
         service.get_accessible_embeddings(owner)
         service.get_accessible_embeddings(other)
         assert reads.call_count == 2
