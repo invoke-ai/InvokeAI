@@ -45,10 +45,13 @@ import type {
 import { addControlLayers, getOrAddLliteCollector } from './addControlLayers';
 import {
   addRegionalGuidance,
+  getEffectiveLayoutKind,
   getLayoutPromptRejectionReason,
   getLayoutRegionIssue,
+  getRegionalGuidanceSupport,
   isLayoutRegionalGuidanceBase,
   isRegionalGuidanceSupportedForBase,
+  type LayoutRegionalGuidanceBase,
   type RegionalGuidanceInput,
   type RegionalLayoutKind,
 } from './addRegionalGuidance';
@@ -215,7 +218,8 @@ const getCanvasValidationReasons = (input: CompileCanvasGraphInput, processingSi
     reasons.push('Canvas inpainting requires an inpaint mask.');
   }
 
-  // The layout node refuses regions around a blank prompt. A mask with pixels in the bbox has an area to place.
+  // A layout is built around the global prompt, so regions around a blank one are refused. A mask with pixels in the
+  // bbox has an area to place.
   const layoutPromptReason = getLayoutPromptRejectionReason({
     base: model.base,
     prompt: getEffectivePrompts(settings).positivePrompt,
@@ -873,6 +877,8 @@ interface LayoutRegionElement {
 interface AddLayoutRegionsOptions {
   /** The generation bbox the regions' mask bounds are measured in. */
   bbox: Pick<Rect, 'width' | 'height'>;
+  /** The roles the base distinguishes. */
+  layoutKinds: readonly RegionalLayoutKind[];
   regions: readonly RegionalGuidanceInput[];
 }
 
@@ -881,11 +887,12 @@ const clamp = (value: number, max: number): number => Math.min(Math.max(value, 0
 
 const toLayoutElement = (
   region: RegionalGuidanceInput,
+  layoutKinds: readonly RegionalLayoutKind[],
   scale: { x: number; y: number },
   size: { width: number; height: number }
 ): LayoutRegionElement | null => {
   const caption = region.positivePrompt;
-  if (caption === null || getLayoutRegionIssue(region) !== null) {
+  if (caption === null || getLayoutRegionIssue(region, layoutKinds) !== null) {
     return null;
   }
   const bounds = region.maskBounds;
@@ -897,7 +904,7 @@ const toLayoutElement = (
   if (x2 <= x1 || y2 <= y1) {
     return null;
   }
-  const kind = region.layout?.kind ?? 'object';
+  const kind = getEffectiveLayoutKind(layoutKinds, region.layout);
   return {
     bbox: [x1, y1, x2, y2],
     caption,
@@ -911,17 +918,79 @@ const toLayoutElement = (
  * (which PiD can shrink below the processing size) and clamped to it. The base graph's `layout_prompt` node assembles
  * them with the global prompt at run time; regions the layout cannot place are left out.
  */
-const addLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+const addMossImageLayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
   const layoutPrompt = graph.nodes.layout_prompt;
   if (!layoutPrompt) {
-    throw new Error('addLayoutRegions: base graph is missing the layout prompt node.');
+    throw new Error('addMossImageLayoutRegions: base graph is missing the layout prompt node.');
   }
   const size = getDenoiseSize(graph, requireDenoise(graph));
   const scale = { x: size.width / options.bbox.width, y: size.height / options.bbox.height };
   // The frame and the boxes come from one size, so they cannot drift apart.
   layoutPrompt.width = size.width;
   layoutPrompt.height = size.height;
-  layoutPrompt.regions = options.regions.flatMap((region) => toLayoutElement(region, scale, size) ?? []);
+  layoutPrompt.regions = options.regions.flatMap(
+    (region) => toLayoutElement(region, options.layoutKinds, scale, size) ?? []
+  );
+};
+
+/** One element of the `ideogram4_caption_builder` node's `regions` input; `bbox` is `[y_min, x_min, y_max, x_max]`. */
+interface Ideogram4RegionElement {
+  prompt: string;
+  bbox: [number, number, number, number];
+}
+
+/** Ideogram 4 boxes are whole numbers from 0 to 1000 across the image, origin top-left. */
+const IDEOGRAM4_COORD_MAX = 1000;
+
+const toIdeogram4Coord = (pixels: number, extent: number): number =>
+  clamp(Math.round((pixels / extent) * IDEOGRAM4_COORD_MAX), IDEOGRAM4_COORD_MAX);
+
+const toIdeogram4Region = (
+  region: RegionalGuidanceInput,
+  options: AddLayoutRegionsOptions
+): Ideogram4RegionElement | null => {
+  const prompt = region.positivePrompt;
+  if (prompt === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const { maskBounds: bounds } = region;
+  const { height, width } = options.bbox;
+  const yMin = toIdeogram4Coord(bounds.y, height);
+  const xMin = toIdeogram4Coord(bounds.x, width);
+  const yMax = toIdeogram4Coord(bounds.y + bounds.height, height);
+  const xMax = toIdeogram4Coord(bounds.x + bounds.width, width);
+  // A mask that misses the bbox, or rounds to a line, has no box to place.
+  if (yMax <= yMin || xMax <= xMin) {
+    return null;
+  }
+  return { bbox: [yMin, xMin, yMax, xMax], prompt };
+};
+
+/**
+ * Ideogram 4 regions: each becomes an object element of the structured caption, boxed around its mask. The output is
+ * the bbox, resized, so boxes are normalized to the bbox rather than the denoise size. The base graph's
+ * `caption_builder` assembles the caption around the global prompt at run time, so batch prompt variation still flows
+ * through `positive_prompt`, and core metadata already records its output. Regions the caption cannot place are left
+ * out, and without any the graph stays untouched.
+ */
+const addIdeogram4Regions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const captionBuilder = graph.nodes.caption_builder;
+  if (!captionBuilder) {
+    throw new Error('addIdeogram4Regions: base graph is missing the caption builder node.');
+  }
+  const regions = options.regions.flatMap((region) => toIdeogram4Region(region, options) ?? []);
+  if (regions.length > 0) {
+    captionBuilder.regions = regions;
+  }
+};
+
+/** Each layout base places its regions through its own prompt node. */
+const LAYOUT_REGION_GRAFTS: Record<
+  LayoutRegionalGuidanceBase,
+  (graph: BackendGraphContract, options: AddLayoutRegionsOptions) => void
+> = {
+  'ideogram-4': addIdeogram4Regions,
+  'moss-image': addMossImageLayoutRegions,
 };
 
 /** Throw the first validation reason. */
@@ -1010,9 +1079,11 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   // Regional masks and models must already be validated. Layout bases read only each mask's bounds.
   const regions = input.regionalGuidance ?? [];
   const regionalBase = model.base;
-  if (regions.length > 0 && isRegionalGuidanceSupportedForBase(regionalBase)) {
+  // The support row answers the layout roles; the base guards narrow the base to the graph tables' keys.
+  const regionalSupport = getRegionalGuidanceSupport(regionalBase);
+  if (regions.length > 0 && regionalSupport && isRegionalGuidanceSupportedForBase(regionalBase)) {
     if (isLayoutRegionalGuidanceBase(regionalBase)) {
-      addLayoutRegions(backendGraph, { bbox, regions });
+      LAYOUT_REGION_GRAFTS[regionalBase](backendGraph, { bbox, layoutKinds: regionalSupport.layoutKinds, regions });
     } else {
       addRegionalGuidance(backendGraph, {
         base: regionalBase,

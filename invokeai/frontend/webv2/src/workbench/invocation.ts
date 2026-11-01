@@ -1,6 +1,6 @@
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
-import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasLayerContract, CanvasRegionalGuidanceLayerContract } from '@workbench/canvas-engine/api';
 import type {
   InvocationMode,
   InvocationRoute,
@@ -119,9 +119,15 @@ export interface InvocationRouteInput {
   canvasLayers: readonly CanvasLayerContract[];
   /**
    * Whether a visible raster layer's bounds overlap the frame, so a text-only hosted model is blocked before invoke
-   * without reading pixels. Measured only for a Canvas route with such a model; false otherwise.
+   * without reading pixels. Measured only with such a model, whatever the selected source; false otherwise.
    */
   canvasRasterInFrame: boolean;
+  /**
+   * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a
+   * layout base places around the global prompt. Measured whatever the model: which bases read them is capability
+   * data that can arrive after the project, so readiness decides that when it runs.
+   */
+  canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
 
 const getMountedWidgetIds = (project: Project): WidgetId[] => {
@@ -148,6 +154,15 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
 
   return Array.from(mountedWidgetIds).sort();
 };
+
+type FrameRect = Project['canvas']['document']['bbox'];
+
+/** Whether document-space bounds overlap the frame's interior; touching its edge does not. */
+const overlapsFrame = (bounds: FrameRect, frame: FrameRect): boolean =>
+  bounds.x < frame.x + frame.width &&
+  frame.x < bounds.x + bounds.width &&
+  bounds.y < frame.y + frame.height &&
+  frame.y < bounds.y + bounds.height;
 
 /**
  * Whether a raster layer the generation composite draws overlaps the frame's interior with its own bounds. Invoke
@@ -176,31 +191,52 @@ const hasRasterContentInFrame = (document: Project['canvas']['document']): boole
       return false;
     }
 
-    const bounds = getSourceBounds(layer, document);
-
-    return (
-      bounds.x < bbox.x + bbox.width &&
-      bbox.x < bounds.x + bounds.width &&
-      bounds.y < bbox.y + bbox.height &&
-      bbox.y < bounds.y + bounds.height
-    );
+    return overlapsFrame(getSourceBounds(layer, document), bbox);
   });
+};
+
+const NO_REGIONAL_LAYERS: readonly CanvasRegionalGuidanceLayerContract[] = [];
+
+/**
+ * The compositable regional guidance layers whose mask bounds, offset and transform included, overlap the frame's
+ * interior: the regions a layout base can place. The one remaining approximation is a mask bitmap that reaches into
+ * the frame with transparent pixels only (a legacy document-sized mask, say), which still counts here although the
+ * canvas compiler, reading the uploaded mask's pixels, leaves it out.
+ */
+const getRegionalLayersInFrame = (
+  document: Project['canvas']['document'],
+  layers: readonly CanvasLayerContract[]
+): readonly CanvasRegionalGuidanceLayerContract[] => {
+  const { bbox } = document;
+
+  if (bbox.width <= 0 || bbox.height <= 0) {
+    return NO_REGIONAL_LAYERS;
+  }
+
+  const inFrame = layers.filter(
+    (layer): layer is CanvasRegionalGuidanceLayerContract =>
+      isCompositableRegionalGuidanceLayer(layer) && overlapsFrame(getSourceBounds(layer, document), bbox)
+  );
+
+  return inFrame.length > 0 ? inFrame : NO_REGIONAL_LAYERS;
 };
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
-  // This runs on every project change, so only a Canvas route with the model it gates measures layers.
+  // Canvas facts are measured whatever source is selected: a graph preview resolves the Canvas route from this same
+  // input while another source is. This runs on every project change, over leaves the document index caches; raster
+  // layers are measured only for the model they gate.
   const measuresRaster =
-    project.invocation.sourceId === 'canvas' &&
-    isGenerateModelConfig(generateValues.model) &&
-    isExternalTextOnlyCanvasModel(generateValues.model);
+    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
+  const canvasLayers = compileContributingLayers(project.canvas.document);
 
   return {
     canvasBbox: {
       height: project.canvas.document.bbox.height,
       width: project.canvas.document.bbox.width,
     },
-    canvasLayers: compileContributingLayers(project.canvas.document),
+    canvasLayers,
+    canvasRegionalLayersInFrame: getRegionalLayersInFrame(project.canvas.document, canvasLayers),
     canvasRasterInFrame: measuresRaster && hasRasterContentInFrame(project.canvas.document),
     generateValues,
     upscaleValues: getProjectWidgetValues(project, 'upscale'),
@@ -225,6 +261,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.canvasBbox.height === right.canvasBbox.height &&
   left.canvasLayers === right.canvasLayers &&
   left.canvasRasterInFrame === right.canvasRasterInFrame &&
+  areArraysEqual(left.canvasRegionalLayersInFrame, right.canvasRegionalLayersInFrame) &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
 export const createInvocationRouteInputSelector = () =>
@@ -374,11 +411,11 @@ export const resolveInvocationRouteInput = (
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
       }
-      // Before anything uploads; a region whose mask misses the frame still counts here.
+      // Before anything uploads, so only the regions whose mask bounds reach into the frame count.
       const layoutPromptReason = getLayoutPromptRejectionReason({
         base: values.model.base,
         prompt: getEffectivePrompts(values).positivePrompt,
-        regions: input.canvasLayers.filter(isCompositableRegionalGuidanceLayer),
+        regions: input.canvasRegionalLayersInFrame,
       });
       if (layoutPromptReason) {
         validationReasons.push(layoutPromptReason);
