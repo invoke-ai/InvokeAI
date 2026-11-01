@@ -1273,6 +1273,13 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
     expect(getEdge(graph, 'pos_cond', 'prompt')?.source.node_id).toBe('caption_builder');
+    // Metadata records the encoded caption next to the prompt the user typed, which recall restores.
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+    expect(getEdge(graph, metadata.id, 'ideogram4_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'caption_builder',
+    });
+    expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
     // Ideogram 4's denoise node has no negative conditioning input at all.
     expect(graph.nodes.neg_cond).toBeUndefined();
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
@@ -1623,6 +1630,24 @@ describe('MOSS-Image graphs', () => {
     expect(getEdge(graph, 'canvas_output', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getEdge(graph, 'denoise_latents', 'vae')?.source).toEqual({ field: 'vae', node_id: 'model_loader' });
     expect(getNodeByType(graph, 'core_metadata')?.generation_mode).toBe('moss_image_txt2img');
+  });
+
+  it('routes the positive prompt through the layout node, which compiles a layout draft at the denoise size', () => {
+    const graph = compile(mossDiffusers, { height: 768, width: 1280 });
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+
+    expect(graph.nodes.layout_prompt).toMatchObject({
+      height: 768,
+      regions: [],
+      type: 'moss_image_layout_prompt',
+      width: 1280,
+    });
+    expect(getEdge(graph, 'layout_prompt', 'prompt')?.source).toEqual({ field: 'value', node_id: 'positive_prompt' });
+    expect(getEdge(graph, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    expect(getEdge(graph, metadata.id, 'moss_image_layout_prompt')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
   });
 
   it('encodes the negative prompt only while CFG runs the negative branch', () => {

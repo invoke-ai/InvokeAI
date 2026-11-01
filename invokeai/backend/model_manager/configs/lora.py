@@ -174,7 +174,7 @@ def _state_dict_looks_like_sdxl_unet_lora(state_dict: dict[str | int, Any]) -> b
 _FLUX2_CONTEXT_IN_DIMS = FLUX2_CONTEXT_IN_DIMS
 
 # FLUX.2 vec_in_dim values: text encoder hidden_size
-# Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B), Dev: 5120 (Mistral Small 3.1)
+# Klein 4B: 2560 (Qwen3-4B), Klein 9B: 4096 (Qwen3-8B), Dev: 5120 (Mistral Small 3)
 _FLUX2_VEC_IN_DIMS = {2560, 4096, 5120}
 
 # FLUX.1 hidden_size is 3072. Klein 9B uses 4096, FLUX.2 [dev] uses 6144 (48 heads × 128 head_dim).

@@ -145,7 +145,7 @@ export const addMetadata = (
   generationMode: string | null,
   projectSettings: GenerationProjectSettings & { randDevice?: string },
   extras: Record<string, unknown> = {}
-) => {
+): BackendInvocationContract => {
   const loadedLoras = getLoadedLoras(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
   const metadata = addNode(graph, {
@@ -174,6 +174,7 @@ export const addMetadata = (
     addEdge(graph, graph.nodes.negative_prompt, 'value', metadata, 'negative_prompt');
   }
   addEdge(graph, metadata, 'metadata', outputNode, 'metadata');
+  return metadata;
 };
 
 export const toGraphContract = (backendGraph: BackendGraphContract, label: string) => ({
