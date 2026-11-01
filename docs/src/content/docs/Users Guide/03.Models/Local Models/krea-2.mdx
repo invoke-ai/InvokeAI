@@ -1,7 +1,7 @@
 ---
 title: Krea-2
 description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers, training-free style reference and edit LoRAs with reference images.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-11-01
 sidebar:
   order: 8
 ---
@@ -27,7 +27,7 @@ To sample with a different schedule, set **Shift** on the **Denoise - Krea-2** n
 
 ## License
 
-Krea-2 Turbo and Raw are released under the **Krea 2 Community License**. Commercial use of the model and its images is allowed only for companies with less than $1M in annual revenue; above that, an Enterprise license is needed. Redistributed copies must add "Krea" to the model name. The full Diffusers repositories are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The quantized GGUF and NVFP4 copies are not gated, but the same license applies.
+Krea-2 Turbo and Raw are released under the **Krea 2 Community License**. Commercial use of the model and its images is allowed only for companies with less than $1M in annual revenue; above that, an Enterprise license is needed. Redistributed copies must add "Krea" to the model name. The full Diffusers repositories are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The quantized GGUF, NVFP4, fp8 and int8 copies are not gated, but the same license applies.
 
 This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
@@ -37,15 +37,17 @@ Krea-2 is a large model. See the [System Requirements](/start-here/system-requir
 details. In short, on a 24 GB card enable **FP8** in the model's Default Settings to fit 1024² (with a
 LoRA). For lower VRAM, use a smaller transformer build:
 
-| Transformer build           | Transformer size | Notes                                                       |
-| --------------------------- | ---------------- | ----------------------------------------------------------- |
-| NVFP4 (starter model)       | ≈ 7.2 GiB        | stays packed, unpacked per layer on any GPU                 |
-| GGUF Q4_K_M (starter model) | ≈ 7 GB           | stays packed, unpacked per layer                            |
-| GGUF Q8_0 (starter model)   | ≈ 13 GB          | near-full quality                                           |
-| int8 (`int8_convrot`)       | ≈ 12.6 GiB       | stays int8 on every device, no FP8 setting needed           |
-| GGUF Q8_CR (ComfyUI-GGUF)   | ≈ 12.8 GiB       | the same int8 inside a `.gguf`, stays int8 on every device  |
-| fp8 / `fp8_scaled`          | ≈ 12.6 GB        | with FP8 Storage (switched on at install) or `fp8_compute`  |
-| MXFP8                       | ≈ 24 GB          | unpacked to BF16 at load; prefer the fp8, NVFP4 or GGUF build |
+| Transformer build                        | Transformer size | Notes                                                                                |
+| ---------------------------------------- | ---------------- | ------------------------------------------------------------------------------------ |
+| NVFP4 (starter model)                    | ≈ 7.2 GiB        | stays packed, unpacked per layer on any GPU                                          |
+| GGUF Q4_K_M (starter model)              | ≈ 7 GB           | stays packed, unpacked per layer                                                     |
+| GGUF Q8_0 (starter model)                | ≈ 13 GB          | near-full quality                                                                    |
+| int8 (`int8_convrot`, starter model)     | ≈ 12.6 GiB       | stays int8 on every device, no FP8 setting needed                                    |
+| int4 (`convrot_w4a4`, `int4_tensorwise`) | ≈ 6.4–9.6 GiB    | stays packed on every device; most builds keep some layers int8, which sets the size |
+| GGUF Q8_CR (ComfyUI-GGUF)                | ≈ 12.8 GiB       | the same int8 inside a `.gguf`, stays int8 on every device                           |
+| GGUF Q4_CR (ComfyUI-GGUF)                | ≈ 7.0 GiB        | the same int4 inside a `.gguf`                                                       |
+| fp8 / `fp8_scaled` (starter model)       | ≈ 12.2 GiB       | with FP8 Storage (switched on at install) or `fp8_compute`                           |
+| MXFP8                                    | ≈ 24 GB          | unpacked to BF16 at load; prefer the fp8, NVFP4 or GGUF build                        |
 
 The Qwen3-VL encoder and the small VAE come on top of these sizes. The encoder takes about 8.5 GB as bf16
 (the starter bundle's encoder), about half that as fp8, and about 2.8 GB as a Q4_K_M
@@ -60,7 +62,7 @@ Krea-2 needs three components:
 
 | Component               | Diffusers install       | GGUF / single-file install           |
 | ----------------------- | ----------------------- | ------------------------------------ |
-| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint (GGUF, fp8, int8, NVFP4, MXFP8) |
+| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint (GGUF, fp8, int8, int4, NVFP4, MXFP8) |
 | VAE (Qwen-Image)        | bundled                 | installed separately                 |
 | Text encoder (Qwen3-VL) | bundled                 | installed separately                 |
 
@@ -68,6 +70,8 @@ Krea-2 needs three components:
   VAE and text encoder. Nothing else is required.
 - **GGUF / single-file**: the checkpoint ships **only the transformer**. You must also install a
   standalone **Qwen-Image VAE** and a **Qwen3-VL encoder** (both included in the launchpad bundle).
+  Comfy-Org's fp8 and int8 builds, *Krea-2 Turbo (fp8)* (~13.1 GB) and *Krea-2 Turbo (int8)* (~13.5 GB),
+  are individual starter models that install both as dependencies.
 
 When you select a GGUF/single-file Krea-2 model, InvokeAI auto-selects an installed VAE and Qwen3-VL
 encoder if you have them. If none are installed, you'll be prompted to pick them (in the model dropdowns)
@@ -93,7 +97,7 @@ encoder closely; the remaining difference is the quantization of the encoder.
 - The `mmproj-*.gguf` file next to it holds the vision part and is not needed for text-to-image. Installing
   it is refused with a message saying so. Without the vision part, a GGUF encoder cannot encode the
   reference images of [edit LoRAs](#edit-loras-and-reference-images).
-- ComfyUI-GGUF's `Q8_CR` encoder files are refused at install; only the transformer loads from `Q8_CR`.
+- ComfyUI-GGUF's `Q8_CR` and `Q4_CR` encoder files are refused at install; only the transformer loads from them.
 - LoRAs with text-encoder layers still apply to a quantized encoder.
 
 ## Conditioning enhancers
@@ -167,7 +171,7 @@ feeding the **Style Reference** input of **Denoise - Krea-2**.
 ## LoRA
 
 Krea-2 LoRAs (diffusers PEFT format) are supported and apply to both the transformer and — where the
-LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, NVFP4) the LoRA
+LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, int4, NVFP4) the LoRA
 is applied alongside the packed weights rather than merged into them. LoRAs trained to edit an input image
 need reference images; see [Edit LoRAs](#edit-loras-and-reference-images).
 
