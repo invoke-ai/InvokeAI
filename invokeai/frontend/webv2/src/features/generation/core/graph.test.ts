@@ -583,7 +583,7 @@ describe('compileGenerateGraph', () => {
   });
 
   it('rejects dimensions that are not on the selected model family grid', () => {
-    expect(() => compile(flux2Model, { height: 888 })).toThrow('Generate height must be a multiple of 16.');
+    expect(() => compile(flux2Model, { height: 888 })).toThrow('Height must be a multiple of 16.');
   });
 
   it('builds an Anima graph with required components', () => {
@@ -719,7 +719,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('Reference Image #1 is not supported by anima model.');
+      ).toThrow('cannot use reference image 1');
     });
   });
 
@@ -1273,6 +1273,13 @@ describe('Krea-2, Ideogram 4 and Wan graphs', () => {
 
     expect(getEdge(graph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
     expect(getEdge(graph, 'pos_cond', 'prompt')?.source.node_id).toBe('caption_builder');
+    // Metadata records the encoded caption next to the prompt the user typed, which recall restores.
+    const metadata = getNodeByType(graph, 'core_metadata')!;
+    expect(getEdge(graph, metadata.id, 'ideogram4_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'caption_builder',
+    });
+    expect(getEdge(graph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
     // Ideogram 4's denoise node has no negative conditioning input at all.
     expect(graph.nodes.neg_cond).toBeUndefined();
     expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
@@ -1880,7 +1887,7 @@ describe('PiD decode', () => {
 
   it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
     // Reject unsupported PiD rather than silently use ordinary decode.
-    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/does not support PiD/);
   });
 
   it('requires both PiD models before compiling', () => {

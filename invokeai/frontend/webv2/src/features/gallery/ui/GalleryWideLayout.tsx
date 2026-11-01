@@ -1,8 +1,5 @@
-import type { GalleryMediaFilter } from '@features/gallery/core/settings';
-
 import { Box, Flex, HStack, Spacer, Stack } from '@chakra-ui/react';
 import { GALLERY_BOARD_PANEL_MAX_WIDTH_PX, GALLERY_BOARD_PANEL_MIN_WIDTH_PX } from '@features/gallery/core/settings';
-import { IconRadioMenu } from '@platform/ui/Menu';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { useCallback, useId, useRef } from 'react';
@@ -10,11 +7,10 @@ import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryItemFilterMenu } from './GalleryItemFilterMenu';
 import { GalleryItemSearch } from './GalleryItemSearch';
-import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
-import { getGalleryMediaFilterMenuProps } from './galleryStateView';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -30,10 +26,6 @@ export const GalleryWideLayout = () => {
 
   // The grid's "Show all media" hands focus here when it removes itself.
   const mediaFilterTriggerRef = useRef<HTMLButtonElement>(null);
-  const handleMediaFilterChange = useCallback(
-    (mediaFilter: GalleryMediaFilter) => actions.updateSettings({ mediaFilter }),
-    [actions]
-  );
 
   const handleCommitWidth = useCallback(
     (boardPanelWidthPx: number) => actions.updateSettings({ boardPanelWidthPx }),
@@ -57,16 +49,20 @@ export const GalleryWideLayout = () => {
           >
             <GalleryBoardsPanel />
           </Flex>
-          <ResizeHandle
-            label={t('widgets.gallery.resizeBoardPanel')}
-            max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
-            min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
-            orientation="vertical"
-            pane="before"
-            paneRef={boardPanelRef}
-            value={boardPanelWidthPx}
-            onCommit={handleCommitWidth}
-          />
+          {/* Inset like the panel: the handle paints above the center chrome islands, so a full-height line would
+              cross them. */}
+          <Flex flexShrink={0} pb="2" pt={CHROME_INSET_PADDING_TOP}>
+            <ResizeHandle
+              label={t('widgets.gallery.resizeBoardPanel')}
+              max={GALLERY_BOARD_PANEL_MAX_WIDTH_PX}
+              min={GALLERY_BOARD_PANEL_MIN_WIDTH_PX}
+              orientation="vertical"
+              pane="before"
+              paneRef={boardPanelRef}
+              value={boardPanelWidthPx}
+              onCommit={handleCommitWidth}
+            />
+          </Flex>
         </>
       )}
       <Stack flex="1" gap="0" minH="0" minW="0">
@@ -77,14 +73,7 @@ export const GalleryWideLayout = () => {
             <GalleryItemSearch />
           </Box>
           <GalleryStarredFilterToggle />
-          <IconRadioMenu
-            {...getGalleryMediaFilterMenuProps(t, gallery.settings.mediaFilter)}
-            size="md"
-            triggerRef={mediaFilterTriggerRef}
-            value={gallery.settings.mediaFilter}
-            onValueChange={handleMediaFilterChange}
-          />
-          <GalleryItemSortMenu />
+          <GalleryItemFilterMenu triggerRef={mediaFilterTriggerRef} />
           <GalleryUploadButton
             boards={gallery.boards}
             selectedBoardId={gallery.listingBoardId}

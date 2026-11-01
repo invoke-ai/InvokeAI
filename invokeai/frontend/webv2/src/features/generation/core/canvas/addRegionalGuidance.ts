@@ -19,7 +19,7 @@ const NEG_COND_COLLECT_ID = 'neg_cond_collect';
 /** The bases whose text encoder accepts a region mask and whose denoiser accepts a conditioning list. */
 export type MaskRegionalGuidanceBase = 'sd-1' | 'sd-2' | 'sdxl' | 'flux' | 'flux2' | 'krea-2' | 'z-image' | 'anima';
 /** The bases that read regions as boxes of a structured layout prompt; a mask contributes only its bounds. */
-export type LayoutRegionalGuidanceBase = 'moss-image';
+export type LayoutRegionalGuidanceBase = 'moss-image' | 'ideogram-4';
 export type RegionalGuidanceBase = MaskRegionalGuidanceBase | LayoutRegionalGuidanceBase;
 
 /** How a base consumes a region: as masked conditioning, or as a layout box around the mask. */
@@ -39,10 +39,15 @@ export interface RegionalGuidanceSupport {
   autoNegative: boolean;
   /** Mask-scoped reference images, or `null` when the denoiser has no regional image path. */
   referenceImages: RegionalReferenceImageKind | null;
+  /** The roles a layout prompt distinguishes; empty for mask bases. */
+  layoutKinds: readonly RegionalLayoutKind[];
 }
 
 type MaskSupportRow = Pick<RegionalGuidanceSupport, 'label' | 'referenceImages'> & { mode: 'masks' };
-type LayoutSupportRow = { label: string; mode: 'layout'; referenceImages: null };
+type LayoutSupportRow = Pick<RegionalGuidanceSupport, 'label' | 'layoutKinds'> & {
+  mode: 'layout';
+  referenceImages: null;
+};
 
 /** Graph code owns node mapping and each base's mode; the backend owns regional-negative support. */
 const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow> &
@@ -55,7 +60,14 @@ const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow
   'krea-2': { label: 'Krea-2', mode: 'masks', referenceImages: null },
   'z-image': { label: 'Z-Image', mode: 'masks', referenceImages: null },
   anima: { label: 'Anima', mode: 'masks', referenceImages: null },
-  'moss-image': { label: 'MOSS-Image', mode: 'layout', referenceImages: null },
+  'moss-image': {
+    label: 'MOSS-Image',
+    layoutKinds: ['object', 'character', 'text'],
+    mode: 'layout',
+    referenceImages: null,
+  },
+  // The structured caption has only `obj` elements.
+  'ideogram-4': { label: 'Ideogram 4', layoutKinds: ['object'], mode: 'layout', referenceImages: null },
 };
 
 /** Frontend graph keys are narrower than backend capability answers. */
@@ -74,9 +86,12 @@ export const getRegionalGuidanceSupport = (base: string | null): RegionalGuidanc
   }
 
   const row = REGIONAL_GUIDANCE_SUPPORT[base];
-  const negative = row.mode === 'masks' && (getArchitectureFeatures(base)?.regional_negative ?? false);
+  if (row.mode === 'layout') {
+    return { ...row, autoNegative: false, negativePrompt: false };
+  }
+  const negative = getArchitectureFeatures(base)?.regional_negative ?? false;
 
-  return { ...row, autoNegative: negative, negativePrompt: negative };
+  return { ...row, autoNegative: negative, layoutKinds: [], negativePrompt: negative };
 };
 
 /** A region's role in a layout prompt; the canvas persists a subset of these and Canvas checks it does. */
@@ -88,21 +103,30 @@ export interface RegionalLayout {
   text?: string;
 }
 
+/**
+ * The role a layout base places a region as: its stored role when the base distinguishes it, otherwise an object. The
+ * stored role stays on the layer, so switching back to a base that has it restores it.
+ */
+export const getEffectiveLayoutKind = (
+  layoutKinds: readonly RegionalLayoutKind[],
+  layout: RegionalLayout | undefined
+): RegionalLayoutKind => (layout && layoutKinds.includes(layout.kind) ? layout.kind : 'object');
+
 /** What keeps a layout base from placing a region. */
 export type LayoutRegionIssue = 'missing_prompt' | 'missing_text';
 
 /**
- * Why a layout base leaves a region out, or null when it can place it: every layout element needs a caption, and a
- * text element its visible text. Whitespace alone counts as missing.
+ * Why a layout base with these roles leaves a region out, or null when it can place it: every layout element needs a
+ * caption, and a text element its visible text. Whitespace alone counts as missing.
  */
-export const getLayoutRegionIssue = (region: {
-  positivePrompt: string | null;
-  layout?: RegionalLayout;
-}): LayoutRegionIssue | null => {
+export const getLayoutRegionIssue = (
+  region: { positivePrompt: string | null; layout?: RegionalLayout },
+  layoutKinds: readonly RegionalLayoutKind[]
+): LayoutRegionIssue | null => {
   if (!region.positivePrompt?.trim()) {
     return 'missing_prompt';
   }
-  if (region.layout?.kind === 'text' && !region.layout.text?.trim()) {
+  if (getEffectiveLayoutKind(layoutKinds, region.layout) === 'text' && !region.layout?.text?.trim()) {
     return 'missing_text';
   }
   return null;
@@ -122,7 +146,7 @@ export const getLayoutPromptRejectionReason = (params: {
   if (
     support?.mode !== 'layout' ||
     params.prompt.trim().length > 0 ||
-    !params.regions.some((region) => getLayoutRegionIssue(region) === null)
+    !params.regions.some((region) => getLayoutRegionIssue(region, support.layoutKinds) === null)
   ) {
     return null;
   }
@@ -179,7 +203,8 @@ export const getLayoutDraftRejectionReason = (params: {
   positivePrompt: string;
   promptTemplate?: PromptTemplateSnapshot | null;
 }): string | null => {
-  if (getRegionalGuidanceSupport(params.base)?.mode !== 'layout') {
+  // Only MOSS-Image compiles drafts; other layout bases (Ideogram 4) take `{` prompts verbatim.
+  if (params.base !== 'moss-image') {
     return null;
   }
   const effectivePrompt = getEffectivePositivePrompt(params.positivePrompt, params.promptTemplate ?? null);
@@ -493,7 +518,7 @@ export const getRegionalGuidanceRejectionReason = (params: {
     return `Regional guidance "${layerName}" has no masked region.`;
   }
   if (support.mode === 'layout') {
-    switch (getLayoutRegionIssue(params)) {
+    switch (getLayoutRegionIssue(params, support.layoutKinds)) {
       case 'missing_prompt':
         return `Regional guidance "${layerName}" has no prompt to place in the ${support.label} layout.`;
       case 'missing_text':

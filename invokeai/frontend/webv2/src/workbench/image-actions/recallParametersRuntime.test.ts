@@ -132,7 +132,7 @@ describe('createRecallParametersRuntime', () => {
     expect(promptOf(store, firstProjectId)).toBe('for the first project');
     expect(promptOf(store, secondProject.id)).toBeUndefined();
     expect(store.queries.getSnapshot().notifications.at(-1)).toEqual(
-      expect.objectContaining({ kind: 'success', title: 'Recalled parameters' })
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.parameters.applied' })
     );
 
     runtime.dispose();

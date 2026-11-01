@@ -214,8 +214,6 @@ describe('getGalleryPickerStatus', () => {
     accept: ['image'] as const,
     activeItem: image('a.png'),
     isSearching: false,
-    isWindowTruncated: false,
-    loadedCount: 12,
     pane: 'items' as const,
     remaining: null,
     total: 48,
@@ -237,7 +235,7 @@ describe('getGalleryPickerStatus', () => {
     ]);
   });
 
-  it('composes capacity with the window cap or the listing count', () => {
+  it('composes capacity with the listing count', () => {
     expect(getGalleryPickerStatus({ ...base, remaining: 2 })).toEqual([
       { count: 2, kind: 'remainingCount' },
       { count: 48, kind: 'itemCount' },
@@ -246,7 +244,6 @@ describe('getGalleryPickerStatus', () => {
       { kind: 'remainingNone' },
       { count: 48, kind: 'matchCount' },
     ]);
-    expect(getGalleryPickerStatus({ ...base, isWindowTruncated: true })).toEqual([{ count: 12, kind: 'windowLimit' }]);
     expect(getGalleryPickerStatus({ ...base, total: null })).toEqual([]);
   });
 });

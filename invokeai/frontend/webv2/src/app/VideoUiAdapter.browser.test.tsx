@@ -62,8 +62,15 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 let widgetInstances: Record<string, unknown> = {};
 
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useOptionalWorkbenchCommands: () => null,
   useActiveProjectSelector: (selector: (project: unknown) => unknown) =>
     selector({ id: activeProjectId, widgetInstances }),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      (Object.values(widgetInstances) as { state?: { values?: Record<string, unknown> }; typeId: string }[]).find(
+        (instance) => instance.typeId === widgetId
+      )?.state?.values ?? {}
+    ),
   useWorkbenchCommands: () => ({
     gallery: { selectItem },
     notifications: { reportError },

@@ -10,6 +10,8 @@ import sys
 
 import pytest
 import torch
+from torch.utils._python_dispatch import TorchDispatchMode
+from torch.utils._pytree import tree_flatten
 
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
@@ -99,6 +101,64 @@ def test_int8_convrot_linear_state_dict_contract() -> None:
     assert set(lin.state_dict().keys()) == {"weight", "weight_scale", "bias"}
     assert {n for n, _ in lin.named_buffers()} == {"weight", "weight_scale", "bias"}
     assert lin.state_dict()["weight"].dtype == torch.int8
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="measures CUDA allocations")
+def test_a_layer_left_in_ram_streams_its_int8_codes_within_the_transient_estimate() -> None:
+    """Partial loading leaves layers in RAM and their forward streams the int8 codes to the compute device. The
+    streamed copy must decode to exactly what the resident layer computes, and must be freed before the decode
+    peaks: the node's working-memory reservation is sized from `dequant_transient_bytes`, which has no room for it.
+
+    Measured in requested bytes, as in the nvfp4 counterpart. The resident decode runs first, which also mints the
+    shared Hadamard and the cuBLAS workspace a process's first matmul allocates; neither is part of the estimate."""
+    device, dtype = torch.device("cuda"), torch.bfloat16
+    torch.manual_seed(5)
+    q, scale = _quantize_reference(torch.randn(1024, 4 * CONVROT_GROUP_SIZE), convrot=True)
+    lin = Int8ConvrotLinear(q, scale, convrot=True)
+    resident = Int8ConvrotLinear(q.to(device), scale.to(device), convrot=True)._dequantized_weight(device, dtype)
+    torch.cuda.synchronize()
+    torch.cuda.reset_peak_memory_stats()
+    baseline = torch.cuda.memory_stats()["requested_bytes.all.current"]
+
+    streamed = lin._dequantized_weight(device, dtype)
+    torch.cuda.synchronize()
+
+    measured = torch.cuda.memory_stats()["requested_bytes.all.peak"] - baseline
+    assert torch.equal(streamed, resident)
+    if measured == 0:
+        pytest.skip("this allocator backend (e.g. cudaMallocAsync) does not track requested bytes")
+    # The estimate leaves out the per-row scale in the compute dtype, a few KB beside a weight-sized tensor.
+    assert measured <= lin.dequant_transient_bytes(dtype) + lin.out_features * dtype.itemsize
+
+
+class _HostToDeviceCopies(TorchDispatchMode):
+    """Records every tensor an op produced off the CPU from CPU inputs, i.e. what crossed to the device."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.copies: list[torch.Tensor] = []
+
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
+        out = func(*args, **(kwargs or {}))
+        inputs, _ = tree_flatten((args, kwargs))
+        if any(isinstance(t, torch.Tensor) and t.device.type == "cpu" for t in inputs):
+            outputs, _ = tree_flatten(out)
+            self.copies += [t for t in outputs if isinstance(t, torch.Tensor) and t.device.type != "cpu"]
+        return out
+
+
+def test_a_layer_left_in_ram_moves_its_int8_codes_before_widening_them() -> None:
+    """A single `.to(device=, dtype=)` from the CPU widens on the host and then copies twice the bytes: ~5x slower
+    per streamed layer under partial loading (#9773). Pinned through what crosses rather than through timing; the
+    meta device stands in for the accelerator, so this runs without one."""
+    q, scale = _quantize_reference(torch.randn(64, CONVROT_GROUP_SIZE), convrot=True)
+    lin = Int8ConvrotLinear(q, scale, convrot=True)
+
+    with _HostToDeviceCopies() as moved:
+        lin._dequantized_weight(torch.device("meta"), torch.bfloat16)
+
+    assert [t.dtype for t in moved.copies if t.shape == q.shape] == [torch.int8]
 
 
 class TestTheDerotationMatrixIsSharedNotPerLayer:

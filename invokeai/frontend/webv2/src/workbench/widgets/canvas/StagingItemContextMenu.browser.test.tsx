@@ -151,15 +151,15 @@ describe('StagingItemContextMenu', () => {
     expect(mocks.origin).toBe('webv2:p:project-1:q:local-queue-item');
     // The executed prompt and seed come from the backend item that produced the result.
     await vi.waitFor(() => expect(mocks.meta).toEqual({ positivePrompt: 'a staged cat', seed: 4242 }));
-    expect(menuItem('Use Seed').getAttribute('aria-disabled')).toBe('true');
-    expect(menuItem('Use CLIP Skip').getAttribute('aria-disabled')).toBe('true');
-    expect(menuItem('Recall All').getAttribute('aria-disabled')).toBeNull();
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.seed').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.clipSkip').getAttribute('aria-disabled')).toBe('true');
+    expect(menuItem('widgets.gallery.itemActions.recall.verbs.all').getAttribute('aria-disabled')).toBeNull();
 
-    await activate('Use Prompt');
+    await activate('widgets.gallery.itemActions.recall.verbs.prompts');
     expect(mocks.recall).toHaveBeenCalledWith('prompts');
 
     // A greyed verb must stay inert: the row is only visually disabled.
-    await activate('Use Seed');
+    await activate('widgets.gallery.itemActions.recall.verbs.seed');
     expect(mocks.recall).not.toHaveBeenCalledWith('seed');
   });
 

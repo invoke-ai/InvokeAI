@@ -4,6 +4,7 @@ import type { MouseEvent } from 'react';
 import { Box, Flex, Icon, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { Link } from '@tanstack/react-router';
 import { formatRelativeTime } from '@workbench/launchpad/formatRelativeTime';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
@@ -22,7 +23,11 @@ import { ProjectCover } from './ProjectCover';
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
 const REVEAL_ON_HOVER = { opacity: 1 } as const;
-const LINK_STYLE = { cursor: 'default', inset: 0, position: 'absolute' } as const;
+// The card clips its overlay link's own outline, so the card draws the keyboard focus ring around itself.
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
+const CARD_FOCUS_RING = {
+  '&:has(> a:focus-visible)': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
+} as const;
 const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
 
@@ -40,6 +45,7 @@ export const ProjectCard = ({
   const isCompatible = isProjectSummaryCompatible(summary);
 
   const projectSearch = useMemo(() => ({ project: summary.id }), [summary.id]);
+  const pinLabel = isPinned ? t('projects.unpin') : t('projects.pin');
   const menuTarget = useMemo(() => ({ isPinned, onTogglePin, summary }), [isPinned, onTogglePin, summary]);
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => menu.openAtPointer(event, menuTarget),
@@ -50,6 +56,7 @@ export const ProjectCard = ({
 
   return (
     <Box
+      css={CARD_FOCUS_RING}
       bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"
@@ -58,9 +65,10 @@ export const ProjectCard = ({
       position="relative"
       rounded="lg"
       transition={CARD_TRANSITION}
-      _hover={CARD_HOVER}
+      _hover={isCompatible ? CARD_HOVER : undefined}
       onContextMenu={handleContextMenu}
     >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
@@ -68,16 +76,7 @@ export const ProjectCard = ({
           style={LINK_STYLE}
           to="/app"
         />
-      ) : (
-        <Box
-          aria-disabled="true"
-          aria-label={`${t('projects.openProjectLabel', { name: summary.name })}. ${t('projects.file.updateClient')}`}
-          role="link"
-          style={LINK_STYLE}
-          tabIndex={0}
-          title={t('projects.file.updateClient')}
-        />
-      )}
+      ) : null}
       <Box pointerEvents="none">
         <ProjectCover coverUrl={summary.coverUrl} />
       </Box>
@@ -92,20 +91,21 @@ export const ProjectCard = ({
       </Flex>
 
       <Box left="2" pointerEvents="auto" position="absolute" top="2" zIndex="1">
-        <IconButton
-          aria-label={isPinned ? t('projects.unpin') : t('projects.pin')}
-          aria-pressed={isPinned}
-          color={isPinned ? 'fg' : 'fg.muted'}
-          opacity={isPinned ? 1 : 0}
-          size="sm"
-          title={isPinned ? t('projects.unpin') : t('projects.pin')}
-          variant="subtle"
-          _focusVisible={REVEAL_ON_HOVER}
-          _groupHover={REVEAL_ON_HOVER}
-          onClick={handleTogglePin}
-        >
-          <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
-        </IconButton>
+        <Tooltip content={pinLabel}>
+          <IconButton
+            aria-label={pinLabel}
+            aria-pressed={isPinned}
+            color={isPinned ? 'fg' : 'fg.muted'}
+            opacity={isPinned ? 1 : 0}
+            size="sm"
+            variant="subtle"
+            _focusVisible={REVEAL_ON_HOVER}
+            _groupHover={REVEAL_ON_HOVER}
+            onClick={handleTogglePin}
+          >
+            <Icon as={PinIcon} boxSize="3" fill={isPinned ? 'currentColor' : 'none'} />
+          </IconButton>
+        </Tooltip>
       </Box>
 
       <Box bottom="2" pointerEvents="auto" position="absolute" right="2" zIndex="1">

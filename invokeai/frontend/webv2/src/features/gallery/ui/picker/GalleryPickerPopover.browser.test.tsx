@@ -803,6 +803,46 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
 
+  it('opens at the opening scope it is given instead of the Gallery widget scope', async () => {
+    const { dialog } = await openPicker(
+      <GalleryPickerPopover
+        accept={['image']}
+        label="Choose image"
+        openingScope={{ boardId: 'none', galleryView: 'assets' }}
+        onPick={onPick}
+      >
+        <button type="button">Choose image</button>
+      </GalleryPickerPopover>
+    );
+
+    await vi.waitFor(() =>
+      expect(getOptions(dialog).map((option) => option.dataset.itemKey)).toEqual(['image:loose.png'])
+    );
+    expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'none', galleryView: 'assets' }));
+    expect(mocks.listItems).not.toHaveBeenCalledWith(expect.objectContaining({ boardId: 'dogs' }));
+    expect(dialog.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toMatch(
+      /^common\.assets/
+    );
+    expect(dialog.querySelector('[aria-expanded]')?.getAttribute('aria-label')).toBe(
+      'widgets.gallery.picker.changeBoardNamed:widgets.gallery.uncategorized'
+    );
+  });
+
+  it("opens at a given board in the Gallery widget's view when the opening scope names no view", async () => {
+    const { dialog } = await openPicker(
+      <GalleryPickerPopover accept={['image']} label="Choose image" openingScope={{ boardId: 'none' }} onPick={vi.fn()}>
+        <button type="button">Choose image</button>
+      </GalleryPickerPopover>
+    );
+
+    await vi.waitFor(() =>
+      expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'none', galleryView: 'images' }))
+    );
+    expect(dialog.querySelector('[role="tab"][aria-selected="true"]')?.getAttribute('aria-label')).toMatch(
+      /^common\.media/
+    );
+  });
+
   it('switches boards from an in-place list and re-scopes the grid', async () => {
     const { dialog } = await openPicker();
     const input = getSearchInput(dialog);

@@ -3,11 +3,12 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { getResultImageName } from '@features/queue/core/generationMeta';
+import { getQueueItemReadModelLabel } from '@features/queue/core/itemLabels';
 import { parseQueueItemOriginProjectId } from '@features/queue/data/events';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ChevronRightIcon } from 'lucide-react';
-import { memo, useCallback, useRef, useState } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { CancelQueueItemButton } from './CancelQueueItemButton';
@@ -17,7 +18,7 @@ import { QueueItemThumbnail } from './QueueItemThumbnail';
 import { isCancellableQueueItem, isRetryableQueueItem } from './queueOwnership';
 import { QueueStatusDot } from './QueueStatusDot';
 import { QueueStepProgress } from './QueueStepProgress';
-import { useQueueUi } from './QueueUiContext';
+import { useLoadingModelLabel, useQueueUi } from './QueueUiContext';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
 import { RetryQueueItemButton } from './RetryQueueItemButton';
 import { getStatusMeta } from './statusMeta';
@@ -71,6 +72,11 @@ export const QueueItemRow = memo(
     // refetched, so prefer the live value and fall back to the persisted one.
     const deviceLabel = useDeviceLabel(progress?.device ?? item.device);
 
+    // Rows read by what they made; the id stays alongside for matching against logs and other tabs.
+    const itemLabel = useMemo(() => getQueueItemReadModelLabel(item), [item]);
+    const itemNumber = t('widgets.queue.itemNumber', { id: item.id });
+    const errorLine = isFailed && !expanded ? item.errorMessage?.trim().split('\n')[0] : undefined;
+
     const showBorder = expanded || isFailed;
     const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
 
@@ -94,6 +100,7 @@ export const QueueItemRow = memo(
                 truncate
               >
                 {[
+                  itemLabel ? itemNumber : null,
                   statusLabel,
                   ageLabel,
                   deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null,
@@ -106,7 +113,7 @@ export const QueueItemRow = memo(
           isExpanded={canExpand ? expanded : undefined}
           leading={<QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />}
           role="presentation"
-          title={t('widgets.queue.itemTitle', { id: item.id })}
+          title={itemLabel || t('widgets.queue.itemTitle', { id: item.id })}
           trailing={
             canExpand ? (
               <Icon
@@ -123,8 +130,14 @@ export const QueueItemRow = memo(
 
         {item.status === 'in_progress' ? (
           <Box px="2.5" pb="2">
-            <QueueStepProgress message={progress?.message ?? ''} percentage={progress?.percentage ?? null} />
+            <RunningItemProgress message={progress?.message ?? ''} percentage={progress?.percentage ?? null} />
           </Box>
+        ) : null}
+
+        {errorLine ? (
+          <Text color="fg.error" fontSize="xs" pb="2" px="2.5" truncate>
+            {errorLine}
+          </Text>
         ) : null}
 
         {expanded ? (
@@ -136,3 +149,12 @@ export const QueueItemRow = memo(
     );
   }
 );
+
+/** A running row's progress; with no step yet while the server loads a model, it says which instead of only sweeping. */
+const RunningItemProgress = ({ message, percentage }: { message: string; percentage: number | null }) => {
+  const { t } = useTranslation();
+  const loadingModel = useLoadingModelLabel();
+  const caption = message.trim() || (loadingModel ? t('widgets.queue.loadingModel', { model: loadingModel }) : '');
+
+  return <QueueStepProgress message={caption} percentage={percentage} />;
+};

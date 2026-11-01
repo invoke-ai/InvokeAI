@@ -14,7 +14,13 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { commands, userEvent } from 'vitest/browser';
+
+declare module 'vitest/browser' {
+  interface BrowserCommands {
+    imeCompose: (steps: readonly { kind: 'commit' | 'compose'; text: string }[]) => Promise<void>;
+  }
+}
 
 const i18n = i18next.createInstance();
 
@@ -83,6 +89,8 @@ const LTX_SUGGESTION: ExpandPromptSuggestion = {
   systemPromptId: 't2v',
 };
 
+const notices = vi.hoisted(() => ({ info: vi.fn(), offer: vi.fn(), undoable: vi.fn() }));
+
 // Read at render time by the mocks below, so each test can set them before rendering.
 let catalog: (typeof TEXT_ONLY | typeof ENHANCER | typeof VISION_A)[] = [];
 let arePromptsLoading = false;
@@ -133,7 +141,7 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
     capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
     gallery: { selectedImage: { imageName: 'selected.png' } },
     models: { catalog, ensureLoaded: vi.fn(), openManager: vi.fn() },
-    notifications: { reportError: vi.fn() },
+    notifications: { info: notices.info, offer: notices.offer, reportError: vi.fn(), undoable: notices.undoable },
     project: { activeProjectId: 'project-1' },
     promptHistory: { clear: vi.fn(), items: [] },
   }),
@@ -185,6 +193,9 @@ let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(() => {
+  notices.info.mockClear();
+  notices.offer.mockClear();
+  notices.undoable.mockClear();
   vi.mocked(expandPrompt).mockClear();
   vi.mocked(imageToPrompt).mockClear();
   catalog = [TEXT_ONLY, ENHANCER];
@@ -200,6 +211,7 @@ afterEach(async () => {
 
 /** What the field was last rendered with, so a saved slot can render its own change back. */
 let rendered: {
+  onChange: (value: string) => void;
   projectId: string;
   savedPromptModels: SavedPromptModels | undefined;
   suggestion: ExpandPromptSuggestion | null;
@@ -208,9 +220,10 @@ let rendered: {
 const renderField = (
   suggestion: ExpandPromptSuggestion | null,
   savedPromptModels?: SavedPromptModels,
+  onChange: (value: string) => void = vi.fn(),
   projectId = 'project-1'
 ) => {
-  rendered = { projectId, savedPromptModels, suggestion };
+  rendered = { onChange, projectId, savedPromptModels, suggestion };
   root?.render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={new QueryClient()}>
@@ -225,7 +238,7 @@ const renderField = (
               selectedModel={undefined}
               showSyntaxHighlighting={false}
               value="she waves"
-              onChange={vi.fn()}
+              onChange={onChange}
               onResizeEnd={vi.fn()}
               onUsePrompt={vi.fn()}
             />
@@ -239,13 +252,14 @@ const renderField = (
 const renderAndOpen = async (
   suggestion: ExpandPromptSuggestion | null,
   savedPromptModels?: SavedPromptModels,
-  trigger = 'widgets.generate.expandPrompt'
+  trigger = 'widgets.generate.expandPrompt',
+  onChange?: (value: string) => void
 ) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  await act(() => renderField(suggestion, savedPromptModels));
+  await act(() => renderField(suggestion, savedPromptModels, onChange));
   await act(() => host?.querySelector<HTMLButtonElement>(`[aria-label="${trigger}"]`)?.click());
 };
 
@@ -253,7 +267,12 @@ const renderAndOpen = async (
 const savedModels = (overrides: Partial<SavedPromptModels> = {}): SavedPromptModels => {
   const onChange = vi.fn((patch: Partial<SavedPromptModels>) => {
     if (rendered?.savedPromptModels?.onChange === onChange) {
-      renderField(rendered.suggestion, { ...rendered.savedPromptModels, ...patch }, rendered.projectId);
+      renderField(
+        rendered.suggestion,
+        { ...rendered.savedPromptModels, ...patch },
+        rendered.onChange,
+        rendered.projectId
+      );
     }
   });
   return { expandPromptModelKey: null, imageToPromptModelKey: null, ...overrides, onChange };
@@ -411,7 +430,7 @@ it("starts another project from its own saved Expand Prompt model, not the previ
   await choose('text llm', 'qwen');
   expect(select('text llm')?.value).toBe('qwen');
 
-  await act(() => renderField(null, savedModels({ expandPromptModelKey: 'e2b' }), 'project-2'));
+  await act(() => renderField(null, savedModels({ expandPromptModelKey: 'e2b' }), undefined, 'project-2'));
   expect(select('text llm')?.value).toBe('e2b');
 });
 
@@ -419,7 +438,7 @@ it('keeps the session pick of a surface without a saved slot across a project sw
   await renderAndOpen(null);
   await choose('text llm', 'qwen');
 
-  await act(() => renderField(null, undefined, 'project-2'));
+  await act(() => renderField(null, undefined, undefined, 'project-2'));
   expect(select('text llm')?.value).toBe('qwen');
 });
 
@@ -475,48 +494,180 @@ const trigger = (label: string) => host?.querySelector<HTMLButtonElement>(`[aria
 const isSpinning = (button: HTMLButtonElement | null | undefined) =>
   button?.querySelector('.chakra-spinner') !== null && button?.getAttribute('aria-busy') === 'true';
 
-it('lets Expand Prompt close while it runs and reopen to follow it, with a spinner on the button', async () => {
+const promptBox = () =>
+  host?.querySelector<HTMLTextAreaElement>('textarea[aria-label="widgets.generate.positivePrompt"]');
+const buttonWithText = (text: string) =>
+  [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text);
+
+/** The Undo the last landed result offered, as its toast would run it. */
+const undoLastResult = () => {
+  const [, notice] = notices.undoable.mock.calls.at(-1) as [string, { onUndo: () => void }];
+  return act(() => notice.onUndo());
+};
+
+it('writes a result that lands while the popover is open as an edit, closes it, and offers an Undo', async () => {
   const run = pendingRun();
+  const onChange = vi.fn();
   vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
-  await renderAndOpen(null);
+  await renderAndOpen(null, undefined, 'widgets.generate.expandPrompt', onChange);
 
   await act(() => expandButton()?.click());
-  await clickOutside();
-  expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
-  expect(trigger('widgets.generate.expandPrompt')?.disabled).toBe(false);
   expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(true);
-
-  await act(() => trigger('widgets.generate.expandPrompt')?.click());
-  expect(isPopoverOpen('widgets.generate.expand')).toBe(true);
-  expect(expandButton()?.dataset.loading).toBeDefined();
 
   await run.finish();
   expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
   expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(false);
+  expect(promptBox()?.value).toBe('x');
+  expect(onChange).toHaveBeenLastCalledWith('x');
+  expect(document.activeElement).toBe(promptBox());
+  expect(notices.undoable).toHaveBeenCalledExactlyOnceWith('widgets.generate.promptExpanded', {
+    onUndo: expect.any(Function),
+    projectId: 'project-1',
+    supersedes: 'generate-prompt:project-1',
+  });
+  // What Ctrl+Z runs: the browser's own undo, which a controlled value write would have wiped.
+  await act(() => {
+    promptBox()?.focus();
+    document.execCommand('undo');
+  });
+  expect(promptBox()?.value).toBe('she waves');
 });
 
-it('lets Image to Prompt close while it runs and reopen to follow it, with a spinner on the button', async () => {
+it('keeps running once the popover closes, and lands without taking focus from the field the user typed in', async () => {
+  const run = pendingRun();
+  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
+  await renderAndOpen(null);
+  const elsewhere = document.createElement('textarea');
+  document.body.append(elsewhere);
+
+  await act(() => expandButton()?.click());
+  await clickOutside();
+  expect(isPopoverOpen('widgets.generate.expand')).toBe(false);
+  expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(true);
+
+  await userEvent.type(elsewhere, 'notes');
+  await run.finish();
+
+  expect(promptBox()?.value).toBe('x');
+  expect(document.activeElement).toBe(elsewhere);
+  expect(elsewhere.value).toBe('notes');
+  await undoLastResult();
+  expect(promptBox()?.value).toBe('she waves');
+  elsewhere.remove();
+});
+
+it('leaves a composing IME in another field alone when a result lands', async () => {
+  const run = pendingRun();
+  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
+  await renderAndOpen(null);
+  const elsewhere = document.createElement('textarea');
+  document.body.append(elsewhere);
+
+  await act(() => expandButton()?.click());
+  await clickOutside();
+  await act(() => elsewhere.focus());
+  await commands.imeCompose([{ kind: 'compose', text: 'にほ' }]);
+  await run.finish();
+  await commands.imeCompose([{ kind: 'commit', text: '日本' }]);
+
+  expect(promptBox()?.value).toBe('x');
+  expect(document.activeElement).toBe(elsewhere);
+  expect(elsewhere.value).toBe('日本');
+  elsewhere.remove();
+});
+
+it('drops the result of a request the user stopped waiting for', async () => {
+  const run = pendingRun();
+  const onChange = vi.fn();
+  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
+  await renderAndOpen(null, undefined, 'widgets.generate.expandPrompt', onChange);
+
+  await act(() => expandButton()?.click());
+  await act(() => buttonWithText('widgets.generate.stopWaiting')?.click());
+  expect(isSpinning(trigger('widgets.generate.expandPrompt'))).toBe(false);
+
+  await run.finish();
+  expect(promptBox()?.value).toBe('she waves');
+  expect(onChange).not.toHaveBeenCalled();
+  expect(notices.undoable).not.toHaveBeenCalled();
+});
+
+it('offers the result in a toast instead of overwriting a prompt edited while it ran', async () => {
+  const run = pendingRun();
+  vi.mocked(expandPrompt).mockImplementationOnce(() =>
+    run.running.then(() => ({ expanded_prompt: 'rewritten', seed: 1 }))
+  );
+  await renderAndOpen(null);
+
+  await act(() => expandButton()?.click());
+  await act(() => promptBox()?.setSelectionRange(9, 9));
+  await userEvent.type(promptBox()!, ' hello');
+  await run.finish();
+
+  expect(promptBox()?.value).toBe('she waves hello');
+  expect(notices.undoable).not.toHaveBeenCalled();
+  const [title, offer] = notices.offer.mock.calls[0] as [
+    string,
+    { actions: { label: string; onClick: () => void }[]; message: string },
+  ];
+  expect(title).toBe('widgets.generate.promptChangedWhileRunning');
+  expect(offer.message).toBe('rewritten');
+  expect(offer.actions.map((action) => action.label)).toEqual(['widgets.generate.replacePrompt', 'common.discard']);
+
+  await act(() => offer.actions[0]!.onClick());
+  expect(promptBox()?.value).toBe('rewritten');
+  await undoLastResult();
+  expect(promptBox()?.value).toBe('she waves hello');
+});
+
+it('drops a result for a project this field no longer shows', async () => {
+  const run = pendingRun();
+  const onChange = vi.fn();
+  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
+  await renderAndOpen(null, undefined, 'widgets.generate.expandPrompt', onChange);
+
+  await act(() => expandButton()?.click());
+  await act(() => renderField(null, undefined, onChange, 'project-2'));
+  await run.finish();
+
+  expect(promptBox()?.value).toBe('she waves');
+  expect(onChange).not.toHaveBeenCalled();
+  expect(notices.offer).not.toHaveBeenCalled();
+  expect(notices.undoable).not.toHaveBeenCalled();
+});
+
+it('drops the request when its field unmounts, so a remounted field is never written by it', async () => {
+  const run = pendingRun();
+  const onChange = vi.fn();
+  vi.mocked(expandPrompt).mockImplementationOnce(() => run.running.then(() => ({ expanded_prompt: 'x', seed: 1 })));
+  await renderAndOpen(null, undefined, 'widgets.generate.expandPrompt', onChange);
+
+  await act(() => expandButton()?.click());
+  await act(() => root?.render(null));
+  await act(() => renderField(null, undefined, onChange));
+  await run.finish();
+
+  expect(promptBox()?.value).toBe('she waves');
+  expect(onChange).not.toHaveBeenCalled();
+  expect(notices.undoable).not.toHaveBeenCalled();
+});
+
+// Shares Expand's request handling; this covers its own wiring.
+it('runs Image to Prompt and writes its prompt', async () => {
   catalog = [VISION_A];
   const run = pendingRun();
-  vi.mocked(imageToPrompt).mockImplementationOnce(() => run.running.then(() => ({ prompt: 'x' })));
+  vi.mocked(imageToPrompt).mockImplementationOnce(() => run.running.then(() => ({ prompt: 'described' })));
   await renderAndOpen(null, undefined, 'widgets.generate.imageToPrompt');
-  const generateButton = () =>
-    [...document.querySelectorAll<HTMLButtonElement>('button')].find(
-      (button) => button.textContent === 'widgets.generate.generatePrompt'
-    );
+  const generateButton = () => buttonWithText('widgets.generate.generatePrompt');
 
   await act(() => generateButton()?.click());
-  await clickOutside();
-  expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(false);
-  expect(trigger('widgets.generate.imageToPrompt')?.disabled).toBe(false);
   expect(isSpinning(trigger('widgets.generate.imageToPrompt'))).toBe(true);
-
-  await act(() => trigger('widgets.generate.imageToPrompt')?.click());
-  expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(true);
-  expect(generateButton()?.dataset.loading).toBeDefined();
 
   await run.finish();
   expect(isSpinning(trigger('widgets.generate.imageToPrompt'))).toBe(false);
+  expect(isPopoverOpen('widgets.generate.generatePrompt')).toBe(false);
+  expect(promptBox()?.value).toBe('described');
+  expect(notices.undoable).toHaveBeenCalledWith('widgets.generate.promptFromImage', expect.anything());
 });
 
 it('starts Image to Prompt from the first listed vision model and saves a different pick', async () => {
@@ -545,6 +696,6 @@ it("starts another project from its own saved Image to Prompt model, not the pre
   await choose('text llm', 'llava-b');
   expect(select('text llm')?.value).toBe('llava-b');
 
-  await act(() => renderField(null, savedModels({ imageToPromptModelKey: 'llava-a' }), 'project-2'));
+  await act(() => renderField(null, savedModels({ imageToPromptModelKey: 'llava-a' }), undefined, 'project-2'));
   expect(select('text llm')?.value).toBe('llava-a');
 });

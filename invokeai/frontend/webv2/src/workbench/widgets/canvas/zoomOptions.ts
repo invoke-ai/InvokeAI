@@ -11,6 +11,6 @@ export interface ZoomMenuOption {
   label: string;
 }
 
-/** The selectable zoom levels for the HUD menu, largest first (matches snap points top-down). */
+/** The selectable zoom levels for the header menu, smallest first, after Fit to view as in Preview's menu. */
 export const zoomMenuOptions = (): ZoomMenuOption[] =>
-  [...ZOOM_PRESETS].sort((a, b) => b - a).map((value) => ({ label: formatZoomPercent(value), value }));
+  [...ZOOM_PRESETS].sort((a, b) => a - b).map((value) => ({ label: formatZoomPercent(value), value }));

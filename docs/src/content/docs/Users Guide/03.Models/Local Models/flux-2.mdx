@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-01
 sidebar:
   order: 5
 ---
@@ -42,13 +42,16 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 See the [System Requirements](/start-here/system-requirements/) table:
 
-- **Klein 4B** — 12 GB VRAM and 16 GB RAM at 1024×1024; the FP8 build works with 8 GB+. The GGUF Q4 build
-  runs on 6–8 GB.
+- **Klein 4B** — 12 GB VRAM and 16 GB RAM at 1024×1024; the FP8 build works with 8 GB+. The int8 build is
+  about 4.1 GB on any supported GPU. The GGUF Q4 build runs on 6–8 GB.
 - **Klein 9B** — 12 GB VRAM and 32 GB RAM. The int8 build is 9.5 GB on any supported GPU. The FP8 build stays
-  that small only on an RTX 40-series (or newer) card with `fp8_compute` enabled; otherwise it expands to
-  about 18 GB. The Qwen3 8B encoder is about 15 GB and streams on a 12 GB card.
+  about 9.5 GB too: FP8 Storage is switched on when it is installed and keeps its weights in fp8. On an RTX
+  40-series (or newer) card, `fp8_compute` can also run them on the FP8 tensor cores for speed. The Qwen3 8B
+  encoder is about 15 GB and streams on a 12 GB card.
 - **FLUX.2 [dev]** — the full Diffusers pipeline is about 80 GB. The NF4 Diffusers build runs on about 18 GB
-  of VRAM with offloading, and the GGUF Q3_K_M transformer fits about 12 GB with offloading.
+  of VRAM with offloading, and the GGUF Q3_K_M transformer fits about 12 GB with offloading. The FP8 mixed
+  transformer takes about 35.5 GB once loaded, more than a 24 GB card holds, so partial loading streams the
+  rest.
 
 See also [FP8 Storage](/configuration/optimization/fp8-storage/) and [SDNQ
 quantization](/configuration/optimization/sdnq-quantization/).
@@ -78,6 +81,7 @@ ones.
 | FLUX.2 Klein 4B (Diffusers) / 9B (Diffusers) | Diffusers pipeline | ~16 GB / ~35 GB |
 | FLUX.2 Klein 4B | bf16 single file | ~8 GB |
 | FLUX.2 Klein 4B (FP8) / 9B (FP8) | FP8 single file | ~4 GB / ~9.5 GB |
+| FLUX.2 Klein 4B (int8) | int8 single file (community repack) | ~4.1 GB, same size in memory on every supported GPU |
 | FLUX.2 Klein 9B (int8) | int8 single file (community repack) | ~9.5 GB, same size in memory on every supported GPU |
 | FLUX.2 Klein 4B (GGUF Q4 / Q8) | GGUF | ~2.6 GB / ~4.3 GB |
 | FLUX.2 Klein 9B (GGUF Q4 / Q8) | GGUF | ~5.8 GB / ~10 GB |
@@ -98,12 +102,13 @@ fp8 weights instead of expanding them.
 | FLUX.2 [dev] (Diffusers) | Diffusers pipeline | ~80 GB |
 | FLUX.2 [dev] (Diffusers, NF4) | NF4-quantized transformer and text encoder | ~18 GB VRAM with offload |
 | FLUX.2 [dev] Transformer (GGUF Q3_K_M / Q4_K_M / Q5_K_M / Q6_K / Q8_0) | GGUF | ~15.9 / 20 / 24 / 27.9 / 35.5 GB |
+| FLUX.2 [dev] Transformer (FP8 mixed) | Comfy-Org scaled fp8 mixed single file | ~35.5 GB, the same once loaded with FP8 Storage; on a 24 GB card partial loading streams about half |
 | FLUX.2 [dev] ControlNet Union | bf16 single file; see [ControlNet](#controlnet) | ~8.2 GB |
 
-The GGUF transformers need a separate Mistral encoder. Q3_K_M and Q4_K_M install the GGUF Q4 encoder, the
-larger quants the GGUF Q8 encoder. Other encoder starters are the Comfy-Org builds — *FP8* (~18 GB, best
-quality for its size), *BF16* (~35.6 GB) and *FP4 mixed* (~12.3 GB download) — and a GGUF *IQ4_XS* build
-(~11.1 GB). llama.cpp conversions of Mistral Small 3.2, such as unsloth's or bartowski's GGUFs, are the same
+The GGUF and FP8 mixed transformers need a separate Mistral encoder. Q3_K_M and Q4_K_M install the GGUF Q4
+encoder, the larger quants and the FP8 mixed build the GGUF Q8 encoder. Other encoder starters are the Comfy-Org
+builds — *FP8* (~18 GB, best quality for its size), *BF16* (~35.6 GB) and *FP4 mixed* (~12.3 GB download) — and
+a GGUF *IQ4_XS* build (~11.1 GB). llama.cpp conversions of Mistral Small 3.2, such as unsloth's or bartowski's GGUFs, are the same
 encoder; 3.0 and 3.1 GGUFs load too, but they are different weights. These files carry no Tekken tokenizer, so
 their first load fetches it from the gated `black-forest-labs/FLUX.2-dev` repository (see below). A GGUF of the
 same shape that declares scaled RoPE or an attention temperature, such as Devstral Small 2, is a different model

@@ -60,6 +60,7 @@ void i18n.use(initReactI18next).init({
             resetSizeOptimalForRatio: 'Optimal size for {{ratio}}',
             resetSizeSquareNative: 'Square at native size',
             size: 'Size',
+            sizePreviewHandle: 'Resize',
             swapWidthAndHeight: 'Swap width and height',
             unlockAspectRatio: 'Unlock aspect ratio',
             width: 'Width',
@@ -138,13 +139,36 @@ afterEach(async () => {
   await unmountAndReset();
 });
 
+describe('GenerateDimensionFields size preview handle', () => {
+  const pointer = (type: string, x: number, y: number) =>
+    new PointerEvent(type, { bubbles: true, buttons: 1, clientX: x, clientY: y, pointerId: 1 });
+
+  it('offers a 16px target and drops the dragged size when the browser cancels the drag', async () => {
+    const { onCommit } = await render({ height: 512, width: 512 });
+    const handle = host!.querySelector<HTMLButtonElement>('button[aria-label="Resize"]')!;
+    const rect = handle.getBoundingClientRect();
+
+    expect(rect.width).toBeGreaterThanOrEqual(16);
+    expect(rect.height).toBeGreaterThanOrEqual(16);
+
+    await settle(() => handle.dispatchEvent(pointer('pointerdown', rect.x, rect.y)));
+    await settle(() => handle.dispatchEvent(pointer('pointermove', rect.x + 20, rect.y + 20)));
+    expect(host?.textContent).not.toContain('512×512');
+
+    await settle(() => handle.dispatchEvent(pointer('pointercancel', rect.x + 20, rect.y + 20)));
+
+    expect(host?.textContent).toContain('512×512');
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+});
+
 describe('GenerateDimensionFields canvas render size', () => {
   it('lays out the render-size controls and the resized badge for a local model on the canvas', async () => {
     harness.invocationSourceId = 'canvas';
     await render({ height: 512, width: 512 });
 
     expect(host?.querySelector('[data-testid="render-size-controls"]')).not.toBeNull();
-    expect(host?.textContent).toContain('512x512 → 1024x1024');
+    expect(host?.textContent).toContain('512×512 → 1024×1024');
   });
 
   it('shows a hosted provider only the frame, which is the size the provider is asked for', async () => {
@@ -153,7 +177,7 @@ describe('GenerateDimensionFields canvas render size', () => {
 
     expect(host?.querySelector('[data-testid="render-size-controls"]')).toBeNull();
     expect(host?.textContent).not.toContain('→');
-    expect(host?.textContent).toContain('512x512');
+    expect(host?.textContent).toContain('512×512');
   });
 });
 

@@ -11,8 +11,9 @@ import type {
   CanvasLayerContract,
   CanvasNodeContract,
   CanvasRasterLayerContractV2,
+  CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/api';
-import type { InvocationRoute } from '@workbench/invocationContracts';
+import type { InvocationRoute, InvocationValidationReason } from '@workbench/invocationContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
 import { galleryKeys } from '@features/gallery/queries';
@@ -32,6 +33,10 @@ vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompt
 // Remembered control-model picks, which readiness reads imperatively from the account preferences.
 const preferences = vi.hoisted(() => ({ controlModelMemory: {} as Record<string, string> }));
 
+/** A route reason as text: Generate issues carry their English beside the locale key. */
+const reasonText = (reason: InvocationValidationReason) =>
+  typeof reason === 'object' && 'generationIssue' in reason ? reason.generationIssue.message : reason;
+
 vi.mock('./settings/store', async (importOriginal) => {
   const actual = await importOriginal<typeof settingsStoreModule>();
   return {
@@ -43,7 +48,14 @@ vi.mock('./settings/store', async (importOriginal) => {
   };
 });
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
 
 import {
   areInvocationRouteInputsEqual,
@@ -152,7 +164,9 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(missingComponentsRoute.sourceValid).toBe(false);
-    expect(missingComponentsRoute.validationReasons).toContain('Generate needs a Qwen3 Encoder for Anima models.');
+    expect(missingComponentsRoute.validationReasons.map(reasonText)).toContain(
+      'Generate needs a Qwen3 Encoder for Anima models.'
+    );
 
     const validRoute = resolveInvocationRoute(
       getActiveProject(createGenerateValues(animaModel, { qwen3EncoderModel: qwen3Encoder, vae: animaVae }))
@@ -170,7 +184,9 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.');
+    expect(route.validationReasons.map(reasonText)).toContain(
+      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+    );
   });
 
   it('invalidates FLUX.2 generation when dimensions are not on the required 16px grid', () => {
@@ -181,14 +197,16 @@ describe('resolveInvocationRoute', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate height must be a multiple of 16.');
+    expect(route.validationReasons.map(reasonText)).toContain('Height must be a multiple of 16.');
   });
 
   it('invalidates external providers without a registered invocation node', () => {
     const route = resolveInvocationRoute(getActiveProject(createGenerateValues(unknownExternalModel)));
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain("No invocation node registered for external provider 'future-provider'.");
+    expect(route.validationReasons.map(reasonText)).toContain(
+      "No invocation node registered for external provider 'future-provider'."
+    );
   });
 
   it('blocks a MOSS-Image layout draft that a prompt template hides or breaks', () => {
@@ -273,12 +291,12 @@ describe('resolveInvocationRoute — upscale source', () => {
     const withoutWidget = { ...input, mountedWidgetIds: input.mountedWidgetIds.filter((id) => id !== 'upscale') };
     const missingTile = upscaleModels.filter((model) => model.key !== 'tile-upscale');
 
-    expect(resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons).toContain(
-      'The Upscale widget is not mounted in this project.'
-    );
-    expect(resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons).toContain(
-      'SDXL Tile ControlNet is no longer installed.'
-    );
+    expect(
+      resolveInvocationRouteInput(withoutWidget, 'global', route, upscaleModels).validationReasons.map(reasonText)
+    ).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'upscale' } });
+    expect(
+      resolveInvocationRouteInput(input, 'global', route, missingTile).validationReasons.map(reasonText)
+    ).toContain('SDXL Tile ControlNet is no longer installed.');
   });
 
   it('rejects a main-model base the widget has no builder for', () => {
@@ -290,7 +308,7 @@ describe('resolveInvocationRoute — upscale source', () => {
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain(
+    expect(result.validationReasons.map(reasonText)).toContain(
       'Upscale supports only SD1.5, SDXL, FLUX.1, FLUX.2, Z-Image, Anima, Krea-2 or Qwen Image main models.'
     );
   });
@@ -305,7 +323,7 @@ describe('resolveInvocationRoute — upscale source', () => {
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain(
+    expect(result.validationReasons.map(reasonText)).toContain(
       'The Tile ControlNet must match the main model base and be a Tile or Union model.'
     );
   });
@@ -374,7 +392,9 @@ describe('resolveInvocationRoute — canvas source', () => {
     const input = canvasInputFor({ generateValues: createGenerateValues(model) });
     expect(resolveInvocationRouteInput(input, 'global', canvasRoute).sourceValid).toBe(true);
     expect(
-      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons
+      resolveInvocationRouteInput(input, 'global', { ...canvasRoute, sourceId: 'generate' }).validationReasons.map(
+        reasonText
+      )
     ).toContain('Unknown External Provider does not support text-to-image generation.');
   });
 
@@ -406,8 +426,8 @@ describe('resolveInvocationRoute — canvas source', () => {
         canvasInputFor({ generateValues, bbox: { width: 1025, height: 512 } }),
         'global',
         canvasRoute
-      ).validationReasons
-    ).toContain('Unknown External Provider supports a maximum size of 1024×1024.');
+      ).validationReasons.map(reasonText)
+    ).toContain('Unknown External Provider supports at most 1024×1024.');
   });
 
   it('validates a fixed-size provider against the size it is asked for, not the frame', () => {
@@ -454,38 +474,58 @@ describe('resolveInvocationRoute — canvas source', () => {
     ).toBe(true);
   });
 
-  it('measures each visible raster layer against the frame, for a text-only provider on a Canvas route', () => {
-    const textOnly: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
-    let project = getActiveProject(createGenerateValues(textOnly));
-    const raster = (
-      x: number,
-      y: number,
-      overrides: Partial<CanvasRasterLayerContractV2> = {}
-    ): CanvasRasterLayerContractV2 => ({
-      blendMode: 'normal',
-      id: `raster-${x}-${y}`,
-      isEnabled: true,
-      isLocked: false,
-      name: `Raster ${x},${y}`,
-      opacity: 1,
-      source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
-      type: 'raster',
-      ...overrides,
-    });
-    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
-      getInvocationRouteInput({
-        ...project,
-        canvas: {
-          ...project.canvas,
-          document: {
-            ...project.canvas.document,
-            bbox: { height: 100, width: 100, x: 200, y: 0 },
-            stacks: { ...project.canvas.document.stacks, raster: layers },
-          },
+  const textOnlyModel: GenerateModelConfig = { ...unknownExternalModel, provider_id: 'openai' };
+  const raster = (
+    x: number,
+    y: number,
+    overrides: Partial<CanvasRasterLayerContractV2> = {}
+  ): CanvasRasterLayerContractV2 => ({
+    blendMode: 'normal',
+    id: `raster-${x}-${y}`,
+    isEnabled: true,
+    isLocked: false,
+    name: `Raster ${x},${y}`,
+    opacity: 1,
+    source: { image: { height: 64, imageName: 'raster.png', width: 64 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x, y },
+    type: 'raster',
+    ...overrides,
+  });
+  /** A project whose 100×100 frame sits at (200, 0), with these raster layers and this source selected. */
+  const projectWithRaster = (
+    model: GenerateModelConfig,
+    layers: CanvasNodeContract[],
+    sourceId: InvocationRoute['sourceId'] = 'canvas'
+  ) => {
+    const project = getActiveProject(createGenerateValues(model));
+    return {
+      ...project,
+      canvas: {
+        ...project.canvas,
+        document: {
+          ...project.canvas.document,
+          bbox: { height: 100, width: 100, x: 200, y: 0 },
+          stacks: { ...project.canvas.document.stacks, raster: layers },
         },
-        invocation: { ...project.invocation, sourceId },
-      }).canvasRasterInFrame;
+      },
+      invocation: { ...project.invocation, sourceId },
+    };
+  };
+  /**
+   * What the workflow graph preview resolves for its Canvas button: the project's route input with Canvas mounted,
+   * the Canvas source locked over the selected one, in dialog mode.
+   */
+  const resolveCanvasPreview = (project: ReturnType<typeof getActiveProject>) =>
+    resolveInvocationRouteInput(
+      { ...getInvocationRouteInput(project), mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
+      'dialog',
+      { ...project.invocation, sourceId: 'canvas', sourceLocked: true }
+    );
+
+  it('measures each visible raster layer against the frame, for a text-only provider whatever the source', () => {
+    let model: GenerateModelConfig = textOnlyModel;
+    const withRaster = (layers: CanvasNodeContract[], sourceId: InvocationRoute['sourceId'] = 'canvas') =>
+      getInvocationRouteInput(projectWithRaster(model, layers, sourceId)).canvasRasterInFrame;
 
     expect(withRaster([])).toBe(false);
     expect(withRaster([raster(250, 50)])).toBe(true);
@@ -526,10 +566,20 @@ describe('resolveInvocationRoute — canvas source', () => {
       ])
     ).toBe(false);
 
-    // Other routes and other models never measure.
-    expect(withRaster([raster(250, 50)], 'generate')).toBe(false);
-    project = getActiveProject(validGenerateValues);
+    // A graph preview can ask for the Canvas route while Generate is selected, so the source does not matter.
+    expect(withRaster([raster(250, 50)], 'generate')).toBe(true);
+    // Other models never measure.
+    model = animaModel;
     expect(withRaster([raster(250, 50)])).toBe(false);
+  });
+
+  it('refuses a Canvas graph preview for a text-only provider over raster content while Generate is selected', () => {
+    const preview = resolveCanvasPreview(projectWithRaster(textOnlyModel, [raster(250, 50)], 'generate'));
+
+    expect(preview.sourceValid).toBe(false);
+    expect(preview.validationReasons).toEqual([
+      'Unknown External Provider cannot use image content in the generation frame. Hide or move raster content out of the frame to generate.',
+    ]);
   });
 
   it('invalidates a zero-area generation frame', () => {
@@ -540,7 +590,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Canvas generation frame must have a positive area.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'emptyCanvasFrame' } });
   });
 
   it('reuses the generate model validation reasons', () => {
@@ -551,7 +601,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('Generate needs a Qwen3 Encoder for Anima models.');
+    expect(route.validationReasons.map(reasonText)).toContain('Generate needs a Qwen3 Encoder for Anima models.');
   });
 
   it('invalidates when the canvas widget is not mounted', () => {
@@ -562,7 +612,7 @@ describe('resolveInvocationRoute — canvas source', () => {
     );
 
     expect(route.sourceValid).toBe(false);
-    expect(route.validationReasons).toContain('The Canvas widget is not mounted in this project.');
+    expect(route.validationReasons).toContainEqual({ routeIssue: { kind: 'sourceNotMounted', sourceId: 'canvas' } });
   });
 
   it('blocks a typed content-bearing control layer no model resolves once models are loaded', () => {
@@ -631,54 +681,170 @@ describe('resolveInvocationRoute — canvas source', () => {
     expect(modelsLoadingRoute.validationReasons).toEqual([]);
   });
 
-  it('blocks MOSS-Image layout regions around a blank prompt before anything uploads', () => {
-    const mossModel: MainModelConfig = {
-      base: 'moss-image',
+  describe('layout regions', () => {
+    const layoutModel = (base: 'moss-image' | 'ideogram-4', name: string): MainModelConfig => ({
+      base,
       format: 'diffusers',
-      key: 'moss-model',
-      name: 'MOSS-Image',
+      key: `${base}-model`,
+      name,
       type: 'main',
+    });
+    const mossModel = layoutModel('moss-image', 'MOSS-Image');
+    const ideogramModel = layoutModel('ideogram-4', 'Ideogram 4');
+    // The frame sits away from the document origin, so bounds must be compared in document space.
+    const frame = { height: 512, width: 512, x: 256, y: 128 };
+    /** A captioned region whose 64×64 mask bitmap starts at the layer's position. */
+    const region = (
+      id: string,
+      position: { x: number; y: number },
+      overrides: Partial<CanvasRegionalGuidanceLayerContract> = {}
+    ): CanvasRegionalGuidanceLayerContract => ({
+      autoNegative: false,
+      blendMode: 'normal',
+      id,
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: { height: 64, imageName: `${id}.png`, width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
+      name: id,
+      negativePrompt: null,
+      opacity: 1,
+      positivePrompt: 'a shop sign',
+      referenceImages: [],
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, ...position },
+      type: 'regional_guidance',
+      ...overrides,
+    });
+    const projectFor = (
+      model: MainModelConfig,
+      overrides: Partial<GenerateWidgetValues>,
+      layers: CanvasRegionalGuidanceLayerContract[],
+      sourceId: InvocationRoute['sourceId'] = 'canvas'
+    ) => {
+      const project = getActiveProject(createGenerateValues(model, overrides));
+      return {
+        ...project,
+        canvas: {
+          ...project.canvas,
+          document: {
+            ...project.canvas.document,
+            bbox: frame,
+            stacks: { ...project.canvas.document.stacks, regional_guidance: layers },
+          },
+        },
+        invocation: { ...project.invocation, sourceId },
+      };
     };
-    const region = (overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
-      ({
-        autoNegative: false,
-        blendMode: 'normal',
-        id: 'region-1',
-        isEnabled: true,
-        isLocked: false,
-        mask: { bitmap: { height: 64, imageName: 'mask.png', width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
-        name: 'Region 1',
-        negativePrompt: null,
-        opacity: 1,
-        positivePrompt: 'a shop sign',
-        referenceImages: [],
-        transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-        type: 'regional_guidance',
-        ...overrides,
-      }) as CanvasLayerContract;
-    const reasonsFor = (overrides: Partial<GenerateWidgetValues>, layers: CanvasLayerContract[]) =>
+    const inputFor = (...args: Parameters<typeof projectFor>) => getInvocationRouteInput(projectFor(...args));
+    const reasonsFor = (
+      model: MainModelConfig,
+      overrides: Partial<GenerateWidgetValues>,
+      layers: CanvasRegionalGuidanceLayerContract[]
+    ) =>
       resolveInvocationRouteInput(
-        canvasInputFor({ generateValues: createGenerateValues(mossModel, overrides), layers }),
+        { ...inputFor(model, overrides, layers), mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
         'global',
         canvasRoute
       ).validationReasons;
+    const blankPromptReason = (label: string) =>
+      `${label} needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.`;
 
-    expect(reasonsFor({ positivePrompt: '```json\n{"bbox_coord_space": "abs",\n```' }, [])).toEqual([
-      'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
-    ]);
-    expect(reasonsFor({ positivePrompt: ' ' }, [region()])).toEqual([
-      'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
-    ]);
-    // A prompt template supplies the prompt the layout is built around.
-    const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
-    expect(reasonsFor({ positivePrompt: '', promptTemplate: template }, [region()])).toEqual([]);
-    // Regions that never reach the layout leave a blank prompt alone.
-    const unplaced = [
-      region({ id: 'empty', mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
-      region({ id: 'uncaptioned', positivePrompt: null }),
-      region({ id: 'disabled', isEnabled: false }),
-    ];
-    expect(reasonsFor({ positivePrompt: '' }, unplaced)).toEqual([]);
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('blocks a region inside the frame around a blank prompt before anything uploads: %s', (model, label) => {
+      expect(reasonsFor(model, { positivePrompt: ' ' }, [region('inside', { x: 300, y: 200 })])).toEqual([
+        blankPromptReason(label),
+      ]);
+      // A prompt template supplies the prompt the layout is built around.
+      const template = { id: 'poster', name: 'Poster', negativePrompt: '', positivePrompt: 'a vintage poster' };
+      expect(
+        reasonsFor(model, { positivePrompt: '', promptTemplate: template }, [region('inside', { x: 300, y: 200 })])
+      ).toEqual([]);
+    });
+
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('leaves a blank prompt alone for regions that never reach the layout: %s', (model) => {
+      expect(
+        reasonsFor(model, { positivePrompt: '' }, [
+          // Entirely outside the frame, and touching its left edge (x 192..256).
+          region('outside', { x: 0, y: 0 }),
+          region('touching', { x: 192, y: 200 }),
+          region('empty', { x: 300, y: 200 }, { mask: { bitmap: null, fill: { color: '#00ff00', style: 'solid' } } }),
+          region('uncaptioned', { x: 300, y: 200 }, { positivePrompt: null }),
+          region('disabled', { x: 300, y: 200 }, { isEnabled: false }),
+        ])
+      ).toEqual([]);
+    });
+
+    it('measures each mask in document space, with its offset and transform', () => {
+      const blocks = (layer: CanvasRegionalGuidanceLayerContract) =>
+        reasonsFor(ideogramModel, { positivePrompt: '' }, [layer]).length > 0;
+
+      // Partly inside: x 230..294 crosses the frame's left edge at 256.
+      expect(blocks(region('partial', { x: 230, y: 200 }))).toBe(true);
+      // The bitmap offset moves the mask from the origin into the frame.
+      const offsetMask = { bitmap: { height: 64, imageName: 'offset.png', width: 64 }, offset: { x: 300, y: 200 } };
+      expect(
+        blocks(region('offset', { x: 0, y: 0 }, { mask: { ...offsetMask, fill: { color: '#0f0', style: 'solid' } } }))
+      ).toBe(true);
+      // Scaled 4× from x 0 it ends on the frame's edge at 256; 5× reaches 320.
+      expect(
+        blocks(region('scaled-4', { x: 0, y: 200 }, { transform: { rotation: 0, scaleX: 4, scaleY: 1, x: 0, y: 200 } }))
+      ).toBe(false);
+      expect(
+        blocks(region('scaled-5', { x: 0, y: 200 }, { transform: { rotation: 0, scaleX: 5, scaleY: 1, x: 0, y: 200 } }))
+      ).toBe(true);
+    });
+
+    it('measures whatever the model or selected source, keeping the input stable', () => {
+      const inside = [region('inside', { x: 300, y: 200 })];
+      const measured = (...args: Parameters<typeof projectFor>) =>
+        inputFor(...args).canvasRegionalLayersInFrame.map((layer) => layer.id);
+
+      expect(measured(ideogramModel, {}, inside)).toEqual(['inside']);
+      expect(measured(animaModel, {}, inside)).toEqual(['inside']);
+      expect(measured(ideogramModel, {}, inside, 'generate')).toEqual(['inside']);
+
+      const withRegions = projectFor(ideogramModel, {}, inside);
+      // Recomputing over the same document yields an equal input, so the stable selector keeps its identity.
+      expect(
+        areInvocationRouteInputsEqual(getInvocationRouteInput(withRegions), getInvocationRouteInput(withRegions))
+      ).toBe(true);
+    });
+
+    it('blocks a blank prompt when the capability table arrives after the route input', () => {
+      // The project loads first: no base has regional support yet. The file's seed hooks restore the table after.
+      resetArchitectureCapabilities();
+      const input = inputFor(ideogramModel, { positivePrompt: '' }, [region('inside', { x: 300, y: 200 })]);
+      setArchitectureCapabilities(architectureCapabilitiesFixture);
+
+      expect(
+        resolveInvocationRouteInput(
+          { ...input, mountedWidgetIds: ['canvas', 'generate'] as WidgetId[] },
+          'global',
+          canvasRoute
+        ).validationReasons
+      ).toEqual([blankPromptReason('Ideogram 4')]);
+    });
+
+    it.each([
+      [mossModel, 'MOSS-Image'],
+      [ideogramModel, 'Ideogram 4'],
+    ])('resolves a Canvas graph preview while Generate is selected against the frame: %s', (model, label) => {
+      const previewReasons = (layers: CanvasRegionalGuidanceLayerContract[]) =>
+        resolveCanvasPreview(projectFor(model, { positivePrompt: '' }, layers, 'generate')).validationReasons;
+
+      expect(previewReasons([region('inside', { x: 300, y: 200 })])).toEqual([blankPromptReason(label)]);
+      expect(previewReasons([region('outside', { x: 0, y: 0 })])).toEqual([]);
+    });
+
+    it('blocks a MOSS-Image layout draft that is not valid JSON on the Canvas route', () => {
+      expect(reasonsFor(mossModel, { positivePrompt: '```json\n{"bbox_coord_space": "abs",\n```' }, [])).toEqual([
+        'The prompt looks like a MOSS-Image layout draft but is not valid JSON. Run Expand Prompt again or fix it.',
+      ]);
+    });
   });
 
   it('treats the layer stack identity as part of the route input', () => {
@@ -738,6 +904,7 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner,
       prepareCanvasInvocation,
@@ -773,6 +940,7 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -804,6 +972,7 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -834,6 +1003,7 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -860,6 +1030,31 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route,
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+
+  it('dispatches the prompt as typed, with no round trip, while dynamic prompts are off', () => {
+    const project = getActiveProject(
+      createGenerateValues(animaModel, { dynamicPromptsEnabled: false, positivePrompt: 'wall painted #ff0000 {a|b}' })
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const route = routeFor(project, { ...project.invocation, destination: 'gallery', sourceId: 'generate' });
+
+    submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -883,6 +1078,7 @@ describe('submitResolvedInvocation', () => {
         commands: store.commands,
         formatControlLayerError,
         formatUpscaleMetadataFailure,
+        scopedDefaults: {},
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -900,9 +1096,12 @@ describe('submitResolvedInvocation', () => {
 
       await vi.waitFor(() => expect(store.getSnapshot().notifications).toHaveLength(1));
       expect(submitResolved).not.toHaveBeenCalled();
+      // No server reason came back, so the notice says the server could not be reached.
       expect(store.getSnapshot().notifications[0]).toMatchObject({
         kind: 'error',
+        messageKey: 'topbar.invoke.expansionUnreachable',
         title: 'The prompt could not be expanded',
+        titleKey: 'topbar.invoke.expansionFailed',
       });
     });
 
@@ -935,6 +1134,7 @@ describe('submitResolvedInvocation', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner,
       prepareCanvasInvocation,
@@ -963,9 +1163,7 @@ describe('resolveInvocationRoute — video destination compatibility', () => {
     const blocked = resolveInvocationRouteInput(input, 'global', canvasRoute);
 
     expect(blocked.destinationValid).toBe(false);
-    expect(blocked.validationReasons).toContain(
-      'Video results can only be sent to the Gallery. Switch the destination to Gallery.'
-    );
+    expect(blocked.validationReasons).toContainEqual({ routeIssue: { kind: 'videoNeedsGallery' } });
 
     expect(
       resolveInvocationRouteInput(input, 'global', { ...canvasRoute, destination: 'gallery' }).destinationValid

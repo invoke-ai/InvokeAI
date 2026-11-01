@@ -138,6 +138,16 @@ const waitForWorkbench = async (page) => {
   await presetStrip(page).waitFor();
 };
 
+/** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
+const BUILT_IN_BOTTOM_WIDGETS = [
+  'Autosave',
+  'Gallery',
+  'Notifications',
+  'Queue status',
+  'Server Status',
+  'Shortcuts',
+  'Workflow',
+];
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
 /** Preset names need not match their center views; pass the expected view explicitly. */
@@ -441,12 +451,16 @@ const runStatusBarNamesJourney = async (browser) => {
       }
     }
 
+    // Read while the menu is open; its items leave the page with it.
+    const itemLabels = [];
     const labels = [];
 
     for (let index = 0; index < (await items.count()); index++) {
+      // Item text only: a failed widget's row also carries a "Failed" note.
+      const label = ((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim();
+      itemLabels.push(label);
       if ((await items.nth(index).getAttribute('aria-checked')) === 'true') {
-        // Item text only: a failed widget's row also carries a "Failed" note.
-        labels.push(((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim());
+        labels.push(label);
       }
     }
 
@@ -458,7 +472,16 @@ const runStatusBarNamesJourney = async (browser) => {
     const chips = footer.locator('[data-status-bar-widget] > [role="button"]');
     const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    assert.ok(labels.length >= 8, `Every built-in bottom widget must be enabled; got ${JSON.stringify(labels)}.`);
+    assert.deepEqual(
+      itemLabels.toSorted(),
+      BUILT_IN_BOTTOM_WIDGETS.toSorted(),
+      'The bottom widget menu must list every built-in bottom widget.'
+    );
+    assert.equal(
+      labels.length,
+      itemLabels.length,
+      `Every bottom widget the menu lists must be enabled; got ${JSON.stringify(labels)}.`
+    );
     assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
 
     for (const label of labels) {
@@ -665,66 +688,92 @@ const runTopbarMenuJourney = async (browser) => {
     const activeLeftWidgetName = await activeLeftWidget.getAttribute('aria-label');
     assert.ok(activeLeftWidgetName);
 
-    const routingTrigger = page.getByRole('button', { name: /^Invoke from/ });
-    const routingLockIndicator = routingTrigger.locator('[data-routing-lock-indicator]');
-    const routingTriggerBoundsBeforeHover = await routingTrigger.boundingBox();
-    assert.ok(routingTriggerBoundsBeforeHover);
+    // Routing lives in the Invoke card: no separate routing button beside Invoke.
+    assert.equal(await page.locator('[data-routing-control]').count(), 0);
+    const invokeButton = page.getByRole('button', { name: /^Invoke(?: · \d+ issues?)?$/ });
+    const invokeCard = page.locator('[data-scope="popover"][data-part="content"][data-state="open"]');
+    const routingLockIndicator = invokeButton.locator('[data-routing-lock-indicator]');
+    const invokeBoundsBeforeLock = await invokeButton.boundingBox();
+    assert.ok(invokeBoundsBeforeLock);
+    // Activation opens the card only while issues block Invoke; when ready it queues, and announces no popup.
+    const invokeBlocked = (await invokeButton.getAttribute('data-blocked')) !== null;
+    const expectedInvokeExpanded = (expanded) => (invokeBlocked ? String(expanded) : null);
+    assert.equal(await invokeButton.getAttribute('aria-haspopup'), invokeBlocked ? 'dialog' : null);
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
     assert.ok(
-      routingTriggerBoundsBeforeHover.width <= 36 && routingTriggerBoundsBeforeHover.height <= 38,
-      'The routing trigger should remain narrow and align with its attached controls.'
+      ((await invokeButton.getAttribute('aria-keyshortcuts')) ?? '').split(' ').includes('ArrowDown'),
+      'Invoke must list ArrowDown, its keyboard way into the card, among its shortcuts.'
     );
+    // The route and its lock show only in the card and a decorative mark, so the description must carry them.
+    const invokeDescription = () =>
+      invokeButton.evaluate((button) =>
+        (button.getAttribute('aria-describedby') ?? '')
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((descriptionId) => document.getElementById(descriptionId)?.textContent?.trim() ?? '')
+          .join(' ')
+      );
+    const routeDescriptionPattern = (locked) =>
+      new RegExp(`^\\S+ to \\S+${locked ? ', route locked' : ''}\\. Down Arrow opens the route\\.`);
+    assert.match(await invokeDescription(), routeDescriptionPattern(false));
     assert.equal(await routingLockIndicator.count(), 0);
-    await routingTrigger.hover();
-    const routingTooltip = page.getByRole('tooltip', { exact: true, name: 'Change routing' });
-    await routingTooltip.waitFor({ timeout: 2_000 });
-    const [routingTriggerBounds, routingTooltipBounds] = await Promise.all([
-      routingTrigger.boundingBox(),
-      routingTooltip.boundingBox(),
-    ]);
-    assert.ok(routingTriggerBounds);
-    assert.ok(routingTooltipBounds);
-    assert.ok(
-      routingTooltipBounds.x < routingTriggerBounds.x + routingTriggerBounds.width &&
-        routingTooltipBounds.x + routingTooltipBounds.width > routingTriggerBounds.x,
-      'The routing tooltip should be anchored to and horizontally overlap its trigger.'
+
+    // Hover previews the card without expanding it or taking focus.
+    await invokeButton.hover();
+    await invokeCard.getByText('Source', { exact: true }).waitFor();
+    await invokeCard.getByText('Destination', { exact: true }).waitFor();
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
+    await page.mouse.move(0, 0);
+    await invokeCard.waitFor({ state: 'hidden' });
+
+    // ArrowDown pins it and moves focus into it, whether or not Invoke is ready to queue.
+    await invokeButton.focus();
+    await page.keyboard.press('ArrowDown');
+    await invokeCard.waitFor();
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(true));
+    assert.equal(await invokeButton.getAttribute('aria-controls'), await invokeCard.getAttribute('id'));
+    // The card the Down Arrow hint points to is named by its title.
+    assert.equal(
+      await page.getByRole('dialog', { name: /^(?:Add to queue|Unable to queue|Preparing generation…)$/ }).count(),
+      1,
+      'The open Invoke card must be named by its title.'
     );
-    await routingTrigger.click();
-    const routingMenu = page.getByRole('menu');
-    const sourceHeading = routingMenu.getByText('Source', { exact: true });
-    const destinationHeading = routingMenu.getByText('Destination', { exact: true });
-    const lockRouting = routingMenu.getByRole('menuitem', { exact: true, name: 'Lock routing' });
-    await sourceHeading.waitFor();
-    await destinationHeading.waitFor();
-    await lockRouting.waitFor();
-    assert.equal(await routingMenu.getByRole('button', { name: /^(?:Lock|Unlock)/ }).count(), 0);
-    assert.equal(await routingMenu.getByText('Opens', { exact: true }).count(), 0);
-    assert.equal(await routingMenu.getByText('Selected', { exact: true }).count(), 0);
-
-    await lockRouting.click();
-    const lockedRoutingTrigger = page.getByRole('button', {
-      exact: true,
-      name: 'Invoke from workflow, output to gallery, source locked, destination locked',
+    // Focus moves once the card's controls mount.
+    await invokeCard.locator(':focus').waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:invoke-card`, {
+      include: ['[data-scope="popover"][data-part="content"]'],
     });
-    await lockedRoutingTrigger.waitFor();
-    assert.equal(await lockedRoutingTrigger.locator('[data-routing-lock-indicator]').count(), 1);
-    await lockedRoutingTrigger.click();
-    const unlockRouting = page.getByRole('menu').getByRole('menuitem', { exact: true, name: 'Unlock routing' });
-    await unlockRouting.click();
-    await page
-      .getByRole('button', {
-        exact: true,
-        name: 'Invoke from workflow, output to gallery, following edits',
-      })
-      .waitFor();
-    assert.equal(await routingTrigger.locator('[data-routing-lock-indicator]').count(), 0);
 
-    await routingTrigger.click();
+    const lockRouting = invokeCard.getByRole('button', { exact: true, name: 'Lock routing' });
+    assert.equal(await lockRouting.getAttribute('aria-pressed'), 'false');
+    await lockRouting.click();
+    // One fixed name; the pressed state says whether the route is locked.
+    await invokeCard.locator('[data-routing-lock][aria-pressed="true"]').waitFor();
+    // The lock is marked on Invoke itself, without moving or resizing it.
+    await routingLockIndicator.waitFor();
+    const invokeBoundsLocked = await invokeButton.boundingBox();
+    assert.ok(invokeBoundsLocked);
+    assert.equal(invokeBoundsLocked.width, invokeBoundsBeforeLock.width);
+    assert.equal(invokeBoundsLocked.x, invokeBoundsBeforeLock.x);
+    assert.match(await invokeDescription(), routeDescriptionPattern(true));
+    await lockRouting.click();
+    await invokeCard.locator('[data-routing-lock][aria-pressed="false"]').waitFor();
+    assert.equal(await routingLockIndicator.count(), 0);
+    assert.ok(await invokeCard.isVisible(), 'Toggling the lock should keep the card open.');
 
-    await routingMenu.getByRole('menuitemradio', { name: /^Upscale/ }).click();
-    await page.getByRole('button', { name: /^No source widget open/ }).waitFor();
+    // Only sources this layout holds are offered; switching one keeps the layout and the card as they are.
+    const sourceGroup = invokeCard.getByRole('radiogroup', { exact: true, name: 'Source' });
+    assert.equal(await sourceGroup.getByText('Upscale', { exact: true }).count(), 0);
+    await sourceGroup.getByText('Generate', { exact: true }).click();
+    await sourceGroup.locator('input[value="generate"]:checked').waitFor({ state: 'attached' });
+    assert.ok(await invokeCard.isVisible(), 'Switching the source should keep the card open.');
     await centerViewTrigger(page, 'Preview').waitFor();
     assert.equal(await upscaleWidget.count(), 0);
     assert.equal(await activeLeftWidget.getAttribute('aria-label'), activeLeftWidgetName);
+    await page.keyboard.press('Escape');
+    await invokeCard.waitFor({ state: 'hidden' });
+    await expectFocused(invokeButton, 'Closing the Invoke card should return focus to Invoke.');
 
     await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
     const appMenu = page.getByRole('menu', { exact: true, name: 'Open menu' });
@@ -733,7 +782,7 @@ const runTopbarMenuJourney = async (browser) => {
     const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
-    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to InvokeAI' });
+    const donationItem = appMenu.getByRole('menuitem', { exact: true, name: 'Donate to Invoke' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
     await whatsNewItem.waitFor();
@@ -770,11 +819,35 @@ const runTopbarMenuJourney = async (browser) => {
     });
     assert.equal(await page.getByRole('tooltip', { name: /^Command palette/ }).count(), 0);
 
+    // Donate is its own group right after Manage (ending with Queue and Widgets), above the footer icon row; this mock journey
+    // is single-user, so no account section sits between them.
+    const menuItemValues = await appMenu.evaluate((menu) =>
+      [...menu.querySelectorAll('[role="menuitem"]')].map((item) => item.getAttribute('data-value'))
+    );
+    assert.deepEqual(menuItemValues.slice(menuItemValues.indexOf('queue')), [
+      'queue',
+      'widgets',
+      'donate',
+      'command-palette',
+      'settings',
+      'whats-new',
+      'documentation',
+      'discord',
+    ]);
+    const queueItem = appMenu.locator('[role="menuitem"][data-value="queue"]');
+    const widgetsItem = appMenu.locator('[role="menuitem"][data-value="widgets"]');
+
     await appMenu.press('End');
-    assert.equal(await appMenu.getAttribute('aria-activedescendant'), await donationItem.getAttribute('id'));
-    await appMenu.press('ArrowUp');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
+    for (const item of [
+      documentationItem,
+      whatsNewItem,
+      settingsItem,
+      commandPaletteItem,
+      donationItem,
+      widgetsItem,
+      queueItem,
+    ]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }
@@ -1028,7 +1101,7 @@ const runKeepAliveStateJourney = async (browser) => {
 
     await selectLayoutPreset(page, 'Edit', 'Canvas');
 
-    const zoomTrigger = page.getByRole('button', { name: /^Zoom level\b/ });
+    const zoomTrigger = page.getByRole('button', { name: /^Zoom \d+%$/ });
     await zoomTrigger.click();
     await page.getByRole('menuitem', { exact: true, name: '200%' }).click();
     await waitForSettledDocument(page);

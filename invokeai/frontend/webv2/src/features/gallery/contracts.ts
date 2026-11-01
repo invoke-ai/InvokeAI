@@ -8,6 +8,7 @@ export type {
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,
@@ -17,10 +18,12 @@ export { canOnBoard, isOwnGalleryBoard } from './core/boardAccess';
 export {
   getGalleryBoardDestinationGroups,
   getGalleryBoardLabel,
+  getGalleryMoveTargets,
   type GalleryBoardDestinationGroup,
   type GalleryBoardTranslate,
 } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
+export { formatGalleryMediaCounts, type GalleryMediaCounts } from './core/mediaCounts';
 export {
   assertNeverGalleryItem,
   classifyGalleryUpload,
@@ -28,6 +31,7 @@ export {
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
   generatedVideoToGalleryItem,
+  getGalleryItemView,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,
@@ -58,9 +62,9 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
-  GALLERY_AUTO_ADD_FOLLOW,
   getGalleryMediaFilter,
   getGallerySettings,
+  isLegacyFollowAutoAdd,
   toGalleryMediaKind,
   type GalleryMediaFilter,
   type GalleryPaginationMode,
@@ -70,6 +74,7 @@ export {
 export {
   getGalleryAutoAddBoardId,
   getGalleryCompareImage,
+  getGalleryDefaultDestinationBoardId,
   getGalleryMediaFilterMenuProps,
   getGalleryDestinationBoardId,
   getGalleryPage,
@@ -81,6 +86,7 @@ export {
   getGallerySemanticImageQuery,
   getGalleryView,
   settleGallerySearchScope,
+  settleGalleryValues,
   type GallerySelectedImageQuery,
 } from './ui/galleryStateView';
 export {
