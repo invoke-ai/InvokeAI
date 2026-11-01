@@ -7,6 +7,10 @@ from invokeai.backend.model_manager.load.model_cache.counted_dtypes import retur
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_cache.tensor_aliases import StorageKey, analyze_state_dict, storage_key
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
+
+# Tensor subclasses whose packed data lives in Python attributes beside the wrapper (see `_move_packed_params`).
+_PACKED_TENSOR_TYPES = (GGMLTensor, SDNQTensor)
 
 
 class CachedModelOnlyFullLoad:
@@ -57,6 +61,9 @@ class CachedModelOnlyFullLoad:
             {key: tensor.dtype for key, tensor in model.state_dict().items()}
             if isinstance(model, torch.nn.Module)
             else None
+        )
+        self._has_packed_params = isinstance(model, torch.nn.Module) and any(
+            isinstance(p, _PACKED_TENSOR_TYPES) for p in model.parameters()
         )
 
         # A CPU read-only copy of the model's state dict.
@@ -179,14 +186,9 @@ class CachedModelOnlyFullLoad:
                 new_state_dict[k] = copied[key]
             self._model.load_state_dict(new_state_dict, assign=True)
 
-        check_for_gguf = hasattr(self._model, "state_dict") and self._model.state_dict().get("img_in.weight")
-        if isinstance(check_for_gguf, GGMLTensor):
-            old_value = torch.__future__.get_overwrite_module_params_on_conversion()
-            torch.__future__.set_overwrite_module_params_on_conversion(True)
-            self._model.to(self._compute_device)
-            torch.__future__.set_overwrite_module_params_on_conversion(old_value)
-        else:
-            self._model.to(self._compute_device)
+        if self._has_packed_params:
+            self._move_packed_params(self._compute_device)
+        self._model.to(self._compute_device)
 
         self._retie_shared_weights()
         self._is_in_vram = True
@@ -205,14 +207,9 @@ class CachedModelOnlyFullLoad:
             # The RAM copy still has its tied names pointing at one tensor, so this restores the tie as well.
             self._model.load_state_dict(self._cpu_state_dict, assign=True)
 
-        check_for_gguf = hasattr(self._model, "state_dict") and self._model.state_dict().get("img_in.weight")
-        if isinstance(check_for_gguf, GGMLTensor):
-            old_value = torch.__future__.get_overwrite_module_params_on_conversion()
-            torch.__future__.set_overwrite_module_params_on_conversion(True)
-            self._model.to(self._offload_device)
-            torch.__future__.set_overwrite_module_params_on_conversion(old_value)
-        else:
-            self._model.to(self._offload_device)
+        if self._has_packed_params:
+            self._move_packed_params(self._offload_device)
+        self._model.to(self._offload_device)
 
         self._retie_shared_weights()
         self._is_in_vram = False
@@ -227,6 +224,27 @@ class CachedModelOnlyFullLoad:
         """
         if self._counted_dtypes is not None:
             return_to_counted_dtypes(self._model, self._counted_dtypes, self._alias_groups, self._cpu_state_dict)
+
+    def _move_packed_params(self, device: torch.device) -> None:
+        """Move the GGUF and SDNQ parameters to `device` by replacing them, before `nn.Module.to()` sees them.
+
+        Between the CPU and an accelerator, `.to()` updates a parameter in place with `param.data = moved`, which swaps
+        only the wrapper's tensor metadata: the packed data, a Python attribute, stays behind, and every forward
+        dequantizes there and copies the result over. Torch's global `set_overwrite_module_params_on_conversion` would
+        replace them instead, but per-device caches load concurrently and would race on it. A parameter shared by
+        several modules is moved once, since `_retie_shared_weights` cannot recognize packed copies as one weight.
+        """
+        moved_by_id: dict[int, torch.nn.Parameter] = {}
+        for module in self._model.modules():
+            for name, param in module._parameters.items():
+                if not isinstance(param, _PACKED_TENSOR_TYPES):
+                    continue
+                if id(param) not in moved_by_id:
+                    moved = param.to(device)
+                    if moved is not param:
+                        moved = torch.nn.Parameter(moved, requires_grad=param.requires_grad)
+                    moved_by_id[id(param)] = moved
+                module._parameters[name] = moved_by_id[id(param)]
 
     def _retie_shared_weights(self) -> None:
         """Re-point the names of a tied weight at one tensor after a device change.
