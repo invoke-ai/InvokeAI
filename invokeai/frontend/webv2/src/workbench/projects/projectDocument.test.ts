@@ -73,6 +73,27 @@ describe('settings layering migration', () => {
     expect(result.widgetInstances).toBe(document.widgetInstances);
   });
 
+  it("keeps a newer build's higher marker as layered", () => {
+    const document = createPreLayeringDocument() as Record<string, unknown> & {
+      widgetInstances: Record<string, InstanceRecord>;
+    };
+    document.settingsLayering = 2;
+    const gallery = Object.values(document.widgetInstances).find((instance) => instance.typeId === 'gallery')!;
+    gallery.state.values = { ...gallery.state.values, showImageDimensions: false };
+
+    const result = migrated(document);
+
+    expect(result.settingsLayering).toBe(2);
+    expect(valuesOf(result, 'gallery').showImageDimensions).toBe(false);
+  });
+
+  it('coerces a document whose marker is not a number', () => {
+    const document = migrated({ ...createPreLayeringDocument(), settingsLayering: '1' });
+
+    expect(document.settingsLayering).toBe(1);
+    expect(document.settings).toEqual({ useCpuNoise: false, viewerAutoSwitch: 'latest' });
+  });
+
   it('loads a pre-layering document with the defaults left to follow, and saves it with the marker', () => {
     const loaded = deserializeProjectDocument(createPreLayeringDocument());
     if (loaded.status !== 'loaded') {

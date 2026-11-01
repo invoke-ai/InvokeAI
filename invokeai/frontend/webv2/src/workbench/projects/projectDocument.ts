@@ -38,14 +38,21 @@ export type ProjectDocumentV3 = Omit<
   presetWorkingLayouts?: Project['presetWorkingLayouts'];
   /**
    * Present once the document's layerable settings were coerced to pins (see `migrateProjectDocument`); every save
-   * of this build writes it. Additive like `presetWorkingLayouts`: an older build drops it, which only repeats the
-   * coercion.
+   * of this build writes `SETTINGS_LAYERING_VERSION`. Additive like `presetWorkingLayouts`. A build predating the
+   * marker drops it on save. The next load then coerces again: a pin equal to the built-in is dropped, and the
+   * project follows the user's default for that setting. Accepted: only a project edited in such a build, and only
+   * pins equal to the built-in. A higher marker from a newer build counts as layered here, but this build's saves
+   * write its own version, so the newer build re-runs its steps above that version.
    */
-  settingsLayering?: typeof SETTINGS_LAYERING_VERSION;
+  settingsLayering?: number;
   workflows: ProjectWorkflowCollection;
 };
 
-/** The `settingsLayering` marker's value. */
+/**
+ * The `settingsLayering` marker's value. This build accepts a higher marker but saves this one, so a newer build
+ * re-runs every step above it on a document it already migrated: each future step must be idempotent (re-running it
+ * changes nothing). Another drop of values equal to the built-in, say, would damage pins set in the newer build.
+ */
 export const SETTINGS_LAYERING_VERSION = 1;
 
 export const stripSessionScopedGalleryState = (project: Project): Project => {
@@ -193,11 +200,11 @@ const coerceProjectSettings = (settings: Record<string, unknown>): Record<string
 /**
  * Before settings layered over the user's defaults, a stored value equal to the built-in read the same as an absent
  * one, so a document without the marker drops those (widget values its owner's settings edit, and the generation
- * flags) and the retired per-project antialias flag: what is left is what the project chose. With the marker the
- * document's values are its pins and stay as they are.
+ * flags) and the retired per-project antialias flag: what is left is what the project chose. With the marker (this
+ * version, or a newer build's higher one) the document's values are its pins and stay as they are.
  */
 const coerceSettingsLayering = (document: Record<string, unknown>): Record<string, unknown> => {
-  if (document.settingsLayering === SETTINGS_LAYERING_VERSION) {
+  if (typeof document.settingsLayering === 'number' && document.settingsLayering >= SETTINGS_LAYERING_VERSION) {
     return document;
   }
   const widgetInstances = isRecord(document.widgetInstances) ? coerceWidgetInstances(document.widgetInstances) : null;
