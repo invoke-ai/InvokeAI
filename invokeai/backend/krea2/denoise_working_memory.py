@@ -158,7 +158,7 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
-from invokeai.backend.util.calc_tensor_size import calc_tensor_size
+from invokeai.backend.util.calc_tensor_size import largest_module_bytes, module_bytes
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import Line, off_line_reasons
@@ -283,11 +283,6 @@ KREA2_DENOISE_SPEC = register(
 )
 
 
-def _stored_bytes(module: torch.nn.Module) -> int:
-    """A module's own parameters and buffers as stored: what partial loading copies to the device for its forward."""
-    return sum(calc_tensor_size(t) for t in (*module.parameters(recurse=False), *module.buffers(recurse=False)))
-
-
 def _transient_bytes(module: torch.nn.Module, dtype: torch.dtype) -> int:
     """The dequantization and fp8 cast transients of one leaf layer's forward."""
     return peak_dequant_transient_bytes(module, dtype) + peak_fp8_cast_transient_bytes(module, dtype)
@@ -298,7 +293,7 @@ def _peak_layer_bytes(transformer: torch.nn.Module, dtype: torch.dtype, weights_
     for a leaf layer, its dequantization and fp8 cast transients."""
     peak = 0
     for module in transformer.modules():
-        streamed = 0 if weights_resident else _stored_bytes(module)
+        streamed = 0 if weights_resident else module_bytes(module)
         transient = _transient_bytes(module, dtype) if next(module.children(), None) is None else 0
         peak = max(peak, streamed + transient)
     return peak
@@ -328,7 +323,7 @@ def _sidecar_residual_bytes(
             if weights_resident and not transient:
                 # A resident dense layer is patched directly: its weight changes once, not per forward.
                 continue
-            streamed = 0 if weights_resident else _stored_bytes(module)
+            streamed = 0 if weights_resident else module_bytes(module)
             residual = math.prod(weight.shape) * (_RESIDUAL_BYTES_PER_ELEMENT + dtype.itemsize)
             peak = max(peak, streamed + transient + residual)
     return peak
@@ -397,9 +392,7 @@ def estimate_krea2_denoise_working_memory(
             seq_len=score_side,
             has_attn_mask=has_attention_mask,
         ),
-        "streamed_layer_bytes": 0
-        if weights_resident
-        else max((_stored_bytes(module) for module in blocks.modules()), default=0),
+        "streamed_layer_bytes": 0 if weights_resident else largest_module_bytes(blocks),
         "dequant_transient_bytes": peak_dequant_transient_bytes(blocks, dtype),
         "fp8_cast_transient_bytes": peak_fp8_cast_transient_bytes(blocks, dtype),
         "peak_layer_bytes": _peak_layer_bytes(transformer, dtype, weights_resident),
