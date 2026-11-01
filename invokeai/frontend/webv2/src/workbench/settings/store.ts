@@ -78,6 +78,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
+  workflowFormSectionGapPx: 8,
   workflowGroupNodesByCategory: true,
   workflowLibrarySort: 'updated',
   workflowLibraryThumbnailFit: 'cover',
@@ -482,6 +483,13 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.workflowEdgesBehindNodes === 'boolean'
       ? preferences.workflowEdgesBehindNodes
       : DEFAULT_PREFERENCES.workflowEdgesBehindNodes,
+  workflowFormSectionGapPx:
+    typeof preferences?.workflowFormSectionGapPx === 'number' &&
+    Number.isInteger(preferences.workflowFormSectionGapPx) &&
+    preferences.workflowFormSectionGapPx >= 4 &&
+    preferences.workflowFormSectionGapPx <= 36
+      ? preferences.workflowFormSectionGapPx
+      : DEFAULT_PREFERENCES.workflowFormSectionGapPx,
   workflowGroupNodesByCategory:
     typeof preferences?.workflowGroupNodesByCategory === 'boolean'
       ? preferences.workflowGroupNodesByCategory

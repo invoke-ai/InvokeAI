@@ -24,6 +24,7 @@ export interface WorkflowPreferences {
   themeId: WorkbenchThemeId;
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
+  workflowFormSectionGapPx: number;
   workflowGroupNodesByCategory: boolean;
   workflowLibrarySort: WorkflowLibrarySort;
   workflowLibraryThumbnailFit: WorkflowThumbnailFit;

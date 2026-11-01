@@ -59,6 +59,7 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   themeId: preferences.themeId,
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
+  workflowFormSectionGapPx: preferences.workflowFormSectionGapPx,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
   workflowLibrarySort: preferences.workflowLibrarySort,
   workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,

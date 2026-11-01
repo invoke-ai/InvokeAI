@@ -109,6 +109,19 @@ export const workflowSettings = section('workflow', 'Workflow', [
     'workflow edges wires links z-order'
   ),
   preference('workflowSnapToGrid', 'Always snap to grid', 'workflow nodes'),
+  {
+    id: 'workflowFormSectionGapPx',
+    label: text('workflowFormSectionGapPx.label', 'Spacing between form sections (px)'),
+    description: text(
+      'workflowFormSectionGapPx.description',
+      'Adjust the gap between collapsible workflow form sections.'
+    ),
+    kind: 'slider',
+    scope: 'preference',
+    min: 4,
+    max: 36,
+    step: 1,
+  },
   preference('workflowGroupNodesByCategory', 'Group node search by category', 'workflow nodes add search categories'),
   preference('workflowShowMinimap', 'Show minimap'),
   preference('workflowValidateConnections', 'Validate connections', 'workflow edges'),

@@ -2562,6 +2562,10 @@
         "label": "Keep highlighted connections behind nodes",
         "description": "Connections to a selected node normally rise above other nodes. Keep them beneath so they never cover node controls."
       },
+      "workflowFormSectionGapPx": {
+        "label": "Spacing between form sections (px)",
+        "description": "Adjust the gap between collapsible workflow form sections."
+      },
       "workflowGroupNodesByCategory": {
         "label": "Group node search by category",
         "description": "Show add-node results under their categories. When off, results are one list ordered by how closely they match."
@@ -4591,7 +4595,9 @@
       },
       "formView": {
         "empty": "This form collects the workflow's key fields as simple controls. Pin fields on nodes in the workflow editor to add them here.",
-        "openEditor": "Open workflow editor"
+        "openEditor": "Open workflow editor",
+        "unnamedSection": "Section",
+        "needsAttention": "Needs attention"
       },
       "generating": "Generating…",
       "importFailed": "Failed to import workflow",
