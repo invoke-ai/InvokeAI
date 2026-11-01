@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
 description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images and the GGUF / single-file workflow.
-lastUpdated: 2026-10-16
+lastUpdated: 2026-11-01
 sidebar:
   order: 6
 ---
@@ -66,8 +66,8 @@ When you select a GGUF or single-file FLUX.3 model, pick the VAE and the Qwen3-V
 they are not filled in. A Diffusers model uses its bundled components unless you override them there.
 
 :::note[Quantized single files]
-The fp8, int8 and nvfp4 single files from Black Forest Labs and Comfy-Org are not supported yet. Installing one is
-refused with a message saying so. Use the bf16 file or a GGUF.
+The fp8, int8 and nvfp4 transformer single files from Black Forest Labs and Comfy-Org are not supported yet. Installing
+one is refused with a message saying so. Use the bf16 file or a GGUF.
 :::
 
 ## Reference images
@@ -99,6 +99,55 @@ from the bounding box.
 FLUX.3 also reads object boxes and box edits written as JSON at the end of the prompt. InvokeAI passes the prompt
 through unchanged, so a prompt written in the format from the model card works, but there is no editor for it
 yet.
+
+## Prompt upsampler model
+
+FLUX.3 Klein works best with long, detailed captions. Black Forest Labs publishes a prompt upsampler that writes them:
+a 9B vision-language model, fine-tuned from Qwen3.5-9B and released under Apache-2.0. InvokeAI installs it as a
+**Text LLM**:
+
+| Starter model | Download | Source |
+| --- | --- | --- |
+| **FLUX.3 Prompt Upsampler** | ≈ 17.5 GiB (bf16) | `black-forest-labs/flux-3-image-klein-pup`, not gated |
+| **FLUX.3 Prompt Upsampler (int8)** | ≈ 9.1 GiB | ComfyUI's `int8_convrot` file from the gated `flux-3-image-klein-comfy` repository |
+
+Use it in [Expand Prompt](/users-guide/image-generation/prompt-tools/#the-flux3-prompt-upsampler) with Black Forest
+Labs' `t2i` system prompt. It rewrites your text prompt in the prompt box before you generate; generation does not
+run it on its own, and in the Generate panel Expand Prompt does not send it your reference images.
+
+The int8 file takes about 10.7 GiB once loaded, against 17.5 GiB for the bf16 model, because its language model keeps
+its weights in int8; it dequantizes them for every token it generates. With
+[int8 Compute](/configuration/optimization/int8-compute/) on, an NVIDIA GPU runs the language model's layers on its
+int8 tensor cores instead. The vision tower's layers, 108 of the 308 int8 layers, always dequantize; they run once per
+prompt with an image. Measured on an RTX 4090 (24 GB) through Expand Prompt with Black Forest Labs' `t2i` and `i2i`
+system prompts, captions of 237–305 tokens, the model already loaded, the default 3 GB of working memory and
+`reserve_vram_gb: 1`:
+
+| Build | Loaded, all on the GPU | Tokens/s, text prompt | Tokens/s, prompt with an image | VRAM peak (nvidia-smi, with the desktop) |
+| --- | --- | --- | --- | --- |
+| bf16 folder | 17.5 GiB | 21.3 | 18.7 | 19.7 GiB |
+| int8 file | 10.7 GiB | 8.9 | 8.6 | 12.8 GiB |
+| int8 file, int8 Compute on | 10.7 GiB | 14.5 | 14.4 | 12.8 GiB |
+
+The first expansion after a start also loads the model: it took 21.3 s instead of 13.0 s for the same caption with the
+bf16 model, and 45 s instead of 34 s with the int8 file. After int8 Compute was turned on, the first prompt with an
+image took about 8 s longer while the kernels were
+[tuned](/configuration/optimization/int8-compute/#the-first-generation-pauses) for its longer prompt; the tuning is kept
+on disk.
+
+The bf16 model is fast only while all of it is on the GPU: what does not fit is streamed in for every token. On the same
+card with 5 GB of working memory and the same 1 GB reserve, only 89 % of it fit, and it generated 4.2 tokens/s instead
+of 21.3. To keep the model entirely on the GPU, lower
+[`device_working_mem_gb`](/configuration/optimization/low-vram-mode/#working-memory) (on the 4090, the default 3 GB
+left room for the bf16 model) or use the int8 file, which fit entirely in both runs.
+
+ComfyUI's w4a8 build and single files in fp8 scaled, nvfp4 or mxfp8 are refused at install, and a GGUF of the
+upsampler is not recognized; [Model Format Support](/users-guide/models/model-format-support/#text-llms) lists what
+loads.
+
+Before this release, InvokeAI did not install the upsampler as a Text LLM: the folder was not identified, and both
+ComfyUI single files, bf16 and int8, were identified as Qwen3.5 encoders. Use **Re-identify model** in the Model
+Manager on such an install.
 
 ## PiD super-resolution decode
 

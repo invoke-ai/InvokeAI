@@ -10,7 +10,9 @@ mock state dict with `keys_to_mock_state_dict()`, or write it back as a header w
 import json
 import math
 import struct
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import torch
 
@@ -36,20 +38,31 @@ def token_extents(shape: list[int]) -> list[int]:
 _SAFETENSORS_DTYPE_BYTES = {"F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I64": 8, "I8": 1, "U8": 1}
 
 
-def write_header_only_safetensors(path: Path, keys: dict[str, tuple[list[int], str]]) -> Path:
+def write_header_only_safetensors(
+    path: Path, keys: dict[str, tuple[list[int], str]], markers: Mapping[str, Mapping[str, Any]] | None = None
+) -> Path:
     """Write a safetensors file that has a fixture's real header and none of its data.
 
     Identification reads a safetensors file's header and nothing else, so a captured layout can be probed at its
     real shapes -- a T5-XXL is told from a smaller T5 by its width -- without writing gigabytes. Anything that
     reads tensor data from such a file fails, which is the point: identification must not.
+
+    The one exception is `markers`, a fixture's decoded `.comfy_quant` markers by layer: identification reads those
+    blobs to tell int8_tensorwise from other schemes that share its layout. They are written with their bytes, first
+    in the data section, so the file holds them and ends after them.
     """
+    blobs = {
+        f"{layer}.comfy_quant": json.dumps(dict(marker)).encode("utf-8") for layer, marker in (markers or {}).items()
+    }
+    entries = [(key, [len(blob)], "U8") for key, blob in blobs.items()]
+    entries += [(key, shape, dtype) for key, (shape, dtype) in keys.items() if key not in blobs]
     header: dict[str, dict] = {}
     offset = 0
-    for key, (shape, dtype) in keys.items():
+    for key, shape, dtype in entries:
         nbytes = _SAFETENSORS_DTYPE_BYTES[dtype] * math.prod(shape)
         header[key] = {"dtype": dtype, "shape": shape, "data_offsets": [offset, offset + nbytes]}
         offset += nbytes
     encoded = json.dumps(header).encode("utf-8")
     encoded += b" " * (-len(encoded) % 8)
-    path.write_bytes(struct.pack("<Q", len(encoded)) + encoded)
+    path.write_bytes(struct.pack("<Q", len(encoded)) + encoded + b"".join(blobs.values()))
     return path
