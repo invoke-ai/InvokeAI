@@ -1,5 +1,5 @@
 import type { ToastAction } from '@platform/ui/toaster';
-import type { WorkbenchNotificationAction } from '@workbench/projectContracts';
+import type { WorkbenchNotification, WorkbenchNotificationAction } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 import type { TFunction } from 'i18next';
 
@@ -8,7 +8,9 @@ import {
   hasNotificationUndo,
   holdNotificationUndo,
   releaseNotificationUndo,
+  retainNotificationUndos,
   runNotificationUndo,
+  withdrawNotificationUndo,
 } from './undoRegistry';
 
 /** What the editor lends action handlers. Read when a toast opens (labels) and when its button is pressed. */
@@ -34,9 +36,9 @@ interface NotificationActionHandler<Action extends WorkbenchNotificationAction> 
   /** The button label, or null when the action cannot be offered now. */
   label: (action: Action, context: NotificationActionContext) => string | null;
   run: (action: Action, context: NotificationActionContext) => void;
-  /** Keeps what the action needs while a toast shows it. */
+  /** Keeps what the action needs while a toast shows it, even once its record has left the list. */
   hold?: (action: Action) => void;
-  /** Frees what only a visible toast may still run, once that toast has closed. */
+  /** Ends the hold of a toast that has closed; what no listed notification still offers goes then. */
   release?: (action: Action) => void;
   /** Aborts when the action is withdrawn for good; a toast offering it closes then. */
   withdrawal?: (action: Action) => AbortSignal | undefined;
@@ -74,7 +76,7 @@ const handlers: {
     run: ({ projectId, undoId }, { isProjectOpen }) => {
       // The toast can outlive its project's tab; undoing then would act on a project the user no longer sees.
       if (projectId !== undefined && !isProjectOpen(projectId)) {
-        releaseNotificationUndo(undoId);
+        withdrawNotificationUndo(undoId);
         return;
       }
 
@@ -107,6 +109,33 @@ export const releaseNotificationActions = (actions: readonly WorkbenchNotificati
   for (const action of actions) {
     (handlers[action.kind] as NotificationActionHandler<typeof action>).release?.(action);
   }
+};
+
+/**
+ * Keeps the undo entries the listed notifications still offer and frees the rest no toast holds: after the list
+ * changed (a dismiss, Clear, a record pushed past the limit) or a project closed, whose undos are no longer offered.
+ */
+export const retainNotificationActions = (
+  notifications: readonly WorkbenchNotification[],
+  { isProjectOpen }: Pick<NotificationActionContext, 'isProjectOpen'>
+): void => {
+  const referencedIds = new Set<string>();
+
+  for (const notification of notifications) {
+    for (const action of notification.actions ?? []) {
+      if (action.kind !== 'undo') {
+        continue;
+      }
+
+      if (action.projectId !== undefined && !isProjectOpen(action.projectId)) {
+        withdrawNotificationUndo(action.undoId);
+      } else {
+        referencedIds.add(action.undoId);
+      }
+    }
+  }
+
+  retainNotificationUndos(referencedIds);
 };
 
 /** Signals that close a toast offering `actions` once one of them is withdrawn (a superseded undo). */

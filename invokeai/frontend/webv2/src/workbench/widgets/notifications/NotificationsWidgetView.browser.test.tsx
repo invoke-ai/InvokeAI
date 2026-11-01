@@ -7,6 +7,9 @@ import { Box, ChakraProvider } from '@chakra-ui/react';
 import { shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { AppToaster, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
+import { createEditorNotificationActionContext } from '@workbench/shell/notifications/editorNotificationActions';
+import { startNotificationToasts } from '@workbench/shell/notifications/notificationToasts';
+import { registerNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import i18next from 'i18next';
@@ -52,6 +55,7 @@ await i18next.use(initReactI18next).init({
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+let stopToasts: (() => void) | null = null;
 const popoverProps = { presentation: 'expanded', region: 'popover' } as WidgetViewProps;
 
 const renderPopover = () =>
@@ -69,6 +73,49 @@ const button = (name: string) =>
     (candidate) => candidate.textContent === name || candidate.getAttribute('aria-label') === name
   );
 const cards = () => [...(host?.querySelectorAll<HTMLElement>('li') ?? [])];
+const cardNamed = (title: string) => cards().find((card) => card.textContent?.includes(title));
+const buttonsOf = (element: HTMLElement | undefined) =>
+  [...(element?.querySelectorAll<HTMLButtonElement>('button') ?? [])].map((candidate) => candidate.textContent);
+const toastNamed = (title: string) =>
+  [...document.querySelectorAll<HTMLElement>('[data-scope="toast"][data-part="root"]')].find(
+    (toast) => toast.querySelector('[data-part="title"]')?.textContent === title
+  );
+
+/** What `WorkbenchNotificationToaster` runs in the editor: toasts, and keeping undo entries in step with the list. */
+const startToasts = () => {
+  stopToasts = startNotificationToasts({
+    actionContext: createEditorNotificationActionContext({
+      focus: { focusFloating: () => undefined, focusRegion: () => undefined },
+      getWidgetById,
+      getWidgetsForRegion,
+      notifications: store().commands.notifications,
+      queries: store().queries,
+      retryQueueItems: retryItems,
+      t: i18next.t,
+      widgets: store().commands.widgets,
+    }),
+    getNotifications: () => store().getSnapshot().notifications,
+    getPreferences: () => ({ notifyOnEnqueue: true }),
+    subscribe: store().subscribe,
+  });
+};
+
+/** Records an undoable notice the way `useNotify().undoable` does inside the editor. */
+const recordUndoable = (title: string, onUndo: () => void) =>
+  store().commands.notifications.add({
+    actions: [{ kind: 'undo', undoId: registerNotificationUndo(onUndo) }],
+    kind: 'success',
+    title,
+  });
+
+const buttonIn = (element: HTMLElement, name: string) =>
+  [...element.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name)!;
+
+/** Lets every open toast go, as its timeout would. */
+const dismissToasts = async () => {
+  await act(() => toaster.dismiss());
+  await vi.waitFor(() => expect(document.querySelector('[data-scope="toast"][data-part="root"]')).toBeNull());
+};
 
 beforeEach(() => {
   workbench.store = createWorkbenchStore();
@@ -80,6 +127,8 @@ beforeEach(() => {
 afterEach(async () => {
   // A failing test must not leave fake timers behind for the next one.
   vi.useRealTimers();
+  stopToasts?.();
+  stopToasts = null;
   await act(() => toaster.remove());
   await act(() => root?.unmount());
   host?.remove();
@@ -230,9 +279,45 @@ describe('notifications widget', () => {
     expect(store().getSnapshot().notifications[0]?.isRead).toBe(false);
   });
 
-  it('clears the list to empty, with an Undo toast that puts it back', async () => {
+  it('keeps a notice’s Undo after its toast went, runs it once, and then drops it', async () => {
+    const onUndo = vi.fn();
+    startToasts();
+    await renderPopover();
+    await act(() => recordUndoable('Deleted preset', onUndo));
+    await vi.waitFor(() => expect(buttonsOf(toastNamed('Deleted preset'))).toContain('Undo'));
+
+    await dismissToasts();
+    expect(buttonsOf(cardNamed('Deleted preset'))).toContain('Undo');
+    const undo = buttonIn(cardNamed('Deleted preset')!, 'Undo');
+    await act(() => userEvent.click(undo));
+    await act(() => undo.click());
+
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(buttonsOf(cardNamed('Deleted preset'))).not.toContain('Undo');
+  });
+
+  it('closes the toast of an Undo pressed in the list', async () => {
+    const onUndo = vi.fn();
+    startToasts();
+    await renderPopover();
+    await act(() => recordUndoable('Deleted curve', onUndo));
+    await vi.waitFor(() => expect(buttonsOf(toastNamed('Deleted curve'))).toContain('Undo'));
+
+    await act(() => userEvent.click(buttonIn(cardNamed('Deleted curve')!, 'Undo')));
+
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(buttonsOf(cardNamed('Deleted curve'))).not.toContain('Undo');
+    await vi.waitFor(() => expect(toastNamed('Deleted curve')?.getAttribute('data-state')).not.toBe('open'));
+  });
+
+  it('clears the list to empty, with an Undo toast that puts it back, Undo buttons included', async () => {
+    const onUndo = vi.fn();
+    startToasts();
     store().commands.notifications.add({ kind: 'info', title: 'Kept' });
     await renderPopover();
+    await act(() => recordUndoable('Deleted preset', onUndo));
+    // Only the list holds the notice's Undo now, so nothing but Clear's toast keeps it through the clear.
+    await dismissToasts();
 
     await act(() => userEvent.click(button('Clear')!));
     // The clear's own notice stays out of the list it emptied.
@@ -251,6 +336,12 @@ describe('notifications widget', () => {
       store()
         .getSnapshot()
         .notifications.map((notification) => notification.title)
-    ).toEqual(['Kept']);
+    ).toEqual(['Deleted preset', 'Kept']);
+    // Toasts open a microtask after the record; the restored notices were seen once and stay quiet.
+    await act(() => Promise.resolve());
+    expect(toastNamed('Deleted preset')).toBeUndefined();
+    expect(toastNamed('Kept')).toBeUndefined();
+    await act(() => userEvent.click(buttonIn(cardNamed('Deleted preset')!, 'Undo')));
+    expect(onUndo).toHaveBeenCalledOnce();
   });
 });

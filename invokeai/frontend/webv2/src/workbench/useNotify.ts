@@ -5,6 +5,7 @@ import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/
 import i18next from 'i18next';
 import { useMemo } from 'react';
 
+import { holdNotificationActions, releaseNotificationActions } from './shell/notifications/notificationActions';
 import {
   getNotificationUndoWithdrawal,
   holdNotificationUndo,
@@ -24,9 +25,9 @@ export interface NotifyOptions {
 export interface UndoableNotice {
   message?: string;
   /**
-   * Reverts the action the notice reports. Offered once, while the toast shows, for this account only. The toast
-   * outlives tab switches, so the closure must capture its target's ids (never "the active project") and do nothing,
-   * or report, when the target is gone.
+   * Reverts the action the notice reports. Offered once, for this account only, while the notice is listed or its
+   * toast shows: possibly minutes later, after tab switches. The closure must capture its target's ids (never "the
+   * active project") and do nothing, or report, when the target is gone.
    */
   onUndo: () => void;
   /** The button's label when it brings back something other than the reported action; "Undo" otherwise. */
@@ -38,6 +39,11 @@ export interface UndoableNotice {
    * toast: undoing an older step after a newer one would leave a mix of both.
    */
   supersedes?: string;
+  /**
+   * Notification actions a `transient` toast keeps alive while it shows, so the records its Undo brings back (the
+   * notices Clear removed) still offer their own buttons.
+   */
+  holdsActions?: readonly WorkbenchNotificationAction[];
   /**
    * Toast only, never recorded in the notification center: for undoing a change to the center itself, which a record
    * of it would undo in turn (clearing the list would leave the clear's own notice in it).
@@ -88,12 +94,12 @@ export const useNotify = (): Notify => {
 
     const undoable = (
       title: string,
-      { message, onUndo, projectId, supersedes, transient, undoLabel }: UndoableNotice
+      { holdsActions = [], message, onUndo, projectId, supersedes, transient, undoLabel }: UndoableNotice
     ): void => {
       const undoId = registerNotificationUndo(onUndo, supersedes);
 
       if (commands && !transient) {
-        // The center keeps the notice as data; the closure waits in the registry until its toast closes.
+        // The center keeps the notice as data; the closure waits in the registry while the record is listed.
         commands.notifications.add({
           actions: [
             { kind: 'undo', undoId, ...(projectId ? { projectId } : {}), ...(undoLabel ? { label: undoLabel } : {}) },
@@ -115,6 +121,7 @@ export const useNotify = (): Notify => {
         onStatusChange: ({ status }) => {
           if (status === 'unmounted') {
             releaseNotificationUndo(undoId);
+            releaseNotificationActions(holdsActions);
           }
         },
         signal: withdrawal ? AbortSignal.any([captureAccountScope().signal, withdrawal]) : captureAccountScope().signal,
@@ -122,6 +129,7 @@ export const useNotify = (): Notify => {
         type: 'success',
       });
       holdNotificationUndo(undoId);
+      holdNotificationActions(holdsActions);
     };
 
     return { error: record('error'), info: record('info'), success: record('success'), undoable };

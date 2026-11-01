@@ -7,6 +7,7 @@ import {
   holdNotificationUndo,
   registerNotificationUndo,
   releaseNotificationUndo,
+  retainNotificationUndos,
   runNotificationUndo,
 } from './undoRegistry';
 
@@ -15,7 +16,7 @@ beforeEach(() => {
 });
 
 describe('notification undo registry', () => {
-  it('drops the oldest undo no toast has shown once more than twenty wait', () => {
+  it('drops the oldest undo nothing lists or shows once more than twenty wait', () => {
     const ids = Array.from({ length: 21 }, () => registerNotificationUndo(vi.fn()));
 
     expect(hasNotificationUndo(ids[0]!)).toBe(false);
@@ -35,17 +36,75 @@ describe('notification undo registry', () => {
     expect(onUndo).toHaveBeenCalledOnce();
   });
 
-  it('runs an undo at most once and not after its toast released it', () => {
+  it('runs an undo at most once, and closes a toast still offering it', () => {
     const onUndo = vi.fn();
-    const pressed = registerNotificationUndo(onUndo);
-    const closed = registerNotificationUndo(onUndo);
+    const undoId = registerNotificationUndo(onUndo);
+    holdNotificationUndo(undoId);
+    const withdrawal = getNotificationUndoWithdrawal(undoId)!;
 
-    runNotificationUndo(pressed);
-    runNotificationUndo(pressed);
-    releaseNotificationUndo(closed);
-    runNotificationUndo(closed);
+    runNotificationUndo(undoId);
+    runNotificationUndo(undoId);
 
     expect(onUndo).toHaveBeenCalledOnce();
+    expect(withdrawal.aborted).toBe(true);
+  });
+
+  it('frees an undo nothing lists once its toast releases it', () => {
+    const onUndo = vi.fn();
+    const undoId = registerNotificationUndo(onUndo);
+    holdNotificationUndo(undoId);
+
+    releaseNotificationUndo(undoId);
+    runNotificationUndo(undoId);
+
+    expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('keeps an undo its notice still lists after the toast closed, and frees it once the notice goes', () => {
+    const onUndo = vi.fn();
+    const listed = registerNotificationUndo(onUndo);
+    const dismissed = registerNotificationUndo(vi.fn());
+    holdNotificationUndo(listed);
+    retainNotificationUndos(new Set([listed, dismissed]));
+
+    releaseNotificationUndo(listed);
+    retainNotificationUndos(new Set([listed]));
+
+    expect(hasNotificationUndo(listed)).toBe(true);
+    expect(hasNotificationUndo(dismissed)).toBe(false);
+    runNotificationUndo(listed);
+    expect(onUndo).toHaveBeenCalledOnce();
+
+    const cleared = registerNotificationUndo(vi.fn());
+    retainNotificationUndos(new Set([cleared]));
+    retainNotificationUndos(new Set());
+    expect(hasNotificationUndo(cleared)).toBe(false);
+  });
+
+  it('keeps an undo whose notice left the list while a toast still holds it', () => {
+    const undoId = registerNotificationUndo(vi.fn());
+    holdNotificationUndo(undoId);
+
+    retainNotificationUndos(new Set());
+    expect(hasNotificationUndo(undoId)).toBe(true);
+
+    releaseNotificationUndo(undoId);
+    expect(hasNotificationUndo(undoId)).toBe(false);
+  });
+
+  it('caps only undos no notice lists, so a listed Undo outlasts many unlisted ones', () => {
+    const listed: string[] = [];
+    // Each recorded the way the editor does it: registered, then listed.
+    for (let index = 0; index < 30; index += 1) {
+      listed.push(registerNotificationUndo(vi.fn()));
+      retainNotificationUndos(new Set(listed));
+    }
+
+    const unlisted = Array.from({ length: 21 }, () => registerNotificationUndo(vi.fn()));
+
+    expect(listed.every(hasNotificationUndo)).toBe(true);
+    expect(hasNotificationUndo(unlisted[0]!)).toBe(false);
+    expect(unlisted.slice(1).every(hasNotificationUndo)).toBe(true);
   });
 
   it('forgets every undo when the account changes', () => {

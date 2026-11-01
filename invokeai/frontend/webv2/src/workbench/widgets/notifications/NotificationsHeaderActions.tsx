@@ -24,11 +24,13 @@ export const NotificationsHeaderActions = () => {
       return;
     }
 
-    notifications.clear();
+    // The toast holds the cleared notices' own actions before the clear frees them, so restored ones keep their Undo.
     notify.undoable(t('notifications.cleared', { count: cleared.length }), {
+      holdsActions: cleared.flatMap((notification) => notification.actions ?? []),
       onUndo: () => notifications.restore(cleared),
       transient: true,
     });
+    notifications.clear();
   }, [notifications, notify, queries, t]);
 
   return (

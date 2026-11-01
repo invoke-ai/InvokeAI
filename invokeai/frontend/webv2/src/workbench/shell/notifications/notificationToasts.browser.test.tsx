@@ -199,16 +199,33 @@ describe('notification toasts in the editor', () => {
     expect(undoAction?.kind === 'undo' && hasNotificationUndo(undoAction.undoId)).toBe(false);
   });
 
-  it('forgets an undo whose toast was closed without it', async () => {
+  it('keeps an undo its notice still lists after the toast closed, and frees it with the notice', async () => {
     const onUndo = vi.fn();
     await act(() => probe.notify!.undoable('Deleted board', { onUndo }));
     const toast = await openToast('Deleted board');
-    const undoAction = recordedNotifications()[0]?.actions?.[0];
+    const [recorded] = recordedNotifications();
+    const undoAction = recorded?.actions?.[0];
+    const isOffered = () => undoAction?.kind === 'undo' && hasNotificationUndo(undoAction.undoId);
 
     await act(() => toast.querySelector<HTMLButtonElement>('[data-part="close-trigger"]')!.click());
+    await expect.poll(() => toastNamed('Deleted board')).toBeNull();
 
-    await expect.poll(() => undoAction?.kind === 'undo' && hasNotificationUndo(undoAction.undoId)).toBe(false);
+    expect(isOffered()).toBe(true);
+    await act(() => store().commands.notifications.dismiss(recorded!.id));
+    expect(isOffered()).toBe(false);
     expect(onUndo).not.toHaveBeenCalled();
+  });
+
+  it('withdraws a listed undo once the project it changed closes, closing its toast', async () => {
+    const projectId = store().commands.projects.create().id;
+    await act(() => probe.notify!.undoable('Starred image', { onUndo: vi.fn(), projectId }));
+    await openToast('Starred image');
+    const undoAction = recordedNotifications()[0]?.actions?.[0];
+
+    await act(() => store().commands.projects.close(projectId));
+
+    expect(undoAction?.kind === 'undo' && hasNotificationUndo(undoAction.undoId)).toBe(false);
+    await expect.poll(() => isGone('Starred image')).toBe(true);
   });
 
   it('offers Undo only while the project it changed is open', async () => {

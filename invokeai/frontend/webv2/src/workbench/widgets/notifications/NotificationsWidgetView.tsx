@@ -13,6 +13,7 @@ import {
   type NotificationActionContext,
 } from '@workbench/shell/notifications/notificationActions';
 import { resolveNotificationText } from '@workbench/shell/notifications/notificationToasts';
+import { hasNotificationUndo, subscribeNotificationUndos } from '@workbench/shell/notifications/undoRegistry';
 import { StatusWidgetChip } from '@workbench/widget-frame';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
@@ -25,7 +26,7 @@ import {
   XIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NotificationsHeaderActions } from './NotificationsHeaderActions';
@@ -206,6 +207,14 @@ const NotificationCard = memo(
       },
       [notification.id, notification.isRead, onSeen]
     );
+    // Undo closures live outside workbench state: re-render when this notice's go (run elsewhere, withdrawn).
+    const getOfferedUndoCount = useCallback(
+      () =>
+        notification.actions?.filter((action) => action.kind === 'undo' && hasNotificationUndo(action.undoId)).length ??
+        0,
+      [notification.actions]
+    );
+    useSyncExternalStore(subscribeNotificationUndos, getOfferedUndoCount, getOfferedUndoCount);
     const { message, title } = resolveNotificationText(notification, actionContext.t);
     const actions = resolveNotificationActions(notification.actions ?? [], actionContext);
     const repeats = notification.occurrenceCount ?? 1;
