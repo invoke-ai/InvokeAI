@@ -97,10 +97,10 @@ export interface GalleryNotificationsPort {
   add(notification: { kind: 'info' | 'success'; message?: string; title: string }): void;
   reportError(error: { area: string; message: string; namespace: 'gallery' }): void;
   /**
-   * Reports a reversible change that already happened, with an Undo button for as long as its toast shows. Absent on
-   * hosts without one, which report a plain success instead.
+   * Reports a reversible change that already happened, with an Undo that may run minutes later. Absent on hosts without
+   * one, which report a plain success instead. A newer Undo with the same `supersedes` key withdraws the older one.
    */
-  undoable?(title: string, notice: { message?: string; onUndo: () => void }): void;
+  undoable?(title: string, notice: { message?: string; onUndo: () => void; supersedes?: string }): void;
 }
 
 export interface GalleryWidgetRuntime {

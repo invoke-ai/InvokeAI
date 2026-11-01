@@ -348,5 +348,15 @@ describe('Generation adapter presets', () => {
     // Presets deleted since leave its old index past the end.
     act(() => adapter.presets.restore(preset('d'), 9));
     expect(savedIds()).toEqual(['a', 'b', 'c', 'd']);
+
+    // Labels are not keys: a preset saved since under the same name keeps it, and the deleted one comes back too.
+    act(() => adapter.presets.restore({ ...preset('e'), label: 'a' }, 1));
+    expect(getWorkbenchPreferences().generatePresets.map((saved) => `${saved.id}:${saved.label}`)).toEqual([
+      'a:a',
+      'e:a',
+      'b:b',
+      'c:c',
+      'd:d',
+    ]);
   });
 });

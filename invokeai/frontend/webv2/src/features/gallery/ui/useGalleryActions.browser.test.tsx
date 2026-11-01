@@ -592,6 +592,7 @@ describe('optimistic board updates', () => {
     expect(mocks.notificationsAdd).not.toHaveBeenCalled();
     expect(mocks.notificationsUndoable).toHaveBeenCalledExactlyOnceWith('widgets.gallery.boardArchived', {
       onUndo: expect.any(Function),
+      supersedes: 'gallery-board-archive:board-1',
     });
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
     expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
@@ -626,6 +627,22 @@ describe('optimistic board updates', () => {
     expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
   });
 
+  it('offers each archive of a board under one key, so archiving it again withdraws the older Undo', async () => {
+    await archiveViewedAutoAddBoard();
+    await act(async () => {
+      await actionsRef.current?.archiveBoard('board-1', false);
+      await actionsRef.current?.archiveBoard('board-1', true);
+      await actionsRef.current?.archiveBoard('board-2', true);
+    });
+
+    // Unarchiving offers no Undo; the two archives of board-1 share a key, board-2's is its own.
+    expect(mocks.notificationsUndoable.mock.calls.map(([, notice]) => notice.supersedes)).toEqual([
+      'gallery-board-archive:board-1',
+      'gallery-board-archive:board-1',
+      'gallery-board-archive:board-2',
+    ]);
+  });
+
   it('restores nothing when the server refuses to unarchive the board', async () => {
     const undo = await archiveViewedAutoAddBoard();
 
@@ -637,6 +654,22 @@ describe('optimistic board updates', () => {
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
     expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
     expect(mocks.notificationsReportError).toHaveBeenCalledOnce();
+  });
+
+  it('says the board is gone and restores nothing when it was deleted before a late Undo', async () => {
+    const undo = await archiveViewedAutoAddBoard();
+
+    mocks.projectGalleryValues.mockReturnValue({ selectedBoardId: 'none' });
+    mocks.updateGalleryBoard.mockRejectedValueOnce(new ApiError(JSON.stringify({ detail: 'Board not found' }), 404));
+    await undo();
+
+    // Neither the destination nor the selection points at a board that no longer exists.
+    expect(updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: null });
+    expect(selectBoard).toHaveBeenCalledExactlyOnceWith('none');
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'info', title: 'widgets.gallery.boardAccess.gone' })
+    );
+    expect(mocks.notificationsReportError).not.toHaveBeenCalled();
   });
 
   it('restores the destination but selects nothing once another project is open', async () => {

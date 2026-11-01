@@ -167,6 +167,8 @@ export const useGalleryActions = ({
         if (archived && notifications.undoable) {
           notifications.undoable(title, {
             onUndo: () => void undoArchive(),
+            // Archiving the board again (after an unarchive) withdraws this Undo: the newer one now speaks for it.
+            supersedes: `gallery-board-archive:${boardId}`,
           });
         } else {
           recordSuccess(title);
