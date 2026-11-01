@@ -12,9 +12,9 @@ import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
-import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafEditable } from '@workbench/canvas-engine/document/layerEligibility';
+import { leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { snapMovedPoint } from '@workbench/canvas-engine/math/snapping';
 
 import type { Tool, ToolContext } from './tool';
@@ -89,7 +89,15 @@ export const createMoveTool = (): Tool => {
     const leaves = compileDocumentLeaves(doc).filter(
       (leaf) => requested.has(leaf.id) || leaf.parentIds.some((ancestor) => requested.has(ancestor))
     );
-    if (leaves.length === 0 || !leaves.every(isLeafEditable)) {
+    for (const leaf of leaves) {
+      const status = leafEditRefusal(leaf);
+      if (status) {
+        // Said once per press, naming the first layer in the way; nothing moves.
+        ctx.reportEditRefusal?.({ layerId: leaf.id, layerName: leaf.layer.name, status });
+        return { layers: [], primaryId: null };
+      }
+    }
+    if (leaves.length === 0) {
       return { layers: [], primaryId: null };
     }
     const primary = leaves.find((leaf) => leaf.id === selectedId || leaf.parentIds.includes(selectedId));
@@ -180,8 +188,15 @@ export const createMoveTool = (): Tool => {
   };
 
   return {
-    cursor: () => 'move',
+    // Not-allowed over a selected leaf that is locked or hidden: a press there moves nothing.
+    cursor: (ctx) => {
+      const doc = ctx.getDocument();
+      const leaf = doc?.selectedLayerId && !state ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+      return leaf && leafEditRefusal(leaf) ? 'not-allowed' : 'move';
+    },
     id: 'move',
+    // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
+    usesAltKey: true,
     onDeactivate: (ctx) => {
       clearOverride(ctx);
       endGesture();

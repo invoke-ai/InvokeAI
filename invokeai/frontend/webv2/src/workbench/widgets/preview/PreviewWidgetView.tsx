@@ -40,6 +40,7 @@ import {
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { Button } from '@platform/ui/Button';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -47,13 +48,18 @@ import {
 } from '@platform/ui/streaming-image/streamingImageSource';
 import { useStreamingImageSource } from '@platform/ui/streaming-image/useStreamingImageSource';
 import { useQuery } from '@tanstack/react-query';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import {
   ImageContextMenu,
   useDeletionConfirmation,
   useImageActions,
   type ImageContextMenuTarget,
+  type ImageContextMenuVariant,
 } from '@workbench/image-actions';
 import { QueueProgressRail } from '@workbench/queue-integration/QueueProgressRail';
+import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -142,15 +148,16 @@ const getLocalGalleryItems = (values: Record<string, unknown>, queueItems: Queue
   );
 };
 
+/** Preview shows the gallery selection only: a cleared selection shows the empty state, not the newest result. */
 const getSelectedItem = (values: Record<string, unknown>, localItems: GalleryImageItem[]): GalleryItem | null => {
   const selectedItem = getSelectedGalleryItemFromValues(values);
 
-  if (selectedItem) {
-    const selectedItemKey = toGalleryItemKey(selectedItem);
-    return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
+  if (!selectedItem) {
+    return null;
   }
 
-  return localItems[0] ?? null;
+  const selectedItemKey = toGalleryItemKey(selectedItem);
+  return localItems.find((candidate) => toGalleryItemKey(candidate) === selectedItemKey) ?? selectedItem;
 };
 
 const getBoardName = (
@@ -187,15 +194,15 @@ const keepVideoArrowKeys = (event: KeyboardEvent<HTMLElement>) => {
 };
 
 export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
-  const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const previewValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'preview'));
+  const previewValues = useWidgetValuesSelector('preview', (values) => values);
   const generateValues = useWidgetValuesSelector('generate', selectGenerateRecallValues);
-  const { antialiasProgressImages } = useActiveProjectSelector((project) => project.settings);
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const livePreview = useLivePreviewFollow();
   const { gallery, notifications, widgets } = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
-  const { density, rootRef } = usePreviewDensity(region);
+  const { density, rootRef } = usePreviewDensity(region, previewStageStore.setDensity);
   const recentImages = galleryValues.recentImages;
   const localItems = useMemo(() => getLocalGalleryItems({ recentImages }, queueItems), [queueItems, recentImages]);
   const selectedItem = useMemo(() => getSelectedItem(galleryValues, localItems), [galleryValues, localItems]);
@@ -297,6 +304,8 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const [contextMenuTarget, setContextMenuTarget] = useState<ImageContextMenuTarget | null>(null);
+  // The header's ⋮ beside its Edit and Use menus opens without their groups; every other opening shows them all.
+  const [contextMenuVariant, setContextMenuVariant] = useState<ImageContextMenuVariant>('full');
   const getItemActionContext = useCallback(
     () => ({
       filterIdentity: navigationQueryKey,
@@ -457,11 +466,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [boardItems, gallery, notifications, selectedItem]
   );
   useDndMonitor({ onDragEnd: handleCompareDrop });
-  const openFilmstripItemContextMenu = useCallback(
-    (item: GalleryItem, x: number, y: number) =>
-      setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }),
-    []
-  );
+  const openFilmstripItemContextMenu = useCallback((item: GalleryItem, x: number, y: number) => {
+    setContextMenuVariant('full');
+    setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+  }, []);
   const { selectForCompare } = imageActions;
   const compareFilmstripItem = useCallback(
     (item: GalleryItem) => {
@@ -472,8 +480,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [selectForCompare]
   );
   const openItemContextMenu = useCallback(
-    (x: number, y: number) => {
+    (x: number, y: number, variant: ImageContextMenuVariant = 'full') => {
       if (contextMenuItem) {
+        setContextMenuVariant(variant);
         setContextMenuTarget({
           itemRefs: [toGalleryItemRef(contextMenuItem)],
           items: [contextMenuItem],
@@ -700,6 +709,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               boards={boards}
               previewVideoActions={previewVideoContextActions}
               target={contextMenuTarget}
+              variant={contextMenuVariant}
               onClose={closeContextMenu}
             />
           </>
@@ -851,8 +861,8 @@ const SelectedMediaPreview = ({
   source: Parameters<typeof PreviewFrame>[0]['source'];
 }) => (
   <PreviewMediaScaffold>
-    {/* The stage wrapper is the Details popover's boundary for images and
-        videos alike; the frame inside fills it, so their rects coincide. */}
+    {/* The stage wrapper hosts the Details panel for images and videos
+        alike; the frame inside fills it, so their rects coincide. */}
     <Flex ref={setStageElement} css={PREVIEW_NAV_STAGE_CSS} direction="column" flex="1" minH="0" position="relative">
       <PreviewFrame
         dragItem={dragItem}
@@ -933,6 +943,22 @@ const LivePreview = ({
 
 const EmptyPreview = () => {
   const { t } = useTranslation();
+  const openWidget = useOpenWorkbenchWidget();
+  const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
+  // Where the layout already has the Gallery, bring that one forward and focus it; opening it would move it.
+  const showGallery = useCallback(() => {
+    const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: 'gallery', widgets });
+
+    if (!revealed) {
+      openWidget('gallery');
+    } else if (revealed.kind === 'floating') {
+      focusFloating(revealed.instanceId);
+    } else {
+      focusRegion(revealed.region, 'gallery');
+    }
+  }, [focusFloating, focusRegion, openWidget, queries, widgets]);
 
   return (
     <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
@@ -940,9 +966,12 @@ const EmptyPreview = () => {
         <Text fontSize="lg" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}
         </Text>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('widgets.preview.emptyDescription')}
         </Text>
+        <Button size="sm" variant="outline" onClick={showGallery}>
+          {t('widgets.preview.showGallery')}
+        </Button>
       </Stack>
     </PreviewFrame>
   );

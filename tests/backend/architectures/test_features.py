@@ -15,6 +15,7 @@ DENOISE_NODE = {
     BaseModelType.CogView4: "cogview4_denoise",
     BaseModelType.Flux: "flux_denoise",
     BaseModelType.Flux2: "flux2_denoise",
+    BaseModelType.Flux3: "flux3_denoise",
     BaseModelType.ZImage: "z_image_denoise",
     BaseModelType.ErnieImage: "ernie_image_denoise",
     BaseModelType.Ideogram4: "ideogram4_denoise",
@@ -91,7 +92,7 @@ def test_reference_images_and_the_conditions_on_them() -> None:
     supported = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_reference_images
     }
-    assert supported == {"flux", "flux2", "sd-1", "sdxl", "qwen-image", "krea-2", "anima", "qwen-image-2-1"}
+    assert supported == {"flux", "flux2", "flux3", "sd-1", "sdxl", "qwen-image", "krea-2", "anima", "qwen-image-2-1"}
 
     by_format = {
         b.value: f.reference_images_require_format
@@ -121,14 +122,25 @@ def test_regional_guidance_and_its_negative_subset() -> None:
     `sdxl_compel_prompt` path masks both prompt polarities. The FLUX / FLUX.2 / Krea-2 / Z-Image /
     Anima denoisers mask positive conditioning only -- Z-Image and Anima accept a negative list but
     discard its masks, so a "regional" negative there would act globally and webv2 rejects it.
-    MOSS-Image masks nothing: its regions become boxes in the JSON layout prompt, which has no
-    negative counterpart.
+    MOSS-Image and Ideogram 4 mask nothing: their regions become boxes in a JSON layout prompt or
+    structured caption, which has no negative counterpart.
     """
     regional = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_regional_guidance
     }
     negative = {b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.regional_negative}
-    assert regional == {"sd-1", "sd-2", "sdxl", "flux", "flux2", "krea-2", "z-image", "anima", "moss-image"}
+    assert regional == {
+        "sd-1",
+        "sd-2",
+        "sdxl",
+        "flux",
+        "flux2",
+        "krea-2",
+        "z-image",
+        "anima",
+        "moss-image",
+        "ideogram-4",
+    }
     assert negative == {"sd-1", "sd-2", "sdxl"}
     assert negative < regional, "a regional negative prompt without regional guidance is meaningless"
 
@@ -145,6 +157,7 @@ def test_the_negative_prompt_policy_follows_the_guidance_model() -> None:
     assert by_usage["never"] == {"flux", "flux2", "ideogram-4", "minimax-h3"}
     assert by_usage["cfg-gated"] == {
         "anima",
+        "flux3",
         "krea-2",
         "qwen-image",
         "qwen-image-2-1",

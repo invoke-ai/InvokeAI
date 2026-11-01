@@ -799,6 +799,28 @@ VAE_FLUX2_SPEC = register(
 )
 
 
+def flux2_vae_attention_materializes(image_tensor: torch.Tensor, vae: AutoencoderKLFlux2, device: torch.device) -> bool:
+    """Whether encoding ``image_tensor`` untiled would materialize the FLUX.2 VAE mid-block's score matrix.
+
+    False on CUDA, where a fused SDPA kernel takes the 512-wide head and the encode stays linear in area; true
+    on ROCm and MPS (see ``estimate_vae_working_memory_flux2``), where the matrix grows with the square of the
+    pixel count and only a tiled encode stays bounded.
+    """
+    seq_len = (image_tensor.shape[-2] // _FLUX2_VAE_SPATIAL_COMPRESSION) * (
+        image_tensor.shape[-1] // _FLUX2_VAE_SPATIAL_COMPRESSION
+    )
+    return (
+        sdpa_score_matrix_bytes(
+            device=device,
+            dtype=next(vae.parameters()).dtype,
+            num_heads=_FLUX2_VAE_MID_BLOCK_HEADS,
+            head_dim=_FLUX2_VAE_MID_BLOCK_HEAD_DIM,
+            seq_len=seq_len,
+        )
+        > 0
+    )
+
+
 def estimate_vae_working_memory_flux2(
     operation: Literal["encode", "decode"],
     image_tensor: torch.Tensor,

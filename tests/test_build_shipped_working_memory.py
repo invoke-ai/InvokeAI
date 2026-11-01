@@ -962,10 +962,15 @@ def _legacy_data_copy(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
 
 
 def _test_points(data_dir: Path) -> list[MeasuredPoint]:
-    """The denoise points the test's records or export wrote: their device is not the shipped points' `RTX 4090`. A
-    record names the card as the calibration script does, an export's point by name and device class id."""
+    """The Z-Image denoise points the test's records or export wrote: their device is not the shipped Z-Image points'
+    `RTX 4090`. A record names the card as the calibration script does, an export's point by name and device class
+    id."""
     devices = {RTX_4090.name, f"{RTX_4090.name} ({RTX_4090.id})"}
-    return [point for point in load_data(data_dir)["denoise.json"].points if point.device in devices]
+    return [
+        point
+        for point in load_data(data_dir)["denoise.json"].points
+        if point.estimator == Z_IMAGE_DENOISE_SPEC.id and point.device in devices
+    ]
 
 
 def test_fresh_process_points_replace_the_legacy_entry_they_fit_and_leave_the_others_as_they_were(

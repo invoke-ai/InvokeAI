@@ -35,6 +35,7 @@ from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
@@ -143,10 +144,27 @@ async def upload_image(
 
     contents = await file.read()
     try:
-        pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
+
+        def _read_image() -> Image.Image:
+            image = Image.open(io.BytesIO(contents))
+            # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
+            image.load()
+            return image
+
+        pil_image = await asyncio.to_thread(_read_image)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
+
+    # Read file records before pixel transforms: resizing through NumPy discards Image.info.
+    extracted_metadata = await asyncio.to_thread(
+        extract_metadata_from_image,
+        pil_image=pil_image,
+        invokeai_metadata_override=metadata,
+        invokeai_workflow_override=None,
+        invokeai_graph_override=None,
+        logger=ApiDependencies.invoker.services.logger,
+    )
 
     if crop_visible:
         try:
@@ -177,15 +195,6 @@ async def upload_image(
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
-    extracted_metadata = await asyncio.to_thread(
-        extract_metadata_from_image,
-        pil_image=pil_image,
-        invokeai_metadata_override=metadata,
-        invokeai_workflow_override=None,
-        invokeai_graph_override=None,
-        logger=ApiDependencies.invoker.services.logger,
-    )
-
     try:
         image_dto = await asyncio.to_thread(
             ApiDependencies.invoker.services.images.create,
@@ -197,6 +206,7 @@ async def upload_image(
             metadata=extracted_metadata.invokeai_metadata,
             workflow=extracted_metadata.invokeai_workflow,
             graph=extracted_metadata.invokeai_graph,
+            resolved_inputs=extracted_metadata.invokeai_resolved_inputs,
             is_intermediate=is_intermediate,
             user_id=current_user.user_id,
             project_id=project_id,
@@ -353,7 +363,7 @@ def get_image_dto(
         # 404s, so nothing else may wear that answer: a board lookup against an unreadable
         # database, or a URL service failure, would otherwise clear a live image out of the
         # workflows using it. Narrowed here rather than everywhere, because this is the 404
-        # that is acted on destructively — the media, metadata and workflow routes keep theirs.
+        # that is acted on destructively — the media routes keep theirs.
         raise HTTPException(status_code=404)
     redact_project_ids([image_dto], current_user)
     return image_dto
@@ -373,13 +383,20 @@ def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
-    except Exception:
+    except ImageRecordNotFoundException:
+        # Clients cache a 404 here as "this image has no metadata" for good, so only a missing
+        # record earns it. A busy database must surface as a retryable 500; so does stored
+        # metadata that no longer validates — a server fault to log, not an image without metadata.
         raise HTTPException(status_code=404)
 
 
 class WorkflowAndGraphResponse(BaseModel):
     workflow: Optional[str] = Field(description="The workflow used to generate the image, as stringified JSON")
     graph: Optional[str] = Field(description="The graph used to generate the image, as stringified JSON")
+    resolved_inputs: Optional[str] = Field(
+        default=None,
+        description="The image's per-invocation resolved inputs, as stringified Graph JSON, when available",
+    )
 
 
 @images_router.get(
@@ -395,8 +412,10 @@ def get_image_workflow(
     try:
         workflow = ApiDependencies.invoker.services.images.get_workflow(image_name)
         graph = ApiDependencies.invoker.services.images.get_graph(image_name)
-        return WorkflowAndGraphResponse(workflow=workflow, graph=graph)
-    except Exception:
+        resolved_inputs = ApiDependencies.invoker.services.images.get_resolved_inputs(image_name)
+        return WorkflowAndGraphResponse(workflow=workflow, graph=graph, resolved_inputs=resolved_inputs)
+    except (ImageRecordNotFoundException, ImageFileNotFoundException):
+        # See get_image_metadata: only a missing record or file is "not found".
         raise HTTPException(status_code=404)
 
 

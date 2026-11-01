@@ -151,6 +151,10 @@ class ResolvedCoefficients:
 
     values: Mapping[str, float]
     source: str
+    legacy_priced: bool = False
+    """Whether the values are a `legacy` entry's hand-set constants, or were raised to an entry's `unmeasured_floor` on a
+    platform nothing measures: where an estimator that replaced a hand-set formula reserves that formula at least
+    (`EstimatorSpec.legacy_formula`)."""
 
 
 def _parse(entry: Traversable) -> WorkingMemoryData:
@@ -274,7 +278,10 @@ def resolve_coefficients(
         notes.insert(0, f"priced as {_where({key: full[key] for key in shown})}{', floored' if floors else ''}")
     note = f" ({', '.join(notes)})" if notes else ""
     source = f"{origin}:{_where({key: str(getattr(platform, key)) for key in shown})}{note}"
-    return ResolvedCoefficients(values=MappingProxyType(read), source=source)
+    legacy_priced = carrier.legacy or (
+        bool(spec.platform_keys) and measured != platform and bool(carrier.unmeasured_floor)
+    )
+    return ResolvedCoefficients(values=MappingProxyType(read), source=source, legacy_priced=legacy_priced)
 
 
 @functools.cache

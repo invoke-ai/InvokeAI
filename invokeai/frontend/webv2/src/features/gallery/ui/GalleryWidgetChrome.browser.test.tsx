@@ -136,4 +136,15 @@ describe('GalleryWidgetLabel', () => {
 
     expect(updateSettings).toHaveBeenCalledWith({ boardPanelCollapsed: true });
   });
+
+  it('shows the sidebar action in the center view, where the boards sit beside the grid', async () => {
+    await renderChrome(GalleryWidgetLabel, { selectedBoardId: 'dogs' }, 'center');
+
+    expect(getToggle().querySelector('svg.lucide-panel-left-close')).not.toBeNull();
+
+    await renderChrome(GalleryWidgetLabel, { boardPanelCollapsed: true, selectedBoardId: 'dogs' }, 'center');
+
+    expect(getToggle().getAttribute('aria-expanded')).toBe('false');
+    expect(getToggle().querySelector('svg.lucide-panel-left-open')).not.toBeNull();
+  });
 });

@@ -201,6 +201,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -245,6 +246,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
         commands,
         formatControlLayerError,
         formatUpscaleMetadataFailure,
+        scopedDefaults: {},
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -313,6 +315,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -333,6 +336,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -358,6 +362,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       kind: 'error',
       message: 'string_generator: Unbalanced braces',
       title: 'The batch generator could not be resolved',
+      titleKey: 'topbar.invoke.generatorFailed',
     });
   });
 
@@ -376,7 +381,10 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     expect(notify).toHaveBeenCalledWith({
       kind: 'error',
       message: 'Batch node "string_batch" has an empty collection.',
+      messageKey: 'nodes.readiness.batchEmpty',
+      messageValues: { node: 'string_batch' },
       title: 'The batch is not ready',
+      titleKey: 'topbar.invoke.batchNotReady',
     });
   });
 });
@@ -427,6 +435,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -464,12 +473,12 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 describe('submitResolvedInvocation without dynamic prompts', () => {
   seedArchitectureCapabilities();
 
-  const submitGenerate = async (prepend?: boolean) => {
+  const submitGenerate = async (prepend?: boolean, positivePrompt = 'a cat') => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const project = getActiveProject(
       workbenchReducer(createInitialWorkbenchState(), {
         type: 'setGenerateSettings',
-        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt },
       })
     );
     const route = resolveInvocationRoute(project, 'global', {
@@ -487,6 +496,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -509,6 +519,19 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
     expect(back.mock.calls[0]?.[0]).not.toHaveProperty('prepend');
   });
 
+  it('dispatches a JSON prompt literally, without expanding its braces', async () => {
+    const draft =
+      '```json\n{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[{"label":"object","caption":"a cup","bbox":[0,0,10,10]}]}\n```';
+    const compiled =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a poster"},"items":[]}';
+    for (const prompt of [draft, compiled]) {
+      const submitted = await submitGenerate(undefined, prompt);
+      expect(submitted).toHaveBeenCalledTimes(1);
+      expect(submitted.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+      submitted.mockRestore();
+    }
+  });
+
   it('keeps Invoke Front on a Workflow dispatch', async () => {
     generatorsMock.resolveWorkflowGenerators.mockImplementation(
       (_client: unknown, pending: Array<{ key: string; nodeId: string }>) =>
@@ -525,6 +548,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -535,6 +559,53 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+  });
+});
+
+describe("submitResolvedInvocation reads the user's defaults", () => {
+  seedArchitectureCapabilities();
+
+  it('hands Canvas the compositing and generation flags the defaults give a project that pins none', async () => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const state = workbenchReducer(
+      workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' }),
+      {
+        type: 'setGenerateSettings',
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+      }
+    );
+    const project = getActiveProject(state);
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'canvas',
+      sourceLocked: false,
+    });
+    const prepareCanvasInvocation = vi.fn();
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands: createWorkbenchStore().commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {
+        canvas: { outputOnlyMaskedRegions: false },
+        generate: { useCpuNoise: false, useNsfwChecker: true, useWatermark: true },
+      },
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
+
+    expect(prepareCanvasInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compositing: expect.objectContaining({ outputOnlyMaskedRegions: false }),
+        projectSettings: expect.objectContaining({ useCpuNoise: false, useNsfwChecker: true, useWatermark: true }),
+      })
+    );
   });
 });
 
@@ -582,6 +653,7 @@ describe('submitResolvedInvocation for Upscale', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: [upscaler],
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),

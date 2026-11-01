@@ -7,8 +7,10 @@ import {
   ALL_READABLE_BOARDS_ID,
   classifyGalleryUpload,
   compareGalleryItems,
+  getGalleryItemView,
   legacyGeneratedImageToGalleryItem,
 } from '@features/gallery/core/items';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import {
   isDateBoardId,
   isInvalidGalleryBoardDestination,
@@ -45,6 +47,7 @@ const uploadLogger = createLogger({ area: 'upload', namespace: 'gallery' });
 export const useGalleryUploadAction = ({
   boards,
   getCurrentGalleryLocation,
+  revealInReceivingTab = false,
   selectedBoardId: selectedBoardIdOrGetter,
 }: {
   boards: GalleryBoard[];
@@ -53,6 +56,11 @@ export const useGalleryUploadAction = ({
    * the selection alone, as hosts without a workbench must.
    */
   getCurrentGalleryLocation?: () => { galleryView: GalleryView; selectedBoardId: string };
+  /**
+   * The upload was made in the Gallery itself: when none of it landed on the tab showing, switch to the tab that
+   * received it so it is seen. Uploads made elsewhere (a paste bound for Canvas) leave the Gallery's tab alone.
+   */
+  revealInReceivingTab?: boolean;
   /**
    * A getter is read when the upload starts and, when it names a real board, once more after the listing of every
    * readable board is ensured, the second reading deciding: for hosts that resolve the board from that listing or
@@ -68,6 +76,8 @@ export const useGalleryUploadAction = ({
   return useCallback(
     async (files) => {
       const owner = captureAccountScope();
+      // Where the Gallery was when the upload started: only while it is still there may the upload switch its tab.
+      const launchLocation = getCurrentGalleryLocation?.();
       const readSelectedBoardId = () =>
         typeof selectedBoardIdOrGetter === 'function' ? selectedBoardIdOrGetter() : selectedBoardIdOrGetter;
       let selectedBoardId = readSelectedBoardId();
@@ -143,8 +153,6 @@ export const useGalleryUploadAction = ({
         void invalidateGalleryBoardDestinations(queryClient, owner);
         return [];
       }
-      const formatImageCount = (count: number) => t('widgets.gallery.imageCount', { count });
-      const formatVideoCount = (count: number) => t('widgets.gallery.videoCount', { count });
       const recordError = (error: unknown) =>
         notifications.reportError({ area: 'gallery-actions', message: toErrorMessage(error), namespace: 'gallery' });
 
@@ -224,35 +232,51 @@ export const useGalleryUploadAction = ({
         }
 
         const currentGalleryLocation = getCurrentGalleryLocation?.();
-        const visibleUploads = currentGalleryLocation
-          ? uploadedItems.filter(
-              (item) =>
-                item.boardId === currentGalleryLocation.selectedBoardId &&
-                (currentGalleryLocation.galleryView === 'images'
-                  ? item.category === 'general'
-                  : item.category === 'control' || item.category === 'mask' || item.category === 'user')
-            )
+        const uploadsOnBoard = currentGalleryLocation
+          ? uploadedItems.filter((item) => item.boardId === currentGalleryLocation.selectedBoardId)
           : [];
-        const newestVisibleUpload = visibleUploads.reduce<GalleryItem | undefined>(
+        const visibleUploads = uploadsOnBoard.filter(
+          (item) => getGalleryItemView(item) === currentGalleryLocation?.galleryView
+        );
+        // Uploaded images and videos land on different tabs; when nothing landed on the one showing, switch to the
+        // one that received them, so the upload is seen. A mixed upload always has some on the tab showing. A Gallery
+        // the user moved while the upload ran keeps where they took it.
+        const isGalleryWhereLaunched =
+          revealInReceivingTab &&
+          launchLocation !== undefined &&
+          currentGalleryLocation?.galleryView === launchLocation.galleryView &&
+          currentGalleryLocation.selectedBoardId === launchLocation.selectedBoardId;
+        const receivingView =
+          visibleUploads.length === 0 && isGalleryWhereLaunched && uploadsOnBoard[0]
+            ? getGalleryItemView(uploadsOnBoard[0])
+            : null;
+        const shownUploads = receivingView
+          ? uploadsOnBoard.filter((item) => getGalleryItemView(item) === receivingView)
+          : visibleUploads;
+        const newestShownUpload = shownUploads.reduce<GalleryItem | undefined>(
           (newest, item) =>
             newest === undefined || compareGalleryItems(item, newest, { orderDir: 'DESC' }) < 0 ? item : newest,
           undefined
         );
 
-        if (newestVisibleUpload) {
-          gallery?.selectItem(newestVisibleUpload);
+        if (gallery && receivingView) {
+          gallery.setView(receivingView);
+        }
+        if (newestShownUpload) {
+          gallery?.selectItem(newestShownUpload);
         }
 
-        const summary = t('widgets.gallery.uploadSummary', {
-          board: targetBoardName,
-          failed: failedCount,
-          images: formatImageCount(uploadedImages.length),
-          videos: formatVideoCount(uploadedVideos.length),
-        });
-        const split = imageUploads.length > 0 && videoUploads.length > 0 ? ` ${t('widgets.gallery.uploadSplit')}` : '';
+        const media = formatGalleryMediaCounts(t, { images: uploadedImages.length, videos: uploadedVideos.length });
+        const message = [
+          t('widgets.gallery.uploadSummary', { board: targetBoardName, media }),
+          failedCount > 0 ? t('widgets.gallery.uploadFailedCount', { count: failedCount }) : '',
+          uploadedImages.length > 0 && uploadedVideos.length > 0 ? t('widgets.gallery.uploadSplit') : '',
+        ]
+          .filter(Boolean)
+          .join(' ');
         notifications.add({
           kind: 'success',
-          message: `${summary}${split}`,
+          message,
           title: t(
             failedCount > 0 ? 'widgets.gallery.uploadPartialTitle' : 'widgets.gallery.uploadSuccessTitle',
             failedCount > 0 ? { succeeded: uploadedItems.length, total: files.length } : { count: uploadedItems.length }
@@ -268,6 +292,15 @@ export const useGalleryUploadAction = ({
         return [];
       }
     },
-    [boards, gallery, getCurrentGalleryLocation, notifications, queryClient, selectedBoardIdOrGetter, t]
+    [
+      boards,
+      gallery,
+      getCurrentGalleryLocation,
+      notifications,
+      queryClient,
+      revealInReceivingTab,
+      selectedBoardIdOrGetter,
+      t,
+    ]
   );
 };

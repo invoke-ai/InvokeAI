@@ -1,3 +1,4 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasControlLayerContract,
   CanvasDocumentContractV3,
@@ -149,6 +150,8 @@ interface Harness {
   createdIds: string[];
   /** Every admitted stroke edit, so a test can check each one ended. */
   strokeEdits: { cancel: ReturnType<typeof vi.fn> }[];
+  /** What the tool reported through `reportEditRefusal`. */
+  refusals: CanvasEditRefusal[];
 }
 
 const createHarness = (
@@ -166,6 +169,7 @@ const createHarness = (
   const createdIds: string[] = [];
   const beginPixelEdit = transaction === undefined ? null : vi.fn(() => transaction);
   const requestLayerRasterization = vi.fn();
+  const refusals: CanvasEditRefusal[] = [];
   let idCounter = 0;
 
   const ctx: ToolContext = {
@@ -207,6 +211,7 @@ const createHarness = (
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: (layerId) => painted.push(layerId),
+    reportEditRefusal: (refusal) => refusals.push(refusal),
     requestLayerRasterization,
     setLayerTransformOverride: vi.fn(),
     setOverlayCursor: vi.fn(),
@@ -223,6 +228,7 @@ const createHarness = (
     dispatched,
     layers,
     painted,
+    refusals,
     requestLayerRasterization,
     strokeEdits,
     strokes,
@@ -300,6 +306,7 @@ describe('brush tool: stroke into an existing paint layer', () => {
     expect(h.strokes).toHaveLength(0);
     expect(h.layers.peek(layer.id)).toBeUndefined();
     expect(h.requestLayerRasterization).toHaveBeenCalledWith(layer.id);
+    expect(h.refusals).toEqual([{ layerId: layer.id, layerName: layer.name, status: 'layer-loading' }]);
 
     const entry = h.layers.getOrCreateRect(layer.id, { height: 10, width: 10, x: 0, y: 0 });
     h.layers.publishPixels(layer.id);
@@ -368,26 +375,46 @@ describe('eraser tool', () => {
   });
 
   it.each([
-    ['locked', { isLocked: true }, true],
-    ['disabled', { isEnabled: false }, true],
-    ['not rasterized yet', {}, false],
-  ] as const)('brushes a %s image layer onto an auto-created paint layer instead', (_, overrides, cached) => {
-    const transaction = controlTransaction('img1');
-    const h = createHarness(
-      makeDoc([{ ...imageLayer('img1'), ...overrides } as CanvasLayerContract], 'img1'),
-      transaction
-    );
-    if (cached) {
+    ['locked', { isLocked: true }, 'layer-locked'],
+    ['hidden', { isEnabled: false }, 'layer-hidden'],
+  ] as const)(
+    'refuses to brush a %s image layer, offering a new paint layer instead of making one',
+    (_, overrides, status) => {
+      const transaction = controlTransaction('img1');
+      const h = createHarness(
+        makeDoc([{ ...imageLayer('img1'), ...overrides } as CanvasLayerContract], 'img1'),
+        transaction
+      );
       h.layers.getOrCreateRect('img1', { height: 10, width: 10, x: 0, y: 0 }).stale = false;
+      const brush = createBrushTool();
+
+      expect(brush.cursor?.(h.ctx)).toBe('not-allowed');
+      down(brush, h.ctx, pointer(2, 2));
+      up(brush, h.ctx, pointer(2, 2));
+
+      expect(h.beginPixelEdit).not.toHaveBeenCalled();
+      expect(h.dispatched).toEqual([]);
+      expect(h.strokes).toEqual([]);
+      expect(h.refusals).toEqual([{ canPaintNewLayer: true, layerId: 'img1', layerName: 'img1', status }]);
     }
+  );
+
+  it('says an image layer is still loading, asks for its pixels and paints once they are in', () => {
+    const transaction = controlTransaction('img1');
+    const h = createHarness(makeDoc([imageLayer('img1')], 'img1'), transaction);
     const brush = createBrushTool();
 
     down(brush, h.ctx, pointer(2, 2));
     up(brush, h.ctx, pointer(2, 2));
+    expect(h.requestLayerRasterization).toHaveBeenCalledWith('img1');
+    expect(h.refusals).toEqual([{ layerId: 'img1', layerName: 'img1', status: 'layer-loading' }]);
+    expect(h.dispatched).toEqual([]);
 
-    expect(h.beginPixelEdit).not.toHaveBeenCalled();
-    expect(h.dispatched.map((action) => action.type)).toEqual(['addCanvasLayer']);
-    expect(h.strokes.map((stroke) => stroke.layerId)).toEqual([h.createdIds[0]]);
+    h.layers.getOrCreateRect('img1', { height: 10, width: 10, x: 0, y: 0 }).stale = false;
+    down(brush, h.ctx, pointer(2, 2));
+    up(brush, h.ctx, pointer(2, 2));
+    expect(h.beginPixelEdit).toHaveBeenCalledWith('img1');
+    expect(transaction.commit).toHaveBeenCalledOnce();
   });
 
   it('brushes a transparency-locked image layer in place with source-atop, but refuses to erase it', () => {
@@ -397,9 +424,11 @@ describe('eraser tool', () => {
     h.layers.getOrCreateRect('img1', { height: 100, width: 100, x: 0, y: 0 }).stale = false;
 
     const eraser = createEraserTool();
+    expect(eraser.cursor?.(h.ctx)).toBe('not-allowed');
     down(eraser, h.ctx, pointer(2, 2));
     up(eraser, h.ctx, pointer(2, 2));
     expect(h.beginPixelEdit).not.toHaveBeenCalled();
+    expect(h.refusals).toEqual([{ layerId: 'img1', layerName: 'img1', status: 'layer-alpha-locked' }]);
 
     const brush = createBrushTool();
     down(brush, h.ctx, pointer(2, 2));
@@ -471,6 +500,7 @@ describe('paint tool: target resolution', () => {
   it.each(['pointercancel', 'deactivate'] as const)('rolls back control preparation on %s', (ending) => {
     const transaction = controlTransaction();
     const h = createHarness(makeDoc([controlImageLayer('control')], 'control'), transaction);
+    h.layers.getOrCreateRect('control', { height: 20, width: 20, x: 0, y: 0 }).stale = false;
     const brush = createBrushTool();
     down(brush, h.ctx, pointer(10, 10));
     if (ending === 'pointercancel') {
@@ -626,26 +656,27 @@ describe('paint tool: target resolution', () => {
     expect(h.dispatched[0]!.type).toBe('addCanvasLayer');
   });
 
-  it('no-ops on a locked selected paint layer (no dispatch, no paint)', () => {
-    const doc = makeDoc([paintLayer('paint1', { isLocked: true })], 'paint1');
+  it.each([
+    ['locked', { isLocked: true }, 'layer-locked'],
+    ['hidden', { isEnabled: false }, 'layer-hidden'],
+  ] as const)('refuses a %s selected paint layer with a notice and no new layer', (_, opts, status) => {
+    const doc = makeDoc([paintLayer('paint1', opts)], 'paint1');
     const h = createHarness(doc);
     const brush = createBrushTool();
 
+    expect(brush.cursor?.(h.ctx)).toBe('not-allowed');
     down(brush, h.ctx, pointer(20, 20));
     move(brush, h.ctx, pointer(40, 40), [pointer(40, 40)]);
     up(brush, h.ctx, pointer(40, 40));
 
     expect(h.dispatched).toHaveLength(0);
     expect(h.strokes).toHaveLength(0);
+    expect(h.refusals).toEqual([{ layerId: 'paint1', layerName: 'paint1', status }]);
   });
 
-  it('no-ops on a disabled selected paint layer', () => {
-    const doc = makeDoc([paintLayer('paint1', { isEnabled: false })], 'paint1');
-    const h = createHarness(doc);
-    const brush = createBrushTool();
-    down(brush, h.ctx, pointer(20, 20));
-    up(brush, h.ctx, pointer(20, 20));
-    expect(h.strokes).toHaveLength(0);
+  it('shows the crosshair over a paintable selection', () => {
+    const h = createHarness(makeDoc([paintLayer('paint1')], 'paint1'));
+    expect(createBrushTool().cursor?.(h.ctx)).toBe('crosshair');
   });
 });
 
@@ -675,6 +706,7 @@ describe('transparency lock', () => {
     expect(h.strokes).toHaveLength(0);
     expect(h.painted).toEqual([]);
     expect(h.strokeEdits.map((edit) => edit.cancel.mock.calls.length)).toEqual([1]);
+    expect(h.refusals).toEqual([{ layerId: 'paint1', layerName: 'paint1', status: 'layer-alpha-locked' }]);
   });
 
   it('ends the admitted edit and removes the layer it created when the stroke is cancelled', () => {

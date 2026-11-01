@@ -54,6 +54,7 @@ const galleryAdapter = {
 const videoAdapter = {
   findInGallery: noop,
   getUploadBoardId: () => Promise.resolve('none'),
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: noop,
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',

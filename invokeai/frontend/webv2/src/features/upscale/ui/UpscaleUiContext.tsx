@@ -6,6 +6,11 @@ import { createContext, use, useMemo } from 'react';
 
 /** This UI port preserves dependency direction: Upscale cannot import Workbench. */
 export interface UpscaleUiAdapter {
+  /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
+  notifications: {
+    info(title: string): void;
+    undoable(title: string, notice: { onUndo: () => void; supersedes: string }): void;
+  };
   patchPromptDraft(values: ProjectPromptDraftPatch): void;
   /** Functional patches run synchronously against the originating project's latest normalized values. */
   patchValues(
@@ -15,22 +20,27 @@ export interface UpscaleUiAdapter {
   projectId: string;
   promptDraft: ProjectPromptDraft;
   rawValues: Record<string, unknown>;
+  /** This project's shared prompt draft at call time, for an Undo that checks what changed since. */
+  readPromptDraft(): ProjectPromptDraft;
   reportError(message: string): void;
   showPromptSyntaxHighlighting: boolean;
 }
 
 /** The adapter's callbacks, which are stable for the lifetime of a project. */
-export type UpscaleUiActions = Pick<UpscaleUiAdapter, 'patchPromptDraft' | 'patchValues' | 'reportError'>;
+export type UpscaleUiActions = Pick<
+  UpscaleUiAdapter,
+  'notifications' | 'patchPromptDraft' | 'patchValues' | 'readPromptDraft' | 'reportError'
+>;
 
 const UpscaleUiContext = createContext<UpscaleUiAdapter | null>(null);
 /** Separate stable actions from value-bearing adapters so action-only consumers do not rerender on form keystrokes. */
 const UpscaleUiActionsContext = createContext<UpscaleUiActions | null>(null);
 
 export const UpscaleUiProvider = ({ adapter, children }: { adapter: UpscaleUiAdapter; children: ReactNode }) => {
-  const { patchPromptDraft, patchValues, reportError } = adapter;
+  const { notifications, patchPromptDraft, patchValues, readPromptDraft, reportError } = adapter;
   const actions = useMemo<UpscaleUiActions>(
-    () => ({ patchPromptDraft, patchValues, reportError }),
-    [patchPromptDraft, patchValues, reportError]
+    () => ({ notifications, patchPromptDraft, patchValues, readPromptDraft, reportError }),
+    [notifications, patchPromptDraft, patchValues, readPromptDraft, reportError]
   );
 
   return (

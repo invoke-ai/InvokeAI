@@ -14,6 +14,11 @@ export interface VideoUiAdapter {
    * `none` is Uncategorized.
    */
   getUploadBoardId(): Promise<string>;
+  /** Notices about this project; `undoable` reports a change that already happened, with its Undo. */
+  notifications: {
+    info(title: string): void;
+    undoable(title: string, notice: { onUndo: () => void; supersedes: string }): void;
+  };
   /** Functional patches run synchronously against the originating project's latest normalized values. */
   patchValues(
     values: Partial<VideoWidgetValues> | ((current: VideoWidgetValues) => Partial<VideoWidgetValues>),
@@ -57,6 +62,7 @@ export type VideoUiActions = Pick<
   VideoUiAdapter,
   | 'findInGallery'
   | 'getUploadBoardId'
+  | 'notifications'
   | 'patchValues'
   | 'playVideoSpanInPreview'
   | 'readValues'
@@ -74,6 +80,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
   const {
     findInGallery,
     getUploadBoardId,
+    notifications,
     patchValues,
     playVideoSpanInPreview,
     readValues,
@@ -86,6 +93,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     () => ({
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
@@ -97,6 +105,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     [
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,

@@ -159,11 +159,22 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         # The FLUX.2 denoise's short caption.
         "denoise.flux2-cudnn,native-denoise-bf16-h3072-8100+77tok-RTX4090-demand_peak": 1.42,
         "denoise.flux2-miopen,native,windows-denoise-bf16-h3072-8100+77tok-RX9060XT-demand_peak": 1.40,
+        # The FLUX.3 denoise's forwards without reference images.
+        "denoise.flux3-cudnn,native-denoise-bf16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,native-denoise-fp16-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-bf16-h3072-4096+560tok-b2-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
+        "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-1024+560tok-RTX4090-demand_peak": 1.32,
+        # The Krea-2 denoise's short caption.
+        "denoise.krea2-cudnn,native-denoise-bf16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
+        "denoise.krea2-cudnn,native-denoise-fp16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
+        "denoise.krea2-cudnn,cudaMallocAsync-denoise-bf16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
+        "denoise.krea2-cudnn,cudaMallocAsync-denoise-fp16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to: their
 own, rounded up to two decimals, so a refit that moves one shows in the data test. Grouped by cause; with the default
-`device_working_mem_gb` the cache reserves 3 GiB anyway for the 38 of them that estimate less.
+`device_working_mem_gb` the cache reserves 3 GiB anyway for the 46 of them that estimate less.
 
 - Untiled demand, concave under MIOpen's native allocator on Windows: first-run driver spikes at small sizes and a
   second run reserving up to 1.6x the first at large ones, so a line that covers every point cannot stay within 1.3x
@@ -220,7 +231,25 @@ own, rounded up to two decimals, so a refit that moves one shows in the data tes
 - The FLUX.2 denoise points are the Klein 4B width at 1440px with a 77-token caption, 8177 tokens, on both cards: the
   native allocator served them from 1676 MiB (RTX 4090) and 1879 MiB (RX 9060 XT), while the 512-token caption at
   8612 tokens took 2382 and 2577 MiB. The line has to cover the latter. Under `cudaMallocAsync` and expandable
-  segments the two lie on one line."""
+  segments the two lie on one line.
+- The FLUX.3 denoise points are forwards without reference images on the RTX 4090, one of them a batch of two, that
+  the reference points put 1.302 to 1.320x under their line: references cost more per token than the image and the
+  caption (up to 8% under the native allocator, 12% under `cudaMallocAsync`; see `flux3/denoise_working_memory.py`), and
+  the line has to cover the reference forwards. Under the native allocator
+  the 1440px forward with an 80-token caption (8180 tokens, 2060 MiB, against 2516 MiB for the 560-token caption at 8660
+  tokens) in bf16 and fp16, under `cudaMallocAsync` a batch of two at 1024px in bf16 and, in fp32, the 512px forward
+  and the 1440px one with an 80-token caption.
+- The Krea-2 denoise points are a 77-token caption on the RTX 4090, bf16 and fp16 alike. A caption token reserves more
+  than an image token. Allocated memory grows 0.14 to 0.15 MiB per token for caption and image tokens alike, reserved
+  memory 0.30 MiB per image token and 0.73 to 0.95 MiB per caption token under the native allocator (1404 against
+  1086 MiB at 4096 image tokens with 512 and 77 caption tokens, 2916 against 2502 MiB at 9216): the excess is
+  allocator reserve, not live tensors, consistent with the text fusion, which runs each caption token as 12 tapped
+  encoder layers of 2560 before the blocks, leaving segments the blocks' larger tensors do not reuse. One slope prices
+  both, and the line has to cover the 512-token captions, so the
+  77-token forward at 4096 image tokens sits 1.35x below it. Under `cudaMallocAsync` a caption token reserves about
+  twice an image token (1856 against 1680 MiB at 9216 image tokens), and the line is held up by a forward whose warm
+  run read 18% above its cold one (one 1024px joint reference at 1024px: 1984 against 1680 MiB), which puts the
+  77-token forward at 9216 image tokens 1.32x below it."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:

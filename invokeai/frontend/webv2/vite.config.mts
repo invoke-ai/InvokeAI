@@ -41,6 +41,9 @@ const ROUTE_SHARED_MODULES = [
   '/features/fonts/runtime.ts',
   '/features/models/data/modelLoadStore.ts',
   '/features/models/index.ts',
+  // Home's one-click bundle install, the models barrel (editor boot) and the lazy Add Models view share the starter
+  // install sources; alone they cost each route a startup request.
+  '/features/models/ui/add-models/starterModelInstallSources.ts',
   '/features/models/ui/ModelsPage.tsx',
   '/features/nodes/data/nodeExecutionStore.ts',
   '/features/nodes/index.ts',
@@ -52,11 +55,22 @@ const ROUTE_SHARED_MODULES = [
   '/platform/browser/downloadBlob.ts',
   // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
   '/platform/browser/imeComposition.ts',
+  // The settings dialog (boot) and the lazy Launchpad managers share the `/` search shortcut; alone it costs a startup
+  // request.
+  '/platform/browser/searchShortcut.ts',
   // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
   '/platform/browser/webLocks.ts',
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // The boot load-error panels and lazy empty states share it; alone it costs a startup request.
+  '/platform/ui/EmptyState.tsx',
+  // Boot notifications and the lazy queue item details share the toaster, tabs and copy controls; alone they cost a
+  // startup request.
+  '/platform/browser/clipboard.ts',
+  '/platform/ui/JsonPreview.tsx',
+  '/platform/ui/Tabs.tsx',
+  '/platform/ui/toaster.tsx',
   // The Fonts page, the Generate render section and the lazy workflow number fields share the slider controls;
   // alone they cost the editor a boot request, and the editor boot chunk would drag the editor into the Launchpad.
   '/platform/ui/Slider.tsx',
@@ -100,6 +114,13 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/hotkeys/catalog.ts',
   '/workbench/hotkeys/modalLayer.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
+  // The router, the editor context and the project library (below) share the startup launch and the project sync
+  // stores it reads; split from the entry they cost a startup request.
+  '/workbench/launchpad/StayOnLaunchpadButton.tsx',
+  '/workbench/launchpad/startupLaunch.ts',
+  '/workbench/projects/openProjects.ts',
+  '/workbench/projects/projectFlush.ts',
+  '/workbench/projects/syncStore.ts',
   // Without this the editor pulls the whole Launchpad chunk for one lookup table.
   '/workbench/launchpad/intents.ts',
   '/workbench/mediaReferences.ts',
@@ -115,9 +136,15 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/projectFile.ts',
   '/workbench/projects/projectFileErrors.ts',
   '/workbench/projects/projectFileToasts.ts',
+  // The settings store and the project sync share the account session lookup at boot on both routes; alone it costs
+  // each a startup request.
+  '/workbench/projects/session.ts',
   '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
   '/workbench/settings/launchpad.tsx',
+  // The settings store, the project file codec and the editor's reducers share the layered-settings table; alone it
+  // costs each route a startup request.
+  '/workbench/settings/projectSettings.ts',
   '/workbench/settings/settingsSearchShortcut.ts',
 ] as const;
 
@@ -129,10 +156,17 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/hotkeys/hintSources.tsx',
   '/workbench/hotkeys/shortcutHints.ts',
   '/workbench/hotkeys/targetWidget.ts',
+  // The topbar (editor boot) and the image menus' keycaps read effective bindings; alone it cost a boot request.
+  '/workbench/hotkeys/useShortcutBinding.ts',
   '/workbench/widget-frame/compactWidgetCapacity.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
+  // The image menu's canvas destinations and the lazy Layers widget share the layer-kind glyphs; alone they cost a
+  // request.
+  '/workbench/widgets/layers/layerTypeIcon.ts',
+  // The image menu, the Gallery's board menus and the lazy layer menu share the scrolling board list menu.
+  '/platform/ui/ScrollableMenuContent.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
@@ -153,13 +187,62 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
   // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // The canvas dims sync and the lazy Canvas widget and Frame tool share the model grid and the centred resize.
+  '/workbench/widgets/canvas/bboxGrid.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.
   '/workbench/widgets/shared/AutoSwitchMenu.tsx',
+  // The Gallery, the Preview filmstrip and the Canvas staging bar share the progress badge; alone it costs a boot
+  // request.
+  '/platform/ui/ProgressBadge.tsx',
   // Invoke, the image menu (editor boot) and the lazy layer menu reveal a layer's Properties through these.
   '/workbench/widgets/layers/layerPropertiesRequestStore.ts',
   '/workbench/widgets/layers/revealLayerProperties.ts',
   // The reveal opens widgets through this; its own imports (focus regions, context, widget registry) boot already.
   '/workbench/useOpenWorkbenchWidget.ts',
+  // The boot toaster, the palette and the lazy Notifications widget share the notification actions and the queue
+  // reveal they run. Alone they cost boot requests.
+  '/features/queue/reveal.ts',
+  '/features/queue/ui/queueUiStore.ts',
+  '/workbench/shell/notifications/editorNotificationActions.ts',
+  '/workbench/shell/notifications/notificationActions.ts',
+  '/workbench/shell/notifications/notificationToasts.ts',
+  '/workbench/shell/notifications/toastPolicy.ts',
+  // The boot UI adapters and the lazy palette, image menu and canvas saves find gallery items through it.
+  '/workbench/image-actions/useFindGalleryItem.ts',
+  // Invoke (editor boot), the lazy workflow editor and canvas header actions share the modifier-key hook; alone it
+  // costs a boot request.
+  '/platform/react/useModifierHeld.ts',
+] as const;
+
+// Editor runtime the workbench store reaches: the editor boots it, and the settings field bindings (lazy on both
+// routes) reach it through the same store, while the Launchpad palette does not. Without the group Rolldown splits it
+// by importer set, costing the editor boot one request per piece.
+const WORKBENCH_RUNTIME_SHARED_MODULES = [
+  '/features/generation/core/projectPromptDraft.ts',
+  '/features/generation/core/prompt/compel.ts',
+  '/features/queue/core/deviceLabels.ts',
+  '/features/queue/core/graphInputMedia.ts',
+  '/features/queue/data/activeProgressTargetStore.ts',
+  '/features/queue/data/progressImageStore.ts',
+  '/features/queue/data/progressStore.ts',
+  '/features/queue/data/realtimeRuntime.ts',
+  '/features/queue/publicApi.ts',
+  '/features/queue/runtime.ts',
+  '/features/queue/runtime/cancelRequests.ts',
+  '/features/queue/runtime/coordinator.ts',
+  '/features/queue/runtime/receiptAcknowledgements.ts',
+  '/features/queue/ui/useDeviceLabel.ts',
+  '/features/upscale/core/settings.ts',
+  '/features/upscale/ui/UpscaleUiContext.tsx',
+  '/features/video/core/dimensions.ts',
+  '/features/video/core/settings.ts',
+  '/features/video/core/videoPolicies.ts',
+  '/features/video/core/widgetValues.ts',
+  '/features/video/ui/VideoUiContext.tsx',
+  '/features/workflow/core/buildGraph.ts',
+  '/features/workflow/core/formFieldSettings.ts',
+  '/platform/react/draftRegistry.ts',
+  '/platform/react/useDebouncedValue.ts',
 ] as const;
 
 // The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
@@ -172,12 +255,16 @@ const WORKFLOW_CORE_MODULES = [
   '/features/workflow/core/fields.ts',
   '/features/workflow/core/forLoops.ts',
   '/features/workflow/core/graphIndex.ts',
+  // The batch and utility modules read it at boot; the lazy layer workflows share it.
+  '/features/workflow/core/readinessIssues.ts',
   '/features/workflow/core/types.ts',
   '/features/workflow/core/validation.ts',
   '/features/workflow/core/workflowJson.ts',
   '/features/workflow/data/templates.ts',
   '/features/workflow/react.ts',
   '/features/workflow/ui/WorkflowUiContext.tsx',
+  // The UI barrel re-exports its node reveal; alone it costs a boot request.
+  '/features/workflow/ui/editor/selectionStore.ts',
   '/features/workflow/ui/workflowUiStore.ts',
   '/features/workflow/utility.ts',
   '/workbench/projectWorkflows.ts',
@@ -212,6 +299,8 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/utility.ts',
   '/features/gallery/ui/GalleryDragCursor.tsx',
   '/features/gallery/core/boardLabels.ts',
+  // The upload action reads it at boot; the lazy Gallery's board rows and menus share it.
+  '/features/gallery/core/mediaCounts.ts',
   '/features/gallery/data/queries.ts',
   '/features/gallery/data/queryCache.ts',
   '/features/gallery/ui/GallerySearchHelp.tsx',
@@ -249,6 +338,15 @@ const GALLERY_STATE_MODULES = [
   '/features/gallery/ui/GalleryUiContext.tsx',
   '/features/gallery/ui/galleryStateView.ts',
   '/features/queue/contracts.ts',
+  // The queue contracts, index and React entries re-export these; the lazy queue rows and widget share them. Alone
+  // they cost boot requests.
+  '/features/queue/core/itemLabels.ts',
+  '/features/queue/core/queueActivity.ts',
+  '/features/queue/core/retryReport.ts',
+  '/features/queue/ui/queueOwnership.ts',
+  // The boot queue reveal (editor-boot-shared) and the queue data runtime (widget-hosts) share the reveal's requests;
+  // alone they cost the editor a boot request. This chunk boots on both routes, so the Launchpad pays its bytes only.
+  '/features/queue/ui/queueActionRequests.ts',
   '/features/queue/core/generationMeta.ts',
   '/features/queue/core/historySnapshot.ts',
   '/features/queue/core/historySummary.ts',
@@ -280,7 +378,10 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/canvas-operations/useCanvasEngine.ts',
   '/workbench/canvasProjectMutationPort.ts',
   '/workbench/useCanvasProjectMutationDispatch.ts',
-  '/workbench/widgets/canvas/canvasInteractionLock.ts',
+  // The Canvas widget and the Layers history pane share restore points and recovery; alone they cost activation a
+  // request.
+  '/workbench/widgets/canvas/canvasRestorePoints.ts',
+  '/workbench/widgets/canvas/useCanvasRecovery.ts',
   '/workbench/widgets/canvas/canvasToolCommands.ts',
   '/workbench/widgets/canvas/color-system/colorPair.ts',
   '/workbench/widgets/canvas/color-system/maskTintTarget.ts',
@@ -427,6 +528,12 @@ export default defineConfig({
             },
             {
               includeDependenciesRecursively: false,
+              name: 'workbench-runtime-shared',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKBENCH_RUNTIME_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
               name: 'workflow-core',
               priority: 30,
               test: (id) => matchesAnySuffix(id, WORKFLOW_CORE_MODULES),
@@ -449,6 +556,16 @@ export default defineConfig({
               name: 'imageMapStore',
               priority: 30,
               test: (id) => matchesAnySuffix(id, IMAGE_MAP_DATA_MODULES),
+            },
+            {
+              // Only the Image Map's model-missing message renders `<Trans>`. Without its own group the HTML parser
+              // lands in the eager vendor chunk; its other dependencies are i18next's and stay where they are.
+              includeDependenciesRecursively: false,
+              name: 'i18n-trans',
+              priority: 30,
+              test: (id) =>
+                id.includes('/node_modules/html-parse-stringify/') ||
+                /\/node_modules\/react-i18next\/dist\/es\/Trans(?:WithoutContext)?\.js$/.test(id),
             },
             {
               // ~1 MB, only the lazy Image Map plot needs it.

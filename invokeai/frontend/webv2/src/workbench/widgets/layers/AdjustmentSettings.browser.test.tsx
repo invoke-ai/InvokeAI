@@ -329,7 +329,7 @@ describe('scalar and levels editors', () => {
 
     expect(latestAdjustments().some((entry) => entry.id === 'hue1')).toBe(false);
     expect(host!.querySelector('[data-scope="scrubber"]')).toBeNull();
-    expect(stub.history.entries()).toEqual({ future: ['Edit'], past: [] });
+    expect(stub.history.entries()).toEqual({ evicted: 0, future: ['Edit'], past: [] });
     expect(notify.error).not.toHaveBeenCalled();
   });
 

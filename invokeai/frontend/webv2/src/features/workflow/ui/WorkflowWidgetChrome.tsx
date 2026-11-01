@@ -20,6 +20,7 @@ import {
   resolveConnectorSource,
   shouldAddForReturnLoopLinkage,
   parseWorkflowJson,
+  summarizeWorkflowLoadWarnings,
 } from '@features/workflow/utility';
 import { canCopyText } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -49,7 +50,7 @@ import type { WorkflowProjectPersistence } from './WorkflowUiContext';
 
 import { AddNodeDialog } from './editor/AddNodeDialog';
 import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRuntime';
-import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
+import { getWorkflowViewCenter } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
 import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
 import { isBundledLibraryWorkflowId, isUpdatableSource } from './library/projectWorkflowEntries';
@@ -475,10 +476,8 @@ export const WorkflowDialogHost = () => {
       return addNodePosition;
     }
 
-    const instance = getWorkflowFlowInstance();
-    const center = instance
-      ? instance.screenToFlowPosition({ x: window.innerWidth / 2, y: window.innerHeight / 2 })
-      : { x: 0, y: 0 };
+    // The middle of the editor, wherever its window or panel sits, not of the browser window.
+    const center = getWorkflowViewCenter() ?? { x: 0, y: 0 };
 
     // Slight scatter so repeated inserts do not stack perfectly.
     return { x: center.x + (Math.random() - 0.5) * 80, y: center.y + (Math.random() - 0.5) * 80 };
@@ -634,8 +633,10 @@ export const WorkflowDialogHost = () => {
             reusePlaceholder: true,
           });
 
-          for (const warning of warnings) {
-            notify.info(t('widgets.workflow.importWarning'), warning);
+          const warningSummary = summarizeWorkflowLoadWarnings(warnings);
+
+          if (warningSummary) {
+            notify.info(t('widgets.workflow.importWarning'), warningSummary);
           }
         })
         .catch((error: unknown) => {

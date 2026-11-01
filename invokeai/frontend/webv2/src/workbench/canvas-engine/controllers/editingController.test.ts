@@ -48,7 +48,6 @@ const createTransformOptions = () => ({
   hasFloatingSelection: () => false,
   invalidate: vi.fn(),
   isGestureActive: () => false,
-  isInteractionLocked: () => false,
   peekCacheRect: () => undefined,
   pending: { get: () => null, set: vi.fn() },
   reportRefusal: vi.fn(),

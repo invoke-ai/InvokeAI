@@ -7,6 +7,7 @@
 import type { InvocationTemplates, ProjectGraphState, WorkflowInvocationNode } from './types';
 
 import { getCanonicalWorkflowEdges } from './forLoops';
+import { createWorkflowIssue, type WorkflowIssueReason } from './readinessIssues';
 import { isInvocationNode } from './types';
 
 // #region Node classification
@@ -658,7 +659,7 @@ export interface WorkflowBatchPlan {
   batchSize: number | null;
   hasBatchNodes: boolean;
   pendingGenerators: WorkflowPendingGenerator[];
-  reasons: string[];
+  reasons: WorkflowIssueReason[];
 }
 
 export interface WorkflowBatchPlanOptions {
@@ -693,7 +694,7 @@ export const planWorkflowBatch = (
 
   const nodesById = new Map(document.nodes.map((node) => [node.id, node]));
   const edges = getCanonicalWorkflowEdges(document);
-  const reasons: string[] = [];
+  const reasons: WorkflowIssueReason[] = [];
   const pendingGenerators: WorkflowPendingGenerator[] = [];
   const ungrouped: Array<{ datums: WorkflowBatchDatum[]; size: number | null }> = [];
   const grouped = new Map<
@@ -707,6 +708,7 @@ export const planWorkflowBatch = (
     const type = batchNode.data.type as WorkflowBatchNodeType;
     const name = getNodeDisplayName(batchNode, templates);
     const collectionField = BATCH_COLLECTION_FIELDS[type];
+    const onBatchNode = { nodeId: batchNode.id };
     const incoming = edges.find(
       (edge) => edge.destination.node_id === batchNode.id && edge.destination.field === collectionField
     );
@@ -718,7 +720,13 @@ export const planWorkflowBatch = (
       const generatorType = source && isInvocationNode(source) ? source.data.type : '';
 
       if (!source || !isInvocationNode(source) || !isWorkflowGeneratorNodeType(generatorType)) {
-        reasons.push(`Batch node "${name}" can only receive its collection from a generator.`);
+        reasons.push(
+          createWorkflowIssue(
+            'batchSourceNotGenerator',
+            { node: name },
+            { fieldName: collectionField, nodeId: batchNode.id }
+          )
+        );
       } else {
         const value = parseWorkflowGeneratorValue(
           GENERATOR_FIELD_TYPE_NAMES[generatorType],
@@ -733,7 +741,13 @@ export const planWorkflowBatch = (
           // Refused by its count alone: building the list would cost memory in every readiness pass.
           oversizedGenerator = true;
         } else if (runnable?.type === 'image_generator_images_from_board' && runnable.board_id === undefined) {
-          reasons.push(`Image generator "${getNodeDisplayName(source, templates)}" has no board selected.`);
+          reasons.push(
+            createWorkflowIssue(
+              'imageGeneratorNoBoard',
+              { node: getNodeDisplayName(source, templates) },
+              { fieldName: 'generator', nodeId: source.id }
+            )
+          );
         } else if (runnable) {
           const resolution = resolveWorkflowGeneratorValue(runnable, random);
 
@@ -780,7 +794,7 @@ export const planWorkflowBatch = (
       hasOutgoing = true;
 
       if (edge.source.field !== outputField) {
-        reasons.push(`Batch node "${name}" can only batch its image output; width and height are not supported.`);
+        reasons.push(createWorkflowIssue('batchOutputUnsupported', { node: name }, onBatchNode));
         continue;
       }
 
@@ -800,7 +814,11 @@ export const planWorkflowBatch = (
         (targetTemplate && !targetInput)
       ) {
         reasons.push(
-          `"${name}" cannot supply batch values to "${targetInput?.title ?? edge.destination.field}" on "${targetName}".`
+          createWorkflowIssue(
+            'batchTargetUnsupported',
+            { field: targetInput?.title ?? edge.destination.field, node: targetName, source: name },
+            { fieldName: edge.destination.field, nodeId: target.id }
+          )
         );
         continue;
       }
@@ -810,7 +828,11 @@ export const planWorkflowBatch = (
 
       if (claimedBy && claimedBy !== batchNode) {
         reasons.push(
-          `"${targetInput?.title ?? edge.destination.field}" on "${targetName}" receives values from more than one batch node.`
+          createWorkflowIssue(
+            'batchTargetClaimed',
+            { field: targetInput?.title ?? edge.destination.field, node: targetName },
+            { fieldName: edge.destination.field, nodeId: target.id }
+          )
         );
         continue;
       }
@@ -828,15 +850,15 @@ export const planWorkflowBatch = (
     }
 
     if (!hasOutgoing) {
-      reasons.push(`Batch node "${name}" is not connected to any node.`);
+      reasons.push(createWorkflowIssue('batchNotConnected', { node: name }, onBatchNode));
     }
 
     const size = items ? items.length : null;
 
     if (size === 0) {
-      reasons.push(`Batch node "${name}" has an empty collection.`);
+      reasons.push(createWorkflowIssue('batchEmpty', { node: name }, onBatchNode));
     } else if (oversizedGenerator || (size !== null && size > WORKFLOW_BATCH_MAX_ITEMS)) {
-      reasons.push(`Batch node "${name}" has more than ${WORKFLOW_BATCH_MAX_ITEMS.toLocaleString('en-US')} items.`);
+      reasons.push(createWorkflowIssue('batchTooLarge', { max: WORKFLOW_BATCH_MAX_ITEMS, node: name }, onBatchNode));
     }
 
     const groupId = getWorkflowBatchGroupId(batchNode);
@@ -868,7 +890,9 @@ export const planWorkflowBatch = (
         .map((member) => `${getNodeDisplayName(member.node, templates)}: ${member.size}`)
         .join(', ');
 
-      reasons.push(`Batch group "${groupId}" mixes collection sizes (${sizes}).`);
+      reasons.push(
+        createWorkflowIssue('batchGroupMixedSizes', { group: groupId, sizes }, { nodeId: members[0]?.node.id })
+      );
     }
 
     const groupDatums = members.flatMap((member) => member.datums);
