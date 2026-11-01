@@ -4466,6 +4466,7 @@
         "lockedByGeneration": "A generation is running or results wait for review on this canvas, and restoring would throw them away. They’re left as they are: accept or discard them, then restore the point from History.",
         "unsavedMessage": "Your latest strokes couldn’t be saved, so nothing was restored. Try again in a moment.",
         "alreadyStaged": "Those results are already staged",
+        "changedSinceMessage": "The canvas changed since. Its restore point is still in History.",
         "keptReplaced": "History keeps a restore point of the canvas it replaced."
       }
     },

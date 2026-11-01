@@ -15,6 +15,7 @@ import type {
 } from '@workbench/canvas-engine/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { createNewCanvasState } from '@workbench/canvasMigration';
 import { isCancellableQueueItem } from '@workbench/canvasStagingView';
 
@@ -144,6 +145,8 @@ export type RestoreOutcome =
   | { status: 'restored'; undoPointId: string | null }
   | { status: 'locked'; reason: 'editing' | 'canvas' }
   | { status: 'unsaved' }
+  /** The canvas was edited since the swap this restore undoes, strokes saved by the barrier included; nothing changed. */
+  | { status: 'changed' }
   /** A Discard all point whose results are all staged already; it stays. */
   | { status: 'nothing' }
   | { status: 'gone' };
@@ -152,14 +155,19 @@ export type RestoreOutcome =
  * Restores a point. A canvas point waits while an operation, a generation or a review holds the canvas, both before
  * and after saving the strokes still uploading, then takes the replaced canvas's place among the points
  * (`undoPointId`) unless that canvas was blank. A Discard all point only re-stages its results, so it neither waits
- * nor keeps the canvas.
+ * nor keeps the canvas. `isEditedSince`, for an Undo, refuses once the canvas was edited, asked again after the
+ * barrier since the strokes it saves land in the document only then.
  */
 export const restoreFromPoint = async (
   ports: RestorePointPorts,
   point: { id: string; kind?: CanvasSnapshotKind },
-  beforeName: string
+  beforeName: string,
+  isEditedSince: () => boolean = () => false
 ): Promise<RestoreOutcome> => {
   const restagesOnly = point.kind === 'discard-results';
+  if (isEditedSince()) {
+    return { status: 'changed' };
+  }
   const lock = restagesOnly ? null : ports.lockReason();
   if (lock) {
     return { reason: lock, status: 'locked' };
@@ -182,6 +190,9 @@ export const restoreFromPoint = async (
   if (lockAfterBarrier) {
     return { reason: lockAfterBarrier, status: 'locked' };
   }
+  if (isEditedSince()) {
+    return { status: 'changed' };
+  }
   if (ports.isBlank()) {
     if (!engine.document.restoreSnapshot(point.id)) {
       return { status: 'gone' };
@@ -194,4 +205,26 @@ export const restoreFromPoint = async (
   return engine.document.restoreSnapshot(point.id, { createdAt: ports.now(), id: undoPointId, name: beforeName })
     ? { status: 'restored', undoPointId }
     : { status: 'gone' };
+};
+
+/** The canvas a Clear canvas or a restore left, which its Undo must still find. */
+export type CanvasEditFence = Pick<CanvasStateContractV3, 'document' | 'documentRevision'>;
+
+/**
+ * Whether the canvas was edited since `fence`: another swap, a resize, or any change to its layers or background.
+ * Selecting a layer or moving the bbox does not count, since an Undo that replaces them loses no work.
+ */
+export const isCanvasEditedSince = (fence: CanvasEditFence, canvas: CanvasEditFence): boolean => {
+  if (canvas.documentRevision !== fence.documentRevision) {
+    return true;
+  }
+  const before = fence.document;
+  const now = canvas.document;
+  return (
+    now !== before &&
+    (now.width !== before.width ||
+      now.height !== before.height ||
+      !areJsonValuesStructurallyEqual(now.background, before.background) ||
+      !areJsonValuesStructurallyEqual(now.stacks, before.stacks))
+  );
 };

@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import {
   clearCanvasWithRestorePoint,
   getInFlightCanvasItems,
+  isCanvasEditedSince,
   restoreFromPoint,
   saveRestorePoint,
   type RestoreOutcome,
@@ -32,6 +33,22 @@ import {
 /** One project's staged results and recovery: a newer staging Undo withdraws an older one's toast. */
 const stagingUndoKey = (projectId: string): string => `canvas-staging:${projectId}`;
 const restoreUndoKey = (projectId: string): string => `canvas-restore:${projectId}`;
+
+type WorkbenchQueries = ReturnType<typeof useWorkbenchQueries>;
+
+/**
+ * Whether the project's canvas was edited since the swap that offered an Undo, read when the Undo runs. A newer swap
+ * withdraws that Undo, but painting does not, and the Undo may come minutes later from the Notifications list.
+ */
+const readEditedSince = (queries: WorkbenchQueries, projectId: string): (() => boolean) => {
+  const canvas = queries.getProject(projectId)?.canvas;
+  // Only the document: the closure may wait a whole session, and the rest of the canvas state is not compared.
+  const fence = canvas && { document: canvas.document, documentRevision: canvas.documentRevision };
+  return () => {
+    const current = queries.getProject(projectId)?.canvas;
+    return !!fence && !!current && isCanvasEditedSince(fence, current);
+  };
+};
 
 const useRecoveryPorts = () => {
   const { canvas } = useWorkbenchCommands();
@@ -82,6 +99,9 @@ const explainRestore = (outcome: RestoreOutcome, notify: Notify, t: TFunction): 
     case 'nothing':
       notify.info(t('widgets.canvas.restorePoints.alreadyStaged'));
       return;
+    case 'changed':
+      notify.info(t('widgets.canvas.restorePoints.notRestored'), t('widgets.canvas.restorePoints.changedSinceMessage'));
+      return;
     case 'gone':
       notify.error(t('widgets.canvas.restorePoints.unavailable'), t('widgets.canvas.restorePoints.unavailableMessage'));
   }
@@ -89,19 +109,22 @@ const explainRestore = (outcome: RestoreOutcome, notify: Notify, t: TFunction): 
 
 /**
  * Undo of a Clear canvas or of a restore: brings the point back like the History pane does, keeping what the canvas
- * holds now as a point of its own, and says why when it cannot.
+ * holds now as a point of its own, and says why when it cannot. Once the canvas was edited since, it leaves the edits
+ * alone; the point stays in History.
  */
 const undoWithPoint = async (
   ports: RestorePointPorts,
   pointId: string,
   pointName: string,
+  isEditedSince: () => boolean,
   notify: Notify,
   t: TFunction
 ): Promise<void> => {
   const outcome = await restoreFromPoint(
     ports,
     { id: pointId, kind: 'clear-canvas' },
-    t('widgets.canvas.restorePoints.beforeRestore', { name: pointName })
+    t('widgets.canvas.restorePoints.beforeRestore', { name: pointName }),
+    isEditedSince
   );
   explainRestore(outcome, notify, t);
   if (outcome.status === 'restored' && outcome.undoPointId) {
@@ -303,9 +326,10 @@ export const useClearCanvas = () => {
         notify.success(t('widgets.canvas.controls.cleared'), stopped ?? undefined);
         return;
       }
+      const isEditedSince = readEditedSince(queries, projectId);
       notify.undoable(t('widgets.canvas.controls.cleared'), {
         message: [t('widgets.canvas.controls.clearedMessage'), stopped].filter(Boolean).join(' '),
-        onUndo: () => void undoWithPoint(ports, restorePointId, name, notify, t),
+        onUndo: () => void undoWithPoint(ports, restorePointId, name, isEditedSince, notify, t),
         projectId,
         supersedes: restoreUndoKey(projectId),
       });
@@ -318,6 +342,7 @@ export const useClearCanvas = () => {
 export const useRestorePoint = () => {
   const { t } = useTranslation();
   const notify = useNotify();
+  const queries = useWorkbenchQueries();
   const projectId = useActiveProjectId();
   const portsFor = useRecoveryPorts();
 
@@ -339,12 +364,13 @@ export const useRestorePoint = () => {
         notify.success(t('widgets.canvas.restorePoints.restored', { name: point.name }));
         return;
       }
+      const isEditedSince = readEditedSince(queries, projectId);
       notify.undoable(t('widgets.canvas.restorePoints.restored', { name: point.name }), {
-        onUndo: () => void undoWithPoint(ports, undoPointId, beforeName, notify, t),
+        onUndo: () => void undoWithPoint(ports, undoPointId, beforeName, isEditedSince, notify, t),
         projectId,
         supersedes: restoreUndoKey(projectId),
       });
     },
-    [notify, portsFor, projectId, t]
+    [notify, portsFor, projectId, queries, t]
   );
 };

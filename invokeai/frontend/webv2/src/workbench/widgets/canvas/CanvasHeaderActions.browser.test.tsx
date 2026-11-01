@@ -12,10 +12,11 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createCanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import { createCanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
+import { runNotificationUndo } from '@workbench/shell/notifications/undoRegistry';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, createRef, useImperativeHandle, type Ref } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -72,6 +73,7 @@ vi.mock('./useCreateFromBbox', () => ({
 
 import { CanvasHeaderActions } from './CanvasHeaderActions';
 import { CANVAS_SURFACE_ATTR } from './surfaceFocus';
+import { useRestorePoint } from './useCanvasRecovery';
 
 const INSTANCE_ID = 'canvas-1';
 
@@ -81,6 +83,14 @@ const CanvasViewStandIn = () => (
     <div {...{ [CANVAS_SURFACE_ATTR]: '' }} data-testid="surface" tabIndex={-1} />
   </div>
 );
+
+/** Hands the test the History pane's restore, which shares Clear canvas's Undo. */
+const RestorePointProbe = ({ ref }: { ref: Ref<ReturnType<typeof useRestorePoint>> }) => {
+  const restorePoint = useRestorePoint();
+  useImperativeHandle(ref, () => restorePoint, [restorePoint]);
+  return null;
+};
+const restorePointRef = createRef<ReturnType<typeof useRestorePoint>>();
 
 const i18n = createInstance();
 let root: Root | null = null;
@@ -217,6 +227,7 @@ const renderActions = async ({
           <ChakraProvider value={system}>
             <CanvasHeaderActions {...({ instance: { id: INSTANCE_ID }, runtime } as unknown as WidgetViewProps)} />
             <CanvasViewStandIn />
+            <RestorePointProbe ref={restorePointRef} />
           </ChakraProvider>
         </I18nextProvider>
       )
@@ -227,6 +238,30 @@ const renderActions = async ({
 
 const clearButton = () => page.getByRole('button', { exact: true, name: 'Clear canvas' });
 const confirmDialog = () => page.getByRole('alertdialog');
+
+type TestStore = ReturnType<typeof createWorkbenchStore>;
+const rasterIds = (store: TestStore) =>
+  store.getState().projects[0]!.canvas.document.stacks.raster.map((node) => node.id);
+/** Runs the newest notice's Undo, as its button in the Notifications list would. */
+const undoNewest = (store: TestStore) => {
+  const undo = store
+    .getState()
+    .notifications.flatMap((notice) => notice.actions ?? [])
+    .find((action) => action.kind === 'undo');
+  act(() => runNotificationUndo((undo as { undoId: string }).undoId));
+};
+/** Paints on the canvas the way any later edit would: a new layer. */
+const addLayer = (store: TestStore, id: string) =>
+  store.commands.canvas.apply(store.getState().activeProjectId, {
+    anchor: harness.engine!.document.captureInsertionAnchor('raster', null),
+    layer: { ...paintedLayer, id },
+    type: 'addCanvasLayer',
+  });
+const clearConfirmed = async (store: TestStore) => {
+  await clearButton().click();
+  await confirmDialog().getByRole('button', { exact: true, name: 'Clear canvas' }).click();
+  await expect.poll(() => store.getState().notifications[0]?.title).toBe('Canvas cleared');
+};
 
 describe('CanvasHeaderActions clear canvas', () => {
   it('asks to clear the canvas on one click, without a menu, even when the canvas is empty', async () => {
@@ -298,6 +333,84 @@ describe('CanvasHeaderActions clear canvas', () => {
       type: 'restoreCanvasSnapshot',
     });
     expect(store.getState().projects[0]!.canvas.document.stacks.raster.map((node) => node.id)).toEqual(['painted']);
+  });
+
+  it('brings the cleared canvas back from its Undo, even after a selection or bbox change', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer] });
+    await clearConfirmed(store);
+    store.commands.canvas.apply(store.getState().activeProjectId, {
+      bbox: { height: 32, width: 32, x: 8, y: 8 },
+      type: 'setCanvasBbox',
+    });
+
+    undoNewest(store);
+
+    await expect.poll(() => rasterIds(store)).toEqual(['painted']);
+  });
+
+  it('keeps what was painted since a clear when its Undo runs late, and says the canvas was not restored', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer] });
+    await clearConfirmed(store);
+    addLayer(store, 'later');
+
+    undoNewest(store);
+
+    await expect.poll(() => store.getState().notifications[0]?.title).toBe('Canvas not restored');
+    expect(store.getState().notifications[0]?.message).toBe(
+      'The canvas changed since. Its restore point is still in History.'
+    );
+    expect(rasterIds(store)).toEqual(['later']);
+    // The point is still in History for a deliberate restore.
+    expect(store.getState().projects[0]!.canvas.snapshots.map((point) => point.kind)).toEqual(['clear-canvas']);
+  });
+
+  it('undoes a History restore only while the restored canvas is unedited', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer] });
+    await clearConfirmed(store);
+    addLayer(store, 'after-clear');
+    const point = store.getState().projects[0]!.canvas.snapshots[0]!;
+
+    await act(() => restorePointRef.current!(point));
+    expect(rasterIds(store)).toEqual(['painted']);
+    undoNewest(store);
+    await expect.poll(() => rasterIds(store)).toEqual(['after-clear']);
+
+    const kept = store.getState().projects[0]!.canvas.snapshots.find((entry) => entry.name.startsWith('Before'))!;
+    await act(() => restorePointRef.current!(kept));
+    addLayer(store, 'edited');
+    const edited = rasterIds(store);
+    undoNewest(store);
+
+    await expect.poll(() => store.getState().notifications[0]?.title).toBe('Canvas not restored');
+    expect(store.getState().notifications[0]?.message).toBe(
+      'The canvas changed since. Its restore point is still in History.'
+    );
+    expect(rasterIds(store)).toEqual(edited);
+  });
+
+  it('refuses a restore Undo when a stroke still uploading on a layer lands while the Undo saves it', async () => {
+    const { store } = await renderActions({ layers: [paintedLayer] });
+    await clearConfirmed(store);
+    addLayer(store, 'after-clear');
+    await act(() => restorePointRef.current!(store.getState().projects[0]!.canvas.snapshots[0]!));
+    expect(rasterIds(store)).toEqual(['painted']);
+    const projectId = store.getState().activeProjectId;
+    const lifecycle = harness.engine!.lifecycle;
+    const flush = lifecycle.flushPendingUploads.bind(lifecycle);
+    // The stroke reaches the document only once the paint barrier saves it, after the Undo's first look.
+    vi.spyOn(lifecycle, 'flushPendingUploads').mockImplementationOnce(async (options) => {
+      await flush(options);
+      store.commands.canvas.apply(projectId, { id: 'painted', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
+    });
+
+    undoNewest(store);
+
+    await expect.poll(() => store.getState().notifications[0]?.title).toBe('Canvas not restored');
+    expect(store.getState().notifications[0]?.message).toBe(
+      'The canvas changed since. Its restore point is still in History.'
+    );
+    const layers = store.getState().projects[0]!.canvas.document.stacks.raster;
+    expect(layers.map((node) => [node.id, 'opacity' in node ? node.opacity : null])).toEqual([['painted', 0.5]]);
   });
 
   it('is unavailable while editing is locked, says why, and its command opens nothing then', async () => {

@@ -185,6 +185,27 @@ describe('restoreFromPoint', () => {
     expect(fixture.applied).toEqual([]);
   });
 
+  it('refuses an Undo once the canvas was edited, before the barrier or by the strokes it saves', async () => {
+    const early = createFixture();
+    await expect(restoreFromPoint(early.ports, { id: 'p' }, 'Before', () => true)).resolves.toEqual({
+      status: 'changed',
+    });
+    expect(early.order).toEqual([]);
+
+    let strokeLanded = false;
+    const late = createFixture({
+      flush: () => {
+        strokeLanded = true;
+        return Promise.resolve();
+      },
+    });
+    await expect(restoreFromPoint(late.ports, { id: 'p' }, 'Before', () => strokeLanded)).resolves.toEqual({
+      status: 'changed',
+    });
+    expect(late.order).toEqual(['flush']);
+    expect(late.engine.document.restoreSnapshot).not.toHaveBeenCalled();
+  });
+
   it('uses the point up without keeping a blank canvas in its place', async () => {
     const fixture = createFixture({ blank: true });
     await expect(restoreFromPoint(fixture.ports, { id: 'p' }, 'Before')).resolves.toEqual({
