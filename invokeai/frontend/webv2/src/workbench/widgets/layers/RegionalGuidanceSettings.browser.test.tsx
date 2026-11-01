@@ -225,10 +225,33 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     expect(host!.querySelector('[role="status"]')).toBeNull();
   });
 
-  it('names the region type by its label and describes it with the help text', async () => {
+  it('describes the region type by the roles and the prompt field by the box', async () => {
     await renderLive('moss-image');
 
     expect(descriptionOf(kindGroup().element())).toEqual(['widgets.layers.regionalGuidance.layoutKindHelp']);
+    expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutBoxHelp']);
+  });
+
+  it('offers no region type or visible text on a base with objects only, keeping a stored text role', async () => {
+    await renderLive('ideogram-4', { layout: { kind: 'text' }, negativePrompt: 'blurry' });
+
+    expect(kindGroup().query()).toBeNull();
+    expect(visibleTextInput().query()).toBeNull();
+    expect(negativeInput().query()).toBeNull();
+    // Placed as an object, a text role needs no visible text.
+    expect(announced()).toBe('');
+    expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutBoxHelp']);
+    expect(liveLayer().layout).toEqual({ kind: 'text' });
+  });
+
+  it('describes the prompt field by the box and a missing prompt together', async () => {
+    await renderLive('ideogram-4', { positivePrompt: null });
+
+    expect(announced()).toBe('widgets.layers.regionalGuidance.layoutMissingPrompt');
+    expect(descriptionOf(promptInput().element())).toEqual([
+      'widgets.layers.regionalGuidance.layoutBoxHelp',
+      'widgets.layers.regionalGuidance.layoutMissingPrompt',
+    ]);
   });
 
   it('records a type switch and the visible text as one undo step each, keeping text across a switch', async () => {
@@ -297,7 +320,10 @@ describe('RegionalGuidanceSettings on a layout base', () => {
   it('commits an unsaved caption when Invoke flushes drafts from inside the field (Ctrl+Enter)', async () => {
     await renderLive('moss-image', { positivePrompt: null });
     expect(announced()).toBe('widgets.layers.regionalGuidance.layoutMissingPrompt');
-    expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutMissingPrompt']);
+    expect(descriptionOf(promptInput().element())).toEqual([
+      'widgets.layers.regionalGuidance.layoutBoxHelp',
+      'widgets.layers.regionalGuidance.layoutMissingPrompt',
+    ]);
 
     await act(() => promptInput().fill('a neon sign'));
     expect(stub.commits).toHaveLength(0);
