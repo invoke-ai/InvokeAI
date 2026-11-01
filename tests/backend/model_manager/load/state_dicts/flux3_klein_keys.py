@@ -1,8 +1,10 @@
-"""FLUX.3 Image Klein (step-distilled), BFL's native bf16 layout -- `model.safetensors` and its byte-identical ComfyUI repackage `flux3_image_klein_sd_bf16.safetensors`.
+"""FLUX.3 Image Klein (step-distilled), BFL's native bf16 layout -- `model.safetensors` and its byte-identical ComfyUI repackage `flux3-image-klein-bf16.safetensors`.
 
 Captured on 2026-10-16 with `scripts/capture_state_dict_fixture.py`,
 which reads the header only, from
-`E:/ModelStuffSSD/flux-3-image-klein-comfy/diffusion_models/flux3_image_klein_sd_bf16.safetensors`.
+`black-forest-labs/flux-3-image-klein-comfy/diffusion_models/flux3_image_klein_sd_bf16.safetensors`.
+The repository renamed that file to `flux3-image-klein-bf16.safetensors` on 2026-10-17; it is the same LFS object as
+`black-forest-labs/flux-3-image-klein/model.safetensors`.
 
 Subsetting rule: `content_mode_blocks.image` index 0, `content_mode_blocks.image_cond` index 0, `single_blocks` index 0, `txt_mode_blocks` index 0, plus every key outside a stack. Values are `(shape, dtype)`.
 

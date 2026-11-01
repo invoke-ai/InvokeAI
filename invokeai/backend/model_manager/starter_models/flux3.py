@@ -38,11 +38,11 @@ flux3_klein_base = StarterModel(
     variant=Flux3VariantType.KleinBase,
 )
 
+# Both single-file builds are pinned to a commit: the repository renamed their files once, which broke the `main` URLs.
 flux3_klein_single_file = StarterModel(
     name="FLUX.3 Klein (single file)",
     base=BaseModelType.Flux3,
-    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/"
-    "flux3_image_klein_sd_bf16.safetensors",
+    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-bf16.safetensors",
     description="FLUX.3 Image Klein transformer as one bf16 file; the FLUX.2 VAE and Qwen3-VL 4B encoder are "
     f"installed as dependencies and shared with other models. ~11GB. {_LICENSE}",
     type=ModelType.Main,
@@ -54,8 +54,7 @@ flux3_klein_single_file = StarterModel(
 flux3_klein_base_single_file = StarterModel(
     name="FLUX.3 Klein Base (single file)",
     base=BaseModelType.Flux3,
-    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/main/diffusion_models/"
-    "flux3_image_klein_bf16.safetensors",
+    source="https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models/flux3-image-klein-base-bf16.safetensors",
     description="FLUX.3 Image Klein Base transformer as one bf16 file; the FLUX.2 VAE and Qwen3-VL 4B encoder are "
     f"installed as dependencies. ~11GB. {_LICENSE}",
     type=ModelType.Main,
