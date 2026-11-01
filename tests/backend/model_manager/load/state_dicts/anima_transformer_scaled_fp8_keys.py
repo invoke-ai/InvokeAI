@@ -7,7 +7,7 @@ exactly one `full_precision_matrix_mult` layer -- every other captured checkpoin
 none or a large fraction, so the single-marked case was previously untested.
 
 The header names its layers `net.`-prefixed, i.e. in the checkpoint's own scheme, while the scales
-are read after `_strip_anima_bundle_prefix` has run. Reading the header without renaming matches
+are read after `strip_anima_bundle_prefix` has run. Reading the header without renaming matches
 nothing and drops every flag silently.
 
 Subsetting rule: block 24 (the one carrying the marked layer) plus every non-block key. Values are

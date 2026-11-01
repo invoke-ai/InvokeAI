@@ -16,8 +16,9 @@
       "control_kinds": [
         "anima_lllite"
       ],
-      "max_reference_images": 0,
-      "reference_images_require_variant": null,
+      "max_reference_images": 4,
+      "reference_images_require_variant": "anima_qwen3",
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -74,8 +75,9 @@
       "control_kinds": [
         "anima_lllite"
       ],
-      "max_reference_images": 0,
-      "reference_images_require_variant": null,
+      "max_reference_images": 4,
+      "reference_images_require_variant": "anima_qwen3",
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -132,6 +134,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -173,6 +176,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -224,6 +228,7 @@
       ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -268,6 +273,7 @@
       ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -312,6 +318,7 @@
       ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -350,9 +357,12 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -391,9 +401,12 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -432,9 +445,12 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -473,9 +489,12 @@
       "guidance_max": 20.0,
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "flux2_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -501,6 +520,104 @@
     "vae": null
   },
   {
+    "base": "flux3",
+    "variant": null,
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 16,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": null,
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 10,
+      "reference_images_require_variant": null,
+      "reference_images_require_format": null,
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": null,
+      "steps": 16,
+      "cfg_scale": 1.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": {
+      "accepted": [
+        {
+          "base": "flux2",
+          "latent_channels": null
+        }
+      ]
+    }
+  },
+  {
+    "base": "flux3",
+    "variant": "flux3_klein_base",
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 16,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": null,
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 10,
+      "reference_images_require_variant": null,
+      "reference_images_require_format": null,
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": null,
+      "steps": 50,
+      "cfg_scale": 3.5,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": {
+      "accepted": [
+        {
+          "base": "flux2",
+          "latent_channels": null
+        }
+      ]
+    }
+  },
+  {
     "base": "ideogram-4",
     "variant": null,
     "features": {
@@ -517,7 +634,8 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
-      "supports_regional_guidance": false,
+      "reference_images_require_format": null,
+      "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
       "supports_seamless": false,
@@ -563,8 +681,9 @@
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
       "control_kinds": [],
-      "max_reference_images": 0,
+      "max_reference_images": 3,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -615,8 +734,9 @@
       "scheduler_set": "flow",
       "scheduler_applies_to_graph": false,
       "control_kinds": [],
-      "max_reference_images": 0,
+      "max_reference_images": 3,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -669,6 +789,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -710,6 +831,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -751,6 +873,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -776,6 +899,55 @@
     "vae": null
   },
   {
+    "base": "moss-image",
+    "variant": null,
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 16,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "flow",
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 0,
+      "reference_images_require_variant": null,
+      "reference_images_require_format": null,
+      "supports_regional_guidance": true,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 50,
+      "cfg_scale": 3.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": {
+      "accepted": [
+        {
+          "base": "flux2",
+          "latent_channels": null
+        }
+      ]
+    }
+  },
+  {
     "base": "qwen-image",
     "variant": null,
     "features": {
@@ -789,9 +961,12 @@
       "guidance_max": null,
       "scheduler_set": "standard",
       "scheduler_applies_to_graph": false,
-      "control_kinds": [],
+      "control_kinds": [
+        "qwen_image_control"
+      ],
       "max_reference_images": 5,
       "reference_images_require_variant": "edit",
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -828,6 +1003,90 @@
     }
   },
   {
+    "base": "qwen-image-2-1",
+    "variant": null,
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 32,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "flow",
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 4,
+      "reference_images_require_variant": null,
+      "reference_images_require_format": "diffusers",
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 40,
+      "cfg_scale": 1.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": null
+  },
+  {
+    "base": "qwen-image-2-1",
+    "variant": "qwen_image_21_turbo",
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 32,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "flow",
+      "scheduler_applies_to_graph": false,
+      "control_kinds": [],
+      "max_reference_images": 4,
+      "reference_images_require_variant": null,
+      "reference_images_require_format": "diffusers",
+      "supports_regional_guidance": false,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 8,
+      "cfg_scale": 1.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": null
+  },
+  {
     "base": "sd-1",
     "variant": null,
     "features": {
@@ -847,6 +1106,7 @@
       ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": true,
       "clip_skip_max": 12,
@@ -888,6 +1148,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": true,
       "clip_skip_max": 24,
@@ -929,6 +1190,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -973,6 +1235,7 @@
       ],
       "max_reference_images": 5,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": true,
       "clip_skip_max": null,
@@ -1014,6 +1277,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -1055,6 +1319,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -1103,6 +1368,7 @@
       "control_kinds": [],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": false,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -1153,6 +1419,7 @@
       ],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,
@@ -1203,6 +1470,7 @@
       ],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
+      "reference_images_require_format": null,
       "supports_regional_guidance": true,
       "regional_negative": false,
       "clip_skip_max": null,

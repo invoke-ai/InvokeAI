@@ -205,6 +205,36 @@ def test_the_model_loader_refuses_a_components_only_folder_as_the_model() -> Non
         node.invoke(context)
 
 
+def test_the_model_loader_takes_a_gguf_transformer_with_its_component_folder() -> None:
+    """A GGUF build is a single-file transformer like the safetensors ones: its components come from the
+    folder, and its variant still picks the schedule."""
+    from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+    from invokeai.backend.model_manager.configs.main import Main_GGUF_LTX2_Config
+
+    node = LTX2ModelLoaderInvocation(
+        id="loader",
+        model=_identifier(),
+        component_source=_identifier("components"),
+        text_encoder_model=_identifier("encoder"),
+    )
+    configs = {
+        "transformer": Main_GGUF_LTX2_Config.model_construct(
+            name="LTX-2.5 Distilled (GGUF)", variant=LTX2VariantType.Distilled, generation="2.5"
+        ),
+        "components": Main_Diffusers_LTX2_Config.model_construct(name="LTX-2.5 Components", components_only=True),
+        "encoder": Gemma4Encoder_Gemma4Encoder_LTX2_Config.model_construct(name="Gemma-4"),
+    }
+    context = _context()
+    context.models.exists.return_value = True
+    context.models.get_config.side_effect = lambda key: configs[getattr(key, "key", key)]
+
+    output = node.invoke(context)
+
+    assert output.transformer.variant == LTX2VariantType.Distilled.value
+    assert output.transformer.transformer.key == "transformer"
+    assert output.vae.vae.key == "components" and output.text_encoder.connectors.key == "components"
+
+
 def test_the_model_loader_refuses_a_model_from_another_architecture() -> None:
     node = LTX2ModelLoaderInvocation(id="loader", model=_identifier(), text_encoder_model=_identifier("encoder"))
     context = _context()
@@ -262,6 +292,7 @@ def test_fitting_an_image_to_the_canvas_crops_rather_than_stretches() -> None:
     assert fitted.getpixel((352, 352)) == (0, 0, 255)
 
 
+@pytest.mark.ffmpeg
 def test_the_crf_round_trip_returns_a_recompressed_frame_of_the_same_size() -> None:
     """The conditioning image has to carry codec artefacts; the round trip goes through ffmpeg,
     whose two-process pipe is easy to get subtly wrong."""
@@ -276,6 +307,7 @@ def test_the_crf_round_trip_returns_a_recompressed_frame_of_the_same_size() -> N
     assert recompress_h264(source, 0) is source
 
 
+@pytest.mark.ffmpeg
 def test_an_odd_sized_image_is_cropped_to_what_h264_can_encode() -> None:
     source = Image.new("RGB", (65, 33), "green")
     assert recompress_h264(source, 18).size == (64, 32)
@@ -455,6 +487,53 @@ def test_the_upscaler_hands_the_network_raw_latents_and_returns_normalized_ones(
     )
     # Pixel geometry, not `size()[3] * 8`: 4x6 latents doubled is 8x12, at 32 px per latent.
     assert (output.width, output.height, output.num_frames) == (12 * 32, 8 * 32, (2 - 1) * 8 + 1)
+
+
+class _StopAtReservation(Exception):
+    """Raised out of the mocked `model_on_device()` so the node stops at the reservation."""
+
+
+def test_a_gguf_transformer_reserves_its_dequant_transient() -> None:
+    """A GGUF build dequantizes each packed Linear's weight on every forward, a copy the model's resident
+    size does not include. The reservation is read off the loaded model, so it holds for every format the
+    transformer arrives in; this pins that it does."""
+    import gguf
+
+    from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+
+    def reserved(weight: torch.Tensor) -> int:
+        linear = torch.nn.Linear(64, 128, bias=False)
+        linear.weight = torch.nn.Parameter(weight, requires_grad=False)
+        transformer_info = MagicMock()
+        transformer_info.model = torch.nn.Sequential(linear)
+        transformer_info.model_on_device = MagicMock(side_effect=_StopAtReservation)
+        context = _context()
+        context.models.load.return_value = transformer_info
+        context.models.get_config.return_value = SimpleNamespace(format=ModelFormat.GGUFQuantized)
+        context.conditioning.load.return_value = SimpleNamespace(
+            conditionings=[
+                LTX2ConditioningInfo(
+                    video_embeds=torch.zeros(1, 4, 8),
+                    audio_embeds=torch.zeros(1, 4, 6),
+                    attention_mask=torch.ones(1, 4, dtype=torch.int64),
+                )
+            ]
+        )
+        node = _denoise(
+            transformer=LTX2TransformerField(transformer=_identifier(), variant=LTX2VariantType.Distilled.value),
+            width=64,
+            height=64,
+            num_frames=9,
+        )
+        with pytest.raises(_StopAtReservation):
+            node.invoke(context)
+        return transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
+
+    raw = gguf.quantize(np.zeros((128, 64), np.float32), gguf.GGMLQuantizationType.Q8_0)
+    packed = GGMLTensor(torch.from_numpy(raw), gguf.GGMLQuantizationType.Q8_0, torch.Size((128, 64)), torch.bfloat16)
+
+    # At least the bfloat16 copy of the weight it dequantizes, beyond what the same dense model reserves.
+    assert reserved(packed) - reserved(torch.zeros(128, 64, dtype=torch.bfloat16)) >= 128 * 64 * 2
 
 
 def test_the_refine_pass_forwards_the_noise_level_the_node_was_given(monkeypatch) -> None:
@@ -1352,6 +1431,7 @@ def test_the_source_clip_is_streamed_rather_than_collected(monkeypatch: pytest.M
     assert decoded == 2
 
 
+@pytest.mark.ffmpeg
 def test_the_held_latents_are_not_decoded_when_the_source_clip_is_wired(monkeypatch: pytest.MonkeyPatch) -> None:
     """The whole point is to skip that work: decoding is a second tiled VAE pass over a clip whose
     pixels are already on disk."""

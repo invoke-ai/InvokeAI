@@ -4,8 +4,10 @@ import type { InvocationRoute } from '@workbench/invocationContracts';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { dynamicPromptsKeys } from '@features/generation/prompts';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { createDefaultUpscaleWidgetValues } from '@features/upscale';
 import { queryClient } from '@platform/query/client';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const templatesMock = vi.hoisted(() => ({
@@ -16,6 +18,24 @@ const templatesMock = vi.hoisted(() => ({
   },
 }));
 const generatorsMock = vi.hoisted(() => ({ resolveWorkflowGenerators: vi.fn() }));
+// A fresh listing is cached unless a test says otherwise: nothing to await, so dispatches stay synchronous.
+const galleryQueriesMock = vi.hoisted(() => ({
+  ensureGalleryBoardDestinations: vi.fn((): Promise<void> | null => null),
+}));
+const galleryMock = vi.hoisted(() => ({
+  metadata: vi.fn((_imageName: string, _signal?: AbortSignal): Promise<Record<string, unknown> | null> =>
+    Promise.resolve(null)
+  ),
+}));
+vi.mock('@features/gallery', async (importOriginal) => {
+  const original = await importOriginal<{ galleryImages: Record<string, unknown> }>();
+
+  return { ...original, galleryImages: { ...original.galleryImages, metadata: galleryMock.metadata } };
+});
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  ensureGalleryBoardDestinations: galleryQueriesMock.ensureGalleryBoardDestinations,
+}));
 
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -43,6 +63,7 @@ import { createWorkbenchStore } from './workbenchStore';
 
 // Production words rejections from the locale; tests only need the structured rejection to reach the notice.
 const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+const formatUpscaleMetadataFailure = (name: string) => `metadataFailed: ${name}`;
 
 const field = (name: string, typeName: string, overrides: Record<string, unknown> = {}) => ({
   default: undefined,
@@ -179,6 +200,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -188,6 +210,64 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     return { notify, submitResolved };
   };
+
+  it('reads the board listing alongside generator resolution and dispatches only once both have answered', async () => {
+    galleryQueriesMock.ensureGalleryBoardDestinations.mockClear();
+    let settleBoards!: () => void;
+    galleryQueriesMock.ensureGalleryBoardDestinations.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settleBoards = resolve;
+      })
+    );
+    let settleGenerators!: () => void;
+    const generators = new Promise<void>((resolve) => {
+      settleGenerators = resolve;
+    });
+    generatorsMock.resolveWorkflowGenerators.mockImplementation(
+      async (_client: unknown, pending: Array<{ key: string; nodeId: string }>) => {
+        await generators;
+        return {
+          errors: [],
+          resolutions: Object.fromEntries(pending.map((item) => [item.nodeId, { items: ['a cat'], key: item.key }])),
+        };
+      }
+    );
+    const project = buildProject();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const settle = () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+
+    try {
+      const submission = submitResolvedInvocation({
+        commands,
+        formatControlLayerError,
+        formatUpscaleMetadataFailure,
+        models: undefined,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        route: resolveInvocationRoute(project, 'global', workflowRoute),
+      });
+
+      // The listing read did not hold generator resolution back: both started at once.
+      expect(galleryQueriesMock.ensureGalleryBoardDestinations).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(generatorsMock.resolveWorkflowGenerators).toHaveBeenCalledTimes(1));
+
+      // Generators answered; the dispatch still waits for the listing the destination is judged from.
+      settleGenerators();
+      await settle();
+      expect(submitResolved).not.toHaveBeenCalled();
+
+      settleBoards();
+      await submission;
+      expect(submitResolved).toHaveBeenCalledTimes(1);
+    } finally {
+      galleryQueriesMock.ensureGalleryBoardDestinations.mockReturnValue(null);
+    }
+  });
 
   it('resolves the pending generator and dispatches its output with the snapshot', async () => {
     generatorsMock.resolveWorkflowGenerators.mockImplementation(
@@ -232,6 +312,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -251,6 +332,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -305,7 +387,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
   const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
 
-  const submitDrawn = async (sourceId: 'canvas' | 'generate') => {
+  const submitDrawn = async (sourceId: 'canvas' | 'generate', prepend?: boolean) => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const initial = createInitialWorkbenchState();
     const state = workbenchReducer(
@@ -344,9 +426,11 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
     await submitResolvedInvocation({
       commands,
       formatControlLayerError,
+      formatUpscaleMetadataFailure,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
+      ...(prepend === undefined ? {} : { prepend }),
       project,
       route,
     });
@@ -366,5 +450,200 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 
     expect(submitResolved).not.toHaveBeenCalled();
     expect(prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ expansion: drawn }));
+  });
+
+  it('keeps Invoke Front through prompt expansion to the Generate dispatch and the Canvas preparation', async () => {
+    const generate = await submitDrawn('generate', true);
+    const canvas = await submitDrawn('canvas', true);
+
+    expect(generate.submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+    expect(canvas.prepareCanvasInvocation).toHaveBeenCalledWith(expect.objectContaining({ prepend: true }));
+  });
+});
+
+describe('submitResolvedInvocation without dynamic prompts', () => {
+  seedArchitectureCapabilities();
+
+  const submitGenerate = async (prepend?: boolean, positivePrompt = 'a cat') => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const project = getActiveProject(
+      workbenchReducer(createInitialWorkbenchState(), {
+        type: 'setGenerateSettings',
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt },
+      })
+    );
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'generate',
+      sourceLocked: false,
+    });
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      ...(prepend === undefined ? {} : { prepend }),
+      project,
+      route,
+    });
+
+    return submitResolved;
+  };
+
+  it('dispatches a plain Generate prompt to the front of the queue only for Invoke Front', async () => {
+    const front = await submitGenerate(true);
+    const back = await submitGenerate();
+
+    expect(front).toHaveBeenCalledTimes(1);
+    expect(front.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+    // No expansion took this path.
+    expect(front.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+    expect(back.mock.calls[0]?.[0]).not.toHaveProperty('prepend');
+  });
+
+  it('dispatches a JSON prompt literally, without expanding its braces', async () => {
+    const draft =
+      '```json\n{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[{"label":"object","caption":"a cup","bbox":[0,0,10,10]}]}\n```';
+    const compiled =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a poster"},"items":[]}';
+    for (const prompt of [draft, compiled]) {
+      const submitted = await submitGenerate(undefined, prompt);
+      expect(submitted).toHaveBeenCalledTimes(1);
+      expect(submitted.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+      submitted.mockRestore();
+    }
+  });
+
+  it('keeps Invoke Front on a Workflow dispatch', async () => {
+    generatorsMock.resolveWorkflowGenerators.mockImplementation(
+      (_client: unknown, pending: Array<{ key: string; nodeId: string }>) =>
+        Promise.resolve({
+          errors: [],
+          resolutions: Object.fromEntries(pending.map((item) => [item.nodeId, { items: ['a cat'], key: item.key }])),
+        })
+    );
+    const project = buildProject();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      prepend: true,
+      project,
+      route: resolveInvocationRoute(project, 'global', workflowRoute),
+    });
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+  });
+});
+
+describe('submitResolvedInvocation for Upscale', () => {
+  const upscaler = {
+    base: 'any',
+    file_size: 1,
+    format: 'checkpoint',
+    hash: 'ultrasharp-hash',
+    key: 'ultrasharp',
+    name: '4x-UltraSharp',
+    path: 'ultrasharp',
+    scale: 4,
+    source: 'ultrasharp',
+    source_type: 'path',
+    type: 'spandrel_image_to_image',
+  } as const;
+  const upscaleRoute: InvocationRoute = {
+    destination: 'gallery',
+    destinationLocked: false,
+    sourceId: 'upscale',
+    sourceLocked: false,
+  };
+
+  beforeEach(() => {
+    galleryMock.metadata.mockReset();
+  });
+
+  const submit = async (mode: 'refine' | 'model-only') => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      type: 'patchWidgetValues',
+      values: {
+        ...createDefaultUpscaleWidgetValues([upscaler]),
+        inputImage: { height: 64, image_name: 'input.png', width: 64 },
+        mode,
+      },
+      widgetId: 'upscale',
+    });
+    const project = getActiveProject(state);
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+    const notify = vi.spyOn(commands.notifications, 'add');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      models: [upscaler],
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(project, 'global', upscaleRoute, [upscaler]),
+    });
+
+    return { notify, submitResolved };
+  };
+
+  it("reads a Model only input's metadata once and dispatches it with the image it was read for", async () => {
+    galleryMock.metadata.mockResolvedValue({ positive_prompt: 'a lighthouse' });
+
+    const { notify, submitResolved } = await submit('model-only');
+
+    expect(galleryMock.metadata).toHaveBeenCalledTimes(1);
+    expect(galleryMock.metadata.mock.calls[0]?.[0]).toBe('input.png');
+    expect(notify).not.toHaveBeenCalled();
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      upscaleSourceMetadata: { imageName: 'input.png', metadata: { positive_prompt: 'a lighthouse' } },
+    });
+  });
+
+  it('dispatches an image the server has no metadata for with none to copy', async () => {
+    galleryMock.metadata.mockRejectedValue(new ApiError('{"detail":"Image not found"}', 404));
+
+    const { submitResolved } = await submit('model-only');
+
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      upscaleSourceMetadata: { imageName: 'input.png', metadata: null },
+    });
+  });
+
+  it('queues nothing and names the image when the metadata read fails', async () => {
+    galleryMock.metadata.mockRejectedValue(new ApiError('{"detail":"Database is locked"}', 500));
+
+    const { notify, submitResolved } = await submit('model-only');
+
+    expect(submitResolved).not.toHaveBeenCalled();
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'error', message: 'Database is locked', title: 'metadataFailed: input.png' })
+    );
+  });
+
+  it('reads no metadata for Refine, which records its own', async () => {
+    const { submitResolved } = await submit('refine');
+
+    expect(galleryMock.metadata).not.toHaveBeenCalled();
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('upscaleSourceMetadata');
   });
 });

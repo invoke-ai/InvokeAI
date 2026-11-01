@@ -1,21 +1,27 @@
-import type { HotkeyCategory, HotkeyDefinition } from './types';
+import type { HotkeyCategory, HotkeyDefinition, HotkeyScope } from './types';
 
 import { IS_MAC_OS } from './keys';
 
 /**
  * Only registered handlers intercept chords; handlerless catalog entries do not. App chords are global, other
  * chords require widget focus, and editable fields are excluded unless explicitly allowed. Overrides include
- * print/search/settings, undo/redo, selection/clipboard, and Canvas merge/deselect/invert/transform;
+ * print/search/settings, undo/redo, selection/clipboard, and Canvas merge/deselect/invert;
  * browser-reserved chords work only when delivered to the page.
  */
 
 const categoryScopes = {
   app: { kind: 'global' },
-  canvas: { kind: 'widget', typeId: 'canvas' },
-  gallery: { kind: 'widget', typeId: 'gallery' },
-  viewer: { kind: 'widget', typeId: 'preview' },
-  workflows: { kind: 'widget', typeId: 'workflow' },
-} as const;
+  canvas: { kind: 'widget', typeIds: ['canvas'] },
+  gallery: { kind: 'widget', typeIds: ['gallery'] },
+  viewer: { kind: 'widget', typeIds: ['preview'] },
+  workflows: { kind: 'widget', typeIds: ['workflow'] },
+} as const satisfies Record<HotkeyCategory, HotkeyScope>;
+
+/**
+ * Recall and workflow loading act on the gallery selection, which Preview shows, so they answer wherever the user
+ * selects or views it: Gallery or Preview. Remix stays per widget because Gallery binds its own.
+ */
+const selectedImageScope: HotkeyScope = { kind: 'widget', typeIds: ['preview', 'gallery'] };
 
 const implemented = new Set([
   'app.cancelQueueItem',
@@ -46,6 +52,7 @@ const implemented = new Set([
   'app.togglePanels',
   'app.togglePreview',
   'app.toggleRightPanel',
+  'canvas.cropAllLayersToFrame',
   'canvas.deleteSelected',
   'canvas.fitBboxToLayers',
   'canvas.fitBboxToMasks',
@@ -53,10 +60,16 @@ const implemented = new Set([
   'canvas.nextEntity',
   'canvas.saveBboxToGallery',
   'canvas.saveToGallery',
+  'canvas.setZoomTo100Percent',
+  'canvas.setZoomTo200Percent',
+  'canvas.setZoomTo400Percent',
+  'canvas.setZoomTo800Percent',
   'canvas.prevEntity',
+  'canvas.quickSwitch',
   'canvas.redo',
   'canvas.setFillColorsToDefault',
   'canvas.toggleFillColor',
+  'canvas.transformSelected',
   'canvas.undo',
   'gallery.clearSelection',
   'gallery.deleteSelection',
@@ -89,6 +102,7 @@ const implemented = new Set([
   'viewer.recallSeed',
   'viewer.remix',
   'viewer.swapImages',
+  'viewer.toggleMetadata',
   'viewer.useSize',
   'workflows.addNode',
   'workflows.copySelection',
@@ -129,7 +143,13 @@ const formatHotkeyTitle = (id: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): HotkeyDefinition => {
+/** `title` overrides the one derived from `id` where the command was renamed but its id kept for saved bindings. */
+const hotkey = (
+  category: HotkeyCategory,
+  id: string,
+  defaultKeys: string[],
+  { scope = categoryScopes[category], title = formatHotkeyTitle(id) }: { scope?: HotkeyScope; title?: string } = {}
+): HotkeyDefinition => {
   const commandId = `${category}.${id}`;
 
   return {
@@ -140,8 +160,8 @@ const hotkey = (category: HotkeyCategory, id: string, defaultKeys: string[]): Ho
     id: commandId,
     implemented: implemented.has(commandId),
     preventDefault: true,
-    scope: categoryScopes[category],
-    title: formatHotkeyTitle(id),
+    scope,
+    title,
   };
 };
 
@@ -159,6 +179,12 @@ export const OPEN_COMMAND_PALETTE_HOTKEY: HotkeyDefinition = {
   scope: { kind: 'global' },
   title: 'Open Command Palette',
 };
+
+/**
+ * Generation's `PromptTextarea` marks an editable prompt this way only while the selected model reads attention
+ * syntax. Anywhere else Ctrl+Up/Down keeps its text-field meaning.
+ */
+const PROMPT_ATTENTION_TARGET_SELECTOR = 'textarea[data-prompt-attention-target="true"]:not([readonly])';
 
 export type RegionFocusDirection = 'down' | 'left' | 'right' | 'up';
 
@@ -209,7 +235,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectComposePreset', ['alt+1']),
   hotkey('app', 'selectEditPreset', ['alt+2']),
   hotkey('app', 'selectVideoPreset', ['alt+3']),
-  hotkey('app', 'selectAutomatePreset', ['alt+4']),
+  hotkey('app', 'selectAutomatePreset', ['alt+4'], { title: 'Select Workflow Preset' }),
   hotkey('app', 'cancelQueueItem', ['shift+x']),
   hotkey('app', 'clearQueue', ['mod+shift+x']),
   hotkey('app', 'selectGenerateTab', ['1']),
@@ -220,8 +246,8 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'selectQueueTab', ['6']),
   hotkey('app', 'promptHistoryPrev', ['alt+arrowup']),
   hotkey('app', 'promptHistoryNext', ['alt+arrowdown']),
-  hotkey('app', 'promptWeightUp', ['ctrl+arrowup']),
-  hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']),
+  { ...hotkey('app', 'promptWeightUp', ['ctrl+arrowup']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
+  { ...hotkey('app', 'promptWeightDown', ['ctrl+arrowdown']), targetSelector: PROMPT_ATTENTION_TARGET_SELECTOR },
   hotkey('app', 'focusPrompt', ['alt+a']),
   hotkey('app', 'toggleLeftPanel', ['t', 'o']),
   hotkey('app', 'toggleRightPanel', ['g']),
@@ -229,7 +255,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('app', 'togglePanels', ['f']),
   hotkey('app', 'togglePreview', ['z']),
   hotkey('canvas', 'selectBrushTool', ['b']),
-  hotkey('canvas', 'selectBboxTool', ['c']),
+  hotkey('canvas', 'selectBboxTool', ['c'], { title: 'Select Frame Tool' }),
   hotkey('canvas', 'decrementToolWidth', ['[']),
   hotkey('canvas', 'incrementToolWidth', [']']),
   hotkey('canvas', 'selectEraserTool', ['e']),
@@ -241,18 +267,18 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'setFillColorsToDefault', ['d']),
   hotkey('canvas', 'toggleFillColor', ['x']),
   hotkey('canvas', 'fitLayersToCanvas', ['mod+0']),
-  hotkey('canvas', 'fitBboxToCanvas', ['mod+shift+0']),
-  hotkey('canvas', 'fitBboxToLayers', ['shift+n']),
-  hotkey('canvas', 'setZoomTo100Percent', ['mod+1']),
-  hotkey('canvas', 'setZoomTo200Percent', ['mod+2']),
-  hotkey('canvas', 'setZoomTo400Percent', ['mod+3']),
-  hotkey('canvas', 'setZoomTo800Percent', ['mod+4']),
+  hotkey('canvas', 'fitBboxToCanvas', ['mod+shift+0'], { title: 'Fit Frame To Canvas' }),
+  hotkey('canvas', 'fitBboxToLayers', ['shift+n'], { title: 'Fit Frame To Layers' }),
+  hotkey('canvas', 'setZoomTo100Percent', ['mod+1'], { title: 'Zoom to 100%' }),
+  hotkey('canvas', 'setZoomTo200Percent', ['mod+2'], { title: 'Zoom to 200%' }),
+  hotkey('canvas', 'setZoomTo400Percent', ['mod+3'], { title: 'Zoom to 400%' }),
+  hotkey('canvas', 'setZoomTo800Percent', ['mod+4'], { title: 'Zoom to 800%' }),
   hotkey('canvas', 'quickSwitch', ['q']),
   hotkey('canvas', 'deleteSelected', ['delete', 'backspace']),
   hotkey('canvas', 'resetSelected', ['shift+c']),
   hotkey('canvas', 'mergeDown', ['mod+e']),
   hotkey('canvas', 'mergeVisible', ['mod+shift+e']),
-  hotkey('canvas', 'transformSelected', ['shift+t']),
+  hotkey('canvas', 'transformSelected', ['shift+t'], { title: 'Transform Selected Layer' }),
   hotkey('canvas', 'filterSelected', ['shift+f']),
   hotkey('canvas', 'invertMask', ['shift+v']),
   hotkey('canvas', 'undo', ['mod+z']),
@@ -266,12 +292,14 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('canvas', 'applySegmentAnything', ['enter']),
   hotkey('canvas', 'cancelSegmentAnything', ['esc']),
   hotkey('canvas', 'toggleNonRasterLayers', ['shift+h']),
-  hotkey('canvas', 'fitBboxToMasks', ['shift+b']),
-  hotkey('canvas', 'toggleBbox', ['shift+o']),
-  // New canvas session and the gallery saves: no default keys — assignable via the hotkeys settings.
-  hotkey('canvas', 'newSession', []),
+  hotkey('canvas', 'fitBboxToMasks', ['shift+b'], { title: 'Fit Frame To Masks' }),
+  hotkey('canvas', 'toggleBbox', ['shift+o'], { title: 'Toggle Frame' }),
+  // Clear canvas keeps its saved-binding id, `newSession`.
+  hotkey('canvas', 'newSession', ['mod+alt+n'], { title: 'Clear Canvas' }),
+  // The gallery saves and crop all have no default keys; they are assignable through the hotkeys settings.
   hotkey('canvas', 'saveToGallery', []),
-  hotkey('canvas', 'saveBboxToGallery', []),
+  hotkey('canvas', 'saveBboxToGallery', [], { title: 'Save Frame To Gallery' }),
+  hotkey('canvas', 'cropAllLayersToFrame', []),
   hotkey('workflows', 'addNode', ['shift+a', 'space']),
   hotkey('workflows', 'copySelection', ['mod+c']),
   hotkey('workflows', 'pasteSelection', ['mod+v']),
@@ -284,13 +312,13 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('viewer', 'swapImages', ['c']),
   hotkey('viewer', 'nextComparisonMode', ['m']),
   hotkey('viewer', 'deleteImage', ['delete', 'backspace']),
-  hotkey('viewer', 'loadWorkflow', ['w']),
-  hotkey('viewer', 'recallAll', ['a']),
-  hotkey('viewer', 'recallSeed', ['s']),
-  hotkey('viewer', 'recallPrompts', ['p']),
+  hotkey('viewer', 'loadWorkflow', ['w'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallAll', ['a'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallSeed', ['s'], { scope: selectedImageScope }),
+  hotkey('viewer', 'recallPrompts', ['p'], { scope: selectedImageScope }),
   hotkey('viewer', 'remix', ['r']),
-  hotkey('viewer', 'useSize', ['d']),
-  hotkey('viewer', 'toggleMetadata', ['i']),
+  hotkey('viewer', 'useSize', ['d'], { scope: selectedImageScope }),
+  hotkey('viewer', 'toggleMetadata', ['i'], { title: 'Toggle Details' }),
   hotkey('gallery', 'selectAllOnPage', ['mod+a']),
   hotkey('gallery', 'clearSelection', ['esc']),
   hotkey('gallery', 'galleryNavUp', ['up']),

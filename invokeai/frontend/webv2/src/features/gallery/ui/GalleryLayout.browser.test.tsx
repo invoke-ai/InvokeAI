@@ -11,7 +11,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
@@ -70,8 +70,10 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}) =>
     compareImageKey: null,
     galleryView: 'images',
     items: [createItem('a.png'), createItem('b.png')],
+    listingBoardId: overrides.selectedBoardId ?? 'dogs',
     pendingPlaceholders: [],
     projectBoardId: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     selectedItemKey: 'image:a.png',
@@ -418,6 +420,80 @@ describe('gallery layout shells', () => {
         ranked?.click();
       });
       expect(contextBase.actions.setStarredOnly).not.toHaveBeenCalled();
+    }
+  });
+
+  it('places the media filter between the starred filter and the sort menu in both shells, operable by keyboard', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      setGallery(createGallery());
+      await renderLayout(Layout);
+
+      const toolbarButtons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
+      const starIndex = toolbarButtons.findIndex(
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.starredOnly'
+      );
+      const filter = host?.querySelector<HTMLButtonElement>('[data-gallery-media-filter-menu]');
+      const sortIndex = toolbarButtons.findIndex(
+        (button) => button.getAttribute('aria-label') === 'widgets.gallery.imageSortValue'
+      );
+
+      expect(filter, 'media filter did not render in the toolbar').not.toBeNull();
+      expect(toolbarButtons.indexOf(filter!)).toBe(starIndex + 1);
+      expect(sortIndex).toBe(starIndex + 2);
+      expect(filter?.getAttribute('aria-label')).toBe('widgets.gallery.mediaFilterTrigger');
+
+      filter?.focus();
+      await userEvent.keyboard('{Enter}');
+      const videosOnly = page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterVideos' });
+
+      await expect.element(videosOnly).toBeVisible();
+      await expect
+        .element(page.getByRole('menuitemradio', { name: 'widgets.gallery.mediaFilterAll' }))
+        .toHaveAttribute('aria-checked', 'true');
+      await userEvent.keyboard('{ArrowDown}{ArrowDown}{Enter}');
+
+      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'video' });
+      await expect.element(videosOnly).not.toBeInTheDocument();
+    }
+  });
+
+  it('shows a restricted media filter as an active control', async () => {
+    const triggerBackground = () =>
+      getComputedStyle(host!.querySelector<HTMLElement>('[data-gallery-media-filter-menu]')!).backgroundColor;
+
+    await renderLayout(GalleryWideLayout);
+    const inactiveBackground = triggerBackground();
+
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'image' } }));
+    await renderLayout(GalleryWideLayout);
+
+    const trigger = host?.querySelector('[data-gallery-media-filter-menu]');
+
+    expect(trigger?.getAttribute('data-media-filter')).toBe('image');
+    expect(trigger?.hasAttribute('data-active')).toBe(true);
+    // The cue is visible, not just an attribute: a ghost trigger has no fill.
+    expect(triggerBackground()).not.toBe(inactiveBackground);
+  });
+
+  it('moves focus to the media filter when Show all media removes the empty state, in both shells', async () => {
+    for (const Layout of [GalleryStackedLayout, GalleryWideLayout]) {
+      (contextBase.actions.updateSettings as ReturnType<typeof vi.fn>).mockClear();
+      setGallery(createGallery({ items: [], settings: { ...DEFAULT_GALLERY_SETTINGS, mediaFilter: 'video' } }));
+      await renderLayout(Layout);
+
+      const showAll = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find(
+        (button) => button.textContent === 'widgets.gallery.showAllMedia'
+      );
+
+      expect(showAll, 'Show all media did not render').toBeDefined();
+      showAll?.focus();
+      await act(() => {
+        showAll?.click();
+      });
+
+      expect(contextBase.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+      expect(document.activeElement?.hasAttribute('data-gallery-media-filter-menu')).toBe(true);
     }
   });
 

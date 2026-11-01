@@ -1,3 +1,4 @@
+import errno
 import os
 import shutil
 from contextlib import contextmanager
@@ -34,6 +35,7 @@ from invokeai.app.services.shared.database.schema.boards import board_images
 from invokeai.app.services.shared.database.schema.image_index import image_embeddings, video_embeddings
 from invokeai.app.services.shared.database.schema.image_moves import image_subfolder_move_items
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+from invokeai.app.util import no_replace
 
 
 class _ImageMutationGate:
@@ -67,6 +69,11 @@ def maintenance(
     service = GalleryMaintenanceService()
     service.start(invoker)
     return service, db, records, files
+
+
+def _refuse_link(src: Path, dst: Path) -> None:
+    """Refuse hard links the way exFAT does on Linux."""
+    raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
 
 
 def _count(database: Database, table: Table, where: ColumnElement[bool] | None = None) -> int:
@@ -594,6 +601,43 @@ def test_archive_file_tolerates_ctime_difference_between_path_and_open_file(
     assert not source.exists()
 
 
+def test_archive_file_without_hard_links_publishes_and_restores_a_quarantined_source(
+    maintenance, tmp_path: Path, monkeypatch
+) -> None:
+    service, _db, _records, _files = maintenance
+    source_dir = tmp_path / "gallery"
+    source_dir.mkdir()
+    source = source_dir / "source.png"
+    destination = tmp_path / "archive" / "source.png"
+    source_bytes = b"confirmed source bytes"
+    source.write_bytes(source_bytes)
+    expected = service._signature(source.lstat())
+    real_fsync_directory = GalleryMaintenanceService._GalleryMaintenanceService__fsync_directory
+    quarantine_sync_failed = False
+
+    def fail_first_quarantine_sync(directory: Path) -> None:
+        nonlocal quarantine_sync_failed
+        if Path(directory).name.startswith(".gallery-archive-") and not quarantine_sync_failed:
+            quarantine_sync_failed = True
+            raise OSError("injected quarantine sync failure")
+        real_fsync_directory(directory)
+
+    monkeypatch.setattr(no_replace.os, "link", _refuse_link)
+    monkeypatch.setattr(
+        GalleryMaintenanceService,
+        "_GalleryMaintenanceService__fsync_directory",
+        staticmethod(fail_first_quarantine_sync),
+    )
+
+    with pytest.raises(OSError, match="injected quarantine sync failure"):
+        service._archive_file(source, destination, expected)
+
+    assert destination.read_bytes() == source_bytes
+    assert list(destination.parent.iterdir()) == [destination]
+    assert source.read_bytes() == source_bytes
+    assert list(source_dir.iterdir()) == [source]
+
+
 def test_preview_rejects_symlinked_record_subfolder(maintenance, tmp_path: Path) -> None:
     service, _db, records, files = maintenance
     _save_image_record(records, "outside.png", "linked")
@@ -667,7 +711,10 @@ def test_regeneration_removes_thumbnail_if_size_persistence_fails(maintenance, m
     assert result.status == "failed"
 
 
-def test_regeneration_cleanup_preserves_replacement_thumbnail(maintenance, monkeypatch) -> None:
+@pytest.mark.parametrize("hard_links", [True, False], ids=["hard-links", "no-hard-links"])
+def test_regeneration_cleanup_preserves_replacement_thumbnail(maintenance, monkeypatch, hard_links: bool) -> None:
+    if not hard_links:
+        monkeypatch.setattr(no_replace.os, "link", _refuse_link)
     service, _db, records, files = maintenance
     _save_image_record(records, "replacement.png", "nested")
     _write_png(files, "replacement.png", "nested")

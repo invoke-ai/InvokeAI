@@ -6,14 +6,9 @@ super-resolved image from an SDXL latent in a single 4-step distill pass.
 
 SDXL latents are 4-channel at an 8x spatial down-factor (``_PER_BACKBONE[SDXL]``
 in ``backend/pid/decode.py``: ``lq_latent_channels=4``, ``latent_spatial_down_factor=8``),
-so - unlike FLUX.2 - no patchify/pack is needed; the stored latent goes straight
-to PiD after denormalization.
-
-Denormalization: SDXL's VAE (``AutoencoderKL``) exposes a scalar
-``scaling_factor`` (0.13025) and no shift, so the stored latent is denormalized
-as ``z / scaling_factor + shift`` (matching the FLUX / Z-Image nodes). We read
-the constants from the VAE config at runtime when a ``vae`` is wired, falling
-back to the documented SDXL constants otherwise.
+so - unlike FLUX.2 - no patchify/pack is needed. The stored latent goes to PiD
+unchanged: PiD was trained on the scaled latent (``0.13025 * raw``, what the upstream
+tokenizer encodes to), not the raw latent the VAE's conv decoder consumes.
 """
 
 from contextlib import ExitStack
@@ -47,26 +42,20 @@ from invokeai.backend.pid.decode import (
 )
 from invokeai.backend.util.devices import TorchDevice
 
-# SDXL VAE constants (diffusers `stabilityai/sdxl-vae` config: scaling_factor=0.13025, no shift). Prefer reading
-# scaling_factor / shift_factor from the wired VAE config at runtime; use these only as a fallback.
-_SDXL_VAE_SCALING_FACTOR_FALLBACK: float = 0.13025
-_SDXL_VAE_SHIFT_FACTOR_FALLBACK: float = 0.0
-
 
 @invocation(
     "sdxl_pid_decode",
     title="Latents to Image - SDXL + PiD (4x SR)",
     tags=["latents", "image", "pid", "sdxl", "upscale"],
     category="latents",
-    version="1.0.0",
+    version="1.0.1",
     classification=Classification.Prototype,
 )
 class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Decode an SDXL latent with the PiD pixel-diffusion decoder.
 
-    Produces a 4x super-resolved image in a single pass. The SDXL latent is
-    4-channel at an 8x down-factor, so it is denormalized (``z / scaling_factor``)
-    and handed straight to PiD - no packing needed.
+    Produces a 4x super-resolved image in a single pass. The stored, scaled SDXL
+    latent goes to PiD as is.
     """
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
@@ -87,8 +76,8 @@ class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     vae: VAEField | None = InputField(
         default=None,
         title="VAE",
-        description="SDXL VAE, used to read scaling_factor / shift_factor. "
-        "If omitted, the SDXL fallback constants (0.13025 / 0.0) are used.",
+        description="Not used: PiD decodes the normalized latent directly. Kept so existing workflows "
+        "that connect a VAE stay valid.",
         input=Input.Connection,
     )
     num_inference_steps: int = InputField(
@@ -112,28 +101,11 @@ class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         latents = context.tensors.load(self.latents.latents_name)
 
-        # 1) Resolve the VAE scaling/shift used to denormalise the stored SDXL latent. Prefer the VAE config; fall
-        # back to the documented SDXL constants (0.13025 / 0.0).
-        scaling_factor = _SDXL_VAE_SCALING_FACTOR_FALLBACK
-        shift_factor = _SDXL_VAE_SHIFT_FACTOR_FALLBACK
-        if self.vae is not None:
-            vae_info = context.models.load(self.vae.vae)
-            with vae_info.model_on_device() as (_, vae):
-                config = getattr(vae, "config", None)
-                if config is not None and hasattr(config, "scaling_factor"):
-                    scaling_factor = float(config.scaling_factor)
-                    shift_factor = float(getattr(config, "shift_factor", None) or 0.0)
-                else:
-                    scaling_factor = float(getattr(vae, "scale_factor", scaling_factor))
-                    shift_factor = float(getattr(vae, "shift_factor", shift_factor))
-            del vae_info
-            TorchDevice.empty_cache()
         context.logger.info(
-            f"SDXL PiD decode: latent shape={tuple(latents.shape)} (expect [B, 4, H/8, W/8]) dtype={latents.dtype} "
-            f"using scale={scaling_factor:.5f} shift={shift_factor:.5f}"
+            f"SDXL PiD decode: latent shape={tuple(latents.shape)} (expect [B, 4, H/8, W/8]) dtype={latents.dtype}"
         )
 
-        # 2) Encode caption with Gemma-2.
+        # 1) Encode caption with Gemma-2.
         gemma_text_encoder_info = context.models.load(self.gemma2_encoder.text_encoder)
         gemma_tokenizer_info = context.models.load(self.gemma2_encoder.tokenizer)
         with ExitStack() as stack:
@@ -169,7 +141,7 @@ class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         context.models.offload_from_vram(self.gemma2_encoder.text_encoder)
         TorchDevice.empty_cache()
 
-        # 3) Run PiD decode (the loader already returns a live PidNet).
+        # 2) Run PiD decode (the loader already returns a live PidNet).
         pid_info = context.models.load(self.pid_decoder.decoder)
         # Read once: the estimate and the decode must agree, or the cache reserves headroom for a
         # peak that will not happen (or too little for one that will).
@@ -186,14 +158,13 @@ class SDXLPiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            # SDXL latents come out of the LDM in the VAE-normalized space; denormalise so PiD sees the raw latent.
-            denorm_latent = latents.to(device=device, dtype=dtype) / scaling_factor + shift_factor
+            latent = latents.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")
             decoder = PiDDecoder(pid_net, backbone=BaseModelType.StableDiffusionXL)
             x0 = decoder.decode(
-                latent=denorm_latent,
+                latent=latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(

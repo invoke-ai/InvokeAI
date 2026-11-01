@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- ListItem slots take JSX; the React Compiler memoizes them. */
+import type { ConceptUpdate } from '@features/generation/core/conceptList';
 import type { GenerateLora } from '@features/generation/core/types';
 import type { MouseEvent, ReactNode } from 'react';
 
@@ -30,8 +31,6 @@ export interface ConceptModelPort {
   /** Absent when this session may not manage models; the row then offers no manager link. */
   openInModelManager?: (key: string) => void;
 }
-
-export type ConceptUpdate = Partial<Pick<GenerateLora, 'isEnabled' | 'weight'>>;
 
 export interface ConceptRowProps {
   /** False dims the row, badges it, and locks it off; the caller decides compatibility against its main model. */
@@ -251,6 +250,7 @@ const ConceptRowContent = ({
                 <ScrubberField
                   defaultValue={defaultWeight}
                   disabled={!isActive}
+                  hint="loraWeight"
                   inputMax={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
                   inputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
                   label={t('widgets.generate.weight')}

@@ -16,11 +16,12 @@ import re
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 import requests
 from huggingface_hub import HfApi, hf_hub_url
-from huggingface_hub.errors import RepositoryNotFoundError, RevisionNotFoundError
+from huggingface_hub.errors import HfHubHTTPError, RepositoryNotFoundError, RevisionNotFoundError
 from pydantic.networks import AnyHttpUrl
 from requests.sessions import Session
 
@@ -30,8 +31,11 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
     AnyModelRepoMetadata,
     HuggingFaceMetadata,
     ModelMetadataUnavailableError,
+    ModelRevisionUnavailableError,
     RemoteModelFile,
     UnknownMetadataException,
+    is_transient_hf_http_error,
+    revision_unavailable_message,
 )
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
 
@@ -57,18 +61,25 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         metadata = HuggingFaceMetadata.model_validate_json(json)
         return metadata
 
-    def _model_info_via_session(self, repo_id: str, variant: Optional[ModelRepoVariant] = None) -> SimpleNamespace:
+    def _model_info_via_session(self, repo_id: str, revision: Optional[str] = None) -> SimpleNamespace:
         """Fetch model info using the injected requests session (for testing/custom backends)."""
         params = {"blobs": "true"}
         url = f"https://huggingface.co/api/models/{repo_id}"
-        if variant is not None:
-            url += f"/revision/{variant}"
+        if revision is not None:
+            url += f"/revision/{quote(revision, safe='')}"
         resp = self._requests.get(url, params=params, timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS)
         if resp.status_code == 404:
+            error_response = httpx.Response(
+                status_code=resp.status_code,
+                headers=resp.headers,
+                request=httpx.Request("GET", str(resp.url)),
+            )
             error_code = resp.headers.get("X-Error-Code", "")
-            if error_code == "RevisionNotFound" or (variant is not None):
-                raise RevisionNotFoundError(f"Revision '{variant}' not found for repo '{repo_id}'.")
-            raise RepositoryNotFoundError(f"Repository '{repo_id}' not found.")
+            if error_code == "RevisionNotFound" or (revision is not None):
+                raise RevisionNotFoundError(
+                    f"Revision '{revision}' not found for repo '{repo_id}'.", response=error_response
+                )
+            raise RepositoryNotFoundError(f"Repository '{repo_id}' not found.", response=error_response)
         resp.raise_for_status()
         data = resp.json()
         # Convert siblings dicts to SimpleNamespace objects matching HfApi.model_info() shape
@@ -81,40 +92,66 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
                     lfs=s.get("lfs"),
                 )
             )
-        return SimpleNamespace(id=data["id"], siblings=siblings)
+        return SimpleNamespace(id=data["id"], siblings=siblings, sha=data.get("sha"))
 
-    def from_id(self, id: str, variant: Optional[ModelRepoVariant] = None) -> AnyModelRepoMetadata:
-        """Return a HuggingFaceMetadata object given the model's repo_id."""
-        # Little loop which tries fetching a revision corresponding to the selected variant.
-        # If not available, then set variant to None and get the default.
-        # If this too fails, raise exception.
+    def _model_info(self, repo_id: str, revision: Optional[str]) -> SimpleNamespace:
+        try:
+            # Use the injected session when provided (supports testing with mock adapters).
+            # Otherwise use HfApi which uses httpx internally.
+            if self._has_custom_session:
+                return self._model_info_via_session(repo_id, revision)
+            return HfApi().model_info(
+                repo_id=repo_id,
+                files_metadata=True,
+                revision=revision,
+                timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS,
+            )
+        # ConnectionError includes huggingface_hub's OfflineModeIsEnabled (HF_HUB_OFFLINE=1).
+        except (requests.RequestException, httpx.TransportError, ConnectionError) as e:
+            raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
+        except RepositoryNotFoundError as excp:
+            raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
+        except RevisionNotFoundError:
+            raise
+        except HfHubHTTPError as e:
+            if is_transient_hf_http_error(e):
+                raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
+            raise
 
-        model_info = None
+    def from_id(
+        self,
+        id: str,
+        variant: Optional[ModelRepoVariant] = None,
+        revision: Optional[str] = None,
+        pin_to_commit: bool = False,
+    ) -> AnyModelRepoMetadata:
+        """Return a HuggingFaceMetadata object given the model's repo_id.
 
+        Without `revision`, the files come from the branch named by `variant` if the repo has one, else from the
+        default branch, and their URLs name that branch, as users and model records know them. `pin_to_commit`
+        makes the URLs name the commit the branch points to now instead, so a download resumed later cannot mix in
+        files from a newer commit. With `revision`, the files and URLs come from that revision.
+        """
         # Handling for our special syntax - we only want the base HF `org/repo` here.
         repo_id = id.split("::")[0] or id
-        while not model_info:
+
+        if revision is not None:
             try:
-                # Use the injected session when provided (supports testing with mock adapters).
-                # Otherwise use HfApi which uses httpx internally.
-                if self._has_custom_session:
-                    model_info = self._model_info_via_session(repo_id, variant)
-                else:
-                    model_info = HfApi().model_info(
-                        repo_id=repo_id,
-                        files_metadata=True,
-                        revision=variant,
-                        timeout=HF_METADATA_REQUEST_TIMEOUT_SECONDS,
-                    )
-            except (requests.RequestException, httpx.TransportError) as e:
-                raise ModelMetadataUnavailableError(f"Could not fetch Hugging Face metadata for '{repo_id}'") from e
-            except RepositoryNotFoundError as excp:
-                raise UnknownMetadataException(f"'{repo_id}' not found. See trace for details.") from excp
+                model_info = self._model_info(repo_id, revision)
+            except RevisionNotFoundError as e:
+                raise ModelRevisionUnavailableError(revision_unavailable_message(repo_id, revision)) from e
+            url_revision = revision
+        else:
+            # Try the revision named by the selected variant; if the repo has none, fall back to the default branch.
+            try:
+                model_info = self._model_info(repo_id, variant)
             except RevisionNotFoundError:
                 if variant is None:
                     raise
-                else:
-                    variant = None
+                variant = None
+                model_info = self._model_info(repo_id, None)
+            branch = variant or "main"
+            url_revision = (getattr(model_info, "sha", None) or branch) if pin_to_commit else branch
 
         files: list[RemoteModelFile] = []
 
@@ -125,7 +162,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             assert s.size is not None
             files.append(
                 RemoteModelFile(
-                    url=hf_hub_url(repo_id, s.rfilename, revision=variant or "main"),
+                    url=hf_hub_url(repo_id, s.rfilename, revision=url_revision),
                     path=Path(name, s.rfilename),
                     size=s.size,
                     sha256=s.lfs.get("sha256") if s.lfs else None,
@@ -154,7 +191,7 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             ]
         )
 
-        return HuggingFaceMetadata(
+        metadata = HuggingFaceMetadata(
             id=model_info.id,
             name=name,
             files=files,
@@ -162,8 +199,12 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
             is_diffusers=is_diffusers,
             ckpt_urls=ckpt_urls,
         )
+        metadata._revision = url_revision
+        return metadata
 
-    def from_url(self, url: AnyHttpUrl) -> AnyModelRepoMetadata:
+    def from_url(
+        self, url: AnyHttpUrl, revision: Optional[str] = None, pin_to_commit: bool = False
+    ) -> AnyModelRepoMetadata:
         """
         Return a HuggingFaceMetadata object given the model's web page URL.
 
@@ -171,6 +212,6 @@ class HuggingFaceMetadataFetch(ModelMetadataFetchBase):
         """
         if match := re.match(HF_MODEL_RE, str(url), re.IGNORECASE):
             repo_id = match.group(1)
-            return self.from_id(repo_id)
+            return self.from_id(repo_id, revision=revision, pin_to_commit=pin_to_commit)
         else:
             raise UnknownMetadataException(f"'{url}' does not look like a HuggingFace model page")

@@ -12,7 +12,7 @@ from safetensors import safe_open
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_hash.model_hash import HASHING_ALGORITHMS, ModelHash
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_sd_loader
+from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader, gguf_header_state_dict
 from invokeai.backend.quantization.sdnq.loaders import sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -81,6 +81,15 @@ def _safetensors_meta_state_dict(path: Path) -> StateDict:
     }
 
 
+def unwrap_state_dict(checkpoint: dict[Any, Any]) -> StateDict:
+    """A checkpoint's weights: training checkpoints nest them under `state_dict`.
+
+    Identification reads its state dicts through this (`ModelOnDisk.load_state_dict`). A loader that reads a pickle
+    itself unwraps through it too, so it loads the weights identification accepted.
+    """
+    return checkpoint.get("state_dict", checkpoint)
+
+
 def _is_sdnq_safetensors(path: Path) -> bool:
     """Check if a safetensors file contains SDNQ-quantized weights by checking for weight+scale pairs."""
     try:
@@ -125,7 +134,13 @@ class ModelOnDisk:
         extensions = {".safetensors", ".pt", ".pth", ".ckpt", ".bin", ".gguf"}
         return {f for f in self.path.rglob("*") if f.suffix in extensions and f.is_file()}
 
-    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+    def metadata(self, path: Optional[Path] = None) -> dict[str, Any]:
+        """The file's metadata: safetensors' string map, or a GGUF's scalar fields.
+
+        GGUF values keep their type -- strings, numbers, booleans -- because llama.cpp records hyperparameters
+        as numbers. Array fields (the tokenizer vocabulary, for one) are left out: nothing identifies by them,
+        and they are most of a header's size.
+        """
         path = path or self.path
         if path in self._metadata_cache:
             return self._metadata_cache[path]
@@ -133,11 +148,9 @@ class ModelOnDisk:
             if path.suffix == ".gguf":
                 with WrappedGGUFReader(path) as reader:
                     metadata = {
-                        name: value
+                        name: field.contents()
                         for name, field in reader.fields.items()
-                        if field.types
-                        and field.types[0] == GGUFValueType.STRING
-                        and isinstance(value := field.contents(), str)
+                        if field.types and field.types[0] != GGUFValueType.ARRAY
                     }
             else:
                 with safe_open(path, framework="pt", device="cpu") as f:
@@ -201,9 +214,10 @@ class ModelOnDisk:
                 checkpoint = torch.load(path, map_location="meta")
                 assert isinstance(checkpoint, dict)
             elif path.suffix.endswith(".gguf"):
-                # Identification reads shapes and never builds a module. Whether a Q8_CR file's quantization
-                # is supported is decided from its metadata by `ModelConfigFactory`, once, not per candidate.
-                checkpoint = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="ignore")
+                # Shapes and quantization types from the header, like the safetensors branch: the tensor data
+                # is never read. Whether a Q8_CR file's quantization is supported is decided from its metadata
+                # by `ModelConfigFactory`, once, not per candidate.
+                checkpoint = gguf_header_state_dict(path, compute_dtype=torch.float32)
             elif path.suffix.endswith(".safetensors"):
                 if _is_sdnq_safetensors(path):
                     checkpoint = sdnq_sd_loader(path, compute_dtype=torch.float32)
@@ -216,7 +230,7 @@ class ModelOnDisk:
             else:
                 raise ValueError(f"Unrecognized model extension: {path.suffix}")
 
-        state_dict = checkpoint.get("state_dict", checkpoint)
+        state_dict = unwrap_state_dict(checkpoint)
 
         # Normalize PEFT named-adapter keys (e.g. `lora_A.default.weight` → `lora_A.weight`).
         # Pattern is LoRA-specific, so this is a no-op for non-LoRA state dicts.

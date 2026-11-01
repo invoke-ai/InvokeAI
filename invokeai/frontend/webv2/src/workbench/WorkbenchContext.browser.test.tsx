@@ -1,6 +1,6 @@
 import type { GenerationUiAdapter } from '@features/generation/react';
 import type * as projectsApi from '@workbench/projects/api';
-import type { ProjectRecordDTO } from '@workbench/projects/api';
+import type { ProjectWithWorkspaceDTO } from '@workbench/projects/api';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -21,7 +21,7 @@ const server = vi.hoisted(() => ({
   clientState: new Map<string, string>(),
   /** Writes fail as they do for requests an unloading page starts; reads still answer the next page. */
   offline: false,
-  records: new Map<string, ProjectRecordDTO>(),
+  records: new Map<string, ProjectWithWorkspaceDTO>(),
   updateGate: null as Promise<void> | null,
 }));
 
@@ -39,15 +39,18 @@ vi.mock('@workbench/projects/api', async (importOriginal) => {
         return unreachable();
       }
       const id = request.project_id!;
-      const record: ProjectRecordDTO = {
+      const record: ProjectWithWorkspaceDTO = {
         board_id: `board-${id}`,
         created_at: '2026-10-04T00:00:00.000Z',
         data: structuredClone(request.data),
         minimum_canvas_schema_version: request.minimum_canvas_schema_version ?? 3,
+        minimum_document_schema_version: request.minimum_document_schema_version ?? 3,
         name: request.name,
         project_id: id,
         revision: 1,
         updated_at: '2026-10-04T00:00:00.000Z',
+        workspace_updated_at: null,
+        workspace: null,
       };
       server.calls.push(`create:${request.name}`);
       server.records.set(id, record);
@@ -67,6 +70,25 @@ vi.mock('@workbench/projects/api', async (importOriginal) => {
       return Promise.resolve(
         [...server.records.values()].map(({ data: _data, ...summary }) => structuredClone(summary))
       );
+    },
+    saveProjectWorkspace: (projectId: string, request: projectsApi.ProjectWorkspaceSaveRequest) => {
+      if (server.offline) {
+        return unreachable();
+      }
+      const current = server.records.get(projectId);
+      if (!current) {
+        return Promise.reject(notFound());
+      }
+      if ((current.workspace?.revision ?? null) !== request.expected_revision) {
+        return Promise.reject(new ApiError('conflict', 409));
+      }
+      const workspace = {
+        data: structuredClone(request.data),
+        revision: (current.workspace?.revision ?? 0) + 1,
+        updated_at: '2026-10-04T00:00:00.000Z',
+      };
+      server.records.set(projectId, { ...current, workspace, workspace_updated_at: workspace.updated_at });
+      return Promise.resolve(structuredClone(workspace));
     },
     setClientStateValue: (key: string, value: string) => {
       if (server.offline) {
@@ -88,7 +110,7 @@ vi.mock('@workbench/projects/api', async (importOriginal) => {
       if (current.revision !== request.expected_revision) {
         throw new ApiError('conflict', 409);
       }
-      const record: ProjectRecordDTO = {
+      const record: ProjectWithWorkspaceDTO = {
         ...current,
         data: structuredClone(request.data),
         name: request.name,
@@ -315,7 +337,9 @@ describe('WorkbenchProvider hidden page', () => {
     await leaveEditor();
     await mountEditor({ withStrength: true });
     await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
-    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.data);
+    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.workspace?.data);
+    // The workspace was saved with the project, so the checks below compare against a real copy.
+    expect(savedBeforeEdit).toEqual(expect.any(String));
 
     const slider = strengthSlider()!;
     await act(() => {
@@ -330,9 +354,12 @@ describe('WorkbenchProvider hidden page', () => {
     expect(document.activeElement).toBe(slider);
     expect(strengthValue()).toBeCloseTo(typedStrength);
     // Well before the 250 ms draft debounce and 500 ms autosave could have saved it on their own.
-    await vi.waitFor(() => expect(JSON.stringify(server.records.get(projectId)?.data)).not.toBe(savedBeforeEdit), {
-      timeout: 600,
-    });
+    await vi.waitFor(
+      () => expect(JSON.stringify(server.records.get(projectId)?.workspace?.data)).not.toBe(savedBeforeEdit),
+      {
+        timeout: 600,
+      }
+    );
 
     // The page goes away: its lifetime ends without the editor's exit checkpoint, and a new one loads it again.
     const { storageSuffix } = accountLifecycle.capture();
@@ -351,7 +378,9 @@ describe('WorkbenchProvider hidden page', () => {
     await leaveEditor();
     await mountEditor({ withStrength: true });
     await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
-    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.data);
+    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.workspace?.data);
+    // The workspace was saved with the project, so the checks below compare against a real copy.
+    expect(savedBeforeEdit).toEqual(expect.any(String));
 
     const slider = strengthSlider()!;
     await act(() => {
@@ -369,12 +398,15 @@ describe('WorkbenchProvider hidden page', () => {
 
     expect(activeProject()!.id).toBe(projectId);
     expect(strengthValue()).toBeCloseTo(typedStrength);
-    expect(JSON.stringify(server.records.get(projectId)?.data)).toBe(savedBeforeEdit);
+    expect(JSON.stringify(server.records.get(projectId)?.workspace?.data)).toBe(savedBeforeEdit);
     // Recovered as a pending edit, which the next page saves once it can.
     revivePage!();
-    await vi.waitFor(() => expect(JSON.stringify(server.records.get(projectId)?.data)).not.toBe(savedBeforeEdit), {
-      timeout: 5_000,
-    });
+    await vi.waitFor(
+      () => expect(JSON.stringify(server.records.get(projectId)?.workspace?.data)).not.toBe(savedBeforeEdit),
+      {
+        timeout: 5_000,
+      }
+    );
   });
 
   it('does not let the journal of a back/forward-cached page override work saved after it resumed', async () => {

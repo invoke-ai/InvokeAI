@@ -98,6 +98,22 @@ def test_alpha_defaults_to_rank_scale_one():
         assert layer.scale() == 1.0
 
 
+@pytest.mark.parametrize("prefix", ["", "diffusion_model."])
+def test_file_alpha_on_peft_pairs_wins_over_caller_alpha(prefix: str):
+    # ComfyUI-format H3 LoRAs carry a per-layer alpha next to dotted lora_A/lora_B.
+    sd = _make_turbo_style_state_dict(prefix)
+    for key in [k for k in sd if k.endswith(".lora_A.weight")]:
+        sd[key.removesuffix("lora_A.weight") + "alpha"] = torch.tensor(1.0)
+    assert is_state_dict_likely_in_minimax_h3_format(sd)
+
+    patch = lora_model_from_minimax_h3_state_dict(sd, alpha=float(RANK))
+    assert patch.layers.keys() == {f"{MINIMAX_H3_LORA_TRANSFORMER_PREFIX}{p}" for p in EXPECTED_LAYER_PATHS}
+    for layer in patch.layers.values():
+        assert isinstance(layer, LoRALayer)
+        # alpha / rank with the file's alpha = 1 (the caller's would give 1.0 at rank 4, 2.0 at rank 2).
+        assert layer.scale() == pytest.approx(1.0 / layer.down.shape[0])
+
+
 def test_qkv_fan_out_rows_and_shared_down():
     sd = _make_turbo_style_state_dict()
     key = "blocks.0.attn.qkv_proj"
@@ -207,4 +223,91 @@ def test_rejects_malformed_fused_tensors():
         "blocks.0.mlp.fc1.lora_B.weight": torch.zeros(2 * FFN + 1, RANK),
     }
     with pytest.raises(ValueError, match="odd output row count"):
+        lora_model_from_minimax_h3_state_dict(sd)
+
+
+def _to_kohya(sd: dict[str, torch.Tensor], alpha: float, separator: str = "_") -> dict[str, torch.Tensor]:
+    """Re-key a dotted turbo-style dict the way kohya sd-scripts / musubi-tuner write it."""
+    kohya: dict[str, torch.Tensor] = {}
+    for key, value in sd.items():
+        module, _, suffix = key.rpartition(".lora_")
+        flat = f"lora_unet{separator}{module.replace('.', '_')}"
+        kohya[f"{flat}.lora_{suffix.replace('A.', 'down.').replace('B.', 'up.')}"] = value
+        kohya[f"{flat}.alpha"] = torch.tensor(alpha)
+    return kohya
+
+
+@pytest.mark.parametrize("separator", ["_", "__"])
+def test_kohya_keys_convert_like_dotted_keys(separator: str):
+    dotted = _make_turbo_style_state_dict()
+    kohya = _to_kohya(dotted, alpha=RANK / 2, separator=separator)
+    assert is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    expected = lora_model_from_minimax_h3_state_dict(dotted)
+    patch = lora_model_from_minimax_h3_state_dict(kohya)
+
+    assert patch.layers.keys() == expected.layers.keys()
+    for key, layer in patch.layers.items():
+        reference = expected.layers[key]
+        assert isinstance(layer, LoRALayer) and isinstance(reference, LoRALayer)
+        assert torch.equal(layer.up, reference.up)
+        assert torch.equal(layer.down, reference.down)
+        assert layer.scale() == pytest.approx(0.5 if layer.down.shape[0] == RANK else RANK / 4)
+
+
+def test_kohya_key_naming_no_h3_linear_is_not_detected():
+    # A flattened path outside the H3 Linear vocabulary would convert to a module that does not
+    # exist (a silent no-op), so one such key disqualifies the whole file.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_x_embedder_proj.lora_down.weight"] = torch.zeros(RANK, HIDDEN)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    # A parent of real Linears is not itself a Linear.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_blocks_0_attn.lora_down.weight"] = torch.zeros(RANK, HIDDEN)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)
+
+    # Refiner blocks have no AdaLN projection.
+    kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    kohya["lora_unet_token_refiner_blocks_0_adaln_proj_linear.lora_down.weight"] = torch.zeros(RANK, TIME_EMBED)
+    assert not is_state_dict_likely_in_minimax_h3_format(kohya)
+
+
+def _malformed_cases() -> list[tuple[str, dict[str, torch.Tensor], str]]:
+    """(id, state dict, expected message fragment) for layers the converter must not half-apply."""
+    kohya_down_only = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    del kohya_down_only["lora_unet_blocks_0_attn_qkv_proj.lora_up.weight"]
+
+    dotted_a_only = _make_turbo_style_state_dict()
+    del dotted_a_only["blocks.0.attn.out_proj.lora_B.weight"]
+
+    alpha_only = _make_turbo_style_state_dict()
+    alpha_only["blocks.0.attn.out_proj.alpha"] = torch.tensor(1.0)
+    del alpha_only["blocks.0.attn.out_proj.lora_A.weight"]
+    del alpha_only["blocks.0.attn.out_proj.lora_B.weight"]
+
+    # Same layer twice: whichever came last used to overwrite the other silently.
+    dotted_and_kohya = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_down.weight"] = torch.zeros(RANK, HIDDEN)
+    dotted_and_kohya["blocks.0.attn.qkv_proj.lora_up.weight"] = torch.zeros(3 * HIDDEN, RANK)
+    mixed_spellings = _to_kohya(_make_turbo_style_state_dict(), alpha=RANK)
+    mixed_spellings.update({k: v for k, v in _make_turbo_style_state_dict().items() if "blocks.0.mlp.fc1." in k})
+
+    peft_dora = _make_turbo_style_state_dict()
+    peft_dora["blocks.0.attn.out_proj.lora_magnitude_vector.weight"] = torch.ones(HIDDEN)
+
+    return [
+        ("kohya-down-only", kohya_down_only, r"\['alpha', 'lora_down.weight'\]"),
+        ("dotted-A-only", dotted_a_only, r"\['lora_A.weight'\]"),
+        ("alpha-only", alpha_only, r"\['alpha'\]"),
+        ("dotted-and-kohya", dotted_and_kohya, "two spellings"),
+        ("mixed-A/B-and-down/up", mixed_spellings, "'lora_A.weight', 'lora_B.weight', 'lora_down.weight'"),
+        ("peft-dora-magnitude", peft_dora, "lora_magnitude_vector"),
+    ]
+
+
+@pytest.mark.parametrize(("sd", "message"), [c[1:] for c in _malformed_cases()], ids=[c[0] for c in _malformed_cases()])
+def test_rejects_malformed_layers(sd: dict[str, torch.Tensor], message: str):
+    assert not is_state_dict_likely_in_minimax_h3_format(sd)
+    with pytest.raises(ValueError, match=message):
         lora_model_from_minimax_h3_state_dict(sd)

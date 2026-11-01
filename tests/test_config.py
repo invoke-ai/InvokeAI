@@ -117,6 +117,31 @@ def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, pat
     assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
 
 
+def test_attention_backend_defaults_to_auto_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    # The default must stay `auto`: SageAttention changes images at the same seed, so it is opt-in only.
+    assert InvokeAIAppConfig().attention_backend == "auto"
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\nattention_backend: sage\n')
+
+    assert load_and_migrate_config(temp_config_file).attention_backend == "sage"
+
+
+@pytest.mark.parametrize("kernel", ["cudnn", "flash", "efficient", "math"])
+def test_attention_backend_pins_a_pytorch_kernel_from_yaml(tmp_path: Path, patch_rootdir: None, kernel: str) -> None:
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text(f'schema_version: "4.0.3"\nattention_backend: {kernel}\n')
+
+    assert load_and_migrate_config(temp_config_file).attention_backend == kernel
+
+
+def test_attention_backend_rejects_a_kernel_it_does_not_know() -> None:
+    # `default` is an INVOKE_KREA2_SDPA_BACKEND value, not an attention_backend one.
+    for value in ("xformers", "default"):
+        with pytest.raises(ValidationError):
+            InvokeAIAppConfig(attention_backend=value)
+
+
 def test_load_config_from_root_reads_that_roots_file_and_writes_nothing(tmp_path: Path, patch_rootdir: None) -> None:
     root = tmp_path / "install"
     root.mkdir()
@@ -158,6 +183,15 @@ def test_pid_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     temp_config_file.write_text('schema_version: "4.0.3"\npid_memory_optimization: true\n')
 
     assert load_and_migrate_config(temp_config_file).pid_memory_optimization is True
+
+
+def test_tiny_autoencoder_previews_defaults_to_false_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    assert InvokeAIAppConfig().tiny_autoencoder_previews is False
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\ntiny_autoencoder_previews: true\n')
+
+    assert load_and_migrate_config(temp_config_file).tiny_autoencoder_previews is True
 
 
 def test_migrate_v3_config_from_file(tmp_path: Path, patch_rootdir: None):

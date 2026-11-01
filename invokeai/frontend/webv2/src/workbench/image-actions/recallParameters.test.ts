@@ -20,6 +20,9 @@ const makeModel = (key: string, base: string, type: string, extra: Record<string
   ({ base, hash: `${key}-hash`, key, name: `${key} name`, type, ...extra }) as ComponentModelConfig;
 
 const sdxl = makeModel('sdxl-main', 'sdxl', 'main');
+const refiner = makeModel('refiner', 'sdxl-refiner', 'main');
+const otherRefiner = makeModel('other-refiner', 'sdxl-refiner', 'main');
+const refinerLora = makeModel('refiner-lora', 'sdxl-refiner', 'lora');
 const sd1 = makeModel('sd1-main', 'sd-1', 'main');
 const flux = makeModel('flux-main', 'flux', 'main');
 const sd3 = makeModel('sd3-main', 'sd-3', 'main');
@@ -28,7 +31,20 @@ const fluxLora = makeModel('flux-lora', 'flux', 'lora');
 const sdxlIpAdapter = makeModel('sdxl-ipa', 'sdxl', 'ip_adapter');
 const fluxRedux = makeModel('flux-redux', 'flux', 'flux_redux');
 const sdxlVae = makeModel('sdxl-vae', 'sdxl', 'vae');
-const models = [sdxl, sd1, flux, sd3, sdxlLora, fluxLora, sdxlIpAdapter, fluxRedux, sdxlVae];
+const models = [
+  sdxl,
+  refiner,
+  otherRefiner,
+  refinerLora,
+  sd1,
+  flux,
+  sd3,
+  sdxlLora,
+  fluxLora,
+  sdxlIpAdapter,
+  fluxRedux,
+  sdxlVae,
+];
 const supportedModels = models.filter(isSupportedGenerateModel) as GenerateModelConfig[];
 const vaeModels = models.filter(isVaeModelConfig) as VaeModelConfig[];
 
@@ -192,6 +208,195 @@ describe('buildRecallParametersSettings', () => {
     expect(result.values.model.key).toBe(sdxl.key);
   });
 
+  it('restores a refiner on current SDXL without a main-model field and maps API tuning', () => {
+    const result = build(currentFor(sdxl), {
+      refiner_model: refiner.key,
+      refiner_steps: 12,
+      refiner_cfg_scale: 4.5,
+      refiner_denoise_start: 0.65,
+      refiner_positive_aesthetic_score: 7,
+      refiner_negative_aesthetic_score: 3,
+    });
+
+    expect(result.skipped).toEqual([]);
+    expect(result.fields).toEqual(['refiner']);
+    expect(result.values).toMatchObject({
+      refinerModel: refiner,
+      refinerSteps: 12,
+      refinerCfgScale: 4.5,
+      refinerStart: 0.65,
+      refinerPositiveAestheticScore: 7,
+      refinerNegativeAestheticScore: 3,
+    });
+    expect(build(currentFor(sdxl), { refiner_model: refiner.name }).values.refinerModel).toEqual(refiner);
+  });
+
+  it('resolves names within the refiner family even when a main model has the same name', () => {
+    const namedRefiner = makeModel('named-refiner', 'sdxl-refiner', 'main', { name: sdxl.name });
+    const currentValues = currentFor(sdxl);
+    const result = buildRecallParametersSettings({
+      currentValues,
+      models: [...models, namedRefiner],
+      parameters: { refiner_model: sdxl.name },
+      supportedModels,
+      vaeModels,
+    });
+
+    expect(result.skipped).toEqual([]);
+    expect(result.values.refinerModel).toEqual(namedRefiner);
+    expect(build(currentValues, { refiner_model: sdxl.key }).skipped).toEqual([
+      { key: 'refiner_model', reason: 'incompatible', detail: sdxl.name },
+    ]);
+  });
+
+  it('preserves omitted refiner settings during partial recall and uses the effective main model', () => {
+    const current = currentFor(sdxl, { refinerModel: refiner, refinerSteps: 35, refinerStart: 0.7 });
+    const partial = build(current, { refiner_cfg_scale: 5 });
+
+    expect(partial.skipped).toEqual([]);
+    expect(partial.values).toMatchObject({
+      refinerModel: refiner,
+      refinerSteps: 35,
+      refinerStart: 0.7,
+      refinerCfgScale: 5,
+    });
+    expect(build(current, { positive_prompt: 'only prompt' }).values.refinerModel).toEqual(refiner);
+
+    const switched = build(currentFor(flux), { model: sdxl.key, refiner_model: refiner.key, refiner_steps: 15 });
+    expect(switched.skipped).toEqual([]);
+    expect(switched.values).toMatchObject({ model: sdxl, refinerModel: refiner, refinerSteps: 15 });
+
+    const unsupported = build(currentFor(flux), { refiner_steps: 15, refiner_cfg_scale: 6 });
+    expect(unsupported.fields).toEqual([]);
+    expect(unsupported.skipped).toEqual([
+      { key: 'refiner_steps', reason: 'incompatible', detail: flux.name },
+      { key: 'refiner_cfg_scale', reason: 'incompatible', detail: flux.name },
+    ]);
+
+    const away = build(current, { model: flux.key, refiner_model: refiner.key, refiner_steps: 15 });
+    expect(away.values.refinerModel).toBeNull();
+    expect(away.values.refinerSteps).toBe(35);
+    expect(away.skipped.map(({ key }) => key)).toEqual(['refiner_model', 'refiner_steps']);
+  });
+
+  it('clears a refiner and resets all provided null tuning without changing omitted settings', () => {
+    const current = currentFor(sdxl, {
+      refinerModel: refiner,
+      refinerSteps: 35,
+      refinerCfgScale: 4,
+      refinerStart: 0.6,
+      refinerPositiveAestheticScore: 9,
+      refinerNegativeAestheticScore: 8,
+      refinerScheduler: 'ddim',
+    });
+    const cleared = build(current, { refiner_model: null });
+    expect(cleared.values).toMatchObject({ refinerModel: null, refinerSteps: 35, refinerStart: 0.6 });
+
+    const reset = build(current, {
+      refiner_model: null,
+      refiner_steps: null,
+      refiner_cfg_scale: null,
+      refiner_denoise_start: null,
+      refiner_positive_aesthetic_score: null,
+      refiner_negative_aesthetic_score: null,
+    });
+    expect(reset.skipped).toEqual([]);
+    expect(reset.fields).toEqual(['refiner']);
+    expect(reset.values).toMatchObject({
+      refinerModel: null,
+      refinerSteps: 20,
+      refinerCfgScale: 7.5,
+      refinerStart: 0.8,
+      refinerPositiveAestheticScore: 6,
+      refinerNegativeAestheticScore: 2.5,
+      refinerScheduler: 'ddim',
+    });
+
+    const dormantReset = build(currentFor(flux, { refinerSteps: 35 }), { refiner_steps: null });
+    expect(dormantReset.skipped).toEqual([]);
+    expect(dormantReset.values.refinerSteps).toBe(20);
+  });
+
+  it.each([sdxl, refinerLora])(
+    'rejects a non-refiner slot model $key without retuning the current refiner',
+    (model) => {
+      const result = build(currentFor(sdxl, { refinerModel: refiner, refinerSteps: 35 }), {
+        refiner_model: model.key,
+        refiner_steps: 12,
+      });
+
+      expect(result.values.refinerModel).toEqual(refiner);
+      expect(result.values.refinerSteps).toBe(35);
+      expect(result.fields).toEqual([]);
+      expect(result.skipped[0]).toEqual({ detail: model.name, key: 'refiner_model', reason: 'incompatible' });
+      expect(result.skipped[1]).toEqual({ detail: model.name, key: 'refiner_steps', reason: 'incompatible' });
+    }
+  );
+
+  it('preserves the current refiner and tuning when a delivered identifier is absent from the frontend catalog', () => {
+    const current = currentFor(sdxl, { refinerModel: refiner, refinerSteps: 35 });
+    const missingRefiner = build(current, { refiner_model: 'missing', refiner_steps: 12 });
+    expect(missingRefiner.values).toMatchObject({ refinerModel: refiner, refinerSteps: 35 });
+    expect(missingRefiner.fields).toEqual([]);
+    expect(missingRefiner.skipped).toEqual([
+      { key: 'refiner_model', reason: 'unresolved', detail: 'missing' },
+      { key: 'refiner_steps', reason: 'unresolved', detail: 'missing' },
+    ]);
+
+    const staleMainCatalog = build(current, {
+      model: 'server-resolved-main-key',
+      refiner_model: otherRefiner.key,
+      refiner_steps: 12,
+    });
+    expect(staleMainCatalog.values).toMatchObject({ refinerModel: refiner, refinerSteps: 35 });
+    expect(staleMainCatalog.fields).toEqual([]);
+    expect(staleMainCatalog.skipped.map(({ key }) => key)).toEqual(['model', 'refiner_model', 'refiner_steps']);
+  });
+
+  it.each([
+    ['refiner_model', 42],
+    ['refiner_steps', 0],
+    ['refiner_steps', 1.5],
+    ['refiner_steps', '12'],
+    ['refiner_steps', Infinity],
+    ['refiner_cfg_scale', 0.9],
+    ['refiner_cfg_scale', NaN],
+    ['refiner_denoise_start', -0.1],
+    ['refiner_denoise_start', 1.1],
+    ['refiner_positive_aesthetic_score', 0],
+    ['refiner_positive_aesthetic_score', '6'],
+    ['refiner_negative_aesthetic_score', 11],
+  ])('rejects invalid %s value %s without changing the refiner', (key, value) => {
+    const current = currentFor(sdxl, { refinerModel: refiner });
+    const result = build(current, { [key]: value });
+
+    expect(result.values).toEqual(current);
+    expect(result.fields).toEqual([]);
+    expect(result.skipped).toEqual([{ key, reason: 'invalid' }]);
+  });
+
+  it('accepts refiner range boundaries and rejects the metadata-only denoise key', () => {
+    const result = build(currentFor(sdxl), {
+      refiner_steps: 1,
+      refiner_cfg_scale: 1,
+      refiner_denoise_start: 0,
+      refiner_positive_aesthetic_score: 1,
+      refiner_negative_aesthetic_score: 10,
+    });
+    expect(result.skipped).toEqual([]);
+    expect(result.values).toMatchObject({
+      refinerSteps: 1,
+      refinerCfgScale: 1,
+      refinerStart: 0,
+      refinerPositiveAestheticScore: 1,
+      refinerNegativeAestheticScore: 10,
+    });
+    expect(build(result.values, { refiner_denoise_start: 1 }).values.refinerStart).toBe(1);
+    expect(build(result.values, { refiner_start: 0.5 }).skipped).toEqual([
+      { key: 'refiner_start', reason: 'unsupported' },
+    ]);
+  });
+
   it('builds the LoRA list from installed models, dropping unknown, incompatible and duplicate entries', () => {
     const result = build(currentFor(sdxl), {
       loras: [
@@ -290,6 +495,87 @@ describe('buildRecallParametersSettings', () => {
     expect(untouched.values.referenceImages).toEqual(current.referenceImages);
   });
 
+  it('types recalled Krea-2 references as one set: a lone one is style, several or appended ones are edit', () => {
+    const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
+    const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const krea2Values = getCurrentGenerateValues({
+      generateValues: { modelKey: krea2.key },
+      supportedModels: krea2Supported,
+    });
+
+    if (!krea2Values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const currentValues = {
+      ...krea2Values,
+      referenceImages: [
+        {
+          config: { image: { original: { image: image('pose.png') } }, type: 'krea2_edit_reference_image' as const },
+          id: 'pose',
+          isEnabled: true,
+        },
+      ],
+    };
+    const recalledTypes = (parameters: Record<string, unknown>) =>
+      buildRecallParametersSettings({
+        currentValues,
+        models: [krea2],
+        parameters,
+        supportedModels: krea2Supported,
+        vaeModels: [],
+      }).values.referenceImages.map((reference) => reference.config.type);
+
+    expect(recalledTypes({ append: true, reference_images: [{ image: image('depth.png') }] })).toEqual([
+      'krea2_edit_reference_image',
+      'krea2_edit_reference_image',
+    ]);
+    expect(recalledTypes({ reference_images: [{ image: image('depth.png') }] })).toEqual(['krea2_reference_image']);
+    expect(
+      recalledTypes({
+        reference_images: [{ image: image('pose.png') }, { image: image('depth.png') }, { image: image('room.png') }],
+      })
+    ).toEqual(['krea2_edit_reference_image', 'krea2_edit_reference_image', 'krea2_edit_reference_image']);
+  });
+
+  it('leaves a Krea-2 style card alone when the appended image does not fit the limit', () => {
+    const krea2 = makeModel('krea2-main', 'krea-2', 'main', { format: 'diffusers' });
+    const krea2Supported = [krea2].filter(isSupportedGenerateModel) as GenerateModelConfig[];
+    const krea2Values = getCurrentGenerateValues({
+      generateValues: { modelKey: krea2.key },
+      supportedModels: krea2Supported,
+    });
+
+    if (!krea2Values) {
+      throw new Error('fixture model is not a supported Generate model');
+    }
+
+    const card = (id: string, isEnabled: boolean) => ({
+      config: {
+        image: { original: { image: image(`${id}.png`) } },
+        styleStrength: 1,
+        type: 'krea2_reference_image' as const,
+      },
+      id,
+      isEnabled,
+    });
+    // Three cards fill Krea-2's limit; only the first runs, as a style reference at its default strength.
+    const currentValues = {
+      ...krea2Values,
+      referenceImages: [card('style', true), card('a', false), card('b', false)],
+    };
+    const result = buildRecallParametersSettings({
+      currentValues,
+      models: [krea2],
+      parameters: { append: true, reference_images: [{ image: image('pose.png') }] },
+      supportedModels: krea2Supported,
+      vaeModels: [],
+    });
+
+    expect(result.values.referenceImages).toEqual(currentValues.referenceImages);
+    expect(result.skipped).toContainEqual({ detail: '3', key: 'reference_images', reason: 'limit' });
+  });
+
   it('drops reference images for a model without reference image support and says so', () => {
     const result = build(currentFor(sd3), { reference_images: [{ image: image('subject.png') }] });
 
@@ -302,15 +588,10 @@ describe('buildRecallParametersSettings', () => {
       control_layers: [{ model_key: 'controlnet' }],
       denoise_strength: 0.5,
       positive_prompt: 'still applied',
-      refiner_model: 'refiner',
     });
 
     expect(result.fields).toEqual(['prompts']);
-    expect(result.skipped.map((skip) => skip.key).sort()).toEqual([
-      'control_layers',
-      'denoise_strength',
-      'refiner_model',
-    ]);
+    expect(result.skipped.map((skip) => skip.key).sort()).toEqual(['control_layers', 'denoise_strength']);
     expect(result.skipped.every((skip) => skip.reason === 'unsupported')).toBe(true);
 
     expect(build(currentFor(sdxl), { control_layers: [] }).skipped).toEqual([]);

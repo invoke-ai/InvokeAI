@@ -30,6 +30,7 @@ import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
 import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
+import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { findLayoutPresetWorkingCopy } from '@workbench/layoutPresetSnapshots';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
@@ -90,7 +91,11 @@ export const LayoutPresetStrip = () => {
   const invocation = useActiveProjectSelector((project) => project.invocation);
   const presetWorkingLayouts = useActiveProjectSelector(selectPresetWorkingLayouts, Object.is);
   const sourceOptions = useActiveProjectSelector(selectPlacedGraphWidgetSources);
-  const presets = useMemo(() => getOrderedLayoutPresets(account), [account]);
+  // Labels as shown: a built-in preset not renamed by the account reads in the current language.
+  const presets = useMemo(
+    () => getOrderedLayoutPresets(account).map((preset) => ({ ...preset, label: getLayoutPresetLabel(preset, t) })),
+    [account, t]
+  );
   const presetIds = useMemo(() => presets.map(({ id }) => id), [presets]);
   const { hasDrifted } = useLayoutDrift();
   const activePresetId = useActiveLayoutPresetId();

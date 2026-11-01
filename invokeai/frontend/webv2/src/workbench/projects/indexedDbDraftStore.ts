@@ -27,6 +27,7 @@ import {
   PROJECT_DRAFT_PROJECT_LIMIT,
   toConflictProjectDraft,
   toDirtyProjectDraft,
+  withBases,
   toProjectDraftBody,
   toProjectDraftMetadata,
   toSchemaRefusedProjectDraft,
@@ -45,6 +46,7 @@ import {
   type ProjectDraftRetargetAcknowledgeResult,
   type ProjectDraftRetargetHandoff,
   type ProjectDraftRetargetListResult,
+  type ProjectDraftRebaseResult,
   type ProjectDraftSettlementResult,
   type ProjectDraftStageResult,
   type ProjectDraftStartWriterResult,
@@ -262,7 +264,25 @@ export const createIndexedDbProjectDraftStore = (
     transform: DraftTransform,
     kind: 'marked' | 'rebased'
   ): Promise<ProjectDraftSettlementResult> => {
-    const outcome = await mutate<ProjectDraftSettlementResult | { kind: 'read-marked' }>(
+    const outcome = await settleMetadata(projectId, editorSessionId, writerToken, sentGeneration, transform);
+    if (outcome.kind !== 'read-marked') {
+      return outcome;
+    }
+    const read = await readDraft(projectId, editorSessionId);
+    if (read.kind === 'found') {
+      return read.draft.writerToken === writerToken ? { draft: read.draft, kind } : { kind: 'fenced' };
+    }
+    return read.kind === 'corrupt' || read.kind === 'unavailable' ? read : { kind: 'missing' };
+  };
+  /** The settlement's metadata write alone, for a caller that needs no draft back: the body is not read. */
+  const settleMetadata = (
+    projectId: string,
+    editorSessionId: string,
+    writerToken: string,
+    sentGeneration: number,
+    transform: DraftTransform
+  ): Promise<ProjectDraftSettlementResult | { kind: 'read-marked' }> =>
+    mutate<ProjectDraftSettlementResult | { kind: 'read-marked' }>(
       async () => {
         const transaction = observeTransaction(database.transaction(DRAFT_STORES, 'readwrite'));
         const metadataStore = transaction.objectStore(WORKBENCH_DRAFT_STORE);
@@ -314,15 +334,6 @@ export const createIndexedDbProjectDraftStore = (
       { kind: 'unavailable' },
       { kind: 'quota' }
     );
-    if (outcome.kind !== 'read-marked') {
-      return outcome;
-    }
-    const read = await readDraft(projectId, editorSessionId);
-    if (read.kind === 'found') {
-      return read.draft.writerToken === writerToken ? { draft: read.draft, kind } : { kind: 'fenced' };
-    }
-    return read.kind === 'corrupt' || read.kind === 'unavailable' ? read : { kind: 'missing' };
-  };
 
   return {
     get availability() {
@@ -961,7 +972,13 @@ export const createIndexedDbProjectDraftStore = (
         { kind: 'quota' }
       );
     },
-    resumeSchemaRefused(projectId, editorSessionId, writerToken, generation) {
+    async rebaseDraft(projectId, editorSessionId, writerToken, generation, bases) {
+      const settled = await settleMetadata(projectId, editorSessionId, writerToken, generation, (draft) =>
+        withBases(draft, bases)
+      );
+      return settled.kind === 'read-marked' ? { kind: 'rebased' } : (settled as ProjectDraftRebaseResult);
+    },
+    resumeDraft(projectId, editorSessionId, writerToken, generation) {
       return settle(
         projectId,
         editorSessionId,
@@ -1055,6 +1072,7 @@ export const createIndexedDbProjectDraftStore = (
                 ? null
                 : toDirtyProjectDraft(read.draft, {
                     baseRevision: options.acknowledgedRevision,
+                    baseWorkspaceRevision: options.acknowledgedWorkspaceRevision,
                     copyDocumentByteSize: undefined,
                     copyDocumentJson: undefined,
                     copyProjectId: undefined,
@@ -1110,7 +1128,8 @@ export const createIndexedDbProjectDraftStore = (
       writerToken,
       sentGeneration,
       acknowledgedRevision,
-      acknowledgedMinimumCanvasSchemaVersion
+      acknowledgedMinimumCanvasSchemaVersion,
+      acknowledgedWorkspaceRevision
     ) {
       const outcome = await mutate<ProjectDraftSettlementResult | { kind: 'read-rebased' }>(
         async () => {
@@ -1165,6 +1184,9 @@ export const createIndexedDbProjectDraftStore = (
             baseMinimumCanvasSchemaVersion:
               acknowledgedMinimumCanvasSchemaVersion ?? metadata.baseMinimumCanvasSchemaVersion,
             baseRevision: acknowledgedRevision,
+            ...(acknowledgedWorkspaceRevision === undefined
+              ? {}
+              : { baseWorkspaceRevision: acknowledgedWorkspaceRevision }),
             metadataRevision: nextMetadataRevision,
           });
           await writerStore.put(

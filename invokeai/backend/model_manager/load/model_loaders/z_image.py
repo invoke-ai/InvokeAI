@@ -7,9 +7,9 @@ import accelerate
 import torch
 from transformers import AutoTokenizer, Qwen3ForCausalLM
 
+from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
 from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Diffusers_Config_Base
-from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_ZImage_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_ZImage_Config,
@@ -83,7 +83,7 @@ from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.qwen3.qwen3_tokenizer import load_bundled_qwen3_tokenizer
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
 
 def _remap_z_image_layer_paths(layer_names: Any) -> dict[str, list[str]]:
@@ -127,6 +127,21 @@ def _remap_nvfp4_payloads(payloads: dict[str, NVFP4Payload]) -> dict[str, NVFP4P
     return remapped
 
 
+def _pad_token_row(key: str, value: torch.Tensor) -> torch.Tensor:
+    """A pad token as the plain ``[1, dim]`` tensor diffusers expects.
+
+    Releases store it as ``[dim]`` or as ``[1, dim]`` (GGUF ``[dim, 1]``). Either way it has to arrive
+    unpacked: the diffusers forward applies it with ``torch.where``, which a GGUF or SDNQ tensor does not
+    dispatch, so a packed pad token fails the first denoising step. Anything that is not one row of
+    values is refused rather than flattened into one.
+    """
+    if sum(extent != 1 for extent in value.shape) > 1:
+        raise ValueError(f"Z-Image {key} has shape {tuple(value.shape)}; a pad token must be a single row of values.")
+    if hasattr(value, "get_dequantized_tensor"):
+        value = value.get_dequantized_tensor()
+    return value.reshape(1, -1)
+
+
 def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     """Convert Z-Image GGUF state dict keys to diffusers format.
 
@@ -138,7 +153,7 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
     - x_embedder.* -> all_x_embedder.2-1.*
     - final_layer.* -> all_final_layer.2-1.*
     - norm_final.* -> skipped (diffusers uses non-learnable LayerNorm)
-    - x_pad_token, cap_pad_token: [dim] -> [1, dim] (diffusers expects batch dimension)
+    - x_pad_token, cap_pad_token -> a plain [1, dim] tensor (see _pad_token_row)
     """
     new_sd: dict[str, Any] = {}
 
@@ -147,15 +162,8 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
             new_sd[key] = value
             continue
 
-        # Handle padding tokens: GGUF has shape [dim], diffusers expects [1, dim]
         if key in ("x_pad_token", "cap_pad_token"):
-            if hasattr(value, "shape") and len(value.shape) == 1:
-                # GGMLTensor doesn't support unsqueeze, so dequantize first if needed
-                if hasattr(value, "get_dequantized_tensor"):
-                    value = value.get_dequantized_tensor()
-                # Use reshape instead of unsqueeze for better compatibility
-                value = torch.as_tensor(value).reshape(1, -1)
-            new_sd[key] = value
+            new_sd[key] = _pad_token_row(key, value)
             continue
 
         # Handle x_embedder -> all_x_embedder.2-1
@@ -1008,115 +1016,30 @@ class Qwen3EncoderLoader(ModelLoader):
     type=ModelType.ControlNet,
     format=ModelFormat.Checkpoint,
     fp8_storage=Unimplemented(
-        "the adapter is loaded straight from the file and never cast at all; the Tile build is ~6.7 GB, "
-        "so this one is worth closing"
+        "the control is cast to the compute dtype at load and runs as its own module tree, so the layerwise cast "
+        "would fit; the Union and Tile 2.1 builds are 6.7 GB in bf16, so this one is worth closing"
     ),
 )
-class ZImageControlCheckpointModel(ModelLoader):
-    """Class to load Z-Image Control adapter models from safetensors checkpoint.
+class ZImageFunControlNetLoader(ModelLoader):
+    """Loads a Z-Image Fun-ControlNet (Union 1.0, 2.0, 2.1, 2.1 Lite, Tile 2.1) from its safetensors file.
 
-    Z-Image Control models are standalone adapters containing control layers
-    (control_layers, control_all_x_embedder, control_noise_refiner) that can be
-    combined with a base ZImageTransformer2DModel at runtime for spatial conditioning
-    (Canny, HED, Depth, Pose, MLSD).
+    The file carries no config: `ZImageFunControl.from_state_dict` reads the width and the variant off the tensors.
+    Cast to the device's bfloat16-safe dtype, the policy the transformer loaders follow.
     """
 
-    def _load_model(
-        self,
-        config: AnyModelConfig,
-        submodel_type: Optional[SubModelType] = None,
-    ) -> AnyModel:
-        if not isinstance(config, Checkpoint_Config_Base):
-            raise ValueError("Only CheckpointConfigBase models are supported here.")
-
-        # ControlNet type models don't use submodel_type - load the adapter directly
-        return self._load_control_adapter(config)
-
-    def _load_control_adapter(
-        self,
-        config: AnyModelConfig,
-    ) -> AnyModel:
+    def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         from safetensors.torch import load_file
 
-        from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
-
-        assert isinstance(config, ControlNet_Checkpoint_ZImage_Config)
-        model_path = Path(config.path)
-
-        # Load the safetensors state dict
-        sd = load_file(model_path)
-        # Before the geometry probe, because the shapes it reads are meaningless on a packed weight.
-        reject_quantized_side_channel(sd, f"Z-Image ControlNet checkpoint {model_path.name}")
-
-        # Determine number of control blocks from state dict
-        # Control blocks are named control_layers.0, control_layers.1, etc.
-        control_block_indices = set()
-        for key in sd.keys():
-            if key.startswith("control_layers."):
-                parts = key.split(".")
-                if len(parts) > 1 and parts[1].isdigit():
-                    control_block_indices.add(int(parts[1]))
-        num_control_blocks = len(control_block_indices) if control_block_indices else 6
-
-        # Determine number of refiner layers from state dict
-        refiner_indices: set[int] = set()
-        for key in sd.keys():
-            if key.startswith("control_noise_refiner."):
-                parts = key.split(".")
-                if len(parts) > 1 and parts[1].isdigit():
-                    refiner_indices.add(int(parts[1]))
-        n_refiner_layers = len(refiner_indices) if refiner_indices else 2
-
-        # Determine control_in_dim from embedder weight shape
-        # control_in_dim = weight.shape[1] / (f_patch_size * patch_size * patch_size)
-        # For patch_size=2, f_patch_size=1: control_in_dim = weight.shape[1] / 4
-        control_in_dim = 16  # Default for V1
-        embedder_key = "control_all_x_embedder.2-1.weight"
-        if embedder_key in sd:
-            weight_shape = sd[embedder_key].shape
-            # weight_shape[1] = f_patch_size * patch_size * patch_size * control_in_dim
-            control_in_dim = weight_shape[1] // 4  # 4 = 1 * 2 * 2
-
-        # Log detected configuration for debugging
-        from invokeai.backend.util.logging import InvokeAILogger
-
-        logger = InvokeAILogger.get_logger(self.__class__.__name__)
-        version = "V2.0" if control_in_dim > 16 else "V1"
-        logger.info(
-            f"Z-Image ControlNet detected: {version} "
-            f"(control_in_dim={control_in_dim}, num_control_blocks={num_control_blocks}, "
-            f"n_refiner_layers={n_refiner_layers})"
-        )
-
-        # Create an empty control adapter
-        dim = 3840
-        with accelerate.init_empty_weights():
-            model = ZImageControlAdapter(
-                num_control_blocks=num_control_blocks,
-                control_in_dim=control_in_dim,
-                all_patch_size=(2,),
-                all_f_patch_size=(1,),
-                dim=dim,
-                n_refiner_layers=n_refiner_layers,
-                n_heads=30,
-                n_kv_heads=30,
-                norm_eps=1e-05,
-                qk_norm=True,
-            )
-
-        # Load state dict with strict=False to handle missing keys like x_pad_token
-        # Some control adapters may not include x_pad_token in their checkpoint
-        missing_keys, unexpected_keys = model.load_state_dict(sd, assign=True, strict=False)
-        log_unexpected_keys("Z-Image ControlNet checkpoint", unexpected_keys)
-
-        # Initialize x_pad_token if it was missing from the checkpoint
-        if "x_pad_token" in missing_keys:
-            import torch.nn as nn
-
-            model.x_pad_token = nn.Parameter(torch.empty(dim))
-            nn.init.normal_(model.x_pad_token, std=0.02)
-
-        return model
+        if not isinstance(config, Checkpoint_Config_Base):
+            raise ValueError("Only checkpoint configs are supported here.")
+        path = Path(config.path)
+        sd = load_file(path)
+        # Before the layout is read: the shapes mean nothing on a packed weight, and the tensors are assigned as they
+        # are, so no scale would be folded in. alibaba-pai publishes dense bf16 files only.
+        reject_quantized_side_channel(sd, f"Z-Image ControlNet checkpoint {path.name}")
+        control = ZImageFunControl.from_state_dict(sd, dtype=TorchDevice.choose_bfloat16_safe_dtype(self._torch_device))
+        self._logger.info(f"Z-Image ControlNet {path.name}: the {control.variant.name} layout")
+        return control
 
 
 def _fold_comfy_scaled_weights(sd: dict[str, Any], dtype: torch.dtype) -> int:

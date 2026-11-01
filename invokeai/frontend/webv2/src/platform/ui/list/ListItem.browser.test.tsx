@@ -1,5 +1,5 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Field, Input } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 import { ListItem } from './ListItem';
+import { ListSelectionBar } from './ListSelectionBar';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
@@ -139,6 +140,34 @@ describe('ListItem', () => {
     expect(host.querySelector<HTMLElement>('[data-list-primary] [title]')!.children).toHaveLength(2);
   });
 
+  it('toggles the checkbox from the padding around it without stealing presses from the primary button', async () => {
+    const onCheckedChange = vi.fn();
+    const onPress = vi.fn();
+    const item = (isChecked: boolean) => (
+      <ListItem isChecked={isChecked} title="A model" onCheckedChange={onCheckedChange} onPress={onPress} />
+    );
+
+    await render(item(false));
+
+    const row = primary().parentElement!;
+    const rowRect = row.getBoundingClientRect();
+    const control = host.querySelector<HTMLElement>('[data-part="control"]')!.getBoundingClientRect();
+    const middle = control.top + control.height / 2 - rowRect.top;
+
+    // The row's start padding and the space above the control, both outside its visible box.
+    await userEvent.click(row, { position: { x: control.left - rowRect.left - 4, y: middle } });
+    expect(onCheckedChange).toHaveBeenLastCalledWith(true);
+    await render(item(true));
+    await userEvent.click(row, { position: { x: control.left - rowRect.left + 2, y: control.top - rowRect.top - 4 } });
+    expect(onCheckedChange).toHaveBeenLastCalledWith(false);
+    expect(onPress).not.toHaveBeenCalled();
+
+    // Past the outset, the primary button's start padding still belongs to the press.
+    await userEvent.click(row, { position: { x: control.right - rowRect.left + 8, y: middle } });
+    expect(onPress).toHaveBeenCalledTimes(1);
+    expect(onCheckedChange).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps a title with line breaks on one line', async () => {
     await render(<ListItem title="single line" titleTruncate="end" onPress={() => undefined} />);
     const singleLineHeight = host
@@ -152,5 +181,33 @@ describe('ListItem', () => {
 
     expect(title.getBoundingClientRect().height).toBe(singleLineHeight);
     expect(title.textContent).toContain('third line');
+  });
+});
+
+describe('list checkboxes inside a form Field', () => {
+  // A popover opened from a field's label keeps the Field's context; its list must not bind to the Field's input.
+  it('toggle their own rows on a click and leave the Field input alone', async () => {
+    const onSelectAll = vi.fn();
+    const onRow = vi.fn();
+
+    await render(
+      <Field.Root>
+        <Input aria-label="Field input" />
+        <ListSelectionBar checked={false} label="Select all" onCheckedChange={onSelectAll} />
+        <ListItem title="first" onCheckedChange={onRow} />
+        <ListItem title="second" onCheckedChange={vi.fn()} />
+      </Field.Root>
+    );
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Field input"]')!;
+    const controls = host.querySelectorAll<HTMLElement>('[data-scope="checkbox"][data-part="control"]');
+    const ids = [...host.querySelectorAll('input')].map((element) => element.id);
+
+    expect(new Set(ids).size).toBe(ids.length);
+    await act(() => userEvent.click(controls[0]!));
+    await act(() => userEvent.click(controls[1]!));
+
+    expect(onSelectAll).toHaveBeenCalledOnce();
+    expect(onRow).toHaveBeenCalledOnce();
+    expect(document.activeElement).not.toBe(input);
   });
 });

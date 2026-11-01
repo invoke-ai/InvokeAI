@@ -274,6 +274,23 @@ describe('createFilterOperationSession', () => {
     expect(deps.runFilter).not.toHaveBeenCalled();
   });
 
+  it.each(['too-large', 'over-budget', 'error'] as const)(
+    "publishes a filter source whose Clarity, Texture or Dehaze refused %s as the source's adjustment code",
+    async (reason) => {
+      const deps = createDeps({
+        exportPixels: vi.fn(() =>
+          Promise.resolve({ ownerId: 'layer', ownerName: 'Layer', reason, status: 'adjustment-refused' as const })
+        ),
+      });
+      const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+      expect(await session.process()).toBe('error');
+
+      expect(session.getSnapshot()).toMatchObject({ error: { code: `source-adjustment-${reason}` }, status: 'error' });
+      expect(deps.runFilter).not.toHaveBeenCalled();
+    }
+  );
+
   it('publishes a filter source the guard no longer matches as stale', async () => {
     const deps = createDeps({ isGuardCurrent: vi.fn(() => false) });
     const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
@@ -370,6 +387,20 @@ describe('auto-process', () => {
     vi.useRealTimers();
     await vi.waitFor(() => expect(deps.runFilter).toHaveBeenCalledTimes(times));
   };
+
+  it('previews the starting draft without waiting for an edit', async () => {
+    vi.useFakeTimers();
+    const deps = createDeps();
+    const session = createFilterOperationSession({ deps, guard, initialFilter: layer.filter!, layerType: 'raster' })!;
+
+    await vi.advanceTimersByTimeAsync(FILTER_AUTO_PROCESS_DEBOUNCE_MS);
+    await flushScheduledRun(deps, 1);
+    expect(deps.runFilter).toHaveBeenCalledWith(
+      expect.objectContaining({ filterType: 'canny_edge_detection', settings: { radius: 2 } })
+    );
+    await vi.waitFor(() => expect(session.getSnapshot().preview?.imageName).toBe('filtered'));
+    session.dispose();
+  });
 
   it('debounces draft updates into a single process run with the latest settings', async () => {
     vi.useFakeTimers();

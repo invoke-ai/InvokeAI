@@ -14,6 +14,23 @@ const library = vi.hoisted(() => ({
   getLibraryWorkflowRecordCached: vi.fn(),
 }));
 
+const identity = vi.hoisted(() => ({
+  session: {
+    multiuserEnabled: false,
+    phase: 'ready',
+    user: null,
+  } as {
+    multiuserEnabled: boolean;
+    phase: 'ready';
+    user: { is_admin?: boolean; user_id: string } | null;
+  },
+}));
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => identity.session,
+}));
+
 vi.mock('@features/workflow/queries', () => ({
   getLibraryWorkflowRecordCached: (workflowId: string) => {
     library.beforeAnswer();
@@ -28,8 +45,12 @@ vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => k
 
 const ITEM = { name: 'Portrait', workflow_id: 'lib-portrait' };
 const RECORD = {
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
   name: 'Portrait',
   revision: 4,
+  updated_at: '2026-10-20T00:00:00Z',
+  user_id: 'user-a',
   workflow: {
     author: '',
     contact: '',
@@ -74,12 +95,17 @@ describe('useOpenLibraryWorkflow replace', () => {
   const onOpened = vi.fn();
 
   const Probe = () => {
-    const { replace } = useOpenLibraryWorkflow(onOpened);
+    const { open, replace } = useOpenLibraryWorkflow(onOpened);
 
     return (
-      <button type="button" onClick={() => void replace(ITEM, 'copy-1')}>
-        replace
-      </button>
+      <>
+        <button type="button" onClick={() => void open(ITEM, 'first-copy')}>
+          open
+        </button>
+        <button type="button" onClick={() => void replace(ITEM, 'copy-1')}>
+          replace
+        </button>
+      </>
     );
   };
 
@@ -100,7 +126,9 @@ describe('useOpenLibraryWorkflow replace', () => {
       )
     );
     await act(async () => {
-      host.querySelector('button')!.click();
+      [...host.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent === 'replace')!
+        .click();
       await vi.waitFor(() => expect(library.getLibraryWorkflowRecordCached).toHaveBeenCalled());
       // The load waits two frames for the busy overlay to paint before applying.
       await new Promise<void>((resolve) => {
@@ -109,8 +137,34 @@ describe('useOpenLibraryWorkflow replace', () => {
     });
   };
 
+  const runOpen = async () => {
+    await act(() =>
+      root.render(
+        <WorkflowUiProvider
+          adapter={
+            {
+              commands,
+              notifications,
+              project: { getSnapshot: () => ({ id: projectId, workflows: [] }), subscribe: () => () => {} },
+            } as unknown as WorkflowUiAdapter
+          }
+        >
+          <Probe />
+        </WorkflowUiProvider>
+      )
+    );
+    await act(async () => {
+      [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'open')!.click();
+      await vi.waitFor(() => expect(library.getLibraryWorkflowRecordCached).toHaveBeenCalled());
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+      });
+    });
+  };
+
   beforeEach(() => {
     projectId = 'project-1';
+    identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     commands = { addWorkflow: vi.fn(), replaceWorkflow: vi.fn() };
     notifications = { error: vi.fn(), info: vi.fn() };
     onOpened.mockClear();
@@ -133,7 +187,10 @@ describe('useOpenLibraryWorkflow replace', () => {
     expect(commands.replaceWorkflow).toHaveBeenCalledExactlyOnceWith(
       { projectId: 'project-1', workflowId: 'copy-1' },
       expect.objectContaining({ nodes: [expect.objectContaining({ id: 'value' })] }),
-      { label: 'workflowLibrary.replacedLabel', source: { libraryWorkflowId: ITEM.workflow_id, revision: 4 } }
+      {
+        label: 'workflowLibrary.replacedLabel',
+        source: { libraryWorkflowId: ITEM.workflow_id, ownerUserId: 'user-a', revision: 4 },
+      }
     );
     expect(commands.addWorkflow).not.toHaveBeenCalled();
     expect(workflowFitViewRequestStore.getSnapshot().request).toMatchObject({
@@ -153,5 +210,78 @@ describe('useOpenLibraryWorkflow replace', () => {
     expect(commands.replaceWorkflow).not.toHaveBeenCalled();
     expect(notifications.info).toHaveBeenCalledWith('workflowLibrary.openProjectChanged');
     expect(onOpened).not.toHaveBeenCalled();
+  });
+
+  it('opens another account’s public workflow for an admin without granting update access', async () => {
+    identity.session = {
+      multiuserEnabled: true,
+      phase: 'ready',
+      user: { is_admin: true, user_id: 'admin-user' },
+    };
+    library.getLibraryWorkflowRecordCached.mockResolvedValue({
+      ...RECORD,
+      is_public: true,
+      user_id: 'owner-user',
+    });
+
+    await runOpen();
+
+    expect(commands.addWorkflow).toHaveBeenCalledTimes(1);
+    expect(commands.addWorkflow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: { libraryWorkflowId: ITEM.workflow_id, ownerUserId: 'owner-user', revision: 4 },
+      })
+    );
+    expect(commands.replaceWorkflow).not.toHaveBeenCalled();
+    expect(onOpened).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the update hint for a current owner of a private Library workflow', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'owner-user' } };
+    library.getLibraryWorkflowRecordCached.mockResolvedValue({
+      ...RECORD,
+      is_public: false,
+      user_id: 'owner-user',
+    });
+
+    await runOpen();
+
+    expect(commands.addWorkflow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: { libraryWorkflowId: ITEM.workflow_id, ownerUserId: 'owner-user', revision: 4 },
+      })
+    );
+  });
+
+  it('does not attach owner metadata to a bundled default workflow', async () => {
+    library.getLibraryWorkflowRecordCached.mockResolvedValue({
+      ...RECORD,
+      is_public: true,
+      user_id: 'system',
+      workflow: { ...RECORD.workflow, meta: { category: 'default', version: '3.0.0' } },
+    });
+
+    await runOpen();
+
+    expect(commands.addWorkflow.mock.calls[0]?.[1]?.source).toEqual({
+      libraryWorkflowId: ITEM.workflow_id,
+      revision: 4,
+    });
+  });
+
+  it('withholds the update hint for a multiuser Library record without a verified owner', async () => {
+    identity.session = { multiuserEnabled: true, phase: 'ready', user: { user_id: 'current-user' } };
+    library.getLibraryWorkflowRecordCached.mockResolvedValue({ ...RECORD, is_public: true, user_id: undefined });
+
+    await runOpen();
+
+    expect(commands.addWorkflow).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        source: { libraryWorkflowId: ITEM.workflow_id, revision: 4 },
+      })
+    );
   });
 });

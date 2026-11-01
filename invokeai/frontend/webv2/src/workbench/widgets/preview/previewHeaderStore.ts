@@ -7,7 +7,7 @@ import { createExternalStore } from '@platform/state/externalStore';
 /** The loupe's commands, published once per selection; the readout lives in `previewStageStore`. */
 export interface PreviewZoomCommands {
   reset: () => void;
-  /** Zoom to a fraction of the image's own pixels (1 = 100%), never below fit. */
+  /** Zoom to a fraction of the image's own pixels (1 = 100%), within `getActualZoomLimits`. */
   zoomTo: (actualZoom: number) => void;
 }
 
@@ -16,12 +16,25 @@ export type PreviewZoomControls = PreviewZoomCommands & PreviewZoomReadout;
 
 /** What the loupe shows, as percents of the image's own pixels. */
 export interface PreviewZoomReadout {
-  /** What the fitted image shows, for the menu's presets. */
+  /** What the fitted image shows, unrounded, for the menu's presets. */
   fitPercent: number | null;
   isZoomed: boolean;
   /** What is on screen right now. */
   percent: number | null;
 }
+
+/** Max zoom, as a fraction of the image's actual pixel size. */
+const MAX_ACTUAL_ZOOM = 8;
+
+/**
+ * The zoom range, as fractions of the image's own pixels, for a fit showing it at `fitRatio`: never below the smaller
+ * of fit and 100%, so an image the fit enlarges can still be seen at its own size, and never past `MAX_ACTUAL_ZOOM` or
+ * fit, whichever is larger. The loupe enforces it; the zoom menu offers only presets inside it.
+ */
+export const getActualZoomLimits = (fitRatio: number): { max: number; min: number } => ({
+  max: Math.max(fitRatio, MAX_ACTUAL_ZOOM),
+  min: Math.min(fitRatio, 1),
+});
 
 /** Where the selection sits in its board, for the Details popover's header line. */
 export interface PreviewItemPosition {

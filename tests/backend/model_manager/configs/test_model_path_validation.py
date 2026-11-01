@@ -84,6 +84,32 @@ def test_large_directory_with_model_index_is_accepted(tmp_path: Path) -> None:
     ModelConfigFactory._validate_path_looks_like_model(tmp_path)
 
 
+def test_large_moss_image_pipeline_is_accepted(tmp_path: Path) -> None:
+    # MOSS-Image's pipeline class is remote code upstream (vendored here), so no installed library exports it, and
+    # its Hugging Face repo ships 20 example `assets/` beside the components.
+    (tmp_path / "model_index.json").write_text(json.dumps({"_class_name": "MOSSImagePipeline"}))
+    _fill_directory(tmp_path)
+
+    ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
+@pytest.mark.parametrize("class_name", ["Flux3ModularPipeline", "Flux3DistilledModularPipeline"])
+def test_large_flux3_folder_is_accepted_by_the_installed_diffusers_exports(tmp_path: Path, class_name: str) -> None:
+    # No pinned marker names these; diffusers exports them. A modular pipeline is no DiffusionPipeline subclass.
+    (tmp_path / "modular_model_index.json").write_text(json.dumps({"_class_name": class_name}))
+    _fill_directory(tmp_path)
+
+    ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
+def test_large_directory_with_bare_modular_pipeline_index_is_rejected(tmp_path: Path) -> None:
+    (tmp_path / "modular_model_index.json").write_text(json.dumps({"_class_name": "ModularPipeline"}))
+    _fill_directory(tmp_path)
+
+    with pytest.raises(ValueError, match="general-purpose directory"):
+        ModelConfigFactory._validate_path_looks_like_model(tmp_path)
+
+
 def test_directory_with_utf8_non_ascii_config_is_accepted(tmp_path: Path) -> None:
     # config.json files are UTF-8. Reading them with the platform default encoding (cp1252 on Windows)
     # raises UnicodeDecodeError on non-ASCII bytes, which gets swallowed as "unrecognized" and wrongly

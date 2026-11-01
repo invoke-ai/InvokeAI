@@ -1,7 +1,7 @@
 ---
 title: Prompting Guide
 description: Write prompts that work, then go further with prompt templates, dynamic prompts and wildcards.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-28
 sidebar:
   order: 2
 ---
@@ -165,6 +165,7 @@ a red fox in the snow. photography. f/2.8 macro photo, bokeh, photorealism
 * Only the first `{prompt}` is replaced. Any further copies stay in the text as written.
 * A template without `{prompt}` is added to the end of your prompt, after a space.
 * Templates can carry negative text too. It is combined with your negative prompt by the same rules, for models that use a negative prompt.
+* A positive prompt that is JSON, such as a [MOSS-Image layout](/users-guide/models/local-models/moss-image/#json-layouts), is sent as written: the template's positive text is not added around it. Its negative text is still combined with your negative prompt.
 
 While a template is applied, an eye button in the prompt toolbar (**Show the merged prompt**) shows the prompt exactly as it will be sent, with the template's words distinguished from yours. The prompt boxes are read-only in this view. Click the text, or the button again (**Back to editing your prompt**), to return to editing.
 
@@ -281,6 +282,7 @@ Turn on **New seed for every image** to give each image its own seed instead, fo
 ### Dynamic prompts and other features
 
 * **Prompt templates.** Expansion runs on your prompt after the [template](#prompt-templates) has been applied, so a template can contain dynamic syntax too.
+* **JSON prompts.** A prompt that is a JSON object or array, also inside a Markdown code fence such as ```` ```json ````, is sent as written for every model. Dynamic syntax and [wildcards](#wildcards) in it are not expanded, and the **Dynamic** badge stays off.
 * **Image metadata.** Each image records the expanded prompt that produced it and its own seed. The original dynamic prompt and the dynamic prompt settings are not recorded.
 * **Workflows.** The workflow editor has a **Dynamic Prompt** node, and batch generators for random and combinatorial expansion.
 
@@ -304,6 +306,7 @@ Wildcards are managed on the **Wildcards** tab of the **Dynamic** popover.
 * Click a wildcard to insert it at the cursor (**Insert into the prompt**). You can also type `__` in the prompt, or use the **+** [prompt trigger](/users-guide/image-generation/prompt-tools/#prompt-triggers) menu.
 * Use the pencil and trash buttons on a wildcard to edit or delete it.
 * **Search wildcards** finds wildcards by name or value.
+* To delete several wildcards at once, tick the checkbox beside each one, or use **Select all** above the list to select every wildcard the search shows (selections from earlier searches are kept). Then choose **Delete** and confirm once. The **×** button clears the selection.
 
 Wildcards belong to your account. On a multi-user installation, each user has their own set.
 

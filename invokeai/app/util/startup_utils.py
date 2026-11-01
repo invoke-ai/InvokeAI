@@ -1,12 +1,16 @@
 import ctypes
 import logging
 import mimetypes
+import platform
 import re
 import socket
 import sys
 from pathlib import Path
 
 import torch
+
+from invokeai.app.services.config.config_default import ATTENTION_BACKEND
+from invokeai.backend.util.sdpa_scope import SDPA_KERNELS, describe_sdpa_priority_order, install_default_sdpa_priority
 
 
 def find_open_port(port: int) -> int:
@@ -19,6 +23,22 @@ def find_open_port(port: int) -> int:
             return find_open_port(port=port + 1)
         else:
             return port
+
+
+def describe_torch_build() -> str:
+    """One line naming the torch build and host platform, for the startup log.
+
+    Out-of-tree torch builds (NVIDIA's `+cu134` wheels for Windows on ARM64) and ROCm builds all report
+    `device.type == "cuda"`, so the device line alone does not say what is actually running; a bug
+    report needs the version string, the accelerator API and the CPU architecture.
+    """
+    if torch.version.hip is not None:
+        accelerator = f"HIP {torch.version.hip}"
+    elif torch.version.cuda is not None:
+        accelerator = f"CUDA {torch.version.cuda}"
+    else:
+        accelerator = "no CUDA/HIP"
+    return f"torch {torch.__version__} ({accelerator}) on {platform.system()} {platform.machine()}"
 
 
 def check_cudnn(logger: logging.Logger) -> None:
@@ -148,29 +168,31 @@ def probe_attention_backends(device: torch.device) -> dict[str, bool] | None:
         return None
 
 
-# Devices already reported. The line answers a support question ("which kernels does this build
-# have?"), so it is worth exactly once per device per process and nothing after that.
-_logged_attention_backends: set[str] = set()
+# Devices already probed, whatever the outcome. The line answers a support question ("which kernels
+# does this build have?"), so it is worth exactly once per device per process and nothing after that --
+# and a probe that failed must not allocate and flush the allocator again on every later item.
+_probed_attention_devices: set[str] = set()
 
 
 def log_attention_backends(logger: logging.Logger, device: torch.device) -> None:
-    """Log this device's SDPA backend availability, once per device.
+    """Log this device's SDPA backend availability and the priority order torch picks by, once per device.
 
     The point is support: a question about attention performance can then be answered by reading a
     log line instead of asking the user to run a probe script. Call it from a generation path rather
     than from startup -- `probe_attention_backends` explains why.
     """
     key = str(device)
-    if key in _logged_attention_backends:
+    if key in _probed_attention_devices:
         return
+    _probed_attention_devices.add(key)
     available = probe_attention_backends(device)
     if available is None:
         return
-    _logged_attention_backends.add(key)
     summary = " ".join(f"{name}={'yes' if ok else 'no'}" for name, ok in available.items())
     logger.info(
         f"SDPA attention backends on {device} "
-        f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}"
+        f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}; "
+        f"priority {describe_sdpa_priority_order()}"
     )
 
 
@@ -200,8 +222,8 @@ def enable_dev_reload(custom_nodes_path=None) -> None:
         jurigged.watch(pattern=paths, logger=InvokeAILogger.get_logger(name="jurigged").info)
 
 
-def apply_monkeypatches() -> None:
-    """Apply monkeypatches to fix issues with third-party libraries."""
+def apply_monkeypatches(attention_backend: ATTENTION_BACKEND = "auto") -> None:
+    """Apply monkeypatches to fix issues with third-party libraries, and install the configured attention backend."""
 
     import invokeai.backend.util.hotfixes  # noqa: F401 (monkeypatching on import)
 
@@ -209,9 +231,11 @@ def apply_monkeypatches() -> None:
     # from_single_file) invoke torch.cuda.empty_cache directly, convoying a busy peer GPU on
     # multi-GPU installs. Wrap the torch entry point so every Python caller inherits the
     # skip-while-a-peer-generates policy.
-    from invokeai.backend.util.devices import install_peer_aware_empty_cache
+    from invokeai.backend.util.devices import install_cuda_stream_capture_shim, install_peer_aware_empty_cache
 
     install_peer_aware_empty_cache()
+    # NVIDIA's Windows ARM64 torch crashes in torch.cuda.is_current_stream_capturing() without a device.
+    install_cuda_stream_capture_shim()
 
     # ROCm's fused SDPA kernels return wrong output for heads wider than 256 (the VAE mid-block
     # attention), turning decodes into noise or black images. Route those calls to the math kernel,
@@ -219,6 +243,28 @@ def apply_monkeypatches() -> None:
     from invokeai.backend.util.attention import install_rocm_sdpa_guard
 
     install_rocm_sdpa_guard()
+
+    # Rank torch's exact SDPA kernels flash, cuDNN, memory-efficient, math for every model in the process, with a
+    # pinned kernel ahead of them. The calls SageAttention does not serve use this order too.
+    pinned = SDPA_KERNELS.get(attention_backend)
+    if install_default_sdpa_priority(pinned) and pinned is not None:
+        # A pinned kernel is never exclusive: log the attention it does not serve. Outside the ROCm guard, so it sees
+        # the heads the guard sends to math; inside the cuDNN fallback, so a retry is reported on its kernel.
+        from invokeai.backend.util.attention import install_pinned_sdpa_kernel_report
+
+        install_pinned_sdpa_kernel_report(pinned)
+
+    # cuDNN's eligibility is checked statically, so a cuDNN attention call can still fail at run time. Demote cuDNN
+    # and retry instead of failing the generation. Before SageAttention, so its own fallback calls are covered too.
+    from invokeai.backend.util.attention import install_cudnn_sdpa_fallback
+
+    install_cudnn_sdpa_fallback()
+
+    # Opt-in SageAttention for diffusion-model attention. Installs nothing unless asked for, and never on ROCm.
+    if attention_backend == "sage":
+        from invokeai.backend.util.sage_attention import install_sage_attention
+
+        install_sage_attention()
 
 
 def register_mime_types() -> None:

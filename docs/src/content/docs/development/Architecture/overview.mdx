@@ -85,6 +85,8 @@ The invoker (`/invokeai/app/services/invoker.py`) is the primary interface throu
 - **invocation services**, which are used by invocations to interact with core functionality.
 - **invoker services**, which are used by the invoker to manage sessions and manage the invocation queue.
 
+Creating the invoker starts every service, the session processor last: its workers dequeue at once, and an item left pending before the restart may use any other service. (The queue's start cancels the items that were in progress.) `stop()` stops the session processor first: its workers stop taking items and cancel their sessions, and the other services stop only once the workers have exited. The processor waits up to 30 seconds for all its workers together, and after a second still waiting it logs which worker and queue item it waits for. A worker still in a node at that deadline (one without a cancel point) is given up on with an error in the log, so that shutdown finishes; a later `stop()` does not wait for it again. It keeps its GPU, so until it exits no session processor in the same process starts and none replaces the generation device pool: `ApiDependencies.initialize` refuses a restart before it opens the database.
+
 ### Sessions
 
 Invocations and links between them form a graph, which is maintained in a session. Sessions can be queued for invocation, which will execute their graph (either the next ready invocation, or all invocations). Sessions also maintain execution history for the graph (including storage of any outputs). An invocation may be added to a session at any time, and there is capability to add and entire graph at once, as well as to automatically link new invocations to previous invocations. Invocations can not be deleted or modified once added.

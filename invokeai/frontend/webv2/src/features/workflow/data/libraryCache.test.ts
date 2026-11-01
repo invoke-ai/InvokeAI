@@ -12,6 +12,7 @@ const api = vi.hoisted(() => ({
   getLibraryWorkflowRecord: vi.fn(),
   getWorkflowTagCounts: vi.fn(),
   listLibraryWorkflows: vi.fn(),
+  onLibraryWorkflowOpened: () => () => {},
 }));
 
 const templates = vi.hoisted(() => ({
@@ -45,9 +46,15 @@ const buildPage = (items: WorkflowLibraryListItem[]): WorkflowLibraryPage => ({
 
 /** Revision `n` of a workflow holds `n` notes nodes, so the graph a caller receives names its revision. */
 const buildRecord = (workflowId: string, revision: number): WorkflowRecordDTO => ({
-  ...buildItem(workflowId, revision),
+  created_at: '2026-10-20T00:00:00Z',
+  is_public: false,
+  name: `Workflow ${workflowId}`,
+  revision,
+  updated_at: '2026-10-20T00:00:00Z',
+  user_id: 'user-a',
   workflow: {
     edges: [],
+    meta: { category: 'user' },
     name: `Workflow ${workflowId}`,
     nodes: Array.from({ length: revision }, (_unused, index) => ({
       data: { label: '', notes: '' },
@@ -56,6 +63,7 @@ const buildRecord = (workflowId: string, revision: number): WorkflowRecordDTO =>
       type: 'notes',
     })),
   },
+  workflow_id: workflowId,
 });
 
 const createDeferred = <T>() => {
@@ -104,7 +112,7 @@ describe('workflow library record freshness', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a', 1)]));
     api.getLibraryWorkflowRecord.mockResolvedValue(buildRecord('a', 1));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
     await vi.waitFor(() => expect(enrichedNodeCount()).toBe(1));
 
     // Opening what the list shows reuses the record enrichment read.
@@ -142,7 +150,7 @@ describe('workflow library record freshness', () => {
       .mockResolvedValue(buildPage([buildItem('a', 2)]));
     api.getLibraryWorkflowRecord.mockResolvedValue(buildRecord('a', 2));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
     await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2));
     await vi.waitFor(() => expect(enrichedNodeCount()).toBe(2));
     // A caller still holding the old row is served the newer record without another report.
@@ -282,7 +290,7 @@ describe('workflow library invalidation fencing', () => {
       .mockReturnValueOnce(retry.promise)
       .mockResolvedValue(buildRecord('a', 1));
 
-    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
     await vi.waitFor(() => expect(api.getLibraryWorkflowRecord).toHaveBeenCalledTimes(1));
     // The refreshes these invalidations start never land, so nothing but the row's own read can enrich it.
     api.listLibraryWorkflows.mockReturnValue(createDeferred<WorkflowLibraryPage>().promise);
@@ -342,13 +350,17 @@ describe('workflow library account ownership', () => {
     account.accountLifecycle.activate('user-b');
 
     expect(workflowSignal.aborted).toBe(true);
-    delayed.resolve({ ...buildRecord('shared-id', 1), workflow: { owner: 'a' } });
+    delayed.resolve({ ...buildRecord('shared-id', 1), workflow: { meta: { category: 'user' }, owner: 'a' } });
 
     await expect(oldWorkflow).rejects.toThrow('no longer active');
 
-    api.getLibraryWorkflowRecord.mockResolvedValueOnce({ ...buildRecord('shared-id', 1), workflow: { owner: 'b' } });
+    api.getLibraryWorkflowRecord.mockResolvedValueOnce({
+      ...buildRecord('shared-id', 1),
+      workflow: { meta: { category: 'user' }, owner: 'b' },
+    });
     await expect(cache.getLibraryWorkflowCached('shared-id', { expectedRevision: 1 })).resolves.toEqual({
       id: 'shared-id',
+      meta: { category: 'user' },
       owner: 'b',
     });
   });

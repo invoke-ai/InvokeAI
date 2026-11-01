@@ -1,7 +1,8 @@
 """The session queue: the items users enqueued, their workflow-call chains, and the counts the queue's views show.
 
-An item is read as a dict of its row (every column of `session_queue`) with its owner's display name and email, the
-form `SessionQueueItem.queue_item_from_dict()` and `SessionQueueItemSummary.queue_item_summary_from_dict()` take.
+An item is read as a dict of its row (every column of `session_queue` but its delivery's) with its owner's display name
+and email, the form `SessionQueueItem.queue_item_from_dict()` and `SessionQueueItemSummary.queue_item_summary_from_dict()`
+take. Its delivery (which browser stages its results) is read on its own.
 An origin prefix matches as SQLite's `LIKE` always has, ignoring case; its `%` and `_` are taken as written.
 """
 
@@ -47,7 +48,10 @@ from invokeai.app.services.shared.database.types import now_text, timestamp_text
 _Q = session_queue.c
 _R = session_queue_enqueue_receipts.c
 
-_ITEM = (*session_queue.c, users.c.display_name.label("user_display_name"), users.c.email.label("user_email"))
+_DELIVERY_COLUMNS = frozenset({"delivery_claimant", "delivery_claimed_at", "delivered_at"})
+_ROW = tuple(column for column in session_queue.c if column.name not in _DELIVERY_COLUMNS)
+
+_ITEM = (*_ROW, users.c.display_name.label("user_display_name"), users.c.email.label("user_email"))
 _ITEM_NAMES = tuple(column.name for column in _ITEM)
 _ITEMS = session_queue.outerjoin(users, users.c.user_id == _Q.user_id)
 
@@ -110,12 +114,18 @@ def _origin_pattern(origin_prefix: Optional[str]) -> Optional[str]:
     return like_prefix(origin_prefix) if origin_prefix is not None else None
 
 
+# The origin is tested on the listing index; only the matching items' rows are read.
+_LINEAGE = select(_Q.item_id, _Q.status, _Q.origin, _Q.retried_from_item_id).where(_IN_QUEUE, _origin_matches())
+
+
 @functools.cache
-def _item_by_status(status: str, by_origin: bool) -> Select[Any]:
+def _item_by_status(status: str, by_origin: bool, by_owner: bool) -> Select[Any]:
     """The pending item to run next, or an item in progress (the earliest enqueued of several)."""
     conditions = [_IN_QUEUE_UNINDEXED, _Q.status == literal(status)]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     ordering = [_Q.priority.desc(), _Q.created_at, _Q.item_id] if status == "pending" else [_Q.item_id]
     return select(_Q.item_id).where(*conditions).order_by(*ordering).limit(fixed_limit(1))
 
@@ -156,12 +166,13 @@ def _page(by_status: bool, by_destination: bool, after: bool) -> Select[Any]:
 
 
 @functools.cache
-def _item_ids(descending: bool, by_user: bool, by_origin: bool, limited: bool) -> Select[Any]:
+def _item_ids(descending: bool, by_owner: bool, by_origin: bool, limited: bool) -> Select[Any]:
     """The ids, in an order the listing index yields on SQLite without a sort (newest first), or sorting only the items
     that share a creation time (oldest first); so a limited read stops after its window."""
     conditions = [_IN_QUEUE]
-    if by_user:
-        conditions.append(_Q.user_id == bindparam("user_id"))
+    if by_owner:
+        # Off the account's own index, which holds no creation time: the listing index reads it in order.
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     if by_origin:
         conditions.append(_origin_matches())
     # The item id breaks ties, in enqueue order either way, as SQLite returned them before: a batch's items share
@@ -172,22 +183,26 @@ def _item_ids(descending: bool, by_user: bool, by_origin: bool, limited: bool) -
 
 
 @functools.cache
-def _status_counts(with_own: bool, by_origin: bool) -> Select[Any]:
-    """Every status's count in the queue and, `with_own`, in the account's part of it, in one pass: on SQLite the
-    listing index holds every column read, so no row is."""
+def _status_counts(with_own: bool, by_origin: bool, by_owner: bool) -> Select[Any]:
+    """Every status's count in the queue (or one account's part of it, `by_owner`) and, `with_own`, in the caller's
+    part of it, in one pass: on SQLite the listing index holds every column read, so no row is."""
     conditions = [_IN_QUEUE]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     own = func.sum(case((_Q.user_id == bindparam("user_id"), 1), else_=0)) if with_own else literal(0)
     return select(_Q.status, func.count(), own).where(*conditions).group_by(_Q.status)
 
 
 @functools.cache
-def _current(by_origin: bool) -> Select[Any]:
+def _current(by_origin: bool, by_owner: bool) -> Select[Any]:
     """The identifiers of the item in progress, the earliest enqueued of several."""
     conditions = [_IN_QUEUE_UNINDEXED, _IN_PROGRESS]
     if by_origin:
         conditions.append(_origin_matches())
+    if by_owner:
+        conditions.append(Unindexed(_Q.user_id) == bindparam("owner_id"))
     return (
         select(_Q.item_id, _Q.session_id, _Q.batch_id, _Q.user_id)
         .where(*conditions)
@@ -236,6 +251,10 @@ def _items(rows: Sequence[Sequence[Any]]) -> list[dict[str, Any]]:
 
 def _summaries(rows: Sequence[Sequence[Any]]) -> list[dict[str, Any]]:
     return [dict(zip(_SUMMARY_NAMES, row, strict=True)) for row in rows]
+
+
+def _lineage(rows: Sequence[Sequence[Any]]) -> list[tuple[int, str, Optional[str], Optional[int]]]:
+    return [(row[0], row[1], row[2], row[3]) for row in rows]
 
 
 def _counts(rows: Sequence[Sequence[Any]]) -> dict[str, int]:
@@ -343,8 +362,8 @@ _STATUS_ROW = select(*_STATUS_COLUMNS).where(_Q.item_id == bindparam("item_id"))
 _ITEM_EXISTS = select(literal(1)).where(_Q.item_id == bindparam("item_id"))
 _LOCK_STATUS = select(_Q.status).where(_Q.item_id == bindparam("item_id")).with_for_update()
 # Locks the item's own row only: on a server a FOR UPDATE over a join would lock the owner's account row as well.
-_LOCK_ITEM = select(*session_queue.c).where(_Q.item_id == bindparam("item_id")).with_for_update()
-_LOCK_ITEM_NAMES = tuple(column.name for column in session_queue.c)
+_LOCK_ITEM = select(*_ROW).where(_Q.item_id == bindparam("item_id")).with_for_update()
+_LOCK_ITEM_NAMES = tuple(column.name for column in _ROW)
 
 _CLAIM = (
     update(session_queue)
@@ -478,6 +497,11 @@ _BATCH_ITEM_IDS = select(_Q.item_id).where(_IN_BATCH).order_by(_Q.item_id)
 _ACTIVE_WORK = (
     select(literal(1)).where(_Q.status.in_([literal("pending"), literal("in_progress")])).limit(fixed_limit(1))
 )
+# The unfinished items found by their status, the origin then tested on their rows: the read costs the queue's live
+# items, where the listing index would walk its whole history.
+_UNFINISHED_ORIGINS = select(_Q.origin).where(
+    _IN_QUEUE_UNINDEXED, _Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]), _origin_matches()
+)
 
 _THE_RECEIPT = and_(
     _R.queue_id == bindparam("queue_id"),
@@ -507,6 +531,34 @@ _RECEIPT_USAGE = select(
     func.coalesce(func.sum(case((_UNACKNOWLEDGED, _R.byte_size), else_=0)), 0),
 ).where(_R.user_id == bindparam("user_id"))
 _INSERT_RECEIPT = insert(session_queue_enqueue_receipts)
+
+# Delivery leaves `updated_at` alone: it says nothing about the item that the queue's views show.
+_UNDELIVERED = _Q.delivered_at.is_(None)
+_CLAIM_DELIVERY = (
+    update(session_queue)
+    .where(
+        _THE_ITEM,
+        _UNDELIVERED,
+        or_(
+            _Q.delivery_claimant.is_(None),
+            _Q.delivery_claimant == bindparam("claimant"),
+            _Q.delivery_claimed_at <= bindparam("stale_before"),
+        ),
+    )
+    .values(delivery_claimant=bindparam("new_claimant"), delivery_claimed_at=bindparam("now"), updated_at=_Q.updated_at)
+)
+_CONFIRM_DELIVERY = (
+    update(session_queue).where(_THE_ITEM, _UNDELIVERED).values(delivered_at=bindparam("now"), updated_at=_Q.updated_at)
+)
+_RELEASE_DELIVERY = (
+    update(session_queue)
+    .where(_THE_ITEM, _UNDELIVERED, _Q.delivery_claimant == bindparam("claimant"))
+    .values(delivery_claimant=None, delivery_claimed_at=None, updated_at=_Q.updated_at)
+)
+_DELIVERY = select(_Q.delivered_at, _Q.delivery_claimant, _Q.delivery_claimed_at).where(
+    _Q.item_id == bindparam("item_id")
+)
+_OWNER = select(_Q.queue_id, _Q.user_id).where(_Q.item_id == bindparam("item_id"))
 
 _ACTIVE_ITEM_IDS = select(_Q.item_id).where(_Q.status.in_([literal(status) for status in ACTIVE_QUEUE_STATUSES]))
 # History: finished items that no active workflow call still needs. A completed child is recovery state for its active
@@ -661,6 +713,19 @@ class Transition(NamedTuple):
     changed: Optional[dict[str, Any]]
 
 
+class Delivery(NamedTuple):
+    """Who stages an item's results: when they were delivered, or who claims delivering them since when."""
+
+    delivered_at: Optional[str]
+    claimant: Optional[str]
+    claimed_at: Optional[str]
+
+
+class ItemOwner(NamedTuple):
+    queue_id: str
+    user_id: str
+
+
 class SettledReceipt(NamedTuple):
     payload_hash: str
     batch_id: str
@@ -712,12 +777,17 @@ class SessionQueueQueries(QueryModule):
     @mapped(_item_or_none)
     @read
     def item_by_status(
-        self, conn: Connection, queue_id: str, status: str, origin_prefix: Optional[str]
+        self,
+        conn: Connection,
+        queue_id: str,
+        status: str,
+        origin_prefix: Optional[str],
+        owner_id: Optional[str] = None,
     ) -> Optional[Row[Any]]:
         """The `pending` item that runs next (highest priority, then oldest), or the `in_progress` one first
-        claimed."""
-        statement = _item_by_status(status, origin_prefix is not None)
-        parameters = {"queue_id": queue_id, "origin_pattern": _origin_pattern(origin_prefix)}
+        claimed; of the account's items only, with `owner_id`."""
+        statement = _item_by_status(status, origin_prefix is not None, owner_id is not None)
+        parameters = {"queue_id": queue_id, "origin_pattern": _origin_pattern(origin_prefix), "owner_id": owner_id}
         return _row_of(conn, conn.execute(statement, parameters).scalar())
 
     @read
@@ -769,20 +839,32 @@ class SessionQueueQueries(QueryModule):
         queue_id: str,
         *,
         descending: bool,
-        user_id: Optional[str],
+        owner_id: Optional[str],
         origin_prefix: Optional[str],
         limit: Optional[int] = None,
     ) -> list[int]:
         """The ids of the queue's items (the account's, with the origin, if given) by creation time; with `limit`, the
         first `limit` of that order."""
-        statement = _item_ids(descending, user_id is not None, origin_prefix is not None, limit is not None)
+        statement = _item_ids(descending, owner_id is not None, origin_prefix is not None, limit is not None)
         parameters = {
             "queue_id": queue_id,
-            "user_id": user_id,
+            "owner_id": owner_id,
             "origin_pattern": _origin_pattern(origin_prefix),
             "limit": limit,
         }
         return list(conn.execute(statement, parameters).scalars().all())
+
+    @mapped(_lineage)
+    @read
+    def lineage(self, conn: Connection, queue_id: str, origin_prefix: str) -> Sequence[Row[Any]]:
+        """Id, status, origin and retry source of the queue's items with the origin, in no order."""
+        return conn.execute(_LINEAGE, {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}).all()
+
+    @read
+    def unfinished_origins(self, conn: Connection, queue_id: str, origin_prefix: str) -> list[str]:
+        """The origin of each of the queue's items pending, in progress or waiting with the origin, in no order."""
+        parameters = {"queue_id": queue_id, "origin_pattern": like_prefix(origin_prefix)}
+        return list(conn.execute(_UNFINISHED_ORIGINS, parameters).scalars().all())
 
     @mapped(_summaries)
     @read
@@ -792,12 +874,24 @@ class SessionQueueQueries(QueryModule):
 
     @read
     def status_counts(
-        self, conn: Connection, queue_id: str, user_id: Optional[str], origin_prefix: Optional[str]
+        self,
+        conn: Connection,
+        queue_id: str,
+        user_id: Optional[str],
+        origin_prefix: Optional[str],
+        owner_id: Optional[str] = None,
     ) -> StatusCounts:
-        by_origin = origin_prefix is not None
-        parameters = {"queue_id": queue_id, "user_id": user_id, "origin_pattern": _origin_pattern(origin_prefix)}
-        rows = conn.execute(_status_counts(user_id is not None, by_origin), parameters).all()
-        current = conn.execute(_current(by_origin), parameters).first()
+        """The counts and the item in progress, of the account's items only with `owner_id`; `user_id`'s share of
+        them besides."""
+        by_origin, by_owner = origin_prefix is not None, owner_id is not None
+        parameters = {
+            "queue_id": queue_id,
+            "user_id": user_id,
+            "origin_pattern": _origin_pattern(origin_prefix),
+            "owner_id": owner_id,
+        }
+        rows = conn.execute(_status_counts(user_id is not None, by_origin, by_owner), parameters).all()
+        current = conn.execute(_current(by_origin, by_owner), parameters).first()
         return StatusCounts(
             counts={str(row[0]): int(row[1]) for row in rows},
             own_counts={str(row[0]): int(row[2]) for row in rows if row[2]},
@@ -1009,6 +1103,43 @@ class SessionQueueQueries(QueryModule):
             int(item_id)
             for item_id in conn.execute(_WORKFLOW_CALL_ITEMS, {"workflow_call_id": workflow_call_id}).scalars().all()
         ]
+
+    # --- Delivery ---------------------------------------------------------------------------------------------------
+
+    @write
+    def claim_delivery(self, conn: Connection, item_id: int, claimant: str, *, now: str, stale_before: str) -> bool:
+        """Claims delivering the item's results for `claimant`, stamped `now`, unless they were delivered or another
+        claimant holds a claim made after `stale_before`; whether it did. (A claimant's own claim is renewed.)"""
+        parameters = {
+            "target_item_id": item_id,
+            "claimant": claimant,
+            "new_claimant": claimant,
+            "now": now,
+            "stale_before": stale_before,
+        }
+        return conn.execute(_CLAIM_DELIVERY, parameters).rowcount != 0
+
+    @write
+    def confirm_delivery(self, conn: Connection, item_id: int, *, now: str) -> bool:
+        """Marks the item's results delivered `now`; whether they were not before."""
+        return conn.execute(_CONFIRM_DELIVERY, {"target_item_id": item_id, "now": now}).rowcount != 0
+
+    @write
+    def release_delivery(self, conn: Connection, item_id: int, claimant: str) -> bool:
+        """Drops `claimant`'s claim of the item's undelivered results; whether it held one."""
+        return conn.execute(_RELEASE_DELIVERY, {"target_item_id": item_id, "claimant": claimant}).rowcount != 0
+
+    @read
+    def owner(self, conn: Connection, item_id: int) -> Optional[ItemOwner]:
+        """The item's queue and owner, without reading its session; None if it does not exist."""
+        row = conn.execute(_OWNER, {"item_id": item_id}).first()
+        return ItemOwner(row[0], row[1]) if row is not None else None
+
+    @read
+    def delivery(self, conn: Connection, item_id: int) -> Optional[Delivery]:
+        """The item's delivery; None if it does not exist."""
+        row = conn.execute(_DELIVERY, {"item_id": item_id}).first()
+        return Delivery(row[0], row[1], row[2]) if row is not None else None
 
     # --- Enqueueing -------------------------------------------------------------------------------------------------
 

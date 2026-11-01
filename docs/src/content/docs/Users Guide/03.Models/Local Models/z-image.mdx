@@ -3,7 +3,7 @@ title: Z-Image
 description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4 and SDNQ builds, ControlNets and regional prompting.
 lastUpdated: 2026-09-30
 sidebar:
-  order: 12
+  order: 13
 ---
 
 Z-Image is a 6B-parameter text-to-image family from Tongyi-MAI that understands both English and Chinese
@@ -72,7 +72,10 @@ When the selected Z-Image model is not a self-contained pipeline, the **Componen
 model shows three slots:
 
 - **Component source**: a Diffusers (or SDNQ) Z-Image pipeline to borrow the encoder and VAE from.
-- **Qwen3 Encoder**: a standalone Qwen3 4B encoder.
+- **Qwen3 Encoder**: a standalone Qwen3 4B encoder. Only 4B encoders are listed: the Qwen3 8B encoder that
+  FLUX.2 Klein 9B uses is too wide for Z-Image. A project that still has an 8B encoder selected shows it in the
+  slot with an error, and Invoke stays unavailable until you pick a 4B encoder or clear the slot. In a
+  workflow, **Main Model - Z-Image** refuses any other Qwen3 encoder by name when it runs.
 - **VAE**: Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here.
 
 You need either a component source or both a Qwen3 encoder and a VAE before you can generate.
@@ -95,8 +98,9 @@ Selecting a Z-Image model applies these defaults:
 - **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting) does not
   apply to Z-Image. Write prompts in plain language.
 
-In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep
-shift. Leave it blank to have it calculated from the image size, which is the recommended setting.
+- **Shift**: the Render section's **Shift** override fixes the timestep shift of the sampling schedule.
+  Leave the override off to have it calculated from the image size, which is the recommended setting; the
+  override starts at `3`. In the workflow editor the same thing is the **Shift** input of **Denoise - Z-Image**.
 
 ## ControlNet
 
@@ -106,9 +110,18 @@ Two Z-Image ControlNets are available as starters (both are part of the bundle):
 - **Z-Image ControlNet Tile** is useful for upscaling and adding detail. The **Upscale** tool can use it as an
   optional anchor; see [Upscaling](/users-guide/image-generation/upscale/).
 
+Every Z-Image Turbo Fun-ControlNet alibaba-pai has published can be installed from its `.safetensors` file:
+the first Union release, Union 2.0, the Union and Tile 2.1 builds (8-step, 2601 and 2602 included) and the 2.1
+Lite builds. Invoke tells them apart by their weights. Invoke does not inpaint through a Z-Image ControlNet:
+a control layer takes a control image only.
+
 On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
 ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the
 recommended range. **Only one** Z-Image control layer can be used per generation.
+
+Earlier Invoke versions placed the hints of the Lite and first Union builds after the wrong layers, and left
+out the refiner hints of 2.0 and 2.1 (2.0 also refined its control through the wrong blocks). Applied as they were trained, these ControlNets now follow the control image
+more strongly at the same weight; lower the weight if a control image constrains the result too much.
 
 In the workflow editor, the same thing is the **Z-Image ControlNet** node feeding the **Control** input of
 **Denoise - Z-Image**. That node also needs the **VAE** input connected, which it uses to encode the
@@ -116,8 +129,9 @@ control image.
 
 ## Regional prompting
 
-Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts. Regional negative
-prompts, auto-negative and regional reference images are not supported for Z-Image.
+Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts, together with a
+control layer if you like. Regional negative prompts, auto-negative and regional reference images are not
+supported for Z-Image.
 
 In the workflow editor, **Prompt - Z-Image** takes an optional mask, and **Denoise - Z-Image** accepts
 either one conditioning or a collection of them.
@@ -130,14 +144,16 @@ Collection - Z-Image**.
 
 ## Seed Variance Enhancer
 
-Z-Image Turbo tends to produce similar images across different seeds. The **Seed Variance Enhancer -
-Z-Image** node, available in the workflow editor only, adds reproducible, seed-based noise to the prompt
-conditioning to increase variety:
+Z-Image Turbo tends to produce similar images across different seeds. **Seed variance**, next to the seed
+in the Generate panel's Render section, adds reproducible, seed-based noise to the prompt conditioning to
+increase variety:
 
-- **Strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
-- **Randomize Percent**: the share of embedding values that receive noise (default `50`).
+- **Variance strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
+- **Randomized channels**: the share of embedding values that receive noise (default `50%`).
 
-Connect it between **Prompt - Z-Image** and the denoise node's positive conditioning.
+Both settings are recorded in image metadata and restored by Recall All. In the workflow editor the same
+thing is the **Seed Variance Enhancer - Z-Image** node, connected between **Prompt - Z-Image** and the
+denoise node's positive conditioning.
 
 ## PiD decoding
 

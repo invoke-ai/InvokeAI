@@ -13,7 +13,11 @@ from invokeai.backend.flux.extensions.regional_prompting_extension import Region
 from invokeai.backend.flux.extensions.xlabs_controlnet_extension import XLabsControlNetExtension
 from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPAdapterExtension
 from invokeai.backend.flux.model import Flux
-from invokeai.backend.flux.schedulers import is_flow_match_lcm_scheduler, set_heun_timesteps_from_sigmas
+from invokeai.backend.flux.schedulers import (
+    is_flow_match_lcm_scheduler,
+    set_heun_timesteps_from_sigmas,
+    set_timesteps_from_sigmas,
+)
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.util.devices import TorchDevice
@@ -44,6 +48,8 @@ def denoise(
     dype_extension: DyPEExtension | None = None,
     # Defaults to Diffusers Euler when omitted.
     scheduler: SchedulerMixin | None = None,
+    # RNG for stochastic schedulers. FlowMatchLCMScheduler.step re-noises the sample every step.
+    generator: torch.Generator | None = None,
 ):
     if len(timesteps) <= 1:
         return img
@@ -57,10 +63,7 @@ def denoise(
         set_heun_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)
     elif isinstance(scheduler, FlowMatchEulerDiscreteScheduler):
         # InvokeAI supplies model-evaluation sigmas plus its requested terminal endpoint.
-        scheduler.set_timesteps(sigmas=timesteps[:-1], device=img.device)
-        scheduler.sigmas[-1] = torch.as_tensor(
-            timesteps[-1], dtype=scheduler.sigmas.dtype, device=scheduler.sigmas.device
-        )
+        set_timesteps_from_sigmas(scheduler, timesteps[:-1], timesteps[-1], img.device)
     elif is_flow_match_lcm_scheduler(scheduler):
         # LCM owns its schedule; clipping controls the requested evaluation count,
         # while its exact start/end sigmas remain scheduler-defined.
@@ -217,8 +220,9 @@ def denoise(
             ) and user_step < total_steps
             preview_img = img - t_curr * pred if should_emit_preview else None
 
-            # Use scheduler.step() for the update
-            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img)
+            # Use scheduler.step() for the update. `generator` matters for LCM, which re-noises every
+            # step. Euler and Heun don't use step noise here: with `s_churn` at 0 it is never applied.
+            step_output = scheduler.step(model_output=pred, timestep=timestep, sample=img, generator=generator)
             img = step_output.prev_sample
 
             # Get t_prev for inpainting (next sigma value)
