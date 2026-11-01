@@ -45,6 +45,26 @@ def _get_static_if_selection(state: "GraphExecutionState", node_id: str) -> Opti
     return None
 
 
+def _get_collects_before_iteration_boundary(state: "GraphExecutionState", edges: list[Edge]) -> set[str]:
+    """Find Collects in an input's open ancestry, stopping where iteration or collection closes it."""
+    collects: set[str] = set()
+    visited: set[str] = set()
+    pending = [edge.source.node_id for edge in edges]
+    while pending:
+        node_id = pending.pop()
+        if node_id in visited:
+            continue
+        visited.add(node_id)
+        node = state.graph.get_node(node_id)
+        if isinstance(node, CollectInvocation):
+            collects.add(node_id)
+            continue
+        if isinstance(node, (ForInvocation, IterateInvocation)):
+            continue
+        pending.extend(edge.source.node_id for edge in state.graph._get_input_edges(node_id))
+    return collects
+
+
 def validate_if_iteration_axes(state: "GraphExecutionState") -> None:
     """Reject unrelated condition and branch axes using graph topology alone."""
     iterator_ancestry = _IteratorAncestry(state)
@@ -405,13 +425,7 @@ def _get_edge_frame_axes(
                 }
                 axes.update(branch_axes[selected_field])
                 other_edges = state.graph._get_input_edges(source_id, other_field)
-                other_nodes = {
-                    ancestor_id
-                    for input_edge in other_edges
-                    for ancestor_id in nx.ancestors(state._get_source_graph_flat(), input_edge.source.node_id)
-                    | {input_edge.source.node_id}
-                }
-                if any(isinstance(state.graph.get_node(ancestor_id), CollectInvocation) for ancestor_id in other_nodes):
+                if _get_collects_before_iteration_boundary(state, other_edges):
                     axes.update(branch_axes[other_field] & branch_axes[selected_field])
                 else:
                     for input_edge in other_edges:
@@ -852,19 +866,13 @@ def _get_if_iteration_paths_with_ancestry(
             }
             for branch_field in ("true_input", "false_input")
         }
-        source_graph = state._get_source_graph_flat()
         for _, selected_field in condition_selections:
             selected_axes = condition_axes | selected_axes_by_field[selected_field]
             if not selected_axes:
                 continue
             other_field = "false_input" if selected_field == "true_input" else "true_input"
             other_edges = state.graph._get_input_edges(node_id, other_field)
-            other_nodes = {
-                source_id
-                for edge in other_edges
-                for source_id in nx.ancestors(source_graph, edge.source.node_id) | {edge.source.node_id}
-            }
-            if any(isinstance(state.graph.get_node(source_id), CollectInvocation) for source_id in other_nodes):
+            if _get_collects_before_iteration_boundary(state, other_edges):
                 frame_iterators = [
                     axis_id
                     for axis_id in frame_iterators
@@ -925,6 +933,9 @@ def _get_source_activation_dependencies_for_preparation(
     state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...]
 ) -> tuple[ActivationDependency, ...]:
     dependencies = state._get_source_activation_dependencies(source_node_id, iteration_path)
+    for extra_dependency in _get_static_selected_collect_iterate_dependencies(state, source_node_id, iteration_path):
+        if extra_dependency not in dependencies:
+            dependencies = (*dependencies, extra_dependency)
     if not dependencies:
         return dependencies
 
@@ -969,6 +980,51 @@ def _get_source_activation_dependencies_for_preparation(
             )
         )
     return tuple(resolved_dependencies)
+
+
+def _get_static_selected_collect_iterate_dependencies(
+    state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...]
+) -> tuple[ActivationDependency, ...]:
+    """Return selected-branch dependencies for sources owned by empty Collect-fed Iterate scopes."""
+    runtime = state._runtime()
+    owners_by_source = runtime._static_selected_collect_iterate_owners
+    if owners_by_source is None:
+        ancestry = runtime._iterator_ancestry
+        owner_sources: dict[str, list[tuple[str, str]]] = {}
+        for if_node_id, node in state.graph.nodes.items():
+            if not isinstance(node, IfInvocation):
+                continue
+            selected_field = _get_static_if_selection(state, if_node_id)
+            if selected_field is None:
+                continue
+            other_field = "false_input" if selected_field == "true_input" else "true_input"
+            selected_axes = {
+                axis_id
+                for edge in state.graph._get_input_edges(if_node_id, selected_field)
+                for axis_id in ancestry.get_frame_axes_for_edge(edge)
+            }
+            other_axes = {
+                axis_id
+                for edge in state.graph._get_input_edges(if_node_id, other_field)
+                for axis_id in ancestry.get_frame_axes_for_edge(edge)
+            }
+            if not any(
+                isinstance(state.graph.get_node(axis_id), IterateInvocation)
+                and _get_collects_before_iteration_boundary(
+                    state, state.graph._get_input_edges(axis_id, COLLECTION_FIELD)
+                )
+                for axis_id in other_axes - selected_axes
+            ):
+                continue
+            for source_id in state._get_fresh_if_branch_sources(if_node_id, selected_field):
+                owner_sources.setdefault(source_id, []).append((if_node_id, selected_field))
+        owners_by_source = {source_id: tuple(owners) for source_id, owners in owner_sources.items()}
+        runtime._static_selected_collect_iterate_owners = owners_by_source
+
+    return tuple(
+        ActivationDependency(owner_id=owner_id, branch=branch, frame=iteration_path)
+        for owner_id, branch in owners_by_source.get(source_node_id, ())
+    )
 
 
 def _get_selected_if_frames_for_preparation(
@@ -1023,14 +1079,11 @@ def _is_activation_axis_complete(state: "GraphExecutionState", axis_source_id: s
 def _is_source_inactive(
     state: "GraphExecutionState", source_node_id: str, iteration_path: tuple[int, ...] = ()
 ) -> bool:
-    dependencies = state._get_source_activation_dependencies(source_node_id, iteration_path)
+    dependencies = _get_source_activation_dependencies_for_preparation(state, source_node_id, iteration_path)
     if not dependencies:
         return False
     if iteration_path:
-        prepared_dependencies = _get_source_activation_dependencies_for_preparation(
-            state, source_node_id, iteration_path
-        )
-        return any(state._is_activation_dependency_rejected(dependency) for dependency in prepared_dependencies)
+        return any(state._is_activation_dependency_rejected(dependency) for dependency in dependencies)
 
     frames = {frame for dependency in dependencies for frame in state._prepared_if_exec_frames(dependency.owner_id)}
     if not frames:
@@ -1087,13 +1140,8 @@ def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
         if branch_field in selected_fields:
             axes.update(branch_axis_ids)
         elif static_selection is not None:
-            other_nodes = {
-                source_id
-                for edge in state.graph._get_input_edges(if_node_id, branch_field)
-                for source_id in nx.ancestors(state._get_source_graph_flat(), edge.source.node_id)
-                | {edge.source.node_id}
-            }
-            if any(isinstance(state.graph.get_node(source_id), CollectInvocation) for source_id in other_nodes):
+            branch_edges = state.graph._get_input_edges(if_node_id, branch_field)
+            if _get_collects_before_iteration_boundary(state, branch_edges):
                 selected_axes = branch_axes[static_selection]
                 axes.update((set(branch_axis_ids) & set(selected_axes)) - branch_for_final_axes)
             else:

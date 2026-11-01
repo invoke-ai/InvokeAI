@@ -13,7 +13,6 @@ from invokeai.app.invocations.loops import (
     ForReturnInvocation,
     LoopState,
 )
-from invokeai.app.invocations.primitives import BooleanInvocation
 from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.graph_iterator_ancestry import _get_ordered_input_edges, _IteratorAncestry
@@ -1355,58 +1354,57 @@ class _ExecutionNodeBuilder:
     def _collect_has_selected_for_final_input(self, collect_id: str) -> bool:
         ancestry = self._get_iterator_ancestry(self.iterator_graph())
         return any(
-            self._if_has_selected_for_final_axis(edge.source.node_id, ancestry)
+            self._get_selected_for_final_parent_axes(edge.source.node_id, ancestry)
             for edge in self._state.graph._get_input_edges(collect_id, ITEM_FIELD)
         )
 
-    def _if_has_selected_for_final_axis(self, if_node_id: str, ancestry: _IteratorAncestry) -> bool:
+    def _get_selected_for_final_parent_axes(self, if_node_id: str, ancestry: _IteratorAncestry) -> set[str]:
+        """Return For-final parent frames retained by this If's selection and condition scope."""
         if not isinstance(self._state.graph.get_node(if_node_id), IfInvocation):
-            return False
-        selected_field = graph_if_runtime._get_static_if_selection(self._state, if_node_id)
-        if selected_field is not None:
-            selected_fields = {selected_field}
-        else:
-            condition_edges = self._state.graph._get_input_edges(if_node_id, "condition")
-            if len(condition_edges) != 1:
-                return False
-            condition_edge = condition_edges[0]
-            condition_source = self._state.graph.get_node(condition_edge.source.node_id)
-            if not isinstance(condition_source, BooleanInvocation) or condition_edge.source.field != "value":
-                return False
-            if not self._state.graph._get_input_edges(condition_source.id, "value"):
-                return False
-            selected_fields = {
-                "true_input"
-                if getattr(self._state.results[prepared_id], condition_edge.source.field)
-                else "false_input"
-                for prepared_id in self._get_ordered_prepared_nodes_for_source(condition_source.id)
-                if prepared_id in self._state.results
-            }
-
+            return set()
+        root_selection = graph_if_runtime._get_static_if_selection(self._state, if_node_id)
+        selected_fields = (root_selection,) if root_selection is not None else ("true_input", "false_input")
+        condition_axes = {
+            axis_id
+            for edge in self._state.graph._get_input_edges(if_node_id, "condition")
+            for axis_id in ancestry.get_frame_axes_for_edge(edge)
+        }
         pending_edges = [
             edge
             for branch_field in selected_fields
             for edge in self._state.graph._get_input_edges(if_node_id, branch_field)
         ]
-        visited: set[str] = {if_node_id}
+        visited: set[str] = set()
+        retained_axes: set[str] = set()
         while pending_edges:
             edge = pending_edges.pop()
             source_id = edge.source.node_id
-            if source_id in visited:
-                continue
-            visited.add(source_id)
             source_node = self._state.graph.get_node(source_id)
             if (
                 isinstance(source_node, ForInvocation)
                 and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
             ):
-                return True
+                final_parent_axes = set(ancestry.get_frame_axes_for_edge(edge))
+                retained_axes.update(
+                    final_parent_axes if root_selection is not None else final_parent_axes & condition_axes
+                )
+                continue
+            if source_id in visited:
+                continue
+            visited.add(source_id)
             if isinstance(source_node, IfInvocation):
-                if self._if_has_selected_for_final_axis(source_id, ancestry):
-                    return True
+                nested_selection = graph_if_runtime._get_static_if_selection(self._state, source_id)
+                nested_fields = (nested_selection,) if nested_selection is not None else ("true_input", "false_input")
+                pending_edges.extend(
+                    edge
+                    for branch_field in nested_fields
+                    for edge in self._state.graph._get_input_edges(source_id, branch_field)
+                )
+                continue
+            if isinstance(source_node, (ForInvocation, IterateInvocation, CollectInvocation)):
                 continue
             pending_edges.extend(self._state.graph._get_input_edges(source_id))
-        return False
+        return retained_axes
 
     def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
         source_node_id = edge.source.node_id
@@ -1415,11 +1413,17 @@ class _ExecutionNodeBuilder:
         group_depth = len(iterator_node_ids)
         if edge.destination.field == ITEM_FIELD:
             source_node = self._state.graph.get_node(source_node_id)
-            ancestry = self._get_iterator_ancestry(self.iterator_graph())
-            selected_if_for_final = isinstance(source_node, IfInvocation) and (
-                self._if_has_selected_for_final_axis(source_node.id, ancestry)
-            )
-            if not (selected_if_for_final and self._collect_has_selected_for_final_input(edge.destination.node_id)):
+            if isinstance(source_node, IfInvocation):
+                ancestry = self._get_iterator_ancestry(self.iterator_graph())
+                retained_axes = self._get_selected_for_final_parent_axes(source_node.id, ancestry)
+            else:
+                retained_axes = set()
+            if retained_axes and self._collect_has_selected_for_final_input(edge.destination.node_id):
+                group_depth = max(
+                    (index + 1 for index, axis_id in enumerate(iterator_node_ids) if axis_id in retained_axes),
+                    default=0,
+                )
+            else:
                 group_depth = max(group_depth - 1, 0)
 
         group_keys: set[tuple[int, ...]] = set()
@@ -1985,9 +1989,19 @@ class _ExecutionNodeBuilder:
             node = self._state.graph.get_node(node_id)
             assert isinstance(node, IfInvocation)
             selected_field = "true_input" if node.condition else "false_input"
+            other_field = "false_input" if node.condition else "true_input"
             gating_source_ids = [
                 edge.source.node_id for edge in self._state.graph._get_input_edges(node_id, selected_field)
             ]
+            iterator_ancestry = self._get_iterator_ancestry(self.iterator_graph(graph))
+            branch_axes = graph_if_runtime._get_if_static_frame_analysis(self._state, iterator_ancestry, node_id)[0]
+            selected_axes = set(branch_axes[selected_field])
+            for axis_id in set(branch_axes[other_field]) - selected_axes:
+                if not isinstance(self._state.graph.get_node(axis_id), IterateInvocation):
+                    continue
+                collection_edges = self._state.graph._get_input_edges(axis_id, COLLECTION_FIELD)
+                if graph_if_runtime._get_collects_before_iteration_boundary(self._state, collection_edges):
+                    gating_source_ids.append(axis_id)
         ancestors: set[str] = set()
         for source_node_id in gating_source_ids:
             ancestors.update(nx.ancestors(graph, source_node_id))
@@ -2357,20 +2371,10 @@ class _ExecutionNodeBuilder:
         if axes[0] != axes[1] or not axes[0] > condition_axes:
             return False
 
-        branch_sources = [
-            set().union(
-                *(
-                    nx.ancestors(self._state._get_source_graph_flat(), edge.source.node_id) | {edge.source.node_id}
-                    for edge in edges
-                )
-            )
-            for edges in branch_edges
+        branch_collects = [
+            graph_if_runtime._get_collects_before_iteration_boundary(self._state, edges) for edges in branch_edges
         ]
-        shared_collects = {
-            source_id
-            for source_id in branch_sources[0] & branch_sources[1]
-            if isinstance(self._state.graph.get_node(source_id), CollectInvocation)
-        }
+        shared_collects = branch_collects[0] & branch_collects[1]
         return any(source_id not in self._state.executed for source_id in shared_collects)
 
     def _expand_root_if_for_completed_collect_branch(self, graph: "nx.DiGraph") -> Optional[str]:

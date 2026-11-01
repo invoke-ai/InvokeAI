@@ -822,6 +822,8 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - Open iterator frames run regardless of the `If` condition. A selected `For` final output closes only its own axis
   while keeping enclosing axes open; an unselected `For`-final-only axis adds no `If` frames unless the same axis also
   reaches the `If` directly.
+- Iterating a root `For.output_collection` opens a new `Iterate` axis; a downstream `Collect.item` closes it into the
+  root group.
 - Before invocation, graph validation raises `UnsupportedIfIterationAxesError` for these frame sets:
   - Two unrelated iterators open at the `If` (neither stays open inside the other, judged by iterator ancestry, where a
     `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
