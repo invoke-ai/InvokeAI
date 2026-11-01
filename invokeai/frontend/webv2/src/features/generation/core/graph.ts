@@ -1725,6 +1725,13 @@ const buildFlux3Graph = (
     type: 'flux3_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // FLUX.3 LoRAs change the transformer only. Klein and Klein Base share it, so either variant's LoRAs apply.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'flux3_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1751,7 +1758,7 @@ const buildFlux3Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');

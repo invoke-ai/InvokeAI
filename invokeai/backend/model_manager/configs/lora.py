@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.configs.flux2_variant import (
     flux2_variant_from_vec_dim,
 )
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     raise_for_override_fields,
     raise_if_not_dir,
@@ -46,6 +47,13 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_kohya_keys_strict,
     has_cosmos_dit_peft_keys,
     has_cosmos_dit_peft_keys_strict,
+)
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
+    describe_refusal,
+    has_flux3_lora_keys,
+    misshapen_flux3_layers,
+    peft_scale,
+    read_flux3_lora_keys,
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import LOKR_WEIGHT_KEYS, is_kohya_krea2_lora_key
@@ -1289,6 +1297,47 @@ class LoRA_LyCORIS_QwenImage21_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Qwen-Image-2.1 LoRA")
 
 
+def _raise_unless_flux3_lora(state_dict: dict[str | int, Any], metadata: dict[str, str]) -> None:
+    """`NotAMatchError` for a file that is no FLUX.3 LoRA; `InvalidMatchError`, naming what does not apply, for one that
+    does not apply in full or whose header asks for a scaling this does not apply (`peft_scale`).
+
+    `InvalidMatchError` because the file is a FLUX.3 LoRA: the installer names the reason instead of registering an
+    unknown model, and a part that does not apply would install and then fail, or apply in part.
+    """
+    if not has_flux3_lora_keys(state_dict):
+        raise NotAMatchError("model does not look like a FLUX.3 LoRA")
+    keys = read_flux3_lora_keys(state_dict)
+    refused = {**keys.refused, **misshapen_flux3_layers(state_dict, keys)}
+    if refused:
+        raise InvalidMatchError(describe_refusal(refused))
+    try:
+        peft_scale(metadata)
+    except ValueError as e:
+        raise InvalidMatchError(str(e)) from None
+
+
+class LoRA_LyCORIS_Flux3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for FLUX.3 Image LoRA files: diffusers/PEFT, Black Forest Labs' native names (ai-toolkit, ComfyUI)
+    and raw PEFT, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers
+    header or one describing a PEFT LoRA (`peft_scale`). LyCORIS here is the single-file format: LyCORIS's own
+    flattened key names (`lycoris_...`) are none of these layouts and are not recognized.
+
+    No variant: Klein and Klein Base share the transformer, so a LoRA trained on either runs on both.
+    """
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        _raise_unless_flux3_lora(mod.load_state_dict(), mod.metadata())
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if has_flux3_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Flux3
+        raise NotAMatchError("model does not look like a FLUX.3 LoRA")
+
+
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Anima LoRA models in LyCORIS format."""
 
@@ -1706,6 +1755,22 @@ class LoRA_Diffusers_Flux2_Config(LoRA_Diffusers_Config_Base, Config_Base):
         if _is_flux2_lora_state_dict(state_dict):
             return BaseModelType.Flux2
         raise NotAMatchError("model is not a FLUX.2 Diffusers LoRA")
+
+
+class LoRA_Diffusers_Flux3_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for a FLUX.3 Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a
+    repository-id install of a diffusers trainer's output leaves it. The file is held to what
+    `LoRA_LyCORIS_Flux3_Config` holds a single file to."""
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        _raise_unless_flux3_lora(mod.load_state_dict(path_to_weight_file), mod.metadata(path_to_weight_file))
+        return cls(**override_fields)
 
 
 class LoRA_Diffusers_ZImage_Config(LoRA_Diffusers_Config_Base, Config_Base):

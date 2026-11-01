@@ -146,8 +146,9 @@ themselves.
 | FLUX.2, Z-Image | ✓ (LyCORIS, Diffusers) | FLUX.2 [dev] (single-file checkpoint), Z-Image | |
 | Qwen-Image, Krea-2, Wan 2.2, Anima | ✓ (LyCORIS/kohya and Diffusers PEFT, including LoKR where noted on the family page) | Qwen-Image (single-file checkpoint: Fun and InstantX ControlNet Unions; InstantX Inpainting is refused), Anima (ControlNet-LLLite) | |
 | Qwen-Image-2.1 | ✓ (ComfyUI, diffusers/PEFT and kohya, including LoKR, LoHA and DoRA as noted on the family page) | ✗ | |
+| FLUX.3 | ✓ (diffusers/PEFT, ComfyUI and ai-toolkit files and Diffusers folders, including DoRA, and LoKR and LoHA under diffusers or BFL module names; LyCORIS's flattened `lycoris_…` names are not recognized, and PEFT LoKr/LoHa adapters with a diffusers header and distillation extracts are refused, as noted on the family page) | ✗ | |
 | LTX-2, MiniMax H3 | ✓ (plain low-rank; LoKR, LoHA and DoRA are refused) | ✗ | |
-| SD 3, CogView4, FLUX.3, Ideogram 4, ERNIE-Image, MOSS-Image | ✗ | ✗ | |
+| SD 3, CogView4, Ideogram 4, ERNIE-Image, MOSS-Image | ✗ | ✗ | |
 
 FLUX.1 and FLUX.2 also accept ComfyUI/OneTrainer PEFT LoRAs whose module names start with `diffusion_model.`.
 Per-layer `.alpha` values in these `diffusion_model.` files set the LoRA scale.
