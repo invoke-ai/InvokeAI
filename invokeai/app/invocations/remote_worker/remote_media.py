@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from invokeai.app.invocations.remote_worker.remote_client import RemoteInvokeClient, RemoteInvokeError
-from invokeai.app.services.board_records.board_records_common import BoardVisibility
+from invokeai.app.services.board_access.board_access_common import BoardAccessDeniedError, BoardAction
+from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.util.video_thumbnails import probe_video_with_codec
@@ -44,13 +45,16 @@ def progress_image_from_remote(preview: dict[str, Any]) -> ProgressImage | None:
 def _assert_background_save_access(services: Any, user_id: str | None, board_id: str | None) -> None:
     if not getattr(services.configuration, "multiuser", False):
         return
+    if not user_id:
+        raise PermissionError("Queue user is not authorized to save returned remote images")
     user = services.users.get(user_id)
     if user is None or not user.is_active:
         raise PermissionError("Queue user is not authorized to save returned remote images")
     if board_id:
-        board = services.boards.get_dto(board_id)
-        if not user.is_admin and board.user_id != user_id and board.board_visibility != BoardVisibility.Public:
-            raise PermissionError("Queue user is not authorized to save returned remote images to this board")
+        try:
+            services.board_access.require(board_id, user_id, user.is_admin, BoardAction.AddMedia)
+        except (BoardAccessDeniedError, BoardRecordNotFoundException) as exc:
+            raise PermissionError("Queue user is not authorized to save returned remote images to this board") from exc
 
 
 def save_local_image(
