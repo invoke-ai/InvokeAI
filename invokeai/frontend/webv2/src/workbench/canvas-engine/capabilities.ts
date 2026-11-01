@@ -948,7 +948,7 @@ export {
   type InpaintMaskMergeEligibility,
 } from './document/mergeVisible';
 export { documentToExportLocalSamPoint } from './samCoordinates';
-export { bboxEquals, constrainBboxToRatio, roundBbox } from './tools/bboxHitTest';
+export { bboxEquals, bboxMinSize, roundBbox } from './tools/bboxHitTest';
 export { isEmpty, union } from './math/rect';
 export { ZOOM_PRESETS } from './math/snapping';
 export { isLeafPixelEditEligible } from './editing/controlPixelEdit';

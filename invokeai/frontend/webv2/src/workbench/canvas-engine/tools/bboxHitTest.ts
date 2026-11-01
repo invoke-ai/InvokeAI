@@ -5,7 +5,7 @@
 
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { type AspectAnchor, constrainAspect, snapMovedPoint, snapToGrid } from '@workbench/canvas-engine/math/snapping';
+import { type AspectAnchor, snapMovedPoint, snapToGrid } from '@workbench/canvas-engine/math/snapping';
 
 /** The eight resize handles: four corners + four edge midpoints. */
 export type BboxHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
@@ -361,20 +361,6 @@ export const resizeBbox = (p: ResizeBboxParams): Rect => {
       )
     : resizeAnchored(p);
   return p.snap ? resized : pixelAlignResize(resized, p);
-};
-
-/** Re-fits `rect` to `ratio`, keeping its center fixed, then snaps to `grid` and clamps min size. */
-export const constrainBboxToRatio = (rect: Rect, ratio: number, grid: number): Rect => {
-  if (ratio <= 0) {
-    return rect;
-  }
-  const fitted = constrainAspect(rect, ratio, 'center');
-  const min = bboxMinSize(grid);
-  const width = Math.max(min, snapToGrid(fitted.width, grid));
-  const height = Math.max(1, width / ratio);
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-  return { height, width, x: centerX - width / 2, y: centerY - height / 2 };
 };
 
 /** Rounds a rect's fields to integers (document px), enforcing a ≥1px size. */

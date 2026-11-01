@@ -188,6 +188,7 @@ const createStableGroups = () => ({
   CanvasGenerationSections: () => null,
   CanvasRenderSize: () => null,
   account: { currentUserId: null, multiuserEnabled: false },
+  aspectRatioPresets: { isFull: false, presets: [], remove: noop, save: () => null, update: noop },
   capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
   gallery: { findImage: noop, getUploadBoardId: () => Promise.resolve('none'), selectedImage: null, touchImages: noop },
   models: {
@@ -643,8 +644,12 @@ describe('GenerateSettingsForm render isolation', () => {
       host!.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.resetSize"]')?.click()
     );
     const menu = document.querySelector<HTMLElement>('[role="menu"]');
-    // Highlights the first choice, Square at native size.
-    await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    const highlighted = () => menu?.querySelector('[role="menuitemradio"][data-highlighted]')?.textContent ?? '';
+    // Arrows down to Square at native size by its name, wherever the menu lists it.
+    for (let step = 0; step < 3 && !highlighted().startsWith('widgets.generate.resetSizeSquareNative'); step += 1) {
+      await settle(() => menu?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    }
+    expect(highlighted()).toMatch(/^widgets\.generate\.resetSizeSquareNative/);
 
     // A width step still inside its debounce window, then the reset.
     await settle(() => {

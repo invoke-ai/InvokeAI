@@ -2,6 +2,11 @@
 import type { AspectRatioId, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
 import { Badge, Box, HStack, Icon, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import {
+  formatAspectRatio,
+  getLockedAspectRatioSettings,
+  matchAspectRatio,
+} from '@features/generation/core/aspectRatioPresets';
 import { getDefaultGenerateSettings, getGenerationDimensions } from '@features/generation/core/baseGenerationPolicies';
 import { MAX_DIMENSION, MIN_DIMENSION } from '@features/generation/core/dimensionLimits';
 import {
@@ -27,7 +32,7 @@ import {
   useGenerationQueueInsights,
   useGenerationUi,
 } from './GenerationUiContext';
-import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
+import { AspectRatioLockButton, AspectRatioPicker } from './shared/AspectRatioPicker';
 import { ExternalSizeSelect } from './shared/ExternalSizeSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
@@ -142,7 +147,7 @@ const ResetSizeMenu = ({ choices }: { choices: readonly ResetSizeChoice[] }) => 
     <Menu.Root ids={ids} positioning={RESET_SIZE_MENU_POSITIONING}>
       <Menu.Trigger asChild>
         <Tooltip content={label} ids={ids}>
-          <IconButton aria-label={label} size="sm" variant="outline">
+          <IconButton aria-label={label} variant="outline">
             <RotateCcwIcon />
           </IconButton>
         </Tooltip>
@@ -374,7 +379,7 @@ export const GenerateDimensionFields = ({
   selectedModel,
 }: GenerateDimensionFieldsProps) => {
   const { i18n, t } = useTranslation();
-  const { CanvasRenderSize: CanvasRenderSizeSlot, project } = useGenerationUi();
+  const { aspectRatioPresets, CanvasRenderSize: CanvasRenderSizeSlot, project } = useGenerationUi();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectDimensionSettings);
   const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
@@ -459,8 +464,9 @@ export const GenerateDimensionFields = ({
     onCommit(patch);
   };
 
-  const setAspectRatioId = (id: AspectRatioId) => {
-    if (id === 'Free') {
+  // Any ratio keeps the current pixel count, as a built-in always has; Reset size is where the model's optimum lives.
+  const applyAspectRatio = (ratio: number | null) => {
+    if (ratio === null) {
       commitSettings({
         aspectRatioId: 'Free',
         aspectRatioIsLocked: false,
@@ -470,12 +476,8 @@ export const GenerateDimensionFields = ({
       return;
     }
 
-    const ratio = ASPECT_RATIO_MAP[id].ratio;
-
     commitSettings({
-      aspectRatioId: id,
-      aspectRatioIsLocked: true,
-      aspectRatioValue: ratio,
+      ...getLockedAspectRatioSettings(ratio),
       ...calculateNewSize(ratio, displayDimensions.width * displayDimensions.height, dimensionGrid),
     });
   };
@@ -521,27 +523,50 @@ export const GenerateDimensionFields = ({
   };
 
   const nativeSide = clampDimension(dimensions.optimal, dimensionGrid);
-  const optimalRatio = isRatioConstrained
-    ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
-    : dimensionRatio;
+  // The ratio the lock holds; a built-in's own value, so a drifted stored value cannot unmatch it.
+  const lockedRatio = isRatioConstrained
+    ? settings.aspectRatioId !== 'Free'
+      ? ASPECT_RATIO_MAP[settings.aspectRatioId].ratio
+      : getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+    : null;
   // The model's pixel budget reshaped to the ratio the section holds.
-  const optimalSize = calculateNewSize(optimalRatio, dimensions.optimal * dimensions.optimal, dimensionGrid);
+  const optimalSize = calculateNewSize(
+    lockedRatio ?? dimensionRatio,
+    dimensions.optimal * dimensions.optimal,
+    dimensionGrid
+  );
   const isAtSize = (size: Dimensions) =>
     displayDimensions.width === size.width && displayDimensions.height === size.height;
-  // A preset by its name and a locked free ratio as `W:1`; an unlocked free ratio is just whatever the size is now.
+  // A locked ratio by its saved name, built-in id or terms; an unlocked ratio is just whatever the size is now.
+  const lockedMatch = lockedRatio === null ? null : matchAspectRatio(lockedRatio, aspectRatioPresets.presets);
   const optimalLabel =
-    settings.aspectRatioId !== 'Free'
-      ? t('widgets.generate.resetSizeOptimalForRatio', { ratio: settings.aspectRatioId })
-      : settings.aspectRatioIsLocked
-        ? t('widgets.generate.resetSizeOptimalForRatio', {
-            ratio: `${new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 2 }).format(optimalRatio)}:1`,
-          })
-        : t('widgets.generate.resetSizeOptimalForCurrentRatio');
+    lockedRatio === null
+      ? t('widgets.generate.resetSizeOptimalForCurrentRatio')
+      : t('widgets.generate.resetSizeOptimalForRatio', {
+          ratio:
+            lockedMatch?.kind === 'preset'
+              ? lockedMatch.preset.label
+              : lockedMatch?.kind === 'builtin'
+                ? lockedMatch.id
+                : formatAspectRatio(lockedRatio, i18n.resolvedLanguage),
+        });
 
+  // The ratio follows the size: a lock stays on and holds the default size's ratio, an unlocked ratio stays unlocked.
   const resetToModelDefaults = () => {
-    if (modelDefaults) {
-      resetSize({ height: modelDefaults.height, width: modelDefaults.width });
+    if (!modelDefaults) {
+      return;
     }
+
+    const { height, width } = modelDefaults;
+    const ratio = height > 0 ? width / height : 1;
+
+    resetSize({
+      ...(isRatioConstrained
+        ? getLockedAspectRatioSettings(ratio)
+        : { aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: ratio }),
+      height,
+      width,
+    });
   };
   // Only a size the model sets itself is worth offering; otherwise its defaults are the native square.
   const modelDefaultSize =
@@ -550,25 +575,8 @@ export const GenerateDimensionFields = ({
       : null;
 
   const resetSizeChoices: readonly ResetSizeChoice[] = [
-    {
-      isCurrent:
-        isAtSize({ height: nativeSide, width: nativeSide }) &&
-        settings.aspectRatioId === '1:1' &&
-        settings.aspectRatioIsLocked,
-      label: t('widgets.generate.resetSizeSquareNative'),
-      // The field set choosing the 1:1 preset writes.
-      onSelect: () =>
-        resetSize({
-          aspectRatioId: '1:1',
-          aspectRatioIsLocked: true,
-          aspectRatioValue: 1,
-          height: nativeSide,
-          width: nativeSide,
-        }),
-      size: { height: nativeSide, width: nativeSide },
-      value: 'square-native',
-    },
-    // A square ratio's optimal size is the native square, which the first choice already sets.
+    // First, as the choice most reached for. A square ratio's optimal size is the native square, which the square choice
+    // below sets, so it is left out there.
     ...(optimalSize.width === nativeSide && optimalSize.height === nativeSide
       ? []
       : [
@@ -591,6 +599,24 @@ export const GenerateDimensionFields = ({
           },
         ]
       : []),
+    {
+      isCurrent:
+        isAtSize({ height: nativeSide, width: nativeSide }) &&
+        settings.aspectRatioId === '1:1' &&
+        settings.aspectRatioIsLocked,
+      label: t('widgets.generate.resetSizeSquareNative'),
+      // The field set choosing the 1:1 preset writes.
+      onSelect: () =>
+        resetSize({
+          aspectRatioId: '1:1',
+          aspectRatioIsLocked: true,
+          aspectRatioValue: 1,
+          height: nativeSide,
+          width: nativeSide,
+        }),
+      size: { height: nativeSide, width: nativeSide },
+      value: 'square-native',
+    },
   ];
 
   // The recommendation reshapes the model's pixel budget to the live aspect ratio.
@@ -709,17 +735,20 @@ export const GenerateDimensionFields = ({
                 />
               ) : null}
               <HStack alignItems="center" gap="1">
-                <AspectRatioSelect
-                  fallbackRatio={dimensionRatio}
-                  value={settings.aspectRatioId}
-                  onChange={setAspectRatioId}
+                <AspectRatioPicker
+                  currentSize={displayDimensions}
+                  getSizeForRatio={(ratio) =>
+                    calculateNewSize(ratio, displayDimensions.width * displayDimensions.height, dimensionGrid)
+                  }
+                  lockedRatio={lockedRatio}
+                  presets={aspectRatioPresets}
+                  onChange={applyAspectRatio}
                 />
                 <ResetSizeMenu choices={resetSizeChoices} />
                 <Box css={SWAP_COLUMN_CSS}>
                   <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
                     <IconButton
                       aria-label={t('widgets.generate.swapWidthAndHeight')}
-                      size="sm"
                       variant="outline"
                       onClick={swapDimensions}
                     >
