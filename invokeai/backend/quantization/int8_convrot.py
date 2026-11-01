@@ -73,6 +73,11 @@ INT8_TENSORWISE_FORMAT = "int8_tensorwise"
 # `drop_unconsumed_quantization_sidecars`.
 _UNCONSUMED_SIDECAR_SUFFIXES = (COMFY_QUANT_SUFFIX, *INPUT_SCALE_SUFFIXES)
 
+# Rows `dequantize_convrot_weight` decodes per pass. Its float32 intermediates are two copies of what it decodes, so an
+# LLM's embedding or LM head (248320 x 4096, widened on load) decoded whole would need 7.6 GiB of them on top of the
+# result; 16384 rows of that width need 512 MiB. A weight of at most that many rows decodes in one pass, as before.
+DEQUANTIZE_ROWS_PER_PASS = 16384
+
 
 def check_hadamard_size(size: int) -> None:
     """Refuse a rotation width this scheme has no Hadamard for.
@@ -220,8 +225,30 @@ def dequantize_convrot_weight(
     dtype: torch.dtype,
     group_size: int = CONVROT_GROUP_SIZE,
 ) -> torch.Tensor:
-    """Recover the bf16/fp16 weight from int8 storage (and undo convrot if applied)."""
-    w = weight_q.to(torch.float32) * as_column_scale(weight_q, weight_scale).to(torch.float32)
+    """Recover the bf16/fp16 weight from int8 storage (and undo convrot if applied).
+
+    A 2-D weight taller than `DEQUANTIZE_ROWS_PER_PASS` is decoded that many rows at a time into the result, which
+    bounds the float32 intermediates. Scale and rotation both act within a row, so the passes decode the rows one
+    pass would.
+    """
+    scale = as_column_scale(weight_q, weight_scale)
+    rows = weight_q.shape[0] if weight_q.dim() == 2 else 0
+    if rows <= DEQUANTIZE_ROWS_PER_PASS:
+        return _dequantize_convrot_rows(weight_q, scale, convrot, dtype, group_size)
+    per_row = scale.dim() == 2 and scale.shape[0] == rows
+    result = torch.empty(weight_q.shape, dtype=dtype, device=weight_q.device)
+    for start in range(0, rows, DEQUANTIZE_ROWS_PER_PASS):
+        block = slice(start, start + DEQUANTIZE_ROWS_PER_PASS)
+        result[block] = _dequantize_convrot_rows(
+            weight_q[block], scale[block] if per_row else scale, convrot, dtype, group_size
+        )
+    return result
+
+
+def _dequantize_convrot_rows(
+    weight_q: torch.Tensor, scale: torch.Tensor, convrot: bool, dtype: torch.dtype, group_size: int
+) -> torch.Tensor:
+    w = weight_q.to(torch.float32) * scale.to(torch.float32)
     if convrot:
         out_features, in_features = w.shape
         if in_features % group_size != 0:
@@ -648,9 +675,8 @@ def predict_int8_cast_size(
 
     Loaders call this to size their ``make_room()`` reservation, and call it *before* the split so
     that the tensors the split widens are already reserved for when they appear. (The split's own
-    per-layer fp32 transient is absorbed by that reservation's slack rather than modelled: it runs
-    one widened layer at a time, and the widened set is by construction the small one -- skip-pattern
-    and non-Linear layers.)
+    fp32 transient is absorbed by that reservation's slack rather than modelled: it widens one layer
+    at a time, and at most ``DEQUANTIZE_ROWS_PER_PASS`` rows of it at once.)
 
     Three widths are in play and only one of them is ``dtype.itemsize``. A payload that stays int8
     occupies one byte, and charging it two asks the cache to free ~12 GB a Krea-2 build never uses.

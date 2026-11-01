@@ -92,6 +92,24 @@ the 4B and MOSS-Image only the 9B, and each refuses the other. A 9B file must ho
 of a sharded export, the first shard is refused at install with a message and the others install as unknown
 models. Install the whole MOSS-Image Diffusers folder or a merged single file instead.
 
+## Text LLMs
+
+Text LLMs rewrite prompts in [Expand Prompt](/users-guide/image-generation/prompt-tools/#expand-prompt) and run the
+Text LLM workflow nodes.
+
+| Model | Folder | Single file (bf16) | int8 | GGUF | Other quantizations |
+|---|---|---|---|---|---|
+| Causal language models (`…ForCausalLM`), Gemma-4 | ✓ | ✗ | ✗ | ✗ | ✗ |
+| Qwen3.5 vision-language models, such as the [FLUX.3 prompt upsampler](/users-guide/models/local-models/flux-3/#prompt-upsampler-model) | ✓ | ✓ (9B) | ✓ (9B) | ✗ | R (w4a8, fp8 scaled, nvfp4, mxfp8) |
+
+A folder is a Hugging Face model folder with its tokenizer files; quantized folders (bitsandbytes, GPTQ, AWQ) are not
+supported. Gemma-4 and Qwen3.5 folders also read an image when the folder carries its processor files. A single file
+installs as a Text LLM when it is a whole 9B Qwen3.5 vision-language model, with its vision tower and LM head:
+ComfyUI's exports of the FLUX.3 prompt upsampler (bf16 or `int8_convrot`), or the release's own `model.safetensors`.
+InvokeAI supplies the config, tokenizer and processor itself. Such a file in w4a8, fp8 scaled, nvfp4 or mxfp8 is
+refused at install with a message, and a GGUF of it is not recognized. The same layout at the 4B's width installs as a
+Qwen3.5 encoder, and other widths are not identified.
+
 ## VAEs
 
 | VAE | Single file | Diffusers | Used by |

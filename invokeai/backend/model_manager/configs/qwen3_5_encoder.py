@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen35VariantType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.qwen3_5.qwen3_5_vl import QWEN3_5_VL_LANGUAGE_MODEL_PREFIX, QWEN3_5_VL_VARIANTS
 
 #: Where a Qwen3.5 language model's `layers.` and `embed_tokens.` sit: bare (ComfyUI text-encoder
 #: exports, Anima-3.8B's `qwen35_4b.safetensors`), under a causal LM's `model.`, under the
@@ -35,6 +36,9 @@ _QWEN3_5_HIDDEN_SIZES = {2560: Qwen35VariantType.Qwen35_4B, 4096: Qwen35VariantT
 #: every decoder layer and the norm. Not the 4B: Anima-3.8B's file ships its last layer without the
 #: MLP and a projection head where the final norm would be.
 QWEN3_5_FINAL_NORM_VARIANTS = frozenset({Qwen35VariantType.Qwen35_9B})
+
+#: The first block of a `Qwen3_5ForConditionalGeneration` vision tower, under transformers' names.
+_QWEN3_5_VISION_TOWER_KEY = "model.visual.blocks.0.attn.qkv.weight"
 
 
 def has_qwen3_5_linear_attention(state_dict: dict[str | int, Any]) -> bool:
@@ -60,6 +64,22 @@ def get_qwen3_5_variant(state_dict: dict[str | int, Any], prefix: str) -> Option
     if shape is None or len(shape) != 2:
         return None
     return _QWEN3_5_HIDDEN_SIZES.get(int(shape[1]))
+
+
+def is_qwen3_5_vision_language_lm(state_dict: dict[str | int, Any]) -> bool:
+    """Whether this is a whole `Qwen3_5ForConditionalGeneration` that loads as a Text LLM.
+
+    Language model, vision tower and LM head under transformers' names, at a size with a vendored config: the
+    FLUX.3 prompt upsampler's single files, which are `TextLLM_Checkpoint_Config`'s. The LM head sets them apart
+    from an encoder export of the same model -- MOSS-Image's has the vision tower without one. Anything else stays
+    the encoder config's, LM head or not: a 4B with its tower, which Anima-3.8B can read, or a text-only export.
+    """
+    return (
+        qwen3_5_key_prefix(state_dict) == QWEN3_5_VL_LANGUAGE_MODEL_PREFIX
+        and "lm_head.weight" in state_dict
+        and _QWEN3_5_VISION_TOWER_KEY in state_dict
+        and get_qwen3_5_variant(state_dict, QWEN3_5_VL_LANGUAGE_MODEL_PREFIX) in QWEN3_5_VL_VARIANTS
+    )
 
 
 def _raise_if_not_whole(state_dict: dict[str | int, Any], prefix: str, variant: Qwen35VariantType) -> None:
@@ -110,6 +130,9 @@ class Qwen35Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         prefix = qwen3_5_key_prefix(state_dict)
         if prefix is None:
             raise NotAMatchError("state dict does not look like a Qwen3.5 language model (no linear_attn layer 0)")
+        # The FLUX.3 prompt upsampler is a TextLLM. An explicit type still installs it here.
+        if override_fields.get("type") != ModelType.Qwen35Encoder and is_qwen3_5_vision_language_lm(state_dict):
+            raise NotAMatchError("state dict is a whole Qwen3.5 vision-language model with an LM head: a TextLLM")
         if any(isinstance(v, GGMLTensor) for v in state_dict.values()):
             raise NotAMatchError("state dict looks like GGUF quantized")
 

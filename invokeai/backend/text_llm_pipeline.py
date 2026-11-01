@@ -1,12 +1,18 @@
+import math
 import queue
 import threading
 import time
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import torch
-from PIL.Image import Image
+from PIL.Image import Image, Resampling
 from transformers import PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, TextIteratorStreamer
 from transformers.generation.logits_process import LogitsProcessor
+
+from invokeai.backend.model_manager.taxonomy import SubModelType
+
+if TYPE_CHECKING:
+    from invokeai.backend.model_manager.load.load_base import LoadedModelWithoutConfig
 
 DEFAULT_SYSTEM_PROMPT = (
     "You are an expert prompt writer for AI image generation. "
@@ -16,6 +22,11 @@ DEFAULT_SYSTEM_PROMPT = (
 
 
 ProgressCallback = Callable[[int, int], None]
+
+# The most pixels an image reaches a multimodal model with: 1024 x 1024, the budget BFL and diffusers give the FLUX.3
+# prompt upsampler for a single reference. A vision tower turns pixels into prompt tokens -- Qwen3.5 one per 32 x 32
+# patch, so a 4096 x 4096 image would be 16384 of them -- and the prompt's memory grows with them.
+MAX_IMAGE_PIXELS = 1024 * 1024
 
 # Backstop timeout (seconds) for the streamer's blocking queue.get() between tokens.
 # The common failure mode — generate() raising — is handled explicitly by calling
@@ -204,7 +215,10 @@ class TextLLMPipeline:
             # BatchFeature.to casts floating tensors only, so the pixels follow the model's dtype and the
             # token ids stay integral.
             inputs = self._processor(
-                text=formatted_prompt, images=[image], return_tensors="pt", add_special_tokens=False
+                text=formatted_prompt,
+                images=[_within_pixel_budget(image)],
+                return_tensors="pt",
+                add_special_tokens=False,
             ).to(device=device, dtype=self._model.dtype)
 
         streamer = TextIteratorStreamer(
@@ -279,3 +293,48 @@ class TextLLMPipeline:
             raise generation_error[0]
 
         return "".join(chunks).strip()
+
+
+def _within_pixel_budget(image: Image) -> Image:
+    """`image`, scaled down to cover at most `MAX_IMAGE_PIXELS`, its aspect ratio kept as far as whole pixels allow.
+
+    The short side is rounded up and the long side then takes what the budget leaves, so the result is never more
+    elongated than the original and passes any aspect-ratio limit the original passes. Qwen-VL's processor refuses a
+    ratio above 200, which rounding both sides down can cross: 30000 x 151 would become 14433 x 72.
+    """
+    width, height = image.size
+    if width * height <= MAX_IMAGE_PIXELS:
+        return image
+    long_side, short_side = max(width, height), min(width, height)
+    # The least whole number at or above sqrt(budget * short / long), the short side at the budget's scale; in
+    # integers, because a float root of an exact square, such as a square image's 1024, can round up past it.
+    short = math.isqrt(MAX_IMAGE_PIXELS * short_side // long_side)
+    if short * short * long_side < MAX_IMAGE_PIXELS * short_side:
+        short += 1
+    long = MAX_IMAGE_PIXELS // short
+    return image.resize((long, short) if width >= height else (short, long), Resampling.LANCZOS)
+
+
+def load_text_llm_tokenizer_and_processor(
+    load: Callable[[SubModelType], "LoadedModelWithoutConfig"], *, with_processor: bool
+) -> tuple[PreTrainedTokenizerBase, ProcessorMixin | None]:
+    """A TextLLM's tokenizer and, with ``with_processor``, its processor, as the model loader serves them.
+
+    Through the loader rather than from the model's folder: a single-file TextLLM has none, and its loader serves
+    vendored ones. A processor carries its own tokenizer, so with an image only the processor is loaded; loading
+    both would parse the vocabulary (for Gemma, ~30 MB) twice.
+
+    Args:
+        load: Loads a submodel of the TextLLM, e.g. ``lambda submodel: context.models.load(model, submodel)``.
+        with_processor: Whether the request conditions on an image, which needs the processor.
+    """
+    if with_processor:
+        processor = load(SubModelType.Processor).model
+        tokenizer = getattr(processor, "tokenizer", None)
+        if not isinstance(processor, ProcessorMixin) or not isinstance(tokenizer, PreTrainedTokenizerBase):
+            raise TypeError(f"Expected a processor with a tokenizer for this TextLLM, got {type(processor).__name__}.")
+        return tokenizer, processor
+    tokenizer = load(SubModelType.Tokenizer).model
+    if not isinstance(tokenizer, PreTrainedTokenizerBase):
+        raise TypeError(f"Expected a tokenizer for this TextLLM, got {type(tokenizer).__name__}.")
+    return tokenizer, None

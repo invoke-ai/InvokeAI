@@ -8,9 +8,19 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 from PIL import Image
-from transformers import BatchFeature, LlamaConfig, LlamaForCausalLM
+from transformers import (
+    BatchFeature,
+    LlamaConfig,
+    LlamaForCausalLM,
+    ProcessorMixin,
+    Qwen3_5Config,
+    Qwen3_5ForConditionalGeneration,
+    Qwen3_5TextConfig,
+    Qwen3_5VisionConfig,
+)
 
 from invokeai.backend import text_llm_pipeline
+from invokeai.backend.qwen3_5.qwen3_5_vl import build_qwen3_5_vl_processor
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline, _SeededMultinomialMode
 
 
@@ -511,6 +521,107 @@ def test_pipeline_conditions_on_an_image_through_the_processor():
     generate_kwargs = model.generate.call_args.kwargs
     assert generate_kwargs["pixel_values"].dtype == torch.bfloat16
     assert generate_kwargs["input_ids"].dtype == torch.long
+
+
+@pytest.fixture(scope="module")
+def qwen3_5_processor() -> ProcessorMixin:
+    """The processor the single-file FLUX.3 prompt upsampler is served with."""
+    return build_qwen3_5_vl_processor()
+
+
+@pytest.mark.parametrize(
+    ("size", "sent"),
+    [
+        ((640, 480), (640, 480)),
+        ((4096, 4096), (1024, 1024)),
+        # The short side at the budget's scale, sqrt(1024**2 * 2048 / 4096) = 724.08, rounds up to 725; the long side
+        # takes the rest of the budget, 1024**2 // 725 = 1446.
+        ((2048, 4096), (725, 1446)),
+        # sqrt(1024**2 * 151 / 30000) = 72.65 rounds up to 73, and 1024**2 // 73 = 14364: an aspect ratio of 196.8,
+        # where rounding both sides down, to 14433 x 72, would cross the processor's limit of 200.
+        ((30000, 151), (14364, 73)),
+    ],
+    ids=["within the budget", "square", "tall", "panorama near the aspect-ratio limit"],
+)
+def test_an_image_reaches_the_processor_at_one_megapixel_at_most(
+    qwen3_5_processor: ProcessorMixin, size: tuple[int, int], sent: tuple[int, int]
+) -> None:
+    """A vision tower turns pixels into prompt tokens, so a larger image is scaled down, never to an aspect ratio its
+    original did not have: a processor that accepts the original has to accept what it is sent."""
+    model = _make_mock_model()
+    model.dtype = torch.float32
+    processor = MagicMock(return_value=BatchFeature({"input_ids": torch.tensor([[1, 2, 3]])}))
+    pipeline = TextLLMPipeline(model, _make_mock_tokenizer(has_chat_template=True), processor)
+
+    with _patch_streamer():
+        pipeline.run(prompt="a fox", image=Image.new("RGB", size))
+
+    (image,) = processor.call_args.kwargs["images"]
+    assert image.size == sent
+    # Raises ValueError for an image it refuses.
+    qwen3_5_processor.image_processor(images=[image], return_tensors="pt")
+
+
+def _tiny_qwen3_5_vision_language_model() -> Qwen3_5ForConditionalGeneration:
+    """Qwen3.5's vocabulary, image token ids and 16 px patches merged 2 x 2, around layers a few dozen wide."""
+    text = Qwen3_5TextConfig(
+        vocab_size=248320,
+        hidden_size=32,
+        intermediate_size=64,
+        num_hidden_layers=2,
+        layer_types=["linear_attention", "full_attention"],
+        num_attention_heads=2,
+        num_key_value_heads=1,
+        head_dim=16,
+        linear_num_key_heads=1,
+        linear_num_value_heads=2,
+        linear_key_head_dim=16,
+        linear_value_head_dim=16,
+        linear_conv_kernel_dim=4,
+        rope_parameters={
+            "rope_type": "default",
+            "rope_theta": 10000.0,
+            "partial_rotary_factor": 0.25,
+            "mrope_section": [1, 1, 0],
+            "mrope_interleaved": True,
+        },
+    )
+    vision = Qwen3_5VisionConfig(
+        depth=1,
+        hidden_size=32,
+        intermediate_size=64,
+        num_heads=2,
+        out_hidden_size=32,
+        num_position_embeddings=16,
+        patch_size=16,
+        temporal_patch_size=2,
+        spatial_merge_size=2,
+    )
+    torch.manual_seed(0)
+    config = Qwen3_5Config(text_config=text.to_dict(), vision_config=vision.to_dict(), tie_word_embeddings=True)
+    return Qwen3_5ForConditionalGeneration(config).eval()
+
+
+def test_an_image_reaches_a_qwen3_5_vision_tower_through_the_vendored_processor(
+    qwen3_5_processor: ProcessorMixin,
+) -> None:
+    """The single-file upsampler's text side, as its loader serves it, around a real model: the chat template's image
+    placeholder has to expand into as many image tokens as the vision tower returns features, or generate() fails."""
+    processor = qwen3_5_processor
+    model = _tiny_qwen3_5_vision_language_model()
+    grids: list[list[list[int]]] = []
+    model.model.visual.register_forward_hook(
+        lambda _module, _args, kwargs, _output: grids.append(kwargs["grid_thw"].tolist()), with_kwargs=True
+    )
+    pipeline = TextLLMPipeline(model, processor.tokenizer, processor)
+
+    result = pipeline.run(
+        prompt="a red fox", system_prompt="Write the caption.", max_new_tokens=2, image=Image.new("RGB", (1600, 1200))
+    )
+
+    # Scaled to 1182 x 887 for the pixel budget, which the processor rounds to 1184 x 896: 74 x 56 patches of 16 px.
+    assert grids == [[[1, 56, 74]]]
+    assert isinstance(result, str)
 
 
 def test_pipeline_refuses_an_image_without_a_processor():

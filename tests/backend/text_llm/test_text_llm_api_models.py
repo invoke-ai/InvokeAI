@@ -7,7 +7,12 @@ import pytest
 import torch
 from PIL import Image
 from pydantic import ValidationError
-from transformers import LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
+from transformers import (
+    LlavaOnevisionForConditionalGeneration,
+    LlavaOnevisionProcessor,
+    PreTrainedTokenizerBase,
+    ProcessorMixin,
+)
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.utilities import (
@@ -18,7 +23,7 @@ from invokeai.app.api.routers.utilities import (
     _run_expand_prompt,
     _run_image_to_prompt,
 )
-from invokeai.backend.model_manager.taxonomy import ModelType
+from invokeai.backend.model_manager.taxonomy import ModelType, SubModelType
 from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
 from invokeai.backend.util.devices import TorchDevice
 from tests.fixtures.device_pool import GPU0, GPU1, two_gpu_pool
@@ -79,20 +84,35 @@ class TestExpandPromptResponse:
         assert resp.error == "Model failed"
 
 
-def test_expand_prompt_uses_fresh_seed() -> None:
-    model_config = MagicMock(type=ModelType.TextLLM, path="model")
+def _model() -> MagicMock:
     model = MagicMock()
     model.parameters.side_effect = lambda: iter([torch.nn.Parameter(torch.zeros(1))])
-    loaded_model = MagicMock()
-    loaded_model.model_on_device.return_value.__enter__.return_value = (None, model)
+    return model
+
+
+def _loaded(model: object, text_side: dict[SubModelType, object]) -> Callable[..., MagicMock]:
+    """`load_model` for a TextLLM: the model itself, or the tokenizer or processor its loader serves."""
+
+    def load_model(config: object, submodel_type: SubModelType | None = None, **kwargs: object) -> MagicMock:
+        loaded = MagicMock()
+        if submodel_type is None:
+            loaded.model_on_device.return_value.__enter__.return_value = (None, model)
+        else:
+            loaded.model = text_side[submodel_type]
+        return loaded
+
+    return load_model
+
+
+def test_expand_prompt_uses_fresh_seed() -> None:
     services = MagicMock()
-    services.model_manager.store.get_model.return_value = model_config
-    services.model_manager.load.load_model.return_value = loaded_model
+    services.model_manager.store.get_model.return_value = MagicMock(type=ModelType.TextLLM, path="model")
+    services.model_manager.load.load_model.side_effect = _loaded(
+        _model(), {SubModelType.Tokenizer: MagicMock(spec=PreTrainedTokenizerBase)}
+    )
 
     with (
         patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True),
-        patch("invokeai.app.api.routers.utilities._resolve_model_path", return_value="model"),
-        patch("invokeai.app.api.routers.utilities.AutoTokenizer.from_pretrained"),
         patch("invokeai.app.api.routers.utilities.get_random_seed", return_value=123),
         patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
     ):
@@ -106,30 +126,31 @@ def test_expand_prompt_uses_fresh_seed() -> None:
 
 
 def test_expand_prompt_with_an_image_runs_it_through_the_processor() -> None:
-    """The stored image reaches the pipeline as RGB, next to the model's processor, whose tokenizer is reused."""
-    model_config = MagicMock(type=ModelType.TextLLM, path="model", supports_images=True)
-    model = MagicMock()
-    model.parameters.side_effect = lambda: iter([torch.nn.Parameter(torch.zeros(1))])
-    loaded_model = MagicMock()
-    loaded_model.model_on_device.return_value.__enter__.return_value = (None, model)
+    """The stored image reaches the pipeline as RGB, next to the model's processor, whose tokenizer is reused.
+
+    Both come from the model loader, not from the model's path: a single-file Text LLM has no folder to read them
+    from, and its loader serves vendored ones.
+    """
+    processor = MagicMock(spec=ProcessorMixin)
+    processor.tokenizer = MagicMock(spec=PreTrainedTokenizerBase)
     services = MagicMock()
-    services.model_manager.store.get_model.return_value = model_config
-    services.model_manager.load.load_model.return_value = loaded_model
+    services.model_manager.store.get_model.return_value = MagicMock(
+        type=ModelType.TextLLM, path="upsampler.safetensors", supports_images=True
+    )
+    services.model_manager.load.load_model.side_effect = _loaded(_model(), {SubModelType.Processor: processor})
     services.images.get_pil_image.return_value = Image.new("RGBA", (8, 8))
 
     with (
         patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True),
-        patch("invokeai.app.api.routers.utilities._resolve_model_path", return_value="model"),
-        patch("invokeai.app.api.routers.utilities.AutoTokenizer.from_pretrained") as load_tokenizer,
-        patch("invokeai.app.api.routers.utilities.AutoProcessor.from_pretrained") as load_processor,
         patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
     ):
         pipeline_class.return_value.run.return_value = "expanded"
         _run_expand_prompt("she waves", "model", 10, None, 1, None, "user", image_name="frame.png")
 
     services.images.get_pil_image.assert_called_once_with("frame.png")
-    processor = load_processor.return_value
-    load_tokenizer.assert_not_called()
+    # The processor, then the model: no tokenizer of its own.
+    load_calls = services.model_manager.load.load_model.call_args_list
+    assert [call.args[1] if len(call.args) > 1 else None for call in load_calls] == [SubModelType.Processor, None]
     assert pipeline_class.call_args.args[1:] == (processor.tokenizer, processor)
     assert pipeline_class.return_value.run.call_args.kwargs["image"].mode == "RGB"
 
@@ -138,10 +159,13 @@ def _services_recording_devices(model: object, seen: list[object]) -> MagicMock:
     """Model-manager services whose load and image read record the thread's session device."""
     loaded_model = MagicMock()
     loaded_model.model_on_device.return_value.__enter__.return_value = (None, model)
+    loaded_model.model = MagicMock(spec=PreTrainedTokenizerBase)
     services = MagicMock()
 
     def load_model(*args: object, **kwargs: object) -> MagicMock:
-        seen.append(("load", TorchDevice.get_session_device()))
+        submodel = args[1] if len(args) > 1 else None
+        label = "load" if submodel is None else f"load {submodel.value}"
+        seen.append((label, TorchDevice.get_session_device()))
         return loaded_model
 
     def read_image(name: str) -> Image.Image:
@@ -175,23 +199,16 @@ def _borrow_recording_load_lock(seen: list[object]) -> Callable[[str], object]:
 def test_expand_prompt_loads_and_runs_on_the_idle_gpu() -> None:
     """With a render holding GPU 0, the LLM loads into and runs on GPU 1, and the thread is unpinned after.
 
-    The tokenizer read comes before the borrow and the borrow after the load lock, so neither disk I/O
+    The tokenizer load comes before the borrow and the borrow after the load lock, so neither disk I/O
     nor a wait for another request's load holds a GPU a session could use.
     """
-    model = MagicMock()
-    model.parameters.side_effect = lambda: iter([torch.nn.Parameter(torch.zeros(1))])
     seen: list[object] = []
-    services = _services_recording_devices(model, seen)
+    services = _services_recording_devices(_model(), seen)
     services.model_manager.store.get_model.return_value = MagicMock(type=ModelType.TextLLM, path="model")
 
     with (
         two_gpu_pool(busy=(GPU0,)),
         patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True),
-        patch("invokeai.app.api.routers.utilities._resolve_model_path", return_value="model"),
-        patch(
-            "invokeai.app.api.routers.utilities.AutoTokenizer.from_pretrained",
-            side_effect=_recording(seen, "tokenizer read", MagicMock()),
-        ),
         patch.object(GENERATION_DEVICE_POOL, "try_borrow_off_queue", side_effect=_borrow_recording_load_lock(seen)),
         patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
     ):
@@ -200,7 +217,7 @@ def test_expand_prompt_loads_and_runs_on_the_idle_gpu() -> None:
         assert TorchDevice.get_session_device() is None
 
     assert seen == [
-        ("tokenizer read", None),
+        ("load tokenizer", None),
         ("borrow under load lock", True),
         ("load", GPU1),
         ("run", GPU1),
