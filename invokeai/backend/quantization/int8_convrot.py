@@ -396,8 +396,9 @@ class Int8ConvrotLinear(DequantizingLinear):
         The widened weight is scaled in place, so with convrot the peak is the derotation's: its input alive
         alongside the matmul's output. The int8 codes partial loading leaves in RAM are streamed per call, and that
         copy is freed once widened, before the derotation allocates. Without convrot the peak is the widened weight
-        beside the streamed codes, half a weight less than this; the margin is kept rather than tracking a layout
-        the published builds do not use. Verified against the real `z_image_turbo_int8_convrot` checkpoint: exact
+        beside the streamed codes, ``itemsize + 1`` bytes per element against this estimate's ``2 * itemsize``:
+        half a weight less in bf16 or fp16, three quarters in fp32. The margin is kept rather than tracking a
+        layout the published builds do not use. Verified against the real `z_image_turbo_int8_convrot` checkpoint: exact
         for most shapes, and 2 MiB under on the two that make cuBLAS take a workspace (10240x3840 and 3840x10240),
         against a 3 GiB reservation floor.
 
