@@ -218,6 +218,11 @@ export interface GenerateSettings {
   promptTemplate: PromptTemplateSnapshot | null;
   /** Show the merged prompt read-only instead of the authored text. */
   promptTemplateViewMode: boolean;
+  /**
+   * Expand dynamic prompt syntax (`{a|b}`, `__wildcards__`, `#` comments) on the backend before generating. Off keeps
+   * the prompt exactly as typed. Projects saved before the toggle read as on.
+   */
+  dynamicPromptsEnabled: boolean;
   /** Expand `{a|b}` into every combination; otherwise draw a random sample. */
   dynamicPromptsCombinatorial: boolean;
   /** Upper bound on expanded prompts (the sample size when not combinatorial). */

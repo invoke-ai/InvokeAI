@@ -144,7 +144,9 @@ const Probe = (): ReactNode => {
       <span data-batch-count={state.batchCount} data-testid="reasons">
         {state.issues.map((issue) => issue.message).join(' | ')}
       </span>
-      <span data-testid="issue-layers">{state.issues.map((issue) => issue.layerId ?? '-').join(' | ')}</span>
+      <span data-testid="issue-layers">
+        {state.issues.map(({ target }) => (target.kind === 'layer' ? target.layerId : '-')).join(' | ')}
+      </span>
       <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
         Invoke front
       </button>
@@ -181,9 +183,8 @@ describe('useInvocationState and the architecture capability table', () => {
   it('stops blocking Invoke as soon as a retried load succeeds', async () => {
     await renderProbe(buildGenerateProject());
 
-    expect(blockingReasons()).toBe(
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.'
-    );
+    // Worded from the locale, which this probe leaves untranslated.
+    expect(blockingReasons()).toBe('widgets.generate.issues.capabilitiesUnavailable');
 
     // Capability arrival alone must recompute the route after retry succeeds.
     await act(() => {
@@ -204,13 +205,13 @@ describe('useInvocationState and the workflow node templates', () => {
       )
     );
 
-    expect(blockingReasons()).toContain('Node definitions are still loading.');
+    expect(blockingReasons()).toContain('nodes.readiness.templatesLoading');
 
     await act(() => {
       templates.set({ error: null, status: 'loaded', templates: {} });
     });
 
-    expect(blockingReasons()).not.toContain('Node definitions are still loading.');
+    expect(blockingReasons()).not.toContain('nodes.readiness.templatesLoading');
   });
 
   it("reports the workflow widget's own iteration count for a workflow route", async () => {

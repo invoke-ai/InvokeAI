@@ -673,7 +673,10 @@ export const LayersTree = ({
           updates: [{ id, isEnabled }],
         }),
       setHidden: (id, isHidden) =>
-        runStructural(t('widgets.layers.actions.toggleHidden'), { type: 'set-hidden', updates: [{ id, isHidden }] }),
+        runStructural(t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'), {
+          type: 'set-hidden',
+          updates: [{ id, isHidden }],
+        }),
       setLocked: (id, isLocked) =>
         runStructural(t('widgets.layers.actions.toggleLock'), { type: 'set-locked', updates: [{ id, isLocked }] }),
       startRename: (id) => setRenamingId(id),

@@ -4,6 +4,7 @@ points and fits."""
 import itertools
 import json
 import platform as stdlib_platform
+import re
 import shutil
 from collections.abc import Callable, Iterator
 from importlib.util import module_from_spec, spec_from_file_location
@@ -387,9 +388,9 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     assert main([*map(str, exports), "--data-dir", str(data_dir)]) == 0
     assert _files(data_dir) == before, "nothing written without --write"
     preview = capsys.readouterr().out
-    # The 4.7 GB decode lies above the cuDNN line all FLUX.2 points share with vae.sd3: it is refitted.
-    shipped_k = _carried(DATA_DIR, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"]
-    assert f"vae.sd3 {CUDNN_NATIVE} k_decode_bf16 {shipped_k:.0f} ->" in preview
+    # The 4.7 GB decode lies above the cuDNN line all FLUX.2 points share with vae.sd3: it is raised.
+    assert f"line vae.json: vae.sd3 {CUDNN_NATIVE} decode_bf16: " in preview
+    assert "; raised, 2 new points on it" in preview
 
     # A run's calibration/ directory stands for its exports.
     assert main([str(exports[0].parent), "--data-dir", str(data_dir), "--write"]) == 0
@@ -397,7 +398,9 @@ def test_written_data_holds_the_points_and_passes_the_shipped_data_checks(
     built = load_data(data_dir)["vae.json"]
     probe_points = [p for p in built.points if p.method == "probe_demand"]
     assert sorted(p.measured_bytes for p in probe_points) == [1_150_000_000, 4_700_000_000, 10_900_000_000]
-    assert _carried(data_dir, "vae.sd3", CUDNN_NATIVE)["k_decode_bf16"] > shipped_k
+    shipped, raised = (_carried(d, "vae.sd3", CUDNN_NATIVE) for d in (DATA_DIR, data_dir))
+    at_1024 = [line["k_decode_bf16"] * 1024 * 1024 + line["b_decode_bf16"] for line in (shipped, raised)]
+    assert at_1024[0] < 1.05 * 4_700_000_000 <= at_1024[1]
     shipped_checks(data_dir)
 
     # Built again from the same exports, the data does not change.
@@ -492,16 +495,18 @@ def _miopen_native_point(
     )
 
 
-def _refit_shipped(points: list[MeasuredPoint], specs, carrier: str) -> CoefficientEntry:
+def _refit_shipped(
+    points: list[MeasuredPoint], specs, carrier: str, platform: dict[str, str] = MIOPEN_NATIVE
+) -> CoefficientEntry:
     """The shipped data with `points` merged and refitted, checked against every point's bounds; returns `carrier`'s
-    entry for MIOpen's native allocator off Windows."""
+    entry for `platform`, MIOpen's native allocator off Windows unless given."""
     after = refit(merge_points(coefficients.shipped_data(), points), specs)
     assert bound_violations(after, specs) == []
     [entry] = [
         entry
         for file in after.values()
         for entry in file.coefficients
-        if entry.estimator == carrier and entry.platform == MIOPEN_NATIVE
+        if entry.estimator == carrier and entry.platform == platform
     ]
     return entry
 
@@ -520,20 +525,65 @@ def test_a_stand_in_stays_until_its_fresh_process_points_span_the_sizes_of_a_fit
     assert {"k_decode_fp16", "b_decode_fp16"} <= set(entry.stand_ins)
 
 
-def test_a_raised_stand_in_takes_the_larger_base_too(specs) -> None:
-    """CogView4's bf16 decode stand-in off Windows: 13720 bytes per pixel and a 14 MiB base. Probe decodes with a
-    1 GiB base and 10000 bytes per pixel fit 10500 and 1076 MiB: the slope stays, the base rises."""
-    probes = [
-        _miopen_native_point("vae.cogview4", _sd_decode(px, "bf16"), GIB + 10_000 * px * px, "probe_demand")
+def _cogview4_probes(per_pixel: int) -> list[MeasuredPoint]:
+    """Probe decodes of CogView4's VAE at 512px and 1024px, a 1 GiB base and `per_pixel` bytes per pixel."""
+    return [
+        _miopen_native_point("vae.cogview4", _sd_decode(px, "bf16"), GIB + per_pixel * px * px, "probe_demand")
         for px in (512, 1024)
     ]
 
-    entry = _refit_shipped(probes, specs, "vae.cogview4")
+
+def test_probes_a_stand_in_covers_by_the_margin_leave_it_as_it_is(specs) -> None:
+    """CogView4's bf16 decode stand-in off Windows, 13720 bytes per pixel and a 14 MiB base, reserves 3444 MiB at
+    512px and 13734 MiB at 1024px. Probes of a 1 GiB base and 7000 bytes per pixel read 2774 and 8024 MiB: covered by
+    far more than 5%. Their own fit (7350 bytes per pixel, a 1076 MiB base) must not lift the base by 1062 MiB."""
+    entry = _refit_shipped(_cogview4_probes(7000), specs, "vae.cogview4")
 
     assert entry.values is not None
-    assert (entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]) == (13720, 1076 * MIB)
+    assert (entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]) == (13720, 14 * MIB)
+    assert RAISE_NOTE not in entry.provenance
+
+
+def test_a_stand_in_short_of_a_probe_is_raised_by_the_least_its_bounds_allow(specs) -> None:
+    """Probes of a 1 GiB base and 10000 bytes per pixel read 3524 MiB at 512px, above the stand-in's 3444 MiB, and
+    11024 MiB at 1024px, below its 13734. Covering 512px by 5% takes 3700.2 MiB there: 256.2 MiB more base, or 1025
+    more bytes per pixel. Averaged over the measured 512px to 1024px, the slope costs 2.5 times as much (the middle,
+    655360 px, over 512px's 262144), so the base takes the raise, to 270.2 MiB. Of the lines as they ship, whole bytes
+    per pixel and whole MiB of base, 13720 with 271 MiB averages 8846 MiB over that range; 13721 with 270 MiB still
+    covers 512px and averages 8845.625: a byte per pixel more costs 0.625 MiB at the middle, a MiB of base less saves
+    a whole one."""
+    entry = _refit_shipped(_cogview4_probes(10_000), specs, "vae.cogview4")
+
+    assert entry.values is not None
+    k, b = entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]
+    assert (k, b) == (13721, 270 * MIB)
+    assert k * 512 * 512 + b >= 1.05 * (GIB + 10_000 * 512 * 512) > k * 512 * 512 + b - MIB
     assert {"k_decode_bf16", "b_decode_bf16"} <= set(entry.stand_ins)
     assert RAISE_NOTE in entry.provenance
+
+
+def test_a_probe_no_hull_edge_covers_within_the_bounds_raises_the_line_between_them(specs) -> None:
+    """A FLUX.2 probe decode of 2032 MiB at 640px on the RTX 4090, above the cuDNN bf16 line FLUX.2 shares with SD3
+    (4500 bytes per pixel, a 65 MiB base: 1823 MiB there). Every edge of the hull through it over-reserves the
+    fresh-process 512px decodes, or the 1024px batches of two and three, beyond 1.3x; a line between them covers it
+    by 5% and keeps every bound."""
+    probe = MeasuredPoint(
+        estimator="vae.flux2",
+        version=2,
+        platform=CUDNN_NATIVE,
+        features=_decode(640),
+        measured_bytes=2032 * MIB,
+        method="probe_demand",
+        device="NVIDIA GeForce RTX 4090",
+        provenance="-",
+    )
+
+    entry = _refit_shipped([probe], specs, "vae.sd3", CUDNN_NATIVE)
+
+    assert entry.values is not None
+    k, b = entry.values["k_decode_bf16"], entry.values["b_decode_bf16"]
+    assert k >= 4500 and b >= 65 * MIB
+    assert k * 640 * 640 + b >= 1.05 * 2032 * MIB
 
 
 def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:
@@ -544,11 +594,13 @@ def _fp32_1280(first_mib: int, largest_mib: int) -> list[dict]:
     ]
 
 
-def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_even_with_consent(
+def test_a_probe_no_line_can_cover_within_the_fresh_process_bounds_is_refused_even_with_consent(
     tmp_path: Path, machine, capsys
 ) -> None:
-    """The RX 9060 XT's fp32 SDXL decode at 1280px: allocated stays at 8020 MiB while reserved grows to 13000 MiB. The
-    line that covers it over-reserves the fresh-process points of the same line beyond 1.3x."""
+    """The RX 9060 XT's fp32 SDXL decode at 1280px: allocated stays at 8020 MiB while reserved grows to 13000 MiB. No
+    line at or above the fit covers it by 5% within 1.3x of the fresh-process decodes at 1280px: the data conflicts
+    with the bounds. The refusal shows the point with its windows and the fragmentation flag that explains it, and
+    names the probe and a bound it conflicts with, by id, measured bytes and the most it allows."""
     export = _amd_export(tmp_path, machine, _fp32_1280(8020, 13000))
     data_dir, before = _data_copy(tmp_path)
 
@@ -557,11 +609,36 @@ def test_a_raise_that_pushes_fresh_process_points_over_their_bound_is_refused_ev
         captured = capsys.readouterr()
         assert "[2 windows, MiB 8020, 13000; max/first 1.62]" in captured.out
         assert "reserved MiB 8020, 13000 while allocated MiB 8020, 8020" in captured.out
-        assert "decode_fp32: k 5988 -> " in captured.out and "1 flagged as fragmentation" in captured.out
-        assert "the bounds of these points reject the result" in captured.err
-        violation = "vae.sd-miopen,expandable,windows-decode-fp32-1280x1280-scores-RX9060XT-demand_peak: reserves"
-        assert violation in captured.err
+        assert "error: not written: the points conflict with the bounds: the points cannot fit a line" in captured.err
+        assert "decode_fp32: no line at or above k=5988" in captured.err
+        assert f"covers 13000 MiB at size {1280 * 1280} by 5% within the upper bound of vae." in captured.err
+        assert re.search(r"-1280x1280-scores-RX9060XT-demand_peak \(measured \d+ MiB, at most \d+ MiB\)", captured.err)
         assert _files(data_dir) == before
+
+
+def test_a_stand_in_no_line_can_raise_within_its_bounds_is_refused(tmp_path: Path, machine, capsys) -> None:
+    """CogView4's bf16 decode stand-in on Linux MIOpen (13720 bytes per pixel, a 14 MiB base) with one fresh-process
+    decode of 3000 MiB at 512px, which holds it to 3900 MiB there. A 30000 MiB probe at 1024px needs 31500 MiB: the
+    least slope that reaches it with the stand-in's base puts 512px at 7886 MiB. Nothing is written."""
+    data_dir, _ = _data_copy(tmp_path)
+    data = load_data(data_dir)["vae.json"]
+    fresh = _miopen_native_point("vae.cogview4", _sd_decode(512, "bf16"), 3000 * MIB, "demand_peak")
+    write_data(data_dir / "vae.json", data.model_copy(update={"points": [*data.points, fresh]}))
+    before = _files(data_dir)
+    machine("7.14.0", "linux")
+    window = _window(1, _sd_decode(1024, "bf16"), 30000 * MIB, estimator="vae.cogview4")
+    export = _export(tmp_path / f"20261017-160953-box-1-{RX_9060_XT.id}.json", RX_9060_XT, [window])
+
+    assert main([str(export), "--data-dir", str(data_dir), "--write"]) == 1
+
+    captured = capsys.readouterr()
+    assert f"+ {30000 * MIB}" in captured.out, "the probe is shown"
+    stand_in = "the points cannot raise a stand-in: vae.cogview4 on {'conv_backend': 'miopen', 'allocator': 'native'}"
+    assert stand_in in captured.err
+    assert "decode_bf16: no line at or above k=13720, b=14 MiB covers 30000 MiB at size 1048576 by 5%" in captured.err
+    assert "within the upper bound of vae.cogview4-miopen,native-decode-bf16-512x512-" in captured.err
+    assert "(measured 3000 MiB, at most 3900 MiB)" in captured.err
+    assert _files(data_dir) == before
 
 
 def test_two_owners_attempts_with_one_id_are_measured_apart(tmp_path: Path, machine, entries, specs) -> None:
@@ -730,7 +807,12 @@ def _point_file(path: Path, records: list[dict]) -> Path:
 
 
 def _denoise_entries(data_dir: Path) -> dict[str, coefficients.CoefficientEntry]:
-    return {",".join(entry.platform.values()): entry for entry in load_data(data_dir)["denoise.json"].coefficients}
+    """The Z-Image denoise entries by platform; the file declares the FLUX.2 denoise's too."""
+    return {
+        ",".join(entry.platform.values()): entry
+        for entry in load_data(data_dir)["denoise.json"].coefficients
+        if entry.estimator == Z_IMAGE_DENOISE_SPEC.id
+    }
 
 
 LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part, value in (("k", 262144), ("b", GIB))}
@@ -738,24 +820,33 @@ LEGACY_DENOISE = {f"{part}_denoise_{dtype}": value for dtype in FITTED for part,
 
 
 def _legacy_data_copy(tmp_path: Path) -> tuple[Path, dict[str, bytes]]:
-    """The shipped data as it was before the RTX 4090's native-allocator denoise points shipped: that entry hand-set
-    and `legacy` again, without its points."""
+    """The shipped data as it was before the RTX 4090's native-allocator Z-Image denoise points shipped: that entry
+    hand-set and `legacy` again, without its points."""
     data_dir, _ = _data_copy(tmp_path)
     data = load_data(data_dir)["denoise.json"]
-    coefficients = [
-        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if entry.platform == CUDNN_NATIVE else entry
+
+    def reverted(entry: coefficients.CoefficientEntry | MeasuredPoint) -> bool:
+        return entry.estimator == Z_IMAGE_DENOISE_SPEC.id and entry.platform == CUDNN_NATIVE
+
+    entries = [
+        entry.model_copy(update={"values": LEGACY_DENOISE, "legacy": True}) if reverted(entry) else entry
         for entry in data.coefficients
     ]
-    points = [point for point in data.points if point.platform != CUDNN_NATIVE]
-    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": coefficients, "points": points}))
+    points = [point for point in data.points if not reverted(point)]
+    write_data(data_dir / "denoise.json", data.model_copy(update={"coefficients": entries, "points": points}))
     return data_dir, _files(data_dir)
 
 
 def _test_points(data_dir: Path) -> list[MeasuredPoint]:
-    """The denoise points the test's records or export wrote: their device is not the shipped points' `RTX 4090`. A
-    record names the card as the calibration script does, an export's point by name and device class id."""
+    """The Z-Image denoise points the test's records or export wrote: their device is not the shipped Z-Image points'
+    `RTX 4090`. A record names the card as the calibration script does, an export's point by name and device class
+    id."""
     devices = {RTX_4090.name, f"{RTX_4090.name} ({RTX_4090.id})"}
-    return [point for point in load_data(data_dir)["denoise.json"].points if point.device in devices]
+    return [
+        point
+        for point in load_data(data_dir)["denoise.json"].points
+        if point.estimator == Z_IMAGE_DENOISE_SPEC.id and point.device in devices
+    ]
 
 
 def test_fresh_process_points_replace_the_legacy_entry_they_fit_and_leave_the_others_as_they_were(
@@ -868,6 +959,36 @@ def test_probe_windows_alone_never_replace_a_legacy_entrys_hand_set_values(tmp_p
     native = _denoise_entries(data_dir)["cudnn,native"]
     assert native.legacy and native.values == LEGACY_DENOISE
     assert [p.method for p in _test_points(data_dir)] == ["probe_demand"] * len(windows)
+
+
+def test_a_legacy_entry_whose_fit_conflicts_with_the_bounds_stays_legacy(tmp_path: Path, machine, capsys) -> None:
+    """Fresh RTX 4090 forwards of every dtype at three sizes would replace the legacy entry with their fit, as above.
+    A warm window 2 GiB above the bf16 line at 16384 image tokens (5778 MiB) needs 6067 MiB there, but the fresh
+    forward of that size holds the line to 1.3x its 3730 MiB, 4849 MiB: no bf16 line keeps both. The entry keeps its
+    hand-set values, the note names the conflict, and those values then over-reserve the fresh forwards, which the
+    bound rule refuses to write."""
+    records = [_forward_record(image, dtype) for dtype in FITTED for image in (1024, 4096, 16384)]
+    points = _point_file(tmp_path / "z_image_points.jsonl", records)
+    features = _forward_record(16384, "bf16")["features"]
+    demand = DENOISE_SLOPE * features["tokens"] + DENOISE_BASE + 2 * GIB
+    window = _window(1, features, demand, estimator=Z_IMAGE_DENOISE_SPEC.id, version=Z_IMAGE_DENOISE_SPEC.version)
+    machine(None, "linux")
+    export = _export(tmp_path / f"20261018-120000-box-1-{RTX_4090.id}.json", RTX_4090, [window])
+    data_dir, before = _legacy_data_copy(tmp_path)
+
+    assert main([str(export), "--points", str(points), "--data-dir", str(data_dir), "--write"]) == 1
+
+    captured = capsys.readouterr()
+    assert (
+        f"note: denoise.z_image {CUDNN_NATIVE} stays legacy: denoise_bf16: no line at or above k=236544, b=105 MiB "
+        "covers 5778 MiB at size 16896 by 5% within the upper bound of "
+        "denoise.z_image-cudnn,native-denoise-bf16-16384+512tok-NVIDIAGeForceRTX4090-demand_peak "
+        "(measured 3730 MiB, at most 4849 MiB)"
+    ) in captured.out
+    assert "is fitted now, no longer legacy" not in captured.out
+    assert "the bounds of these points reject the result" in captured.err
+    assert "conflict with the bounds" not in captured.err
+    assert _files(data_dir) == before
 
 
 def test_a_measurement_a_point_file_gives_twice_keeps_its_larger_reading(tmp_path: Path, entries, specs) -> None:

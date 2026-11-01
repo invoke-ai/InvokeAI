@@ -174,6 +174,7 @@ export const createVideoRecallRuntime = ({
         partial: !event.strict,
         projectId,
         requireGenerationMode: false,
+        t,
       });
 
       // A remix asks for a new take, which a fixed seed would not give; increment and decrement already vary it.

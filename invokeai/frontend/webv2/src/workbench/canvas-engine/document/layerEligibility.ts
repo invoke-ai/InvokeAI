@@ -49,3 +49,10 @@ export const isLeafPaintable = (leaf: SemanticLeaf | null | undefined): leaf is 
 /** {@link isMergeableRasterLayer} with the leaf's ancestors applied. */
 export const isMergeableRasterLeaf = (leaf: SemanticLeaf | null | undefined): leaf is SemanticLeaf =>
   isLeafEditable(leaf) && leaf.layer.type === 'raster' && isPixelBackedLayer(leaf.layer);
+
+/**
+ * Why a tool cannot edit `leaf`, folding its ancestors: hidden (disabled) before locked, since a layer the user cannot
+ * see is the first thing to fix. Null when it can be edited.
+ */
+export const leafEditRefusal = (leaf: SemanticLeaf): 'layer-hidden' | 'layer-locked' | null =>
+  !leaf.contributionEnabled ? 'layer-hidden' : leaf.effectiveLocked ? 'layer-locked' : null;

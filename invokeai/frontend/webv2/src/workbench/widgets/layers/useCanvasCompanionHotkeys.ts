@@ -2,7 +2,6 @@ import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { WidgetCommandApi, WidgetHotkeyApi } from '@workbench/widgetContracts';
 
 import { useNotify } from '@workbench/useNotify';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import {
   CANVAS_COMPANION_HOTKEYS,
   CANVAS_HISTORY_HOTKEYS,
@@ -11,7 +10,6 @@ import {
   type CanvasToolCommandId,
 } from '@workbench/widgets/canvas/canvasToolCommands';
 import { useActiveColorCommands } from '@workbench/widgets/canvas/color-system/useActiveColors';
-import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useEffect, useEffectEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -32,7 +30,6 @@ export const useCanvasCompanionHotkeys = (
 ): void => {
   const { t } = useTranslation();
   const notify = useNotify();
-  const queries = useWorkbenchQueries();
   const colorCommands = useActiveColorCommands();
   const run = useEffectEvent((commandId: CompanionCommandId) => {
     if (commandId === 'canvas.undo') {
@@ -43,12 +40,10 @@ export const useCanvasCompanionHotkeys = (
       engine?.history.redo();
       return;
     }
-    const { canvas, queue } = queries.getSnapshot().activeProject;
     const model = engine?.document.model() ?? null;
     const selectedId = model?.document.selectedLayerId ?? null;
     executeCanvasToolCommand(commandId, {
       engine,
-      isInteractionLocked: isCanvasInteractionLocked(canvas, queue.items),
       reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
       selectedLayerId: selectedId === null ? null : (model?.getLayer(selectedId)?.id ?? null),

@@ -145,6 +145,7 @@ invokeai.example.yaml
 /nodes/
 /outputs/
 /fonts/
+/style_presets/
 
 # Spyder project settings
 .spyderproject

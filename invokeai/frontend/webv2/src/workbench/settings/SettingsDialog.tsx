@@ -40,7 +40,7 @@ export const prepareSettingsDialog = async (): Promise<void> => {
   ]);
 };
 
-const GROUPS = ['application', 'project', 'widgets', 'system'] as const;
+const GROUPS = ['application', 'widgets', 'system'] as const;
 const DIRECTION = { base: 'column', sm: 'row' } as const;
 const SIDEBAR_WIDTH = { base: 'full', sm: '44', md: '56' };
 const SIDEBAR_RIGHT_BORDER = { base: '0', sm: '1px' };

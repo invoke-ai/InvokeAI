@@ -8,6 +8,7 @@ import type { TFunction } from 'i18next';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
+import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
 import { workflowWidgetManifest } from '@workbench/widgets/workflow/manifest';
@@ -72,7 +73,14 @@ seedArchitectureCapabilities();
 
 describe('buildGraphPreviewSource', () => {
   it('live-compiles the generate source and reports a seed notice when randomized', () => {
-    const source = buildGraphPreviewSource({ models, project, surface: generateSurface, t, templates: idleTemplates });
+    const source = buildGraphPreviewSource({
+      models,
+      project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: generateSurface,
+      t,
+      templates: idleTemplates,
+    });
 
     expect(source.isLive).toBe(true);
     expect(source.graph).not.toBeNull();
@@ -89,6 +97,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models,
       project: invalidProject,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: generateSurface,
       t,
       templates: idleTemplates,
@@ -104,7 +113,14 @@ describe('buildGraphPreviewSource', () => {
       throw new Error('unsupported sampler combination');
     });
 
-    const source = buildGraphPreviewSource({ models, project, surface: generateSurface, t, templates: idleTemplates });
+    const source = buildGraphPreviewSource({
+      models,
+      project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
+      surface: generateSurface,
+      t,
+      templates: idleTemplates,
+    });
 
     expect(source.graph).toBeNull();
     expect(source.invalidReasons).toEqual(['unsupported sampler combination']);
@@ -115,6 +131,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: workflowSurface,
       t,
       templates: loadedTemplates,
@@ -128,6 +145,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: workflowSurface,
       t,
       templates: idleTemplates,
@@ -150,6 +168,7 @@ describe('buildGraphPreviewSource', () => {
     const source = buildGraphPreviewSource({
       models: undefined,
       project: canvasProject,
+      projectSettings: BUILT_IN_PROJECT_SETTINGS,
       surface: canvasSurface,
       t,
       templates: idleTemplates,

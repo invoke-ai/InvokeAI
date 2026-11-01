@@ -1,10 +1,10 @@
 """Qwen-Image-2.1 starter models.
 
-Every one is under the Qwen Research License: research and evaluation only, no commercial use without a separate
-license from Alibaba's Tongyi Lab.
+Every one but the MIT-licensed preview decoder is under the Qwen Research License: research and evaluation only, no
+commercial use without a separate license from Alibaba's Tongyi Lab.
 """
 
-from invokeai.backend.model_manager.starter_models.common import qwen3_vl_encoder_8b
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE, qwen3_vl_encoder_8b
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, QwenImage21VariantType
 
@@ -16,6 +16,15 @@ qwen_image_2_1_vae = StarterModel(
     source="https://huggingface.co/Comfy-Org/Qwen-Image-2.1/resolve/main/vae/qwen_image_2.1_vae_bf16.safetensors",
     description=f"Qwen-Image-2.1's RGBA VAE (64 latent channels, 16x), for its single-file and GGUF transformers. {_LICENSE} ~0.6GB",
     type=ModelType.VAE,
+)
+
+taeqi2_1 = StarterModel(
+    name="TAEQI2.1 (Qwen-Image-2.1 preview decoder)",
+    base=BaseModelType.QwenImage21,
+    source="https://huggingface.co/madebyollin/taeqi2_1/resolve/5d62f11fee0068b4df7bd699ddab685e32174010/taeqi2_1.safetensors",
+    description=f"Sharp live previews for Qwen-Image-2.1. {TINY_AUTOENCODER_NOTE} ~31MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 qwen_image_2_1 = StarterModel(

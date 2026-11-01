@@ -4,7 +4,7 @@ import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { GraphPreviewDialog } from '@features/workflow/preview';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useActiveProjectSettingsSelector } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -25,13 +25,14 @@ export const GraphPreviewHost = ({
 }) => {
   const { t } = useTranslation();
   const project = useActiveProjectSelector((activeProject) => activeProject);
+  const projectSettings = useActiveProjectSettingsSelector((settings) => settings, Object.is);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const templates = useInvocationTemplatesSnapshot();
   const availabilityModels = modelsStatus === 'loaded' ? models : undefined;
   const source = useMemo(
-    () => buildGraphPreviewSource({ models: availabilityModels, project, surface, t, templates }),
-    [availabilityModels, project, surface, t, templates]
+    () => buildGraphPreviewSource({ models: availabilityModels, project, projectSettings, surface, t, templates }),
+    [availabilityModels, project, projectSettings, surface, t, templates]
   );
 
   useMountEffect(() => {

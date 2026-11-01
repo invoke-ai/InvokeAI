@@ -128,6 +128,7 @@ from invokeai.backend.model_manager.starter_models.flux import (
     pid_1_5_decoder_flux_2kto4k_int8,
     pid_decoder_flux_2k,
     pid_decoder_flux_2kto4k,
+    taef1,
     union_cnet_flux,
 )
 from invokeai.backend.model_manager.starter_models.flux2 import (
@@ -156,6 +157,15 @@ from invokeai.backend.model_manager.starter_models.flux2 import (
     pid_1_5_decoder_flux2_2kto4k_int8,
     pid_decoder_flux2_2k,
     pid_decoder_flux2_2kto4k,
+    taef2,
+)
+from invokeai.backend.model_manager.starter_models.flux3 import (
+    flux3_klein,
+    flux3_klein_base,
+    flux3_klein_base_single_file,
+    flux3_klein_gguf_q4_k_m,
+    flux3_klein_gguf_q8_0,
+    flux3_klein_single_file,
 )
 from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_fp8,
@@ -202,7 +212,11 @@ from invokeai.backend.model_manager.starter_models.minimax_h3 import (
     minimax_h3_ref2va_int8_transformer,
     minimax_h3_turbo_lora,
 )
-from invokeai.backend.model_manager.starter_models.moss_image import moss_image_base, moss_image_sft
+from invokeai.backend.model_manager.starter_models.moss_image import (
+    moss_image_base,
+    moss_image_prompt_enhancer,
+    moss_image_sft,
+)
 from invokeai.backend.model_manager.starter_models.qwen_image import (
     pid_1_5_decoder_qwenimage_2kto4k,
     pid_1_5_decoder_qwenimage_2kto4k_int8,
@@ -230,6 +244,7 @@ from invokeai.backend.model_manager.starter_models.qwen_image_2_1 import (
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_turbo,
     qwen_image_2_1_vae,
+    taeqi2_1,
 )
 from invokeai.backend.model_manager.starter_models.sd_1 import (
     canny_sd1,
@@ -258,6 +273,7 @@ from invokeai.backend.model_manager.starter_models.sd_1 import (
     t2i_canny_sd1,
     t2i_depth_sd1,
     t2i_sketch_sd1,
+    taesd,
     tile_sd1,
 )
 from invokeai.backend.model_manager.starter_models.sd_3 import (
@@ -265,6 +281,7 @@ from invokeai.backend.model_manager.starter_models.sd_3 import (
     pid_decoder_sd3_2kto4k,
     sd35_large,
     sd35_medium,
+    taesd3,
 )
 from invokeai.backend.model_manager.starter_models.sdxl import (
     alien_lora_sdxl,
@@ -285,6 +302,7 @@ from invokeai.backend.model_manager.starter_models.sdxl import (
     t2i_canny_sdxl,
     t2i_lineart_sdxl,
     t2i_sketch_sdxl,
+    taesdxl,
     tile_sdxl,
     union_cnet_sdxl,
 )
@@ -338,6 +356,7 @@ STARTER_MODELS: list[StarterModel] = [
     flux_schnell_sdnq,
     sd35_medium,
     sd35_large,
+    taesd3,
     ideogram_4_nf4,
     ideogram_4_fp8,
     ideogram_4_single_file,
@@ -361,7 +380,10 @@ STARTER_MODELS: list[StarterModel] = [
     archvis_sdxl,
     sdxl_refiner,
     sdxl_fp16_vae_fix,
+    taesd,
+    taesdxl,
     flux_vae,
+    taef1,
     alien_lora_sdxl,
     noodle_lora_sdxl,
     easy_neg_sd1,
@@ -421,6 +443,7 @@ STARTER_MODELS: list[StarterModel] = [
     smollm2_1_7b_instruct,
     flux_fill,
     flux2_vae,
+    taef2,
     flux2_klein_4b,
     flux2_klein_4b_single,
     flux2_klein_4b_fp8,
@@ -499,14 +522,22 @@ STARTER_MODELS: list[StarterModel] = [
     krea2_turbo_gguf_q4_k_m,
     krea2_turbo_gguf_q8_0,
     krea2_turbo_nvfp4,
+    flux3_klein,
+    flux3_klein_base,
+    flux3_klein_single_file,
+    flux3_klein_base_single_file,
+    flux3_klein_gguf_q4_k_m,
+    flux3_klein_gguf_q8_0,
     qwen3_vl_encoder_4b,
     qwen_image_2_1_turbo,
     qwen_image_2_1,
     qwen_image_2_1_gguf_q4_k_m,
     qwen_image_2_1_vae,
+    taeqi2_1,
     qwen3_vl_encoder_8b,
     moss_image_base,
     moss_image_sft,
+    moss_image_prompt_enhancer,
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
@@ -721,6 +752,14 @@ krea2_bundle: list[StarterModel] = [
     krea2_turbo_nvfp4,
 ]
 
+# FLUX.3: the ungated GGUF build with its shared VAE and encoder, so one click needs no license gate and no
+# 20 GB download. The gated BFL builds (Diffusers and single files) stay available a la carte.
+flux3_bundle: list[StarterModel] = [
+    flux2_vae,
+    qwen3_vl_encoder_4b,
+    flux3_klein_gguf_q4_k_m,
+]
+
 # Wan 2.2: text-to-video (T2V-A14B), image-to-video (I2V-A14B), and the low-VRAM TI2V-5B that
 # handles both modes in one ~3.4 GB model, each A14B pair with its Lightning LoRAs. Q8 variants and
 # full Diffusers builds stay available as a-la-carte starters.
@@ -780,6 +819,7 @@ STARTER_BUNDLES: dict[str, StarterModelBundle] = {
     BaseModelType.QwenImage: StarterModelBundle(name="Qwen Image", models=qwen_image_bundle),
     BaseModelType.Anima: StarterModelBundle(name="Anima", models=anima_bundle),
     BaseModelType.Krea2: StarterModelBundle(name="Krea 2", models=krea2_bundle),
+    BaseModelType.Flux3: StarterModelBundle(name="FLUX.3", models=flux3_bundle),
     BaseModelType.Wan: StarterModelBundle(name="Wan 2.2", models=wan_bundle),
     BaseModelType.MiniMaxH3: StarterModelBundle(name="MiniMax H3", models=minimax_h3_bundle),
     BaseModelType.LTX2: StarterModelBundle(name="LTX 2.5", models=ltx2_bundle),

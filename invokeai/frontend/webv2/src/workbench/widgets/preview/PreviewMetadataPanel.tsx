@@ -1,12 +1,16 @@
 import type { GalleryImage, GalleryImageMetadata, GalleryItem, GalleryItemKey } from '@features/gallery';
 
-import { DataList, HStack, Icon, Stack, Tabs, Text } from '@chakra-ui/react';
+import { Box, DataList, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { galleryImages, galleryVideos } from '@features/gallery';
 import { toGalleryItemKey } from '@features/gallery/contracts';
+import { galleryImageMetadataOptions, galleryVideoMetadataOptions } from '@features/gallery/queries';
 import { canCopyText, copyText } from '@platform/browser/clipboard';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { IconButton, Scrollable, Tooltip } from '@platform/ui';
 import { JsonPreview } from '@platform/ui/JsonPreview';
+import { LoadError } from '@platform/ui/LoadError';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { toaster } from '@platform/ui/toaster';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -17,14 +21,14 @@ import {
   type ImageRecallKind,
 } from '@workbench/image-actions';
 import { CopyIcon } from 'lucide-react';
-import { useCallback, type KeyboardEvent, type ReactNode } from 'react';
+import { useCallback, useId, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
 
 /**
- * Show parsed image details with copy/recall, or raw video payloads. Key query children by account and qualified
- * identity so closure/identity changes abort supported transports.
+ * Show parsed details with copy (and per-field recall for images) beside the raw payloads. Key query children by
+ * account and qualified identity so closure/identity changes abort supported transports.
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
@@ -58,7 +62,7 @@ export const PreviewDetails = ({
   image,
   item,
 }: {
-  /** Read by the caller, outside the popover's presence boundary, so an account change re-keys the query. */
+  /** Read by the caller, outside the panel's mount boundary, so an account change re-keys the query. */
   accountEpoch: number;
   actions: ImageActions;
   image: GalleryImage | null;
@@ -78,20 +82,6 @@ export const PreviewDetails = ({
   );
 };
 
-type PreviewDetailsData =
-  | {
-      graph: string | null;
-      kind: 'image';
-      metadata: GalleryImageMetadata | null;
-      workflow: string | null;
-    }
-  | {
-      graph: string | null;
-      kind: 'video';
-      metadata: Record<string, unknown> | null;
-      workflow: string | null;
-    };
-
 const PreviewDetailsQuery = ({
   accountEpoch,
   actions,
@@ -104,83 +94,147 @@ const PreviewDetailsQuery = ({
   image: GalleryImage | null;
   item: GalleryItem;
   itemKey: GalleryItemKey;
+}) =>
+  item.kind === 'video' ? (
+    <VideoDetailsQuery accountEpoch={accountEpoch} itemKey={itemKey} videoName={item.name} />
+  ) : image ? (
+    <ImageDetailsQuery accountEpoch={accountEpoch} actions={actions} image={image} itemKey={itemKey} />
+  ) : (
+    <DetailsTabs graph={null} metadata={null} workflow={null}>
+      <ImageDetails
+        actions={actions}
+        capabilities={EMPTY_IMAGE_RECALL_CAPABILITIES}
+        image={null}
+        isLoading={false}
+        metadata={null}
+      />
+    </DetailsTabs>
+  );
+
+/**
+ * Metadata comes from the gallery's shared entry, which the video's menu and recall commands also read; the embedded
+ * workflow and graph are Details' own read. Either failing leaves the other's tabs on offer.
+ */
+const VideoDetailsQuery = ({
+  accountEpoch,
+  itemKey,
+  videoName,
+}: {
+  accountEpoch: number;
+  itemKey: GalleryItemKey;
+  videoName: string;
 }) => {
   const { t } = useTranslation();
-  const detailsQuery = useQuery({
-    queryFn: async ({ signal }): Promise<PreviewDetailsData> => {
-      if (item.kind === 'image') {
-        if (!image) {
-          return { graph: null, kind: 'image', metadata: null, workflow: null };
-        }
-
-        // Show complete raw metadata alongside parsed fields because workflows may add arbitrary entries.
-        const [metadata, workflow] = await Promise.all([
-          galleryImages.metadata(item.name, signal),
-          galleryImages.workflow(item.name, signal),
-        ]);
-
-        return { graph: workflow.graph, kind: 'image', metadata, workflow: workflow.workflow };
-      }
-
-      const [metadata, workflow] = await Promise.all([
-        galleryVideos.metadata(item.name, signal),
-        galleryVideos.workflow(item.name, signal),
-      ]);
-
-      return { graph: workflow.graph, kind: 'video', metadata, workflow: workflow.workflow };
-    },
-    queryKey: ['preview', 'details', accountEpoch, itemKey],
+  const metadataQuery = useQuery(galleryVideoMetadataOptions(captureAccountScope(), videoName));
+  const workflowQuery = useQuery({
+    queryFn: ({ signal }) => galleryVideos.workflow(videoName, signal),
+    queryKey: ['preview', 'details', accountEpoch, itemKey, 'workflow'],
     retry: false,
   });
 
-  if (item.kind === 'video') {
-    if (detailsQuery.isPending) {
-      return (
-        <Text color="fg.subtle" fontSize="xs">
-          {t('widgets.preview.loadingMetadata')}
-        </Text>
-      );
-    }
-
-    const details = isVideoDetails(detailsQuery.data) ? detailsQuery.data : null;
-
+  if (metadataQuery.isPending || workflowQuery.isPending) {
     return (
-      <DetailsTabs
-        graph={details?.graph ?? null}
-        metadata={details?.metadata ?? null}
-        workflow={details?.workflow ?? null}
-      />
+      <Text color="fg.subtle" fontSize="xs">
+        {t('widgets.preview.loadingMetadata')}
+      </Text>
     );
   }
 
-  const details = isImageDetails(detailsQuery.data) ? detailsQuery.data : null;
-  const capabilities =
-    image && details ? actions.deriveImageRecallCapabilities(image, details.metadata) : EMPTY_IMAGE_RECALL_CAPABILITIES;
+  const metadata = metadataQuery.data ?? null;
+  // Recall verbs live in the video's menu; these rows only show and copy what was recorded.
+  const entries = parsePreviewMetadata(metadata, { kind: 'video', t });
 
   return (
     <DetailsTabs
-      graph={details?.graph ?? null}
-      metadata={details?.metadata ?? null}
-      workflow={details?.workflow ?? null}
+      failedReads={getFailedReads(metadataQuery, workflowQuery)}
+      graph={workflowQuery.data?.graph ?? null}
+      metadata={metadata}
+      workflow={workflowQuery.data?.workflow ?? null}
+    >
+      {entries.length > 0 ? <VideoDetails entries={entries} /> : null}
+    </DetailsTabs>
+  );
+};
+
+const VideoDetails = ({ entries }: { entries: readonly PreviewMetadataEntry[] }) => (
+  <Scrollable flex="1" minH="0">
+    <Stack gap="2" pe="1">
+      <DataList.Root gap="1.5" orientation="horizontal">
+        {entries.map((entry) => (
+          <MetadataRow key={entry.key} entry={entry} />
+        ))}
+      </DataList.Root>
+    </Stack>
+  </Scrollable>
+);
+
+/**
+ * Metadata comes from the gallery's shared entry, which the image's menus and recall commands also read; the embedded
+ * workflow and graph are Details' own read. Either failing leaves the other's tabs on offer.
+ */
+const ImageDetailsQuery = ({
+  accountEpoch,
+  actions,
+  image,
+  itemKey,
+}: {
+  accountEpoch: number;
+  actions: ImageActions;
+  image: GalleryImage;
+  itemKey: GalleryItemKey;
+}) => {
+  const metadataQuery = useQuery(galleryImageMetadataOptions(captureAccountScope(), image.imageName));
+  const workflowQuery = useQuery({
+    queryFn: ({ signal }) => galleryImages.workflow(image.imageName, signal),
+    queryKey: ['preview', 'details', accountEpoch, itemKey, 'workflow'],
+    retry: false,
+  });
+  // Show complete raw metadata alongside parsed fields because workflows may add arbitrary entries.
+  const metadata = metadataQuery.data ?? null;
+  const capabilities = metadataQuery.isPending
+    ? EMPTY_IMAGE_RECALL_CAPABILITIES
+    : actions.deriveImageRecallCapabilities(image, metadata);
+
+  return (
+    <DetailsTabs
+      failedReads={getFailedReads(metadataQuery, workflowQuery)}
+      graph={workflowQuery.data?.resolved_inputs ?? workflowQuery.data?.graph ?? null}
+      metadata={metadata}
+      workflow={workflowQuery.data?.workflow ?? null}
     >
       <ImageDetails
         actions={actions}
         capabilities={capabilities}
         image={image}
-        isLoading={detailsQuery.isPending}
-        metadata={details?.metadata ?? null}
+        isLoading={metadataQuery.isPending}
+        metadata={metadata}
       />
     </DetailsTabs>
   );
 };
 
-const isVideoDetails = (
-  value: PreviewDetailsData | undefined
-): value is Extract<PreviewDetailsData, { kind: 'video' }> => value?.kind === 'video';
+/** A Details read that failed: it holds no answer, unlike a null one (nothing recorded), so it offers a retry. */
+interface FailedDetailsRead {
+  isRetrying: boolean;
+  read: 'metadata' | 'workflow';
+  retry: () => unknown;
+}
 
-const isImageDetails = (
-  value: PreviewDetailsData | undefined
-): value is Extract<PreviewDetailsData, { kind: 'image' }> => value?.kind === 'image';
+interface DetailsReadState {
+  isError: boolean;
+  isFetching: boolean;
+  refetch: () => Promise<unknown>;
+}
+
+const getFailedReads = (metadata: DetailsReadState, workflow: DetailsReadState): FailedDetailsRead[] =>
+  (
+    [
+      ['metadata', metadata],
+      ['workflow', workflow],
+    ] as const
+  ).flatMap(([read, query]) =>
+    query.isError ? [{ isRetrying: query.isFetching, read, retry: () => query.refetch() }] : []
+  );
 
 const ImageDetails = ({
   actions,
@@ -197,8 +251,10 @@ const ImageDetails = ({
 }) => {
   const { t } = useTranslation();
   const entries = [
-    ...parsePreviewMetadata(metadata),
-    ...(image ? [{ key: 'sourceRun', label: 'Source Run', value: image.sourceQueueItemId }] : []),
+    ...parsePreviewMetadata(metadata, { kind: 'image', t }),
+    ...(image
+      ? [{ key: 'sourceRun', label: t('widgets.preview.fields.sourceRun'), value: image.sourceQueueItemId }]
+      : []),
   ];
   const handleRecall = useCallback(
     (kind: ImageRecallKind) => {
@@ -237,65 +293,90 @@ const ImageDetails = ({
   );
 };
 
+type DetailsTabId = 'details' | 'graph' | 'metadata' | 'workflow';
+
+const NO_FAILED_READS: readonly FailedDetailsRead[] = [];
+
 const DetailsTabs = ({
   children: details,
+  failedReads = NO_FAILED_READS,
   graph,
   metadata,
   workflow,
 }: {
-  /** The parsed rows + recall verbs; images only. */
+  /** The parsed rows; the Details tab is offered only with them. */
   children?: ReactNode;
+  failedReads?: readonly FailedDetailsRead[];
   graph: string | null;
   metadata: Record<string, unknown> | null;
   workflow: string | null;
 }) => {
   const { t } = useTranslation();
-  // A tab with nothing behind it is disabled rather than opening onto an empty
-  // pane, so the first tab with content is where the popover opens.
-  const defaultValue = details ? 'details' : metadata !== null ? 'metadata' : workflow !== null ? 'workflow' : 'graph';
+  const idBase = useId();
+  const tabListRef = useRef<HTMLDivElement | null>(null);
+  // A tab with nothing behind it is disabled rather than opening onto an empty pane, so until a tab is chosen the panel
+  // shows the first one with content, which a retried read can change. With none, Metadata stays selected over no pane.
+  const [chosenId, setChosenId] = useState<DetailsTabId | null>(null);
+  // A successful retry removes its button; focus goes to the selected tab rather than falling to the document.
+  const focusSelectedTab = useCallback(() => {
+    tabListRef.current?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')?.focus();
+  }, []);
+  const tabs = useMemo(
+    () => [
+      ...(details ? [{ disabled: false, id: 'details' as const, label: t('widgets.preview.details') }] : []),
+      { disabled: metadata === null, id: 'metadata' as const, label: t('widgets.preview.metadata') },
+      { disabled: workflow === null, id: 'workflow' as const, label: t('widgets.preview.workflow') },
+      { disabled: graph === null, id: 'graph' as const, label: t('widgets.preview.graph') },
+    ],
+    [details, graph, metadata, t, workflow]
+  );
+  const activeId = chosenId ?? tabs.find((tab) => !tab.disabled)?.id ?? 'metadata';
+  const hasActiveContent = tabs.some((tab) => tab.id === activeId && !tab.disabled);
 
   return (
-    <Tabs.Root
-      defaultValue={defaultValue}
-      display="flex"
-      flexDirection="column"
-      lazyMount
-      minH="0"
-      size="xl"
-      unmountOnExit
-      variant="outline"
-    >
-      <Tabs.List flexShrink={0} onKeyDown={keepTabKeys}>
-        {details ? (
-          <Tabs.Trigger fontSize="xs" value="details">
-            {t('widgets.preview.details')}
-          </Tabs.Trigger>
-        ) : null}
-        <Tabs.Trigger disabled={metadata === null} fontSize="xs" value="metadata">
-          {t('widgets.preview.metadata')}
-        </Tabs.Trigger>
-        <Tabs.Trigger disabled={workflow === null} fontSize="xs" value="workflow">
-          {t('widgets.preview.workflow')}
-        </Tabs.Trigger>
-        <Tabs.Trigger disabled={graph === null} fontSize="xs" value="graph">
-          {t('widgets.preview.graph')}
-        </Tabs.Trigger>
-      </Tabs.List>
-      {details ? (
-        <Tabs.Content display="flex" flexDirection="column" minH="0" value="details">
-          {details}
-        </Tabs.Content>
-      ) : null}
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="metadata">
-        <JsonPreview label={t('widgets.preview.metadataJsonLabel')} maxH="100%" value={metadata} />
-      </Tabs.Content>
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="workflow">
-        <RawJsonPreview label={t('widgets.preview.workflowJsonLabel')} text={workflow} />
-      </Tabs.Content>
-      <Tabs.Content display="flex" flexDirection="column" minH="0" value="graph">
-        <RawJsonPreview label={t('widgets.preview.graphJsonLabel')} text={graph} />
-      </Tabs.Content>
-    </Tabs.Root>
+    <Stack gap="1.5" minH="0">
+      <Box ref={tabListRef} flexShrink={0} onKeyDown={keepTabKeys}>
+        <SegmentTabs
+          activeId={activeId}
+          ariaLabel={t('widgets.preview.details')}
+          idBase={idBase}
+          isCompact
+          tabs={tabs}
+          onSelect={setChosenId}
+        />
+      </Box>
+      {failedReads.map((failure) => (
+        <LoadError
+          key={failure.read}
+          flexShrink={0}
+          isRetrying={failure.isRetrying}
+          layout="inline"
+          message={t(failure.read === 'metadata' ? 'widgets.preview.metadataFailed' : 'widgets.preview.workflowFailed')}
+          retryLabel={t(
+            failure.read === 'metadata' ? 'widgets.preview.retryMetadata' : 'widgets.preview.retryWorkflow'
+          )}
+          onFocusLost={focusSelectedTab}
+          onRetry={failure.retry}
+        />
+      ))}
+      <Stack
+        aria-labelledby={segmentTabsTabId(idBase, activeId)}
+        gap="0"
+        id={segmentTabsPanelId(idBase)}
+        minH="0"
+        role="tabpanel"
+      >
+        {!hasActiveContent ? null : activeId === 'details' ? (
+          details
+        ) : activeId === 'metadata' ? (
+          <JsonPreview label={t('widgets.preview.metadataJsonLabel')} maxH="100%" value={metadata} />
+        ) : activeId === 'workflow' ? (
+          <RawJsonPreview label={t('widgets.preview.workflowJsonLabel')} text={workflow} />
+        ) : (
+          <RawJsonPreview label={t('widgets.preview.graphJsonLabel')} text={graph} />
+        )}
+      </Stack>
+    </Stack>
   );
 };
 
@@ -313,7 +394,7 @@ const MetadataRow = ({
   recallKind,
 }: {
   entry: PreviewMetadataEntry;
-  onRecall: (kind: ImageRecallKind) => void;
+  onRecall?: (kind: ImageRecallKind) => void;
   recallKind?: ImageRecallKind;
 }) => {
   const { t } = useTranslation();
@@ -327,10 +408,10 @@ const MetadataRow = ({
   );
   const recallValue = useCallback(() => {
     if (recallKind) {
-      onRecall(recallKind);
+      onRecall?.(recallKind);
     }
   }, [onRecall, recallKind]);
-  const recallVerb = recallKind ? getImageRecallVerb(recallKind) : null;
+  const recallVerb = recallKind ? getImageRecallVerb(recallKind, t) : null;
 
   return (
     <DataList.Item alignItems="start" className="group">

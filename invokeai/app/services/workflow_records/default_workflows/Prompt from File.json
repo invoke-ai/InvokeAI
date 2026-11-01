@@ -192,7 +192,7 @@
       "type": "invocation",
       "data": {
         "id": "1b7e0df8-8589-4915-a4ea-c0088f15d642",
-        "version": "1.0.2",
+        "version": "2.0.0",
         "nodePack": "invokeai",
         "label": "Prompts from File",
         "notes": "",

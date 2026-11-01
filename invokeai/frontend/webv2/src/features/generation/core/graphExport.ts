@@ -37,7 +37,7 @@ import {
   isControlKindSupportedForBase,
   isControlModelUsableForKind,
 } from './canvas/controlValidation';
-import { hasDynamicPromptSyntax, planGenerateSubmission, type GenerateSubmissionPrompts } from './dynamicPrompts';
+import { expandsDynamicPrompts, planGenerateSubmission, type GenerateSubmissionPrompts } from './dynamicPrompts';
 import { compileGenerateGraph } from './graph';
 import { stabilizeBackendGraphNodeIds } from './previewGraph';
 import { resolveGenerateWidgetValues } from './resolveGenerateWidgetValues';
@@ -466,12 +466,14 @@ export const compileGraphExportCase = (
 
   assertRequestedValuesKept(values, input);
 
-  // No expansion: the UI expands dynamic prompts through the backend before it queues.
+  // No expansion: the UI expands dynamic prompts through the backend before it queues. With dynamic prompts off the
+  // prompt runs as typed, so its syntax exports as text.
   const { effectivePrompts, submission } = planGenerateSubmission(values);
 
-  if (hasDynamicPromptSyntax(effectivePrompts.positivePrompt)) {
+  if (expandsDynamicPrompts(effectivePrompts.positivePrompt, values.dynamicPromptsEnabled)) {
     throw new Error(
-      'positive_prompt has dynamic prompt syntax, which only the backend expands; export each expansion.'
+      'positive_prompt has dynamic prompt syntax, which only the backend expands; export each expansion, or set ' +
+        'settings.dynamicPromptsEnabled to false to send it as typed.'
     );
   }
 

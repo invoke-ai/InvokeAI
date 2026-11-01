@@ -1,7 +1,7 @@
 ---
 title: Generate Panel Reference
 description: Every section of the Generate panel in detail — size, render settings, negative prompts, advanced options, resetting to defaults, concepts, reference images and the prompt tools.
-lastUpdated: 2026-10-19
+lastUpdated: 2026-10-29
 sidebar:
   order: 1
 ---
@@ -23,13 +23,15 @@ The **Size** section sets the width and height of the image.
   * **Optimal size for** the current ratio — the model's optimal area at the current aspect ratio. It is absent at 1:1, where it would be the native square.
   * **Model defaults** — the size set in the model's default settings. It appears only when the model sets one.
 
-  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way. On the Canvas, these resets keep the generation frame centered on the same point; typing or dragging a new width or height resizes the frame from its top-left corner. Size resets are not canvas edits, so they do not appear in the canvas's undo history.
+  Right-clicking the width and height and choosing **Reset to model default** also resets the size this way.
+
+When the Canvas is where you generate, the section says *Linked to the canvas frame*: the width, height and aspect lock are the generation frame's, and the frame's aspect lock is this one. Any change here, typed, dragged or reset, resizes the frame around its center, and while the canvas is open that resize is a canvas step, so undoing it on the canvas puts the frame and the size back. Resizing the frame on the canvas changes these fields; a frame you resize freely leaves the ratio **Free** even when it happens to match a preset, so only a ratio you choose or lock holds.
 
 Models produce their best results near their optimal size. Much larger images can show repeated subjects or distorted anatomy. To make a large image, generate at the optimal size and then upscale.
 
 ## Render settings
 
-The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. To reset a single field, double-click it or right-click it and choose **Reset to model default**.
+The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. A field you have changed shows a small dot to its left; click the dot to reset the field to the model default. You can also double-click the field, or open its menu by right-clicking it (or with the menu key or Shift+F10 while it has focus) and choose **Reset to model default**.
 
 ### Steps
 
@@ -41,7 +43,7 @@ The **Render** section controls how the image is generated. Each slider has a ma
 
 ### Scheduler
 
-The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. **Use model default scheduler** switches back to the model's own choice.
+The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. When you have picked another scheduler, the dot to the left of the field switches back to the model's own choice.
 
 ### Seed
 
@@ -66,7 +68,7 @@ Some families add their own controls to the Render section:
 
 A negative prompt lists what you do *not* want in the image, such as *blurry, watermark, extra fingers*. Models that support one show a **+ Negative prompt…** button under the prompt; click it to open the box, and click **Turn off negative prompt** to hide it again without losing the text.
 
-Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1, Krea-2 and MOSS-Image, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
+Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image, Qwen-Image-2.1, Krea-2, FLUX.3 Klein Base and MOSS-Image, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
 
 ### Refiner
 
@@ -85,15 +87,15 @@ The **Advanced** section appears for models with extra options, and its header c
 * **Reference K/V cache** — Krea-2 only, and only with active **Edit** references and an enabled LoRA in **Concepts**. Turn it on for edit LoRAs trained with isolated references (ai-toolkit's `kv_cache` option), such as the thedeoxen Krea-2 pose LoRA; the references then run through the model once per generation, which is faster. Leave it off for other edit LoRAs. See [Krea-2](/users-guide/models/local-models/krea-2/#reference-kv-cache).
 * **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
 
-Two output filters live in **Settings** under **Project** rather than in the panel, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Upscale results, workflow runs and images from external models are not filtered.
+Two output filters live in the Generate widget's settings (the cog in its header, or **Settings** › **Generate**) rather than in the panel's form, because they apply to every image the project's Generate panel and Canvas produce: the **NSFW checker** blurs images it flags as explicit, and the **Invisible watermark** stamps every saved image. Both are off by default. Changing one in an open project changes it for that project only; set your default for every project on the Launchpad under **Preferences**. Upscale results, workflow runs and images from external models are not filtered.
 
 ### Resetting to defaults
 
-Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
+Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts and concepts are left alone, and a notification offers **Undo** to bring your earlier values back. The button is disabled when your settings already match the defaults.
 
-To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
+To return to the settings of an earlier image instead, open **Use** in the Preview's header, or right-click the image in the Gallery or Preview and open **Reuse from image**. **All settings** restores its model, concepts, prompts, seed, size, render and refiner settings; **Remix image** does the same with a new seed; and **Use prompt**, **Use seed** and **Use size** recall one thing at a time. Recalled concepts replace the ones in the panel at the weights the image used; any that are not installed or do not fit the model are listed in a notice. If the image's model is not installed, or the image was saved from the canvas, your current concepts are kept.
 
-To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
+To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again. When you save, **Include prompts** decides whether the preset keeps your prompts too; the panel remembers your choice. Applying a preset saved without prompts keeps the prompts you have. Applying a preset shows a notification with **Undo**, which restores the settings you had before. Deleting a preset, or a saved Krea-2 conditioning rebalance curve, takes effect immediately; a notification with **Undo** brings it back.
 
 ## Adding concepts
 
@@ -109,13 +111,13 @@ Concepts, also called LoRAs, are small add-on models that teach the main model a
 
 </Steps>
 
-You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, its concepts are marked **Incompatible** or removed. SD3, CogView4, ERNIE Image, Ideogram 4, Qwen-Image-2.1, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
+You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, the concepts it cannot use stay in the list, marked **Incompatible** and switched off; they run again when you switch back to a model they fit. A concept that is no longer installed is marked **Not installed**. SD3, CogView4, ERNIE Image, Ideogram 4, MOSS-Image and external API models don't support concepts, so with one of them selected the section says so instead of offering LoRAs.
 
 ## Adding reference images
 
 A reference image guides the new image by example rather than by words: its style, its composition, a person or an object in it. Reference images are added at the top of the **Guidance** section, and only appear for models that support them.
 
-To add one, click **Add reference image** and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the section. You can also right-click any image and choose **Use as Reference Image**. Most models accept up to five. The order of the references matters to some models; use the arrow buttons on each card to reorder them.
+To add one, click **Add reference image** and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the section. You can also right-click any image and choose **Use as reference image**. Most models accept up to five. The order of the references matters to some models; use the arrow buttons on each card to reorder them.
 
 Hovering over a reference's thumbnail offers **Crop**, to use only part of the image, and **Use size**, to set the generation's size to match the reference. The switch on each card turns a reference off without removing it.
 
@@ -130,6 +132,7 @@ What a reference does, and what options it has, depends on the model family:
 | **Anima** (not Anima-3.8B) | An Anima IP-Adapter carries a character's appearance (hair, outfit, accessories) into the image. Up to four references (experimental); images of one character combine well, different characters blend. | **Strength** (0 to 2; 0 turns it off), per reference. Under **Advanced**: the IP-Adapter model and the **Active steps** range. |
 | **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
 | **FLUX.2, Qwen Image Edit, Qwen-Image-2.1** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
+| **FLUX.3** | As FLUX.2, with up to ten references. The prompt names them by the tag on each card, such as `<ref_image_0>`; click the tag to copy it. | None. |
 | **Krea-2** | **Style**: one reference's look — palette, texture, rendering — is transferred into the image while the prompt keeps driving the content. **Edit**: up to three references for an edit LoRA, such as a pose skeleton or a depth map, read in card order. See [Krea-2 style reference](/users-guide/models/local-models/krea-2/#style-reference) and [edit LoRAs](/users-guide/models/local-models/krea-2/#edit-loras-and-reference-images). | **Mode**: **Style** or **Edit**. **Style strength** (0–2; 0 turns the reference off) for Style. |
 
 Reference images require an extra model for SD 1.5, SDXL, FLUX.1 and Anima (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
@@ -163,7 +166,7 @@ These features change what the prompt says or how the model reads it. Prompt tri
 | Feature | What it does |
 |---|---|
 | **[Prompt templates](/users-guide/image-generation/prompting-guide/#prompt-templates)** | Wrap your prompt in a reusable style, such as a photographic or concept-art look, without retyping it. Includes 18 built-in templates, and you can create, import and export your own. |
-| **[Dynamic prompts](/users-guide/image-generation/prompting-guide/#dynamic-prompts)** | Write alternatives such as `a {red\|green\|blue} car` to generate one image per combination, or a random sample of them. Wildcards let you reuse named lists of values. |
+| **[Dynamic prompts](/users-guide/image-generation/prompting-guide/#dynamic-prompts)** | Write alternatives such as `a {red\|green\|blue} car` to generate one image per combination, or a random sample of them. Wildcards let you reuse named lists of values. Switch off **Use dynamic prompts** in the popover to use the prompt exactly as typed, for example to keep a `#` that would otherwise start a [comment](/users-guide/image-generation/advanced-prompt-syntax/#comments). |
 | **[Attention weighting](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting)** | Make parts of the prompt count for more or less, for example `(red car)++` or `(red car)1.3`, and blend or combine prompts. Select text and press **Ctrl+Up** or **Ctrl+Down** to adjust its weight. Applies to SD 1.5, SD 2.x and SDXL. |
 | **[Prompt triggers](/users-guide/image-generation/prompt-tools/#prompt-triggers)** | Insert the trigger phrases of your model and concepts, compatible embeddings and wildcards from a searchable menu. |
 

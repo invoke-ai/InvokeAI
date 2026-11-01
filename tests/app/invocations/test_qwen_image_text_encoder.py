@@ -6,6 +6,7 @@ import threading
 import traceback
 import weakref
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -16,6 +17,7 @@ from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
 from invokeai.app.invocations.model import ModelIdentifierField, QwenVLEncoderField
 from invokeai.app.invocations.text_encoder.qwen_image_text_encoder import (
+    _EDIT_DROP_IDX,
     _GENERATE_DROP_IDX,
     QwenImageTextEncoderInvocation,
     _build_prompt,
@@ -77,6 +79,60 @@ class TestBuildPrompt:
         """Prompt with special characters should be included verbatim."""
         prompt = _build_prompt("add {curly} braces & <angle> brackets", 0)
         assert "add {curly} braces & <angle> brackets" in prompt
+
+
+def test_run_encoder_uses_multimodal_positions_for_image_tokens() -> None:
+    """The processor's token types must reach transformers so image tokens get 3-D M-RoPE positions."""
+    with torch.random.fork_rng():
+        torch.manual_seed(0)
+        text_encoder = Qwen2_5_VLForConditionalGeneration(_tiny_config()).eval()
+
+    image_slice = slice(_EDIT_DROP_IDX, _EDIT_DROP_IDX + 4)
+    seq_len = _EDIT_DROP_IDX + 6
+    input_ids = torch.ones(1, seq_len, dtype=torch.long)
+    input_ids[:, image_slice] = text_encoder.config.image_token_id
+    attention_mask = torch.ones_like(input_ids)
+    mm_token_type_ids = torch.zeros_like(input_ids)
+    mm_token_type_ids[:, image_slice] = 1
+    image_grid_thw = torch.tensor([[1, 4, 4]], dtype=torch.long)
+    patch_width = (
+        text_encoder.config.vision_config.in_channels
+        * text_encoder.config.vision_config.temporal_patch_size
+        * text_encoder.config.vision_config.patch_size**2
+    )
+    pixel_values = torch.zeros(16, patch_width)
+
+    shared_inputs = {
+        "input_ids": input_ids,
+        "attention_mask": attention_mask,
+        "pixel_values": pixel_values,
+        "image_grid_thw": image_grid_thw,
+    }
+    positions: list[torch.Tensor] = []
+    handle = text_encoder.model.language_model.rotary_emb.register_forward_pre_hook(
+        lambda _module, args: positions.append(args[1].detach().clone())
+    )
+    try:
+        QwenImageTextEncoderInvocation._run_encoder(
+            text_encoder,
+            SimpleNamespace(**shared_inputs, mm_token_type_ids=mm_token_type_ids),
+            edit_mode=True,
+        )
+        QwenImageTextEncoderInvocation._run_encoder(text_encoder, SimpleNamespace(**shared_inputs), edit_mode=True)
+    finally:
+        handle.remove()
+
+    start = _EDIT_DROP_IDX
+    assert torch.equal(
+        positions[0][:, 0, image_slice],
+        torch.tensor(
+            [[start, start, start, start], [start, start, start + 1, start + 1], [start, start + 1, start, start + 1]]
+        ),
+    )
+    assert torch.equal(
+        positions[1][:, 0, image_slice],
+        torch.arange(start, start + 4).repeat(3, 1),
+    )
 
 
 class TestResizeForVLEncoder:
@@ -162,6 +218,9 @@ def _tiny_config() -> Qwen2_5_VLConfig:
             "vocab_size": 512,
             "max_position_embeddings": 256,
             "tie_word_embeddings": False,
+            "bos_token_id": 1,
+            "eos_token_id": 2,
+            "pad_token_id": 0,
             "rope_scaling": {"type": "mrope", "mrope_section": [2, 3, 3]},
         },
         vision_config={
@@ -177,6 +236,10 @@ def _tiny_config() -> Qwen2_5_VLConfig:
             "window_size": 112,
             "fullatt_block_indexes": [1],
         },
+        image_token_id=5,
+        video_token_id=6,
+        vision_start_token_id=7,
+        vision_end_token_id=8,
     )
 
 

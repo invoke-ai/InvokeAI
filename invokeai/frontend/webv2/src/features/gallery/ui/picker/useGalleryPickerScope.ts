@@ -24,14 +24,20 @@ export interface GalleryPickerScope {
 }
 
 /**
- * Seed local scope on open without writing back. Clear search when switching panes because each pane interprets it
- * differently.
+ * Where a picker opens: a board id as `getGalleryRawSelectedBoardId` reads it ('none' is Uncategorized) and a view.
+ * Without a view the picker opens on the one the Gallery shows, as for an item no view lists.
  */
-export const useGalleryPickerScope = () => {
+export type GalleryPickerOpeningScope = Pick<GalleryPickerScope, 'boardId'> & { galleryView?: GalleryView };
+
+/**
+ * Seed local scope on open without writing back: the given opening scope, else the Gallery host's board and view.
+ * Clear search when switching panes because each pane interprets it differently.
+ */
+export const useGalleryPickerScope = (openingScope?: GalleryPickerOpeningScope) => {
   const { galleryValues } = useGalleryHost();
   const [scope, setScope] = useState<GalleryPickerScope>(() => ({
-    boardId: getGalleryRawSelectedBoardId(galleryValues),
-    galleryView: getGalleryView(galleryValues),
+    boardId: openingScope ? openingScope.boardId : getGalleryRawSelectedBoardId(galleryValues),
+    galleryView: openingScope?.galleryView ?? getGalleryView(galleryValues),
     pane: 'items',
     searchTerm: '',
   }));

@@ -15,7 +15,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributed import ProcessGroup
-from torch.nn.functional import scaled_dot_product_attention
 
 from invokeai.backend.pid._src.utils.context_parallel import cat_outputs_cp_with_grad
 
@@ -269,7 +268,7 @@ class RotaryAttention(nn.Module):
         k = k.view(B, -1, self.num_heads, C // self.num_heads).transpose(1, 2).contiguous()
         v = v.view(B, -1, self.num_heads, C // self.num_heads).transpose(1, 2).contiguous()
 
-        x = scaled_dot_product_attention(q, k, v, attn_mask=mask, dropout_p=0.0)
+        x = F.scaled_dot_product_attention(q, k, v, attn_mask=mask, dropout_p=0.0)
 
         x = x.transpose(1, 2).reshape(B, N, C)
         x = self.proj(x)

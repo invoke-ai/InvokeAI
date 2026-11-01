@@ -606,7 +606,7 @@ describe('compositeDocument', () => {
     expect(drawImages[0]!.args).toEqual([staged.canvas, 5, 5, 40, 40]);
   });
 
-  it('draws a placed staged preview at its candidate opacity and keeps the pending outline opaque', () => {
+  it('draws a placed staged preview at its candidate opacity, leaving its outline to the overlay', () => {
     const backend = createTestStubRasterBackend();
     const caches = createLayerCacheStore(backend);
     const target = backend.createSurface(200, 200);
@@ -624,7 +624,45 @@ describe('compositeDocument', () => {
     const drawImages = target.callLog.filter((entry) => entry.op === 'drawImage');
     expect(drawImages).toHaveLength(1);
     expect(drawImages[0]!.args).toEqual([staged.canvas, -8, 13, 46, 34]);
-    expect(findSet(target.callLog, 'globalAlpha')).toEqual([0.35, 1]);
+    expect(findSet(target.callLog, 'globalAlpha')).toEqual([0.35]);
+    expect(target.callLog.some((entry) => entry.op === 'strokeRect')).toBe(false);
+  });
+
+  it('lands the staged preview above raster and control layers and below masks and regions', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    // Identify each blit by its source width, as the stack-order test does.
+    caches.getOrCreate('raster', 10, 10);
+    caches.getOrCreate('control', 11, 11);
+    caches.getOrCreate('regional', 12, 12);
+    caches.getOrCreate('inpaint', 13, 13);
+    const widthToId: Record<number, string> = {
+      10: 'raster',
+      11: 'control',
+      12: 'regional',
+      13: 'inpaint',
+      14: 'staged',
+    };
+    const target = backend.createSurface(200, 200) as StubRasterSurface;
+    const doc = makeDoc([
+      rasterLayer('raster'),
+      inpaintMaskLayer('inpaint'),
+      controlLayer('control'),
+      maskLayer('regional'),
+    ]);
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      stagedPreview: { rect: { height: 14, width: 14, x: 0, y: 0 }, surface: backend.createSurface(14, 14) },
+    });
+
+    const order = target.callLog
+      .filter((e) => e.op === 'drawImage')
+      .map((e) => widthToId[(e.args[0] as { width: number }).width])
+      .filter((id): id is string => id !== undefined);
+    expect(order.indexOf('control')).toBeLessThan(order.indexOf('staged'));
+    expect(order.indexOf('staged')).toBeLessThan(order.indexOf('regional'));
+    expect(order.indexOf('staged')).toBeLessThan(order.indexOf('inpaint'));
   });
 });
 
