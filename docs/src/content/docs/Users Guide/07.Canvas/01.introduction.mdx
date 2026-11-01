@@ -62,11 +62,11 @@ When the Canvas is the source of a generation, InvokeAI looks at what is inside 
 
 ## Sending generations to the Canvas
 
-In the Edit layout, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. The routing control next to Invoke shows this. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
+In the Edit layout, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. Hover over **Invoke** to see the route in its card. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
 
 When the source is the Canvas, the **Size** section's width and height are the frame's, and **Render at** at the bottom of the section chooses the size the model generates at before the result is scaled back to the frame (legacy versions called this *Scale before processing*): the frame's own size, the model's optimal size, or a custom size. The **Render** section adds **Denoising strength** below the guidance scale: how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%, and the section header shows the current value. The Generate panel also adds a **Compositing** section at the bottom, which sets how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
 
-Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to Layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard**. While results are staged, the canvas tools are locked except for **View**.
+Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard** (with **Undo**). You can keep editing while results generate or wait for review: every tool works, and each result keeps the place it was generated for, even if you move the generation frame.
 
 ## Inpainting
 
@@ -76,13 +76,13 @@ Inpainting regenerates part of an image and leaves the rest untouched: remove an
 
 <Steps>
 
-1. **Add an inpaint mask**, or select the one a new canvas starts with, in the **Inpaint Masks** stack.
+1. **Add an inpaint mask**, or select the empty one a new canvas starts with, in the **Inpaint Masks** stack. (A new canvas opens with nothing selected and the Brush active, so a stroke there paints a new raster layer.)
 
 2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, or draw it with the **Shape** tool (**R**). The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
 
 3. **Describe the result** in the Generate panel's prompt: describe the whole picture as it should look, or just what should appear in the masked area.
 
-4. **Press Invoke**, then pick a result in the staging area and click **Accept to Layer**.
+4. **Press Invoke**, then pick a result in the staging area and click **Accept to layer**.
 
 </Steps>
 
@@ -142,7 +142,7 @@ A control layer shapes the composition with a guide image: the edges of a sketch
    * Choose **+ → Control layer**, then **Upload** an image, use the **Frame** (what is visible inside the generation frame), or **Draw** the guide yourself. These buttons are in the layer's Properties, in its **Image** row.
    * Right-click an image in the Gallery and choose **Use as Control**. It fills the selected control layer if that layer has no image yet, and otherwise adds a new control layer.
    * Right-click a raster layer and choose **Use as control layer**, which copies its pixels to a new control layer.
-   * Drag an image from the Gallery onto the canvas and drop it on **Add as Control Layer**. As with **Use as Control**, it fills the selected control layer if that layer is still empty.
+   * Drag an image from the Gallery onto the canvas and drop it on **Add as control layer**. As with **Use as Control**, it fills the selected control layer if that layer is still empty.
    * Select an empty control layer and drop an image file from your computer onto the canvas, where the layer shows *Drop an image here*. The file is uploaded into that layer.
 
 2. **Choose the Type**: **Pose**, **Depth**, **Edges**, **Soft edges**, **Line art**, **Sketch**, **Color** or **Tile**. Next to each type, the menu says how many installed models are made for it, *via Union* when only a Union model covers it, or *Not installed*.
@@ -157,7 +157,7 @@ A control layer shapes the composition with a guide image: the edges of a sketch
 
 Once a map has been detected, a switch above the canvas shows the layer as its **Original** image, the detected **Map**, or an **Overlay** of the two. The switch changes only what you see; generation always uses the map.
 
-An empty control layer, or one with neither a type nor a model, only shows a warning and contributes nothing; Invoke stays available. A control layer with an image blocks Invoke if no model can be chosen for it, or if its map is out of date. **Invoke** then shows the number of issues, for example *Invoke · 1 issue*; click it to select the first layer that needs attention.
+An empty control layer, or one with neither a type nor a model, only shows a warning and contributes nothing; Invoke stays available. A control layer with an image blocks Invoke if no model can be chosen for it, or if its map is out of date. **Invoke** then shows the number of issues, for example *Invoke · 1 issue*; click it to list them, and choose **Show layer** to select the layer that needs attention.
 
 Control layers work with SD 1.5, SDXL, FLUX.1, FLUX.2 [dev], Qwen Image, Z-Image and Anima, and need a control model for the same family, installed from the Model Manager's starter models. If no model fits, the **Model** row says so, with a link to the Model Manager when you can manage models.
 
@@ -175,8 +175,8 @@ The tool strip also has shape, gradient and text tools, which are described in t
 
 There are three ways to bring an existing image onto the canvas:
 
-* **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as Raster Layer**, **Add as Control Layer**, **Add as Regional Reference Image**, **Add as Inpaint Mask** and **Add as Resized Control Layer**, which scales the image to the model's optimal size.
-* **Use the image's menu.** Right-click an image in the Gallery or Preview and choose **Add to Current Canvas**, then the kind of layer. **New Project from Image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
+* **Drag it from the Gallery.** With the Gallery and the Canvas both on screen (for example, the Compose layout with its center view switched to Canvas), drag an image onto the canvas. Drop zones appear: **Add as raster layer**, **Add as control layer**, **Add as regional reference image**, **Add as inpaint mask** and **Add as resized control layer**, which scales the image to the model's optimal size.
+* **Use the image's menu.** Right-click an image in the Gallery or Preview, or open **Edit** in the Preview's header. **Edit on Canvas** adds it as an image layer and opens Canvas; **Add to Canvas as…** lets you choose the kind of layer. **New project from image** instead starts a new project whose canvas holds the image, sized to fit it; the current project is left as it is.
 * **Paste it.** Copy an image, click the canvas and press **Ctrl+V** (**Cmd+V** on macOS). It is added as a new raster layer at the generation frame.
 
 A new raster layer from an image is placed at its full size at the top-left of the generation frame. Use the **Move** (**V**) or **Transform** (**Shift+T**) tool to position and scale it.

@@ -66,6 +66,7 @@ describe('project document serialization', () => {
         'name',
         'promptHistory',
         'settings',
+        'settingsLayering',
         'widgetGraphs',
         'widgetInstances',
         'widgetRegions',

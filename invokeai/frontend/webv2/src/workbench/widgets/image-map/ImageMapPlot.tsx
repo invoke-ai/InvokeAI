@@ -43,6 +43,7 @@ import {
 import { getThumbnailUrl } from '@workbench/image-map/thumbnailCache';
 import { MapHoverCard } from '@workbench/widgets/image-map/MapHoverCard';
 import { shallowEqual, useWidgetValuesSelector } from '@workbench/WorkbenchContext';
+import i18next from 'i18next';
 import Plotly from 'plotly.js-gl2d-dist-min';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -378,7 +379,7 @@ const ImageMapPlot = ({
         }
 
         // Report WebGL initialization as renderError so valid points cannot repeatedly remount the failing plot.
-        imageMapStore.patchSnapshot({ renderError: 'The map failed to render (WebGL unavailable).' });
+        imageMapStore.patchSnapshot({ renderError: i18next.t('widgets.imageMap.renderFailed') });
       });
 
     return () => {

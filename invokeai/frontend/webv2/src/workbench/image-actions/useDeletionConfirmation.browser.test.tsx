@@ -26,6 +26,7 @@ vi.mock('react-i18next', () => ({
     t: (key: string, values?: Record<string, unknown>) => {
       const count = Number(values?.count ?? 0);
       const messages: Record<string, string> = {
+        'common.cancel': 'Cancel',
         'widgets.gallery.deleteConfirmLabel': 'Delete',
         'widgets.gallery.deleteConfirmSkip': "Don't ask me again",
         'widgets.gallery.deleteConfirmSkipHint': 'You can turn this confirmation back on in Settings.',
@@ -40,6 +41,14 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
         'widgets.gallery.deleteInUse.usedCount': count === 1 ? '1 selected item' : `${count} selected items`,
         'widgets.gallery.deleteInUse.warning': 'The affected work keeps pointing at media that will no longer exist.',
+        'widgets.gallery.deleteTargetImage': `Image ${String(values?.index)}`,
+        'widgets.gallery.deleteTargetVideo': `Video ${String(values?.index)}`,
+        'widgets.gallery.deleteTargetsMore': `+${count}`,
+        'widgets.gallery.deleteTargetsMoreLabel': `${count} more items`,
+        'widgets.gallery.deleteTargetsSummary': `Deleting ${String(values?.media)}`,
+        'widgets.gallery.imageCount': count === 1 ? '1 image' : `${count} images`,
+        'widgets.gallery.mediaCountsTwo': `${String(values?.first)} and ${String(values?.second)}`,
+        'widgets.gallery.videoCount': count === 1 ? '1 video' : `${count} videos`,
       };
 
       return messages[key] ?? key;
@@ -151,12 +160,15 @@ describe('useDeletionConfirmation', () => {
     const consoleError = vi.spyOn(console, 'error');
 
     await act(() => {
-      void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, executeDeletion, undefined, [
-        { names: ['image.png'], surface: 'canvasRaster' },
-        { label: 'Upscale pass', names: ['image.png', 'video.mp4'], surface: 'workflow' },
-        // Workflow names are not unique.
-        { label: 'Upscale pass', names: ['video.mp4'], surface: 'workflow' },
-      ]);
+      void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, executeDeletion, {
+        canSkipFutureConfirmations: true,
+        usage: [
+          { names: ['image.png'], surface: 'canvasRaster' },
+          { label: 'Upscale pass', names: ['image.png', 'video.mp4'], surface: 'workflow' },
+          // Workflow names are not unique.
+          { label: 'Upscale pass', names: ['video.mp4'], surface: 'workflow' },
+        ],
+      });
     });
 
     const dialog = openDialog();
@@ -188,14 +200,49 @@ describe('useDeletionConfirmation', () => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
         vi.fn(async () => {}),
-        undefined,
-        [{ names: ['image.png'], surface: 'canvasRaster' }]
+        { canSkipFutureConfirmations: true, usage: [{ names: ['image.png'], surface: 'canvasRaster' }] }
       );
     });
 
     expect(openDialog()?.textContent).toContain('Still used in this project:');
     expect(skipCheckbox()).toBeNull();
     expect(openDialog()?.textContent).not.toContain('You can turn this confirmation back on in Settings.');
+  });
+
+  it('offers no opt-out to a request that cannot skip it, such as a batch or an item off screen', async () => {
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        mixedRefs,
+        vi.fn(async () => {})
+      );
+    });
+
+    expect(openDialog()?.textContent).toContain('Delete 2 items?');
+    expect(skipCheckbox()).toBeNull();
+  });
+
+  it('shows what it deletes: the count of each kind, the first thumbnails and how many more', async () => {
+    const refs: GalleryItemRef[] = [
+      ...Array.from({ length: 9 }, (_, index) => ({ kind: 'image' as const, name: `image-${index}.png` })),
+      { kind: 'video', name: 'clip.mp4' },
+    ];
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        refs,
+        vi.fn(async () => {})
+      );
+    });
+
+    const targets = openDialog()?.querySelector('[role="list"]');
+    expect(openDialog()?.textContent).toContain('Deleting 9 images and 1 video');
+    // One row: seven thumbnails and a tile counting the other three.
+    expect(Array.from(targets?.querySelectorAll('img') ?? []).map((image) => image.getAttribute('alt'))).toEqual(
+      Array.from({ length: 7 }, (_, index) => `Image ${index + 1}`)
+    );
+    expect(targets?.querySelector('img')?.getAttribute('src')).toContain('/images/i/image-0.png/thumbnail');
+    expect(targets?.lastElementChild?.getAttribute('aria-label')).toBe('3 more items');
+    expect(targets?.lastElementChild?.textContent).toBe('+3');
   });
 
   it('shows no usage section for a deletion nothing depends on', async () => {
@@ -278,7 +325,8 @@ describe('useDeletionConfirmation', () => {
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
-        vi.fn(async () => {})
+        vi.fn(async () => {}),
+        { canSkipFutureConfirmations: true }
       );
     });
     await vi.waitFor(() => expect(document.activeElement).toBe(buttonNamed('Cancel')));
@@ -299,7 +347,9 @@ describe('useDeletionConfirmation', () => {
     const executeDeletion = vi.fn(async () => {});
 
     await act(() => {
-      void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, executeDeletion);
+      void confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
+        canSkipFutureConfirmations: true,
+      });
     });
     await act(() => userEvent.click(skipLabel()!));
     expect(skipCheckbox()?.checked).toBe(true);
@@ -318,7 +368,9 @@ describe('useDeletionConfirmation', () => {
       let request!: Promise<void>;
 
       await act(() => {
-        request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion);
+        request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
+          canSkipFutureConfirmations: true,
+        });
       });
       await act(() => userEvent.click(skipLabel()!));
       expect(skipCheckbox()?.checked).toBe(true);
@@ -343,7 +395,10 @@ describe('useDeletionConfirmation', () => {
     await act(() => {
       request = confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
-        vi.fn(async () => {})
+        vi.fn(async () => {}),
+        {
+          canSkipFutureConfirmations: true,
+        }
       );
     });
     await act(() => userEvent.click(skipLabel()!));
@@ -354,7 +409,10 @@ describe('useDeletionConfirmation', () => {
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
-        vi.fn(async () => {})
+        vi.fn(async () => {}),
+        {
+          canSkipFutureConfirmations: true,
+        }
       );
     });
 

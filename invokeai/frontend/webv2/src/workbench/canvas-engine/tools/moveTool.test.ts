@@ -1,3 +1,4 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
@@ -92,6 +93,7 @@ interface Harness {
   lifts: string[];
   commitFloat: ReturnType<typeof vi.fn>;
   transforms: LayerTransform[];
+  refusals: CanvasEditRefusal[];
 }
 
 interface HarnessOptions {
@@ -125,6 +127,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     current: options.existingFloat ? fakeFloat(doc.selectedLayerId ?? 'a') : null,
   };
   const commitFloat = vi.fn();
+  const refusals: CanvasEditRefusal[] = [];
   const stores = createEngineStores();
   stores.snapToGrid.set(options.snapToGrid ?? false);
   if (options.bboxGrid !== undefined) {
@@ -158,6 +161,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
       return result;
     },
     notifyLayerPainted: vi.fn(),
+    reportEditRefusal: (refusal) => refusals.push(refusal),
     setFloatingTransform: (transform) => {
       transforms.push(transform);
       if (float.current) {
@@ -170,7 +174,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     updateCursor: vi.fn(),
     viewport: null as never,
   };
-  return { commitFloat, commits, ctx, dispatched, float, lifts, overrides, transforms };
+  return { commitFloat, commits, ctx, dispatched, float, lifts, overrides, refusals, transforms };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -282,6 +286,7 @@ describe('move tool: drag', () => {
 
     expect(h.overrides).toEqual([]);
     expect(h.commits).toEqual([]);
+    expect(h.refusals).toEqual([{ layerId: 'b', layerName: 'b', status: 'layer-locked' }]);
   });
 
   it('previews via override on move then commits one structural transform on up', () => {
@@ -378,6 +383,7 @@ describe('move tool: drag', () => {
     expect(h.commits).toHaveLength(0);
     expect(h.overrides).toHaveLength(0);
     expect(h.dispatched).toHaveLength(0);
+    expect(h.refusals).toEqual([{ layerId: 'locked', layerName: 'locked', status: 'layer-locked' }]);
   });
 
   it('constrains to the dominant axis under shift', () => {

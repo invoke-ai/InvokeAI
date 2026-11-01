@@ -121,17 +121,6 @@ describe('getSamActionEligibility', () => {
       canSave: false,
     });
   });
-
-  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
-    expect(getSamActionEligibility(snapshot({ hasPreview: true }), true)).toEqual({
-      canApply: false,
-      canCancel: true,
-      canEditInputs: false,
-      canProcess: false,
-      canReset: false,
-      canSave: false,
-    });
-  });
 });
 
 describe('getSamPanelViewModel', () => {
@@ -478,7 +467,6 @@ describe('toggleSamSetting', () => {
   it('keeps the preference when the session refuses the change', () => {
     patchWorkbenchPreferences.mockClear();
 
-    toggleSamSetting({ updateSelectObjectSession: () => 'blocked' }, 'autoProcess', false);
     toggleSamSetting({ updateSelectObjectSession: () => 'stale' }, 'autoProcess', false);
 
     expect(patchWorkbenchPreferences).not.toHaveBeenCalled();
@@ -513,15 +501,9 @@ describe('select object regions', () => {
         )
       );
     const [inputGroup, settingsGroup] = selectObjectOperationForm.groups;
-    const input = render(
-      createElement(inputGroup!.body, { engine: engine as never, isSurfaceInteractionLocked: false })
-    );
-    const settings = render(
-      createElement(settingsGroup!.body, { engine: engine as never, isSurfaceInteractionLocked: false })
-    );
-    const footer = render(
-      createElement(selectObjectOperationForm.footer, { engine: engine as never, isExternalInteractionLocked: false })
-    );
+    const input = render(createElement(inputGroup!.body, { engine: engine as never }));
+    const settings = render(createElement(settingsGroup!.body, { engine: engine as never }));
+    const footer = render(createElement(selectObjectOperationForm.footer, { engine: engine as never }));
 
     // Input group: mode, points, bbox indicator, invert switch — no verbs.
     expect(input.indexOf('>Visual<')).toBeLessThan(input.indexOf('aria-label="Include 1"'));

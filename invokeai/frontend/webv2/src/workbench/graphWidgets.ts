@@ -3,7 +3,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WidgetTypeId } from '@workbench/widgetContracts';
 
 import { autoSwitchDestinations } from './autoRoutePolicy';
-import { getDestinationLabel, getSourceLabel, isInvocationSourceAvailable } from './invocation';
+import { getSourceLabel, isInvocationSourceAvailable } from './invocation';
 
 const graphWidgetTypeIds = ['generate', 'canvas', 'upscale', 'video', 'workflow'] as const;
 
@@ -96,25 +96,4 @@ export const getPlacedWidgetTypeIds = (project: Project): Set<WidgetTypeId> => {
   addFloatingWidgetTypeIds(project, typeIds);
 
   return typeIds;
-};
-
-export const describeRoute = ({
-  destination,
-  destinationLocked,
-  hasSource,
-  sourceId,
-  sourceLocked,
-}: {
-  destination: ResultDestination;
-  destinationLocked: boolean;
-  hasSource: boolean;
-  sourceId: InvocationSourceId;
-  sourceLocked: boolean;
-}): string => {
-  const from = hasSource ? `Invoke from ${getSourceLabel(sourceId).toLowerCase()}` : 'No source widget open';
-  const to = `output to ${getDestinationLabel(destination).toLowerCase()}`;
-  const mode = sourceLocked ? 'source locked' : 'following edits';
-  const destinationMode = destinationLocked ? ', destination locked' : '';
-
-  return `${from}, ${to}, ${mode}${destinationMode}`;
 };

@@ -15,7 +15,9 @@ Click the **Nodes** tab (circuit icon) in the left sidebar, between **Models** a
 The page is split into two panels:
 
 - **Left:** the list of installed node packs, with each pack's node count, type badges, and on-disk path.
-- **Right:** the install UI, with tabs for **Git Repository URL** and **Scan Folder**, plus an install log at the bottom.
+- **Right:** the install UI, with tabs for **Git Repository URL** and **Scan Folder**.
+
+The **Install Queue** sits under both panels. Collapsed, it shows the running install and counts of failed and installed packs; expand it to list every install and uninstall from this session, or maximize it to fill the page. Each row shows its outcome and any message. A failed install offers **Retry install**, an installed pack **Open node pack**, and **Clear finished** removes settled rows.
 
 ## Installing a node pack
 
@@ -30,7 +32,7 @@ What happens during install:
 - The repo is cloned into your `nodes` directory.
 - The nodes are loaded into the running InvokeAI process immediately — **no restart needed**.
 - Any workflow `.json` files found in the repo are imported into your workflow library and tagged with `node-pack:<pack-name>` so you can filter for them.
-- The install log at the bottom of the panel shows the result for each step.
+- The **Install Queue** shows the install while it runs, then its result.
 
 :::caution[Security]
 Custom nodes execute arbitrary Python on your machine. **Only install node packs from authors you trust.** A malicious pack could harm your system or exfiltrate data.
@@ -59,7 +61,7 @@ The **Scan Folder** tab shows the path of your `nodes` directory. Anything place
 
 - Confirm the Git URL is correct and reachable.
 - The repo must contain an `__init__.py` at its root.
-- Read the install log — it surfaces the underlying error.
+- Read the failed row in the **Install Queue** — it surfaces the underlying error.
 
 ### Nodes don't appear after install
 

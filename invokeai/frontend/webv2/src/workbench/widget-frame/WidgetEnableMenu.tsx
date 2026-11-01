@@ -4,8 +4,10 @@ import type { RegisteredWidget, WidgetIconComponent, WidgetInstanceId, WidgetTyp
 import { Flex, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { CheckIcon, MoreHorizontalIcon } from 'lucide-react';
+import { openWidgetsDialogFrom } from '@workbench/shell/widgetsDialogStore';
+import { CheckIcon, LayoutGridIcon, MoreHorizontalIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -88,6 +90,12 @@ export const WidgetEnableMenu = ({
   triggerLabel,
 }: WidgetEnableMenuProps) => {
   const { t } = useTranslation();
+  const triggerIds = useTooltipTriggerIds();
+  // The dialog outlives this menu: closing it returns focus to the menu's trigger, which stays on the page.
+  const openAllWidgets = useCallback(
+    () => openWidgetsDialogFrom(() => document.getElementById(triggerIds.trigger)),
+    [triggerIds.trigger]
+  );
   const content = (
     <MenuContent minW="12rem">
       <Menu.ItemGroup>
@@ -101,6 +109,12 @@ export const WidgetEnableMenu = ({
           return <WidgetEnableMenuRow key={item.id} disabled={disabled} item={item} meta={meta} onToggle={onToggle} />;
         })}
       </Menu.ItemGroup>
+      <Menu.Separator />
+      {/* Every widget in one place, including those this region cannot hold. */}
+      <Menu.Item value="all-widgets" onClick={openAllWidgets}>
+        <Icon as={LayoutGridIcon} boxSize="3.5" />
+        <Menu.ItemText>{t('shell.widgets.menuItem')}</Menu.ItemText>
+      </Menu.Item>
     </MenuContent>
   );
 
@@ -120,10 +134,14 @@ export const WidgetEnableMenu = ({
     [onContextClose]
   );
 
+  const tooltipPositioning = useMemo(() => ({ placement: positioning.placement }), [positioning.placement]);
+
   return (
     <>
-      <Menu.Root positioning={positioning}>
-        <Menu.Trigger asChild>{getWidgetEnableMenuTriggerButton(triggerLabel, trigger)}</Menu.Trigger>
+      <Menu.Root ids={triggerIds} positioning={positioning}>
+        <Tooltip content={triggerLabel} ids={triggerIds} positioning={tooltipPositioning}>
+          <Menu.Trigger asChild>{getWidgetEnableMenuTriggerButton(triggerLabel, trigger)}</Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>{content}</Menu.Positioner>
         </Portal>

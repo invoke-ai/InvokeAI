@@ -414,7 +414,11 @@ def test_a_real_forward_ships_as_a_lower_bound_every_refit_must_keep(tmp_path: P
     assert data.coefficients == shipped.coefficients
     if built:
         assert status == 0
-        (added,) = [p for p in data.points if p.device == "AMD Radeon RX 9060 XT (gfx1200)"]
+        (added,) = [
+            p
+            for p in data.points
+            if p.estimator == FLUX3_DENOISE_SPEC.id and p.device == "AMD Radeon RX 9060 XT (gfx1200)"
+        ]
         assert (added.in_fit, added.measured_bytes) == (False, estimate - MIB)
     else:
         assert status == 1

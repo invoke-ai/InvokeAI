@@ -64,10 +64,11 @@ vi.mock('./pages/ProjectsPage', () => ({ ProjectsPage: () => null }));
 vi.mock('./projects/ProjectActionsMenuHost', () => ({
   ProjectActionsMenuProvider: ({ children }: { children: ReactNode }) => children,
 }));
+const projects = vi.hoisted(() => ({ open: ['one', 'two'] }));
 vi.mock('@workbench/projects/openProjects', () => ({
   refreshOpenProjects: () => Promise.resolve(),
   useOpenProjectsSelector: <T,>(select: (value: openProjects.OpenProjectsSnapshot) => T) =>
-    select({ activeId: 'one', ids: ['one', 'two'], status: 'ready' } as openProjects.OpenProjectsSnapshot),
+    select({ activeId: 'one', ids: projects.open, status: 'ready' } as openProjects.OpenProjectsSnapshot),
 }));
 vi.mock('@workbench/projects/library', () => ({
   useProjectLibrarySelector: <T,>(select: (value: { summaries: { id: string; name: string }[] }) => T) =>
@@ -158,6 +159,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  projects.open = ['one', 'two'];
   await act(() => root.unmount());
   queryClient.clear();
   host.remove();
@@ -218,6 +220,33 @@ describe('Launchpad shell', () => {
     expect(await auditAccessibility(document.querySelector('[role="menu"]')!)).toEqual([]);
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('button', { name: 'launchpad.help.label' })).toHaveFocus();
+  });
+
+  it('squeezes the open projects list to one entry before the rail scrolls', async () => {
+    projects.open = ['one', 'two', 'p3', 'p4', 'p5', 'p6', 'p7', 'p8'];
+    const viewportOf = (element: Element) => element.closest('[data-scope="scroll-area"][data-part="viewport"]')!;
+    const isScrollable = (viewport: Element) => viewport.scrollHeight > viewport.clientHeight;
+    const current = () => page.getByRole('link', { name: 'First · launchpad.openProjects.current' }).element();
+    const help = () => page.getByRole('button', { name: 'launchpad.help.label' }).element();
+
+    await page.viewport(1280, 900);
+    await render();
+    const fullList = viewportOf(page.getByRole('link', { name: /^First/ }).element());
+    // Twelve rem of entries plus the focus-ring inset.
+    await expect.poll(() => rect(fullList).height).toBe(200);
+    expect(isScrollable(fullList)).toBe(true);
+
+    await page.viewport(720, 450);
+    await expect.poll(() => rect(viewportOf(current())).height).toBeLessThan(200);
+    expect(isScrollable(viewportOf(current()))).toBe(true);
+    expect(isScrollable(viewportOf(help()))).toBe(false);
+    expect(isInView(current())).toBe(true);
+
+    await page.viewport(720, 360);
+    await expect.poll(() => isScrollable(viewportOf(help()))).toBe(true);
+    expect(isInView(current())).toBe(true);
+    help().focus();
+    expect(isInView(help())).toBe(true);
   });
 
   it('shows the labelled rail and both panes when the window widens', async () => {

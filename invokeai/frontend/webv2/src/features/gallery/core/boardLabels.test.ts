@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { GalleryBoard, GalleryBoardAction } from './types';
 
-import { getGalleryBoardDestinationGroups, getGalleryBoardLabel, getGalleryProjectGroupLabel } from './boardLabels';
+import {
+  getGalleryBoardDestinationGroups,
+  getGalleryBoardLabel,
+  getGalleryMoveTargets,
+  getGalleryProjectGroupLabel,
+} from './boardLabels';
 
 const createBoard = (overrides: Partial<GalleryBoard> = {}): GalleryBoard => ({
   archived: false,
@@ -138,5 +143,42 @@ describe('getGalleryBoardDestinationGroups', () => {
     expect(
       getGalleryBoardDestinationGroups({ boards: [], projectId: 'p1', projectName: 'Mine', projectNames: new Map(), t })
     ).toEqual([]);
+  });
+});
+
+describe('getGalleryMoveTargets', () => {
+  const boards = [
+    createBoard({ id: 'dogs' }),
+    createBoard({ id: 'cats', name: 'cats' }),
+    createBoard({ archived: true, id: 'old', name: 'old' }),
+    createBoard({ id: 'by_date:2026-07-30', kind: 'date', name: '30 July' }),
+    createBoard({ id: 'none', kind: 'uncategorized', name: '' }),
+  ];
+  const ids = (targets: ReturnType<typeof getGalleryMoveTargets>) => targets.boards.map((board) => board.id);
+
+  it('offers stored, unarchived boards, less the one every item is on', () => {
+    expect(ids(getGalleryMoveTargets(boards, { itemBoardIds: ['dogs', 'dogs'] }))).toEqual(['cats']);
+  });
+
+  it('keeps every board when the items are spread over several', () => {
+    expect(ids(getGalleryMoveTargets(boards, { itemBoardIds: ['dogs', 'cats'] }))).toEqual(['dogs', 'cats']);
+  });
+
+  it("places unloaded items on the listing's board, and on any board when that is unknown", () => {
+    const unloaded = { itemBoardIds: ['dogs'], unloadedCount: 2 };
+
+    expect(ids(getGalleryMoveTargets(boards, { ...unloaded, listingBoardId: 'dogs' }))).toEqual(['cats']);
+    expect(ids(getGalleryMoveTargets(boards, { ...unloaded, listingBoardId: 'all' }))).toEqual(['dogs', 'cats']);
+    expect(ids(getGalleryMoveTargets(boards, unloaded))).toEqual(['dogs', 'cats']);
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none'], unloadedCount: 1 }).canRemoveFromBoard).toBe(true);
+  });
+
+  it('offers removing from a board only while some item may be on one', () => {
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none', 'none'] }).canRemoveFromBoard).toBe(false);
+    expect(
+      getGalleryMoveTargets(boards, { itemBoardIds: ['none'], listingBoardId: 'none', unloadedCount: 3 })
+        .canRemoveFromBoard
+    ).toBe(false);
+    expect(getGalleryMoveTargets(boards, { itemBoardIds: ['none', 'dogs'] }).canRemoveFromBoard).toBe(true);
   });
 });

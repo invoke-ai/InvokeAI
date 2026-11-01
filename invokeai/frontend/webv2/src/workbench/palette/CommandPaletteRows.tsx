@@ -1,11 +1,12 @@
 import type { ReactNode, Ref } from 'react';
 
-import { Box, HStack, Icon, Kbd, ScrollArea, Spacer, Text, chakra } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, Spacer, Text, chakra } from '@chakra-ui/react';
+import { Scrollable } from '@platform/ui/Scrollable';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { dropdownGroupLabel } from '@theme/recipes';
 import { ShortcutKeyGlyph, ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { CheckIcon } from 'lucide-react';
-import { useCallback, useImperativeHandle, useState } from 'react';
+import { useCallback, useImperativeHandle, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PaletteEntry, PaletteRow } from './entries';
@@ -13,6 +14,7 @@ import type { PaletteEntry, PaletteRow } from './entries';
 const RESULT_LIST_ID = 'command-palette-results';
 const LABEL_ROW_HEIGHT_PX = 26;
 const ENTRY_ROW_HEIGHT_PX = 40;
+const RESULT_LIST_IDS = { content: RESULT_LIST_ID };
 const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 
 export const getCommandPaletteRowDomId = (rowId: string): string => `${RESULT_LIST_ID}-${encodeURIComponent(rowId)}`;
@@ -272,40 +274,39 @@ export const CommandPaletteRows = ({
     virtualizer,
   ]);
 
-  return (
-    <ScrollArea.Root maxH="min(400px, 55dvh)" variant="hover" w="full">
-      <ScrollArea.Viewport ref={setScrollElement} maxH="inherit" w="full">
-        <ScrollArea.Content
-          id={RESULT_LIST_ID}
-          aria-busy={isBusy}
-          aria-label={t('commandPalette.resultsLabel')}
-          pb="1.5"
-          role="listbox"
-          w="full"
-        >
-          <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
-            {virtualizer.getVirtualItems().map((virtualRow) => {
-              const row = rows[virtualRow.index];
+  const resultsLabel = t('commandPalette.resultsLabel');
+  const contentProps = useMemo(
+    () => ({ 'aria-busy': isBusy, 'aria-label': resultsLabel, pb: '1.5', role: 'listbox' }),
+    [isBusy, resultsLabel]
+  );
 
-              return row ? (
-                <VirtualPaletteRow
-                  key={virtualRow.key}
-                  activeRowId={activeRowId}
-                  measureElement={virtualizer.measureElement}
-                  row={row}
-                  virtualIndex={virtualRow.index}
-                  virtualStart={virtualRow.start}
-                  onActive={onActive}
-                  onRun={onRun}
-                />
-              ) : null;
-            })}
-          </Box>
-        </ScrollArea.Content>
-      </ScrollArea.Viewport>
-      <ScrollArea.Scrollbar>
-        <ScrollArea.Thumb />
-      </ScrollArea.Scrollbar>
-    </ScrollArea.Root>
+  return (
+    <Scrollable
+      contentProps={contentProps}
+      // Zag looks the content up by id to observe its size, so the listbox id goes through `ids`, not the element.
+      ids={RESULT_LIST_IDS}
+      maxH="min(400px, 55dvh)"
+      viewportRef={setScrollElement}
+      w="full"
+    >
+      <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const row = rows[virtualRow.index];
+
+          return row ? (
+            <VirtualPaletteRow
+              key={virtualRow.key}
+              activeRowId={activeRowId}
+              measureElement={virtualizer.measureElement}
+              row={row}
+              virtualIndex={virtualRow.index}
+              virtualStart={virtualRow.start}
+              onActive={onActive}
+              onRun={onRun}
+            />
+          ) : null;
+        })}
+      </Box>
+    </Scrollable>
   );
 };

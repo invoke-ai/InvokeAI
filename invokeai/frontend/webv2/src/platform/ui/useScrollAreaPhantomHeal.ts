@@ -24,6 +24,7 @@ export const useScrollAreaPhantomHeal = (viewportRef: RefObject<HTMLElement | nu
       return Boolean(phantomY || phantomX);
     };
 
+    let disposed = false;
     let observed: HTMLElement | null = null;
     const timers: ReturnType<typeof setTimeout>[] = [];
     const observer = new ResizeObserver(() => check());
@@ -54,9 +55,16 @@ export const useScrollAreaPhantomHeal = (viewportRef: RefObject<HTMLElement | nu
       timers.push(setTimeout(check, delay));
     }
 
-    check();
+    // A microtask leaves React's effect flush, where a scroll listener calling flushSync is an error, and still lands
+    // before the next paint after mount.
+    queueMicrotask(() => {
+      if (!disposed) {
+        check();
+      }
+    });
 
     return () => {
+      disposed = true;
       timers.forEach(clearTimeout);
       observer.disconnect();
     };

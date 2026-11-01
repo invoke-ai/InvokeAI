@@ -10,11 +10,14 @@ export const RoutingDestinationSegments = ({
   ariaLabel,
   disabled,
   onChange,
+  size,
   value,
 }: {
   ariaLabel: string;
   disabled?: boolean;
   onChange: (destination: ResultDestination) => void;
+  /** `xs` fits the dense Invoke card; unset keeps the dialog's working size. */
+  size?: 'xs';
   value: ResultDestination | null;
 }) => {
   const handleChange = useCallback(
@@ -27,13 +30,19 @@ export const RoutingDestinationSegments = ({
   );
 
   return (
-    <SegmentGroup.Root aria-label={ariaLabel} disabled={disabled} value={value} onValueChange={handleChange}>
+    <SegmentGroup.Root
+      aria-label={ariaLabel}
+      disabled={disabled}
+      size={size}
+      value={value}
+      onValueChange={handleChange}
+    >
       <SegmentGroup.Indicator />
       {resultDestinations.map((destination) => (
         <SegmentGroup.Item key={destination.id} flex="1" justifyContent="center" value={destination.id}>
           <SegmentGroup.ItemHiddenInput />
-          <SegmentGroup.ItemText display="flex" alignItems="center" gap="1.5">
-            <WidgetIcon boxSize="3.5" icon={getWidgetById(destination.id)?.manifest.icon} />
+          <SegmentGroup.ItemText alignItems="center" display="flex" fontSize={size} gap={size === 'xs' ? '1' : '1.5'}>
+            <WidgetIcon boxSize={size === 'xs' ? '3' : '3.5'} icon={getWidgetById(destination.id)?.manifest.icon} />
             {getDestinationLabel(destination.id)}
           </SegmentGroup.ItemText>
         </SegmentGroup.Item>

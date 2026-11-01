@@ -1,12 +1,9 @@
-import type { GalleryMediaFilter } from '@features/gallery/core/settings';
-
 import { Flex, HStack, Stack } from '@chakra-ui/react';
 import {
   GALLERY_BOARD_PANEL_MAX_HEIGHT_PX,
   GALLERY_BOARD_PANEL_MIN_HEIGHT_PX,
   GALLERY_MIN_GRID_HEIGHT_PX,
 } from '@features/gallery/core/settings';
-import { IconRadioMenu } from '@platform/ui/Menu';
 import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
@@ -14,11 +11,10 @@ import { useTranslation } from 'react-i18next';
 
 import { GalleryBoardsPanel } from './GalleryBoardsPanel';
 import { GalleryImageGrid } from './GalleryImageGrid';
+import { GalleryItemFilterMenu } from './GalleryItemFilterMenu';
 import { GalleryItemSearch } from './GalleryItemSearch';
-import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
-import { getGalleryMediaFilterMenuProps } from './galleryStateView';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
@@ -38,10 +34,6 @@ export const GalleryStackedLayout = () => {
 
   // The grid's "Show all media" hands focus here when it removes itself.
   const mediaFilterTriggerRef = useRef<HTMLButtonElement>(null);
-  const handleMediaFilterChange = useCallback(
-    (mediaFilter: GalleryMediaFilter) => actions.updateSettings({ mediaFilter }),
-    [actions]
-  );
 
   const containerRef = useCallback((element: HTMLDivElement | null) => {
     containerObserverRef.current?.disconnect();
@@ -137,14 +129,7 @@ export const GalleryStackedLayout = () => {
             <GalleryViewTabs idBase={viewTabsIdBase} />
             <HStack flexShrink={0} gap="1" ms="auto">
               <GalleryStarredFilterToggle />
-              <IconRadioMenu
-                {...getGalleryMediaFilterMenuProps(t, gallery.settings.mediaFilter)}
-                size="md"
-                triggerRef={mediaFilterTriggerRef}
-                value={gallery.settings.mediaFilter}
-                onValueChange={handleMediaFilterChange}
-              />
-              <GalleryItemSortMenu />
+              <GalleryItemFilterMenu triggerRef={mediaFilterTriggerRef} />
               <GalleryUploadButton
                 boards={gallery.boards}
                 selectedBoardId={gallery.listingBoardId}
