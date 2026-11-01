@@ -28,6 +28,7 @@ from invokeai.backend.quantization.int8_convrot import (
     marker_layout,
     unpack_int4_codes,
 )
+from tests.fixtures.device_allocations import PeakDeviceBytes
 from tests.fixtures.quantized_payloads import (
     comfy_quant_marker,
     convrot_w4a4_marker,
@@ -218,22 +219,61 @@ def test_an_int8_marker_on_a_packed_payload_is_refused_at_the_swap() -> None:
     assert isinstance(model.proj, Int4ConvrotLinear)
 
 
-@pytest.mark.slow
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="measures GPU allocations")
+@pytest.mark.parametrize("streamed", [True, False], ids=["streamed", "resident"])
 @pytest.mark.parametrize("convrot", [True, False])
 @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32])
-def test_the_transient_estimate_covers_what_the_per_forward_decode_allocates(convrot: bool, dtype: torch.dtype) -> None:
+def test_the_transient_estimate_is_the_decode_peak_with_the_payload_streamed(
+    streamed: bool, convrot: bool, dtype: torch.dtype
+) -> None:
+    """The node reserves working memory before partial loading decides which layers stay in RAM, so the estimate
+    has to hold for a layer whose packed payload is copied to the compute device per call: unrotated, that copy is
+    still alive while the unpack peaks. A resident layer peaks at or below it. The meta device stands in for the
+    accelerator."""
+    device = torch.device("meta")
+    torch.manual_seed(3)
+    payload = quantize_convrot_int4(torch.randn(64, 2 * CONVROT_GROUP_SIZE))
+    model = torch.nn.Module()
+    model.proj = Int4ConvrotLinear(
+        payload.packed if streamed else payload.packed.to(device),
+        payload.scale if streamed else payload.scale.to(device),
+        convrot=convrot,
+    )
+    model.proj._dequantized_weight(device, dtype)  # Mints the shared Hadamard matrix.
+
+    with PeakDeviceBytes(device) as allocations:
+        model.proj._dequantized_weight(device, dtype)
+
+    estimate = peak_dequant_transient_bytes(model, dtype)
+    if streamed:
+        assert allocations.peak == estimate
+    else:
+        assert allocations.peak <= estimate
+
+
+@pytest.mark.slow
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="measures GPU allocations")
+@pytest.mark.parametrize("streamed", [True, False], ids=["streamed", "resident"])
+@pytest.mark.parametrize("convrot", [True, False])
+@pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32])
+def test_the_transient_estimate_covers_what_the_per_forward_decode_allocates(
+    streamed: bool, convrot: bool, dtype: torch.dtype
+) -> None:
     """The node reserves this much working memory for the decode, and the model's resident size does not include
     it, so an estimate that falls short lets the first forward compete with weights the cache just placed. Runs on
     ROCm too, where `torch.cuda` is the HIP device.
 
     Measured in requested bytes: peak *allocated* bytes count whole cached blocks, which blocks left over by
-    earlier tests in the same process can inflate."""
+    earlier tests in the same process can inflate. The estimate counts the payload as streamed, so a resident
+    unrotated layer comes in at (itemsize + 1) / (itemsize + 1.5) of it."""
     device = torch.device("cuda")
     torch.manual_seed(3)
     payload = quantize_convrot_int4(torch.randn(1024, 4096))
     model = torch.nn.Module()
-    model.proj = Int4ConvrotLinear(payload.packed.to(device), payload.scale.to(device), convrot=convrot)
+    model.proj = Int4ConvrotLinear(
+        payload.packed if streamed else payload.packed.to(device),
+        payload.scale if streamed else payload.scale.to(device),
+        convrot=convrot,
+    )
     model.proj._dequantized_weight(device, dtype)  # Mints the shared Hadamard matrix.
     torch.cuda.synchronize()
     torch.cuda.reset_peak_memory_stats()
@@ -245,7 +285,7 @@ def test_the_transient_estimate_covers_what_the_per_forward_decode_allocates(con
     measured = torch.cuda.memory_stats()["requested_bytes.all.peak"] - baseline
     estimate = peak_dequant_transient_bytes(model, dtype)
     assert weight.dtype is dtype
-    assert 0.9 * estimate <= measured <= estimate
+    assert (0.9 * estimate if streamed or convrot else 0.8 * estimate) <= measured <= estimate
 
 
 @pytest.mark.slow

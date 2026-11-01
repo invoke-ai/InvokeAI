@@ -394,18 +394,16 @@ class Int8ConvrotLinear(DequantizingLinear):
         """Two weight-sized tensors in the compute dtype.
 
         The widened weight is scaled in place, so with convrot the peak is the derotation's: its input alive
-        alongside the matmul's output. Without convrot that step does not exist and one weight is the peak; the
-        second is kept as margin rather than tracking a layout the published builds do not use.
+        alongside the matmul's output. The int8 codes partial loading leaves in RAM are streamed per call, and that
+        copy is freed once widened, before the derotation allocates. Without convrot the peak is the widened weight
+        beside the streamed codes, half a weight less than this; the margin is kept rather than tracking a layout
+        the published builds do not use. Verified against the real `z_image_turbo_int8_convrot` checkpoint: exact
+        for most shapes, and 2 MiB under on the two that make cuBLAS take a workspace (10240x3840 and 3840x10240),
+        against a 3 GiB reservation floor.
 
-        Under partial load the int8 weight is additionally streamed to the device per call. That copy is at
-        most half a weight and is freed once widened, before the derotation allocates, so the peak stays at two. Verified
-        against the real `z_image_turbo_int8_convrot` checkpoint: exact for most shapes, and 2 MiB under on
-        the two that make cuBLAS take a workspace (10240x3840 and 3840x10240), against a 3 GiB reservation
-        floor.
-
-        This also bounds the int8 compute path: it quantizes at most ``2 * out_features`` rows at a
-        time, so its int8 activation copy plus a streamed int8 weight stay below these two weights
-        (see ``int8_matmul``).
+        This also bounds the int8 compute path, which only rotated layers take: it quantizes at most
+        ``2 * out_features`` rows at a time, so its int8 activation copy plus a streamed int8 weight stay below
+        these two weights (see ``int8_matmul``).
         """
         return 2 * self.out_features * self.in_features * compute_dtype.itemsize
 
@@ -475,14 +473,18 @@ class Int4ConvrotLinear(DequantizingLinear):
         )
 
     def dequant_transient_bytes(self, compute_dtype: torch.dtype) -> int:
-        """The derotation's two weight-sized tensors in the compute dtype, or without convrot the widened
-        weight beside the two half-width shift results it is filled from.
+        """The decode's peak, counting the packed payload as streamed.
 
-        Under partial load the packed payload is additionally streamed per call; the resident regime pays nothing
-        for that.
+        With convrot that is the derotation's two weight-sized tensors in the compute dtype. Without it, the unpack
+        is the peak: the widened weight beside the two half-width shift results it is filled from and the payload
+        copy, half a byte per element, that partial loading streams to the device per call. The working memory is
+        reserved before the model cache decides which layers stay in RAM, so any layer may stream; a resident one
+        peaks half a byte per element lower.
         """
         elements = self.out_features * self.in_features
-        return elements * (2 * compute_dtype.itemsize if self.convrot else compute_dtype.itemsize + 1)
+        if self.convrot:
+            return 2 * elements * compute_dtype.itemsize
+        return elements * compute_dtype.itemsize + elements + elements // 2
 
     def extra_repr(self) -> str:
         return f"in_features={self.in_features}, out_features={self.out_features}, convrot={self.convrot}, int4"

@@ -24,6 +24,7 @@ from invokeai.backend.quantization.int8_convrot import (
     parse_comfy_quant_marker,
     shared_regular_hadamard,
 )
+from tests.fixtures.device_allocations import PeakDeviceBytes
 
 
 def _quantize_reference(w: torch.Tensor, convrot: bool) -> tuple[torch.Tensor, torch.Tensor]:
@@ -396,6 +397,33 @@ class TestThePerForwardDequantTransient:
         model = self._model((4, CONVROT_GROUP_SIZE), (16, CONVROT_GROUP_SIZE), convrot=True)
 
         assert peak_dequant_transient_bytes(model, torch.bfloat16) == 2 * 16 * CONVROT_GROUP_SIZE * 2
+
+    @pytest.mark.parametrize("streamed", [True, False], ids=["streamed", "resident"])
+    @pytest.mark.parametrize("convrot", [True, False])
+    @pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float32])
+    def test_it_covers_the_decode_peak_with_the_codes_streamed_or_resident(
+        self, streamed: bool, convrot: bool, dtype: torch.dtype
+    ) -> None:
+        """Working memory is reserved before partial loading decides which layers stay in RAM, so the estimate has
+        to hold for a layer whose codes are copied to the compute device per call as well as for a resident one.
+        With convrot both peak at exactly the estimate. The meta device stands in for the accelerator (see the int4
+        counterpart)."""
+        device = torch.device("meta")
+        q, scale = _quantize_reference(torch.randn(64, 2 * CONVROT_GROUP_SIZE), convrot=convrot)
+        model = torch.nn.Module()
+        model.proj = Int8ConvrotLinear(
+            q if streamed else q.to(device), scale if streamed else scale.to(device), convrot=convrot
+        )
+        model.proj._dequantized_weight(device, dtype)  # Mints the shared Hadamard matrix.
+
+        with PeakDeviceBytes(device) as allocations:
+            model.proj._dequantized_weight(device, dtype)
+
+        estimate = peak_dequant_transient_bytes(model, dtype)
+        if convrot:
+            assert allocations.peak == estimate
+        else:
+            assert allocations.peak <= estimate
 
     def test_a_model_with_no_quantized_layers_needs_nothing(self) -> None:
         model = torch.nn.Module()
