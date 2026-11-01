@@ -439,6 +439,9 @@
       "invokeFrontHint": "{{shortcut}} or Shift+click: add to the front of the queue",
       "invokeFrontHintNoShortcut": "Shift+click: add to the front of the queue",
       "preparing": "Preparing generation…",
+      "routeDescription": "{{source}} to {{destination}}.",
+      "routeDescriptionLocked": "{{source}} to {{destination}}, route locked.",
+      "routeHint": "Down Arrow opens the route.",
       "routeIssues": {
         "emptyCanvasFrame": "The Canvas generation frame has no area.",
         "sourceNotMounted": "The {{source}} widget is not in this layout. Add it, or run another source.",

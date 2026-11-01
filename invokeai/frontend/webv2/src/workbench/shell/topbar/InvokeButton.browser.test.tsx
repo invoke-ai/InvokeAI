@@ -54,12 +54,17 @@ vi.mock('./invokeIssueActions', () => ({
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { count?: number; reason?: string; shortcut?: string }) =>
+    t: (
+      key: string,
+      options?: { count?: number; destination?: string; reason?: string; shortcut?: string; source?: string }
+    ) =>
       options?.shortcut
         ? `${key}: ${options.shortcut}`
-        : options?.count !== undefined
-          ? `${key}(${[options.count, options.reason].filter((value) => value !== undefined).join(', ')})`
-          : key,
+        : options?.source !== undefined
+          ? `${key}(${options.source}, ${options.destination})`
+          : options?.count !== undefined
+            ? `${key}(${[options.count, options.reason].filter((value) => value !== undefined).join(', ')})`
+            : key,
   }),
 }));
 
@@ -205,7 +210,12 @@ describe('InvokeButton icon slot', () => {
 
     expect(button.getAttribute('aria-disabled')).toBe('true');
     await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
-    await expect.element(button).toHaveAccessibleDescription('topbar.invoke.preparing');
+    // The reason leads, and the route still follows it.
+    await expect
+      .element(button)
+      .toHaveAccessibleDescription(
+        'topbar.invoke.preparing topbar.invoke.routeDescription(widgets.labels.generate, widgets.labels.gallery) topbar.invoke.routeHint'
+      );
     expect(hasSpinner(button)).toBe(true);
 
     await act(() => button.click());
@@ -252,7 +262,7 @@ describe('InvokeButton front of queue', () => {
     await page.viewport(1440, 900);
     const { button } = await renderInvokeButton();
 
-    expect(button.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Control+Shift+Enter');
+    expect(button.getAttribute('aria-keyshortcuts')).toBe('Control+Enter Control+Shift+Enter ArrowDown');
     // The keycap hint shows at this width but stays out of the name; aria-keyshortcuts carries the binding.
     await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
     await act(() => userEvent.hover(button));
@@ -344,7 +354,9 @@ describe('InvokeButton issues', () => {
     expect(button.querySelector('kbd')).toBeNull();
     // Blocked is not disabled: activating it opens the list.
     expect(button.getAttribute('aria-disabled')).not.toBe('true');
+    // Activation opens the list, so the button announces it.
     expect(button.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(button.getAttribute('aria-expanded')).toBe('false');
     expect(button.dataset.blocked).toBe('');
   });
 
@@ -479,12 +491,31 @@ describe('InvokeButton route card', () => {
   const sourceGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.source' });
   const destinationGroup = () => page.getByRole('radiogroup', { name: 'topbar.routing.destination' });
 
-  it('announces its card in every state, and expands only once pinned', async () => {
+  it('announces no popup while activation queues, but names the route and the way into it', async () => {
     const { button } = await renderInvokeButton();
 
-    expect(button.getAttribute('aria-haspopup')).toBe('dialog');
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.hasAttribute('aria-haspopup')).toBe(false);
+    expect(button.hasAttribute('aria-expanded')).toBe(false);
     expect(button.getAttribute('aria-controls')).toBeNull();
+    expect(button.getAttribute('aria-keyshortcuts')?.split(' ')).toContain('ArrowDown');
+    await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+    await expect
+      .element(button)
+      .toHaveAccessibleDescription(
+        'topbar.invoke.routeDescription(widgets.labels.generate, widgets.labels.gallery) topbar.invoke.routeHint'
+      );
+  });
+
+  it('describes a Video route as going to the Gallery, whatever destination it holds', async () => {
+    const { button } = await renderInvokeButton({
+      invocation: { ...invocation, destination: 'canvas', sourceId: 'video' },
+    });
+
+    await expect
+      .element(button)
+      .toHaveAccessibleDescription(
+        'topbar.invoke.routeDescription(widgets.labels.video, widgets.labels.gallery) topbar.invoke.routeHint'
+      );
   });
 
   it('opens pinned on ArrowDown while valid, focusing the selected source, and never invokes', async () => {
@@ -496,8 +527,10 @@ describe('InvokeButton route card', () => {
 
     await expect.poll(() => (document.activeElement as HTMLInputElement | null)?.value).toBe('generate');
     expect(sourceGroup().element().contains(document.activeElement)).toBe(true);
-    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.hasAttribute('aria-expanded')).toBe(false);
     expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
+    // The card the description's Down Arrow hint points to is named by its title.
+    await expect.element(page.getByRole('dialog')).toHaveAccessibleName('topbar.invoke.addToQueue');
     expect(invoke).not.toHaveBeenCalled();
 
     await act(() => userEvent.keyboard('{Escape}'));
@@ -523,7 +556,7 @@ describe('InvokeButton route card', () => {
 
     expect(contextMenu.defaultPrevented).toBe(true);
     await expect.element(destinationGroup()).toBeVisible();
-    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
     expect(invoke).not.toHaveBeenCalled();
   });
 
@@ -537,7 +570,7 @@ describe('InvokeButton route card', () => {
 
     expect(harness.destinations).toEqual(['canvas']);
     await expect.element(destinationGroup()).toBeVisible();
-    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
   });
 
   it('pins a hover preview on a press inside it, so leaving no longer closes it', async () => {
@@ -545,10 +578,9 @@ describe('InvokeButton route card', () => {
 
     await act(() => userEvent.hover(button));
     await expect.element(destinationGroup()).toBeVisible();
-    expect(button.getAttribute('aria-expanded')).toBe('false');
+    expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
 
     await act(() => destinationGroup().getByText('Canvas').click());
-    expect(button.getAttribute('aria-expanded')).toBe('true');
     await act(() => userEvent.unhover(destinationGroup()));
     await act(() => userEvent.hover(document.body));
 
@@ -573,8 +605,13 @@ describe('InvokeButton route card', () => {
     await expect.element(lock).toHaveAttribute('aria-pressed', 'true');
     await expect.element(lock).toHaveFocus();
     expect(button.querySelector('[data-routing-lock-indicator]')).not.toBeNull();
-    // The mark is decoration: Invoke keeps its name.
+    // The mark is decoration: Invoke keeps its name, and its description says the route is locked.
     await expect.element(button).toHaveAccessibleName('topbar.invoke.invoke');
+    await expect
+      .element(button)
+      .toHaveAccessibleDescription(
+        'topbar.invoke.routeDescriptionLocked(widgets.labels.generate, widgets.labels.gallery) topbar.invoke.routeHint'
+      );
   });
 
   it('opens pinned on Alt+ArrowDown too, and keeps both keys from the window’s hotkeys', async () => {
@@ -588,7 +625,7 @@ describe('InvokeButton route card', () => {
       button.focus();
       await act(() => userEvent.keyboard('{Alt>}{ArrowDown}{/Alt}'));
       await expect.element(destinationGroup()).toBeVisible();
-      expect(button.getAttribute('aria-expanded')).toBe('true');
+      expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
       await act(() => userEvent.keyboard('{Escape}'));
       await expect.element(button).toHaveFocus();
       await act(() => userEvent.keyboard('{ArrowDown}'));
@@ -608,7 +645,7 @@ describe('InvokeButton route card', () => {
     button.focus();
     await act(() => userEvent.keyboard('{ArrowDown}'));
 
-    expect(button.getAttribute('aria-expanded')).toBe('true');
+    expect(button.getAttribute('aria-controls')).toBe(document.querySelector('[role="dialog"]')?.id);
     await expect.poll(() => destinationGroup().element().contains(document.activeElement)).toBe(true);
   });
 

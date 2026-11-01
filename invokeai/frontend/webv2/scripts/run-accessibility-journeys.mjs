@@ -138,6 +138,16 @@ const waitForWorkbench = async (page) => {
   await presetStrip(page).waitFor();
 };
 
+/** Every built-in widget the status bar can hold, by its menu label (manifests allowing the `bottom` region). */
+const BUILT_IN_BOTTOM_WIDGETS = [
+  'Autosave',
+  'Gallery',
+  'Notifications',
+  'Queue status',
+  'Server Status',
+  'Shortcuts',
+  'Workflow',
+];
 const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
 
 /** Preset names need not match their center views; pass the expected view explicitly. */
@@ -441,17 +451,19 @@ const runStatusBarNamesJourney = async (browser) => {
       }
     }
 
+    // Read while the menu is open; its items leave the page with it.
+    const itemLabels = [];
     const labels = [];
 
     for (let index = 0; index < (await items.count()); index++) {
+      // Item text only: a failed widget's row also carries a "Failed" note.
+      const label = ((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim();
+      itemLabels.push(label);
       if ((await items.nth(index).getAttribute('aria-checked')) === 'true') {
-        // Item text only: a failed widget's row also carries a "Failed" note.
-        labels.push(((await items.nth(index).locator('[data-part="item-text"]').textContent()) ?? '').trim());
+        labels.push(label);
       }
     }
 
-    // Counted while the menu is open; its items leave the page with it.
-    const itemCount = await items.count();
     await page.keyboard.press('Escape');
     await menu.waitFor({ state: 'hidden' });
     // A chip still loading its view is named "Loading <label>" by its busy status fallback.
@@ -460,10 +472,14 @@ const runStatusBarNamesJourney = async (browser) => {
     const chips = footer.locator('[data-status-bar-widget] > [role="button"]');
     const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    assert.ok(itemCount >= 1, 'The bottom widget menu must list at least one widget.');
+    assert.deepEqual(
+      itemLabels.toSorted(),
+      BUILT_IN_BOTTOM_WIDGETS.toSorted(),
+      'The bottom widget menu must list every built-in bottom widget.'
+    );
     assert.equal(
       labels.length,
-      itemCount,
+      itemLabels.length,
       `Every bottom widget the menu lists must be enabled; got ${JSON.stringify(labels)}.`
     );
     assert.equal(await chips.count(), labels.length, 'Each enabled bottom widget must render one status-bar chip.');
@@ -679,14 +695,34 @@ const runTopbarMenuJourney = async (browser) => {
     const routingLockIndicator = invokeButton.locator('[data-routing-lock-indicator]');
     const invokeBoundsBeforeLock = await invokeButton.boundingBox();
     assert.ok(invokeBoundsBeforeLock);
-    assert.equal(await invokeButton.getAttribute('aria-haspopup'), 'dialog');
+    // Activation opens the card only while issues block Invoke; when ready it queues, and announces no popup.
+    const invokeBlocked = (await invokeButton.getAttribute('data-blocked')) !== null;
+    const expectedInvokeExpanded = (expanded) => (invokeBlocked ? String(expanded) : null);
+    assert.equal(await invokeButton.getAttribute('aria-haspopup'), invokeBlocked ? 'dialog' : null);
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
+    assert.ok(
+      ((await invokeButton.getAttribute('aria-keyshortcuts')) ?? '').split(' ').includes('ArrowDown'),
+      'Invoke must list ArrowDown, its keyboard way into the card, among its shortcuts.'
+    );
+    // The route and its lock show only in the card and a decorative mark, so the description must carry them.
+    const invokeDescription = () =>
+      invokeButton.evaluate((button) =>
+        (button.getAttribute('aria-describedby') ?? '')
+          .split(/\s+/)
+          .filter(Boolean)
+          .map((descriptionId) => document.getElementById(descriptionId)?.textContent?.trim() ?? '')
+          .join(' ')
+      );
+    const routeDescriptionPattern = (locked) =>
+      new RegExp(`^\\S+ to \\S+${locked ? ', route locked' : ''}\\. Down Arrow opens the route\\.`);
+    assert.match(await invokeDescription(), routeDescriptionPattern(false));
     assert.equal(await routingLockIndicator.count(), 0);
 
     // Hover previews the card without expanding it or taking focus.
     await invokeButton.hover();
     await invokeCard.getByText('Source', { exact: true }).waitFor();
     await invokeCard.getByText('Destination', { exact: true }).waitFor();
-    assert.equal(await invokeButton.getAttribute('aria-expanded'), 'false');
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(false));
     await page.mouse.move(0, 0);
     await invokeCard.waitFor({ state: 'hidden' });
 
@@ -694,7 +730,14 @@ const runTopbarMenuJourney = async (browser) => {
     await invokeButton.focus();
     await page.keyboard.press('ArrowDown');
     await invokeCard.waitFor();
-    assert.equal(await invokeButton.getAttribute('aria-expanded'), 'true');
+    assert.equal(await invokeButton.getAttribute('aria-expanded'), expectedInvokeExpanded(true));
+    assert.equal(await invokeButton.getAttribute('aria-controls'), await invokeCard.getAttribute('id'));
+    // The card the Down Arrow hint points to is named by its title.
+    assert.equal(
+      await page.getByRole('dialog', { name: /^(?:Add to queue|Unable to queue|Preparing generation…)$/ }).count(),
+      1,
+      'The open Invoke card must be named by its title.'
+    );
     // Focus moves once the card's controls mount.
     await invokeCard.locator(':focus').waitFor();
     await waitForSettledDocument(page);
@@ -713,6 +756,7 @@ const runTopbarMenuJourney = async (browser) => {
     assert.ok(invokeBoundsLocked);
     assert.equal(invokeBoundsLocked.width, invokeBoundsBeforeLock.width);
     assert.equal(invokeBoundsLocked.x, invokeBoundsBeforeLock.x);
+    assert.match(await invokeDescription(), routeDescriptionPattern(true));
     await lockRouting.click();
     await invokeCard.locator('[data-routing-lock][aria-pressed="false"]').waitFor();
     assert.equal(await routingLockIndicator.count(), 0);

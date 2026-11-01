@@ -7,7 +7,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, useUnavailableControl } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
 import { useShortcutBinding } from '@workbench/hotkeys/useShortcutBinding';
-import { isRoutingLocked } from '@workbench/invocation';
+import { isRoutingLocked, ROUTE_LABEL_KEYS } from '@workbench/invocation';
 import { useActiveQueueProgress } from '@workbench/queue-integration/useActiveQueueProgress';
 import { useNotify } from '@workbench/useNotify';
 import { CircleAlertIcon, ListStartIcon, PlayIcon } from 'lucide-react';
@@ -78,9 +78,13 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const shortcutParts = shortcutBinding?.parts ?? null;
   // Shift+click queues at the front: holding it over a ready button says so before the click.
   const isShiftHeld = useModifierHeld('Shift');
-  const ariaKeyShortcuts =
-    [shortcutBinding?.aria, frontBinding?.aria].filter((value) => value !== undefined).join(' ') || undefined;
+  // ArrowDown is the keyboard's way into the card while activation queues.
+  const ariaKeyShortcuts = [shortcutBinding?.aria, frontBinding?.aria, 'ArrowDown']
+    .filter((value) => value !== undefined)
+    .join(' ');
   const contentId = useId();
+  const routeDescriptionId = useId();
+  const titleId = useId();
   const buttonRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const timers = useRef<{ close?: number; open?: number }>({});
@@ -342,10 +346,20 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
   const getButton = useCallback(() => buttonRef.current, []);
   // The button is the popover's anchor, not its trigger: pressing it while open is its own toggle, not an outside press.
   const persistentElements = useMemo(() => [getButton], [getButton]);
-  const popoverIds = useMemo(() => ({ content: contentId }), [contentId]);
+  const popoverIds = useMemo(() => ({ content: contentId, title: titleId }), [contentId, titleId]);
 
-  // Preparing is the one state with nothing to do: the reason describes the unavailable control.
+  // Preparing is the one state with nothing to do: the reason describes the unavailable control, ahead of the route.
   const unavailable = useUnavailableControl(isPreparing ? t('topbar.invoke.preparing') : undefined, undefined);
+  // The route and its lock show only in the card and a decorative mark, so the description carries them.
+  const routeLabels = {
+    // Video results always land in the Gallery, whatever destination the route holds.
+    destination: t(ROUTE_LABEL_KEYS[state.invocation.sourceId === 'video' ? 'gallery' : state.invocation.destination]),
+    source: t(ROUTE_LABEL_KEYS[state.invocation.sourceId]),
+  };
+  const routeDescription = `${t(
+    isLocked ? 'topbar.invoke.routeDescriptionLocked' : 'topbar.invoke.routeDescription',
+    routeLabels
+  )} ${t('topbar.invoke.routeHint')}`;
 
   const iconMode = isPreparing
     ? ({ mode: 'progress', value: null } as const)
@@ -372,10 +386,14 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         <Button
           {...unavailable?.props}
           ref={buttonRef}
+          aria-describedby={
+            unavailable ? `${unavailable.props['aria-describedby']} ${routeDescriptionId}` : routeDescriptionId
+          }
           aria-busy={isOpenPending || undefined}
           aria-controls={mode === 'closed' ? undefined : contentId}
-          aria-expanded={mode === 'pinned'}
-          aria-haspopup="dialog"
+          // Activation opens the card only while issues block it; when ready it queues, so it announces no popup.
+          aria-expanded={showsIssues ? mode === 'pinned' : undefined}
+          aria-haspopup={showsIssues ? 'dialog' : undefined}
           aria-keyshortcuts={ariaKeyShortcuts}
           colorPalette={showsIssues ? 'gray' : 'brand'}
           css={INVOKE_BUTTON_CSS}
@@ -419,6 +437,9 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             )}
           </Box>
           {showsIssues ? t('topbar.invoke.issueCount', { count: issues.length }) : t('topbar.invoke.invoke')}
+          <span hidden id={routeDescriptionId}>
+            {routeDescription}
+          </span>
           {unavailable?.description}
           {shortcutParts && !showsIssues ? (
             // The keycap stays out of the name; aria-keyshortcuts announces the binding.
@@ -433,7 +454,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
             </Kbd>
           ) : null}
           {isLocked ? (
-            // Shows the route is locked while the card is closed; the card's lock control names it.
+            // Shows the route is locked while the card is closed; the description and the card's lock control name it.
             <Status.Root
               aria-hidden
               colorPalette="accent"
@@ -452,6 +473,8 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         <Popover.Positioner>
           <PopoverContent
             ref={contentRef}
+            // The card's title names it, so the route the description points to is what the dialog announces.
+            aria-labelledby={titleId}
             p="3"
             onKeyDown={handleContentKeyDown}
             onPointerDown={pinPreview}
