@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig } from '@features/generation/core/types';
+import type { WildcardRecord } from '@features/generation/data/wildcards';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -10,7 +11,7 @@ import { adjustFocusedPromptAttention } from '@features/generation/ui/promptFiel
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18next from 'i18next';
-import { act, useSyncExternalStore } from 'react';
+import { act, useState, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -63,6 +64,8 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   }),
 }));
 
+const wildcardRecords: WildcardRecord[] = [];
+
 vi.mock('@features/generation/data/promptUtilities', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   parseDynamicPrompts,
@@ -75,7 +78,10 @@ vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
   updateWildcard: vi.fn(),
-  wildcardsQueryOptions: () => ({ queryFn: () => Promise.resolve([]), queryKey: ['generation', 'wildcards'] }),
+  wildcardsQueryOptions: () => ({
+    queryFn: () => Promise.resolve(wildcardRecords),
+    queryKey: ['generation', 'wildcards'],
+  }),
 }));
 
 let host: HTMLDivElement | null = null;
@@ -87,6 +93,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  wildcardRecords.length = 0;
 });
 
 it('keeps positive prompt actions enabled when stale view mode has no active template', async () => {
@@ -388,4 +395,63 @@ it('shows a JSON prompt under a template whole, as it generates, and never expan
   expect(dynamicButton).toBeDefined();
   expect(dynamicButton?.textContent).not.toMatch(/\d/);
   expect(parseDynamicPrompts).not.toHaveBeenCalled();
+});
+
+it('keeps overflowing wildcard suggestions open when the list scrolls', async () => {
+  wildcardRecords.push(
+    ...Array.from({ length: 24 }, (_, index) => ({ id: `wildcard-${index}`, name: `w${index}`, values: ['red'] }))
+  );
+  const Prompt = () => {
+    const [value, setValue] = useState('');
+
+    return (
+      <PositivePromptField
+        heightPx={96}
+        loras={[]}
+        projectId="project-1"
+        selectedModel={undefined}
+        showSyntaxHighlighting={false}
+        value={value}
+        onChange={setValue}
+        onResizeEnd={vi.fn()}
+        onUsePrompt={vi.fn()}
+      />
+    );
+  };
+
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  await act(() => {
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <QueryClientProvider client={new QueryClient()}>
+          <ChakraProvider value={system}>
+            <DndContext>
+              <Prompt />
+            </DndContext>
+          </ChakraProvider>
+        </QueryClientProvider>
+      </I18nextProvider>
+    );
+  });
+  await act(async () => {
+    await userEvent.type(host!.querySelector('textarea')!, '__');
+  });
+  await expect.poll(() => document.querySelector('[role="listbox"]')).not.toBeNull();
+
+  const list = document.querySelector<HTMLElement>('[role="listbox"]')!;
+
+  expect(list.scrollHeight).toBeGreaterThan(list.clientHeight);
+  await act(async () => {
+    const scrolled = new Promise<void>((resolve) => {
+      list.addEventListener('scroll', () => resolve(), { once: true });
+    });
+
+    list.scrollTop = list.scrollHeight;
+    await scrolled;
+  });
+
+  expect(document.querySelector('[role="listbox"]')).toBe(list);
+  expect(list.scrollTop).toBeGreaterThan(0);
 });
