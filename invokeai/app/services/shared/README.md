@@ -818,11 +818,12 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
 - An `If` runs once per frame of the innermost iterator in its iterator ancestry, whichever branch is selected. When a
   condition, literal or computed in the root frame, selects a root value while the other branch carries an open
   `Iterate`, the `If` keeps that per-item cardinality and returns the root value in each item frame; the unselected
-  per-item computation stays inactive. A branch `For`'s final output carries no axis into that ancestry, so selecting
-  the root value over such a branch runs the `If` once in the root frame, while selecting it runs the `If` per item of
-  the iterator the `For` runs under.
-- The iterators whose frames are open at an `If`, including one reached through a `For` final output (which closes only
-  the `For`'s own axis), run regardless of the condition and are never gated by it.
+  per-item computation stays inactive.
+- Open iterator frames run regardless of the `If` condition. A selected `For` final output closes only its own axis
+  while keeping enclosing axes open; an unselected `For`-final-only axis adds no `If` frames unless the same axis also
+  reaches the `If` directly.
+- Iterating a root `For.output_collection` opens a new `Iterate` axis; a downstream `Collect.item` closes it into the
+  root group.
 - Before invocation, graph validation raises `UnsupportedIfIterationAxesError` for these frame sets:
   - Two unrelated iterators open at the `If` (neither stays open inside the other, judged by iterator ancestry, where a
     `Collect.item` input closes an axis), unless the input that decides the `If`'s frames carries both: the condition,
@@ -837,10 +838,20 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     (a node between the `Collect` and the `Iterate`, or extra collected items) can change the length, and selecting
     the upstream axis over its reopening pairs it with per-group frames; both would drop or invent frames.
   - A branch whose open axes, or the axes a branch `Collect` keeps, are deeper than a per-item condition's, unless
-    both branches carry the same deeper axes.
-  - A root-frame condition choosing between branches with different deeper axes. When both branches share nested
-    deeper axes, a root-frame condition runs the `If` once per frame of the innermost one.
-  Selected-branch frame cardinality is not supported.
+    both branches carry the same deeper axes. Each `Collect.item` closes its innermost axis and keeps the outer axes;
+    this identity is followed through chained `Collect`s and ordinary passthrough nodes. Separate branch Collect chains
+    may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
+    not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. A downstream
+    `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
+    nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
+    own axis. When a wired Boolean condition resolves per parent frame to select a `For.output_collection`, its `If`
+    output retains those parent-frame groups through `Collect`, including through an outer literal-`True` `If`.
+  - A root-frame condition choosing between branches with different deeper axes. When both branches retain the same
+    nested axes, a root-frame condition runs the `If` once per available frame of the innermost axis. Selecting a root
+    value over an axis reached only through an unselected `For` final output is the root-frame exception described
+    above; literal and computed root conditions have the same result cardinality.
+  Validation and frame inference use graph topology and statically known conditions only; they do not depend on
+  unresolved runtime branch selections.
 - A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
   `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
   group; when it is rejected, it never runs and the `If` runs in the frames of its remaining iterators. A `Collect` of a
@@ -849,17 +860,18 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
   body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
   `For` nested in the body of an ungated `For` runs with that loop. A `For` whose final output feeds the `If` directly
-  is attached only after it finalizes, and the `If` is not prepared before that, so gating it on the `If` would
-  deadlock. Known limitation: with a per-item condition, such a `For` and its body run even for items that reject the
-  branch, and an error they raise is recorded.
+  attaches after it finalizes; with a per-item condition, rejected frames do not run the `For` or its body, and selected
+  frames wait for its final output before the `If` input is attached. A literal `If` waits only for its selected branch;
+  an unselected `For` final input does not delay it.
 - An `If` has no execution in a frame where the innermost iterator in its ancestry has no items. When an `Iterate` in
   its iterator ancestry, whether it feeds `If.condition` or a branch, has no items at all, no `If` execution is created,
   the branch sources are retired empty, the downstream `Collect` produces an empty collection, and the state completes
   without an error. The same holds for a literal condition whose selected branch runs under an empty `Iterate` reached
   only through a `For` final output. Retirement may add the branch source IDs to `executed_history`; neither branch
-  invocation runs and no branch result is created. Known limitation: with a wired condition, an `If` whose branch
-  reaches an empty `Iterate` only through a `For` final output stalls, whether the condition is root-frame or per item
-  of that `Iterate`.
+  invocation runs and no branch result is created. With a wired root-frame condition and one parent `Iterate` carried
+  through a selected `For` final output, the `If` broadcasts over the parent frames; an empty parent `Iterate` gives it
+  no executions and the downstream `Collect` remains empty. Multiple unrelated open frames that cannot be paired still
+  fail validation before execution.
 - The SQLite queue/processor path has evidence for cancellation before and after `If` resolution and retry from each
   boundary for both condition polarities. A canceled attempt keeps its activation ledger and cannot resume; retry
   starts a fresh state and must emit a fresh matching activation token before selected-only completion.

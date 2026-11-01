@@ -46,34 +46,12 @@ class _Graph:
         return self._output_edges.get(node_id, [])
 
 
-class _Registry:
-    def get_source_node_id(self, exec_node_id: str) -> str:
-        return exec_node_id
-
-    def get_prepared_ids(self, source_node_id: str) -> list[str]:
-        return [source_node_id] if source_node_id == "if" else []
-
-
 class _State:
     def __init__(self) -> None:
         self.graph = _Graph()
-        self.admitted: set[ActivationDependency] = set()
-        self.rejected: set[ActivationDependency] = set()
-
-    def _prepared_registry(self) -> _Registry:
-        return _Registry()
-
-    def _get_iteration_path(self, _: str) -> tuple[int, ...]:
-        return ()
 
     def _get_source_graph_flat(self) -> object:
         return object()
-
-    def _is_activation_dependency_satisfied(self, dependency: ActivationDependency) -> bool:
-        return dependency in self.admitted
-
-    def _is_activation_dependency_rejected(self, dependency: ActivationDependency) -> bool:
-        return dependency in self.rejected
 
 
 @pytest.mark.platform_independent
@@ -101,7 +79,7 @@ def test_graph_nx_patch_seam_and_branch_cache(monkeypatch: pytest.MonkeyPatch) -
     assert calls == ["true"]
 
 
-def test_controller_dependencies_admission_rejection_and_inactive(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_controller_gets_source_dependencies(monkeypatch: pytest.MonkeyPatch) -> None:
     class _NetworkX:
         def ancestors(self, _graph: object, _node_id: str) -> set[str]:
             return set()
@@ -115,17 +93,6 @@ def test_controller_dependencies_admission_rejection_and_inactive(monkeypatch: p
     assert controller.get_source_dependencies("true") == (true_dependency,)
     assert controller.get_source_dependencies("false") == (false_dependency,)
     assert controller.get_source_dependencies("outside") == ()
-    assert not controller.is_source_admitted("true")
-    assert not controller.is_source_rejected("true")
-    assert not controller.is_source_inactive("true")
-
-    state.admitted.add(true_dependency)
-    assert controller.is_source_admitted("true")
-
-    state.rejected.add(true_dependency)
-    assert controller.is_source_rejected("true")
-    state.rejected.add(ActivationDependency(owner_id="if", branch="true_input", frame=(1,)))
-    assert controller.is_source_inactive("true", (1,))
 
 
 @pytest.mark.parametrize(
@@ -135,7 +102,7 @@ def test_controller_dependencies_admission_rejection_and_inactive(monkeypatch: p
         (False, "false", "true", "true_input"),
     ],
 )
-def test_controller_admits_only_source_level_selected_branch(
+def test_controller_selects_source_dependencies_for_source_level_branch(
     monkeypatch: pytest.MonkeyPatch,
     condition: bool,
     selected_source: str,
@@ -152,8 +119,6 @@ def test_controller_admits_only_source_level_selected_branch(
     controller = _IfActivationController(state)
 
     assert controller.get_source_dependencies(selected_source) == ()
-    assert controller.is_source_admitted(selected_source)
-    assert not controller.is_source_inactive(selected_source)
     assert controller.get_source_dependencies(unselected_source) == (
         ActivationDependency(owner_id="if", branch=unselected_field, frame=()),
     )

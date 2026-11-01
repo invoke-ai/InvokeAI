@@ -43,6 +43,7 @@ class _ExecutionRuntime:
     def __init__(self, state: "GraphExecutionState") -> None:
         self._state = state
         self._iterator_ancestry = _IteratorAncestry(state)
+        self._static_selected_collect_iterate_owners: Optional[dict[str, tuple[tuple[str, str], ...]]] = None
 
     def _get_cached_iteration_path(self, exec_node_id: str) -> Optional[tuple[int, ...]]:
         return self._state._prepared_registry().get_iteration_path(exec_node_id)

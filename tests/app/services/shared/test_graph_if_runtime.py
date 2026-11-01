@@ -1,6 +1,10 @@
+from types import SimpleNamespace
+
 import pytest
 
+from invokeai.app.invocations.collections import CollectionConcatInvocation
 from invokeai.app.invocations.logic import BooleanLogicInvocation, IfInvocation
+from invokeai.app.invocations.loops import ForInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.invocations.primitives import BooleanOutput
 from invokeai.app.services.shared import graph_if_runtime
@@ -8,8 +12,9 @@ from invokeai.app.services.shared.execution_engine.scheduler import ActivationDe
 from invokeai.app.services.shared.graph import Edge, EdgeConnection, Graph, GraphExecutionState
 from invokeai.app.services.shared.graph_iterator_ancestry import _IteratorAncestry
 from invokeai.app.services.shared.graph_runtime_records import _ApplyTransaction
-from invokeai.app.services.shared.graph_validation import IterateInvocation
+from invokeai.app.services.shared.graph_validation import CollectInvocation, IterateInvocation
 from tests.app.services.shared.import_test_utils import assert_module_imports_without_graph
+from tests.test_nodes import AnyTypeTestInvocation
 
 
 @pytest.fixture
@@ -24,6 +29,45 @@ def state() -> GraphExecutionState:
 @pytest.mark.platform_independent
 def test_runtime_import_without_graph() -> None:
     assert_module_imports_without_graph("invokeai.app.services.shared.graph_if_runtime")
+
+
+def test_empty_if_frame_analysis_reuses_static_branch_axes(monkeypatch: pytest.MonkeyPatch) -> None:
+    state = GraphExecutionState(graph=Graph(nodes={"if": IfInvocation(id="if")}))
+    original = graph_if_runtime._get_if_branch_frame_axes
+    analysis_count = 0
+
+    def count_analysis(*args: object, **kwargs: object) -> dict[str, tuple[str, ...]]:
+        nonlocal analysis_count
+        analysis_count += 1
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", count_analysis)
+
+    assert [graph_if_runtime._has_empty_if_frame(state, "if") for _ in range(20)] == [False] * 20
+    assert analysis_count == 1
+
+
+@pytest.mark.parametrize(
+    ("source_kind", "source_field", "axes", "expected"),
+    [
+        ("regular", "value", ("outer", "inner"), ("outer",)),
+        ("regular", "value", (), ()),
+        ("for_final", "output_collection", ("outer",), ("outer",)),
+    ],
+)
+def test_collect_item_axis_closure_handles_empty_axes_and_for_final_output(
+    source_kind: str, source_field: str, axes: tuple[str, ...], expected: tuple[str, ...]
+) -> None:
+    source = IfInvocation(id="source", condition=True) if source_kind == "regular" else ForInvocation(id="source")
+    graph = Graph()
+    graph.nodes.update({"source": source, "collect": CollectInvocation(id="collect")})
+    state = SimpleNamespace(graph=graph)
+    edge = Edge(
+        source=EdgeConnection(node_id="source", field=source_field),
+        destination=EdgeConnection(node_id="collect", field="item"),
+    )
+
+    assert graph_if_runtime._without_closed_axis(state, edge, axes) == expected
 
 
 @pytest.mark.parametrize(
@@ -182,7 +226,7 @@ def test_nested_if_iteration_paths_use_supplied_source_graph_recursively() -> No
 
 def test_unresolved_nested_literal_if_chain_has_no_condition_path() -> None:
     nodes = {"iterator": IterateInvocation(id="iterator"), "guarded": IfInvocation(id="guarded")}
-    nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(24)})
+    nodes.update({f"if-{i}": IfInvocation(id=f"if-{i}", condition=True) for i in range(600)})
     edges = [
         Edge(
             source=EdgeConnection(node_id="iterator", field="item"),
@@ -190,7 +234,7 @@ def test_unresolved_nested_literal_if_chain_has_no_condition_path() -> None:
         )
     ]
     previous = "guarded"
-    for i in range(24):
+    for i in range(600):
         edges.append(
             Edge(
                 source=EdgeConnection(node_id=previous, field="value"),
@@ -213,6 +257,239 @@ def test_resolved_literal_if_uses_root_frame_path() -> None:
     assert graph_if_runtime._get_if_iteration_paths_with_ancestry(
         state, "if", set(), lambda _: set(), lambda *_: (), _IteratorAncestry(state)
     ) == [()]
+
+
+def test_if_branch_frame_axes_deduplicates_stably_with_linear_comparisons(monkeypatch: pytest.MonkeyPatch) -> None:
+    comparisons = 0
+
+    class Axis(str):
+        def __eq__(self, other: object) -> bool:
+            nonlocal comparisons
+            comparisons += 1
+            return super().__eq__(other)
+
+        __hash__ = str.__hash__
+
+    axes = [Axis(f"axis-{index}") for index in range(1000)]
+    graph = Graph(nodes={"if": IfInvocation(id="if")})
+    for index in range(2):
+        source_id = f"source{index}"
+        graph.add_node(AddInvocation(id=source_id))
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id=source_id, field="value"),
+                destination=EdgeConnection(node_id="if", field="true_input" if index == 0 else "false_input"),
+            )
+        )
+    state = SimpleNamespace(graph=graph)
+    axis_tuple = tuple(axes)
+    monkeypatch.setattr(graph_if_runtime, "_get_edge_frame_axes", lambda _state, _ancestry, edge, _cache: axis_tuple)
+
+    result = graph_if_runtime._get_if_branch_frame_axes(
+        state, _IteratorAncestry(GraphExecutionState(graph=Graph())), "if", {}
+    )
+
+    assert tuple(result["true_input"]) == tuple(f"axis-{index}" for index in range(1000))
+    assert result["true_input"] == result["false_input"]
+    assert comparisons < 10_000
+
+
+def test_edge_frame_axis_traversal_visits_long_passthrough_chain_linearly(monkeypatch: pytest.MonkeyPatch) -> None:
+    chain_length = 1000
+    graph = Graph()
+    graph.nodes["source"] = CollectionConcatInvocation(id="source", first=["x"])
+    graph.nodes["iterate"] = IterateInvocation(id="iterate")
+    graph.nodes["if"] = IfInvocation(id="if")
+    graph.add_edge(
+        Edge(
+            source=EdgeConnection(node_id="source", field="collection"),
+            destination=EdgeConnection(node_id="iterate", field="collection"),
+        )
+    )
+    previous = ("iterate", "item")
+    for index in range(chain_length):
+        node_id = f"pass{index}"
+        graph.nodes[node_id] = AnyTypeTestInvocation(id=node_id)
+        graph.add_edge(
+            Edge(
+                source=EdgeConnection(node_id=previous[0], field=previous[1]),
+                destination=EdgeConnection(node_id=node_id, field="value"),
+            )
+        )
+        previous = (node_id, "value")
+    edge = Edge(
+        source=EdgeConnection(node_id=previous[0], field=previous[1]),
+        destination=EdgeConnection(node_id="if", field="true_input"),
+    )
+    graph.add_edge(edge)
+    state = GraphExecutionState(graph=graph)
+    get_input_edges = graph._get_input_edges
+    visits = 0
+
+    def counted_get_input_edges(node_id: str, *args: object, **kwargs: object) -> list[Edge]:
+        nonlocal visits
+        visits += 1
+        return get_input_edges(node_id, *args, **kwargs)
+
+    monkeypatch.setattr(graph, "_get_input_edges", counted_get_input_edges)
+
+    axes = graph_if_runtime._get_edge_frame_axes(state, _IteratorAncestry(state), edge, {})
+
+    assert axes == ("iterate",)
+    assert visits < chain_length * 3
+
+
+def test_edge_frame_axis_traversal_caches_shared_nested_ifs(monkeypatch: pytest.MonkeyPatch) -> None:
+    chain_length = 12
+    graph = Graph()
+    graph.nodes["source"] = AddInvocation(id="source")
+    previous_id = "source"
+    for index in range(chain_length):
+        node_id = f"if-{index}"
+        graph.nodes[node_id] = IfInvocation(id=node_id, condition=True)
+        for branch in ("true_input", "false_input"):
+            graph.add_edge(
+                Edge(
+                    source=EdgeConnection(node_id=previous_id, field="value"),
+                    destination=EdgeConnection(node_id=node_id, field=branch),
+                )
+            )
+        previous_id = node_id
+    graph.nodes["sink"] = AddInvocation(id="sink")
+    edge = Edge(
+        source=EdgeConnection(node_id=previous_id, field="value"),
+        destination=EdgeConnection(node_id="sink", field="a"),
+    )
+    graph.add_edge(edge)
+    state = GraphExecutionState(graph=graph)
+    original = graph_if_runtime._get_if_branch_frame_axes
+    branch_lookups = 0
+
+    def count_branch_lookups(*args: object, **kwargs: object) -> dict[str, tuple[str, ...]]:
+        nonlocal branch_lookups
+        branch_lookups += 1
+        return original(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", count_branch_lookups)
+
+    assert graph_if_runtime._get_edge_frame_axes(state, _IteratorAncestry(state), edge, {}) == ()
+    assert branch_lookups <= chain_length + 1
+
+
+def test_nested_if_frame_axes_do_not_depend_on_runtime_branch_selection(monkeypatch: pytest.MonkeyPatch) -> None:
+    graph = Graph(
+        nodes={
+            "condition": BooleanLogicInvocation(id="condition"),
+            "if": IfInvocation(id="if"),
+            "true": AddInvocation(id="true"),
+            "false": AddInvocation(id="false"),
+            "sink": AddInvocation(id="sink"),
+        }
+    )
+    edge = Edge(
+        source=EdgeConnection(node_id="if", field="value"),
+        destination=EdgeConnection(node_id="sink", field="a"),
+    )
+    graph.edges.extend(
+        [
+            Edge(
+                source=EdgeConnection(node_id="condition", field="value"),
+                destination=EdgeConnection(node_id="if", field="condition"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="true", field="value"),
+                destination=EdgeConnection(node_id="if", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="false", field="value"),
+                destination=EdgeConnection(node_id="if", field="false_input"),
+            ),
+            edge,
+        ]
+    )
+    state = GraphExecutionState(graph=graph)
+    state.source_prepared_mapping["if"] = {"if-exec"}
+    state._resolved_if_exec_branches["if-exec"] = "true_input"
+    iterator_ancestry = _IteratorAncestry(state)
+
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "if")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
+    state._resolved_if_exec_branches["if-exec"] = "false_input"
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "if")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
+
+
+def test_static_if_analysis_is_independent_of_runtime_branch_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    graph = Graph(
+        nodes={
+            "condition": BooleanLogicInvocation(id="condition"),
+            "inner": IfInvocation(id="inner"),
+            "outer-condition": BooleanLogicInvocation(id="outer-condition"),
+            "outer": IfInvocation(id="outer"),
+            "true": AddInvocation(id="true"),
+            "false": AddInvocation(id="false"),
+            "outer-false": AddInvocation(id="outer-false"),
+        }
+    )
+    graph.edges.extend(
+        [
+            Edge(
+                source=EdgeConnection(node_id="condition", field="value"),
+                destination=EdgeConnection(node_id="inner", field="condition"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="true", field="value"),
+                destination=EdgeConnection(node_id="inner", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="false", field="value"),
+                destination=EdgeConnection(node_id="inner", field="false_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="outer-condition", field="value"),
+                destination=EdgeConnection(node_id="outer", field="condition"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="inner", field="value"),
+                destination=EdgeConnection(node_id="outer", field="true_input"),
+            ),
+            Edge(
+                source=EdgeConnection(node_id="outer-false", field="value"),
+                destination=EdgeConnection(node_id="outer", field="false_input"),
+            ),
+        ]
+    )
+    state = GraphExecutionState(graph=graph)
+    state.source_prepared_mapping["inner"] = {"inner-exec"}
+    iterator_ancestry = _IteratorAncestry(state)
+
+    def branch_axes(_current_state: GraphExecutionState, _ancestry: object, node_id: str, _cache: dict) -> dict:
+        if node_id == "outer":
+            return {"true_input": (), "false_input": ()}
+        return {"true_input": (), "false_input": ()}
+
+    monkeypatch.setattr(graph_if_runtime, "_get_if_branch_frame_axes", branch_axes)
+
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "outer")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
+    state._resolved_if_exec_branches["inner-exec"] = "true_input"
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "outer")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
+    state._resolved_if_exec_branches.clear()
+    assert graph_if_runtime._get_if_static_frame_analysis(state, iterator_ancestry, "outer")[0] == {
+        "true_input": (),
+        "false_input": (),
+    }
 
 
 @pytest.mark.parametrize("executed", [False, True])
@@ -238,3 +515,54 @@ def test_prepared_selected_source_preserves_paths_without_ancestry(executed: boo
         lambda *_: (2,),
         _IteratorAncestry(state),
     ) == ([] if executed else [(2,)])
+
+
+def test_collect_empty_path_fallback_reuses_input_edge_axes(monkeypatch: pytest.MonkeyPatch) -> None:
+    graph = Graph(
+        nodes={
+            "outer": AddInvocation(id="outer"),
+            "source": AddInvocation(id="source"),
+            "collect": CollectInvocation(id="collect"),
+        }
+    )
+    graph.edges.append(
+        Edge(
+            source=EdgeConnection(node_id="outer", field="item"),
+            destination=EdgeConnection(node_id="source", field="a"),
+        )
+    )
+    input_edge = Edge(
+        source=EdgeConnection(node_id="source", field="output_collection"),
+        destination=EdgeConnection(node_id="collect", field="item"),
+    )
+    graph.edges.append(input_edge)
+    graph.edges.append(
+        Edge(
+            source=EdgeConnection(node_id="outer", field="item"),
+            destination=EdgeConnection(node_id="consumer", field="value"),
+        )
+    )
+    graph._invalidate_edge_indexes()
+    state = SimpleNamespace(graph=graph, source_prepared_mapping={"outer"})
+    axis_lookups = 0
+
+    def get_edge_frame_axes(_state: object, _ancestry: object, edge: Edge, _cache: dict) -> tuple[str, ...]:
+        nonlocal axis_lookups
+        assert edge == input_edge
+        axis_lookups += 1
+        return ("outer", "inner")
+
+    monkeypatch.setattr(graph_if_runtime, "_get_edge_frame_axes", get_edge_frame_axes)
+
+    assert graph_if_runtime._get_effective_iteration_paths_for_edge(
+        state,
+        Edge(
+            source=EdgeConnection(node_id="collect", field="collection"),
+            destination=EdgeConnection(node_id="consumer", field="value"),
+        ),
+        {"source"},
+        lambda _source_id: {"outer-exec"},
+        lambda _edge, _prepared_id: (),
+        _IteratorAncestry(GraphExecutionState(graph=Graph())),
+    ) == {()}
+    assert axis_lookups == 1
