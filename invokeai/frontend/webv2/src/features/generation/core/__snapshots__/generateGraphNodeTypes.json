@@ -151,6 +151,7 @@
         "core_metadata",
         "flux2_vae_decode",
         "flux3_denoise",
+        "flux3_layout_prompt",
         "flux3_model_loader",
         "flux3_text_encoder",
         "flux_kontext",
@@ -1336,6 +1337,25 @@
       },
       "outputs": [
         "latents"
+      ]
+    },
+    "flux3_layout_prompt": {
+      "inputs": [
+        "prompt"
+      ],
+      "literalInputs": {
+        "edit_targets": [
+          true
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
       ]
     },
     "flux3_model_loader": {

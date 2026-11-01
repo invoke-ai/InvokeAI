@@ -1525,6 +1525,25 @@ describe('FLUX.3 graphs', () => {
     expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
+
+  it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
+    const plain = compile(kleinModel);
+    const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
+    const withDisabledReference = compile(kleinModel, { referenceImages: [reference('off', false)] });
+
+    expect(getEdge(plain, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(plain, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    // Canvas regions fill the node; without them it passes the prompt through, and core metadata keeps only the
+    // prompt as typed.
+    expect(plain.nodes.layout_prompt).toMatchObject({ type: 'flux3_layout_prompt' });
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+    expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(withReference.nodes.layout_prompt?.edit_targets).toBe(true);
+    // A disabled reference wires nothing into the denoiser, so FLUX.3 does not edit.
+    expect(getEdge(withDisabledReference, 'denoise_latents', 'kontext_conditioning')).toBeUndefined();
+    expect(withDisabledReference.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+  });
 });
 
 describe('ERNIE-Image graphs', () => {

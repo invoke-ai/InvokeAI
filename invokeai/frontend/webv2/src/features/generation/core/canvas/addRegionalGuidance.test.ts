@@ -247,7 +247,7 @@ describe('getRegionalGuidanceSupport', () => {
     expect(getRegionalGuidanceSupport(null)).toBeNull();
   });
 
-  it('places MOSS-Image and Ideogram 4 regions as layout boxes, with no negative or reference-image side', () => {
+  it('places MOSS-Image, Ideogram 4 and FLUX.3 regions as layout boxes, with no negative or reference-image side', () => {
     expect(getRegionalGuidanceSupport('moss-image')).toEqual({
       autoNegative: false,
       label: 'MOSS-Image',
@@ -260,6 +260,15 @@ describe('getRegionalGuidanceSupport', () => {
     expect(getRegionalGuidanceSupport('ideogram-4')).toEqual({
       autoNegative: false,
       label: 'Ideogram 4',
+      layoutKinds: ['object'],
+      mode: 'layout',
+      negativePrompt: false,
+      referenceImages: null,
+    });
+    // Regions become rows of the box table.
+    expect(getRegionalGuidanceSupport('flux3')).toEqual({
+      autoNegative: false,
+      label: 'FLUX.3',
       layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,

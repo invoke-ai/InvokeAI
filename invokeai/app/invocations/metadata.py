@@ -237,7 +237,7 @@ class MiniMaxH3ReferenceMetadataField(BaseModel):
 # other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
 # without the key predates versioning and is read with the same rules. Documented, with the
 # field table, in docs/development/Architecture/media-metadata.
-CORE_METADATA_VERSION = "1.1.0"
+CORE_METADATA_VERSION = "1.2.0"
 
 
 @invocation(
@@ -245,7 +245,7 @@ CORE_METADATA_VERSION = "1.1.0"
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.8.0",
+    version="2.9.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -318,6 +318,12 @@ class CoreMetadataInvocation(BaseInvocation):
     moss_image_layout_prompt: Optional[str] = InputField(
         default=None,
         description="The JSON layout prompt encoded for MOSS-Image inference",
+    )
+    # FLUX.3 can encode a caption other than the typed prompt: canvas regions append a box table to it at generation
+    # time (flux3_layout_prompt). As for `ideogram4_caption`, an edge records the caption encoded.
+    flux3_caption: Optional[str] = InputField(
+        default=None,
+        description="The caption encoded for FLUX.3 inference, when it is not the positive prompt as typed",
     )
 
     # Video generation. Frame count and keyframes have no home among the image fields, and
