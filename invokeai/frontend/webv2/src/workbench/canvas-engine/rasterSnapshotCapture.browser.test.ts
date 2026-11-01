@@ -249,6 +249,19 @@ describe('region snapshots through real Canvas2D compositing', () => {
   it('keeps members of a spatial group on their full sources', async () => {
     await compare(scene(identity, noise, spatial), true);
   });
+  it.each([true, false])(
+    'shares nested group source context with enabled spatial adjustments: %s',
+    async (isEnabled) => {
+      const s = scene(identity, noise);
+      const outerAdjustments = spatial.map((entry) => ({ ...entry, isEnabled }));
+      s.canvas.document.stacks = stacksFrom([
+        groupContract('outer', [groupContract('inner', [s.layer], { adjustments: color })], {
+          adjustments: outerAdjustments,
+        }),
+      ]);
+      await compare(s, isEnabled);
+    }
+  );
 });
 
 it.each([origin, { x: -19.4, y: -11.6 }])(

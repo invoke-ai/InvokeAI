@@ -13,6 +13,7 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { expand, intersect, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
@@ -308,7 +309,7 @@ const setTransform = (ctx: Ctx, m: Mat2d): void => {
 };
 
 /** The layer's local→document transform matrix. */
-const layerMatrix = (ref: CompositeLayerRef): Mat2d =>
+const layerMatrix = (ref: Pick<CompositeLayerRef, 'transform'>): Mat2d =>
   fromTRS(
     { x: ref.transform.x, y: ref.transform.y },
     ref.transform.rotation,
@@ -316,11 +317,63 @@ const layerMatrix = (ref: CompositeLayerRef): Mat2d =>
     ref.transform.scaleY
   );
 
-/** The layer-local region of `content` an output over `frame` samples, with one pixel of resampling margin. */
-const sampledLayerRegion = (ref: CompositeLayerRef, frame: Rect, content: Rect): Rect | null => {
+/** Source-context policy shared by layer sampling, isolated group frames, and immutable capture. */
+const requiresWholeSource = (adjustments: CanvasAdjustmentsContract | undefined): boolean =>
+  hasSpatialAdjustments(adjustments);
+
+/** Whole source for context-dependent stacks; otherwise the output's layer-local samples plus resampling margin. */
+const layerSourceRegion = (
+  ref: Pick<CompositeLayerRef, 'transform' | 'adjustments'>,
+  frame: Rect,
+  content: Rect
+): Rect | null => {
+  if (requiresWholeSource(ref.adjustments)) {
+    return content;
+  }
   const inverse = invert(multiply(bboxView(frame), layerMatrix(ref)));
   const output: Rect = { height: Math.max(0, frame.height), width: Math.max(0, frame.width), x: 0, y: 0 };
   return inverse ? intersect(roundOut(expand(transformBounds(inverse, output), 1)), content) : content;
+};
+
+/**
+ * Detached source pixels sufficient for this renderer, including enclosing groups' source context. Capture aligns
+ * the renderer's already-rounded sample region to the source pixel grid so fractional paint origins never clip it.
+ * Rotation/rescaling keeps the full source: changing Canvas2D's source origin can change transformed sampling.
+ */
+export const getRasterSnapshotCaptureRect = (
+  document: CanvasDocumentContractV3,
+  layer: CanvasLayerContract,
+  frame: Rect | undefined,
+  content: Rect
+): Rect => {
+  const t = layer.transform;
+  if (!frame || t.rotation !== 0 || Math.abs(t.scaleX) !== 1 || Math.abs(t.scaleY) !== 1) {
+    return { ...content };
+  }
+  if (layer.type === 'raster') {
+    const index = getDocumentIndex(document);
+    if (
+      index.byId.get(layer.id)!.path.some((id) => {
+        const ancestor = index.byId.get(id)!.node;
+        return ancestor.type === 'group' && requiresWholeSource(ancestor.adjustments);
+      })
+    ) {
+      return { ...content };
+    }
+  }
+  const sampled = layerSourceRegion(layer, frame, content);
+  if (!sampled) {
+    return { x: content.x, y: content.y, width: 0, height: 0 };
+  }
+  const pixels = intersect(roundOut({ ...sampled, x: sampled.x - content.x, y: sampled.y - content.y }), {
+    x: 0,
+    y: 0,
+    width: content.width,
+    height: content.height,
+  });
+  return pixels
+    ? { ...pixels, x: pixels.x + content.x, y: pixels.y + content.y }
+    : { x: content.x, y: content.y, width: 0, height: 0 };
 };
 
 const areaOf = (rect: Rect | null): number => (rect ? Math.max(0, rect.width) * Math.max(0, rect.height) : 0);
@@ -331,10 +384,10 @@ const areaOf = (rect: Rect | null): number => (rect ? Math.max(0, rect.width) * 
  * output when the layer is downscaled, and a spatial stack adjusts all of `content`.
  */
 const layerScratchPixels = (ref: CompositeLayerRef, frame: Rect, content: Rect): number => {
-  if (hasSpatialAdjustments(ref.adjustments)) {
-    return areaOf(content);
+  if (requiresWholeSource(ref.adjustments)) {
+    return areaOf(layerSourceRegion(ref, frame, content));
   }
-  const sampled = isPositionDependentAdjustments(ref.adjustments) ? sampledLayerRegion(ref, frame, content) : null;
+  const sampled = isPositionDependentAdjustments(ref.adjustments) ? layerSourceRegion(ref, frame, content) : null;
   return Math.max(areaOf(frame), areaOf(sampled));
 };
 
@@ -374,7 +427,7 @@ export const compositeScratchPixels = (entry: CompositeEntry): number => {
       for (; index < scope.start; index += 1) {
         pixels += leafScratch(index, frame);
       }
-      const inner = hasSpatialAdjustments(scope.adjustments) ? plannedScopeExtent(entry, scope) : frame;
+      const inner = requiresWholeSource(scope.adjustments) ? plannedScopeExtent(entry, scope) : frame;
       if (inner) {
         pixels += areaOf(inner) + scratchOf(scope.start, scope.end, scope.children, inner);
       }
@@ -494,24 +547,20 @@ export const renderRasterComposite = async (
         // adjusts after resampling, keeping the work bounded by the output. Noise must stay layer-local so
         // resampling averages it exactly as the display does, so its work is the sampled region.
         const shared = deps.adjustedSurface?.(ref.id, source, ref.adjustments) ?? null;
+        const sampled = shared ? null : layerSourceRegion(ref, frame, origin);
         if (shared) {
           source = shared;
-        } else if (hasSpatialAdjustments(ref.adjustments)) {
-          if (areaOf(origin) === 0) {
-            return;
-          }
-          extra = reserveExcess(areaOf(origin), layerScratchPixels(ref, frame, plannedContent(ref)));
-          const local = deps.backend.createSurface(origin.width, origin.height);
+        } else if (!sampled || areaOf(sampled) === 0) {
+          return;
+        } else if (requiresWholeSource(ref.adjustments)) {
+          extra = reserveExcess(areaOf(sampled), layerScratchPixels(ref, frame, plannedContent(ref)));
+          const local = deps.backend.createSurface(sampled.width, sampled.height);
           setTransform(local.ctx, IDENTITY);
           local.ctx.drawImage(source.canvas, 0, 0);
-          const pixels = readImageData(local, fullRectOf(origin));
-          writeImageData(local, await evaluate(pixels, ref.adjustments, origin, ref.id), 0, 0);
+          const pixels = readImageData(local, fullRectOf(sampled));
+          writeImageData(local, await evaluate(pixels, ref.adjustments, sampled, ref.id), 0, 0);
           source = local;
         } else {
-          const sampled = sampledLayerRegion(ref, frame, origin);
-          if (!sampled) {
-            return;
-          }
           if (areaOf(sampled) > areaOf(frame) && !isPositionDependentAdjustments(ref.adjustments)) {
             drawAdjustedAtOutput(ctx, frame, ref, source, origin, placed, ref.adjustments);
             return;
@@ -635,7 +684,7 @@ export const renderRasterComposite = async (
     for (let i = end - 1; i >= start;) {
       const scope = scopeIndex >= 0 ? scopes[scopeIndex]! : null;
       if (scope && i >= scope.start && i < scope.end) {
-        if (hasSpatialAdjustments(scope.adjustments)) {
+        if (requiresWholeSource(scope.adjustments)) {
           await drawSpatialScope(ctx, frame, scope, leased);
         } else {
           const output = fullRectOf(frame);

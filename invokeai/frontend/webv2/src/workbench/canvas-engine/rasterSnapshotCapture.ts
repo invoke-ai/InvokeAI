@@ -12,32 +12,11 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
-import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
-import { fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
-import { expand, intersect, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
-import { hasSpatialAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { getRasterSnapshotCaptureRect } from '@workbench/canvas-engine/render/rasterComposite';
 
 const BYTES_PER_PIXEL = 4;
-
-/** Select whole source pixels, preserving their grid even when the layer-local content origin is fractional. */
-const captureRect = (content: Rect, region: Rect | undefined): Rect => {
-  if (!region) {
-    return { ...content };
-  }
-  // Adjustments sample an outward-rounded layer-local region; cover it before snapping to the source pixel grid.
-  const local = roundOut(expand(region, 1));
-  const sampled = intersect(roundOut({ ...local, x: local.x - content.x, y: local.y - content.y }), {
-    x: 0,
-    y: 0,
-    width: content.width,
-    height: content.height,
-  });
-  return sampled
-    ? { ...sampled, x: sampled.x + content.x, y: sampled.y + content.y }
-    : { x: content.x, y: content.y, width: 0, height: 0 };
-};
 
 // A disjoint layer keeps a transparent pixel so downstream Canvas2D drawing remains valid.
 const rectBytes = (rect: Rect): number => Math.max(1, rect.width) * Math.max(1, rect.height) * BYTES_PER_PIXEL;
@@ -121,9 +100,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
 
     const document = documentSnapshot.canvas.document;
     const uniqueLayerIds = [...new Set(layerIds)];
-    const regions = new Map<string, Rect>();
     const estimatedBytes = new Map<string, number>();
-    const index = getDocumentIndex(document);
     let requestedBytes = 0;
     for (const layerId of uniqueLayerIds) {
       const layer = lookupDocumentLayer(document, layerId);
@@ -131,27 +108,9 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       if (!layer || !source || !isSupportedExportSource(source)) {
         return { status: 'not-ready' };
       }
-      if (options?.region) {
-        // Spatial stacks need the owner's whole source, including every member of a spatial group.
-        const spatial =
-          layer.type === 'raster' &&
-          (hasSpatialAdjustments(layer.adjustments) ||
-            index.byId.get(layerId)!.path.some((id) => {
-              const ancestor = index.byId.get(id)!.node;
-              return ancestor.type === 'group' && hasSpatialAdjustments(ancestor.adjustments);
-            }));
-        const t = layer.transform;
-        // Rotating or scaling a cropped Canvas2D source can change sampling; retain the original pixel grid.
-        const unitScale = Math.abs(t.scaleX) === 1 && Math.abs(t.scaleY) === 1;
-        const inverse = !spatial && unitScale && t.rotation === 0 && invert(fromTRS(t, t.rotation, t.scaleX, t.scaleY));
-        if (inverse) {
-          regions.set(layerId, transformBounds(inverse, options.region));
-        }
-      }
       const content = getSourceContentRect(layer, document);
-      const bytes = regions.has(layerId)
-        ? rectBytes(captureRect(content, regions.get(layerId)))
-        : content.width * content.height * BYTES_PER_PIXEL;
+      const rect = getRasterSnapshotCaptureRect(document, layer, options?.region, content);
+      const bytes = options?.region ? rectBytes(rect) : content.width * content.height * BYTES_PER_PIXEL;
       estimatedBytes.set(layerId, bytes);
       requestedBytes += bytes;
     }
@@ -211,8 +170,16 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
         }
         capturedGuards.push(live.guard);
         try {
-          const region = regions.get(layerId);
-          const rect = captureRect({ ...live.rect, width: live.surface.width, height: live.surface.height }, region);
+          const rect = getRasterSnapshotCaptureRect(
+            document,
+            lookupDocumentLayer(document, layerId)!,
+            options?.region,
+            {
+              ...live.rect,
+              width: live.surface.width,
+              height: live.surface.height,
+            }
+          );
           const actualBytes = rectBytes(rect);
           // The up-front reservation was an estimate from the source; a surface
           // that rasterized larger has to be paid for before it is detached.
@@ -231,7 +198,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
             detached.ctx.drawImage(live.surface.canvas, live.rect.x - rect.x, live.rect.y - rect.y);
           }
           layerSurfaces.set(layerId, {
-            rect: region ? rect : { ...live.rect },
+            rect: options?.region ? rect : { ...live.rect },
             ...(options?.region ? { sourceRect: { ...live.rect } } : {}),
             surface: detached,
           });
