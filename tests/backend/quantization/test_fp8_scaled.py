@@ -6,6 +6,7 @@ from unittest import mock
 import pytest
 import torch
 
+from invokeai.backend.quantization import fp8_scaled
 from invokeai.backend.quantization.block_scale_tiles import unblock_scale_grid
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
@@ -860,6 +861,35 @@ class TestE5m2ScaleRecovery:
         assert kept == {}
         assert sd["lin.weight"].dtype is torch.bfloat16
         assert torch.allclose(sd["lin.weight"].float(), torch.full((4, 4), 0.5))
+
+
+class TestFoldInSlabs:
+    """A tensor larger than a slab is folded a slab of rows at a time, and must come out as the whole fold would.
+
+    The expectations are the definition -- float32 product, one rounding to the target dtype -- written out per
+    scale layout rather than taken from the expansion the fold uses. The slab is shrunk so a 37-row weight splits
+    into slabs of two rows and an odd one at the end, the boundaries a row-indexing mistake would show at.
+    """
+
+    @pytest.mark.parametrize("layout", ["per_tensor", "per_row", "block_wise"])
+    def test_slabs_fold_exactly_as_the_whole(self, monkeypatch: pytest.MonkeyPatch, layout: str) -> None:
+        monkeypatch.setattr(fp8_scaled, "_FOLD_SLAB_ELEMENTS", 100)
+        torch.manual_seed(0)
+        codes = torch.randn(37, 48).to(FP8_DTYPE)
+        if layout == "per_tensor":
+            scale = torch.tensor(0.37)
+            expanded = scale
+        elif layout == "per_row":
+            scale = torch.rand(37) + 0.5
+            expanded = scale[:, None]
+        else:  # one scale per 16 columns
+            scale = torch.rand(37, 3) + 0.5
+            expanded = scale.repeat_interleave(16, dim=1)
+        sd = {"lin.weight": codes}
+
+        dequantize_fp8_scaled(sd, {"lin": Fp8ScaledLayer(weight_scale=scale)}, torch.bfloat16)
+
+        assert torch.equal(sd["lin.weight"], (codes.float() * expanded).to(torch.bfloat16))
 
 
 class TestBlockWiseScale:
