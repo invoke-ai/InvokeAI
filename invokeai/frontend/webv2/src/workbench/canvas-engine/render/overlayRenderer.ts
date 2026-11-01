@@ -22,6 +22,15 @@ export const MIN_GRID_SPACING_PX = 8;
 
 const BBOX_COLOR = '#3b82f6';
 const BBOX_DASH: readonly number[] = [4, 4];
+/** Pending results' landing rects: amber, so a frame moved off them still reads as a different thing. */
+const STAGED_REGION_COLOR = '#f59e0b';
+const STAGED_REGION_DASH: readonly number[] = [6, 4];
+/** Others stay readable; the selected one is wider and opaque. */
+const STAGED_REGION_ALPHA = 0.8;
+const STAGED_REGION_WIDTH_PX = 1.5;
+const STAGED_REGION_SELECTED_WIDTH_PX = 2.5;
+/** A dark halo under the dashes keeps them visible over light and busy pixels alike. */
+const STAGED_REGION_HALO = 'rgba(0, 0, 0, 0.55)';
 /** The bbox-overlay dim fill when no theme surround color has been fed in. */
 const BBOX_OVERLAY_FILL = 'hsl(220 12% 10%)';
 /** The shade is the surround color at this opacity: the dimmed area reads as "outside the document". */
@@ -93,6 +102,8 @@ export interface OverlayState {
   viewportSize: { readonly width: number; readonly height: number };
   /** Generation bounding box in document space. */
   bbox: Rect;
+  /** Where each pending result lands (document space); the selected one is emphasized. Absent: none. */
+  stagedRegions?: readonly { readonly rect: Rect; readonly selected: boolean }[];
   /** Whether to draw the eight bbox resize handles (bbox tool active). */
   bboxHandles?: boolean;
   /** Whether to draw the passive bbox frame (default when absent: drawn). */
@@ -579,6 +590,32 @@ const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlaySta
   ctx.restore();
 };
 
+/**
+ * Dashed amber outlines where pending results land, over a dark halo so they read on busy content, as given:
+ * `PreviewStateController` already lists each rect once with the selected one last.
+ */
+const drawStagedRegions = (ctx: Ctx, state: OverlayState): void => {
+  const regions = state.stagedRegions;
+  if (!regions || regions.length === 0) {
+    return;
+  }
+  ctx.save();
+  for (const { rect, selected } of regions) {
+    const screenRect = transformBounds(state.view, rect);
+    const width = selected ? STAGED_REGION_SELECTED_WIDTH_PX : STAGED_REGION_WIDTH_PX;
+    ctx.globalAlpha = selected ? 1 : STAGED_REGION_ALPHA;
+    ctx.setLineDash([]);
+    ctx.strokeStyle = STAGED_REGION_HALO;
+    ctx.lineWidth = width + 2;
+    strokeRectScreen(ctx, screenRect);
+    ctx.setLineDash([...STAGED_REGION_DASH]);
+    ctx.strokeStyle = STAGED_REGION_COLOR;
+    ctx.lineWidth = width;
+    strokeRectScreen(ctx, screenRect);
+  }
+  ctx.restore();
+};
+
 const drawRuleOfThirds = (ctx: Ctx, state: OverlayState): void => {
   if (!state.ruleOfThirds) {
     return;
@@ -641,6 +678,9 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
 
   // Rule-of-thirds guides sit inside the bbox, behind its frame.
   drawRuleOfThirds(ctx, state);
+
+  // Pending results' rects sit under the bbox frame, which may coincide with one of them.
+  drawStagedRegions(ctx, state);
 
   // Passive bbox visibility is optional; active-tool handles remain editable even when hidden.
   if (state.showBbox ?? true) {

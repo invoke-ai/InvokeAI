@@ -1,15 +1,16 @@
 import type { GalleryItemKey } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 
-import { Badge, Box, HStack } from '@chakra-ui/react';
+import { Badge, Box, HStack, Icon, type SystemStyleObject } from '@chakra-ui/react';
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { MoreVerticalIcon } from 'lucide-react';
+import { LocateIcon, MoreVerticalIcon } from 'lucide-react';
 import { useCallback, useMemo, type MouseEvent, type PointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +27,17 @@ import {
   isGalleryItemDragData,
 } from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
+
+/**
+ * On the selected row's accent fill, the ghost button's own foreground, hover tint and accent focus ring all vanish:
+ * take the row's contrast colour and tint with it instead.
+ */
+const SELECTED_ACTIONS_CSS: SystemStyleObject = {
+  _expanded: { bg: 'accent.contrast/15' },
+  _hover: { bg: 'accent.contrast/15' },
+  color: 'inherit',
+  focusRingColor: 'accent.contrast',
+};
 
 export const GalleryBoardRow = ({
   accessibleName,
@@ -48,9 +60,9 @@ export const GalleryBoardRow = ({
    * managed through its project, and never outside the workbench's drag context.
    */
   dragScope?: string;
-  /** Results without a board of their own land here (the gallery is not following its selection). */
+  /** Results without a board of their own land here: the destination the header names. */
   isAutoAddTarget?: boolean;
-  /** The view-only board whose results come here instead, named in the Auto badge's tooltip. */
+  /** The view-only board whose results come here instead, named in the destination marker's tooltip. */
   autoAddRedirectedFrom?: string;
   /** Its own menu is showing, so the trigger must not fade out from under it. */
   isMenuOpen?: boolean;
@@ -109,10 +121,12 @@ export const GalleryBoardRow = ({
   const dragOrigin = isDragging ? (active?.rect.current.initial ?? null) : null;
 
   const counts = getBoardCounts(board);
-  const mediaCount = Math.max(0, counts.imageCount + counts.videoCount - counts.assetVideoCount);
+  // The badge reads "Media | Uploads", the two tabs; its label spells out what each holds.
   const countsBreakdown = t('widgets.gallery.boardCountsBreakdown', {
-    assets: counts.assetCount + counts.assetVideoCount,
-    media: mediaCount,
+    media:
+      formatGalleryMediaCounts(t, { images: counts.images, videos: counts.videos }) ||
+      t('widgets.gallery.imageCount', { count: 0 }),
+    uploads: t('widgets.gallery.assetCount', { count: counts.uploads }),
   });
 
   const handleSelect = useCallback(() => onSelectBoard(board.id), [board.id, onSelectBoard]);
@@ -170,26 +184,29 @@ export const GalleryBoardRow = ({
   const actions = useMemo(
     () =>
       onOpenMenu ? (
-        <IconButton
-          aria-label={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}
-          className="board-row-actions"
-          flexShrink={0}
-          // Its menu anchors to this button, so it must not fade out beneath it.
-          opacity={isMenuOpen ? 1 : 0}
-          // 24px: the target-size floor, and short enough for the 28px row.
-          size="sm"
-          transition="opacity var(--wb-motion-duration-medium) ease"
-          variant="ghost"
-          onClick={handleActionsClick}
-          // Pressing the menu button must not start dragging the row it sits on.
-          onMouseDown={stopPropagation}
-          onPointerDown={stopPropagation}
-          onPointerUp={stopPropagation}
-        >
-          <MoreVerticalIcon />
-        </IconButton>
+        <Tooltip content={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}>
+          <IconButton
+            aria-label={t('widgets.gallery.boardActionsForBoard', { name: spokenLabel })}
+            className="board-row-actions"
+            css={isSelected ? SELECTED_ACTIONS_CSS : undefined}
+            flexShrink={0}
+            // Its menu anchors to this button, so it must not fade out beneath it.
+            opacity={isMenuOpen ? 1 : 0}
+            // 24px: the target-size floor, and short enough for the 28px row.
+            size="sm"
+            transition="opacity var(--wb-motion-duration-medium) ease"
+            variant="ghost"
+            onClick={handleActionsClick}
+            // Pressing the menu button must not start dragging the row it sits on.
+            onMouseDown={stopPropagation}
+            onPointerDown={stopPropagation}
+            onPointerUp={stopPropagation}
+          >
+            <MoreVerticalIcon />
+          </IconButton>
+        </Tooltip>
       ) : null,
-    [handleActionsClick, isMenuOpen, onOpenMenu, spokenLabel, stopPropagation, t]
+    [handleActionsClick, isMenuOpen, isSelected, onOpenMenu, spokenLabel, stopPropagation, t]
   );
 
   // The container, which outlives neither a move to another tier (the row remounts there) nor an archive or delete.
@@ -261,14 +278,19 @@ export const GalleryBoardRow = ({
                 : t('widgets.gallery.autoAddRedirectedTooltip', { name: autoAddRedirectedFrom })
             }
           >
-            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
-              {t('widgets.gallery.autoAddBadge')}
-            </Badge>
+            <Icon
+              aria-label={t('widgets.gallery.autoAddTarget')}
+              as={LocateIcon}
+              boxSize="3.5"
+              color={isSelected ? 'inherit' : 'accent.fg'}
+              flexShrink={0}
+              role="img"
+            />
           </Tooltip>
         ) : null}
         <Tooltip content={countsBreakdown}>
           <Badge aria-label={countsBreakdown} flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
-            {mediaCount} | {counts.assetCount}
+            {counts.media} | {counts.uploads}
           </Badge>
         </Tooltip>
       </GalleryBoardRowShell>

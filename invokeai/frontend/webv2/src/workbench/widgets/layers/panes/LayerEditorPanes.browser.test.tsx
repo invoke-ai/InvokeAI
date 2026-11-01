@@ -5,6 +5,7 @@ import type {
   CanvasLayerSourceContract,
   PreparedDocumentEdit,
 } from '@workbench/canvas-engine/api';
+import type * as CanvasOperationsApi from '@workbench/canvas-operations/api';
 import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasEngine } from '@workbench/canvas-operations/createCanvasEngine';
 import type { FilterOperationSessionState } from '@workbench/canvas-operations/filterOperationSession';
@@ -14,7 +15,7 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { createDocumentModel, getDocumentLeaves } from '@workbench/canvas-engine/api';
 import {
   groupContract,
   layerContract,
@@ -39,6 +40,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { page, userEvent } from 'vitest/browser';
 
 const harness = vi.hoisted(() => ({
+  /** History tests let edits land in the harness project, as the reducer would; other suites keep it fixed. */
+  appliesMutations: false,
   engine: null as unknown,
   listeners: new Set<() => void>(),
   project: null as Project | null,
@@ -78,8 +81,21 @@ vi.mock('@workbench/WorkbenchContext', async () => {
     };
     harness.listeners.forEach((listener) => listener());
   };
-  const commands = { widgets: { patchValues } };
-  const queries = { getSnapshot: () => ({ activeProject: harness.project! }) };
+  const { applyCanvasProjectMutation } = await import('@workbench/canvasProjectMutations');
+  const applyCanvas = (projectId: string, mutation: Parameters<typeof applyCanvasProjectMutation>[1]) => {
+    const project = harness.project;
+    if (!project || project.id !== projectId) {
+      return false;
+    }
+    harness.project = applyCanvasProjectMutation(project, mutation);
+    harness.listeners.forEach((listener) => listener());
+    return harness.project.canvas !== project.canvas;
+  };
+  const commands = { canvas: { apply: applyCanvas }, widgets: { patchValues } };
+  const queries = {
+    getProject: (projectId: string) => (harness.project?.id === projectId ? harness.project : undefined),
+    getSnapshot: () => ({ activeProject: harness.project! }),
+  };
   return {
     useActiveProjectId: () => harness.project!.id,
     useActiveProjectSelector: (selector: (project: Project) => unknown) => {
@@ -95,6 +111,11 @@ vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => true,
 }));
 vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
+// Recovery looks the project's engine up when it acts; the harness engine is the project's.
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof CanvasOperationsApi>()),
+  getCanvasEngine: () => harness.engine,
+}));
 
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
@@ -122,7 +143,15 @@ beforeAll(async () => {
 const createEngineDeps = (): EngineDeps => {
   const mutationPort: CanvasProjectMutationPort = {
     commitEdit: () => undefined,
-    dispatch: () => false,
+    dispatch: (mutation) => {
+      if (!harness.appliesMutations || !harness.project) {
+        return false;
+      }
+      const before = harness.project.canvas;
+      harness.project = applyCanvasProjectMutation(harness.project, mutation);
+      harness.listeners.forEach((listener) => listener());
+      return harness.project.canvas !== before;
+    },
     getCanvasState: () => harness.project?.canvas ?? createEmptyCanvasState(64, 64),
     // Harness project changes reach the engine's document mirror, as reducer dispatches do in the app.
     subscribe: (listener) => {
@@ -298,6 +327,7 @@ const mount = async (
 };
 
 afterEach(async () => {
+  harness.appliesMutations = false;
   await act(() => root?.unmount());
   host?.remove();
   registry?.releaseEngine('p');
@@ -1059,11 +1089,138 @@ describe('Segment tab strip', () => {
 });
 
 describe('History pane', () => {
+  const steps = () =>
+    [...page.getByRole('list', { name: 'Edit history' }).element().querySelectorAll('button')].map(
+      (button) => button.textContent
+    );
+
   it('shows the empty state with undo and redo disabled', async () => {
     await mount(HistoryPane);
     await expect.element(page.getByText('No edits yet.', { exact: true })).toBeVisible();
     await expect.element(page.getByRole('button', { exact: true, name: 'Undo canvas edit' })).toBeDisabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Redo canvas edit' })).toBeDisabled();
+    await expect.element(page.getByRole('button', { exact: true, name: 'Clear history' })).toBeDisabled();
+    expect(steps()).toEqual(['Start']);
+  });
+
+  it('jumps back to the start, and clears history only once that is confirmed', async () => {
+    harness.appliesMutations = true;
+    await mount(HistoryPane, 'layer');
+    const bbox = harness.project!.canvas.document.bbox;
+    await act(() => {
+      engine!.layers.commitStructural(
+        'Move frame',
+        { bbox: { ...bbox, x: 8 }, type: 'setCanvasBbox' },
+        {
+          bbox,
+          type: 'setCanvasBbox',
+        }
+      );
+    });
+    expect(steps()).toEqual(['Start', 'Move frame']);
+
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Start' })));
+    await expect.poll(() => engine!.history.getEntries().future).toEqual(['Move frame']);
+
+    await act(() => userEvent.click(page.getByRole('button', { exact: true, name: 'Clear history' })));
+    const dialog = page.getByRole('alertdialog');
+    await expect.element(dialog).toBeVisible();
+    expect(dialog.element().textContent).toContain('Discards the 1 undo step for this canvas.');
+    await act(() => userEvent.click(dialog.getByRole('button', { exact: true, name: 'Clear history' })));
+    await expect.poll(() => engine!.history.getEntries().future).toEqual([]);
+    expect(steps()).toEqual(['Start']);
+  });
+
+  it('lists restore points newest first and says what each brings back', async () => {
+    await mount(HistoryPane);
+    const document = harness.project!.canvas.document;
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
+            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
+          ],
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+    const points = page.getByRole('list', { name: 'Restore points' });
+    await expect.element(points).toBeVisible();
+    const names = [...points.element().querySelectorAll('li')].map((item) => item.querySelector('p')?.textContent);
+    expect(names).toEqual(['Discarded', 'Before clearing']);
+    await expect.element(points.getByRole('button', { name: 'Restore' }).first()).toBeEnabled();
+  });
+
+  it('restores a canvas point, keeping the canvas it replaced as a point in its place', async () => {
+    harness.appliesMutations = true;
+    await mount(HistoryPane, 'layer');
+    const document = {
+      ...harness.project!.canvas.document,
+      selectedLayerId: 'restored',
+      stacks: stacksFrom([layerContract('restored', 'raster', { name: 'Restored' })]),
+    };
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Earlier' },
+          ],
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+
+    await act(() =>
+      userEvent.click(page.getByRole('list', { name: 'Restore points' }).getByRole('button', { name: 'Restore' }))
+    );
+    await expect
+      .poll(() => getDocumentLeaves(harness.project!.canvas.document).map((layer) => layer.id))
+      .toEqual(['restored']);
+    const kept = harness.project!.canvas.snapshots;
+    expect(kept.map((point) => point.name)).toEqual(['Before restoring “Earlier”']);
+    expect(getDocumentLeaves(kept[0]!.document).map((layer) => layer.id)).toEqual(['l0']);
+  });
+
+  it('holds a canvas restore while results wait for review, but re-stages a Discard all point', async () => {
+    await mount(HistoryPane);
+    const document = harness.project!.canvas.document;
+    const staged = {
+      height: 64,
+      imageName: 'staged.png',
+      imageUrl: '',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'q',
+      thumbnailUrl: '',
+      width: 64,
+    };
+    await act(() => {
+      harness.project = {
+        ...harness.project!,
+        canvas: {
+          ...harness.project!.canvas,
+          snapshots: [
+            { createdAt: new Date().toISOString(), document, id: 'a', kind: 'clear-canvas', name: 'Before clearing' },
+            { createdAt: new Date().toISOString(), document, id: 'b', kind: 'discard-results', name: 'Discarded' },
+          ],
+          stagingArea: {
+            ...harness.project!.canvas.stagingArea,
+            pendingImageIds: ['staged.png'],
+            pendingImages: [staged],
+          },
+        },
+      };
+      harness.listeners.forEach((listener) => listener());
+    });
+    const restores = page.getByRole('list', { name: 'Restore points' }).getByRole('button', { name: 'Restore' });
+    // Newest first: the Discard all point, then the cleared canvas.
+    await expect.element(restores.nth(0)).not.toHaveAttribute('aria-disabled', 'true');
+    await expect.element(restores.nth(1)).toHaveAttribute('aria-disabled', 'true');
   });
 });
 

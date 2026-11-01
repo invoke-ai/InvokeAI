@@ -712,6 +712,10 @@ describe('runCanvasInvocation', () => {
       '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
     ],
     [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+    [
+      { status: 'over-budget' } as const,
+      'Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.',
+    ],
   ])('explains a %o capture and dispatches nothing', async (result, message) => {
     const harness = makeHarness();
     harness.deps.composeForGeneration = () => Promise.resolve(result);
@@ -929,9 +933,7 @@ describe('runCanvasInvocation', () => {
     const harness = makeHarness({ model });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices().map((notice) => notice.message)).toEqual([
-      'OpenAI Image supports a maximum size of 32×64.',
-    ]);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['OpenAI Image supports at most 32×64.']);
   });
 
   it('counts the captured init image against the Seedream budget before enqueue', async () => {

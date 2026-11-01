@@ -12,17 +12,7 @@ export type CanvasOperationKind = Extract<CanvasOperationState, { status: 'activ
 
 export interface ToolFormProps {
   engine: CanvasToolOptionsEngine;
-  /** Staging or generation owns the surface: mutating controls disable, Cancel stays. */
-  isSurfaceInteractionLocked: boolean;
 }
-
-export interface ToolFooterProps {
-  engine: CanvasToolOptionsEngine;
-  isExternalInteractionLocked: boolean;
-}
-
-/** Preview cards take the footer's props: the engine plus the surface lock. */
-export type ToolPreviewProps = ToolFooterProps;
 
 export type ToolFormComponent = ComponentType<ToolFormProps>;
 
@@ -48,10 +38,10 @@ export interface ToolPropertyForm {
   id: ToolId;
   /** Paints into one leaf: a selected group gets the "select a layer" notice instead of strokes. */
   paintsLeaf?: boolean;
-  preview?: ComponentType<ToolPreviewProps>;
+  preview?: ComponentType<ToolFormProps>;
   groups: readonly ToolPropertyGroup[];
   /** Sticks to the pane's bottom edge while the form scrolls: session status, Apply, Cancel. */
-  footer?: ComponentType<ToolFooterProps>;
+  footer?: ComponentType<ToolFormProps>;
 }
 
 /** A guarded operation's pane form: named groups plus the sticky footer that owns its verbs. */
@@ -59,5 +49,5 @@ export interface OperationPropertyForm {
   kind: CanvasOperationKind;
   groups: readonly ToolPropertyGroup[];
   /** Status chip, Process/Reset, Apply and Cancel; pinned to the pane's bottom edge. */
-  footer: ComponentType<ToolFooterProps>;
+  footer: ComponentType<ToolFormProps>;
 }

@@ -11,12 +11,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as QueueDataStore from './queueDataStore';
 
 import { QueueItemRow } from './QueueItemRow';
+import { createTestQueueUiAdapter } from './queueUiAdapter.testing';
 import { QueueUiProvider, type QueueUiAdapter } from './QueueUiContext';
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, values?: { id?: number }) =>
-      key === 'widgets.queue.itemTitle' ? `Queue item #${values?.id}` : key,
+    t: (key: string, values?: { id?: number; model?: string }) =>
+      key === 'widgets.queue.itemTitle'
+        ? `Queue item #${values?.id}`
+        : key === 'widgets.queue.itemNumber'
+          ? `#${values?.id}`
+          : key === 'widgets.queue.loadingModel'
+            ? `Loading ${values?.model}…`
+            : key,
   }),
 }));
 const commands = vi.hoisted(() => ({
@@ -52,21 +59,7 @@ const item = (overrides: Partial<QueueItemReadModel> = {}): QueueItemReadModel =
   ...overrides,
 });
 
-const adapter = (overrides: Partial<QueueUiAdapter> = {}): QueueUiAdapter => ({
-  ItemActions: () => null,
-  activeProjectId: null,
-  canManageInvocationCache: false,
-  canManageItem: () => true,
-  canManageProcessor: true,
-  canViewItemDetails: () => true,
-  isConnected: true,
-  isProjectOpen: () => true,
-  notify: { error: () => undefined, info: () => undefined, success: () => undefined },
-  openQueue: () => undefined,
-  preloadItemActions: () => undefined,
-  queueJobsScope: 'all',
-  ...overrides,
-});
+const adapter = createTestQueueUiAdapter;
 
 let host: HTMLDivElement;
 let root: Root;
@@ -111,8 +104,10 @@ describe('QueueItemRow', () => {
     expect(card.querySelector('[role="presentation"] [data-list-primary]')).toBe(primary());
     expect(primary().tagName).toBe('BUTTON');
     expect(primary().getAttribute('aria-expanded')).toBe('false');
-    expect(primary().textContent).toContain('Queue item #7');
-    expect(card.textContent).not.toContain('A castle at dusk');
+    // A row reads by what it made; its id stays alongside.
+    expect(primary().textContent).toContain('A castle at dusk');
+    expect(primary().textContent).toContain('#7');
+    expect(card.textContent).not.toContain('common.prompt');
 
     const cancel = host.querySelector<HTMLButtonElement>('button[aria-label="widgets.queue.cancelItem"]')!;
 
@@ -127,13 +122,39 @@ describe('QueueItemRow', () => {
     expect(primary().getAttribute('aria-expanded')).toBe('true');
     // The details stay inside the list item, so they read as part of the row.
     expect(card.textContent).toContain('common.prompt');
-    expect(card.textContent).toContain('A castle at dusk');
-    expect(primary().textContent).toContain('Queue item #7');
+    expect(primary().textContent).toContain('A castle at dusk');
 
     await act(() => primary().click());
     expect(primary().getAttribute('aria-expanded')).toBe('false');
     expect(card.textContent).not.toContain('common.prompt');
-    expect(card.textContent).not.toContain('A castle at dusk');
+  });
+
+  it('names a workflow run by its workflow rather than a prompt-like field', async () => {
+    await render(adapter(), item({ workflowName: 'Tiled upscale' }));
+
+    expect(primary().textContent).toContain('Tiled upscale');
+    expect(primary().textContent).not.toContain('A castle at dusk');
+  });
+
+  it('shows why a failed row failed on one line without expanding it', async () => {
+    await render(
+      adapter(),
+      item({ errorMessage: 'CUDA out of memory\nTraceback (most recent call last)', status: 'failed' })
+    );
+
+    const card = host.querySelector<HTMLElement>('[role="listitem"]')!;
+
+    expect(card.textContent).toContain('CUDA out of memory');
+    expect(card.textContent).not.toContain('Traceback');
+  });
+
+  it('says which model a running item waits on before its first step', async () => {
+    await render(
+      adapter({ loadingModel: { getLabel: () => 'SDXL Base', subscribe: () => () => undefined } }),
+      item({ status: 'in_progress' })
+    );
+
+    expect(host.textContent).toContain('Loading SDXL Base…');
   });
 
   it('distinguishes workflow rows without prompt metadata by their queue item ids', async () => {

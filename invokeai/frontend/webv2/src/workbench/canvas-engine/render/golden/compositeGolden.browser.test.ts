@@ -189,6 +189,25 @@ describe('compositor goldens', () => {
     });
   }
 
+  it('draws a mask being edited over a staged candidate, which covers the raster beneath', async () => {
+    const layers = [inpaintMask('mask', { color: '#e07575', style: 'solid' }), raster('base')];
+    const { backend, caches } = scene(layers, {
+      base: BASE,
+      mask: { paint: solid('#000000'), rect: { height: 40, width: 50, x: 50, y: 35 } },
+    });
+    const candidate = backend.createSurface(60, 50);
+    solid('#4f8ff2')(candidate.ctx, { height: 50, width: 60, x: 0, y: 0 });
+    const target = backend.createSurface(WIDTH, HEIGHT);
+    // With the mask selected the staging view keeps every overlay stack shown (no `showOverlayStacks`).
+    compositeDocument(target, doc(layers), caches, identity(), {
+      backend,
+      checkerboardTile: createCheckerboardTile(backend),
+      maskPatternTile: (fillStyle, color) => createMaskPatternTile(backend, fillStyle as 'solid', color),
+      stagedPreview: { rect: { height: 50, width: 60, x: 70, y: 45 }, surface: candidate },
+    });
+    await expectGolden('staged-candidate-mask-selected', target);
+  });
+
   it('skips a hidden control layer normally but draws it while isolated', async () => {
     const layers = [control('control', { isHidden: true }), raster('base')];
     const paint = { base: BASE, control: { paint: solid('#8a2be2'), rect: { height: 30, width: 90, x: 35, y: 30 } } };

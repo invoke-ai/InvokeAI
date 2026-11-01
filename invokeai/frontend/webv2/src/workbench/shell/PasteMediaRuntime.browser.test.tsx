@@ -31,7 +31,13 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => mocks.project.id,
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
-  useWidgetValuesSelector: () => ({}),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      widgetId === 'gallery'
+        ? (Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === 'gallery')?.state
+            .values ?? {})
+        : {}
+    ),
 }));
 vi.mock('@features/gallery/picker', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -60,9 +66,9 @@ vi.mock('@features/gallery/queries', () => ({
 }));
 vi.mock('@features/generation/react', () => ({ createGenerateFormValuesSelector: () => () => ({}) }));
 vi.mock('@workbench/image-actions', () => ({
-  getGalleryCanvasImportMenuItems: () => [
-    { destination: 'raster', label: 'widgets.canvas.import.raster', value: 'raster' },
-    { destination: 'control', label: 'widgets.canvas.import.control', value: 'control' },
+  GALLERY_CANVAS_IMPORT_DESTINATIONS: [
+    { destination: 'raster', icon: () => null, label: 'widgets.canvas.import.raster' },
+    { destination: 'control', icon: () => null, label: 'widgets.canvas.import.control' },
   ],
   useDeletionConfirmation: () => ({ dialog: null, requestDeletionConfirmation: vi.fn() }),
   useImageActions: () => ({
@@ -123,7 +129,11 @@ describe('PasteMediaRuntime', () => {
   beforeEach(async () => {
     mocks.canUseAsReferenceImage = true;
     mocks.project = createInitialWorkbenchState().projects[0]!;
-    getProjectWidgetInstance(mocks.project, 'gallery')!.state.values.selectedBoardId = 'board-1';
+    // Following the selected board, so pastes go where the gallery is.
+    Object.assign(getProjectWidgetInstance(mocks.project, 'gallery')!.state.values, {
+      followSelectedBoard: true,
+      selectedBoardId: 'board-1',
+    });
     applyThemeToRoot(DEFAULT_THEME_ID);
     mocks.sendToCanvas.mockReset().mockResolvedValue(undefined);
     mocks.uploadFiles.mockReset().mockResolvedValue([uploadedImage]);
@@ -165,7 +175,7 @@ describe('PasteMediaRuntime', () => {
     expect(event.defaultPrevented).toBe(true);
     const dialog = page.getByRole('dialog', { name: i18n.t('shell.pasteMedia.title', { count: 1 }) });
     await expect.element(dialog).toBeVisible();
-    await expect.element(page.getByRole('button', { name: /Upload to Gallery/ })).toHaveFocus();
+    await expect.element(page.getByRole('button', { name: /Upload to gallery/ })).toHaveFocus();
     await expect.element(page.getByText('Moodboard')).toBeVisible();
     await expect
       .element(page.getByRole('img', { name: i18n.t('shell.pasteMedia.imagePreview', { index: 1 }) }))
@@ -186,7 +196,7 @@ describe('PasteMediaRuntime', () => {
 
   it('uploads to the gallery without a follow-on action, and uses images as reference images', async () => {
     paste(document.body, [imageFile()]);
-    await page.getByRole('button', { name: /Upload to Gallery/ }).click();
+    await page.getByRole('button', { name: /Upload to gallery/ }).click();
     expect(mocks.uploadFiles).toHaveBeenCalledOnce();
     await vi.waitFor(() => expect(pasteDialog().elements()).toHaveLength(0));
     expect(mocks.sendToCanvas).not.toHaveBeenCalled();
@@ -204,7 +214,7 @@ describe('PasteMediaRuntime', () => {
     expect(page.getByRole('button', { name: i18n.t('widgets.canvas.import.raster') }).elements()).toHaveLength(0);
     expect(page.getByRole('button', { name: i18n.t('shell.pasteMedia.reference') }).elements()).toHaveLength(0);
     expect(page.getByText(i18n.t('shell.pasteMedia.videosGalleryOnly')).elements()).toHaveLength(0);
-    await expect.element(page.getByRole('button', { name: /Upload to Gallery/ })).toBeVisible();
+    await expect.element(page.getByRole('button', { name: /Upload to gallery/ })).toBeVisible();
   });
 
   it('uploads to the project board while the gallery shows a date bucket', async () => {
@@ -213,7 +223,7 @@ describe('PasteMediaRuntime', () => {
     values.projectBoardId = 'board-1';
     paste(document.body, [imageFile()]);
 
-    await expect.element(page.getByRole('button', { name: /Upload to Gallery/ })).toHaveAccessibleName(/Moodboard/);
+    await expect.element(page.getByRole('button', { name: /Upload to gallery/ })).toHaveAccessibleName(/Moodboard/);
     // Read by the upload action as the paste is chosen, once it has the listing the board is judged from.
     const { selectedBoardId } = mocks.uploadOptions!;
     expect(selectedBoardId).toBeTypeOf('function');

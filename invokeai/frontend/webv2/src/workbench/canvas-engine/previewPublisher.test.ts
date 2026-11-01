@@ -50,6 +50,12 @@ beforeEach(() => {
   isGuardCurrent = vi.fn(() => true);
 });
 
+/** A staged candidate input at an arbitrary pinned rect. */
+const staged = (imageName: string) => ({
+  imageName,
+  placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+});
+
 describe('staged previews', () => {
   it('prefetches unseen candidate bytes so first selection does not start another full-image request', async () => {
     const publisher = build();
@@ -58,7 +64,7 @@ describe('staged previews', () => {
     await vi.waitFor(() => expect(resolveImage).toHaveBeenCalledOnce());
     expect(decodeBlob).not.toHaveBeenCalled();
 
-    publisher.setStagedPreview({ imageName: 'next.png' });
+    publisher.setStagedPreview(staged('next.png'));
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
 
     expect(resolveImage).toHaveBeenCalledOnce();
@@ -74,11 +80,11 @@ describe('staged previews', () => {
         })
     );
     const publisher = build();
-    publisher.setStagedPreview({ imageName: 'a.png' });
+    publisher.setStagedPreview(staged('a.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(1));
-    publisher.setStagedPreview({ imageName: 'b.png' });
+    publisher.setStagedPreview(staged('b.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
-    publisher.setStagedPreview({ imageName: 'a.png' });
+    publisher.setStagedPreview(staged('a.png'));
     await Promise.resolve();
 
     expect(decodeBlob).toHaveBeenCalledTimes(2);
@@ -92,7 +98,7 @@ describe('staged previews', () => {
   });
 
   it('decodes an image-name input and publishes it', async () => {
-    build().setStagedPreview({ imageName: 'staged.png' });
+    build().setStagedPreview(staged('staged.png'));
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
     expect(resolveImage).toHaveBeenCalledWith('staged.png', expect.any(AbortSignal));
     expect(previews.getStaged()).toMatchObject({ height: 8, width: 8 });
@@ -107,15 +113,21 @@ describe('staged previews', () => {
     expect(previews.getStaged()?.placement).toMatchObject({ opacity: 0.5 });
   });
 
-  it('decodes a base64 data URL at the requested size through the raster seam', async () => {
-    build().setStagedPreview({ dataUrl: `data:image/png;base64,${btoa('pixels')}`, height: 3, width: 5 });
+  it('decodes a base64 data URL at its own size through the raster seam, pinned to the submitted rect', async () => {
+    build().setStagedPreview({
+      dataUrl: `data:image/png;base64,${btoa('pixels')}`,
+      placement: { height: 3, opacity: 1, width: 5, x: -2, y: 7 },
+    });
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
-    const [blob, dimensions] = decodeBlob.mock.calls[0] ?? [];
+    const [blob] = decodeBlob.mock.calls[0] ?? [];
     expect(blob?.type).toBe('image/png');
     await expect(blob?.text()).resolves.toBe('pixels');
-    expect(dimensions).toEqual({ height: 3, scale: true, width: 5 });
-    // The declared size wins over whatever the decode reported.
-    expect(previews.getStaged()).toMatchObject({ height: 3, width: 5 });
+    // A latent-sized frame is never decoded at the (possibly upscaled) output size; the compositor scales it.
+    expect(previews.getStaged()).toMatchObject({
+      height: 8,
+      placement: { height: 3, opacity: 1, width: 5, x: -2, y: 7 },
+      width: 8,
+    });
   });
 
   it('discards a decode that a newer set superseded while it was in flight', async () => {
@@ -127,9 +139,9 @@ describe('staged previews', () => {
         })
     );
     const publisher = build();
-    publisher.setStagedPreview({ imageName: 'first.png' });
+    publisher.setStagedPreview(staged('first.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
-    publisher.setStagedPreview({ imageName: 'second.png' });
+    publisher.setStagedPreview(staged('second.png'));
     release?.();
     await vi.waitFor(() => expect(previews.getStaged()).toMatchObject({ width: 8 }));
     expect(previews.getStaged()).not.toMatchObject({ width: 1 });
@@ -144,7 +156,7 @@ describe('staged previews', () => {
         })
     );
     const publisher = build();
-    publisher.setStagedPreview({ imageName: 'cooling.png' });
+    publisher.setStagedPreview(staged('cooling.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
 
     publisher.clearStagedPreview();
@@ -164,12 +176,12 @@ describe('staged previews', () => {
         })
     );
     const publisher = build();
-    publisher.setStagedPreview({ imageName: 'candidate.png' });
+    publisher.setStagedPreview(staged('candidate.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledOnce());
 
     publisher.clearStagedPreview();
     publisher.clearStagedPreviewCache();
-    publisher.setStagedPreview({ imageName: 'candidate.png' });
+    publisher.setStagedPreview(staged('candidate.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
 
     releases.forEach((release) => release());
@@ -179,10 +191,10 @@ describe('staged previews', () => {
 
   it('leaves a prior preview standing when a later decode fails', async () => {
     const publisher = build();
-    publisher.setStagedPreview({ imageName: 'good.png' });
+    publisher.setStagedPreview(staged('good.png'));
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
     decodeBlob.mockRejectedValueOnce(new Error('decode blew up'));
-    publisher.setStagedPreview({ imageName: 'bad.png' });
+    publisher.setStagedPreview(staged('bad.png'));
     await vi.waitFor(() => expect(decodeBlob).toHaveBeenCalledTimes(2));
     expect(previews.getStaged()).not.toBeNull();
   });
@@ -192,7 +204,7 @@ describe('staged previews', () => {
     publisher.setStagedPreview(null);
     expect(invalidateAll).not.toHaveBeenCalled();
 
-    publisher.setStagedPreview({ imageName: 'staged.png' });
+    publisher.setStagedPreview(staged('staged.png'));
     await vi.waitFor(() => expect(previews.getStaged()).not.toBeNull());
     invalidateAll.mockClear();
 

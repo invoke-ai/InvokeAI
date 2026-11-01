@@ -8,6 +8,7 @@ import { getClusterColor } from '@workbench/image-map/clusterPalette';
 import { getImageLabels } from '@workbench/image-map/imageLabelCache';
 import { PlayIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** Bounds the hover card's thumbnail. */
 const HOVER_PREVIEW_MAX_PX = 160;
@@ -37,7 +38,7 @@ export interface HoverCluster {
 /** "Label: a, b, c" with the first (primary) tag emphasized. */
 const HoverTagsRow = ({ prefix, tags }: { prefix: string; tags: string[] }) => (
   <Text color="fg.muted" fontSize="md">
-    <chakra.span color="fg.subtle">{prefix}</chakra.span>
+    <chakra.span color="fg.subtle">{prefix} </chakra.span>
     {tags.map((tag, index) => (
       <chakra.span key={tag} fontWeight={index === 0 ? '600' : undefined}>
         {index > 0 ? ', ' : ''}
@@ -60,6 +61,7 @@ export const MapHoverCard = ({
   hoverCluster: HoverCluster;
   clusterLabel: ImageMapClusterLabelInfo | null;
 }) => {
+  const { t } = useTranslation();
   const cardRef = useRef<HTMLDivElement | null>(null);
   const [imageLabels, setImageLabels] = useState<ImageMapImageLabels | null>(null);
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -147,8 +149,12 @@ export const MapHoverCard = ({
         <Box bg={clusterColor} boxSize="2" flexShrink={0} rounded="full" />
         <Text fontSize="md" fontWeight="600">
           {hoverCluster.cluster < 0
-            ? 'Unclustered'
-            : `Cluster ${hoverCluster.cluster} · ${hoverCluster.clusterSize} items`}
+            ? t('widgets.imageMap.hover.unclustered')
+            : t('widgets.imageMap.hover.cluster', {
+                cluster: hoverCluster.cluster,
+                count: hoverCluster.clusterSize,
+                formatted: hoverCluster.clusterSize.toLocaleString(),
+              })}
         </Text>
       </HStack>
       <HStack alignItems="flex-start" gap="1.5">
@@ -162,8 +168,8 @@ export const MapHoverCard = ({
           {item.name}
         </Text>
       </HStack>
-      {clusterTags ? <HoverTagsRow prefix="Cluster tags: " tags={clusterTags} /> : null}
-      {imageTags ? <HoverTagsRow prefix="Image tags: " tags={imageTags} /> : null}
+      {clusterTags ? <HoverTagsRow prefix={t('widgets.imageMap.hover.clusterTags')} tags={clusterTags} /> : null}
+      {imageTags ? <HoverTagsRow prefix={t('widgets.imageMap.hover.imageTags')} tags={imageTags} /> : null}
     </Stack>
   );
 };

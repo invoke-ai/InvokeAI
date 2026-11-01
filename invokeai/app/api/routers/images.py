@@ -35,6 +35,7 @@ from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageNamesResult,
@@ -362,7 +363,7 @@ def get_image_dto(
         # 404s, so nothing else may wear that answer: a board lookup against an unreadable
         # database, or a URL service failure, would otherwise clear a live image out of the
         # workflows using it. Narrowed here rather than everywhere, because this is the 404
-        # that is acted on destructively — the media, metadata and workflow routes keep theirs.
+        # that is acted on destructively — the media routes keep theirs.
         raise HTTPException(status_code=404)
     redact_project_ids([image_dto], current_user)
     return image_dto
@@ -382,7 +383,10 @@ def get_image_metadata(
 
     try:
         return ApiDependencies.invoker.services.images.get_metadata(image_name)
-    except Exception:
+    except ImageRecordNotFoundException:
+        # Clients cache a 404 here as "this image has no metadata" for good, so only a missing
+        # record earns it. A busy database must surface as a retryable 500; so does stored
+        # metadata that no longer validates — a server fault to log, not an image without metadata.
         raise HTTPException(status_code=404)
 
 
@@ -410,7 +414,8 @@ def get_image_workflow(
         graph = ApiDependencies.invoker.services.images.get_graph(image_name)
         resolved_inputs = ApiDependencies.invoker.services.images.get_resolved_inputs(image_name)
         return WorkflowAndGraphResponse(workflow=workflow, graph=graph, resolved_inputs=resolved_inputs)
-    except Exception:
+    except (ImageRecordNotFoundException, ImageFileNotFoundException):
+        # See get_image_metadata: only a missing record or file is "not found".
         raise HTTPException(status_code=404)
 
 

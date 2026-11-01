@@ -1,11 +1,15 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryVideoItem } from '@features/gallery';
 import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
 import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
+import type * as ClipboardModule from '@platform/browser/clipboard';
 import type { ImageActions, ImageRecallCapabilities } from '@workbench/image-actions';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { galleryKeys } from '@features/gallery/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -14,7 +18,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { PreviewDetailsPopover } from './PreviewDetailsPopover';
+import { PreviewDetailsPanel } from './PreviewDetailsPanel';
 
 const galleryMocks = vi.hoisted(() => ({
   imageMetadata: vi.fn(),
@@ -23,23 +27,29 @@ const galleryMocks = vi.hoisted(() => ({
   videoWorkflow: vi.fn(),
 }));
 const identityMocks = vi.hoisted(() => ({ accountEpoch: 7 }));
+const clipboardMocks = vi.hoisted(() => ({ copyText: vi.fn<(text: string) => Promise<void>>() }));
+
+vi.mock('@platform/browser/clipboard', async (importOriginal) => ({
+  ...(await importOriginal<typeof ClipboardModule>()),
+  canCopyText: () => true,
+  copyText: clipboardMocks.copyText,
+}));
 
 vi.mock('@features/gallery', async (importOriginal) => {
   const actual = await importOriginal<typeof GalleryModule>();
 
   return {
     ...actual,
-    galleryImages: {
-      ...actual.galleryImages,
-      metadata: galleryMocks.imageMetadata,
-      workflow: galleryMocks.imageWorkflow,
-    },
-    galleryVideos: {
-      metadata: galleryMocks.videoMetadata,
-      workflow: galleryMocks.videoWorkflow,
-    },
+    galleryImages: { ...actual.galleryImages, workflow: galleryMocks.imageWorkflow },
+    galleryVideos: { ...actual.galleryVideos, workflow: galleryMocks.videoWorkflow },
   };
 });
+// The transport under the gallery's shared metadata queries.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryImageMetadata: galleryMocks.imageMetadata,
+  getGalleryVideoMetadata: galleryMocks.videoMetadata,
+}));
 vi.mock('@features/identity', async (importOriginal) => {
   const actual = await importOriginal<typeof IdentityModule>();
 
@@ -131,10 +141,33 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { countOfTotal: '{{count}} of {{total}}', copy: 'Copy' },
+        common: { countOfTotal: '{{count}} of {{total}}', copy: 'Copy', retry: 'Retry' },
         widgets: {
+          gallery: {
+            itemActions: {
+              recall: {
+                verbs: {
+                  all: 'Recall all',
+                  clipSkip: 'Use CLIP skip',
+                  dimensions: 'Use size',
+                  prompts: 'Use prompt',
+                  remix: 'Remix image',
+                  seed: 'Use seed',
+                },
+              },
+            },
+          },
           preview: {
             details: 'Details',
+            // Distinct from the English catalog, so the rows provably read their labels from i18n.
+            fields: {
+              fps: 'Frame rate',
+              frames: 'Frame count',
+              model: 'Checkpoint',
+              prompt: 'Prompt text',
+              seed: 'Seed value',
+              sourceRun: 'Queue run',
+            },
             framesPerSecond: '{{count}} fps',
             graph: 'Graph',
             graphJsonLabel: 'Video graph JSON',
@@ -142,12 +175,16 @@ void i18n.use(initReactI18next).init({
             itemCount_other: '{{count}} items',
             loadingMetadata: 'Loading metadata',
             metadata: 'Metadata',
+            metadataFailed: 'Could not load the metadata',
             metadataJsonLabel: 'Video metadata JSON',
             nextItemInBoard: 'Next item in board',
             previousItemInBoard: 'Previous item in board',
             recallNotAvailable: 'Not recallable for this image',
+            retryMetadata: 'Retry loading the metadata',
+            retryWorkflow: 'Retry loading the workflow and graph',
             videoDuration: 'Duration {{duration}}',
             workflow: 'Workflow',
+            workflowFailed: 'Could not load the workflow and graph',
             workflowJsonLabel: 'Video workflow JSON',
           },
         },
@@ -158,6 +195,8 @@ void i18n.use(initReactI18next).init({
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+/** The Preview stage Details pins itself into. */
+let stage: HTMLDivElement | null = null;
 let queryClient: QueryClient;
 let actions: ImageActions;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -184,13 +223,13 @@ const renderDetails = async ({
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
-            <PreviewDetailsPopover
+            <PreviewDetailsPanel
               actions={actions}
               image={item.kind === 'image' ? actionImage : null}
               isOpen={isOpen}
               item={item}
               position={POSITION}
-              stageElement={null}
+              stageElement={stage}
               onOpenChange={() => undefined}
             />
           </ChakraProvider>
@@ -206,16 +245,18 @@ beforeEach(() => {
   galleryMocks.imageWorkflow.mockReset().mockResolvedValue({ graph: null, workflow: null });
   galleryMocks.videoMetadata.mockReset().mockResolvedValue(null);
   galleryMocks.videoWorkflow.mockReset().mockResolvedValue({ graph: null, workflow: null });
+  clipboardMocks.copyText.mockReset().mockResolvedValue(undefined);
   actions = {
     deriveImageRecallCapabilities: vi.fn(() => ALL_RECALL_CAPABILITIES),
-    getImageRecallCapabilities: vi.fn(() => Promise.resolve(ALL_RECALL_CAPABILITIES)),
     recallImageData: vi.fn(() => Promise.resolve()),
   } as unknown as ImageActions;
   queryClient = new QueryClient({
     defaultOptions: { queries: { gcTime: Infinity, retry: false } },
   });
   host = document.createElement('div');
-  document.body.append(host);
+  stage = document.createElement('div');
+  Object.assign(stage.style, { height: '480px', position: 'relative', width: '640px' });
+  document.body.append(host, stage);
   root = createRoot(host);
 });
 
@@ -223,8 +264,10 @@ afterEach(async () => {
   await interact(() => root?.unmount(), 0);
   queryClient.clear();
   host?.remove();
+  stage?.remove();
   host = null;
   root = null;
+  stage = null;
 });
 
 describe('Preview query-driven Details', () => {
@@ -316,19 +359,17 @@ describe('Preview query-driven Details', () => {
     await renderDetails({ isOpen: true, item: imageItem });
 
     const metadataSignal = galleryMocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
-    expect(actions.getImageRecallCapabilities).not.toHaveBeenCalled();
+    expect(galleryMocks.imageMetadata).toHaveBeenCalledOnce();
 
     await renderDetails({ isOpen: false, item: imageItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(metadataSignal.aborted).toBe(true);
     await interact(() => {
       metadata.resolve(null);
     }, 0);
   });
 
-  it('starts video metadata and workflow/graph concurrently under an epoch + GalleryItemKey query', async () => {
+  it('starts video metadata and workflow/graph concurrently, metadata under the shared gallery entry', async () => {
     const metadata = deferred<Record<string, unknown> | null>();
     const workflow = deferred<{ graph: string | null; workflow: string | null }>();
     galleryMocks.videoMetadata.mockReturnValueOnce(metadata.promise);
@@ -341,8 +382,14 @@ describe('Preview query-driven Details', () => {
     expect(galleryMocks.videoMetadata.mock.calls[0]?.[0]).toBe('clip.mp4');
     expect(galleryMocks.videoWorkflow.mock.calls[0]?.[0]).toBe('clip.mp4');
     expect(galleryMocks.videoMetadata.mock.calls[0]?.[1]).toBeInstanceOf(AbortSignal);
-    expect(galleryMocks.videoWorkflow.mock.calls[0]?.[1]).toBe(galleryMocks.videoMetadata.mock.calls[0]?.[1]);
-    expect(queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 7, 'video:clip.mp4'] })).toBeDefined();
+    expect(galleryMocks.videoWorkflow.mock.calls[0]?.[1]).toBeInstanceOf(AbortSignal);
+    // The gallery's shared entry, which the video's menu and recall commands read too.
+    expect(
+      queryClient.getQueryCache().find({ queryKey: galleryKeys.videoMetadata(captureAccountScope(), 'clip.mp4') })
+    ).toBeDefined();
+    expect(
+      queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 7, 'video:clip.mp4', 'workflow'] })
+    ).toBeDefined();
 
     await interact(() => {
       metadata.resolve({ codec: 'h264' });
@@ -361,8 +408,6 @@ describe('Preview query-driven Details', () => {
 
     await renderDetails({ isOpen: false, item: videoItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(metadataSignal.aborted).toBe(true);
     expect(workflowSignal.aborted).toBe(true);
     expect(galleryMocks.videoMetadata).toHaveBeenCalledOnce();
@@ -419,11 +464,11 @@ describe('Preview query-driven Details', () => {
     identityMocks.accountEpoch = 8;
     await renderDetails({ isOpen: true, item: videoItem });
 
-    // The popover's exit runs through zag outside act; settle it before asserting.
-    await interact(() => undefined, 600);
     expect(oldSignal.aborted).toBe(true);
     expect(galleryMocks.videoMetadata).toHaveBeenCalledTimes(2);
-    expect(queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 8, 'video:clip.mp4'] })).toBeDefined();
+    expect(
+      queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 8, 'video:clip.mp4', 'workflow'] })
+    ).toBeDefined();
     await act(async () => {
       await vi.waitFor(() => expect(document.body.textContent).toContain('new-account'));
     });
@@ -450,7 +495,7 @@ describe('Preview query-driven Details', () => {
     expect(getButton('Metadata')).not.toBeNull();
     expect(getButton('Workflow')).not.toBeNull();
     expect(getButton('Graph')).not.toBeNull();
-    // Videos have no parsed rows, so no Details tab.
+    // A record with no parsed rows offers no Details tab.
     expect([...document.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual([
       'Metadata',
       'Workflow',
@@ -464,6 +509,44 @@ describe('Preview query-driven Details', () => {
     expect(document.querySelector('[aria-label="Video graph JSON"]')).not.toBeNull();
   });
 
+  it('opens a video on its parsed rows, which copy but offer no recall', async () => {
+    galleryMocks.videoMetadata.mockResolvedValueOnce({
+      fps: 16,
+      generation_mode: 'wan_t2v',
+      model: { base_model: 'wan', model_name: 'Wan 2.2 T2V' },
+      num_frames: 81,
+      positive_prompt: 'a red fox',
+      seed: 7,
+    });
+
+    await renderDetails({ isOpen: true, item: videoItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('a red fox'));
+    });
+
+    expect([...document.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual([
+      'Details',
+      'Metadata',
+      'Workflow',
+      'Graph',
+    ]);
+    const rows: Record<string, Element> = Object.fromEntries(
+      [...document.querySelectorAll('.chakra-data-list__item')].map((row) => [
+        row.querySelector('dt')?.textContent,
+        row,
+      ])
+    );
+    expect(Object.keys(rows)).toEqual(['Prompt text', 'Checkpoint', 'Seed value', 'Frame count', 'Frame rate']);
+    expect(rows['Checkpoint']?.textContent).toContain('Wan 2.2 T2V');
+    expect(rows['Frame count']?.textContent).toContain('81');
+    // Copy is each row's only action; video recall lives in its menu.
+    expect(document.querySelector('[aria-label="Use prompt"]')).toBeNull();
+    expect(rows['Frame rate']?.querySelectorAll('button')).toHaveLength(1);
+
+    await interact(() => rows['Frame rate']?.querySelector<HTMLButtonElement>('[aria-label="Copy"]')?.click());
+    expect(clipboardMocks.copyText).toHaveBeenCalledWith('16');
+  });
+
   it('keeps parsed image rows, source run, and recall controls while moving the fetch to Query', async () => {
     galleryMocks.imageMetadata.mockResolvedValueOnce({
       model: { name: 'Test Model' },
@@ -474,15 +557,150 @@ describe('Preview query-driven Details', () => {
     await renderDetails({ isOpen: true, item: imageItem });
 
     expect(galleryMocks.imageMetadata).toHaveBeenCalledWith('still.png', expect.any(AbortSignal));
-    expect(queryClient.getQueryCache().find({ queryKey: ['preview', 'details', 7, 'image:still.png'] })).toBeDefined();
+    // The gallery's shared entry, which the image's menus and recall commands read too.
+    expect(
+      queryClient.getQueryCache().find({ queryKey: galleryKeys.imageMetadata(captureAccountScope(), 'still.png') })
+    ).toBeDefined();
     await act(async () => {
       await vi.waitFor(() => expect(document.body.textContent).toContain('query-driven prompt'));
     });
     expect(document.body.textContent).toContain('Test Model');
+    expect(document.body.textContent).toContain('Queue run');
     expect(document.body.textContent).toContain('queue-image');
 
-    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use Prompt"]')?.click());
+    await interact(() => document.querySelector<HTMLButtonElement>('[aria-label="Use prompt"]')?.click());
     expect(actions.recallImageData).toHaveBeenCalledWith(actionImage, 'prompts');
+  });
+
+  it('keeps the image workflow and graph tabs when its metadata cannot be read', async () => {
+    galleryMocks.imageMetadata.mockRejectedValueOnce(new Error('metadata unavailable'));
+    galleryMocks.imageWorkflow.mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: '{"name":"still"}' });
+
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Workflow').getAttribute('aria-disabled')).not.toBe('true'));
+    });
+
+    expect(getButton('Graph').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getButton('Metadata').getAttribute('aria-disabled')).toBe('true');
+    // Recall still derives from what the image itself carries.
+    expect(actions.deriveImageRecallCapabilities).toHaveBeenLastCalledWith(actionImage, null);
+    expect(document.body.textContent).toContain('queue-image');
+  });
+
+  it('keeps the video workflow and graph tabs when its metadata cannot be read, and retries the metadata', async () => {
+    galleryMocks.videoMetadata
+      .mockRejectedValueOnce(new Error('metadata unavailable'))
+      .mockResolvedValueOnce({ codec: 'h264' });
+    galleryMocks.videoWorkflow.mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: '{"name":"clip"}' });
+
+    await renderDetails({ isOpen: true, item: videoItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Could not load the metadata'));
+    });
+
+    expect(getButton('Workflow').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getButton('Graph').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getButton('Metadata').getAttribute('aria-disabled')).toBe('true');
+    expect(document.body.textContent).not.toContain('Could not load the workflow and graph');
+
+    const retry = document.querySelector<HTMLButtonElement>('button[aria-label="Retry loading the metadata"]');
+    expect(retry).not.toBeNull();
+    retry?.focus();
+    await interact(() => retry?.click());
+
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Metadata').getAttribute('aria-disabled')).not.toBe('true'));
+    });
+    expect(galleryMocks.videoMetadata).toHaveBeenCalledTimes(2);
+    expect(galleryMocks.videoWorkflow).toHaveBeenCalledOnce();
+    expect(document.body.textContent).not.toContain('Could not load the metadata');
+    // Nothing was chosen yet, so the panel moves to the tab the retry filled; the removed button hands focus there.
+    expect(document.body.textContent).toContain('"codec": "h264"');
+    await vi.waitFor(() => expect(document.activeElement).toBe(getButton('Metadata')));
+  });
+
+  it('offers a retry for each failed video read over no pane, and fills the tab a retry reads', async () => {
+    galleryMocks.videoMetadata.mockRejectedValueOnce(new Error('metadata unavailable'));
+    galleryMocks.videoWorkflow
+      .mockRejectedValueOnce(new Error('workflow unavailable'))
+      .mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: '{"name":"clip"}' });
+
+    await renderDetails({ isOpen: true, item: videoItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Could not load the workflow and graph'));
+    });
+
+    expect(document.body.textContent).toContain('Could not load the metadata');
+    const retries = [...document.querySelectorAll<HTMLButtonElement>('[role="alert"] button')].map((button) =>
+      button.getAttribute('aria-label')
+    );
+    expect(retries).toEqual(['Retry loading the metadata', 'Retry loading the workflow and graph']);
+    // Every tab is disabled; Metadata stays selected with no empty JSON pane behind it.
+    expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Metadata');
+    expect(document.querySelector('[role="tabpanel"]')?.childElementCount).toBe(0);
+
+    await interact(() =>
+      document.querySelector<HTMLButtonElement>('button[aria-label="Retry loading the workflow and graph"]')?.click()
+    );
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('"name":"clip"'));
+    });
+    expect(document.querySelector('[role="tab"][aria-selected="true"]')?.textContent).toBe('Workflow');
+    expect(document.body.textContent).toContain('Could not load the metadata');
+    expect(document.body.textContent).not.toContain('Could not load the workflow and graph');
+  });
+
+  it('keeps the video metadata tab when its workflow cannot be read, and retries only the workflow', async () => {
+    galleryMocks.videoMetadata.mockResolvedValueOnce({ codec: 'h264' });
+    galleryMocks.videoWorkflow
+      .mockRejectedValueOnce(new Error('workflow unavailable'))
+      .mockResolvedValueOnce({ graph: '{"nodes":[]}', workflow: '{"name":"clip"}' });
+
+    await renderDetails({ isOpen: true, item: videoItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('"codec": "h264"'));
+    });
+
+    expect(getButton('Workflow').getAttribute('aria-disabled')).toBe('true');
+    expect(document.body.textContent).toContain('Could not load the workflow and graph');
+    await interact(() =>
+      document.querySelector<HTMLButtonElement>('button[aria-label="Retry loading the workflow and graph"]')?.click()
+    );
+
+    await act(async () => {
+      await vi.waitFor(() => expect(getButton('Workflow').getAttribute('aria-disabled')).not.toBe('true'));
+    });
+    expect(galleryMocks.videoMetadata).toHaveBeenCalledOnce();
+    expect(galleryMocks.videoWorkflow).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells a failed image metadata read from one that recorded nothing', async () => {
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('queue-image'));
+    });
+    // Recorded nothing: an answer, not a failure.
+    expect(document.querySelector('button[aria-label="Retry loading the metadata"]')).toBeNull();
+    await interact(() => root?.unmount(), 0);
+    queryClient.clear();
+    root = createRoot(host!);
+
+    galleryMocks.imageMetadata
+      .mockRejectedValueOnce(new Error('metadata unavailable'))
+      .mockResolvedValueOnce({ positive_prompt: 'read on retry' });
+    await renderDetails({ isOpen: true, item: imageItem });
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('Could not load the metadata'));
+    });
+
+    await interact(() =>
+      document.querySelector<HTMLButtonElement>('button[aria-label="Retry loading the metadata"]')?.click()
+    );
+    await act(async () => {
+      await vi.waitFor(() => expect(document.body.textContent).toContain('read on retry'));
+    });
+    expect(document.body.textContent).not.toContain('Could not load the metadata');
   });
 
   it('recalls a single field from its metadata row', async () => {
@@ -499,12 +717,12 @@ describe('Preview query-driven Details', () => {
 
     // Only the row buttons carry aria-labels; the verb-row buttons are named
     // by their visible text, so the attribute selector is unambiguous.
-    const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use Seed"]');
+    const seedRecall = document.querySelector<HTMLButtonElement>('[aria-label="Use seed"]');
     expect(seedRecall).not.toBeNull();
-    expect(document.querySelector('[aria-label="Use Prompt"]')).not.toBeNull();
+    expect(document.querySelector('[aria-label="Use prompt"]')).not.toBeNull();
     // No size row was parsed, so no row carries the size verb even though the
     // capability itself is available.
-    expect(document.querySelector('[aria-label="Use Size"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use size"]')).toBeNull();
 
     // The model row has no single-field verb — copy stays its only action.
     const modelRow = [...(document.querySelectorAll('.chakra-data-list__item') ?? [])].find((row) =>
@@ -526,7 +744,7 @@ describe('Preview query-driven Details', () => {
       await vi.waitFor(() => expect(document.body.textContent).toContain('42'));
     });
 
-    expect(document.querySelector('[aria-label="Use Seed"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use seed"]')).toBeNull();
   });
 
   it('updates row recall verbs when capability inputs change without refetching cached metadata', async () => {
@@ -534,7 +752,7 @@ describe('Preview query-driven Details', () => {
 
     await renderDetails({ isOpen: true, item: imageItem });
     await act(async () => {
-      await vi.waitFor(() => expect(document.querySelector('[aria-label="Use Prompt"]')).not.toBeNull());
+      await vi.waitFor(() => expect(document.querySelector('[aria-label="Use prompt"]')).not.toBeNull());
     });
 
     actions = {
@@ -543,7 +761,7 @@ describe('Preview query-driven Details', () => {
     } as unknown as ImageActions;
     await renderDetails({ isOpen: true, item: imageItem });
 
-    expect(document.querySelector('[aria-label="Use Prompt"]')).toBeNull();
+    expect(document.querySelector('[aria-label="Use prompt"]')).toBeNull();
     expect(galleryMocks.imageMetadata).toHaveBeenCalledOnce();
   });
 });

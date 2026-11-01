@@ -1,6 +1,5 @@
 import type { CanvasEngine, CanvasInteractionState } from '@workbench/canvas-engine/api';
 
-import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { createShortcutHintSources } from '@workbench/hotkeys/hintSources';
 import { describe, expect, it, vi } from 'vitest';
@@ -21,7 +20,6 @@ const state = {
   canUndo: false,
   hasSelection: false,
   hasTransform: false,
-  isLocked: false,
   lassoShape: 'freehand',
   operation: null,
   samVisual: false,
@@ -38,7 +36,7 @@ describe('Canvas gesture guidance', () => {
     ]);
   });
 
-  it('keeps one registered source through lock changes, caches equal inputs and releases all notifications', () => {
+  it('keeps one registered source through tool changes, caches equal inputs and releases all notifications', () => {
     const stores = createEngineStores('brush');
     const engine = {
       interaction: {
@@ -46,11 +44,7 @@ describe('Canvas gesture guidance', () => {
         subscribe: (key: keyof CanvasInteractionState, listener: () => void) => stores[key].subscribe(listener),
       },
     } as unknown as CanvasEngine;
-    const locked = createExternalStoreCore({ value: false });
-    const source = createCanvasShortcutHintSource(engine, 'one', 'canvas', {
-      getSnapshot: () => locked.getSnapshot().value,
-      subscribe: locked.subscribe,
-    });
+    const source = createCanvasShortcutHintSource(engine, 'one', 'canvas');
     const sources = createShortcutHintSources();
     const release = sources.register(source);
     let notifications = 0;
@@ -59,25 +53,22 @@ describe('Canvas gesture guidance', () => {
     expect(source.getSnapshot()).toBe(brush);
     stores.lassoOptions.set({ shape: 'freehand', mode: 'add' });
     expect(source.getSnapshot()).toBe(brush);
-    locked.setSnapshot({ value: true });
+    stores.activeTool.set('view');
     expect(sources.get('one', 'canvas')).toBe(source);
     expect(source.getSnapshot().titleKey).toBe('widgets.canvas.tools.view');
     expect(source.getSnapshot().hints).toHaveLength(2);
-    locked.setSnapshot({ value: false });
+    const toView = notifications;
+    expect(toView).toBeGreaterThan(0);
+    stores.activeTool.set('brush');
     expect(source.getSnapshot().titleKey).toBe('widgets.canvas.tools.brush');
     release();
     expect(sources.get('one', 'canvas')).toBeNull();
     const afterRelease = notifications;
-    locked.setSnapshot({ value: true });
     stores.activeTool.set('view');
     expect(notifications).toBe(afterRelease);
     unsubscribe();
   });
-  it('removes painting/session instructions during staging and prompt-mode object selection', () => {
-    expect(hintLabels({ ...state, isLocked: true })).toEqual([
-      'workbench.shortcuts.actions.pan',
-      'workbench.shortcuts.actions.zoom',
-    ]);
+  it('removes painting/session instructions during prompt-mode object selection and Filter', () => {
     expect(hintLabels({ ...state, operation: 'select-object', samVisual: false })).toEqual([
       'workbench.shortcuts.actions.pan',
       'workbench.shortcuts.actions.zoom',
@@ -120,5 +111,22 @@ describe('Canvas gesture guidance', () => {
     expect(sam).toContain('workbench.shortcuts.actions.samOppositePoint');
     expect(sam).not.toContain('canvas.undo');
     expect(sam).not.toContain('workbench.shortcuts.actions.apply');
+  });
+
+  it('teaches the brush line, the frame and move gestures, and the C hold and tap', () => {
+    const brush = hintLabels(state);
+    expect(brush).toContain('workbench.shortcuts.actions.straightLine');
+    const bbox = hintLabels({ ...state, activeTool: 'bbox' });
+    expect(bbox.slice(0, 2)).toEqual([
+      'workbench.shortcuts.actions.moveFrame',
+      'workbench.shortcuts.actions.resizeFrame',
+    ]);
+    expect(bbox).toContain('workbench.shortcuts.actions.ignoreGrid');
+    expect(bbox).toContain('workbench.shortcuts.actions.frameKey');
+    const moveHints = hintLabels({ ...state, activeTool: 'move' });
+    expect(moveHints[0]).toBe('workbench.shortcuts.actions.moveLayer');
+    expect(moveHints).toContain('canvas.nudgeRight');
+    // Alt skips the grid on these tools, so it advertises no color sample.
+    expect([...bbox, ...moveHints]).not.toContain('workbench.shortcuts.actions.sample');
   });
 });

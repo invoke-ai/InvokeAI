@@ -1,7 +1,6 @@
 import type {
   OperationPropertyForm,
   ToolFormProps,
-  ToolFooterProps,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ChangeEvent } from 'react';
@@ -167,12 +166,9 @@ export const toggleSamSetting = (
   }
 };
 
-export const getSamActionEligibility = (
-  session: SamSessionSnapshot,
-  isExternalInteractionLocked = false
-): SamActionEligibility => {
+export const getSamActionEligibility = (session: SamSessionSnapshot): SamActionEligibility => {
   const isProcessing = isSamProcessingStatus(session.status);
-  const actionsBlocked = session.status === 'committing' || isExternalInteractionLocked;
+  const actionsBlocked = session.status === 'committing';
   const hasReadyPreview = session.hasPreview && !isProcessing && !actionsBlocked;
   return {
     canApply: hasReadyPreview,
@@ -417,14 +413,14 @@ export const SamSettings = ({
 /** Input mode, the visual point labels or the prompt, and invert: what changes between previews. */
 
 /** The session's inputs: visual points or a prompt, plus the invert switch. */
-const SamInputSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const SamInputSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
   const operations = getCanvasOperations(engine);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   const viewModel = getSamPanelViewModel(session, (layerName, width, height) =>
     t('widgets.layers.selectObject.sourceLayerLabel', {
       height,
@@ -479,13 +475,13 @@ const SamInputSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps)
 };
 
 /** Set-once session settings: model, refinement, preview behavior. */
-const SamSettingsGroup = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const SamSettingsGroup = ({ engine }: ToolFormProps) => {
   const session = useSamSession(engine);
   const operations = getCanvasOperations(engine);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   return (
     <SamSettings
       eligibility={eligibility}
@@ -500,14 +496,14 @@ const SamSettingsGroup = ({ engine, isSurfaceInteractionLocked }: ToolFormProps)
 const APPLY_MENU_POSITIONING = { placement: 'top-end' } as const;
 
 /** The sticky footer: status chip, Reset, Process, Apply with its save-as menu, Cancel. */
-const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => {
+const SamFooter = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
   const actions = useMemo(() => getSamActionHandlers(getCanvasOperations(engine)), [engine]);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   const isProcessing = isSamProcessingStatus(session.status);
   const isBusy = !session.error && (isProcessing || session.status === 'scheduled' || session.status === 'committing');
   const sourceLabel = t('widgets.layers.selectObject.sourceLayerLabel', {

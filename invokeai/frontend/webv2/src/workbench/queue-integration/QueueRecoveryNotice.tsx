@@ -4,6 +4,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQueryClient } from '@tanstack/react-query';
+import { useProjectLibrarySelector } from '@workbench/projects/library';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -60,6 +61,10 @@ export const QueueRecoveryNotice = ({
     query.data?.kind === 'available' ? query.data.projectIds.filter((projectId) => !openIds.has(projectId)) : [];
   const visibleIndex = Math.min(selectedIndex, Math.max(0, projectIds.length - 1));
   const projectId = projectIds[visibleIndex];
+  // The project is not open here, so its name comes from the library; without one it goes unnamed, never by id.
+  const projectName = useProjectLibrarySelector(
+    (snapshot) => snapshot.summaries.find((summary) => summary.id === projectId)?.name ?? null
+  );
   const isBusy = pendingAction !== null || discardProjectId !== null;
 
   const canUpdate = useCallback(() => isMountedRef.current && isAccountScopeCurrent(owner), [owner]);
@@ -188,7 +193,9 @@ export const QueueRecoveryNotice = ({
             <Stack gap="0.5" minW="0">
               <Alert.Title>{t('shell.queueRecovery.title')}</Alert.Title>
               <Alert.Description overflowWrap="anywhere">
-                {t('shell.queueRecovery.description', { projectId })}
+                {projectName
+                  ? t('shell.queueRecovery.description', { project: projectName })
+                  : t('shell.queueRecovery.descriptionUnnamed')}
                 {projectIds.length > 1
                   ? ` ${t('shell.queueRecovery.position', {
                       count: projectIds.length,

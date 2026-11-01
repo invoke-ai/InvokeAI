@@ -36,6 +36,36 @@ const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; 
   }
 };
 
+/**
+ * Drags with the real mouse through `points` (the test frame's viewport coordinates), so the browser hit-tests every
+ * move and the release the way a user's drag is, which synthetic events dispatched at an element skip.
+ */
+const mouseDragPath: BrowserCommand<[points: readonly { x: number; y: number }[], frameWidth: number]> = async (
+  { frame, page },
+  points,
+  frameWidth
+) => {
+  const box = await (await (await frame()).frameElement()).boundingBox();
+
+  if (!box || points.length === 0) {
+    throw new Error('mouseDragPath needs a visible test frame and at least one point');
+  }
+
+  const scale = box.width / frameWidth;
+  const [start, ...rest] = points.map((point) => ({ x: box.x + point.x * scale, y: box.y + point.y * scale }));
+
+  await page.mouse.move(start!.x, start!.y);
+  await page.mouse.down();
+  try {
+    for (const point of rest) {
+      await page.mouse.move(point.x, point.y, { steps: 6 });
+    }
+  } finally {
+    // Never leave the button pressed for the next test.
+    await page.mouse.up();
+  }
+};
+
 type ThumbnailRouteState = {
   /** Requests still to be answered with `failureStatus`. */
   failuresLeft: number;
@@ -118,8 +148,14 @@ const stopThumbnailRouteCommand: BrowserCommand<[]> = async ({ context, sessionI
   await stopThumbnailRoute(context, sessionId);
 };
 
+/**
+ * Without the dev proxy, `/api` requests fail the way they do in CI. Proxied to a developer's running backend, their
+ * responses arrive late and change what tests render: a menu row inserted mid-click moves the clicked item.
+ */
+const { proxy: _devBackendProxy, ...server } = viteConfig.server ?? {};
+
 export default mergeConfig(
-  viteConfig,
+  { ...viteConfig, server },
   defineConfig({
     define: {
       __CANVAS_GOLDEN_UPDATE__: process.env.CANVAS_GOLDEN_UPDATE === '1',
@@ -144,6 +180,7 @@ export default mergeConfig(
           endThumbnailRouteFailures,
           getThumbnailRequests,
           imeCompose,
+          mouseDragPath,
           resetBrowserPointer,
           startThumbnailRoute,
           stopThumbnailRoute: stopThumbnailRouteCommand,

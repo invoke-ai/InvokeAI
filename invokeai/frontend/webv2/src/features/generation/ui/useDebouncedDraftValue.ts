@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface UseDebouncedDraftValueOptions<Value> {
   value: Value;
@@ -16,6 +16,8 @@ interface DebouncedDraftValue<Value> {
   replaceDraftValue: (value: Value) => void;
   flushDraftValue: () => void;
   hasPendingDraft: () => boolean;
+  /** The draft as of the latest edit, for code that runs after an await and must not act on a stale render. */
+  readDraftValue: () => Value;
 }
 
 export const useDebouncedDraftValue = <Value>({
@@ -41,34 +43,70 @@ export const useDebouncedDraftValue = <Value>({
     onCommitRef.current = onCommit;
   });
 
-  const setDraft = (nextValue: Value) => {
-    draftValueRef.current = nextValue;
-    setDraftValueState(nextValue);
-  };
+  // Stable across renders (they act only on refs and state setters), so callers' memos and callbacks hold.
+  const actions = useMemo(() => {
+    const setDraft = (nextValue: Value) => {
+      draftValueRef.current = nextValue;
+      setDraftValueState(nextValue);
+    };
 
-  const clearPendingCommit = () => {
-    if (timeoutRef.current !== null) {
-      window.clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  };
+    const clearPendingCommit = () => {
+      if (timeoutRef.current !== null) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
 
-  const clearPendingDraft = () => {
-    clearPendingCommit();
-    hasPendingDraftRef.current = false;
-    pendingDraftRef.current = null;
-  };
+    const clearPendingDraft = () => {
+      clearPendingCommit();
+      hasPendingDraftRef.current = false;
+      pendingDraftRef.current = null;
+    };
 
-  const flushDraftValue = () => {
-    if (!hasPendingDraftRef.current) {
-      return;
-    }
+    const flushDraftValue = () => {
+      if (!hasPendingDraftRef.current) {
+        return;
+      }
 
-    const valueToCommit = pendingDraftRef.current as Value;
+      const valueToCommit = pendingDraftRef.current as Value;
 
-    clearPendingDraft();
-    onCommitRef.current(valueToCommit);
-  };
+      clearPendingDraft();
+      onCommitRef.current(valueToCommit);
+    };
+
+    const setDraftValue = (nextValue: Value) => {
+      setDraft(nextValue);
+      hasPendingDraftRef.current = true;
+      pendingDraftRef.current = nextValue;
+      clearPendingCommit();
+
+      timeoutRef.current = window.setTimeout(flushDraftValue, delayMs);
+    };
+
+    const commitDraftValue = (nextValue: Value) => {
+      clearPendingDraft();
+      setDraft(nextValue);
+      onCommitRef.current(nextValue);
+    };
+
+    const replaceDraftValue = (nextValue: Value) => {
+      clearPendingDraft();
+      setDraft(nextValue);
+    };
+
+    return {
+      clearPendingCommit,
+      clearPendingDraft,
+      commitDraftValue,
+      flushDraftValue,
+      hasPendingDraft: () => hasPendingDraftRef.current,
+      readDraftValue: () => draftValueRef.current,
+      replaceDraftValue,
+      setDraft,
+      setDraftValue,
+    };
+  }, [delayMs]);
+  const { clearPendingCommit, clearPendingDraft, flushDraftValue, setDraft } = actions;
 
   useLayoutEffect(() => {
     if (resetKeyRef.current !== resetKey) {
@@ -98,7 +136,7 @@ export const useDebouncedDraftValue = <Value>({
 
     clearPendingDraft();
     setDraft(value);
-  }, [isEqual, resetKey, value]);
+  }, [clearPendingDraft, isEqual, resetKey, setDraft, value]);
 
   useEffect(
     () => () => {
@@ -111,35 +149,16 @@ export const useDebouncedDraftValue = <Value>({
 
       clearPendingDraft();
     },
-    []
+    [clearPendingCommit, clearPendingDraft, flushDraftValue]
   );
 
-  const setDraftValue = (nextValue: Value) => {
-    setDraft(nextValue);
-    hasPendingDraftRef.current = true;
-    pendingDraftRef.current = nextValue;
-    clearPendingCommit();
-
-    timeoutRef.current = window.setTimeout(flushDraftValue, delayMs);
-  };
-
-  const commitDraftValue = (nextValue: Value) => {
-    clearPendingDraft();
-    setDraft(nextValue);
-    onCommitRef.current(nextValue);
-  };
-
-  const replaceDraftValue = (nextValue: Value) => {
-    clearPendingDraft();
-    setDraft(nextValue);
-  };
-
   return {
-    commitDraftValue,
+    commitDraftValue: actions.commitDraftValue,
     draftValue,
     flushDraftValue,
-    hasPendingDraft: () => hasPendingDraftRef.current,
-    replaceDraftValue,
-    setDraftValue,
+    hasPendingDraft: actions.hasPendingDraft,
+    readDraftValue: actions.readDraftValue,
+    replaceDraftValue: actions.replaceDraftValue,
+    setDraftValue: actions.setDraftValue,
   };
 };

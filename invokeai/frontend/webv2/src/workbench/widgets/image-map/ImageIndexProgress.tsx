@@ -4,8 +4,7 @@ import { Button, HStack, Progress, Stack, Text } from '@chakra-ui/react';
 import { Tooltip } from '@platform/ui';
 import { describeIndexProgress } from '@workbench/image-map/indexProgress';
 import { useEffect, useState } from 'react';
-
-const PROGRESS_LABEL = 'Image indexing progress';
+import { useTranslation } from 'react-i18next';
 
 /** Update age coarsely for minute-scale stall messages shared by panel and footer. */
 const TICK_MS = 5_000;
@@ -45,23 +44,23 @@ export const ImageIndexProgressPanel = ({
   onRetry,
   updatedAt,
 }: ImageIndexProgressProps & { error?: string | null; onRetry: () => void }) => {
-  const progress = describeIndexProgress(counts, useCountsAge(updatedAt));
+  const { t } = useTranslation();
+  const progress = describeIndexProgress(counts, t, useCountsAge(updatedAt));
 
   return (
     <Stack align="center" gap="2" maxW="sm" textAlign="center" w="full">
       <Text fontSize="xl" fontWeight="semibold">
-        Indexing gallery
+        {t('widgets.imageMap.progress.title')}
       </Text>
       <Text color="fg.muted" fontSize="lg">
-        Images and videos are being embedded so they can be mapped. The map appears here on its own once enough of them
-        are done — you can keep working in the meantime.
+        {t('widgets.imageMap.progress.description')}
       </Text>
       <Stack gap="1" mt="2" w="full">
         <Progress.Root max={100} size="lg" value={progress.percent}>
           {/* The name goes on the track: that is the element carrying
               role="progressbar", and Chakra otherwise names it "25%", which
               tells a screen reader the number but never what it counts. */}
-          <Progress.Track aria-label={PROGRESS_LABEL} aria-valuenow={progress.percent}>
+          <Progress.Track aria-label={t('widgets.imageMap.progress.label')} aria-valuenow={progress.percent}>
             <Progress.Range />
           </Progress.Track>
         </Progress.Root>
@@ -91,7 +90,7 @@ export const ImageIndexProgressPanel = ({
       ) : null}
       {/* Refresh is the only control before map readiness and recovers counts missed while offline. */}
       <Button mt={error ? '0' : '2'} onClick={onRetry} variant="outline">
-        {error ? 'Retry' : 'Check again'}
+        {error ? t('common.retry') : t('widgets.imageMap.checkAgain')}
       </Button>
     </Stack>
   );
@@ -102,10 +101,11 @@ export const ImageIndexProgressPanel = ({
  * rebuilds.
  */
 export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgressProps) => {
-  const progress = describeIndexProgress(counts, useCountsAge(updatedAt));
+  const { t } = useTranslation();
+  const progress = describeIndexProgress(counts, t, useCountsAge(updatedAt));
   const label = progress.stale
-    ? `Indexing ${progress.counts} · ${progress.stale}`
-    : `Indexing ${progress.counts}. The map and its cluster labels update as images finish.`;
+    ? t('widgets.imageMap.progress.badgeStale', { counts: progress.counts, stale: progress.stale })
+    : t('widgets.imageMap.progress.badge', { counts: progress.counts });
 
   return (
     // Positioned by the map's overlay column, which passes pointer events
@@ -124,15 +124,17 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
         pointerEvents="auto"
         px="2"
         py="1"
-        title={label}
       >
         <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
-          <Progress.Track aria-label={`${PROGRESS_LABEL}: ${label}`} aria-valuenow={progress.percent}>
+          <Progress.Track
+            aria-label={`${t('widgets.imageMap.progress.label')}: ${label}`}
+            aria-valuenow={progress.percent}
+          >
             <Progress.Range />
           </Progress.Track>
         </Progress.Root>
         <Text fontVariantNumeric="tabular-nums" truncate>
-          indexing {progress.compact}
+          {t('widgets.imageMap.progress.compact', { compact: progress.compact })}
         </Text>
       </HStack>
     </Tooltip>
@@ -140,23 +142,29 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
 };
 
 export const ImageIndexProgressInline = ({ counts, updatedAt }: ImageIndexProgressProps) => {
-  const progress = describeIndexProgress(counts, useCountsAge(updatedAt));
-  const label = progress.stale ? `Indexing ${progress.counts} · ${progress.stale}` : `Indexing ${progress.counts}`;
+  const { t } = useTranslation();
+  const progress = describeIndexProgress(counts, t, useCountsAge(updatedAt));
+  const label = progress.stale
+    ? t('widgets.imageMap.progress.badgeStale', { counts: progress.counts, stale: progress.stale })
+    : t('widgets.imageMap.progress.inline', { counts: progress.counts });
 
   return (
     <Tooltip content={label}>
       {/* Use minW=0 and truncation so six-digit footer counts cannot cover refresh in narrow panels. */}
-      <HStack gap="1.5" minW="0" overflow="hidden" title={label}>
+      <HStack gap="1.5" minW="0" overflow="hidden">
         <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
           {/* The counts go in the name too: at the widget's minimum width the
               label beside it truncates to a couple of characters, and the
               tooltip carrying the full text is hover-only. */}
-          <Progress.Track aria-label={`${PROGRESS_LABEL}: ${label}`} aria-valuenow={progress.percent}>
+          <Progress.Track
+            aria-label={`${t('widgets.imageMap.progress.label')}: ${label}`}
+            aria-valuenow={progress.percent}
+          >
             <Progress.Range />
           </Progress.Track>
         </Progress.Root>
         <Text fontVariantNumeric="tabular-nums" truncate>
-          indexing {progress.compact}
+          {t('widgets.imageMap.progress.compact', { compact: progress.compact })}
         </Text>
       </HStack>
     </Tooltip>
