@@ -1711,6 +1711,34 @@ describe('new projects', () => {
   });
 });
 
+describe('project settings', () => {
+  it('patches an open project that is not active, leaving the active one', () => {
+    const initial = createInitialWorkbenchState();
+    const firstId = initial.activeProjectId;
+    const state = workbenchReducer(workbenchReducer(initial, { type: 'createProject' }), {
+      projectId: firstId,
+      settings: { useNsfwChecker: true },
+      type: 'setActiveProjectSettings',
+    });
+    const first = state.projects.find((project) => project.id === firstId)!;
+    const active = state.projects.find((project) => project.id === state.activeProjectId)!;
+    expect(state.activeProjectId).not.toBe(firstId);
+    expect(first.settings.useNsfwChecker).toBe(true);
+    expect(Object.hasOwn(active.settings, 'useNsfwChecker')).toBe(false);
+  });
+
+  it('leaves the state alone for a project that is not open', () => {
+    const initial = createInitialWorkbenchState();
+    expect(
+      workbenchReducer(initial, {
+        projectId: 'closed-project',
+        settings: { useNsfwChecker: true },
+        type: 'setActiveProjectSettings',
+      })
+    ).toBe(initial);
+  });
+});
+
 describe('workbench widget alignment', () => {
   it('moves a bottom widget between the strip clusters and back', () => {
     const initial = createInitialWorkbenchState();

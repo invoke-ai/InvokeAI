@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { SettingDefinition, SettingsTarget } from '@platform/ui/settings/contracts';
 import type * as projectsApi from '@workbench/projects/api';
+import type { UndoableNotice } from '@workbench/useNotify';
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from '@workbench/workbenchStore';
 
@@ -8,6 +9,11 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
+import {
+  hasNotificationUndo,
+  registerNotificationUndo,
+  runNotificationUndo,
+} from '@workbench/shell/notifications/undoRegistry';
 import { Field as CanvasField } from '@workbench/widgets/canvas/settingsBindings';
 import { canvasSettingsContribution } from '@workbench/widgets/canvas/settingsContribution';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
@@ -47,6 +53,17 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     );
   },
 }));
+/** Undo notices as offered, each registered in the real registry so `supersedes` withdraws as it does in the app. */
+const notices = vi.hoisted(() => [] as { title: string; notice: UndoableNotice; undoId: string }[]);
+const notify = vi.hoisted(() => ({
+  error: vi.fn(),
+  info: vi.fn(),
+  success: vi.fn(),
+  undoable: (title: string, notice: UndoableNotice) => {
+    notices.push({ notice, title, undoId: registerNotificationUndo(notice.onUndo, notice.supersedes) });
+  },
+}));
+vi.mock('@workbench/useNotify', () => ({ useNotify: () => notify }));
 vi.mock('@workbench/projects/api', async (importOriginal) => ({
   ...(await importOriginal<typeof projectsApi>()),
   setClientStateValue: async () => {},
@@ -115,6 +132,8 @@ const canvasPins = (store: WorkbenchInternalStore, projectId = store.getSnapshot
 
 beforeEach(async () => {
   accountLifecycle.activate('layered-setting-test');
+  notices.length = 0;
+  notify.info.mockClear();
   await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
   storeRef.current = null;
   stopMirror = () => {};
@@ -196,16 +215,17 @@ describe('layered settings inside a project', () => {
     expect(binding().layer).toBeUndefined();
   });
 
-  it('edits an explicit instance without retargeting the default instance', async () => {
+  it('pins the project instance through an alias target and leaves the alias values untouched', async () => {
     const state = createInitialWorkbenchState();
     const project = state.projects[0]!;
-    project.widgetInstances['canvas-copy'] = { ...project.widgetInstances.canvas!, id: 'canvas-copy' };
+    project.widgetInstances['canvas:alias'] = { ...project.widgetInstances.canvas!, id: 'canvas:alias' };
     const store = mountWorkbench(createWorkbenchStore(state));
-    await renderWithProviders(<Probe target={{ instanceId: 'canvas-copy', projectId: project.id }} />);
+    await renderWithProviders(<Probe target={{ instanceId: 'canvas:alias', projectId: project.id }} />);
     await interact(() => binding().set(true));
     const instances = store.getSnapshot().activeProject.widgetInstances;
-    expect(instances['canvas-copy']!.state.values.showGrid).toBe(true);
-    expect(instances.canvas!.state.values.showGrid).toBeUndefined();
+    expect(instances.canvas!.state.values.showGrid).toBe(true);
+    expect(Object.hasOwn(instances['canvas:alias']!.state.values, 'showGrid')).toBe(false);
+    expect(pinnedLayer().state).toBe('pinned');
   });
 
   it('disables a removed or wrong-type target without creating an instance', async () => {
@@ -256,6 +276,212 @@ describe('layered settings inside a project', () => {
     await act(() => page.getByRole('menuitem', { name: /Follow my default/ }).click());
     expect(Object.hasOwn(store.getSnapshot().activeProject.settings, 'useNsfwChecker')).toBe(false);
     await expect.element(toggle).not.toBeChecked();
+  });
+});
+
+describe('undoing a dot action', () => {
+  const lastNotice = () => notices.at(-1)!;
+  const undo = (entry = lastNotice()) => interact(() => runNotificationUndo(entry.undoId));
+  const defaults = () => getWorkbenchPreferences().scopedDefaults;
+
+  it('undoes Use as my default by restoring the earlier default and the pin', async () => {
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    expect(lastNotice().title).toBe('Your default for Show grid is now On');
+    expect(defaults()).toEqual({ canvas: { showGrid: true } });
+    await undo();
+    expect(defaults()).toEqual({});
+    expect(canvasPins(store).showGrid).toBe(true);
+
+    // A pin equal to the built-in removes the default it replaces; Undo brings that default back.
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    expect(lastNotice().title).toBe('Show grid follows the Invoke default again (Off)');
+    expect(defaults()).toEqual({});
+    await undo();
+    expect(defaults()).toEqual({ canvas: { showGrid: true } });
+    expect(canvasPins(store).showGrid).toBe(false);
+  });
+
+  it('undoes Follow my default by pinning the old value again', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onFollowDefault());
+    expect(lastNotice().title).toBe('Show grid follows your default (On)');
+    expect(lastNotice().notice.projectId).toBe(store.getSnapshot().activeProject.id);
+    await undo();
+    expect(canvasPins(store).showGrid).toBe(false);
+    expect(defaults()).toEqual({ canvas: { showGrid: true } });
+  });
+
+  it('undoes Reset to Invoke default by restoring the default, account-wide', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    await renderWithProviders(<Probe />);
+    await interact(() => defaultLayer().onResetToBuiltIn!());
+    expect(defaults()).toEqual({});
+    expect(lastNotice().notice).not.toHaveProperty('projectId');
+    await undo();
+    expect(defaults()).toEqual({ canvas: { showGrid: true } });
+  });
+
+  it('keeps an edit made since the action', async () => {
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    await patchWorkbenchPreferences({ scopedDefaults: {} });
+    await undo();
+    expect(defaults()).toEqual({});
+    expect(Object.hasOwn(canvasPins(store), 'showGrid')).toBe(false);
+    expect(notify.info).toHaveBeenCalledWith('Nothing to undo: Show grid changed since.');
+  });
+
+  it('keeps a different pin made since following the default', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onFollowDefault());
+    await interact(() => binding().set(true));
+    await undo();
+    expect(canvasPins(store).showGrid).toBe(true);
+    expect(notify.info).toHaveBeenCalledWith('Nothing to undo: Show grid changed since.');
+  });
+
+  it('keeps a default set since a pin at the built-in removed it', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    expect(defaults()).toEqual({});
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: false } } });
+    await undo();
+    expect(defaults()).toEqual({ canvas: { showGrid: false } });
+    expect(Object.hasOwn(canvasPins(store), 'showGrid')).toBe(false);
+    expect(notify.info).toHaveBeenCalledWith('Nothing to undo: Show grid changed since.');
+  });
+
+  it('restores a pin in a project that is open but no longer active, each project keeping its own Undo', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const store = mountWorkbench();
+    const firstId = store.getSnapshot().activeProject.id;
+    await renderWithProviders(<Probe target={{ projectId: firstId }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onFollowDefault());
+    const first = lastNotice();
+
+    let secondId = '';
+    await act(() => {
+      secondId = store.commands.projects.create().id;
+    });
+    await renderWithProviders(<Probe target={{ projectId: secondId }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onFollowDefault());
+    expect(hasNotificationUndo(first.undoId)).toBe(true);
+
+    await undo(first);
+    expect(canvasPins(store, firstId).showGrid).toBe(false);
+    expect(Object.hasOwn(canvasPins(store, secondId), 'showGrid')).toBe(false);
+    expect(store.getSnapshot().activeProject.id).toBe(secondId);
+  });
+
+  it('restores through the project instance after the alias the action came from is gone', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const state = createInitialWorkbenchState();
+    const project = state.projects[0]!;
+    project.widgetInstances['canvas:alias'] = { ...project.widgetInstances.canvas!, id: 'canvas:alias' };
+    const store = mountWorkbench(createWorkbenchStore(state));
+    await renderWithProviders(<Probe target={{ instanceId: 'canvas:alias', projectId: project.id }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onFollowDefault());
+
+    const current = store.getState();
+    const { 'canvas:alias': _removed, ...widgetInstances } = current.projects[0]!.widgetInstances;
+    await interact(() =>
+      store.internal.persistence.hydrate({ ...current, projects: [{ ...current.projects[0]!, widgetInstances }] })
+    );
+    expect(store.getSnapshot().activeProject.widgetInstances['canvas:alias']).toBeUndefined();
+    await undo();
+    expect(canvasPins(store).showGrid).toBe(false);
+  });
+
+  it('restores a project setting in its project while another project is active', async () => {
+    const store = mountWorkbench();
+    const firstId = store.getSnapshot().activeProject.id;
+    const nsfwRead = (values: Readonly<Record<string, unknown>>) => values.useNsfwChecker === true;
+    const NsfwProbe = ({ target }: { target: SettingsTarget }) => {
+      const nsfw = useLayeredSetting('generate', 'useNsfwChecker', target, nsfwRead, false, nsfwField);
+      useImperativeHandle(bindingRef, () => nsfw, [nsfw]);
+      return null;
+    };
+    await renderWithProviders(<NsfwProbe target={{ projectId: firstId }} />);
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onFollowDefault());
+    expect(Object.hasOwn(store.getSnapshot().activeProject.settings, 'useNsfwChecker')).toBe(false);
+
+    let secondId = '';
+    await act(() => {
+      secondId = store.commands.projects.create().id;
+    });
+    await undo();
+    expect(store.queries.getProject(firstId)!.settings.useNsfwChecker).toBe(true);
+    expect(Object.hasOwn(store.queries.getProject(secondId)!.settings, 'useNsfwChecker')).toBe(false);
+    expect(store.getSnapshot().activeProject.id).toBe(secondId);
+  });
+
+  it('withdraws the earlier Undo when a later action changes the same default or pin', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    const store = mountWorkbench();
+    await renderWithProviders(<Probe target={{ projectId: store.getSnapshot().activeProject.id }} />);
+    await interact(() => binding().set(false));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    const first = lastNotice();
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    expect(hasNotificationUndo(first.undoId)).toBe(false);
+    await undo();
+    expect(defaults()).toEqual({});
+    expect(canvasPins(store).showGrid).toBe(true);
+
+    // A Follow Undo would re-pin over the default Use as my default sets, so that action withdraws it.
+    await interact(() => pinnedLayer().onFollowDefault());
+    const follow = lastNotice();
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onUseAsDefault());
+    const useAsDefault = lastNotice();
+    expect(defaults()).toEqual({ canvas: { showGrid: true } });
+    expect(hasNotificationUndo(follow.undoId)).toBe(false);
+    await undo(follow);
+    expect(Object.hasOwn(canvasPins(store), 'showGrid')).toBe(false);
+    await undo(useAsDefault);
+    expect(defaults()).toEqual({});
+    expect(canvasPins(store).showGrid).toBe(true);
+    expect(notify.info).not.toHaveBeenCalled();
+
+    // Following the default in the same project twice: only the latest Undo stays.
+    await interact(() => pinnedLayer().onFollowDefault());
+    const firstFollow = lastNotice();
+    await interact(() => binding().set(true));
+    await interact(() => pinnedLayer().onFollowDefault());
+    expect(hasNotificationUndo(firstFollow.undoId)).toBe(false);
+  });
+
+  it('does nothing once the account has changed', async () => {
+    await patchWorkbenchPreferences({ scopedDefaults: { canvas: { showGrid: true } } });
+    await renderWithProviders(<Probe />);
+    await interact(() => defaultLayer().onResetToBuiltIn!());
+    const { notice } = lastNotice();
+    accountLifecycle.activate('next-account');
+    const before = getWorkbenchPreferences();
+    await interact(() => notice.onUndo());
+    expect(getWorkbenchPreferences()).toBe(before);
+    expect(notify.info).not.toHaveBeenCalled();
   });
 });
 

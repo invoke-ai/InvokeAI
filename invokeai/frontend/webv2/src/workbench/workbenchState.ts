@@ -632,7 +632,8 @@ type WorkbenchReducerAction =
   /** Puts back notifications a Clear removed (its Undo), behind any recorded since. */
   | { type: 'restoreNotifications'; notifications: readonly WorkbenchNotification[] }
   | { type: 'recordWidgetFailure'; failure: WidgetFailure }
-  | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings> }
+  /** Patches the settings of `projectId` (the active project without one); a project that is not open is left alone. */
+  | { type: 'setActiveProjectSettings'; settings: Partial<ProjectSettings>; projectId?: string }
   /** Mirrors the user's `scopedDefaults` preference; the settings store owns it. */
   | { type: 'setScopedDefaults'; scopedDefaults: ScopedDefaults }
   | {
@@ -6477,7 +6478,7 @@ const reduceWorkbenchAction = (
       );
     }
     case 'setActiveProjectSettings': {
-      return updateActiveProject(state, (project) => {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const settings = normalizeProjectSettings({ ...project.settings, ...action.settings });
         // Both sides' keys: an `undefined` in the patch clears a pin, which leaves the key out of `settings`.
         const keys = new Set([...Object.keys(project.settings), ...Object.keys(settings)]) as Set<

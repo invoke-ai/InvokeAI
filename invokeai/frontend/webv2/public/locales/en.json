@@ -6610,7 +6610,12 @@
       "yourDefault": "Your default: {{value}}",
       "invokeDefault": "Invoke default: {{value}}",
       "resetToBuiltIn": "Reset to Invoke default",
-      "automatic": "Automatic"
+      "automatic": "Automatic",
+      "useAsDefaultDone": "Your default for {{setting}} is now {{value}}",
+      "followDefaultDone": "{{setting}} follows your default ({{value}})",
+      "followInvokeDefaultDone": "{{setting}} follows the Invoke default again ({{value}})",
+      "resetToBuiltInDone": "{{setting}} reset to Invoke default ({{value}})",
+      "undoStale": "Nothing to undo: {{setting}} changed since."
     }
   },
   "intermediates": {

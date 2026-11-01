@@ -93,9 +93,13 @@ const createCommands = (
 
   return {
     account: {
+      /** Patches the active project's settings, or those of `projectId` while it is open. */
       updateProjectPreferences: command(
         'setActiveProjectSettings',
-        (settings: ActionPayload<'setActiveProjectSettings'>['settings']) => ({ settings })
+        (settings: ActionPayload<'setActiveProjectSettings'>['settings'], projectId?: string) => ({
+          settings,
+          ...(projectId ? { projectId } : {}),
+        })
       ),
     },
     canvas: {

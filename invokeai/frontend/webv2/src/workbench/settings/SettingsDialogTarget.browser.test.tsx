@@ -80,12 +80,13 @@ beforeEach(async () => {
   await settingsDialogResource.load();
   const state = createInitialWorkbenchState();
   const project = state.projects[0]!;
+  // Pins live on the project's Canvas; the other Canvas only targets the cog, which edits those same pins.
   const canvas = project.widgetInstances.canvas!;
-  project.widgetInstances['canvas-copy'] = {
+  project.widgetInstances.canvas = {
     ...canvas,
-    id: 'canvas-copy',
     state: { ...canvas.state, values: { ...canvas.state.values, showGrid: true } },
   };
+  project.widgetInstances['canvas-copy'] = { ...canvas, id: 'canvas-copy' };
   storeRef.current = createWorkbenchStore(state);
   widgetProps = {
     instance: { ...project.widgetInstances['canvas-copy']!, title: 'Other Canvas' },
@@ -146,10 +147,8 @@ it('edits another widget through global search while retaining the originating C
   const grid = page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true });
   await expect.element(grid).toBeChecked();
   await act(() => page.getByText(i18n.t('widgets.canvas.settings.grid'), { exact: true }).click());
-  await expect
-    .poll(() => store.getSnapshot().activeProject.widgetInstances['canvas-copy']!.state.values.showGrid)
-    .toBe(false);
-  expect(store.getSnapshot().activeProject.widgetInstances.canvas).toBe(before.widgetInstances.canvas);
+  await expect.poll(() => store.getSnapshot().activeProject.widgetInstances.canvas!.state.values.showGrid).toBe(false);
+  expect(store.getSnapshot().activeProject.widgetInstances['canvas-copy']).toBe(before.widgetInstances['canvas-copy']);
   expect(settingsDialogStore.getSnapshot().target).toEqual({ projectId: before.id, instanceId: 'canvas-copy' });
 });
 
@@ -168,7 +167,7 @@ it('opens the pinned-setting menu from the gear popover and keeps focus inside t
   const popoverContent = () => document.querySelector('[data-scope="popover"][data-part="content"]');
   const grid = page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true });
   await expect.element(grid).toBeChecked();
-  // The other Canvas pins its grid; only that row carries the dot.
+  // The project's Canvas pins its grid, which the other Canvas's cog shows; only that row carries the dot.
   const dot = page.getByRole('button', {
     name: i18n.t('settingsDialog.layer.pinnedNamed', { setting: i18n.t('widgets.canvas.settings.grid') }),
     exact: true,
@@ -188,9 +187,7 @@ it('opens the pinned-setting menu from the gear popover and keeps focus inside t
   await act(() => dot.click());
   await act(() => page.getByRole('menuitem', { name: /Follow my default/ }).click());
   await expect
-    .poll(() =>
-      Object.hasOwn(store.getSnapshot().activeProject.widgetInstances['canvas-copy']!.state.values, 'showGrid')
-    )
+    .poll(() => Object.hasOwn(store.getSnapshot().activeProject.widgetInstances.canvas!.state.values, 'showGrid'))
     .toBe(false);
   await expect.element(grid).not.toBeChecked();
   await expect.poll(() => popoverContent()?.contains(document.activeElement)).toBe(true);

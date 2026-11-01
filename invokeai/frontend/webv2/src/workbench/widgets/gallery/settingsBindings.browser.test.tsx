@@ -9,6 +9,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
+import { getProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
 import { act } from 'react';
@@ -131,6 +132,29 @@ describe('Gallery settings in a project', () => {
     await act(() => page.getByRole('menuitem', { name: /Follow my default/ }).click());
     expect(Object.hasOwn(galleryPins(), 'imageOrderDir')).toBe(false);
     expect(galleryPins().galleryPage).toBe(0);
+  });
+
+  it('pins the project gallery from an alias instance, sharing its pins with every gallery cog', async () => {
+    const { projectId } = mountProject({ showImageDimensions: false });
+    const store = storeRef.current!;
+    const project = () => store.getSnapshot().activeProject;
+    const centerTarget = { instanceId: 'gallery:center', projectId };
+    await renderBoth('showImageDimensions', centerTarget);
+    const toggle = surface('quick', 'input') as HTMLInputElement;
+    await act(() => toggle.click());
+    expect(getProjectWidgetValues(project(), 'gallery').showImageDimensions).toBe(true);
+    expect(Object.hasOwn(project().widgetInstances['gallery:center']!.state.values, 'showImageDimensions')).toBe(false);
+
+    await renderBoth('showPendingItems', { projectId });
+    await act(() => (surface('quick', 'input') as HTMLInputElement).click());
+    await renderBoth('showPendingItems', centerTarget);
+    expect(
+      page
+        .getByRole('button', {
+          name: i18n.t('settingsDialog.layer.pinnedNamed', { setting: i18n.t('widgets.gallery.showPendingItems') }),
+        })
+        .elements()
+    ).toHaveLength(2);
   });
 
   it('disables edits for a target belonging to another project', async () => {
