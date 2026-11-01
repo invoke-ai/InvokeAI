@@ -1,7 +1,7 @@
 ---
 title: Anima
 description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting, character-reference IP-Adapter and ControlNet-LLLite adapters.
-lastUpdated: 2026-10-21
+lastUpdated: 2026-11-01
 sidebar:
   order: 1
 ---
@@ -24,7 +24,7 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 ## Hardware
 
 Anima is small by current standards: the transformer is a ~4.5 GB download (1.0–2.2 GB as a
-[GGUF](#gguf-builds)), the Qwen3 encoder ~1.2 GB and the VAE ~200 MB. On low-VRAM GPUs,
+[GGUF](#gguf-builds), ~2.6 GB as [int8](#int8-builds)), the Qwen3 encoder ~1.2 GB and the VAE ~200 MB. On low-VRAM GPUs,
 [Low-VRAM mode](/configuration/optimization/low-vram-mode/) and
 [FP8 Storage](/configuration/optimization/fp8-storage/) both apply to Anima.
 
@@ -115,6 +115,14 @@ use the **Anima-2.9B (Preview v1)** starter model instead, or its int8 build for
 No GGUF of Anima-3.8B has been verified, so one is refused at install as well; use its safetensors starter
 model. A 52-block GGUF without Anima-3.8B's semantic connector is refused too, because it cannot be told apart
 from the unsupported v1.0 transformer.
+
+## int8 builds
+
+Two starter models install Bedovyy's `int8_convrot` builds with the same Qwen3 encoder and VAE as dependencies:
+**Anima Base 1.0 (int8)** and **Anima Turbo 1.1 (int8)**, ~2.6 GB each. Their int8 layers stay int8 on every
+supported GPU, about 2.7 GB once loaded. By default they are not faster than the bf16 checkpoint;
+[int8 Compute](/configuration/optimization/int8-compute/) can run their layers on NVIDIA int8 tensor cores. Like
+the Turbo GGUF, the Turbo build is set to 10 steps at CFG 1 when selected.
 
 ## Generation settings
 
