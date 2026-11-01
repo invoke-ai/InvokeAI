@@ -32,7 +32,8 @@ export const getPreviewDensity = ({
 };
 
 /**
- * Observe root width with a cleaned-up ref callback; update state only when its density bucket changes.
+ * Measure root width when it attaches and observe it after, with a cleaned-up ref callback; update state only when its
+ * density bucket changes.
  * `onMeasure` (stable for the hook's lifetime) receives every measured density, so chrome outside the view follows it,
  * and null when the root detaches, so that chrome stops following a view that is gone.
  */
@@ -58,6 +59,12 @@ export const usePreviewDensity = (
   const [rootRef] = useState(() => (node: HTMLDivElement | null) => {
     if (!node) {
       return;
+    }
+
+    // Measure in the commit too: the update from the observer's first report renders after the first paint, so the
+    // guessed density would paint once and then shift the stage's padding and chrome under the pointer.
+    if (node.clientWidth > 0) {
+      applyMeasuredWidth(node.clientWidth);
     }
 
     const observer = new ResizeObserver((entries) => {

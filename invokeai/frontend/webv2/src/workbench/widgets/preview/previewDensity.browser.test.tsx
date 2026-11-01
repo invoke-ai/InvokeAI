@@ -15,9 +15,9 @@ const published: { current: string | null } = { current: null };
 
 /** The view's wiring: its measured root publishes to the stage store the header reads. */
 const View = ({ region, widthPx }: { region: WorkbenchRegion; widthPx: number }) => {
-  const { rootRef } = usePreviewDensity(region, previewStageStore.setDensity);
+  const { density, rootRef } = usePreviewDensity(region, previewStageStore.setDensity);
 
-  return <div ref={rootRef} style={{ width: `${widthPx}px` }} />;
+  return <div ref={rootRef} data-density={density} style={{ width: `${widthPx}px` }} />;
 };
 
 const HeaderProbe = () => {
@@ -63,6 +63,14 @@ describe('Preview density publishing', () => {
 
     await render('floating', 640);
     await vi.waitFor(() => expect(published.current).toBe('full'));
+  });
+
+  it('lays out for the measured width in the commit that mounts it, before the observer first reports', async () => {
+    // No frame passes inside `render`, so the observer has not run: a guessed density would still be on screen.
+    await render('center', 500);
+
+    expect(host?.querySelector('[data-density]')).toHaveAttribute('data-density', 'compact');
+    expect(published.current).toBe('compact');
   });
 
   it('stops publishing when the view goes away, so the header falls back to compact', async () => {
