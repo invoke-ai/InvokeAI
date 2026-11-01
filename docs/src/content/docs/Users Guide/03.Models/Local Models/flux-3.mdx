@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
-description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images and the GGUF / single-file workflow.
-lastUpdated: 2026-10-16
+description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, LoRAs and the GGUF / single-file workflow.
+lastUpdated: 2026-10-31
 sidebar:
   order: 6
 ---
@@ -88,6 +88,50 @@ large reference (a 4 MP reference needs about 8.5 GB to encode whole, so cards b
 Apple Silicon, where the encoder's attention would need memory that grows with the square of the image size, they
 are always encoded in 512 px tiles. Tiling keeps memory bounded but changes the edit slightly.
 
+## LoRAs
+
+FLUX.3 LoRAs install like any other and appear under **Concepts** in the Generate panel. Install the LoRA's
+`.safetensors` file, for example by pasting its download URL into the Model Manager, or a Diffusers LoRA folder
+(`pytorch_lora_weights.safetensors`). A LoRA may name the transformer's layers in either of two ways:
+
+- diffusers' module names: under `transformer.`, as diffusers' and SimpleTuner's trainers save a pipeline's LoRA;
+  without a prefix, as diffusers saves the transformer's own adapter (`save_lora_adapter`) and PEFT a model's state
+  dict, which carries the adapter's name in each key (`lora_A.default.weight`); or under `base_model.model.`, as PEFT
+  saves an adapter;
+- Black Forest Labs' native module names, under `diffusion_model.` as ai-toolkit writes them and ComfyUI conversions
+  store them.
+
+A per-layer `.alpha` in the file sets that layer's scale. A layer without one takes the scale PEFT gives it from the
+PEFT settings diffusers saves in the file's header: `lora_alpha` divided by the rank, or by the rank's square root with
+rsLoRA. A pipeline's save keys them `transformer.r`, `transformer.lora_alpha` and so on, and the transformer's own
+save writes them without the prefix. A header with both is read by its `transformer.` settings. A file whose header
+sets the rank or alpha per layer (`rank_pattern`, `alpha_pattern`) is refused.
+
+Klein and Klein Base share one transformer, so a LoRA trained on either runs on both; most published FLUX.3 LoRAs
+are trained on Klein Base. How well one holds up at Klein's step count depends on the LoRA.
+
+- LoRAs change the transformer only. A file that also has text-encoder layers is refused.
+- Low-rank (`lora_A`/`lora_B` or `lora_down`/`lora_up`), DoRA, LoKR and LoHA layers are recognized, and so are full
+  weight differences (`diff`) on the transformer's linear layers. LoKR and LoHA layers (`lokr_*` and `hada_*`
+  parameters) load under the diffusers or Black Forest Labs module names above, in a file without diffusers' PEFT
+  header. LyCORIS's own flattened key names (`lycoris_…`, as SimpleTuner's LyCORIS output writes them) are not
+  recognized, so such a file does not install as a FLUX.3 LoRA. A PEFT LoKr or LoHa adapter saved with diffusers'
+  header (`peft_type` LOKR or LOHA) is refused at install: how PEFT scales those layers is not verified against
+  InvokeAI's.
+- A layer on Klein's flow-map embedder (`ref_time_in`) has no counterpart in Klein Base and is skipped there, with a
+  warning in the log.
+- On GGUF transformers, and with FP8 Storage on, a LoRA runs alongside the weights rather than being merged into them.
+- A FLUX.3 LoRA installs only if all of it applies: every layer it targets exists in the FLUX.3 transformer, is
+  complete and has the shape of the weight it changes. One with any other part is refused at install, with a message
+  naming what does not apply. That includes distillation extracts that change norm scales or add the flow-map embedder
+  (`delta.*` tensors, `set_weight`), such as terminusresearch's Klein extract: to sample with distilled weights,
+  install FLUX.3 Klein itself.
+- PDD few-step LoRAs carry per-step output heads (`proj_out.weight` or `pdd.heads`), which PDD's own sampler fuses per
+  jump. InvokeAI loads such a LoRA without them and says so in the log. Use it on Klein Base with CFG Scale `1.0` and
+  4 to 8 steps; results differ from those of PDD's own sampler.
+- LoRAs installed with an earlier version of InvokeAI were registered as FLUX.1 LoRAs or as unknown models. Select one
+  in the Model Manager and use **Re-identify model** to register it as a FLUX.3 LoRA.
+
 ## Canvas
 
 Image-to-image, inpainting and outpainting work on the Canvas as they do for FLUX.2. Regional guidance and layout
@@ -110,6 +154,7 @@ FLUX.3 latents are FLUX.2 latents, so the FLUX.2 PiD decoders decode them. See
 | Node | Purpose |
 | --- | --- |
 | **Main Model - FLUX.3** | Loads the transformer, encoder and VAE |
+| **Apply LoRA - FLUX.3** / **Apply LoRA Collection - FLUX.3** | Apply one LoRA, or a collection of them, to the transformer |
 | **Prompt - FLUX.3** | Encodes the prompt |
 | **Denoise - FLUX.3** | Runs the diffusion; takes the VAE, optional reference images and, for Klein Base, CFG and a negative prompt |
 | **Latents to Image - FLUX2** / **Image to Latents - FLUX2** | VAE decode / encode |

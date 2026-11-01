@@ -24,7 +24,7 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize
 from invokeai.backend.flux2.sampling_utils import pack_flux2, unpack_flux2
 from invokeai.backend.flux3.sampling import get_schedule_flux3, redensify_schedule_flux3
-from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelFormat, ModelType
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
@@ -74,7 +74,7 @@ def _drive(
 
     context = MagicMock()
     context.models.get_config.return_value = SimpleNamespace(
-        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant
+        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant, format=ModelFormat.Checkpoint
     )
     context.models.load.side_effect = lambda key: vae_info if key == "vae" else transformer_info
     context.conditioning.load.side_effect = lambda name: ConditioningFieldData(
