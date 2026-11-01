@@ -30,6 +30,14 @@ type Layer = ComponentProps<typeof RegionalGuidanceSettings>['layer'];
 
 const i18n = createInstance();
 void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng: 'en', resources: {} });
+// The real catalog, for copy that names the model. Rendered through its own provider, so it stays out of the
+// react-i18next default the instance above registers.
+const english = createInstance();
+await english.init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -52,7 +60,7 @@ const createLayer = (overrides: Partial<CanvasRegionalGuidanceLayerContract> = {
     ...overrides,
   }) as unknown as Layer;
 
-const render = async (base: string | null, layer: Layer) => {
+const render = async (base: string | null, layer: Layer, translations = i18n) => {
   selectedBase = base;
   applyThemeToRoot('classic');
   host = document.createElement('div');
@@ -61,7 +69,7 @@ const render = async (base: string | null, layer: Layer) => {
   root = createRoot(host);
   await act(() => {
     root?.render(
-      <I18nextProvider i18n={i18n}>
+      <I18nextProvider i18n={translations}>
         <ChakraProvider value={system}>
           <RegionalGuidanceSettings engine={null} layer={layer} />
         </ChakraProvider>
@@ -242,6 +250,21 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     expect(announced()).toBe('');
     expect(descriptionOf(promptInput().element())).toEqual(['widgets.layers.regionalGuidance.layoutBoxHelp']);
     expect(liveLayer().layout).toEqual({ kind: 'text' });
+  });
+
+  it('names FLUX.3 in the help for its box, offering no region type and no negative prompt', async () => {
+    await render('flux3', createLayer({ layout: { kind: 'character' }, negativePrompt: 'blurry' }), english);
+
+    // By role alone, so renamed copy cannot hide a control that is shown.
+    expect(page.getByRole('radiogroup').query()).toBeNull();
+    const textboxes = page.getByRole('textbox').all();
+    expect(textboxes).toHaveLength(1);
+    await expect
+      .element(textboxes[0]!)
+      .toHaveAccessibleDescription(
+        'FLUX.3 places the rectangle around everything painted on this layer inside the frame, so the shape does not matter and separate areas share one box.'
+      );
+    expect(alerts()).toEqual([]);
   });
 
   it('describes the prompt field by the box and a missing prompt together', async () => {

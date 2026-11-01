@@ -2486,6 +2486,134 @@ describe('compileCanvasGraph — regional guidance', () => {
       '../__snapshots__/ideogram4RegionalCanvasGraphs.json'
     );
   });
+
+  /** FLUX.3 regions on the 768×1024 bbox; `FLUX3_ROWS` are the rows the first three become. */
+  const flux3Regions = () => [
+    // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+    region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+    // Starts above the bbox and ends past its right edge.
+    region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+    // FLUX.3 places objects only: the stored role stays on the layer, the region is placed as an object.
+    region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+    // One pixel in the corner rounds to [0, 0, 1, 1], which FLUX.3 reads as 0–1 fractions.
+    region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+    region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+    region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+    region('no-prompt', { positivePrompt: null }),
+    region('blank-prompt', { positivePrompt: ' ' }),
+  ];
+  const FLUX3_ROWS = [
+    { bbox: [10, 130, 498, 521], desc: 'a red kite' },
+    { bbox: [0, 911, 78, 1000], desc: 'a cat' },
+    { bbox: [125, 83, 375, 333], desc: 'a shop sign' },
+  ];
+
+  it('fills the FLUX.3 layout prompt with boxes normalized to the 768×1024 bbox and records the caption', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+    // Without reference images FLUX.3 does not edit, so the boxes stay object rows; no mask is encoded.
+    expect(backendGraph.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    // Recall restores the prompt the user typed.
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('places FLUX.3 boxes on the bbox when the canvas generates at a scaled size', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      scaling: { height: 768, method: 'manual', width: 576 },
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 576 });
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('leaves the FLUX.3 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(flux3Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(flux3Model, 'txt2img', {
+        regionalGuidance: [
+          region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+          region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+        ],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+      expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...flux3Model, hash: 'blake3:flux3' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges; quotes and non-ASCII text
+    // travel inside the JSON the node writes.
+    const regions = [
+      region('kite', {
+        maskBounds: { height: 256, width: 384, x: 192, y: 64 },
+        positivePrompt: 'a red kite reading "Éole"',
+      }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    // With a reference image FLUX.3 edits, and the boxes say where new content goes in the output.
+    const reference = {
+      config: {
+        image: { original: { image: { height: 768, image_name: 'beach.png', width: 512 } } },
+        type: 'flux2_reference_image' as const,
+      },
+      id: 'beach',
+      isEnabled: true,
+    };
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let edit: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+      edit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...settings, referenceImages: [reference] },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the FLUX.3 layout graph tests.',
+      edit: { ...edit, id: 'flux3_layout_canvas_edit' },
+      inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/flux3LayoutCanvasGraphs.json'
+    );
+  });
 });
 
 describe('compileCanvasGraph — SDXL Refiner', () => {

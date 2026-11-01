@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
-description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images and the GGUF / single-file workflow.
-lastUpdated: 2026-10-16
+description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, layout boxes from Canvas regional guidance and the GGUF / single-file workflow.
+lastUpdated: 2026-10-31
 sidebar:
   order: 6
 ---
@@ -90,15 +90,56 @@ are always encoded in 512 px tiles. Tiling keeps memory bounded but changes the 
 
 ## Canvas
 
-Image-to-image, inpainting and outpainting work on the Canvas as they do for FLUX.2. Regional guidance and layout
-boxes are not supported yet. Using the canvas itself as a reference image is a manual step: create a reference image
-from the bounding box.
+Image-to-image, inpainting and outpainting work on the Canvas as they do for FLUX.2. Using the canvas itself as a
+reference image is a manual step: create a reference image from the bounding box.
+
+### Layout boxes from regional guidance
+
+On the Canvas, each enabled **Regional Guidance** layer becomes one box in the prompt. The layer's **Positive prompt**
+describes what goes in the box, and the box is the rectangle around everything painted on the layer inside the
+generation frame. The shape does not matter, and separate painted areas on one layer share one box. A layer without a
+positive prompt is left out.
+
+Without reference images, each box places an object. With reference images, FLUX.3 edits them, and each box says
+where its content goes in the output: the boxes become edit rows with `"from": "target"` (see below).
+
+FLUX.3 has one kind of box, so the layer offers no **Region type**. Regional negative prompts, auto-negative and
+regional reference images are not used with FLUX.3; the layer hides its negative prompt and auto-negative controls.
+When a layer with a positive prompt has paint inside the generation frame, the main prompt cannot be blank: Invoke is
+disabled with *FLUX.3 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional
+guidance layers.*
+
+The boxes are added when the generation runs, as the box table described below, so dynamic prompts and batches vary
+the prompt in front of them. The caption FLUX.3 encoded is saved in the image's metadata as `flux3_caption`; recalling
+the image restores the prompt you typed.
 
 ## Layout and box edits in the prompt
 
-FLUX.3 also reads object boxes and box edits written as JSON at the end of the prompt. InvokeAI passes the prompt
-through unchanged, so a prompt written in the format from the model card works, but there is no editor for it
-yet.
+FLUX.3 reads a layout as the caption, one space, and a JSON list of rows, the box table, at the end of the prompt.
+
+:::caution[Hand-written tables and dynamic prompts]
+A table written into the prompt by hand reaches FLUX.3 from the workflow editor and through the API. In the Generate
+panel and on the Canvas, every prompt that contains `{` and `}` goes through dynamic prompts, which read the braces as
+variant syntax and remove them, so a table written there does not reach FLUX.3 as a table, and boxes from regional
+guidance start a table of their own after it. Those boxes are added after dynamic prompts have run and are not
+affected.
+:::
+
+Boxes are `[y_min, x_min, y_max, x_max]` in whole numbers from 0 to 1000 across the image, with (0, 0) at the top
+left. An object row places an object:
+
+```text
+A misty coast at dawn. [{"id": "obj_1", "bbox": [80, 100, 450, 420], "desc": "a red hot-air balloon"}, {"id": "obj_2", "bbox": [300, 600, 950, 900], "desc": "a lighthouse on a cliff"}]
+```
+
+An edit row, `{"id", "from", "src_bbox", "tgt_bbox", "desc"}`, takes an object from a reference image
+(`"from": "ref_image_0"`) or adds a new one (`"from": "target"`, with `"src_bbox": null`): `src_bbox` is where it is in
+the reference, `tgt_bbox` where it goes in the output. Regional guidance writes only object rows and target rows.
+
+Without regional guidance, InvokeAI adds nothing to the prompt. A list at the end of the prompt whose items are not
+all rows like these, such as `["SALE"]`, is part of the caption. When boxes are added to a prompt that already ends
+with a box table, its rows are kept, edit rows included, and the new rows follow them with ids numbered after the
+highest `obj_N`.
 
 ## PiD super-resolution decode
 
@@ -110,6 +151,7 @@ FLUX.3 latents are FLUX.2 latents, so the FLUX.2 PiD decoders decode them. See
 | Node | Purpose |
 | --- | --- |
 | **Main Model - FLUX.3** | Loads the transformer, encoder and VAE |
+| **Layout Prompt - FLUX.3** | Adds boxes to a prompt as its box table, or to the table it already ends with: object rows, or with **Edit Targets** on, rows that place new content in the output of an edit. Each region is a description and a box `[y_min, x_min, y_max, x_max]` from 0 to 1000. Generate and Canvas graphs pass the prompt through it, turn on Edit Targets when reference images are attached, and fill its regions from regional guidance on the Canvas; the regions input has no editor widget |
 | **Prompt - FLUX.3** | Encodes the prompt |
 | **Denoise - FLUX.3** | Runs the diffusion; takes the VAE, optional reference images and, for Klein Base, CFG and a negative prompt |
 | **Latents to Image - FLUX2** / **Image to Latents - FLUX2** | VAE decode / encode |

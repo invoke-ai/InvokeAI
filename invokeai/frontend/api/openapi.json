@@ -31595,6 +31595,23 @@
             "orig_required": false,
             "title": "Moss Image Layout Prompt"
           },
+          "flux3_caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The caption encoded for FLUX.3 inference, when it is not the positive prompt as typed",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Flux3 Caption"
+          },
           "num_frames": {
             "anyOf": [
               {
@@ -32109,7 +32126,7 @@
         "tags": ["metadata"],
         "title": "Core Metadata",
         "type": "object",
-        "version": "2.8.0",
+        "version": "2.9.0",
         "output": {
           "$ref": "#/components/schemas/MetadataOutput"
         }
@@ -40493,6 +40510,113 @@
           "$ref": "#/components/schemas/LatentsOutput"
         }
       },
+      "Flux3LayoutPromptInvocation": {
+        "category": "conditioning",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Places regions on a FLUX.3 prompt as boxes, at generation time.\n\nThe boxes are added here rather than by the graph builder so the prompt that dynamic prompts and batching vary is\nthe one laid out. Without regions the prompt passes through unchanged; a prompt that already ends with a box table\ngets the regions appended to it, numbered after its highest `obj_N` id.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "prompt": {
+            "default": "",
+            "description": "The image prompt: the caption the boxes follow, optionally ending with a box table of its own.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": "",
+            "orig_required": false,
+            "title": "Prompt",
+            "type": "string",
+            "ui_component": "textarea"
+          },
+          "regions": {
+            "default": [],
+            "description": "Boxes on the 0-1000 grid across the image, assembled from Canvas Regional Guidance layers.",
+            "field_kind": "input",
+            "input": "any",
+            "items": {
+              "$ref": "#/components/schemas/Flux3LayoutRegion"
+            },
+            "orig_default": [],
+            "orig_required": false,
+            "title": "Regions",
+            "type": "array"
+          },
+          "edit_targets": {
+            "default": false,
+            "description": "Write each region as an edit row that places new content at its box in the output (\"from\": \"target\"), the rows FLUX.3 reads when it edits reference images. Off: object rows.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Edit Targets",
+            "type": "boolean"
+          },
+          "type": {
+            "const": "flux3_layout_prompt",
+            "default": "flux3_layout_prompt",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["prompt", "layout", "flux3", "flux"],
+        "title": "Layout Prompt - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/StringOutput"
+        }
+      },
+      "Flux3LayoutRegion": {
+        "description": "One FLUX.3 box: what a canvas region depicts, and where.",
+        "properties": {
+          "desc": {
+            "description": "What the region depicts. Becomes the row's `desc`, stripped; must not be blank.",
+            "title": "Desc",
+            "type": "string"
+          },
+          "bbox": {
+            "description": "Box [y_min, x_min, y_max, x_max] in whole numbers from 0 to 1000 across the image, origin top-left, with y_min < y_max and x_min < x_max.",
+            "items": {
+              "maximum": 1000,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Bbox",
+            "type": "array"
+          }
+        },
+        "required": ["desc", "bbox"],
+        "title": "Flux3LayoutRegion",
+        "type": "object"
+      },
       "Flux3ModelLoaderInvocation": {
         "category": "model",
         "class": "invocation",
@@ -46319,6 +46443,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
                 },
                 {
                   "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
@@ -56770,6 +56897,9 @@
                 "$ref": "#/components/schemas/Flux3DenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
               },
               {
@@ -58454,6 +58584,9 @@
                 "$ref": "#/components/schemas/Flux3DenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
               },
               {
@@ -59626,6 +59759,9 @@
           "flux3_denoise": {
             "$ref": "#/components/schemas/LatentsOutput"
           },
+          "flux3_layout_prompt": {
+            "$ref": "#/components/schemas/StringOutput"
+          },
           "flux3_model_loader": {
             "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
           },
@@ -60538,6 +60674,7 @@
           "flux2_vae_decode",
           "flux2_vae_encode",
           "flux3_denoise",
+          "flux3_layout_prompt",
           "flux3_model_loader",
           "flux3_text_encoder",
           "flux_control_lora_loader",
@@ -61168,6 +61305,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
@@ -62458,6 +62598,9 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
