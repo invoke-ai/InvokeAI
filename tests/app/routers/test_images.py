@@ -4,14 +4,17 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, status
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
+from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.auth.token_service import TokenData
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import ImageNamesResult, ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
@@ -896,9 +899,24 @@ def test_unreadable_storage_does_not_read_as_missing_image_metadata(
         MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
     )
 
-    # Uncaught in the route, so a 500 in production; the test client re-raises instead.
-    with pytest.raises(sqlite3.OperationalError):
-        client.get(path)
+    response = TestClient(client.app, raise_server_exceptions=False).get(path)
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+def test_invalid_stored_metadata_answers_500(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    """Stored metadata that no longer validates is a server fault, not an image without metadata."""
+    try:
+        MetadataField.model_validate("not a metadata object")
+    except ValidationError as error:
+        validation_error = error
+
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.images, "get_metadata", MagicMock(side_effect=validation_error))
+
+    response = TestClient(client.app, raise_server_exceptions=False).get("/api/v1/images/i/test.png/metadata")
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @pytest.mark.parametrize(
@@ -914,3 +932,10 @@ def test_image_deleted_mid_request_answers_metadata_404(
     )
 
     assert client.get(path).status_code == 404
+
+
+def test_image_workflow_file_missing_answers_404(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
+    prepare_image_read_test(monkeypatch, mock_invoker)
+    monkeypatch.setattr(mock_invoker.services.images, "get_workflow", MagicMock(side_effect=ImageFileNotFoundException))
+
+    assert client.get("/api/v1/images/i/test.png/workflow").status_code == 404

@@ -351,10 +351,12 @@ def test_unreadable_storage_does_not_read_as_a_deleted_video(
 
     mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
-    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
-    # rendering it. Either way it must not be the 404 that clears the user's reference.
-    with pytest.raises(sqlite3.OperationalError):
-        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+    # Must be a retryable 500, not the 404 that clears the user's reference.
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        "/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
@@ -370,8 +372,11 @@ def test_unreadable_storage_does_not_read_as_missing_video_metadata(
         MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
     )
 
-    with pytest.raises(sqlite3.OperationalError):
-        client.get(f"/api/v1/videos/i/unreadable.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"})
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        f"/api/v1/videos/i/unreadable.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
