@@ -12,14 +12,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const galleryApi = vi.hoisted(() => ({
   galleryImages: { metadata: vi.fn(), resolveMany: vi.fn() },
   galleryItems: { resolve: vi.fn() },
-  galleryVideos: { metadata: vi.fn() },
 }));
+const videoMetadata = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/gallery', () => galleryApi);
 // The transport under the gallery's shared metadata query.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
-  getGalleryVideoMetadata: galleryApi.galleryVideos.metadata,
+  getGalleryVideoMetadata: videoMetadata,
 }));
 
 import { galleryVideoMetadataOptions } from '@features/gallery/queries';
@@ -119,7 +119,7 @@ const recallReferences = async (conditioning: unknown) => {
   recallSeq += 1;
   const recalledItem: GalleryVideoItem = { ...item, name: `output-${recallSeq}.mp4` };
 
-  galleryApi.galleryVideos.metadata.mockResolvedValue(h3ReferenceMetadata(conditioning));
+  videoMetadata.mockResolvedValue(h3ReferenceMetadata(conditioning));
   galleryApi.galleryItems.resolve.mockResolvedValue(wrappedAudioItem);
   const patchValues = vi.fn();
   const commands = {
@@ -176,7 +176,7 @@ const recallConditioningClip = async (
 ) => {
   recallSeq += 1;
 
-  galleryApi.galleryVideos.metadata.mockResolvedValue({ ...ltx2ConditioningMetadata(role, videoName), ...recorded });
+  videoMetadata.mockResolvedValue({ ...ltx2ConditioningMetadata(role, videoName), ...recorded });
   // An ordinary gallery clip: `getDefaultConditioningRole` would take it for the VIDEO role, so a
   // recalled `audio` role can only come from the metadata.
   galleryApi.galleryItems.resolve.mockResolvedValue({ ...item, durationSeconds: 4, fps: 24, name: 'song.mp4' });
@@ -212,13 +212,13 @@ describe('executeVideoRecall', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
-    galleryApi.galleryVideos.metadata.mockReset();
+    videoMetadata.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
   });
 
   it('writes only the prompt keys for a prompts-only recall', async () => {
-    galleryApi.galleryVideos.metadata.mockResolvedValue(metadata);
+    videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();
     // A prompts-only recall must not persist the model-family transition produced by resnapshotting an uninstalled
     // main.
@@ -244,7 +244,7 @@ describe('executeVideoRecall', () => {
   });
 
   it('writes the whole values object when the recall carries more than prompts', async () => {
-    galleryApi.galleryVideos.metadata.mockResolvedValue(metadata);
+    videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();
     const videoValues = createDefaultVideoWidgetValues([wanModel]);
 
@@ -269,7 +269,7 @@ describe('executeVideoRecall', () => {
   });
 
   it('recalls from the metadata the menu already read, without reading it again', async () => {
-    galleryApi.galleryVideos.metadata.mockResolvedValue(metadata);
+    videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();
 
     // The menu derives its recall verbs from the same entry before the user picks one.
@@ -285,7 +285,7 @@ describe('executeVideoRecall', () => {
     });
 
     expect(didRecall).toBe(true);
-    expect(galleryApi.galleryVideos.metadata).toHaveBeenCalledOnce();
+    expect(videoMetadata).toHaveBeenCalledOnce();
     expect(patchValues).toHaveBeenCalledWith(
       'video',
       expect.objectContaining({ positivePrompt: 'a fox running' }),
@@ -306,15 +306,15 @@ describe('executeVideoRecall', () => {
         models: [wanModel],
       });
 
-    galleryApi.galleryVideos.metadata.mockRejectedValueOnce(new ApiError('Internal Server Error', 500));
+    videoMetadata.mockRejectedValueOnce(new ApiError('Internal Server Error', 500));
     await expect(recall()).resolves.toBe(false);
     expect(commands.notifications.reportError).toHaveBeenCalledWith(
       expect.objectContaining({ area: 'video-recall', message: 'Internal Server Error' })
     );
 
-    galleryApi.galleryVideos.metadata.mockResolvedValueOnce(metadata);
+    videoMetadata.mockResolvedValueOnce(metadata);
     await expect(recall()).resolves.toBe(true);
-    expect(galleryApi.galleryVideos.metadata).toHaveBeenCalledTimes(2);
+    expect(videoMetadata).toHaveBeenCalledTimes(2);
     expect(patchValues).toHaveBeenCalledOnce();
   });
 });
@@ -323,14 +323,14 @@ describe('the LTX-2 keyframe and extend modes on recall', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
-    galleryApi.galleryVideos.metadata.mockReset();
+    videoMetadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
   });
 
   const recallLtx2 = async (metadata: Record<string, unknown>) => {
     recallSeq += 1;
-    galleryApi.galleryVideos.metadata.mockResolvedValue({
+    videoMetadata.mockResolvedValue({
       height: 704,
       model: { base: 'ltx-2', key: 'ltx2-main', name: 'LTX-2.5 dev', type: 'main' },
       num_frames: 121,
@@ -385,7 +385,7 @@ describe('the LTX-2 conditioning clip on recall', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
-    galleryApi.galleryVideos.metadata.mockReset();
+    videoMetadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
   });
@@ -445,7 +445,7 @@ describe('the LTX-2 conditioning clip on recall', () => {
   });
 
   it('clears a clip the panel is holding when the recalled run used none', async () => {
-    galleryApi.galleryVideos.metadata.mockResolvedValue({
+    videoMetadata.mockResolvedValue({
       ...ltx2ConditioningMetadata('audio'),
       ltx2_conditioning_video: undefined,
       ltx2_conditioning_role: undefined,
@@ -484,7 +484,7 @@ describe('ref2va reference conditioning on recall', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
-    galleryApi.galleryVideos.metadata.mockReset();
+    videoMetadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
   });
 
@@ -509,7 +509,7 @@ describe('reading the media a recall names', () => {
   beforeEach(() => {
     queryClient = new QueryClient();
     accountLifecycle.activate('test-account');
-    galleryApi.galleryVideos.metadata.mockReset();
+    videoMetadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
     galleryApi.galleryImages.resolveMany.mockReset();
   });
@@ -519,7 +519,7 @@ describe('reading the media a recall names', () => {
 
   const recallH3 = (recorded: Record<string, unknown>, getVideoValues?: () => Record<string, unknown>) => {
     recallSeq += 1;
-    galleryApi.galleryVideos.metadata.mockResolvedValue({ ...h3ReferenceMetadata('video'), ...recorded });
+    videoMetadata.mockResolvedValue({ ...h3ReferenceMetadata('video'), ...recorded });
     const { commands, patchValues } = createCommands();
     const recall = executeVideoRecall({
       queryClient,

@@ -28,8 +28,8 @@ export const getProjectWidgetState = (project: WidgetInstanceHolder, widgetId: W
   getProjectWidgetInstance(project, widgetId)?.state ?? emptyWidgetState(widgetId);
 
 /**
- * The widget's own values: the project's pins alone. Write paths and persistence read these; a display or runtime
- * read of a settings owner's values uses {@link getResolvedProjectWidgetValues}.
+ * Stored values; for a layered key (`getLayeredSettings`) that is the pin alone; {@link getResolvedProjectWidgetValues}
+ * is the resolved read. Write paths and persistence read these.
  */
 export const getProjectWidgetValues = (
   project: WidgetInstanceHolder,

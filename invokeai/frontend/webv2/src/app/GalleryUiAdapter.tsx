@@ -3,7 +3,7 @@ import type { GalleryProjectRef, GalleryUiAdapter } from '@features/gallery/reac
 import type { ProjectLibrarySnapshot } from '@workbench/projects/library';
 import type { ReactNode } from 'react';
 
-import { getGalleryAutoAddBoardId, getGallerySettings } from '@features/gallery/contracts';
+import { getGalleryAutoAddBoardId, getGallerySettings, isLegacyFollowAutoAdd } from '@features/gallery/contracts';
 import { GalleryUiProvider } from '@features/gallery/react';
 import { useAuthSession } from '@features/identity';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -33,9 +33,6 @@ import { lazy, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = Object.freeze({});
-
-/** What earlier builds stored for following the selected board, their default. */
-const LEGACY_AUTO_ADD_FOLLOW = 'follow';
 
 /** The Gallery's values as it reads them: the project's pins over the user's gallery defaults. */
 const getGalleryValues = (
@@ -136,7 +133,7 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
         // stored 'follow', now read as the default destination): say that browsing no longer moves results, the first
         // time the user browses away from where they go.
         if (
-          values.autoAddBoardId === LEGACY_AUTO_ADD_FOLLOW &&
+          isLegacyFollowAutoAdd(values) &&
           !getGallerySettings(values).followSelectedBoard &&
           boardId !== (getGalleryAutoAddBoardId(values, () => true) ?? 'none') &&
           areWorkbenchPreferencesReady() &&

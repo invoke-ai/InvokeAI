@@ -1404,25 +1404,6 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
 /** Every settings key that holds a component model. */
 export const GENERATE_COMPONENT_VALUE_KEYS = Object.keys(COMPONENT_SETTING_LABELS) as GenerateComponentValueKey[];
 
-/** The subjects a switch can report that are not component slots; a Record so a new subject cannot be left out. */
-const SWITCH_SETTING_SUBJECTS: Record<Exclude<GenerateModelSwitchSubject, GenerateComponentValueKey>, true> = {
-  cfgRescale: true,
-  clipSkip: true,
-  colorCompensation: true,
-  concepts: true,
-  guidance: true,
-  hiDiffusion: true,
-  referenceImages: true,
-  seamless: true,
-  vaePrecision: true,
-};
-
-/** Every subject a switch can report; the locale names each under `widgets.generate.switchSubjects`. */
-export const GENERATE_MODEL_SWITCH_SUBJECTS = [
-  ...GENERATE_COMPONENT_VALUE_KEYS,
-  ...Object.keys(SWITCH_SETTING_SUBJECTS),
-] as readonly GenerateModelSwitchSubject[];
-
 const isSelectedComponentCompatible = (
   slotPolicy: ComponentSlotPolicy | undefined,
   model: GenerateModelConfig,

@@ -1,6 +1,6 @@
 import type { ProjectLayoutState } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
-import type { EffectiveProjectSettings, ScopedDefaults } from '@workbench/settings/contracts';
+import type { EffectiveProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
@@ -290,12 +290,6 @@ export const useActiveProjectLayoutSelector = <Selected,>(
   selector: (layout: ProjectLayoutState) => Selected,
   isEqual?: EqualityFn<Selected>
 ): Selected => useActiveProjectSelector((project) => selector(project.layout), isEqual);
-
-/** The user's defaults for per-project settings, as mirrored into the snapshot. */
-export const useScopedDefaultsSelector = <Selected,>(
-  selector: (scopedDefaults: ScopedDefaults) => Selected,
-  isEqual?: EqualityFn<Selected>
-): Selected => useWorkbenchSelector((snapshot) => selector(snapshot.scopedDefaults), isEqual);
 
 /** The active project's settings with every layered flag resolved (pin, then the user's default, then built-in). */
 export const useActiveProjectSettingsSelector = <Selected,>(

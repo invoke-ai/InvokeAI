@@ -21,7 +21,6 @@ import type {
 
 import {
   coerceSchedulerForGraph,
-  GENERATE_MODEL_SWITCH_SUBJECTS,
   getComponentSectionPolicy,
   getAutoFlux2ComponentSourceModel,
   getDefaultGenerateSettings,
@@ -51,6 +50,7 @@ import { describeGenerationIssue, getGenerationIssueFixPatch } from './generatio
 import { collectGenerationIssueScenarios } from './generationIssues.testing';
 import { getActiveRefiner } from './sdxlRefiner';
 import { SUPPORTED_GENERATE_BASES } from './supportedBases';
+import { GENERATE_MODEL_SWITCH_SUBJECTS } from './switchSubjects.testing';
 
 const createModel = (base: string, overrides: Partial<MainModelConfig> = {}): MainModelConfig => ({
   base,

@@ -57,6 +57,10 @@ export const GALLERY_BOARD_PANEL_MAX_WIDTH_PX = 420;
  */
 const LEGACY_AUTO_ADD_FOLLOW = 'follow';
 
+/** Whether the stored values still hold the legacy follow-the-selected-board auto-add value. */
+export const isLegacyFollowAutoAdd = (values: Readonly<Record<string, unknown>>): boolean =>
+  values.autoAddBoardId === LEGACY_AUTO_ADD_FOLLOW;
+
 /** User-tunable gallery settings, persisted in the widget's `values` record. */
 export interface GallerySettings {
   /**
@@ -204,9 +208,7 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
 
   return {
     autoAddBoardId:
-      typeof values.autoAddBoardId === 'string' &&
-      values.autoAddBoardId !== '' &&
-      values.autoAddBoardId !== LEGACY_AUTO_ADD_FOLLOW
+      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== '' && !isLegacyFollowAutoAdd(values)
         ? values.autoAddBoardId
         : DEFAULT_GALLERY_SETTINGS.autoAddBoardId,
     boardOrderBy: isBoardOrderBy(values.boardOrderBy) ? values.boardOrderBy : DEFAULT_GALLERY_SETTINGS.boardOrderBy,

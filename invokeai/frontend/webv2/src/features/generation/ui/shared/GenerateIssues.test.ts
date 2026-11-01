@@ -1,5 +1,5 @@
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
-import { GENERATE_MODEL_SWITCH_SUBJECTS } from '@features/generation/core/baseGenerationPolicies';
+import { GENERATE_COMPONENT_VALUE_KEYS } from '@features/generation/core/baseGenerationPolicies';
 import { collectGenerationIssueScenarios } from '@features/generation/core/generationIssues.testing';
 import { describe, expect, it } from 'vitest';
 
@@ -9,7 +9,7 @@ seedArchitectureCapabilities();
 
 describe('ISSUE_FIELD_RENDERERS', () => {
   it('has a renderer for every field an issue points at; component slots render their own', () => {
-    const componentSlots = new Set<string>(GENERATE_MODEL_SWITCH_SUBJECTS);
+    const componentSlots = new Set<string>(GENERATE_COMPONENT_VALUE_KEYS);
     const fields = collectGenerationIssueScenarios().flatMap(({ target }) => (target.field ? [target.field] : []));
 
     expect(fields.length).toBeGreaterThan(0);

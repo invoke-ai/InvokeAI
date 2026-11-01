@@ -64,6 +64,7 @@ export {
   DEFAULT_GALLERY_SETTINGS,
   getGalleryMediaFilter,
   getGallerySettings,
+  isLegacyFollowAutoAdd,
   toGalleryMediaKind,
   type GalleryMediaFilter,
   type GalleryPaginationMode,
