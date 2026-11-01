@@ -1,11 +1,36 @@
 import json
+from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import sentencepiece as spm
 from tokenizers import Tokenizer
 from tokenizers.models import Unigram
 
 from invokeai.backend.wan.tokenizer import load_wan_tokenizer
+
+
+def _write_serialized_umt5_tokenizer(path: Path) -> None:
+    backend = Tokenizer(
+        Unigram(
+            [("<pad>", 0.0), ("</s>", 0.0), ("<s>", 0.0), ("<unk>", 0.0), ("music", -1.0)],
+            unk_id=3,
+        )
+    )
+    backend.save(str(path / "tokenizer.json"))
+    (path / "tokenizer_config.json").write_text(
+        json.dumps(
+            {
+                "tokenizer_class": "T5Tokenizer",
+                "extra_ids": 0,
+                "pad_token": "<pad>",
+                "eos_token": "</s>",
+                "bos_token": "<s>",
+                "unk_token": "<unk>",
+            }
+        ),
+        encoding="utf-8",
+    )
 
 
 def test_load_wan_tokenizer_preserves_serialized_unknown_token_id(tmp_path) -> None:
@@ -93,6 +118,31 @@ def test_load_wan_tokenizer_reconstructs_umt5_pipeline_without_tokenizer_json(tm
     assert 2 not in unknown_ids
     assert tokenizer.encode("𝄞") == [*unknown_ids, sentencepiece.eos_id()]
     assert tokenizer.unk_token_id == sentencepiece.unk_id() == 3
+
+
+@pytest.mark.parametrize("nested", [True, False], ids=["nested", "flat"])
+def test_wan_t5_encoder_loader_uses_serialized_tokenizer_pipeline(tmp_path, nested: bool) -> None:
+    from invokeai.backend.model_manager.load.model_loaders.wan import WanT5EncoderLoader
+    from invokeai.backend.model_manager.taxonomy import SubModelType
+
+    model_path = tmp_path / "umt5"
+    model_path.mkdir()
+    if nested:
+        text_encoder_dir = model_path / "text_encoder"
+        text_encoder_dir.mkdir()
+        (text_encoder_dir / "config.json").write_text(json.dumps({"model_type": "umt5"}), encoding="utf-8")
+        tokenizer_dir = model_path / "tokenizer"
+        tokenizer_dir.mkdir()
+    else:
+        (model_path / "config.json").write_text(json.dumps({"model_type": "umt5"}), encoding="utf-8")
+        tokenizer_dir = model_path
+    _write_serialized_umt5_tokenizer(tokenizer_dir)
+
+    loader = object.__new__(WanT5EncoderLoader)
+    tokenizer = loader._load_model(SimpleNamespace(path=str(model_path)), SubModelType.Tokenizer)
+
+    assert tokenizer.unk_token_id == 3
+    assert tokenizer.encode("𝄞", add_special_tokens=False) == [3]
 
 
 def test_wan_diffusers_loader_uses_serialized_tokenizer_pipeline(tmp_path) -> None:
