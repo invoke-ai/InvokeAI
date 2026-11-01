@@ -64,6 +64,70 @@ flux3_klein_base_single_file = StarterModel(
     dependencies=[flux2_vae, qwen3_vl_encoder_4b],
 )
 
+# Comfy-Org's quantized repackages, pinned to a commit rather than `main`. That is a correctness matter, not only
+# reproducibility: the int8 decode follows each layer's `comfy_quant` marker (`convrot`, its group size) and the nvfp4
+# one the layers the header names, so a re-upload at the same path that changed either would load cleanly and
+# generate noise. The repository has renamed its files once already. Black Forest Labs' own `variants/` builds are
+# not listed: Klein's and Klein Base's are both `model.safetensors`, so they are installed by URL (see the FLUX.3 docs).
+_COMFY_QUANTIZED = (
+    "https://huggingface.co/black-forest-labs/flux-3-image-klein-comfy/resolve/"
+    "feef60b0aaf63a4773ace96636ebbcf43b881312/diffusion_models"
+)
+_INT8_NOTE = (
+    "Its quantized layers stay int8 in memory on every GPU and are decoded per step, or with int8 Compute (RTX 30-series "
+    "and newer) multiplied in int8."
+)
+_NVFP4_NOTE = "Its 4-bit weights are decoded on every step."
+
+flux3_klein_int8 = StarterModel(
+    name="FLUX.3 Klein (int8)",
+    base=BaseModelType.Flux3,
+    source=f"{_COMFY_QUANTIZED}/flux3-image-klein-int8-convrot.safetensors",
+    description="FLUX.3 Image Klein transformer in Comfy-Org's int8_convrot build, about half the memory of bf16. "
+    f"{_INT8_NOTE} The FLUX.2 VAE and Qwen3-VL 4B encoder are installed as dependencies. ~5.8GB. {_LICENSE}",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=Flux3VariantType.Klein,
+    dependencies=[flux2_vae, qwen3_vl_encoder_4b],
+)
+
+flux3_klein_nvfp4 = StarterModel(
+    name="FLUX.3 Klein (NVFP4)",
+    base=BaseModelType.Flux3,
+    source=f"{_COMFY_QUANTIZED}/flux3-image-klein-nvfp4.safetensors",
+    description="FLUX.3 Image Klein transformer in Comfy-Org's nvfp4 build: 33 of its 43 blocks in 4 bits, the rest "
+    f"bf16. {_NVFP4_NOTE} The FLUX.2 VAE and Qwen3-VL 4B encoder are installed as dependencies. ~5.3GB. {_LICENSE}",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=Flux3VariantType.Klein,
+    dependencies=[flux2_vae, qwen3_vl_encoder_4b],
+)
+
+flux3_klein_base_int8 = StarterModel(
+    name="FLUX.3 Klein Base (int8)",
+    base=BaseModelType.Flux3,
+    source=f"{_COMFY_QUANTIZED}/flux3-image-klein-base-int8-convrot.safetensors",
+    description="FLUX.3 Image Klein Base transformer in Comfy-Org's int8_convrot build, about half the memory of bf16. "
+    f"{_INT8_NOTE} The FLUX.2 VAE and Qwen3-VL 4B encoder are installed as dependencies. ~5.8GB. {_LICENSE}",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=Flux3VariantType.KleinBase,
+    dependencies=[flux2_vae, qwen3_vl_encoder_4b],
+)
+
+flux3_klein_base_nvfp4 = StarterModel(
+    name="FLUX.3 Klein Base (NVFP4)",
+    base=BaseModelType.Flux3,
+    source=f"{_COMFY_QUANTIZED}/flux3-image-klein-base-nvfp4.safetensors",
+    description="FLUX.3 Image Klein Base transformer in Comfy-Org's nvfp4 build: 33 of its 43 blocks in 4 bits, the "
+    f"rest bf16. {_NVFP4_NOTE} The FLUX.2 VAE and Qwen3-VL 4B encoder are installed as dependencies. ~5.3GB. "
+    f"{_LICENSE}",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=Flux3VariantType.KleinBase,
+    dependencies=[flux2_vae, qwen3_vl_encoder_4b],
+)
+
 flux3_klein_gguf_q4_k_m = StarterModel(
     name="FLUX.3 Klein (GGUF Q4_K_M)",
     base=BaseModelType.Flux3,

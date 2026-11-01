@@ -1,4 +1,4 @@
-"""Tests for the Krea-2 and MiniMax H3 starter-model bundles and the LTX-2 GGUF transformers.
+"""Tests for the Krea-2 and MiniMax H3 starter-model bundles, the LTX-2 GGUF transformers and the FLUX.3 single files.
 
 A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
@@ -13,6 +13,7 @@ from invokeai.backend.model_manager.starter_models import (
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    Flux3VariantType,
     Krea2VariantType,
     LTX2VariantType,
     ModelFormat,
@@ -130,4 +131,23 @@ def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> Non
             (ModelType.Main, ModelFormat.Diffusers),
             (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
         }, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name
+
+
+def test_every_flux3_transformer_only_starter_pulls_the_vae_and_the_encoder() -> None:
+    """The single files, quantized or not, and the GGUFs hold only the transformer: installing one has to pull the
+    FLUX.2 VAE and the Qwen3-VL encoder, both installable starters themselves. Klein and Klein Base both ship that way."""
+    transformer_only = [
+        m for m in STARTER_MODELS if m.base is BaseModelType.Flux3 and m.type is ModelType.Main and m.format is not None
+    ]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.format for m in transformer_only} == {ModelFormat.Checkpoint, ModelFormat.GGUFQuantized}
+    assert {m.variant for m in transformer_only if m.format is ModelFormat.Checkpoint} == {
+        Flux3VariantType.Klein,
+        Flux3VariantType.KleinBase,
+    }
+    for model in transformer_only:
+        dependencies = model.dependencies or []
+        assert {dep.type for dep in dependencies} == {ModelType.VAE, ModelType.Qwen3VLEncoder}, model.name
         assert all(dep.source in starter_sources for dep in dependencies), model.name

@@ -9,6 +9,10 @@ Two schemes in this tree arrive in it, with different block widths and different
 nvfp4 (16-element blocks, ``float8_e4m3fn`` entries) and MXFP8 (32-element blocks, E8M0 exponent
 bytes). The tiling is over the *grid*, so it is the same permutation for both and belongs to
 neither scheme -- which is why it lives here rather than in one of them importing the other.
+
+Not every producer tiles. NVIDIA's ModelOpt exports, Black Forest Labs' FLUX.3 nvfp4 build among them,
+store the grid row-major; :func:`block_scale_grid` tiles such a grid once at load, so that every decode
+here reads one layout.
 """
 
 import torch
@@ -47,4 +51,20 @@ def unblock_scale_grid(scale: torch.Tensor) -> torch.Tensor:
     rows, blocks = scale.shape
     check_tile_layout(rows, blocks)
     tiles = scale.reshape(rows // TILE_ROWS, blocks // TILE_BLOCKS, 32, 4, TILE_BLOCKS)
+    return tiles.permute(0, 3, 2, 1, 4).reshape(rows, blocks)
+
+
+def block_scale_grid(grid: torch.Tensor) -> torch.Tensor:
+    """Lay a row-major ``[rows, blocks]`` grid out in cuBLAS's tiled layout: the inverse of
+    :func:`unblock_scale_grid`.
+
+    Row-major ``(tile row, row // 32, row % 32, tile column, block)`` becomes the stored ``(tile row,
+    tile column, row % 32, row // 32, block)``. It is the same permutation of axes as the unblocking one,
+    which swaps two axes and so undoes itself.
+    """
+    if grid.dim() != 2:
+        raise ValueError(f"expected a 2-D block-scale grid, got shape {tuple(grid.shape)}")
+    rows, blocks = grid.shape
+    check_tile_layout(rows, blocks)
+    tiles = grid.reshape(rows // TILE_ROWS, 4, 32, blocks // TILE_BLOCKS, TILE_BLOCKS)
     return tiles.permute(0, 3, 2, 1, 4).reshape(rows, blocks)

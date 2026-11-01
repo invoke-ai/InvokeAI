@@ -304,7 +304,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
     """The degraded half-state, at this seam rather than at the detector.
 
     A packed uint8 weight with a block-scale grid and no `weight_scale_2` is what a guard keyed on
-    `weight_scale_2` -- the key the decode itself keys on -- lets straight through. `_find_nvfp4_layers`
+    `weight_scale_2` -- the key the decode itself keys on -- lets straight through. `find_nvfp4_layers`
     refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader still
     reaches the detector before it asks the cache for room, and on both fp8 branches. Nothing but the
     order of two statements keeps `pop_nvfp4_layers` above the reservation here.

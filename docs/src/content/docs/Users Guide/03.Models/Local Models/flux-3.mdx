@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
-description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images and the GGUF / single-file workflow.
-lastUpdated: 2026-10-16
+description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images and the GGUF, single-file and quantized builds.
+lastUpdated: 2026-11-01
 sidebar:
   order: 6
 ---
@@ -33,15 +33,46 @@ commercially.
 | Transformer build           | Transformer size | Notes                                   |
 | --------------------------- | ---------------- | --------------------------------------- |
 | bf16 (Diffusers or single file) | ≈ 10.3 GiB   | reference quality                       |
+| int8 (starter model)        | ≈ 5.4 GiB        | stays int8 on every GPU                 |
+| fp8r (Black Forest Labs)    | ≈ 5.8 GiB        | with FP8 Storage (switched on at install) or `fp8_compute`; ≈ 10.3 GiB otherwise |
+| nvfp4 (starter model, or Black Forest Labs) | ≈ 4.9 GiB | 4-bit weights, decoded on every step |
 | GGUF Q8_0 (starter model)   | ≈ 5.6 GiB        | close to bf16                           |
 | GGUF Q4_K_M (starter model) | ≈ 3.1 GiB        | lowest VRAM; fine detail differs from bf16 |
 
 The Qwen3-VL 4B encoder (≈ 8.5 GB as bf16, about half as fp8) and the FLUX.2 VAE come on top. The encoder runs
 before the transformer, so the two do not have to fit on the GPU at the same time.
 
-Reference images add to the work per step: each 1 MP reference costs about as much as the image itself. On an
-RTX 4090 a 1024² image takes about 15 s with Klein, 25 s with one reference, 50 s with three references, and
-about 50 s with Klein Base.
+Reference images add to the work per step. Measured on an RTX 4090 with the models already loaded, a whole 1024²
+image (text encoder, denoise and decode) with Klein bf16 at its defaults takes 6.5 s without a reference, 13.5 s with
+one 1 MP reference and 31.7 s with three. Klein Base at 50 steps and CFG 3.5 takes 36.7 s.
+
+### Speed and quality by build
+
+Measured on the same RTX 4090 (24 GB) with Klein at its defaults (16 steps, CFG 1.0) and 1024², three prompts with
+three seeds each:
+
+| Build | Denoise per image | With int8 Compute / `fp8_compute` | VRAM peak | PSNR against bf16 |
+| --- | --- | --- | --- | --- |
+| bf16 | 6.22 s | 6.20 s | 19.5 GiB | reference |
+| int8 | 7.01 s | 4.07 s | 14.4 GiB | 33.2 dB; 34.5 dB with int8 Compute |
+| GGUF Q8_0 | 6.78 s | not affected | 14.5 GiB | 34.4 dB |
+| fp8r (FP8 Storage on, as installed) | 6.61 s | 5.35 s | 15.0 GiB | 26.8 dB; 25.4 dB with `fp8_compute` |
+| nvfp4 (Comfy-Org or Black Forest Labs: identical images) | 6.82–6.84 s | not affected | 14.1–14.3 GiB | 22.8 dB |
+
+The VRAM peak is what `nvidia-smi` reports, text encoder and desktop included. The PSNR is the mean over the nine
+images. With `fp8_compute` on, the text encoder used here (a scaled-fp8 checkpoint) computes in fp8 too, so the PSNR
+values with the switches on compare against bf16 images made with that same encoder.
+
+- **Closest to bf16** are int8 and GGUF Q8_0, then fp8r, then nvfp4. For the prompt with a sign, every build spelled its
+  text correctly in all three seeds, with and without the compute switches. Without the switches, every quantized build
+  scores its lowest per-image PSNR on the same seed of the sign prompt, whose letter colors shift in all of them, Q8_0
+  included.
+- **Speed:** without a compute switch, every quantized layer is dequantized on each forward, so on this card the
+  quantized builds take up to 13 % longer than bf16. [int8 Compute](/configuration/optimization/int8-compute/) makes
+  the int8 build the fastest, 1.52× as fast as bf16, and
+  [`fp8_compute`](/configuration/optimization/fp8-storage/#fp8-compute) makes fp8r 1.16× as fast as bf16. Neither
+  affects nvfp4 or GGUF.
+- **Memory:** the quantized builds peak about 5 GiB below bf16.
 
 ## Installing
 
@@ -65,10 +96,33 @@ FLUX.3 needs three components:
 When you select a GGUF or single-file FLUX.3 model, pick the VAE and the Qwen3-VL encoder under **Components** if
 they are not filled in. A Diffusers model uses its bundled components unless you override them there.
 
-:::note[Quantized single files]
-The fp8, int8 and nvfp4 single files from Black Forest Labs and Comfy-Org are not supported yet. Installing one is
-refused with a message saying so. Use the bf16 file or a GGUF.
-:::
+### Quantized single files
+
+Comfy-Org's int8 and nvfp4 builds of both checkpoints are starter models. Black Forest Labs publishes an fp8 build
+(`fp8r`) and an nvfp4 build of each as well, in the `variants/` folder of its repositories. They are not starter models,
+because Klein's and Klein Base's files are both called `model.safetensors`. Install one by URL in the Model Manager,
+then rename it so the models can be told apart. The URLs are pinned to the revisions InvokeAI was checked against:
+the Klein file was loaded in full, the Klein Base file compared with it by its header.
+
+- Klein: `https://huggingface.co/black-forest-labs/flux-3-image-klein/resolve/337337621b8526e120f2275d250242f4a6bedd75/variants/fp8r/model.safetensors`
+- Klein Base: `https://huggingface.co/black-forest-labs/flux-3-image-klein-base/resolve/3f7fa5ee22ca1d5a5cc095ac7cc96e6a173b4c86/variants/fp8r/model.safetensors`
+
+Like every Black Forest Labs repository, these need your HuggingFace token. For nvfp4, prefer the Comfy-Org starter
+model to `variants/nvfp4/`: InvokeAI turns Black Forest Labs' file into exactly Comfy-Org's bytes while loading it, an
+extra pass over the weights on every load.
+
+- **int8** keeps its quantized layers in int8 on every GPU and decodes them on every step. On an RTX 30-series or
+  newer, [int8 Compute](/configuration/optimization/int8-compute/) multiplies them in int8 instead.
+- **nvfp4** keeps 33 of the 43 transformer blocks in 4 bits and decodes them on every step, on every GPU.
+- **fp8r** stores fp8 weights with one scale per row. With [FP8 Storage](/configuration/optimization/fp8-storage/), which
+  installing it switches on, or with `fp8_compute`, the weights stay fp8; otherwise they are expanded to bf16 as the
+  model loads.
+
+FP8 Storage does not apply to the int8 and nvfp4 builds: their quantized layers are smaller already, and the layers
+they keep in bf16 stay bf16. The Model Manager can still show the toggle as on for an nvfp4 build, because installing
+switches it on for any file holding fp8 numbers, and nvfp4's block scales are fp8. It has no effect there. Other
+quantized files, such as AWQ or bitsandbytes exports or nvfp4 files from other tools, are refused at install with a
+message saying why.
 
 ## Reference images
 
