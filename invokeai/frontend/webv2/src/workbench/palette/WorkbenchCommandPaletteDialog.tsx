@@ -6,17 +6,26 @@ import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widg
 import type { TFunction } from 'i18next';
 
 import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
-import { flushGenerateDrafts, notifyGenerateModelSelectionCleared } from '@features/generation/react';
+import {
+  flushGenerateDrafts,
+  notifyGenerateModelSwitched,
+  requestGenerateModelSwitchConfirmation,
+} from '@features/generation/react';
 import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
+import { useProjectLibrary } from '@workbench/projects/library';
+import { useProjectActions } from '@workbench/projects/useProjectActions';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
+import { revealOrOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
+import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
@@ -31,7 +40,13 @@ import { useTranslation } from 'react-i18next';
 import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
-import { buildCatalogCommandEntries, buildOpenSettingsEntry, buildSettingsEntries, getEntryKeys } from './entries';
+import {
+  buildCatalogCommandEntries,
+  buildOpenSettingsEntry,
+  buildSettingsEntries,
+  buildWidgetEntries,
+  getEntryKeys,
+} from './entries';
 import { buildExtensionPaletteEntry, createExtensionSearchProvider } from './extensionPaletteAdapters';
 import {
   createBoardsProvider,
@@ -42,6 +57,14 @@ import {
   createSemanticImagesProvider,
   createWorkflowsProvider,
 } from './paletteProviders';
+import { listPaletteWidgets } from './paletteWidgets';
+import { createProjectsProvider } from './projectsProvider';
+
+type OpenProjectName = { id: string; name: string };
+
+const areOpenProjectNamesEqual = (left: readonly OpenProjectName[], right: readonly OpenProjectName[]): boolean =>
+  left.length === right.length &&
+  left.every((project, index) => project.id === right[index]?.id && project.name === right[index]?.name);
 
 const buildStaticAppEntries = (t: TFunction, settingsKeys: string[] | undefined): PaletteEntry[] => [
   buildOpenSettingsEntry(t, () => openWorkbenchSettings(), settingsKeys),
@@ -89,6 +112,13 @@ const WorkbenchCommandPaletteDialog = ({
   const projectId = useActiveProjectSelector((project) => project.id);
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
   const promptHistory = useActiveProjectSelector((project) => project.promptHistory);
+  // Names only: project edits must not rebuild the providers or re-key the projects search.
+  const openProjects = useWorkbenchSelector(
+    (snapshot) => snapshot.projects.map(({ id, name }) => ({ id, name })),
+    areOpenProjectNamesEqual
+  );
+  const projectLibrary = useProjectLibrary();
+  const { openProject } = useProjectActions();
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
@@ -99,6 +129,44 @@ const WorkbenchCommandPaletteDialog = ({
     () => getLayoutPresetCommandTitleOverrides(account, (name) => t('commandPalette.layoutPresetCommand', { name })),
     [account, t]
   );
+
+  const focus = useWorkbenchFocus();
+  const { widgets: widgetCommands } = useWorkbenchCommands();
+  const widgetEntries = useMemo(() => {
+    const openable = listPaletteWidgets(getWidgetsForRegion);
+
+    return buildWidgetEntries({
+      catalog,
+      customHotkeys: preferences.customHotkeys,
+      formatHotkey,
+      show: (typeId) =>
+        revealOrOpenWorkbenchWidget(
+          { focus, getWidgetsForRegion, queries: workbenchQueries, widgets: widgetCommands },
+          typeId
+        ),
+      t,
+      widgets: openable.map((widget) => ({
+        label: resolveWidgetLabel(widget.manifest, t),
+        typeId: widget.manifest.id,
+      })),
+    });
+  }, [
+    catalog,
+    focus,
+    formatHotkey,
+    getWidgetsForRegion,
+    preferences.customHotkeys,
+    t,
+    widgetCommands,
+    workbenchQueries,
+  ]);
+  const commandStore = extensions.stores.commands;
+  const commandContributions = useSyncExternalStore(commandStore.subscribe, commandStore.list, commandStore.list);
+  const isHandled = useMemo(() => {
+    const handled = new Set(commandContributions.map(({ id }) => id));
+
+    return (commandId: string) => handled.has(commandId);
+  }, [commandContributions]);
 
   const executeCommand = useCallback(
     (commandId: string) => {
@@ -118,6 +186,7 @@ const WorkbenchCommandPaletteDialog = ({
         execute: executeCommand,
         catalog,
         formatHotkey,
+        isHandled,
         presentWidgetTypeIds: new Set(presentWidgetTypeIds),
         t,
         titleOverrides: commandTitleOverrides,
@@ -125,6 +194,7 @@ const WorkbenchCommandPaletteDialog = ({
       ...paletteContributions.map((contribution) =>
         buildExtensionPaletteEntry(contribution, extensions.commands.executeForSource)
       ),
+      ...widgetEntries,
       ...buildStaticAppEntries(
         t,
         getEntryKeys(
@@ -141,12 +211,14 @@ const WorkbenchCommandPaletteDialog = ({
       executeCommand,
       extensions,
       formatHotkey,
+      isHandled,
       paletteContributions,
       preferences,
       presentWidgetTypeIds,
       settingsEntryDeps,
       settingsSections,
       t,
+      widgetEntries,
     ]
   );
 
@@ -161,6 +233,7 @@ const WorkbenchCommandPaletteDialog = ({
 
     return {
       currentValues: getProjectWidgetValues(project, 'generate'),
+      isCanvasFrame: project.invocation.sourceId === 'canvas',
       projectId: project.id,
     };
   }, [workbenchQueries]);
@@ -194,6 +267,12 @@ const WorkbenchCommandPaletteDialog = ({
     };
 
     return [
+      createProjectsProvider({
+        library: projectLibrary,
+        openProject: (id, name) => void openProject(id, name),
+        openProjects,
+        t,
+      }),
       createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow'), t }),
       createBoardsProvider({
         openGalleryWidget: () => openWidget('gallery'),
@@ -201,21 +280,42 @@ const WorkbenchCommandPaletteDialog = ({
         t,
       }),
       createModelsProvider({
-        applyModel: (model, catalogModels) => {
-          const { currentValues, projectId } = readCurrentGenerateContext();
-          const result = selectProjectGenerateModel({
+        selectModel: (model, catalogModels) => {
+          const { currentValues, isCanvasFrame, projectId } = readCurrentGenerateContext();
+          const selection = selectProjectGenerateModel({
             currentValues,
             generation,
+            isCanvasFrame,
             model,
             models: catalogModels,
             projectId,
           });
 
-          notifyGenerateModelSelectionCleared({
-            clearedLabels: result.clearedLabels,
+          if (selection.status === 'needsConfirmation') {
+            // The project's model card asks, as it does for its own picker, once the widget below opens.
+            requestGenerateModelSwitchConfirmation({ model, projectId });
+            return;
+          }
+
+          if (selection.status === 'unchanged' || !selection.revertPatch) {
+            return;
+          }
+
+          const { revertPatch } = selection;
+          const readGenerateValues = (id: string) => {
+            const project = workbenchQueries.getProject(id);
+
+            return project ? getProjectWidgetValues(project, 'generate') : null;
+          };
+
+          notifyGenerateModelSwitched({
             locale: i18n.resolvedLanguage,
-            modelName: model.name,
+            model,
             notifications: notify,
+            projectId,
+            result: selection.result,
+            revertPatch,
+            settings: { patchGenerateSettings: generation.patchSettings, readGenerateValues },
             t,
           });
         },
@@ -264,14 +364,18 @@ const WorkbenchCommandPaletteDialog = ({
     i18n.resolvedLanguage,
     notify,
     getWidgetsForRegion,
+    openProject,
+    openProjects,
     openWidgetPlacement,
     projectId,
+    projectLibrary,
     promptHistory,
     queueScope,
     readCurrentGenerateContext,
     requestQueueItemReveal,
     t,
     workbenchCommands,
+    workbenchQueries,
   ]);
 
   return (

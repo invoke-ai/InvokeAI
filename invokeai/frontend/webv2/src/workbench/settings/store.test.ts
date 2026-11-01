@@ -1,9 +1,9 @@
 import type * as accountLifecycleModule from '@platform/state/accountLifecycle';
 
 import { LOG_NAMESPACES } from '@platform/logging/contracts';
+import { CONTROL_TYPES } from '@workbench/canvas-engine/api';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { ProjectSettings } from './contracts';
 import type * as storeModule from './store';
 
 /**
@@ -339,29 +339,6 @@ describe('clearWorkbenchSettings', () => {
   });
 });
 
-describe('normalizeProjectSettings', () => {
-  it('defaults progress-image behavior for older project payloads', () => {
-    expect(store.normalizeProjectSettings({}).showProgressImagesInViewer).toBe(true);
-    expect(store.normalizeProjectSettings({ showProgressImagesInViewer: false }).showProgressImagesInViewer).toBe(
-      false
-    );
-  });
-
-  /**
-   * Discard legacy project highlighting/attention settings so imports cannot overwrite personal editor
-   * preferences.
-   */
-  it('drops prompt preferences that older documents still carry in project settings', () => {
-    const normalized = store.normalizeProjectSettings({
-      preferNumericAttentionStyle: true,
-      showPromptSyntaxHighlighting: true,
-    } as Partial<ProjectSettings>);
-
-    expect(normalized).not.toHaveProperty('showPromptSyntaxHighlighting');
-    expect(normalized).not.toHaveProperty('preferNumericAttentionStyle');
-  });
-});
-
 describe('normalizeWorkbenchPreferences prompt editing', () => {
   it('defaults prompt syntax highlighting on and numeric attention style off', () => {
     expect(store.normalizeWorkbenchPreferences({}).showPromptSyntaxHighlighting).toBe(true);
@@ -379,11 +356,67 @@ describe('normalizeWorkbenchPreferences prompt editing', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences workflow library', () => {
+  it('orders by last update and fills thumbnails unless a known choice is stored', () => {
+    expect(store.normalizeWorkbenchPreferences({})).toMatchObject({
+      workflowLibrarySort: 'updated',
+      workflowLibraryThumbnailFit: 'cover',
+    });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'size', workflowLibraryThumbnailFit: 'stretch' })
+    ).toMatchObject({ workflowLibrarySort: 'updated', workflowLibraryThumbnailFit: 'cover' });
+    expect(
+      store.normalizeWorkbenchPreferences({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' })
+    ).toMatchObject({ workflowLibrarySort: 'opened', workflowLibraryThumbnailFit: 'contain' });
+  });
+});
+
+describe('normalizeWorkbenchPreferences canvas tool memory', () => {
+  it('keeps only the known tools, each a plain record, and an already-valid record as is', () => {
+    const valid = { brush: { size: 12 }, text: { fontSize: 40 } };
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: valid }).canvasToolMemory).toBe(valid);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        canvasToolMemory: { brush: { size: 12 }, eraser: 'wide', junk: { a: 1 }, shape: [1] } as never,
+      }).canvasToolMemory
+    ).toEqual({ brush: { size: 12 } });
+    expect(store.normalizeWorkbenchPreferences({ canvasToolMemory: [] as never }).canvasToolMemory).toEqual({});
+  });
+});
+
 describe('normalizeWorkbenchPreferences appearance', () => {
   it('keeps high contrast off unless explicitly enabled', () => {
     expect(store.normalizeWorkbenchPreferences({}).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: 1 as never }).highContrast).toBe(false);
     expect(store.normalizeWorkbenchPreferences({ highContrast: true }).highContrast).toBe(true);
+  });
+});
+
+describe('normalizeWorkbenchPreferences canvas operations', () => {
+  it('keeps Select Object auto-process off unless it was stored as on', () => {
+    expect(store.normalizeWorkbenchPreferences({}).selectObjectAutoProcess).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: 'true' as never }).selectObjectAutoProcess
+    ).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ selectObjectAutoProcess: true }).selectObjectAutoProcess).toBe(true);
+  });
+});
+
+describe('installInPlace preference', () => {
+  it('installs in place unless the account stored the box unticked', () => {
+    expect(store.normalizeWorkbenchPreferences({}).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: 'false' as never }).installInPlace).toBe(true);
+    expect(store.normalizeWorkbenchPreferences({ installInPlace: false }).installInPlace).toBe(false);
+  });
+
+  it('keeps an unticked box across a reload of the account settings', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchWorkbenchPreferences({ installInPlace: false });
+
+    vi.resetModules();
+    store = await import('./store');
+
+    expect((await store.loadWorkbenchSettings()).installInPlace).toBe(false);
   });
 });
 
@@ -465,6 +498,20 @@ describe('normalizeWorkbenchPreferences queue scope', () => {
   });
 });
 
+describe('normalizeWorkbenchPreferences startup destination', () => {
+  it('opens the Launchpad unless the most recent project was chosen', () => {
+    expect(store.normalizeWorkbenchPreferences({}).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'recentProject' }).startupDestination).toBe(
+      'recentProject'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'launchpad' }).startupDestination).toBe(
+      'launchpad'
+    );
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: 'project' }).startupDestination).toBe('launchpad');
+    expect(store.normalizeWorkbenchPreferences({ startupDestination: true }).startupDestination).toBe('launchpad');
+  });
+});
+
 describe('normalizeWorkbenchPreferences generate sections', () => {
   it('defaults to no section overrides', () => {
     expect(store.normalizeWorkbenchPreferences({}).generateSectionsOpen).toEqual({});
@@ -497,5 +544,136 @@ describe('normalizeWorkbenchPreferences language', () => {
 
   it('heals unsupported languages to the default', () => {
     expect(store.normalizeWorkbenchPreferences({ language: 'missing' as never }).language).toBe('en');
+  });
+});
+
+describe('controlModelMemory preference', () => {
+  it('starts empty and keeps only well-formed picks', () => {
+    expect(store.normalizeWorkbenchPreferences({}).controlModelMemory).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({ controlModelMemory: ['sdxl:depth'] as never }).controlModelMemory
+    ).toEqual({});
+    expect(
+      store.normalizeWorkbenchPreferences({
+        controlModelMemory: {
+          ':depth': 'no-base',
+          'sdxl:depth': 'depth-model',
+          'sdxl:flux': 'unknown-type',
+          'sdxl:pose': '',
+          'sdxl:tile': 'x'.repeat(256),
+          'sd-1:edges': 7 as never,
+          sdxl: 'no-type',
+        },
+      }).controlModelMemory
+    ).toEqual({ 'sdxl:depth': 'depth-model' });
+  });
+
+  it('accepts every control type, so the spelled-out key pattern stays in step with the canvas contract', () => {
+    const memory = Object.fromEntries(CONTROL_TYPES.map((type) => [`sdxl:${type}`, `${type}-model`]));
+
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toEqual(memory);
+  });
+
+  it('keeps the newest 256 picks', () => {
+    const memory = Object.fromEntries(Array.from({ length: 300 }, (_, index) => [`base-${index}:depth`, `m${index}`]));
+    const kept = store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory;
+
+    expect(Object.keys(kept)).toHaveLength(256);
+    expect(kept['base-299:depth']).toBe('m299');
+    expect(kept['base-43:depth']).toBeUndefined();
+  });
+
+  it('keeps the same record across unrelated preference patches, so readers that compare it do not re-run', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    const memory = store.getWorkbenchPreferences().controlModelMemory;
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toBe(memory);
+    expect(store.normalizeWorkbenchPreferences({ controlModelMemory: memory }).controlModelMemory).toBe(memory);
+  });
+
+  it('remembers, replaces and forgets a pick through the persisted preferences, and resets with the rest', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchControlModelMemory('sdxl:depth', 'depth-a');
+    await store.patchControlModelMemory('flux:pose', 'flux-union');
+    await store.patchControlModelMemory('sdxl:depth', 'depth-b');
+
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'flux:pose': 'flux-union', 'sdxl:depth': 'depth-b' });
+
+    await store.patchControlModelMemory('flux:pose', null);
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+    expect(readBackendPreferences().controlModelMemory).toEqual({ 'sdxl:depth': 'depth-b' });
+
+    await store.clearWorkbenchSettings();
+
+    expect(store.getWorkbenchPreferences().controlModelMemory).toEqual({});
+  });
+});
+
+describe('scopedDefaults preference', () => {
+  it('keeps only layerable keys of known owners, and returns a clean record as is', () => {
+    const valid = { gallery: { thumbnailFit: 'aspect' }, generate: { useWatermark: true } };
+
+    expect(store.normalizeWorkbenchPreferences({}).scopedDefaults).toEqual({});
+    expect(store.normalizeWorkbenchPreferences({ scopedDefaults: valid }).scopedDefaults).toBe(valid);
+    expect(
+      store.normalizeWorkbenchPreferences({
+        scopedDefaults: { canvas: [true], gallery: { thumbnailFit: 'aspect' }, preview: 'slider' } as never,
+      }).scopedDefaults
+    ).toEqual({ gallery: { thumbnailFit: 'aspect' } });
+    expect(store.normalizeWorkbenchPreferences({ scopedDefaults: [] as never }).scopedDefaults).toEqual({});
+    // Workspace state that never layers, an unknown owner, and the Generate widget's own values all drop.
+    expect(
+      store.normalizeWorkbenchPreferences({
+        scopedDefaults: {
+          gallery: { galleryPage: 4, selectedBoardId: 'b', showDateBoards: true },
+          generate: { model: 'm', useCpuNoise: false },
+          later: { anything: 1 },
+        },
+      }).scopedDefaults
+    ).toEqual({ gallery: { showDateBoards: true }, generate: { useCpuNoise: false } });
+  });
+
+  it('sets and clears one owner key at a time, keeping the others, and persists them', async () => {
+    await store.loadWorkbenchSettings();
+
+    await store.patchScopedDefault('gallery', { thumbnailFit: 'aspect' });
+    await store.patchScopedDefault('gallery', { showDateBoards: true });
+    await store.patchScopedDefault('generate', { useWatermark: true });
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toEqual({
+      gallery: { showDateBoards: true, thumbnailFit: 'aspect' },
+      generate: { useWatermark: true },
+    });
+    expect(readBackendPreferences().scopedDefaults).toEqual(store.getWorkbenchPreferences().scopedDefaults);
+
+    await store.clearScopedDefault('gallery', ['thumbnailFit']);
+    await store.clearScopedDefault('generate', ['useWatermark']);
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toEqual({ gallery: { showDateBoards: true } });
+  });
+
+  it('keeps the defaults record across an unrelated preference patch', async () => {
+    await store.loadWorkbenchSettings();
+    await store.patchScopedDefault('canvas', { showGrid: true });
+    const before = store.getWorkbenchPreferences().scopedDefaults;
+
+    await store.patchWorkbenchPreferences({ reduceMotion: true });
+
+    expect(store.getWorkbenchPreferences().scopedDefaults).toBe(before);
+  });
+});
+
+describe('antialiasProgressImages preference', () => {
+  it('is off unless stored as on', () => {
+    expect(store.normalizeWorkbenchPreferences({}).antialiasProgressImages).toBe(false);
+    expect(
+      store.normalizeWorkbenchPreferences({ antialiasProgressImages: 'yes' as never }).antialiasProgressImages
+    ).toBe(false);
+    expect(store.normalizeWorkbenchPreferences({ antialiasProgressImages: true }).antialiasProgressImages).toBe(true);
   });
 });

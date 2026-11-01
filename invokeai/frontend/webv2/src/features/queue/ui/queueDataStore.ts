@@ -1,12 +1,21 @@
-import type { QueueCounts, QueueItemReadModel, QueueQueryScope } from '@features/queue/core/types';
+import type { QueueItem } from '@features/queue/core/historyTypes';
+import type {
+  QueueCounts,
+  QueueItemDetailReadModel,
+  QueueItemReadModel,
+  QueueQueryScope,
+} from '@features/queue/core/types';
 
-import { getQueueReadModelOptions } from '@features/queue/publicApi';
+import { getPersonalQueueActivity } from '@features/queue/core/types';
+import { invalidateQueueQueries } from '@features/queue/data/queries';
+import { getQueueItemDetailOptions, getQueueReadModelOptions } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { getCurrentBatchItems } from './currentBatchItems';
 import { clearProgressForQueueItemsWithResults } from './queueProgressCleanup';
-import { useQueueQueryScope } from './queueScope';
+import { getQueueOpenWorkElsewhere, useQueueQueryScope } from './queueScope';
 
 const EMPTY_COUNTS: QueueCounts = {
   canceled: 0,
@@ -37,10 +46,26 @@ const useQueueReadModel = () => {
   return useQuery(getQueueReadModelOptions(scope, onQueueRead));
 };
 
-/** Invalidate queue data; TanStack Query deduplicates concurrent callers. */
-export const refreshQueue = async (): Promise<void> => {
-  await queryClient.invalidateQueries({ queryKey: ['queue'] });
+/**
+ * The viewer's open work in the queue scope beyond `projectItems`, the active project's runs (see
+ * `getQueueOpenWorkElsewhere`), so a surface can count the project's runs and this without counting anything twice.
+ */
+export const useQueueOpenWorkElsewhere = (projectItems: QueueItem[]): number => {
+  const model = useQueueReadModel().data;
+
+  return useMemo(() => {
+    if (!model) {
+      return 0;
+    }
+
+    const { inProgress, pending } = getPersonalQueueActivity(model.status.queue);
+
+    return getQueueOpenWorkElsewhere(model, inProgress + pending, { queue: { items: projectItems } });
+  }, [model, projectItems]);
 };
+
+/** Invalidate queue data; TanStack Query deduplicates concurrent callers. */
+export const refreshQueue = (): Promise<void> => invalidateQueueQueries(queryClient);
 
 /** Imperative prefetch for non-React composition roots. */
 export const ensureQueueLoaded = (scope: QueueQueryScope = {}): void => {
@@ -74,4 +99,42 @@ export const useQueueLoadState = (): { loadState: 'loading' | 'loaded' | 'error'
   }
 
   return { error: null, loadState: query.isPending ? 'loading' : 'loaded' };
+};
+
+export interface QueueItemDetailState {
+  detail: QueueItemDetailReadModel | null;
+  error: string | null;
+  loadState: 'idle' | 'loading' | 'loaded' | 'error';
+  retry: () => void;
+  /** A retry of a failed read is in flight; the failure stays shown until it settles. */
+  retrying: boolean;
+}
+
+/** One item's saved execution data, fetched only while `enabled` (a details dialog is open). */
+export const useQueueItemDetail = (itemId: number, enabled: boolean): QueueItemDetailState => {
+  const query = useQuery({ ...getQueueItemDetailOptions(itemId), enabled });
+  const retry = query.refetch;
+
+  if (!enabled) {
+    return { detail: null, error: null, loadState: 'idle', retry, retrying: false };
+  }
+
+  if (query.isError) {
+    return {
+      detail: null,
+      // The view words the failure; only a reason the server gave is worth adding to it.
+      error: query.error instanceof Error ? query.error.message : null,
+      loadState: 'error',
+      retry,
+      retrying: query.isFetching,
+    };
+  }
+
+  return {
+    detail: query.data ?? null,
+    error: null,
+    loadState: query.isPending ? 'loading' : 'loaded',
+    retry,
+    retrying: false,
+  };
 };

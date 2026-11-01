@@ -4,18 +4,29 @@ import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from
 import { Stack } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
+  getComponentSlotIssue,
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
-import { isMainModelConfig, isModelIdentifierConfig, isVaeModelConfig } from '@features/generation/core/settings';
+import {
+  DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT,
+  isMainModelConfig,
+  isModelIdentifierConfig,
+  isVaeModelConfig,
+  MAX_ANIMA_INPAINT_ADAPTER_WEIGHT,
+  MIN_ANIMA_INPAINT_ADAPTER_WEIGHT,
+} from '@features/generation/core/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Field } from '@platform/ui';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
+import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateComponentsSectionProps {
   draft: GenerateDraft;
@@ -27,6 +38,9 @@ const toComponentModel = (model: ModelConfig | null): ComponentModelConfig | nul
   isModelIdentifierConfig(model) ? model : null;
 
 const selectComponentSettings = pickGenerateSettings([
+  'animaInpaintAdapterEnabled',
+  'animaInpaintAdapterModel',
+  'animaInpaintAdapterWeight',
   'clipEmbedModel',
   'clipGEmbedModel',
   'clipLEmbedModel',
@@ -64,6 +78,7 @@ const getComponentPolicyContext = (
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
+    animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -83,18 +98,26 @@ const ComponentPicker = ({
   onChange: (model: ModelConfig | null) => void;
   slot: ComponentSlotPolicy;
 }) => {
+  const { t } = useTranslation();
   const value = ctx.selectedComponents[slot.key];
   const filter = useCallback((model: ModelConfig) => slot.filter?.(model, ctx) ?? false, [ctx, slot]);
   const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
-  const selectedValue = value && (!filter || filter(value as ModelConfig)) ? value.key : null;
+  const isIncompatible = Boolean(value && slot.filter && !filter(value as ModelConfig));
+  const isRequired = Boolean(slot.required?.(ctx));
+  const error = getComponentSlotIssue(slot, ctx) ?? undefined;
+  // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
+  const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
 
   return (
-    <Field label={slot.label} helpText={slot.helpText}>
+    <Field label={slot.label} helpText={slot.helpText} error={error}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
+        invalid={Boolean(error)}
         isClearable
         modelTypes={modelTypes}
-        placeholder={slot.placeholder ?? 'Model default'}
+        placeholder={
+          slot.placeholder ?? (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+        }
         value={selectedValue}
         onChange={onChange}
       />
@@ -147,8 +170,68 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
         {policy.slots.map((slot) => (
           <ComponentPickerRow key={slot.key} commitSlotValue={commitSlotValue} ctx={ctx!} slot={slot} />
         ))}
+        {settings.animaInpaintAdapterModel && policy.slots.some((slot) => slot.key === 'animaInpaintAdapterModel') ? (
+          <AnimaInpaintAdapterControls
+            enabled={settings.animaInpaintAdapterEnabled}
+            weight={settings.animaInpaintAdapterWeight}
+            onCommit={onCommit}
+          />
+        ) : null}
+        <GenerateIssueNotes section="components" />
       </Stack>
     </GenerateCollapsibleSection>
+  );
+};
+
+/** The legacy slider spanned 0 to 2 with these stops; typed values may use the node's full range. */
+const ANIMA_INPAINT_ADAPTER_WEIGHT_MARKS = [0, 1, 2];
+
+/** Switching the adapter off keeps its selection and weight, so switching back on restores them. */
+const AnimaInpaintAdapterControls = ({
+  enabled,
+  onCommit,
+  weight,
+}: {
+  enabled: boolean;
+  onCommit: (patch: Partial<GenerateSettings>) => void;
+  weight: number;
+}) => {
+  const { t } = useTranslation();
+  const onEnabledChange = useCallback(
+    (checked: boolean) => onCommit({ animaInpaintAdapterEnabled: checked }),
+    [onCommit]
+  );
+  const onWeightChange = useCallback(
+    (value: number) => {
+      if (Number.isFinite(value)) {
+        onCommit({ animaInpaintAdapterWeight: value });
+      }
+    },
+    [onCommit]
+  );
+
+  return (
+    <Stack gap="1.5">
+      <GenerateToggleSwitch
+        checked={enabled}
+        helpText={enabled ? undefined : t('widgets.generate.animaInpaintAdapterOffHelp')}
+        label={t('widgets.generate.animaInpaintAdapterEnabled')}
+        onCheckedChange={onEnabledChange}
+      />
+      <ScrubberField
+        defaultValue={DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT}
+        disabled={!enabled}
+        inputMax={MAX_ANIMA_INPAINT_ADAPTER_WEIGHT}
+        inputMin={MIN_ANIMA_INPAINT_ADAPTER_WEIGHT}
+        label={t('widgets.generate.animaInpaintAdapterWeight')}
+        marks={ANIMA_INPAINT_ADAPTER_WEIGHT_MARKS}
+        max={2}
+        min={0}
+        step={0.05}
+        value={weight}
+        onChange={onWeightChange}
+      />
+    </Stack>
   );
 };
 

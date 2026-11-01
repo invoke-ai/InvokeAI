@@ -18,6 +18,7 @@ import {
   createProjectGraph,
   projectGraphReducer,
 } from './document';
+import { formatWorkflowReadinessReason } from './readinessIssues';
 
 const input = (name: string, overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
   default: undefined,
@@ -99,20 +100,27 @@ const buildDocument = (): { doc: ProjectGraphState; sinkId: string; sourceId: st
   return { doc, sinkId: sinkNode.id, sourceId: sourceNode.id };
 };
 
+/** Readiness with each reason in its English wording, so expectations read as the user would. */
+const readinessInEnglish = (...args: Parameters<typeof getProjectGraphReadiness>) => {
+  const readiness = getProjectGraphReadiness(...args);
+
+  return { ...readiness, reasons: readiness.reasons.map(formatWorkflowReadinessReason) };
+};
+
 describe('getProjectGraphReadiness', () => {
   it('requires loaded templates and at least one node', () => {
     const empty = createProjectGraph('empty');
 
-    expect(getProjectGraphReadiness(empty, { error: null, status: 'loading', templates: {} }).reasons[0]).toMatch(
+    expect(readinessInEnglish(empty, { error: null, status: 'loading', templates: {} }).reasons[0]).toMatch(
       /still loading/
     );
-    expect(getProjectGraphReadiness(empty, loadedSnapshot).reasons[0]).toMatch(/no nodes/);
+    expect(readinessInEnglish(empty, loadedSnapshot).reasons[0]).toMatch(/no nodes/);
   });
 
   it('is ready when required inputs are connected or filled', () => {
     const { doc } = buildDocument();
 
-    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
+    expect(readinessInEnglish(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
 
   it('treats resolved connector output edges as connected required inputs', () => {
@@ -147,7 +155,7 @@ describe('getProjectGraphReadiness', () => {
       type: 'addEdge',
     });
 
-    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
+    expect(readinessInEnglish(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
 
   it('reports missing required inputs and unknown node types', () => {
@@ -159,7 +167,7 @@ describe('getProjectGraphReadiness', () => {
       value: '',
     });
 
-    expect(getProjectGraphReadiness(withEmptyString, loadedSnapshot)).toEqual({
+    expect(readinessInEnglish(withEmptyString, loadedSnapshot)).toEqual({
       batch: null,
       canInvoke: true,
       reasons: [],
@@ -172,7 +180,7 @@ describe('getProjectGraphReadiness', () => {
       value: undefined,
     });
 
-    expect(getProjectGraphReadiness(withMissingValue, loadedSnapshot).reasons[0]).toMatch(/missing required input/);
+    expect(readinessInEnglish(withMissingValue, loadedSnapshot).reasons[0]).toMatch(/missing required input/);
 
     const unknownTemplates: InvocationTemplatesSnapshot = {
       error: null,
@@ -180,7 +188,7 @@ describe('getProjectGraphReadiness', () => {
       templates: { source: templates.source },
     };
 
-    expect(getProjectGraphReadiness(doc, unknownTemplates).reasons[0]).toMatch(/Unknown node type "sink"/);
+    expect(readinessInEnglish(doc, unknownTemplates).reasons[0]).toMatch(/Unknown node type "sink"/);
   });
 
   it('reports invalid required direct values', () => {
@@ -204,7 +212,7 @@ describe('getProjectGraphReadiness', () => {
     doc = projectGraphReducer(doc, { fieldName: 'choice', nodeId: node.id, type: 'setFieldValue', value: 'z' });
     doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
 
-    const readiness = getProjectGraphReadiness(doc, {
+    const readiness = readinessInEnglish(doc, {
       error: null,
       status: 'loaded',
       templates: { constrained: constrainedTemplate },
@@ -214,6 +222,31 @@ describe('getProjectGraphReadiness', () => {
     expect(readiness.reasons).toEqual([
       '"constrained" has invalid input "choice".',
       '"constrained" has invalid input "count".',
+    ]);
+  });
+
+  it('names the node and input each issue is about, so a surface can lead to it', () => {
+    const { doc, sourceId } = buildDocument();
+    const withMissingValue = projectGraphReducer(doc, {
+      fieldName: 'value',
+      nodeId: sourceId,
+      type: 'setFieldValue',
+      value: undefined,
+    });
+
+    expect(getProjectGraphReadiness(withMissingValue, loadedSnapshot).reasons).toEqual([
+      {
+        workflowIssue: {
+          fieldName: 'value',
+          message: expect.stringMatching(/missing required input/),
+          messageKey: 'nodes.readiness.missingInput',
+          messageValues: { field: expect.any(String), node: expect.any(String) },
+          nodeId: sourceId,
+        },
+      },
+    ]);
+    expect(getProjectGraphReadiness(createProjectGraph('empty'), loadedSnapshot).reasons).toEqual([
+      { workflowIssue: { message: expect.any(String), messageKey: 'nodes.readiness.noNodes' } },
     ]);
   });
 
@@ -232,7 +265,7 @@ describe('getProjectGraphReadiness', () => {
     doc = projectGraphReducer(doc, { node, type: 'addNode' });
 
     expect(
-      getProjectGraphReadiness(doc, {
+      readinessInEnglish(doc, {
         error: null,
         status: 'loaded',
         templates: { 'optional-constrained': constrainedTemplate },
@@ -242,12 +275,56 @@ describe('getProjectGraphReadiness', () => {
     doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
 
     expect(
-      getProjectGraphReadiness(doc, {
+      readinessInEnglish(doc, {
         error: null,
         status: 'loaded',
         templates: { 'optional-constrained': constrainedTemplate },
       })
     ).toEqual({ batch: null, canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
+  });
+
+  it('validates a form-exposed field against its authored bounds', () => {
+    const constrainedTemplate = template('form-bounded', {
+      count: input('count', {
+        maximum: 100,
+        minimum: 0,
+        required: false,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    });
+    const snapshot = { error: null, status: 'loaded', templates: { 'form-bounded': constrainedTemplate } } as const;
+    const node = buildInvocationNode(constrainedTemplate, { x: 0, y: 0 });
+    let doc = createProjectGraph('form-bounds');
+
+    doc = projectGraphReducer(doc, { node, type: 'addNode' });
+    doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 50 });
+    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'count', nodeId: node.id }, type: 'exposeField' });
+
+    const element = Object.values(doc.form.elements).find((candidate) => candidate.type === 'node-field');
+
+    expect(element).toBeDefined();
+    expect(readinessInEnglish(doc, snapshot).canInvoke).toBe(true);
+
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 0, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(readinessInEnglish(doc, snapshot)).toEqual({
+      batch: null,
+      canInvoke: false,
+      reasons: ['"form-bounded" has invalid input "count".'],
+    });
+
+    // An inverted pair is ignored rather than blocking the invoke.
+    doc = projectGraphReducer(doc, {
+      elementId: element!.id,
+      settings: { component: 'slider', max: 20, min: 30, type: 'integer-field-config' },
+      type: 'setNodeFieldSettings',
+    });
+
+    expect(readinessInEnglish(doc, snapshot).canInvoke).toBe(true);
   });
 
   it('treats only explicitly externally satisfied connection inputs as ready', () => {
@@ -273,13 +350,13 @@ describe('getProjectGraphReadiness', () => {
       templates: { 'connection-sink': connectionTemplate },
     };
 
-    expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+    expect(readinessInEnglish(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
       batch: null,
       canInvoke: false,
       reasons: ['"connection-sink" is missing a connection for "Mask image".'],
     });
     expect(
-      getProjectGraphReadiness(doc, snapshot, {
+      readinessInEnglish(doc, snapshot, {
         externallySatisfiedInputs: new Set(['sink:image', 'sink:mask']),
       })
     ).toEqual({ batch: null, canInvoke: true, reasons: [] });
@@ -302,7 +379,7 @@ describe('getProjectGraphReadiness', () => {
       templates: { 'direct-sink': directTemplate },
     };
 
-    expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+    expect(readinessInEnglish(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
       batch: null,
       canInvoke: false,
       reasons: ['"direct-sink" is missing required input "Layer image".'],
@@ -391,6 +468,38 @@ describe('compileProjectGraph', () => {
     expect(
       compileProjectGraph(toUncategorized, templates, { autoBoardId: 'none' }).backendGraph?.nodes[sinkId]
     ).not.toHaveProperty('board');
+  });
+
+  it('sends an explicit board the destination predicate refuses where Auto goes, and keeps one it allows', () => {
+    const { doc, sinkId } = buildDocument();
+    const isBoardDestination = vi.fn((boardId: string) => boardId === 'kept');
+    const withBoard = (value: unknown, autoBoardId: string | null) =>
+      compileProjectGraph(
+        projectGraphReducer(doc, { fieldName: 'board', nodeId: sinkId, type: 'setFieldValue', value }),
+        templates,
+        { autoBoardId, isBoardDestination }
+      ).backendGraph?.nodes[sinkId];
+
+    expect(withBoard({ board_id: 'kept' }, 'auto-board')).toMatchObject({ board: { board_id: 'kept' } });
+    // Revoked, archived away or deleted since it was chosen: the run lands on the auto-add board instead.
+    expect(withBoard({ board_id: 'revoked' }, 'auto-board')).toMatchObject({ board: { board_id: 'auto-board' } });
+    // With no auto-add board the refused board resolves like Auto: unboarded, so Uncategorized.
+    expect(withBoard({ board_id: 'revoked' }, 'none')).not.toHaveProperty('board');
+    // The sentinels never ask the predicate; without a predicate an explicit board is taken as given.
+    expect(withBoard('none', 'auto-board')).not.toHaveProperty('board');
+    expect(isBoardDestination.mock.calls.map(([boardId]) => boardId)).toEqual(['kept', 'revoked', 'revoked']);
+    expect(
+      compileProjectGraph(
+        projectGraphReducer(doc, {
+          fieldName: 'board',
+          nodeId: sinkId,
+          type: 'setFieldValue',
+          value: { board_id: 'revoked' },
+        }),
+        templates,
+        { autoBoardId: 'auto-board' }
+      ).backendGraph?.nodes[sinkId]
+    ).toMatchObject({ board: { board_id: 'revoked' } });
   });
 
   it('preserves auto/none board sentinels only in Call Saved Workflow inputs', () => {
@@ -1032,13 +1141,13 @@ describe('batch nodes', () => {
   it('is ready with a fed, wired batch node and reports the batch size', () => {
     const { doc } = build([1.5, 2.5]);
 
-    expect(getProjectGraphReadiness(doc, snapshot)).toEqual({ batch: { size: 2 }, canInvoke: true, reasons: [] });
+    expect(readinessInEnglish(doc, snapshot)).toEqual({ batch: { size: 2 }, canInvoke: true, reasons: [] });
   });
 
   it("still judges each entry of a batch node's own list, so a cleared row cannot reach the queue", () => {
     const { doc } = build([1.5, null as unknown as number]);
 
-    expect(getProjectGraphReadiness(doc, snapshot)).toMatchObject({
+    expect(readinessInEnglish(doc, snapshot)).toMatchObject({
       canInvoke: false,
       reasons: ['"float_batch" has invalid input "floats".'],
     });
@@ -1047,12 +1156,12 @@ describe('batch nodes', () => {
   it('refuses a batch whose runs would overflow the queue before anything is submitted', () => {
     const { doc } = build([1.5, 2.5]);
 
-    expect(getProjectGraphReadiness(doc, snapshot, { batchCount: 5_000 })).toEqual({
+    expect(readinessInEnglish(doc, snapshot, { batchCount: 5_000 })).toEqual({
       batch: { size: 2 },
       canInvoke: true,
       reasons: [],
     });
-    expect(getProjectGraphReadiness(doc, snapshot, { batchCount: 5_001 })).toMatchObject({
+    expect(readinessInEnglish(doc, snapshot, { batchCount: 5_001 })).toMatchObject({
       canInvoke: false,
       reasons: ['This batch would queue 10,002 sessions; the queue accepts at most 10,000.'],
     });
@@ -1061,7 +1170,7 @@ describe('batch nodes', () => {
   it('blocks on batch reasons and leaves the size unknown while a generator is unresolved', () => {
     const { doc } = build([]);
 
-    expect(getProjectGraphReadiness(doc, snapshot)).toMatchObject({
+    expect(readinessInEnglish(doc, snapshot)).toMatchObject({
       batch: { size: 0 },
       canInvoke: false,
       reasons: ['Batch node "float_batch" has an empty collection.'],
@@ -1070,7 +1179,7 @@ describe('batch nodes', () => {
     // A batch node's own list is the planner's business: a generator-fed batch has no list of its own.
     const generated = build([], { count: 3, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
 
-    expect(getProjectGraphReadiness(generated.doc, snapshot)).toEqual({
+    expect(readinessInEnglish(generated.doc, snapshot)).toEqual({
       batch: { size: 3 },
       canInvoke: true,
       reasons: [],
@@ -1079,7 +1188,7 @@ describe('batch nodes', () => {
     // A cleared or off-rule setting is readable, so the field names it and the planner reports nothing more.
     const cleared = build([], { count: null, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
 
-    expect(getProjectGraphReadiness(cleared.doc, snapshot)).toEqual({
+    expect(readinessInEnglish(cleared.doc, snapshot)).toEqual({
       batch: { size: null },
       canInvoke: false,
       reasons: ['"float_generator" has invalid input "generator".'],

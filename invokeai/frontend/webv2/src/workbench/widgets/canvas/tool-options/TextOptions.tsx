@@ -1,7 +1,7 @@
 import type { SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasTextFontRef, TextToolOptions } from '@workbench/canvas-engine/api';
 import type { TextSource } from '@workbench/widgets/canvas/textFontStyle';
-import type { ToolFormProps, ToolPreviewProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
+import type { ToolFormProps } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 import type { CSSProperties } from 'react';
 
 import { Box, createListCollection, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
@@ -303,7 +303,7 @@ const useTextEditor = (engine: ToolFormProps['engine']) => {
   return { active, applyEdit, content, targetName };
 };
 
-export const TextPreview = ({ engine }: ToolPreviewProps) => {
+export const TextPreview = ({ engine }: ToolFormProps) => {
   const { active, content, targetName } = useTextEditor(engine);
   // The instanced face the canvas rasterizes with; the engine keeps the
   // session's, the document's and the defaults' faces active, so the load is shared.

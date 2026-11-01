@@ -1,8 +1,9 @@
-import type { CanvasStagingCandidateContract, CanvasStateContractV3 } from '@workbench/canvas-engine/api';
+import type { CanvasStagingCandidateContract, CanvasStateContractV3, Rect } from '@workbench/canvas-engine/api';
 import type { WorkbenchQueueItem as QueueItem } from '@workbench/queueHistoryContracts';
 
 import { getQueueItemSnapshotBatchCount, getQueueItemSnapshotDimensions } from '@features/queue/contracts';
 
+/** A result still generating. `x`/`y`/`width`/`height` are where it lands: the rect its run was submitted with. */
 export interface CanvasQueuePlaceholderSlot {
   height: number;
   id: string;
@@ -10,6 +11,8 @@ export interface CanvasQueuePlaceholderSlot {
   kind: 'placeholder';
   queueItemId: string;
   width: number;
+  x: number;
+  y: number;
 }
 
 export interface CanvasCandidateSlot {
@@ -33,14 +36,17 @@ const isActiveCanvasQueueItemForDocument = (canvas: CanvasStateContractV3, item:
 const getFiniteNumber = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-const getSubmittedBboxSize = (item: QueueItem): { height: number; width: number } => {
+/** The submitted bbox's origin and the result's size there (an upscale's output is larger than its bbox). */
+const getSubmittedRect = (item: QueueItem): Rect => {
   const { bbox } = item.snapshot.canvas.document;
   const bboxSize = {
     height: Math.max(1, Math.round(getFiniteNumber(bbox.height, item.snapshot.canvas.document.height))),
     width: Math.max(1, Math.round(getFiniteNumber(bbox.width, item.snapshot.canvas.document.width))),
   };
+  const { height, width } =
+    item.snapshot.sourceId === 'upscale' ? getQueueItemSnapshotDimensions(item, bboxSize) : bboxSize;
 
-  return item.snapshot.sourceId === 'upscale' ? getQueueItemSnapshotDimensions(item, bboxSize) : bboxSize;
+  return { height, width, x: getFiniteNumber(bbox.x, 0), y: getFiniteNumber(bbox.y, 0) };
 };
 
 const getExpectedImageCount = (item: QueueItem): number => {
@@ -101,18 +107,24 @@ const createCandidateSlot = (candidate: CanvasStagingCandidateContract, itemInde
   width: candidate.width,
 });
 
-const createPlaceholderSlot = (item: QueueItem, itemIndex: number): CanvasQueuePlaceholderSlot => {
-  const { height, width } = getSubmittedBboxSize(item);
+const createPlaceholderSlot = (item: QueueItem, itemIndex: number): CanvasQueuePlaceholderSlot => ({
+  ...getSubmittedRect(item),
+  id: `${item.id}:${itemIndex - 1}`,
+  itemIndex,
+  kind: 'placeholder',
+  queueItemId: item.id,
+});
 
-  return {
-    height,
-    id: `${item.id}:${itemIndex - 1}`,
-    itemIndex,
-    kind: 'placeholder',
-    queueItemId: item.id,
-    width,
-  };
-};
+/** Where a slot's result lands in document space: a candidate's placement, a placeholder's submitted rect. */
+export const getCanvasStagingSlotRect = (slot: CanvasStagingSlot): Rect =>
+  slot.kind === 'candidate'
+    ? {
+        height: slot.candidate.placement.height,
+        width: slot.candidate.placement.width,
+        x: slot.candidate.placement.x,
+        y: slot.candidate.placement.y,
+      }
+    : { height: slot.height, width: slot.width, x: slot.x, y: slot.y };
 
 export const getCanvasQueuePlaceholderSlots = (
   canvas: CanvasStateContractV3,
@@ -252,6 +264,22 @@ export const getCanvasStagingSlots = (
 export const getCanvasStagingSlotCount = (canvas: CanvasStateContractV3, queueItems: readonly QueueItem[]): number =>
   getCanvasStagingSlots(canvas, queueItems).length;
 
+/**
+ * Whether this canvas session has results to lose: a staged candidate, or a generation still queued or running for
+ * the current document revision (even one whose placeholders are all spent). A document swap throws them away.
+ */
+export const hasPendingCanvasResults = (
+  canvas: Pick<CanvasStateContractV3, 'documentRevision' | 'stagingArea'>,
+  queueItems: readonly QueueItem[]
+): boolean =>
+  canvas.stagingArea.pendingImages.length > 0 ||
+  queueItems.some(
+    (item) =>
+      item.snapshot.destination === 'canvas' &&
+      item.snapshot.canvas.documentRevision === canvas.documentRevision &&
+      (item.status === 'pending' || item.status === 'running')
+  );
+
 export const getFirstCanvasPlaceholderSlotIndex = (
   canvas: CanvasStateContractV3,
   queueItems: readonly QueueItem[]
@@ -260,6 +288,13 @@ export const getFirstCanvasPlaceholderSlotIndex = (
 /** Whether the queue can still cancel `item`: the backend supports it and its work is queued or running. */
 export const isCancellableQueueItem = (item: QueueItem): boolean =>
   item.cancellable && (item.status === 'pending' || item.status === 'running');
+
+/**
+ * A run this tab queued that the backend has not accepted: never sent, or its enqueue still in flight. A backend
+ * cancel cannot reach it; only marking it canceled here stops it (an enqueue that lands then is canceled at once).
+ */
+export const isUnsubmittedQueueItem = (item: QueueItem): boolean =>
+  isCancellableQueueItem(item) && !item.backendItemIds?.length;
 
 export const getCancelableCanvasStagingQueueItemId = (slot: CanvasStagingSlot | undefined): string | null =>
   slot?.kind === 'placeholder' ? slot.queueItemId : null;

@@ -1,16 +1,27 @@
 import type { GalleryImageItem, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoard, GalleryBoardDeletionResult, GalleryImage, GalleryView } from '@features/gallery/core/types';
+import type {
+  GalleryBoard,
+  GalleryBoardDeletionResult,
+  GalleryImage,
+  GalleryProjectRef,
+  GalleryView,
+} from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
+import { asSingleAccountBoards } from '@features/gallery/core/boardAccess';
 import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
 
 export interface GalleryItemActions {
   /**
    * `returnFocus` names where keyboard focus goes when a confirmation dialog closes, resolved then: the deletion can
-   * remove the control that opened it.
+   * remove the control that opened it. `targetsOffScreen` says some item is not on screen, so the deletion asks even
+   * when the user turned routine confirmations off; so does any deletion of more than one item.
    */
-  deleteItems(items: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }): Promise<void>;
+  deleteItems(
+    items: GalleryItemRef[],
+    options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
+  ): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
   downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
@@ -43,6 +54,8 @@ export interface GalleryItemContextMenuTarget {
   allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
+  /** The board the listing the targets were selected in reads, where targets `items` omits sit. */
+  listingBoardId?: string;
   x: number;
   y: number;
 }
@@ -73,12 +86,21 @@ export interface GalleryCommandsPort {
   setView(view: GalleryView): void;
   /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
   toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
-  updateSettings(settings: Partial<GallerySettings>): void;
+  /**
+   * Writes the gallery settings of the open project while it is active; with `projectId`, of that project while it is
+   * open, for work that finishes after the user moved on (an Undo).
+   */
+  updateSettings(settings: Partial<GallerySettings>, projectId?: string): void;
 }
 
 export interface GalleryNotificationsPort {
   add(notification: { kind: 'info' | 'success'; message?: string; title: string }): void;
   reportError(error: { area: string; message: string; namespace: 'gallery' }): void;
+  /**
+   * Reports a reversible change that already happened, with an Undo that may run minutes later. Absent on hosts without
+   * one, which report a plain success instead. A newer Undo with the same `supersedes` key withdraws the older one.
+   */
+  undoable?(title: string, notice: { message?: string; onUndo: () => void; supersedes?: string }): void;
 }
 
 export interface GalleryWidgetRuntime {
@@ -101,14 +123,27 @@ export interface GalleryUiAdapter {
   ItemActionsProvider: ComponentType<GalleryItemActionsOptions & { children: ReactNode }>;
   ImageContextMenu: ComponentType<GalleryItemContextMenuProps>;
   antialiasProgressImages: boolean;
+  /** The server has more than one account, so boards can be shared. Absent (off) for hosts without one. */
+  boardSharing?: boolean;
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
   generateValues: Record<string, unknown>;
+  /** A project's gallery values as they are now, or null once it is closed; absent for hosts without projects. */
+  getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
+  /** The user picked a board in the board list to look at it: the host may explain where new results still go. */
+  noteBoardBrowsed?(boardId: string): void;
   /** Resolves an item's best image-map vocabulary label, or null when it has none. */
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
   notifications: GalleryNotificationsPort;
   projectId: string;
   projectName: string;
+  /** The account's projects, for naming the boards that belong to each; the open project need not be among them. */
+  projects: readonly GalleryProjectRef[];
+  /**
+   * Make the open project exist on the server before a board is created in or moved into it: a new project is
+   * saved only after its first debounced flush. Absent for hosts without a workbench, which never create in one.
+   */
+  ensureProjectOnServer?: () => Promise<void>;
   /**
    * Export a project as an `.invk`, reporting progress itself. Keyed by project rather than
    * board because a board menu can offer this for any project's board, not only the open one.
@@ -166,6 +201,29 @@ export const useGalleryUi = (): GalleryUiAdapter => {
 /** For hooks shared with hosts that have no workbench; they use it only for Gallery widget side effects. */
 export const useOptionalGalleryUi = (): GalleryUiAdapter | null => use(GalleryUiContext);
 
+const NO_BOARDS: GalleryBoard[] = [];
+
+/**
+ * A board listing as this host shows it. Only a host that says boards cannot be shared (a server with one account)
+ * folds them into the caller's own; every surface that names boards (the panel, board menus, workflow board fields)
+ * reads the listing through here, so one board never reads as the caller's in one place and as someone else's in
+ * another. Undefined (a listing not loaded yet) reads as no boards, with a stable identity.
+ */
+export const useHostGalleryBoards = (boards: readonly GalleryBoard[] | undefined): GalleryBoard[] => {
+  const isSingleAccount = useOptionalGalleryUi()?.boardSharing === false;
+
+  return useMemo(
+    () =>
+      boards === undefined
+        ? NO_BOARDS
+        : isSingleAccount
+          ? asSingleAccountBoards(boards)
+          : // The listing's own identity: a folded list is a new one only when folding changes a board.
+            (boards as GalleryBoard[]),
+    [boards, isSingleAccount]
+  );
+};
+
 /**
  * What gallery surfaces outside the Gallery widget (the picker, media slots) need from their host. The workbench
  * derives it from its UI adapter; a host without a workbench (the Launchpad) supplies one with GalleryHostProvider.
@@ -173,7 +231,11 @@ export const useOptionalGalleryUi = (): GalleryUiAdapter | null => use(GalleryUi
 export interface GalleryHost {
   galleryValues: Record<string, unknown>;
   notifications: GalleryNotificationsPort;
+  /** The open project, whose boards list first; absent where there is none (the Launchpad). */
+  projectId?: string;
   projectName: string;
+  /** For naming other projects' boards; absent hosts list them unnamed. */
+  projects?: readonly GalleryProjectRef[];
   /** Shows the Gallery widget at a view, switching board when one is given; absent where there is no widget. */
   revealInGallery?: (location: { boardId: string | null; view: GalleryView }) => boolean;
 }
@@ -184,6 +246,23 @@ export const GalleryHostProvider = ({ children, host }: { children: ReactNode; h
   <GalleryHostContext value={host}>{children}</GalleryHostContext>
 );
 
+/** The project a gallery host lists boards against: what board pickers outside the gallery need to group them. */
+export type GalleryHostProjectContext = Pick<GalleryHost, 'projectId' | 'projectName' | 'projects'>;
+
+/** `useGalleryHost`'s project context, or null without a gallery host, for surfaces that work without one. */
+export const useOptionalGalleryHostProjectContext = (): GalleryHostProjectContext | null => {
+  const source = use(GalleryHostContext) ?? use(GalleryUiContext);
+  const hasSource = source !== null;
+  const projectId = source?.projectId;
+  const projectName = source?.projectName;
+  const projects = source?.projects;
+
+  return useMemo(
+    () => (hasSource ? { projectId, projectName: projectName ?? '', projects } : null),
+    [hasSource, projectId, projectName, projects]
+  );
+};
+
 export const useGalleryHost = (): GalleryHost => {
   const host = use(GalleryHostContext);
   const adapter = use(GalleryUiContext);
@@ -192,7 +271,9 @@ export const useGalleryHost = (): GalleryHost => {
       adapter && {
         galleryValues: adapter.galleryValues,
         notifications: adapter.notifications,
+        projectId: adapter.projectId,
         projectName: adapter.projectName,
+        projects: adapter.projects,
         revealInGallery: ({ boardId, view }) => {
           if (boardId !== null) {
             adapter.gallery.selectBoard(boardId);

@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -8,17 +10,22 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION, isCanvasSchemaVersionSupported } from '@workbench/canvasSchemaVersion';
+import { forgetStartupLaunchProject } from '@workbench/launchpad/startupLaunch';
 
+import type { DuplicateProjectDeps } from './invk/duplicateProject';
 import type { ProjectTransferIssues } from './invk/transfer';
 
 import {
+  type DeleteProjectBoards,
   deleteProject as apiDeleteProject,
   getProject as apiGetProject,
   getProjectBoardSnapshot,
   listProjects,
   updateProject as apiUpdateProject,
   type ProjectRecordDTO,
+  type ProjectWithWorkspaceDTO,
   type ProjectSummaryDTO,
 } from './api';
 import {
@@ -29,6 +36,7 @@ import {
   recordProjectCover,
   subscribeProjectCovers,
 } from './covers';
+import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 import { refreshOpenProjects } from './openProjects';
 import { assertProjectFlushed } from './projectFlush';
 import { pruneSessionProject } from './session';
@@ -41,7 +49,10 @@ export interface ProjectSummary {
   name: string;
   revision: number;
   minimumCanvasSchemaVersion: number;
+  /** Absent before the server reported it: a project saved whole. */
+  minimumDocumentSchemaVersion?: number;
   createdAt: string;
+  /** The later of the content's save and the caller's own workspace save: when they last worked on it. */
   updatedAt: string;
   /** The cover index is independent of document-free listings; absent entries yield no cover. */
   coverUrl?: string;
@@ -76,9 +87,13 @@ const toSummary = (dto: ProjectSummaryDTO): ProjectSummary =>
     createdAt: normalizeServerTimestamp(dto.created_at),
     id: dto.project_id,
     minimumCanvasSchemaVersion: dto.minimum_canvas_schema_version,
+    minimumDocumentSchemaVersion: dto.minimum_document_schema_version,
     name: dto.name,
     revision: dto.revision,
-    updatedAt: normalizeServerTimestamp(dto.updated_at),
+    updatedAt: [dto.updated_at, dto.workspace_updated_at]
+      .filter((timestamp): timestamp is string => typeof timestamp === 'string')
+      .map(normalizeServerTimestamp)
+      .reduce((latest, timestamp) => (timestamp > latest ? timestamp : latest)),
   });
 
 /** Recompute summaries when the independent cover index changes. */
@@ -139,7 +154,8 @@ export const refreshProjectLibrary = (): Promise<void> =>
           }
 
           store.patchSnapshot({
-            error: error instanceof Error ? error.message : 'Failed to load projects.',
+            // The server's own reason, not its raw JSON body: the Launchpad shows it under its own title.
+            error: getApiErrorMessage(error, 'Failed to load projects.'),
             status: 'error',
           });
         })
@@ -175,25 +191,56 @@ export const upsertProjectSummary = (
 };
 
 export const isProjectSummaryCompatible = (summary: ProjectSummary): boolean =>
-  isCanvasSchemaVersionSupported(summary.minimumCanvasSchemaVersion);
+  isCanvasSchemaVersionSupported(summary.minimumCanvasSchemaVersion) &&
+  (summary.minimumDocumentSchemaVersion ?? 0) <= PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION;
 
 /** Open projects mutate through their sync engine; closed projects use the HTTP API directly. */
 
-/** Permanently remove a project from the server, its board with it. The only deletion path. */
-export const deleteLibraryProject = async (projectId: string): Promise<void> => {
+/**
+ * Why a delete was refused before anything was sent: `active-runs` while queue runs for the project are still active
+ * (in any tab), `runs-unverified` when the queue-run journal could not be read, `coordination-unavailable` when the
+ * cross-tab lock could not be requested. Callers translate it and offer the way forward (the queue for active runs).
+ */
+export type ProjectDeletionRefusal = 'active-runs' | 'runs-unverified' | 'coordination-unavailable';
+
+export class ProjectDeletionRefusedError extends Error {
+  constructor(readonly reason: ProjectDeletionRefusal) {
+    super(`Project deletion refused: ${reason}.`);
+    this.name = 'ProjectDeletionRefusedError';
+  }
+}
+
+/**
+ * What to tell the viewer about a failed delete, for the editor's notice and the Launchpad's toast alike: a refusal's
+ * reason, or the server's message; `offersQueue` when the runs holding it are the way forward.
+ */
+export const describeProjectDeletionFailure = (
+  error: unknown,
+  t: TFunction
+): { message: string; offersQueue: boolean } =>
+  error instanceof ProjectDeletionRefusedError
+    ? { message: t(`projects.deleteRefused.${error.reason}`), offersQueue: error.reason === 'active-runs' }
+    : { message: getApiErrorMessage(error, t('common.unknownError')), offersQueue: false };
+
+/**
+ * Permanently remove a project from the server, its inbox with it. The only deletion path. Its other boards are
+ * released to the Library unless asked to go too; media survives either way.
+ */
+export const deleteLibraryProject = async (
+  projectId: string,
+  boards: DeleteProjectBoards = 'release'
+): Promise<void> => {
   const owner = captureAccountScope();
-  const [{ acquireProjectMutationLock }, { createAccountOwnedQueueRunJournal }] = await Promise.all([
-    import('./projectLifecycleLocks'),
-    import('@workbench/queue-integration/queueRunJournal'),
-  ]);
+  const [{ acquireProjectMutationLock, withSingleTabFallback }, { createAccountOwnedQueueRunJournal }] =
+    await Promise.all([import('./projectLifecycleLocks'), import('@workbench/queue-integration/queueRunJournal')]);
   assertAccountScopeCurrent(owner);
   const openProject = getOpenProject(projectId);
-  const mutationLock = await acquireProjectMutationLock(owner.storageSuffix, projectId);
+  const mutationLock = withSingleTabFallback(await acquireProjectMutationLock(owner.storageSuffix, projectId));
   if (mutationLock.kind === 'contended') {
-    throw new Error('Wait for active queue runs to finish before deleting this project.');
+    throw new ProjectDeletionRefusedError('active-runs');
   }
   if (mutationLock.kind === 'unavailable') {
-    throw new Error('Project deletion is unavailable because cross-tab coordination could not be established.');
+    throw new ProjectDeletionRefusedError('coordination-unavailable');
   }
   let journal;
 
@@ -201,23 +248,24 @@ export const deleteLibraryProject = async (projectId: string): Promise<void> => 
     journal = await createAccountOwnedQueueRunJournal(owner);
     const queueRuns = await journal.listForProject(projectId);
     if (queueRuns.kind === 'unavailable') {
-      throw new Error('Project deletion is unavailable because active queue runs could not be verified.');
+      throw new ProjectDeletionRefusedError('runs-unverified');
     }
     if (queueRuns.entries.length > 0) {
-      throw new Error('Wait for active queue runs to finish before deleting this project.');
+      throw new ProjectDeletionRefusedError('active-runs');
     }
 
     if (openProject) {
       // Queueing ensures an in-flight save finishes before DELETE is sent.
-      await openProject.deleteOnServer();
+      await openProject.deleteOnServer(boards);
     } else {
-      await apiDeleteProject(projectId, owner.signal);
+      await apiDeleteProject(projectId, owner.signal, boards);
     }
 
     assertAccountScopeCurrent(owner);
     await journal.deleteForProject(projectId);
     openProject?.close();
     forgetProjectCover(projectId, owner);
+    forgetStartupLaunchProject(projectId);
     store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
 
     // Remove deleted projects from durable session state so missing records do not reopen.
@@ -264,7 +312,10 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
 };
 
 /** Export/copy requires the paint barrier and an acknowledged flush before reading server bytes. */
-export const readAcknowledgedProject = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
+export const readAcknowledgedProject = async (
+  projectId: string,
+  owner: AccountScope
+): Promise<ProjectWithWorkspaceDTO> => {
   const openProject = getOpenProject(projectId);
 
   if (openProject) {
@@ -305,7 +356,7 @@ export interface DuplicatedProject extends ProjectTransferIssues {
  */
 export const duplicateLibraryProject = async (
   projectId: string,
-  options: { onProgress?: (progress: { completed: number; total: number }) => void; owner?: AccountScope } = {}
+  options: Pick<DuplicateProjectDeps, 'onProgress'> & { owner?: AccountScope } = {}
 ): Promise<DuplicatedProject> => {
   const owner = options.owner ?? captureAccountScope();
   const record = await readAcknowledgedProject(projectId, owner);
@@ -318,7 +369,7 @@ export const duplicateLibraryProject = async (
 
   const { duplicateProjectRecord } = await import('./invk/duplicateProject');
   const duplicated = await duplicateProjectRecord(
-    { boardItems: snapshot.items, owner, record },
+    { boards: snapshot.boards, owner, record },
     options.onProgress ? { onProgress: options.onProgress } : {}
   );
 
@@ -329,6 +380,7 @@ export const duplicateLibraryProject = async (
   }
 
   return {
+    boardIssues: duplicated.boardIssues,
     boardItemIssues: duplicated.boardItemIssues,
     documentReferenceIssues: duplicated.documentReferenceIssues,
     summary: adoptCreatedProject(duplicated.record, owner),

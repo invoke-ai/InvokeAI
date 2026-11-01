@@ -4,12 +4,7 @@ import type { GalleryImage, GeneratedImageContract } from '@features/gallery/cor
 import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { describe, expect, it } from 'vitest';
 
-import {
-  getGalleryRecentItems,
-  isGalleryWindowTruncated,
-  mapGalleryItemPageSlots,
-  mergeGalleryItemWindow,
-} from './useGalleryData';
+import { getGalleryRecentItems, mapGalleryItemPageSlots, mergeGalleryItemWindow } from './useGalleryData';
 
 const createImage = (index: number, overrides: Partial<GalleryImage> = {}): GalleryImage => ({
   boardId: 'none',
@@ -102,6 +97,52 @@ describe('getGalleryRecentItems', () => {
         recentImages: [first],
       })
     ).toEqual([]);
+  });
+
+  it('omits recents no newer than the given listing instant, in either order direction', () => {
+    // The listing instant in SQLite form; recents in ISO form, so the cut compares instants rather than strings.
+    const newerThan = '2026-08-29 13:01:20.649';
+    const recentImages = [
+      asGenerated(createImage(1, { createdAt: '2026-08-29T02:28:40.566Z', imageName: 'echoed-old.png' })),
+      asGenerated(createImage(2, { createdAt: '2026-08-29T13:01:20.649Z', imageName: 'same-instant.png' })),
+      asGenerated(createImage(3, { createdAt: '2026-08-29T13:01:20.650Z', imageName: 'fresh.png' })),
+    ];
+    const namesFor = (orderDir: 'ASC' | 'DESC', cut?: string) =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, orderDir }, newerThan: cut, recentImages }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('DESC', newerThan)).toEqual(['fresh.png']);
+    expect(namesFor('ASC', newerThan)).toEqual(['fresh.png']);
+    // Without a cut (an empty listing, or the dense window, which interleaves) every recent stays overlaid.
+    expect(namesFor('DESC')).toEqual(['fresh.png', 'same-instant.png', 'echoed-old.png']);
+  });
+
+  it('overlays each local output only on the view whose listing holds its category', () => {
+    const recentImages = [
+      asGenerated(createImage(1, { imageName: 'generated.png' })),
+      asGenerated(createImage(2, { imageCategory: 'control', imageName: 'control.png' })),
+      asGenerated(createImage(3, { imageCategory: 'other', imageName: 'canvas-layer.png' })),
+    ];
+    const namesFor = (galleryView: 'images' | 'assets') =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, galleryView }, recentImages }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('images')).toEqual(['generated.png']);
+    // Canvas-owned `other` pixels are in no listing, so the overlay never shows them as a phantom asset.
+    expect(namesFor('assets')).toEqual(['control.png']);
+  });
+
+  it('hides local outputs whose media kind the listing excludes', () => {
+    const recent = asGenerated(createImage(1, { imageName: 'recent-1.png' }));
+    const namesFor = (mediaKind: 'image' | 'video') =>
+      getGalleryRecentItems({ backendItems: [], filter: { ...filter, mediaKind }, recentImages: [recent] }).map(
+        (item) => item.name
+      );
+
+    expect(namesFor('video')).toEqual([]);
+    expect(namesFor('image')).toEqual(['recent-1.png']);
   });
 });
 
@@ -284,30 +325,5 @@ describe('mergeGalleryItemWindow', () => {
         recentImages: [],
       }).map((item) => item.name)
     ).toEqual(['a.png', '_draft.png', 'Z.png', 'A.png', '!bang.png']);
-  });
-});
-
-describe('isGalleryWindowTruncated', () => {
-  const atCap = { hasNextPage: false, isPaginated: false, loadedRowCount: 600, maxRows: 600, total: 1_000 };
-
-  it('reports truncation only when the full window hides reachable images', () => {
-    expect(isGalleryWindowTruncated(atCap)).toBe(true);
-  });
-
-  it('does not report truncation at the true end of a board', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, total: 600 })).toBe(false);
-    expect(isGalleryWindowTruncated({ ...atCap, loadedRowCount: 240, total: 240 })).toBe(false);
-  });
-
-  it('does not report truncation while more pages can still be loaded', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, hasNextPage: true })).toBe(false);
-  });
-
-  it('never reports truncation in paginated mode, where every page is reachable', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, isPaginated: true, loadedRowCount: 60, maxRows: 60 })).toBe(false);
-  });
-
-  it('does not report truncation before the backend total is known', () => {
-    expect(isGalleryWindowTruncated({ ...atCap, total: null })).toBe(false);
   });
 });

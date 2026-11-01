@@ -129,6 +129,65 @@ def test_queue_listing_and_counts_read_only_the_listing_index(session_queue: Ses
     assert counts[0].count("SEARCH session_queue") == 1, counts[0]
 
 
+def test_the_lineage_read_tests_the_origin_on_the_listing_index(
+    session_queue: SessionQueue, database: Database
+) -> None:
+    """The calibration status reads the retry source of its own items: the origin is tested on the listing index,
+    and no sort follows."""
+    _enqueue(session_queue)
+    [lineage] = _statements(database, lambda: session_queue.get_queue_item_lineage("default", ORIGIN_PREFIX))
+    assert f"USING INDEX {LISTING_INDEX} (queue_id=?)" in lineage.plan
+    assert "TEMP B-TREE" not in lineage.plan
+
+
+def test_the_unfinished_origins_read_finds_its_rows_by_their_status(
+    session_queue: SessionQueue, database: Database
+) -> None:
+    """The working-memory fits ask before every queue item which calibration items are still to run: it costs the live
+    rows, not the queue's history."""
+    _enqueue(session_queue)
+    [unfinished] = _statements(database, lambda: session_queue.get_unfinished_origins("default", ORIGIN_PREFIX))
+    assert ANY_STATUS_SEEK.search(unfinished.plan), unfinished
+    assert LISTING_INDEX not in unfinished.plan, unfinished
+
+
+def test_a_non_admins_project_reads_keep_their_plans(session_queue: SessionQueue, database: Database) -> None:
+    """Limited to the caller's items, a project's listing and counts still read the listing index alone, and its
+    current and next items are still found by their status: the account's own index would read its whole history."""
+    listing = _statements(
+        database,
+        lambda: session_queue.get_queue_item_ids(
+            "default", SQLiteDirection.Descending, owner_id="alice", origin_prefix=ORIGIN_PREFIX, limit=50
+        ),
+    )
+    status = _statements(
+        database,
+        lambda: session_queue.get_queue_status(
+            "default", user_id="alice", acting_user_id="alice", origin_prefix=ORIGIN_PREFIX, owner_id="alice"
+        ),
+    )
+    counts = [statement for statement in status if "count(" in statement.sql]
+    for statement in listing + counts:
+        assert COVERING_LISTING_INDEX in statement.plan, statement
+    for statement in listing:
+        assert "TEMP B-TREE" not in statement.plan, statement
+
+    current_and_next = _statements(
+        database,
+        lambda: (
+            session_queue.get_current_for_api("default", origin_prefix=ORIGIN_PREFIX, owner_id="alice"),
+            session_queue.get_next_for_api("default", origin_prefix=ORIGIN_PREFIX, owner_id="alice"),
+        ),
+    )
+    in_progress = [statement for statement in status if "count(" not in statement.sql]
+    for statement in current_and_next + in_progress:
+        assert statement.binds("alice"), statement
+        assert ANY_STATUS_SEEK.search(statement.plan), statement
+    # The counts compare the account in their SELECT too; the filters are the WHERE terms.
+    for statement in listing + in_progress + current_and_next:
+        assert not INDEXED_USER_FILTER.search(statement.sql), statement
+
+
 def _vm_steps(database: Database, read: Callable[[], object]) -> int:
     """Virtual machine steps (in units of 10) the statements executed during `read` take."""
     steps = 0

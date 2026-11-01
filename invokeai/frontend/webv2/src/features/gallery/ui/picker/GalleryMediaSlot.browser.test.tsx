@@ -77,6 +77,7 @@ const board: GalleryBoard = {
   imageCount: 1,
   kind: 'board',
   name: 'Dogs',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
 };
@@ -179,7 +180,7 @@ const renderSlot = async (props: Partial<Parameters<typeof GalleryMediaSlot>[0]>
   await interact(() => root?.render(<Harness />));
 };
 
-const trigger = () => host?.querySelector<HTMLButtonElement>('button[aria-label^="widgets.gallery.picker."]');
+const trigger = () => host?.querySelector<HTMLButtonElement>('button[aria-haspopup="dialog"]');
 const actionButton = (key: string) =>
   [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((button) => button.textContent?.includes(key));
 const alertText = () => host?.querySelector('[role="alert"]')?.textContent ?? null;
@@ -230,7 +231,9 @@ describe('GalleryMediaSlot', () => {
   it('opens the picker from the slot and hands back the picked item', async () => {
     await renderSlot();
 
-    expect(trigger()?.getAttribute('aria-label')).toBe('widgets.gallery.picker.chooseImage');
+    await expect
+      .element(trigger()!)
+      .toHaveAccessibleName('widgets.gallery.picker.chooseImage widgets.gallery.picker.dropHint');
     await interact(() => trigger()?.click());
 
     const dialog = document.querySelector<HTMLElement>('[role="dialog"][data-state="open"]');
@@ -259,6 +262,10 @@ describe('GalleryMediaSlot', () => {
 
     expect(mocks.getGalleryItemByRef).toHaveBeenCalledExactlyOnceWith(IMAGE_REF, expect.any(AbortSignal));
     expect(trigger()?.getAttribute('aria-busy')).toBe('true');
+    // The spinner hides the label on screen, but the face keeps it in its name.
+    await expect
+      .element(trigger()!)
+      .toHaveAccessibleName('widgets.gallery.picker.chooseImage widgets.gallery.picker.working');
 
     await interact(() => resolveItem?.(image('frame.png')));
 
@@ -323,9 +330,10 @@ describe('GalleryMediaSlot', () => {
 
     await renderSlot({ value });
 
-    expect(trigger()?.getAttribute('aria-label')).toBe('widgets.gallery.picker.replaceImage');
-    expect(host?.textContent).toContain('chosen.png');
-    expect(host?.textContent).toContain('128 × 96');
+    // Its visible name, size and replace hint name it (WCAG 2.5.3).
+    await expect
+      .element(trigger()!)
+      .toHaveAccessibleName(/^chosen\.png\s*128 × 96\s*widgets\.gallery\.picker\.replace/);
 
     await interact(() => actionButton('widgets.gallery.picker.removeImage')?.click());
 
@@ -443,6 +451,8 @@ describe('GalleryMediaSlot', () => {
     expect(icon.getBoundingClientRect().bottom).toBeLessThanOrEqual(label.getBoundingClientRect().top);
 
     await renderTile({ kind: 'image', name: 'cover.png' });
+    // A bare thumbnail has no visible text, so the face keeps its action label.
+    await expect.element(trigger()!).toHaveAccessibleName('widgets.gallery.picker.replaceImage');
     const remove = host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.picker.removeImage"]');
     expect(remove).not.toBeNull();
     // Beside the face, never inside it.

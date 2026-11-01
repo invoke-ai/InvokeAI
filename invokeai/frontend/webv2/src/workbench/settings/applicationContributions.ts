@@ -19,7 +19,7 @@ const custom = (
   id: string,
   label: string,
   scope: SettingDefinition['scope'] = 'preference',
-  options: { fill?: boolean } = {}
+  options: { fill?: boolean; framed?: boolean } = {}
 ): SettingDefinition => ({
   id,
   label: text(`${id}.label`, label),
@@ -63,9 +63,21 @@ export const appearanceSettings = section('appearance', 'Appearance', [
   },
 ]);
 export const behaviorSettings = section('behavior', 'Behavior', [
-  preference('autoSwitchInvocationRoute', 'Auto-switch Invoke route'),
+  {
+    id: 'startupDestination',
+    label: text('startupDestination.label', 'On startup, open'),
+    description: text('startupDestination.description'),
+    keywords: 'launch start open resume recent project launchpad home',
+    kind: 'select',
+    scope: 'preference',
+    options: [
+      { value: 'launchpad', label: text('options.launchpad', 'Launchpad') },
+      { value: 'recentProject', label: text('options.recentProject', 'Most recent project') },
+    ],
+  },
+  preference('autoSwitchInvocationRoute', 'Invoke follows what you edit', 'route source destination'),
   preference('enableInformationalPopovers', 'Enable informational popovers', 'help tooltips'),
-  preference('enableModelDescriptions', 'Show model descriptions', 'models'),
+  preference('enableModelDescriptions', 'Show descriptions in model pickers', 'models dropdowns'),
   preference('notifyOnEnqueue', 'Notify when queued', 'notifications queue'),
   preference('preferNumericAttentionStyle', 'Prefer numeric attention style', 'generate prompt editor'),
   preference('showPromptSyntaxHighlighting', 'Highlight prompt syntax', 'generate prompt editor'),
@@ -73,20 +85,11 @@ export const behaviorSettings = section('behavior', 'Behavior', [
 export const hotkeysSettings = section('hotkeys', 'Keyboard shortcuts', [
   custom('hotkeys', 'Keyboard shortcuts', 'preference', { fill: true }),
 ]);
-export const projectSettings = section('project', 'Project', [
-  {
-    ...preference('useCpuNoise', 'Use CPU noise'),
-    scope: 'project',
-  },
-]);
 export const galleryPreferenceSettings = section('gallery', 'Gallery', [
   preference('confirmImageDeletion', 'Confirm image deletion', 'delete safety'),
 ]);
-export const previewProjectSettings = section('preview', 'Preview', [
-  {
-    ...preference('antialiasProgressImages', 'Antialias progress images'),
-    scope: 'project',
-  },
+export const previewPreferenceSettings = section('preview', 'Preview', [
+  preference('antialiasProgressImages', 'Antialias progress images'),
 ]);
 export const workflowSettings = section('workflow', 'Workflow', [
   {
@@ -145,19 +148,24 @@ export const developerSettings = section('developer', 'Developer', [
 ]);
 export const serverSettings = section('server', 'Server', [
   custom('generationDevices', 'Generation devices', 'server'),
+  { ...custom('imageStorage', 'Image storage', 'server'), keywords: 'images folder subfolder layout move recover' },
+  custom('maxQueueHistory', 'Queue history', 'server'),
 ]);
 export const workspaceSettings = section('workspace', 'Data & workspace', [
   custom('workspaceActions', 'Data & workspace', 'none'),
+  {
+    ...custom('clearSavedData', 'Clear saved data', 'none', { framed: true }),
+    keywords: 'delete reset erase wipe projects',
+  },
 ]);
-export const aboutSettings = section('about', 'About', [custom('about', 'About InvokeAI', 'none')]);
+export const aboutSettings = section('about', 'About', [custom('about', 'About Invoke', 'none')]);
 
 export const applicationSettingsContributions = [
   appearanceSettings,
   behaviorSettings,
   hotkeysSettings,
-  projectSettings,
   galleryPreferenceSettings,
-  previewProjectSettings,
+  previewPreferenceSettings,
   imageMapVocabularySettings,
   developerSettings,
   serverSettings,

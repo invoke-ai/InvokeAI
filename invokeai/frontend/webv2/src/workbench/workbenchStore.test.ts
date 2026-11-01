@@ -10,7 +10,7 @@ import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore
 import { publishLayerPanelSelection, readLayerPanelState, toggleLayerStackCollapsed } from './layerPanelState';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
-import { getProjectWidgetValues } from './widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState } from './workbenchState';
 import { createWorkbenchStore } from './workbenchStore';
 
@@ -63,12 +63,10 @@ describe('createWorkbenchStore', () => {
     configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'trace' });
   });
 
-  it('exposes stable capability interfaces and initializes snapshot metadata', () => {
+  it('initializes snapshot metadata', () => {
     const store = createWorkbenchStore();
     const snapshot = store.getSnapshot();
 
-    expect(store.commands).toBe(store.commands);
-    expect(store.queries).toBe(store.queries);
     expect(snapshot.hasHydrated).toBe(false);
     expect(snapshot.projects).toHaveLength(1);
   });
@@ -413,6 +411,32 @@ describe('createWorkbenchStore', () => {
     expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery').searchTerm).toBe('positional form');
   });
 
+  it('selects an item picked from another board within that board, leaving the Gallery on its own board', () => {
+    const store = createWorkbenchStore();
+    store.commands.gallery.selectBoard('board-a');
+
+    store.commands.gallery.selectItemInItsBoard({
+      boardId: 'board-b',
+      category: 'general',
+      createdAt: '2026-09-01T00:00:00.000Z',
+      durationSeconds: 4,
+      fullUrl: '/full/clip.mp4',
+      height: 64,
+      isIntermediate: false,
+      kind: 'video',
+      name: 'clip.mp4',
+      starred: false,
+      thumbnailUrl: '/thumb/clip.mp4',
+      width: 64,
+    });
+
+    const values = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    expect(values.selectedImageName).toBe('video:clip.mp4');
+    // Preview's next/previous step through this listing.
+    expect(values.selectedImageQuery).toMatchObject({ boardId: 'board-b', itemBoard: true, page: 0 });
+    expect(values.selectedBoardId).toBe('board-a');
+  });
+
   it('edits a preset default route through the layout capability', () => {
     const store = createWorkbenchStore();
 
@@ -489,7 +513,8 @@ describe('createWorkbenchStore', () => {
     const projectId = store.getSnapshot().activeProject.id;
 
     store.internal.persistence.saveStarted();
-    store.internal.persistence.savePending('Autosave requires your attention.');
+    store.internal.persistence.savePending('Autosave is pending and will retry.');
+    store.internal.persistence.saveNeedsAttention('2026-10-14T09:00:00.000Z');
     store.internal.persistence.saveFailed('Backend rejected the revision');
     store.commands.queue.setStatus({ error: 'Out of memory', projectId, queueItemId: 'missing', status: 'failed' });
 
@@ -507,9 +532,56 @@ describe('createWorkbenchStore', () => {
         name: 'persistence.autosave-failed',
         source: { area: 'autosave', namespace: 'persistence', projectId },
       },
-      { level: 'warn', name: 'persistence.autosave-pending' },
+      { level: 'warn', name: 'persistence.autosave-needs-attention' },
+      {
+        context: { reason: 'Autosave is pending and will retry.' },
+        level: 'warn',
+        name: 'persistence.autosave-pending',
+      },
       { level: 'debug', name: 'persistence.autosave-started' },
     ]);
+  });
+
+  it('warns once per retry cycle while autosave keeps retrying', () => {
+    const store = createWorkbenchStore();
+    const persistence = store.internal.persistence;
+    const pendingWarnings = () =>
+      getLogSnapshot().entries.filter((entry) => entry.name === 'persistence.autosave-pending');
+
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      persistence.saveStarted();
+      persistence.savePending('Autosave is pending and will retry.');
+    }
+    expect(pendingWarnings()).toHaveLength(1);
+    expect(store.getSnapshot().autosave.status).toBe('pending');
+
+    persistence.saveStarted();
+    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
+    persistence.saveStarted();
+    persistence.savePending('Autosave is pending and will retry.');
+
+    expect(pendingWarnings()).toHaveLength(2);
+  });
+
+  it('reports a retrying save as pending and a project awaiting a decision as attention, not as failures', () => {
+    const store = createWorkbenchStore();
+    const persistence = store.internal.persistence;
+
+    persistence.saveSucceeded('2026-10-14T09:00:00.000Z');
+    persistence.savePending('Autosave is pending and will retry.');
+
+    expect(store.getSnapshot().autosave).toEqual({
+      error: 'Autosave is pending and will retry.',
+      lastSavedAt: '2026-10-14T09:00:00.000Z',
+      status: 'pending',
+    });
+
+    persistence.saveStarted();
+    persistence.saveNeedsAttention('2026-10-14T09:00:05.000Z');
+
+    // Every other project did save, so the time stays visible while one project waits.
+    expect(store.getSnapshot().autosave).toEqual({ lastSavedAt: '2026-10-14T09:00:05.000Z', status: 'attention' });
+    expect(store.getSnapshot().notifications).toEqual([]);
   });
 
   it('records accepted widget failures into diagnostics once', () => {
@@ -615,6 +687,29 @@ describe('createWorkbenchStore', () => {
     expect(statusObjectWatcher.changeCount).toBe(1);
   });
 
+  it('resolves widget value selectors over the mirrored defaults without counting them as project edits', () => {
+    const store = createWorkbenchStore();
+    const revision = store.getPersistedRevision();
+    const gallery = (snapshot: WorkbenchSnapshot) =>
+      getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults);
+    const pinsBefore = gallery(store.getSnapshot());
+
+    store.internal.setScopedDefaults({ gallery: { thumbnailFit: 'aspect' } });
+
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery')).toBe(pinsBefore);
+    expect(store.getPersistedRevision()).toBe(revision);
+
+    store.commands.widgets.patchInstanceValues('gallery', { thumbnailFit: 'square' });
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
+
+    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], 'another-project');
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('square');
+
+    store.commands.widgets.clearInstanceValues('gallery', ['thumbnailFit'], store.getSnapshot().activeProject.id);
+    expect(gallery(store.getSnapshot()).thumbnailFit).toBe('aspect');
+  });
+
   it('keeps widget placement metadata stable across widget value updates', () => {
     const store = createWorkbenchStore();
     const placementWatcher = watchSelector(
@@ -698,7 +793,9 @@ describe('createWorkbenchStore', () => {
     store.subscribe(listener);
 
     store.commands.generation.setBatchCount(1);
-    store.commands.account.updateProjectPreferences({ useCpuNoise: true });
+    store.commands.account.updateProjectPreferences({
+      viewerAutoSwitch: store.getSnapshot().activeProject.settings.viewerAutoSwitch,
+    });
     store.commands.layout.setRegionCollapsed('left', false);
     store.commands.layout.setRegionSize('left', store.getSnapshot().activeProject.widgetRegions.left.sizePx);
     store.commands.widgets.patchValues('generate', {});
@@ -794,7 +891,7 @@ describe('createWorkbenchStore', () => {
     expect(store.getSnapshot().activeProject.queue.items[0]?.status).toBe('cancelled');
     expect(store.getSnapshot().notifications[0]).toMatchObject({
       kind: 'info',
-      title: 'Invocation cancellation requested',
+      titleKey: 'notifications.run.cancelRequested',
     });
 
     store.commands.queue.clearCompleted();

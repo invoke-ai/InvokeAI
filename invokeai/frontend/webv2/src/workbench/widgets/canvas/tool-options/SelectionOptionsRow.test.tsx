@@ -5,8 +5,9 @@ import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createControlLayer } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { createControlLayer, createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
+import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import { createDraftProject } from '@workbench/workbenchState';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,7 +68,7 @@ const renderRow = (layer: CanvasLayerContract): Map<string, CapturedButton> => {
   activeProject.current = project;
   renderToStaticMarkup(
     <ChakraProvider value={system}>
-      <SelectionActions engine={engine} isSurfaceInteractionLocked={false} />
+      <SelectionActions engine={engine} />
     </ChakraProvider>
   );
   return new Map(buttons);
@@ -81,14 +82,14 @@ beforeEach(() => {
 describe('SelectionActions select all', () => {
   it('stays available with no selection and no eligible layer', () => {
     hasSelection.current = false;
-    const captured = renderRow(createControlLayer('Control', 'control-1', 'sd-1', null));
+    const captured = renderRow(createControlLayer({ base: 'sd-1', id: 'control-1', name: 'Control' }));
     expect(captured.get('widgets.canvas.toolOptions.selectAll')?.['aria-disabled']).toBe(false);
   });
 });
 
 describe('SelectionActions pixel target eligibility', () => {
   const rasterPaint = createEmptyPaintLayer('Raster', 'raster');
-  const controlPaint = createControlLayer('Control', 'control');
+  const controlPaint = createControlLayer({ id: 'control', name: 'Control' });
   const rasterImage: CanvasLayerContract = {
     ...createEmptyPaintLayer('Raster image', 'raster-image'),
     source: { image: { height: 10, imageName: 'raster-image', width: 10 }, type: 'image' },

@@ -1,6 +1,6 @@
 import { chakra, Input, Portal, Stack } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
-import { useCallback, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
 import { Dialog } from './Dialog';
@@ -8,6 +8,8 @@ import { Field } from './Field';
 
 /** Submit only changed, nonempty names; async failures keep the dialog open and callers surface the error. */
 export const RenameDialog = ({
+  cancelLabel = 'Cancel',
+  children,
   finalFocusEl,
   initialName,
   isOpen,
@@ -19,6 +21,9 @@ export const RenameDialog = ({
   submitUnchanged = false,
   title = 'Rename project',
 }: {
+  cancelLabel?: string;
+  /** Further options under the name, such as what a save includes; the host reads their state on submit. */
+  children?: ReactNode;
   finalFocusEl?: () => HTMLElement | null;
   initialName: string;
   isOpen: boolean;
@@ -33,7 +38,7 @@ export const RenameDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
   // Keep the labels the dialog showed while it animates out, even if the host clears its subject on close.
-  const live = useMemo(() => ({ label, submitLabel, title }), [label, submitLabel, title]);
+  const live = useMemo(() => ({ cancelLabel, label, submitLabel, title }), [cancelLabel, label, submitLabel, title]);
   const shown = useExitRetainedValue(isOpen ? live : null);
   const text = shown.value ?? live;
   const { release } = shown;
@@ -106,11 +111,12 @@ export const RenameDialog = ({
                   <Field label={text.label}>
                     <Input autoFocus defaultValue={initialName} name="renameValue" size="lg" />
                   </Field>
+                  {children}
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
                 <Button disabled={isPending} type="button" variant="ghost" onClick={onClose}>
-                  Cancel
+                  {text.cancelLabel}
                 </Button>
                 <Button loading={isPending} type="submit" variant="solid">
                   {text.submitLabel}

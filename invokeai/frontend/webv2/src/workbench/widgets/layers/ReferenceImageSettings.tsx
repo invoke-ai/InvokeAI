@@ -424,6 +424,7 @@ const ReferenceImageEditor = ({
           <ScrubberField
             defaultValue={DEFAULT_REGIONAL_REFERENCE_WEIGHT}
             formatValue={formatWeight}
+            hint="referenceImageWeight"
             label={t('widgets.layers.regionalGuidance.weight')}
             max={2}
             min={-1}

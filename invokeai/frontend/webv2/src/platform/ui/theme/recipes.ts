@@ -284,8 +284,8 @@ export const buttonRecipe = defineRecipe({
 });
 
 /**
- * Stock segment groups skip xl; the larger steps take the renamed stock 2xl and 3xl. Those two now subtract the root
- * border like every other step (stock did not), so they are 2px shorter than stock but align with same-sized buttons.
+ * Stock segment groups skip xl; the larger steps take the renamed stock 2xl and 3xl. Every step subtracts the root
+ * border and inset from the shared control height, so groups align with same-sized buttons.
  */
 const SEGMENT_BASIS: Record<ControlSize, string> = { ...CONTROL_BASIS, xl: 'lg', '2xl': '2xl' };
 
@@ -296,22 +296,30 @@ const SEGMENT_SIZE_TWEAKS: Partial<Record<ControlSize, SystemStyleObject>> = {
   lg: { px: '3.5', textStyle: 'md' },
 };
 
+// Match SegmentTabs: a neutral selection, the strip's hover fill and its dividers.
+const SEGMENT_SELECTED_BG = 'gray.hoverTint/15';
+// Raw selectors skip disabled items, as the theme's `_hover` condition does.
+const SEGMENT_HOVERED = '&:not([data-disabled]):hover';
+
 export const segmentGroupSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.segmentGroup,
   base: {
     ...chakraSlotRecipes.segmentGroup.base,
     root: {
       ...chakraSlotRecipes.segmentGroup.base?.root,
-      '--segment-radius': 'radii.sm',
-      // Use accent selection because neutral fills disappear on lighter section surfaces.
-      '--segment-indicator-bg': 'colors.accent.solid',
+      // Concentric with the root: the 5px control radius less the 1px border and 2px inset.
+      '--segment-radius': 'radii.xs',
+      // Gap between the root border and the items; size variants subtract it from item heights.
+      '--segment-inset': 'spacing.0.5',
+      '--segment-gap': 'spacing.0.5',
       '--segment-indicator-shadow': 'none',
       bg: 'transparent',
       borderColor: 'border.subtle',
-      // Inner radius subtracts the 1px border from the shared outer radius.
       borderRadius: 'control',
       borderWidth: '1px',
       boxShadow: 'none',
+      gap: 'var(--segment-gap)',
+      p: 'var(--segment-inset)',
     },
     item: {
       ...chakraSlotRecipes.segmentGroup.base?.item,
@@ -322,13 +330,40 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       fontWeight: '500',
       transitionDuration: 'faster',
       transitionProperty: 'background, color',
-      _before: { display: 'none' },
-      _checked: { color: 'accent.contrast' },
+      _before: {
+        content: '""',
+        position: 'absolute',
+        bg: 'border.emphasized',
+        borderRadius: 'full',
+        transitionDuration: 'faster',
+        transitionProperty: 'opacity',
+      },
+      // Centre the divider in the gap before the item.
+      _horizontal: {
+        _before: {
+          insetInlineStart: 'calc(var(--segment-gap) / -2 - 0.5px)',
+          insetBlock: 'auto',
+          top: '50%',
+          translate: '0 -50%',
+          width: '1px',
+          height: '3.5',
+        },
+      },
+      _vertical: {
+        _before: {
+          insetBlockStart: 'calc(var(--segment-gap) / -2 - 0.5px)',
+          insetInline: '1.5',
+          height: '1px',
+        },
+      },
+      // A hovered item's fill replaces its neighbouring dividers, as the checked item's does.
+      [`${SEGMENT_HOVERED}, ${SEGMENT_HOVERED} + &`]: { _before: { opacity: '0' } },
+      _checked: { color: 'fg' },
       _hover: {
-        '&:not([data-state=checked])': { color: 'fg' },
+        '&:not([data-state=checked])': { bg: 'bg.hover', color: 'fg' },
       },
       '&[data-state=checked][data-ssr]': {
-        bg: 'accent.solid',
+        bg: SEGMENT_SELECTED_BG,
         shadow: 'none',
       },
     },
@@ -336,17 +371,23 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.segmentGroup.base?.indicator,
       // Bind Zag's inline transition variable to the motion-aware duration token.
       '--transition-duration': '{durations.fast}',
+      bg: SEGMENT_SELECTED_BG,
       shadow: 'none',
       zIndex: 0,
     },
   },
   variants: {
     ...chakraSlotRecipes.segmentGroup.variants,
-    // Subtract root borders from same-size button heights so segment controls align with neighboring buttons.
+    // Subtract the root border and inset from same-size button heights so segment controls align with neighboring
+    // buttons.
     size: controlSizes<SlotStyles>(
       chakraSlotRecipes.segmentGroup.variants?.size,
       (styles, height, size) => ({
-        item: { ...styles?.item, height: `calc(${height} - 2px)`, ...SEGMENT_SIZE_TWEAKS[size] },
+        item: {
+          ...styles?.item,
+          height: `calc(${height} - 2px - 2 * var(--segment-inset))`,
+          ...SEGMENT_SIZE_TWEAKS[size],
+        },
       }),
       SEGMENT_BASIS
     ),
@@ -711,6 +752,51 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
       '&[data-orientation="horizontal"]:not([data-overflow-x])': { display: 'none' },
       // Above sticky content (z-index 1) so opaque pinned headers never cover the thumb.
       zIndex: 2,
+    },
+  },
+});
+
+/**
+ * Extend the control's hit area past its box with an invisible outset; the root is a label, so a press there toggles
+ * the input. 6px gives the smallest (sm, 12px) control a 24px target and stays under the 8px minimum spacing between
+ * neighbouring controls, so it never reaches a neighbour's box. Insets resolve from the padding box, so the outset
+ * also clears the control's 1px border.
+ *
+ * Ark marks the control hovered while any part of the root is, so the label and the outset show the hover too. The
+ * hover is defined for the `solid` variant only, the default every checkbox uses.
+ */
+export const checkboxSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.checkbox,
+  base: {
+    ...chakraSlotRecipes.checkbox.base,
+    control: {
+      ...chakraSlotRecipes.checkbox.base?.control,
+      position: 'relative',
+      transitionDuration: 'fast',
+      transitionProperty: 'border-color, background',
+      _before: { content: '""', inset: 'calc(-1px - {spacing.1.5})', position: 'absolute' },
+    },
+  },
+  variants: {
+    ...chakraSlotRecipes.checkbox.variants,
+    variant: {
+      ...chakraSlotRecipes.checkbox.variants?.variant,
+      solid: {
+        control: {
+          ...chakraSlotRecipes.checkbox.variants?.variant?.solid?.control,
+          _hover: {
+            // Halfway to the foreground is stronger than the rest border in every theme, high contrast included,
+            // where the rest border already matches the muted foreground. An invalid control keeps its error border.
+            '&[data-state=unchecked]:not([data-invalid])': {
+              borderColor: 'color-mix(in oklab, {colors.border.emphasized}, {colors.fg})',
+            },
+            '&:is([data-state=checked], [data-state=indeterminate]):not([data-invalid])': {
+              bg: 'colorPalette.solid/90',
+              borderColor: 'colorPalette.solid/90',
+            },
+          },
+        },
+      },
     },
   },
 });
@@ -1235,7 +1321,7 @@ export const dataListSlotRecipe = defineSlotRecipe({
     ...chakraSlotRecipes.dataList.base,
     item: {
       ...chakraSlotRecipes.dataList.base?.item,
-      '&:not(:first-child)': {
+      '&:not(:first-of-type)': {
         // Use borderColor plus top width; side-specific color does not resolve the semantic token.
         borderColor: 'border.subtle',
         borderTopWidth: '1px',

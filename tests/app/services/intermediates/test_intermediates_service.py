@@ -294,6 +294,36 @@ def test_summary_groups_rows_and_classifies_under_the_policy(invoker: Invoker, s
     assert all(row.user_id == "alice" for row in summary.items)
 
 
+def test_a_project_row_takes_its_cover_from_whichever_of_its_boards_has_the_newest_image(
+    invoker: Invoker, service: IntermediatesService
+) -> None:
+    project = _project(invoker, "alice", "Portraits", {})
+    boards = {
+        "inbox.png": invoker.services.project_records.get_board_id("alice", project),
+        "member.png": invoker.services.board_records.save("Studies", "alice", project_id=project).board_id,
+        # Newest of all, but in the Library, so not the project's.
+        "library.png": invoker.services.board_records.save("Loose", "alice").board_id,
+    }
+    for index, (name, board_id) in enumerate(boards.items()):
+        _seed_image(invoker, name, project_id=project, is_intermediate=False)
+        invoker.services.board_image_records.add_image_to_board(board_id, name)
+        with sqlite_cursor_of(invoker.services.session_queue) as cursor:
+            cursor.execute(
+                "UPDATE board_images SET created_at = ? WHERE image_name = ?;", (f"2020-01-0{index + 1} 00:00:00", name)
+            )
+    # The newest board of all, with nothing durable on it: a database that sorts its empty newest first must not
+    # hand the project no cover.
+    invoker.services.board_records.save("Empty", "alice", project_id=project)
+    _seed_image(invoker, "intermediate.png", project_id=project, size=1)
+
+    summary = service.get_summary(
+        ALICE, owner_id=None, search=None, sort="project_name", descending=False, offset=0, limit=50
+    )
+
+    (row,) = [row for row in summary.items if row.project_id == project]
+    assert row.cover_image_name == "member.png"
+
+
 def test_summary_scopes_owners_search_sort_and_pages(invoker: Invoker, service: IntermediatesService) -> None:
     alpha = _project(invoker, "alice", "Alpha", {})
     beta = _project(invoker, "alice", "Beta", {})
@@ -1563,6 +1593,25 @@ def test_quarantined_projects_are_named_when_a_force_clear_would_break_them(
     assert safe.impact.keep_referenced_images == 1
     force = service.create_preview(IntermediatesPreviewRequest(mode="force", scope=_owner("alice")), ADMIN)
     assert [(doc.kind, doc.name) for doc in force.affected_documents] == [("quarantined_project", "Before boards")]
+
+
+def test_a_workspace_is_named_after_its_project_when_a_force_clear_would_break_it(
+    invoker: Invoker, service: IntermediatesService
+) -> None:
+    _seed_image(invoker, "staged.png")
+    project = invoker.services.project_records.create(
+        "alice", "Poster", {}, minimum_document_schema_version=4, max_document_schema_version=4
+    )
+    invoker.services.project_records.save_workspace(
+        "alice", project.project_id, None, {"staged": {"imageName": "staged.png"}}, max_document_schema_version=4
+    )
+
+    safe, _ = _run(service, ALICE, _owner("alice"))
+    assert safe.impact.keep_referenced_images == 1
+    force = service.create_preview(IntermediatesPreviewRequest(mode="force", scope=_owner("alice")), ALICE)
+    assert [(doc.kind, doc.owner_id, doc.name) for doc in force.affected_documents] == [
+        ("project_workspace", project.project_id, "Poster")
+    ]
 
 
 # ── bounds ──

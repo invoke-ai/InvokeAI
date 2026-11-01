@@ -12,6 +12,7 @@ import { useCurrentBatchItems, useQueueLoadState, useRecentItems } from './queue
 import { matchesFilter } from './queueFilters';
 import { QUEUE_FILTER_TABS_ID } from './QueueFilterTabs';
 import { QueueItemRow } from './QueueItemRow';
+import { useQueueUi } from './QueueUiContext';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
 
 /** Exclude running and next items from recent history because NOW & NEXT already shows them. */
@@ -75,8 +76,21 @@ export const RecentSection = ({
   );
 };
 
+/** The item is not in the loaded list (cleared, or outside the queue's scope): say so rather than do nothing. */
 const UnavailableRevealConsumer = ({ request }: { request: QueueItemRevealRequest }) => {
-  useMountEffect(() => clearPendingQueueItemReveal(request.requestId));
+  const { t } = useTranslation();
+  const { notify } = useQueueUi();
+
+  useMountEffect(() => {
+    if (!clearPendingQueueItemReveal(request.requestId)) {
+      return;
+    }
+
+    notify.info(
+      t('widgets.queue.revealUnavailable', { id: request.itemId }),
+      t('widgets.queue.revealUnavailableDescription')
+    );
+  });
 
   return null;
 };

@@ -93,14 +93,16 @@ let root: Root | null = null;
 const createProject = ({
   canvas = {},
   frame,
+  generate = {},
   model,
 }: {
   canvas?: Record<string, unknown>;
   frame: { height: number; width: number };
+  generate?: Record<string, unknown>;
   model: Record<string, unknown>;
 }): HarnessProject => ({
   canvas: { document: { bbox: { ...frame, x: 0, y: 0 } } },
-  values: { canvas, generate: { ...frame, model, pidMode: 'off' } },
+  values: { canvas, generate: { ...frame, ...generate, model, pidMode: 'off' } },
 });
 
 const mount = async (children: ReactNode) => {
@@ -134,6 +136,7 @@ const renderSizeSection = async (project: HarnessProject) => {
       projectId="project"
       selectedModel={SD1_MODEL}
       onCommit={vi.fn()}
+      onResetSize={vi.fn()}
     />
   );
 };
@@ -142,11 +145,11 @@ const canvasValues = () => harness.project.getSnapshot().values.canvas;
 /** The section header's size badge. */
 const badgeText = () =>
   [...(host?.querySelectorAll('span') ?? [])].find(
-    (element) => element.childElementCount === 0 && /^\d+x\d+/.test(element.textContent ?? '')
+    (element) => element.childElementCount === 0 && /^\d+×\d+/.test(element.textContent ?? '')
   )?.textContent;
 const statusText = () =>
   [...(host?.querySelectorAll('p') ?? [])].find((element) => element.textContent?.includes('MP'))?.textContent;
-const optimalSizeButton = () => page.getByRole('button', { name: 'Set optimal size' });
+const resetSizeButton = () => page.getByRole('button', { name: 'Reset size' });
 const renderAt = () => page.getByRole('combobox', { name: 'Render at' });
 
 /** The dashed ghost in the size preview, in preview pixels. */
@@ -262,7 +265,7 @@ describe('Size section in canvas mode', () => {
     await expect.element(renderAt()).toHaveTextContent('Optimal for model');
     // People who knew the setting by its legacy name find it in the select's description, tooltip open or not.
     await expect.element(renderAt()).toHaveAccessibleDescription(/^Scale before processing/);
-    expect(badgeText()).toBe('384x384 → 512x512');
+    expect(badgeText()).toBe('384×384 → 512×512');
     expect(statusText()).toMatch(/^512×512 · 0\.26 MP/);
     // The stage fits the larger render size: 88px of preview spans 512px.
     expect(ghostSize()).toEqual([88, 88]);
@@ -275,7 +278,7 @@ describe('Size section in canvas mode', () => {
     await chooseRenderAt('Frame size');
 
     expect(canvasValues().scaleMethod).toBe('none');
-    expect(badgeText()).toBe('384x384');
+    expect(badgeText()).toBe('384×384');
     expect(statusText()).toMatch(/^0\.15 MP/);
     expect(ghostSize()).toEqual([88, 88]);
   });
@@ -299,32 +302,49 @@ describe('Size section in canvas mode', () => {
 
     expect(canvasValues().scaledWidth).toBe(1024);
     await expect.element(width).toHaveValue('1024');
-    expect(badgeText()).toBe('384x384 → 1024x512');
+    expect(badgeText()).toBe('384×384 → 1024×512');
     expect(statusText()).toMatch(/^1024×512 · 0\.52 MP/);
     // The preview spans the wider render size: 88px for 1024px, so the ghost is 44px tall.
     expect(ghostSize()).toEqual([88, 44]);
   });
 
-  it('offers the optimal frame size only while the frame renders at its own size', async () => {
-    // An undersized frame: Auto grows it and Custom sets its own, so resizing the frame adds nothing.
-    await renderSizeSection(createProject({ frame: { height: 384, width: 384 }, model: SD1_MODEL }));
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
-    await chooseRenderAt('Custom');
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
-    await chooseRenderAt('Frame size');
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
-    await unmount();
-
-    // An oversized frame: Auto never shrinks it.
-    await renderSizeSection(createProject({ frame: { height: 768, width: 768 }, model: SD1_MODEL }));
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
-    await unmount();
-
-    // A frame already at the recommended size has nothing to offer in any mode.
+  it('keeps a custom render size at the locked ratio as either side is edited', async () => {
     await renderSizeSection(
-      createProject({ canvas: { scaleMethod: 'none' }, frame: { height: 512, width: 512 }, model: SD1_MODEL })
+      createProject({
+        canvas: { scaleMethod: 'manual', scaledHeight: 768, scaledWidth: 1360 },
+        frame: { height: 768, width: 1360 },
+        generate: { aspectRatioId: '16:9', aspectRatioIsLocked: true, aspectRatioValue: 16 / 9 },
+        model: SD1_MODEL,
+      })
     );
-    await expect.element(optimalSizeButton()).not.toBeInTheDocument();
+    const width = page.getByRole('spinbutton', { name: 'Render width' });
+    const height = page.getByRole('spinbutton', { name: 'Render height' });
+
+    await userEvent.fill(width, '1023');
+    // While typing, the other side follows unsnapped: 1023 × 9/16 ≈ 575.4.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 575, scaledWidth: 1023 });
+    await userEvent.keyboard('{Enter}');
+
+    // 1024 wide at 16:9 is exactly 576 tall.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 576, scaledWidth: 1024 });
+    await expect.element(height).toHaveValue('576');
+
+    await userEvent.fill(height, '900');
+    await userEvent.keyboard('{Enter}');
+
+    // 900 snaps to 904; 904 × 16/9 ≈ 1607.1, which snaps to 1608.
+    expect(canvasValues()).toMatchObject({ scaledHeight: 904, scaledWidth: 1608 });
+    await expect.element(width).toHaveValue('1608');
+  });
+
+  it('offers the Reset size menu in every render mode, without a footer optimal-size button', async () => {
+    await renderSizeSection(createProject({ frame: { height: 384, width: 384 }, model: SD1_MODEL }));
+    await expect.element(resetSizeButton()).toBeInTheDocument();
+    await chooseRenderAt('Custom');
+    await expect.element(resetSizeButton()).toBeInTheDocument();
+    await chooseRenderAt('Frame size');
+    await expect.element(resetSizeButton()).toBeInTheDocument();
+    await expect.element(page.getByRole('button', { name: 'Set optimal size' })).not.toBeInTheDocument();
   });
 
   it('leaves the Size section as it is when the canvas is not the invocation source', async () => {
@@ -338,9 +358,9 @@ describe('Size section in canvas mode', () => {
     );
 
     await expect.element(renderAt()).not.toBeInTheDocument();
-    expect(badgeText()).toBe('384x384');
+    expect(badgeText()).toBe('384×384');
     expect(statusText()).toMatch(/^0\.15 MP/);
-    await expect.element(optimalSizeButton()).toBeInTheDocument();
+    await expect.element(resetSizeButton()).toBeInTheDocument();
     // The ghost is the recommended 512x512, not the canvas's custom render size.
     expect(ghostSize()).toEqual([88, 88]);
   });

@@ -227,7 +227,8 @@ describe('IndexedDB queue run journal', () => {
     const { journal } = await createJournal();
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
-    const item = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
+    const baseItem = createItem({ backendBatchId: 'batch-1', backendItemIds: [11], status: 'running' });
+    const item = { ...baseItem, snapshot: { ...baseItem.snapshot, prepend: true } };
     await journal.record(projectId, item);
 
     const loaded = await journal.listForProject(projectId);
@@ -245,10 +246,43 @@ describe('IndexedDB queue run journal', () => {
         snapshot: expect.objectContaining({
           canvas: item.snapshot.canvas,
           graph: { id: 'graph-1', label: 'Graph' },
+          prepend: true,
         }),
         status: 'running',
       }),
     ]);
+  });
+
+  it('keeps the items a retry reopened a run away from, and drops a malformed list without losing the run', async () => {
+    const { journal } = await createJournal();
+    const store = createWorkbenchStore();
+    const projectId = store.getState().activeProjectId;
+    const reopened = createItem({ backendItemIds: [99], retriedBackendItemIds: [41, 42], status: 'running' });
+    const malformed = createItem({
+      backendItemIds: [100],
+      id: 'queue-item-2',
+      retriedBackendItemIds: [43, 43],
+      status: 'running',
+    });
+    await journal.record(projectId, reopened);
+    await journal.record(projectId, malformed);
+
+    const loaded = await journal.listForProject(projectId);
+    expect(loaded.kind).toBe('available');
+    store.commands.queue.restoreFromJournal({
+      items: loaded.kind === 'available' ? loaded.entries.map((entry) => entry.item) : [],
+      projectId,
+    });
+
+    const restored = store.getState().projects[0]?.queue.items ?? [];
+    expect(restored.find((item) => item.id === reopened.id)).toMatchObject({
+      backendItemIds: [99],
+      retriedBackendItemIds: [41, 42],
+      status: 'running',
+    });
+    const restoredMalformed = restored.find((item) => item.id === malformed.id);
+    expect(restoredMalformed).toMatchObject({ backendItemIds: [100], status: 'running' });
+    expect(restoredMalformed).not.toHaveProperty('retriedBackendItemIds');
   });
 
   it('restores newest-first submission order without moving a run when its status changes', async () => {

@@ -7,21 +7,33 @@ import { IconButton } from '@platform/ui/Button';
 import { ResizeCorner, trackResizeDrag, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
-  clampWindowToViewport,
-  commitResizedAxes,
+  commitChangedAxes,
   FLOATING_MIN_HEIGHT_PX,
   FLOATING_MIN_WIDTH_PX,
   FLOATING_VIEWPORT_MARGIN_PX,
   resizeFloatingGeometry,
   type FloatingGeometry,
+  isAwaitedCenterView,
   type FloatingResizeEdge,
 } from '@workbench/floatingWindows';
 import { useFloatingWindowFocus, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { DOCK_DESTINATION_ICONS, resolveDockLabel, resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import {
+  useActiveProjectId,
+  useActiveProjectSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import { ChevronsDownUpIcon, ChevronsUpDownIcon, Maximize2Icon, Minimize2Icon, TriangleAlertIcon } from 'lucide-react';
+import {
+  ChevronsDownUpIcon,
+  ChevronsUpDownIcon,
+  Maximize2Icon,
+  Minimize2Icon,
+  TriangleAlertIcon,
+  XIcon,
+} from 'lucide-react';
 import {
   Activity,
   Component,
@@ -57,7 +69,8 @@ const FOCUS_RING = { outline: '2px solid', outlineColor: 'accent.solid', outline
  *
  * The position keeps a grabbable sliver on screen and the size never exceeds the viewport, both without touching
  * what is stored: a window persisted on a larger display, or left behind by a shrunken browser window, comes back
- * as it was when there is room again (`clampWindowToViewport` is the same policy for what a gesture commits).
+ * as it was when there is room again. A gesture commits the same clamp, against the same viewport (the window's
+ * viewport probe), and only on the axes it changed (`commitChangedAxes`).
  *
  * A gesture previews its geometry in `--fw-preview-*` and names the mode it started in. The preview applies only
  * while the window is still in that mode, so a window that maximizes or shades under a gesture shows its new
@@ -90,23 +103,39 @@ const WINDOW_SX: SystemStyleObject = {
 // The title bar has no room for a scrollbar; the strip scrolls by focus, a sideways scroll, and touch.
 const ACTIONS_SCROLL_SX: SystemStyleObject = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' };
 
-const getViewport = () => ({ height: window.innerHeight, width: window.innerWidth });
+/** The window's rectangle on screen and the viewport CSS holds it in, measured together. */
+interface OnScreen {
+  start: FloatingGeometry;
+  viewport: { height: number; width: number };
+}
 
-const keepInViewport = (geometry: FloatingGeometry): FloatingGeometry => clampWindowToViewport(geometry, getViewport());
+/**
+ * What moving the rectangle on screen commits, or null for nothing (see {@link commitChangedAxes}). The move starts
+ * from the stored size at the position on screen: a move never changes the size, so the stored one is kept.
+ */
+const moveOnScreen = (
+  stored: FloatingGeometry,
+  { start, viewport }: OnScreen,
+  deltaX: number,
+  deltaY: number
+): FloatingGeometry | null => {
+  const from = { ...stored, x: start.x, y: start.y };
 
-/** What resizing the rectangle on screen commits, or null for nothing (see {@link commitResizedAxes}). */
+  return commitChangedAxes(stored, from, { ...from, x: from.x + deltaX, y: from.y + deltaY }, viewport);
+};
+
+/** What resizing the rectangle on screen commits, or null for nothing (see {@link commitChangedAxes}). */
 const resizeOnScreen = (
   stored: FloatingGeometry,
-  start: FloatingGeometry,
+  { start, viewport }: OnScreen,
   edge: FloatingResizeEdge,
   deltaX: number,
   deltaY: number
 ): FloatingGeometry | null => {
-  const viewport = getViewport();
   // A window is never shown larger than the viewport, so a resize does not grow past it either.
   const max = { heightPx: viewport.height, widthPx: viewport.width };
 
-  return commitResizedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, max), viewport);
+  return commitChangedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, max), viewport);
 };
 
 // A drag rewrites the preview properties every frame. Custom properties inherit by default, which would restyle
@@ -251,9 +280,9 @@ interface WindowGesture {
   /** What a release would commit; null until the pointer has actually moved. */
   live: FloatingGeometry | null;
   mode: FloatingWidgetMode;
+  /** Where the window was on screen, and the viewport holding it there. */
+  onScreen: OnScreen;
   session: AbortController | null;
-  /** Where the window was on screen. */
-  start: FloatingGeometry;
   /** What was stored, which the gesture keeps on every axis it does not change. */
   stored: FloatingGeometry;
 }
@@ -337,6 +366,7 @@ export const FloatingWidgetWindow = ({
 }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
+  const queries = useWorkbenchQueries();
   const { getWidgetById } = useWorkbenchWidgetRegistry();
   const instance = useActiveProjectSelector(
     (project) => project.widgetInstances[instanceId],
@@ -346,6 +376,7 @@ export const FloatingWidgetWindow = ({
   const { activate, isHighlighted } = useFloatingWindowFocus(instanceId, projectId);
   const { focusRegion } = useWorkbenchFocus();
   const windowRef = useRef<HTMLDivElement>(null);
+  const viewportProbeRef = useRef<HTMLDivElement>(null);
   const gestureRef = useRef<WindowGesture | null>(null);
   const startDrag = usePointerDrag();
 
@@ -365,14 +396,24 @@ export const FloatingWidgetWindow = ({
   );
 
   /**
-   * Where the window is on screen right now. Gestures and key steps start here, not from the stored geometry:
-   * CSS may be holding the window inside the viewport or capping its size, and starting from the stored values
-   * would make it jump.
+   * Where the window is on screen right now, and the viewport CSS holds it in. Gestures and key steps start here,
+   * not from the stored geometry: CSS may be holding the window inside the viewport or capping its size, and
+   * starting from the stored values would make it jump.
+   *
+   * The viewport is the probe's, not `innerWidth` and `innerHeight`: at a fractional zoom `100vw` and `100vh` are
+   * fractional pixels, which those round. Clamped to a rounded edge, a push into the edge the window already sits
+   * at would read as a move by the difference and store that edge over the stored position.
    */
-  const readRenderedGeometry = useCallback((): FloatingGeometry | null => {
+  const readOnScreen = useCallback((): OnScreen | null => {
     const rect = windowRef.current?.getBoundingClientRect();
+    const viewport = viewportProbeRef.current?.getBoundingClientRect();
 
-    return rect ? { heightPx: rect.height, widthPx: rect.width, x: rect.left, y: rect.top } : null;
+    return rect && viewport
+      ? {
+          start: { heightPx: rect.height, widthPx: rect.width, x: rect.left, y: rect.top },
+          viewport: { height: viewport.height, width: viewport.width },
+        }
+      : null;
   }, []);
 
   // A gesture writes its geometry as inline custom properties so it renders without React; the committed render
@@ -419,14 +460,14 @@ export const FloatingWidgetWindow = ({
       cancelGesture();
 
       const handle = event.currentTarget;
-      const start = readRenderedGeometry();
+      const onScreen = readOnScreen();
 
-      if (!start) {
+      if (!onScreen) {
         return;
       }
 
       const stored = { heightPx, widthPx, x, y };
-      const gesture: WindowGesture = { edge, live: null, mode, session: null, start, stored };
+      const gesture: WindowGesture = { edge, live: null, mode, onScreen, session: null, stored };
       const isCurrent = () => gestureRef.current === gesture;
 
       gestureRef.current = gesture;
@@ -461,20 +502,13 @@ export const FloatingWidgetWindow = ({
             return;
           }
           // A gesture commits only what it changed. A press that never moves, or a drag against the minimum or
-          // the viewport's cap, changes nothing and commits nothing; a move keeps the stored size and a resize
-          // keeps the axis it does not touch. What is on screen there may only be the viewport's clamp or cap,
-          // which is not the user's choice to persist.
+          // the viewport's cap, changes nothing and commits nothing; a move keeps the stored size, and a move or
+          // resize keeps the stored value of an axis it does not touch. What is on screen there may only be the
+          // viewport's clamp or cap, which is not the user's choice to persist.
           gesture.live =
-            edge !== 'move'
-              ? resizeOnScreen(stored, start, edge, deltaX, deltaY)
-              : deltaX === 0 && deltaY === 0
-                ? null
-                : keepInViewport({
-                    heightPx: stored.heightPx,
-                    widthPx: stored.widthPx,
-                    x: start.x + deltaX,
-                    y: start.y + deltaY,
-                  });
+            edge === 'move'
+              ? moveOnScreen(stored, onScreen, deltaX, deltaY)
+              : resizeOnScreen(stored, onScreen, edge, deltaX, deltaY);
           writePreview(gesture.live ? { geometry: gesture.live, mode: gesture.mode } : null);
         },
       });
@@ -495,7 +529,7 @@ export const FloatingWidgetWindow = ({
         }
       });
     },
-    [cancelGesture, commitGeometry, heightPx, mode, readRenderedGeometry, startDrag, widthPx, writePreview, x, y]
+    [cancelGesture, commitGeometry, heightPx, mode, readOnScreen, startDrag, widthPx, writePreview, x, y]
   );
   const handleTitlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -527,36 +561,42 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
-      const rendered = readRenderedGeometry();
+      const onScreen = readOnScreen();
 
-      if (!rendered) {
+      if (!onScreen) {
         return;
       }
 
       // The move consumes the key: the widget's own arrow bindings must not act on it too.
       event.preventDefault();
       event.stopPropagation();
-      // Like a pointer move: from where the window is on screen, keeping the stored size.
-      commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
+      // Like a pointer move: from where the window is on screen, keeping the stored size and the stored position
+      // on the axis the key does not move.
+      const moved = moveOnScreen({ heightPx, widthPx, x, y }, onScreen, offset[0], offset[1]);
+
+      if (moved) {
+        commitGeometry(moved);
+      }
     },
-    [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx]
+    [commitGeometry, heightPx, mode, readOnScreen, widthPx, x, y]
   );
 
   const handleResizeKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      const rendered = readRenderedGeometry();
+      const onScreen = readOnScreen();
 
-      if (!rendered) {
+      if (!onScreen) {
         return;
       }
 
+      const { start } = onScreen;
       const step = event.shiftKey ? FLOATING_STEP_PX * 2 : FLOATING_STEP_PX;
       const offsets: Partial<Record<string, [number, number]>> = {
         ArrowDown: [0, step],
         ArrowLeft: [-step, 0],
         ArrowRight: [step, 0],
         ArrowUp: [0, -step],
-        Home: [FLOATING_MIN_WIDTH_PX - rendered.widthPx, FLOATING_MIN_HEIGHT_PX - rendered.heightPx],
+        Home: [FLOATING_MIN_WIDTH_PX - start.widthPx, FLOATING_MIN_HEIGHT_PX - start.heightPx],
       };
       const offset = offsets[event.key];
 
@@ -568,13 +608,13 @@ export const FloatingWidgetWindow = ({
       event.preventDefault();
       event.stopPropagation();
 
-      const resized = resizeOnScreen({ heightPx, widthPx, x, y }, rendered, 'se', offset[0], offset[1]);
+      const resized = resizeOnScreen({ heightPx, widthPx, x, y }, onScreen, 'se', offset[0], offset[1]);
 
       if (resized) {
         commitGeometry(resized);
       }
     },
-    [commitGeometry, heightPx, readRenderedGeometry, widthPx, x, y]
+    [commitGeometry, heightPx, readOnScreen, widthPx, x, y]
   );
 
   // Pointer-down and keyboard focus make this the active window and raise it; hover does neither. A late event
@@ -614,6 +654,20 @@ export const FloatingWidgetWindow = ({
       focusRegion(state.returnRegion, typeId);
     }
   }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
+  // Close takes the window out of the layout (an Undo toast brings it back). Focus goes where the window's marker menu
+  // sends it: the center when it gets its view back, else the panel the window's rail shows, else the center.
+  const handleClose = useCallback(() => {
+    const { layout, widgetRegions } = queries.getSnapshot().activeProject;
+    const restoresCenter = isAwaitedCenterView(widgetRegions.center, instanceId);
+    const region = state.returnRegion;
+    const isRailPanelShown =
+      (region === 'left' ? layout.panels.isLeftOpen : region === 'right' && layout.panels.isRightOpen) &&
+      !widgetRegions[region].isCollapsed;
+
+    flushWorkbenchDrafts();
+    widgets.closeFloating(instanceId);
+    focusRegion(restoresCenter || !isRailPanelShown ? 'center' : region, restoresCenter ? typeId : undefined);
+  }, [focusRegion, instanceId, queries, state.returnRegion, typeId, widgets]);
   const handleToggleShade = useCallback(() => {
     // Shading hides the body: its editors keep their state but stop running, so their drafts are saved first.
     if (mode !== 'shaded') {
@@ -795,6 +849,17 @@ export const FloatingWidgetWindow = ({
                 <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
               </IconButton>
             </Tooltip>
+            <Tooltip content={t('widgets.floating.close')}>
+              <IconButton
+                aria-label={t('widgets.floating.closeNamed', { label })}
+                color="fg.muted"
+                size="sm"
+                variant="ghost"
+                onClick={handleClose}
+              >
+                <Icon as={XIcon} boxSize="3.5" />
+              </IconButton>
+            </Tooltip>
           </HStack>
         </HStack>
         {/* A shaded body is hidden, not unmounted: its local state survives, and no second copy mounts. */}
@@ -822,6 +887,20 @@ export const FloatingWidgetWindow = ({
           />
         </>
       )}
+      {/*
+       * The viewport exactly as the clamp above resolves `100vw` and `100vh`. Inside the window so it shares any
+       * CSS zoom an ancestor applies to the window; fixed only to keep it out of the window's layout.
+       */}
+      <Box
+        ref={viewportProbeRef}
+        aria-hidden
+        h="100vh"
+        left="0"
+        position="fixed"
+        top="0"
+        visibility="hidden"
+        w="100vw"
+      />
     </Box>
   );
 };

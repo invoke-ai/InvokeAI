@@ -1,19 +1,24 @@
 import type { GalleryImageItem, GalleryItem, GalleryVideoItem } from '@features/gallery/core/items';
 import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
 
+import { getGallerySettings } from '@features/gallery/core/settings';
 import { describe, expect, it } from 'vitest';
 
 import {
   getBoardCounts,
   getGalleryAutoAddBoardId,
+  getGalleryIntendedDestinationId,
   getGalleryDestinationBoardId,
+  getGalleryListingBoardId,
   getGallerySelectedBoardId,
+  getGallerySelectionBoardId,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
   getGalleryListing,
   getGalleryReadStatus,
   getGalleryStateView,
   type GalleryQueryFacts,
+  settleGalleryValues,
 } from './galleryStateView';
 
 const boards: GalleryBoard[] = [
@@ -25,6 +30,7 @@ const boards: GalleryBoard[] = [
     imageCount: 1,
     kind: 'uncategorized',
     name: '',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -36,6 +42,7 @@ const boards: GalleryBoard[] = [
     imageCount: 2,
     kind: 'board',
     name: 'Board 1',
+    isInbox: false,
     projectId: null,
     videoCount: 0,
   },
@@ -94,7 +101,10 @@ describe('gallery state view', () => {
    * Uncategorized.
    */
   it('falls back to the project board before uncategorized', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('project-board');
@@ -102,7 +112,10 @@ describe('gallery state view', () => {
   });
 
   it('keeps a still-resolvable selection rather than reverting to the project board', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
     const values = { projectBoardId: 'project-board', selectedBoardId: 'board-1' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('board-1');
@@ -116,7 +129,10 @@ describe('gallery state view', () => {
 
   /** An absent saved destination is not an explicit choice of Uncategorized; use the project's board. */
   it('uses the project board when nothing was ever selected', () => {
-    const projectBoards = [...boards, { ...boards[1]!, id: 'project-board', name: 'My Project', projectId: 'p1' }];
+    const projectBoards = [
+      ...boards,
+      { ...boards[1]!, id: 'project-board', isInbox: true, name: 'My Project', projectId: 'p1' },
+    ];
 
     expect(getGallerySelectedBoardId({ projectBoardId: 'project-board' }, projectBoards)).toBe('project-board');
     expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');
@@ -136,28 +152,38 @@ describe('gallery state view', () => {
     expect(gallery.selectedItemKey).toBeNull();
   });
 
-  it('exposes image, video, and asset counts for board labels', () => {
-    expect(getBoardCounts({ ...boards[1], videoCount: 3 })).toEqual({
-      assetCount: 0,
-      assetVideoCount: 0,
-      imageCount: 2,
-      videoCount: 3,
+  it("splits a board's counts as its Media and Uploads tabs list them", () => {
+    expect(getBoardCounts({ ...boards[1], assetCount: 4, assetVideoCount: 1, videoCount: 3 })).toEqual({
+      images: 2,
+      items: 9,
+      media: 4,
+      uploads: 5,
+      videos: 2,
     });
   });
 
   it('parses persisted gallery settings with safe defaults', () => {
-    const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' }, boards, []);
+    const gallery = getGalleryStateView(
+      { boardOrderBy: 'board_name', mediaFilter: 'audio', starredSectionCollapsed: 'yes' },
+      boards,
+      []
+    );
 
     expect(gallery.settings).toEqual({
-      autoAddBoardId: 'follow',
+      autoAddBoardId: null,
       boardOrderBy: 'board_name',
       boardOrderDir: 'DESC',
       boardPanelCollapsed: false,
       boardPanelHeightPx: 280,
       boardPanelWidthPx: 240,
       collapsedBoardSections: [],
+      collapsedProjectGroupIds: [],
+      expandedBoardSections: [],
+      followSelectedBoard: false,
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
+      mediaFilter: 'all',
+      middleClickOpensInNewTab: false,
       paginationMode: 'infinite',
       showArchivedBoards: false,
       showDateBoards: false,
@@ -165,12 +191,14 @@ describe('gallery state view', () => {
       showOtherProjectBoards: false,
       showPendingItems: true,
       progressSectionCollapsed: false,
+      searchScope: 'board',
       starredSectionCollapsed: false,
       thumbnailFit: 'square',
     });
     expect(getGalleryStateView({ starredSectionCollapsed: true }, boards, []).settings.starredSectionCollapsed).toBe(
       true
     );
+    expect(getGalleryStateView({ mediaFilter: 'video' }, boards, []).settings.mediaFilter).toBe('video');
   });
 
   it('exposes comparison state only while an image selection differs from the compare image', () => {
@@ -226,6 +254,10 @@ describe('gallery state view', () => {
     expect(pageOf({ searchTerm: 'cats' })).toBeNull();
     expect(pageOf({ starredOnly: true })).toBeNull();
     expect(pageOf({ starredOnly: true }, { starredOnly: true })).toBe(2);
+    // A stamp without a media kind was made in a listing of both kinds, whatever the filter is now.
+    expect(pageOf({ mediaFilter: 'video' })).toBeNull();
+    expect(pageOf({ mediaFilter: 'video' }, { mediaKind: 'video' })).toBe(2);
+    expect(pageOf({}, { mediaKind: 'image' })).toBeNull();
     // A starred selection sits in the strip, so no page of the unstarred grid holds it.
     expect(pageOf({ selectedImage: { ...createImageItem('starred.png'), starred: true } })).toBeNull();
     expect(
@@ -235,6 +267,48 @@ describe('gallery state view', () => {
       )
     ).toBe(2);
     expect(pageOf({ semanticImageQuery: { imageName: 'ref.png', kind: 'image' } })).toBeNull();
+    // A search of every board is its own listing: a stamp made there names it rather than the selected board.
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { searchTerm: 'cats' })).toBeNull();
+    expect(pageOf({ searchScope: 'all', searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBe(2);
+    expect(pageOf({ searchTerm: 'cats' }, { boardId: 'all', searchTerm: 'cats' })).toBeNull();
+  });
+
+  it('searches every board only while a search is active, leaving the selected board as it is', () => {
+    const view = (values: Record<string, unknown>) =>
+      getGalleryStateView({ searchScope: 'all', selectedBoardId: 'board-1', ...values }, boards, []);
+    const searching = [
+      { searchTerm: 'cat' },
+      { semanticSearchText: 'sunset' },
+      { semanticImageQuery: { imageName: 'ref.png', kind: 'image' } },
+    ];
+
+    for (const search of searching) {
+      expect(view(search)).toMatchObject({
+        isSearchActive: true,
+        listingBoardId: 'all',
+        searchScope: 'all',
+        selectedBoardId: 'board-1',
+      });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search })).toBe('all');
+      expect(getGalleryListingBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...search }, boards)).toBe(
+        'all'
+      );
+    }
+
+    // No search, or only blank text: the scope does not apply.
+    for (const idle of [{}, { searchTerm: '  ' }, { semanticSearchText: '' }]) {
+      expect(view(idle)).toMatchObject({ isSearchActive: false, listingBoardId: 'board-1', searchScope: 'board' });
+      expect(getGallerySelectionBoardId({ searchScope: 'all', selectedBoardId: 'board-1', ...idle })).toBe('board-1');
+    }
+
+    expect(view({ searchScope: 'board', searchTerm: 'cat' })).toMatchObject({
+      listingBoardId: 'board-1',
+      searchScope: 'board',
+    });
+    // Where pasted or generated media lands is not the listing's scope.
+    expect(getGalleryDestinationBoardId({ searchScope: 'all', searchTerm: 'cat', selectedBoardId: 'board-1' })).toBe(
+      'board-1'
+    );
   });
 
   it('reads the starred-only filter as a strict boolean and stamps it on the selection query', () => {
@@ -247,6 +321,12 @@ describe('gallery state view', () => {
     expect(
       getGallerySelectedImageQuery({ selectedImageQuery: { starredOnly: true }, starredOnly: false })
     ).toMatchObject({ starredOnly: true });
+    // Unlike the other fields, a legacy stamp's missing media kind never falls back to the live filter.
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video', selectedImageQuery: {} }).mediaKind).toBeNull();
+    expect(getGallerySelectedImageQuery({ mediaFilter: 'video' }).mediaKind).toBeNull();
+    expect(
+      getGallerySelectedImageQuery({ mediaFilter: 'all', selectedImageQuery: { mediaKind: 'video' } }).mediaKind
+    ).toBe('video');
     expect(getGallerySelectedImageQuery({ starredOnly: true })).toMatchObject({ starredOnly: true });
   });
 
@@ -434,13 +514,140 @@ describe('getGalleryDestinationBoardId', () => {
 });
 
 describe('getGalleryAutoAddBoardId', () => {
-  it('follows the gallery destination until a board is fixed', () => {
-    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' })).toBe('picked');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' })).toBe('project');
+  const anyBoard = () => true;
+
+  it('sends results to the project inbox by default, wherever the gallery browses', () => {
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' }, anyBoard)).toBe(
+      'project'
+    );
+    // What earlier builds stored for following the selected board, their default, reads as the default now.
+    expect(
+      getGalleryAutoAddBoardId(
+        { autoAddBoardId: 'follow', projectBoardId: 'project', selectedBoardId: 'picked' },
+        anyBoard
+      )
+    ).toBe('project');
+    // A gallery with no inbox, such as a Library-only one, falls back to Uncategorized.
+    expect(getGalleryAutoAddBoardId({ selectedBoardId: 'picked' }, anyBoard)).toBe('none');
+  });
+
+  it('follows the selected board only when that is turned on, the project board for a date bucket', () => {
+    const following = { followSelectedBoard: true, projectBoardId: 'project' };
+
+    expect(
+      getGalleryAutoAddBoardId({ ...following, autoAddBoardId: 'fixed', selectedBoardId: 'picked' }, anyBoard)
+    ).toBe('picked');
+    expect(getGalleryAutoAddBoardId({ ...following, selectedBoardId: 'by_date:2026-07-15' }, anyBoard)).toBe('project');
   });
 
   it('uses a fixed board, including Uncategorized, whatever the selection', () => {
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' })).toBe('fixed');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' })).toBe('none');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' }, anyBoard)).toBe('fixed');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' }, anyBoard)).toBe('none');
+  });
+
+  it('sends results a view-only board refuses to the project inbox, followed or fixed', () => {
+    const viewOnly = (boardId: string) => boardId !== 'shared';
+
+    expect(
+      getGalleryAutoAddBoardId(
+        { followSelectedBoard: true, projectBoardId: 'inbox', selectedBoardId: 'shared' },
+        viewOnly
+      )
+    ).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared', projectBoardId: 'inbox' }, viewOnly)).toBe('inbox');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared' }, viewOnly)).toBe('none');
+    // Uncategorized is always the caller's own.
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', projectBoardId: 'inbox' }, () => false)).toBe('none');
+  });
+});
+
+describe('getGalleryIntendedDestinationId', () => {
+  const view = (settings: Partial<ReturnType<typeof getGallerySettings>>, selectedBoardId: string) => ({
+    projectBoardId: 'inbox',
+    selectedBoardId,
+    settings: { ...getGallerySettings({}), ...settings },
+  });
+
+  it('names the chosen board, else the inbox, whatever is selected', () => {
+    expect(getGalleryIntendedDestinationId(view({}, 'moodboard'))).toBe('inbox');
+    expect(getGalleryIntendedDestinationId(view({ autoAddBoardId: 'chosen' }, 'moodboard'))).toBe('chosen');
+  });
+
+  it('names the selected board while following it, the inbox for a date bucket', () => {
+    expect(
+      getGalleryIntendedDestinationId(view({ autoAddBoardId: 'chosen', followSelectedBoard: true }, 'moodboard'))
+    ).toBe('moodboard');
+    expect(getGalleryIntendedDestinationId(view({ followSelectedBoard: true }, 'by_date:2026-07-15'))).toBe('inbox');
+  });
+});
+
+describe('settleGalleryValues', () => {
+  const selected = {
+    selectedBoardId: 'dogs',
+    selectedImage: { boardId: 'dogs', kind: 'image', name: 'a.png' },
+    selectedImageName: 'image:a.png',
+    selectedImageNames: ['image:a.png', 'image:b.png'],
+  };
+
+  it.each([
+    ['another board', { selectedBoardId: 'cats' }],
+    ['a search', { searchTerm: 'fox' }],
+    ['the starred filter', { starredOnly: true }],
+    ['the other tab', { galleryView: 'assets' }],
+    ['a media filter', { mediaFilter: 'video' }],
+    ['a semantic query', { semanticImageQuery: { kind: 'text', query: 'fox' }, semanticSearchText: 'fox' }],
+  ])(
+    'drops a selection the listing no longer holds after a switch to %s, keeping the item Preview shows',
+    (_case, patch) => {
+      const next = settleGalleryValues(selected, { ...selected, ...patch });
+
+      expect(next.selectedImageNames).toEqual([]);
+      expect(next.selectedImageName).toBe('image:a.png');
+    }
+  );
+
+  it('keeps the selection through writes that leave the listing as it was', () => {
+    const next = { ...selected, galleryPage: 3, imageDensityPercent: 20, imageOrderDir: 'ASC' };
+
+    expect(settleGalleryValues(selected, next)).toBe(next);
+  });
+
+  it('drops the selection when a search widens to every board, and again when clearing it narrows it back', () => {
+    const searching = { ...selected, searchTerm: 'fox' };
+    const widened = settleGalleryValues(searching, { ...searching, searchScope: 'all' });
+
+    expect(widened.selectedImageNames).toEqual([]);
+    // Clearing the search settles the scope back to the board, a different listing again.
+    const reselected = { ...widened, selectedImageNames: ['image:c.png'] };
+    const cleared = settleGalleryValues(reselected, { ...reselected, searchTerm: '' });
+
+    expect(cleared.searchScope).toBe('board');
+    expect(cleared.selectedImageNames).toEqual([]);
+  });
+
+  it('keeps a selection whose write restamps its listing, even with the list carried over', () => {
+    const next = settleGalleryValues(selected, {
+      ...selected,
+      selectedBoardId: 'cats',
+      selectedImageQuery: { boardId: 'cats' },
+    });
+
+    expect(next.selectedImageNames).toEqual(['image:a.png', 'image:b.png']);
+  });
+
+  it('keeps a selection the same write sets, as a reveal landing on its item does', () => {
+    const next = settleGalleryValues(selected, {
+      ...selected,
+      selectedBoardId: 'cats',
+      selectedImageNames: ['image:c.png'],
+    });
+
+    expect(next.selectedImageNames).toEqual(['image:c.png']);
+  });
+
+  it('drops a single legacy selection stored without its list', () => {
+    const legacy = { selectedBoardId: 'dogs', selectedImageName: 'image:a.png' };
+
+    expect(settleGalleryValues(legacy, { ...legacy, starredOnly: true }).selectedImageNames).toEqual([]);
   });
 });

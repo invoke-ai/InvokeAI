@@ -1,6 +1,6 @@
 import { chakra } from '@chakra-ui/react';
 
-import { LIST_DIVIDER_INSET, LIST_ROW_GAP_PX, LIST_ROW_INSET } from './listLayout';
+import { LIST_DIVIDER_INSET, LIST_ROW_GAP_PX } from './listLayout';
 
 const HAIRLINE_PX = 1;
 /** Softer than a section border: it separates rows, it does not frame them. */
@@ -24,11 +24,11 @@ const IN_FLOW_CSS = {
   my: HALF_GAP,
 } as const;
 
-/** For virtualized rows: drawn inside the row slot's bottom gap, clear of the row's own inset. */
+/** For virtualized rows: drawn inside the row slot's bottom gap, clear of the row inset the owning List sets. */
 const IN_SLOT_CSS = {
   ...HAIRLINE,
   bottom: HALF_GAP,
-  insetInline: `calc(${LIST_ROW_INSET} + ${LIST_DIVIDER_INSET})`,
+  insetInline: `calc(var(--list-row-inset) + ${LIST_DIVIDER_INSET})`,
   pointerEvents: 'none',
   position: 'absolute',
 } as const;

@@ -1,5 +1,6 @@
 import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { Project } from '@workbench/projectContracts';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -38,6 +39,11 @@ vi.mock('@workbench/widgets/preview/livePreviewFollow', () => ({
     showAll: vi.fn(),
   }),
 }));
+const session = vi.hoisted(() => ({ multiuserEnabled: false }));
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useAuthSession: () => session,
+}));
 vi.mock('@workbench/projects/useProjectFileActions', () => ({ useExportLibraryProject: () => noop }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => noop }));
 vi.mock('./GalleryImageActionsBridge', () => ({
@@ -52,8 +58,13 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       (snapshot) => selector(snapshot.activeProject),
       shallowEqual
     ),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
+  useWorkbenchInternalStore: () => store,
+  useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
   useWorkbenchQueries: () => store.queries,
+  useWorkbenchSelector: (selector: (snapshot: WorkbenchSnapshot) => unknown) =>
+    useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, shallowEqual),
 }));
 
 const renderAdapter = async (absent: string[] = []) => {
@@ -114,4 +125,17 @@ describe('Gallery adapter subscriptions', () => {
     expect(adapter.generateValues.positivePrompt).toBe('Updated prompt');
     expect(adapter.galleryValues).toBe(galleryAdapter.galleryValues);
   });
+});
+
+describe('board sharing', () => {
+  it.each([true, false])(
+    'tells the gallery boards can be shared exactly when the server has accounts (%s)',
+    async (multiuser) => {
+      session.multiuserEnabled = multiuser;
+
+      await renderAdapter();
+
+      expect(adapter.boardSharing).toBe(multiuser);
+    }
+  );
 });

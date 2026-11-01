@@ -1,16 +1,21 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop -- the container ref callback is intentionally re-created when `engine` changes, so a project switch detaches the old engine and attaches the new one. */
+import type { CanvasKeyOwner } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { isResizeDragActive, subscribeResizeDrag } from '@platform/ui/ResizeHandle';
-import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
+import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
+import { getHotkeyTargetWidget, resolveHotkeyTarget } from '@workbench/hotkeys/targetWidget';
+import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import { CANVAS_SURFACE_ATTR, shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
 import { TextEditPortal } from '@workbench/widgets/canvas/TextEditPortal';
+import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useRef } from 'react';
 
 export type CanvasSurfaceEngine = Pick<
   CanvasEngineHandle,
-  'document' | 'interaction' | 'layers' | 'surface' | 'viewport'
+  'document' | 'interaction' | 'layers' | 'projectId' | 'surface' | 'viewport'
 >;
 
 /**
@@ -27,9 +32,30 @@ const focusCanvasSurface = (event: ReactPointerEvent<HTMLDivElement>) => {
  * Bind document/overlay canvases and ResizeObserver through an engine-keyed ref callback with cleanup. The engine
  * owns input without React interaction renders.
  */
-export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
+export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEngine; instanceId: string }) => {
   const screenRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const getFocusTarget = useWorkbenchFocusTarget();
+  const queries = useWorkbenchQueries();
+
+  // The engine's own keys ask the judge the hotkey runtime asks, with the same inputs, only on keydown: this canvas
+  // owns the key, the Layers widget acting on its layers is a companion, and any other widget keeps it.
+  const resolveKeyOwner = (event: KeyboardEvent): CanvasKeyOwner => {
+    const project = queries.getSnapshot().activeProject;
+    if (project.id !== engine.projectId) {
+      return 'elsewhere';
+    }
+    const target = resolveHotkeyTarget({
+      focusTarget: getFocusTarget(),
+      project: getWidgetPlacementProject(project),
+      targetWidget: getHotkeyTargetWidget(event.target),
+    });
+    return target.activeInstanceId === instanceId
+      ? 'surface'
+      : target.activeWidgetTypeId === 'layers'
+        ? 'companion'
+        : 'elsewhere';
+  };
 
   const bindContainer = (container: HTMLDivElement) => {
     const screen = screenRef.current;
@@ -38,7 +64,7 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
       return;
     }
 
-    engine.surface.attach(screen, overlay, container);
+    engine.surface.attach(screen, overlay, container, { resolveKeyOwner });
 
     // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim
     // canvas crop or reveal rather than stretch.
@@ -91,6 +117,7 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
   return (
     <Box
       ref={bindContainer}
+      {...{ [CANVAS_SURFACE_ATTR]: '' }}
       h="full"
       outline="none"
       overflow="hidden"

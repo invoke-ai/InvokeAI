@@ -1,18 +1,26 @@
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-import type { MouseEvent as ReactMouseEvent } from 'react';
+import type { DragEvent as ReactDragEvent, MouseEvent as ReactMouseEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { useDndMonitor, type DragEndEvent } from '@dnd-kit/core';
+import { invalidateGallery } from '@features/gallery/queries';
 import { useQueueItemProgressImage } from '@features/queue/react';
+import { ClipboardUnavailableError, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { useQueryClient } from '@tanstack/react-query';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
-import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
+import {
+  getControlUploadNotice,
+  resolveControlFileDrop,
+  uploadControlImageFile,
+  type ControlSourceNotice,
+} from '@workbench/canvas-operations/api';
 import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
-import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
+import { getCanvasStagingSlotRect, getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { useRegisterShortcutHintSource } from '@workbench/hotkeys/hintSources';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
-import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { useWorkbenchPreferenceSelector, useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
@@ -20,28 +28,30 @@ import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
   useActiveProjectSelector,
+  useWidgetValuesSelector,
   useWorkbenchCommands,
   useWorkbenchQueries,
-  useWorkbenchSubscription,
 } from '@workbench/WorkbenchContext';
-import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useLayoutEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useModelGridSize } from './bboxGrid';
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
-import { copyBlobToClipboard, decodeImageBlob, readClipboardImage } from './canvasClipboard';
+import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
 import {
+  cropAllLayersToFrame,
   resolveCanvasContextMenu,
   resolveCanvasContextMenuBranch,
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
 import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
+import { CanvasCropAllLayersMenuItem } from './CanvasCropAllLayersMenuItem';
 import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
+import { CanvasFrameLockFeed } from './CanvasFrameLockFeed';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
-import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
+import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
 import { CanvasImageDropOverlay } from './CanvasImageDropOverlay';
-import { createCanvasInteractionLockReader, getCanvasInteractionCapabilities } from './canvasInteractionLock';
 import { CanvasSaveToGallerySubmenu } from './CanvasSaveToGallerySubmenu';
 import {
   CANVAS_SETTINGS,
@@ -49,11 +59,14 @@ import {
   canvasSettingsEqual,
   resolveCanvasSettings,
 } from './canvasSettings';
+import { CanvasStagedRegionsFeed } from './CanvasStagedRegionsFeed';
 import { CanvasSurface } from './CanvasSurface';
 import { CanvasSurfaceContextLayout } from './CanvasSurfaceContextLayout';
+import { CANVAS_COMPANION_HOTKEYS, reportTransformRefusal } from './canvasToolCommands';
 import { resolveCheckerColors } from './checkerColors';
 import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
+import { ControlLayerCanvasOverlay } from './ControlLayerCanvasOverlay';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
 import { createCanvasShortcutHintSource } from './shortcutHints';
@@ -63,15 +76,18 @@ import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
+import { useStagingRecovery } from './useCanvasRecovery';
 import { useCreateFromBbox } from './useCreateFromBbox';
 import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
+
+const isFileDrag = (dataTransfer: DataTransfer): boolean => dataTransfer.types.includes('Files');
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
 );
 
-/** The shared engine stays stable for this keyed project/instance lease; lock changes are source notifications. */
+/** The shared engine stays stable for this keyed project/instance lease. */
 const CanvasShortcutHintRegistration = ({
   engine,
   projectId,
@@ -81,24 +97,7 @@ const CanvasShortcutHintRegistration = ({
   projectId: string;
   instanceId: string;
 }) => {
-  const queries = useWorkbenchQueries();
-  const subscribe = useWorkbenchSubscription();
-  const [source] = useState(() => {
-    const getLocked = createCanvasInteractionLockReader(() => queries.getProject(projectId));
-    return createCanvasShortcutHintSource(engine, projectId, instanceId, {
-      getSnapshot: getLocked,
-      subscribe: (listener) => {
-        let previous = getLocked();
-        return subscribe(() => {
-          const next = getLocked();
-          if (next !== previous) {
-            previous = next;
-            listener();
-          }
-        });
-      },
-    });
-  });
+  const [source] = useState(() => createCanvasShortcutHintSource(engine, projectId, instanceId));
   useRegisterShortcutHintSource(source);
   return null;
 };
@@ -117,13 +116,14 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const projectId = useActiveProjectId();
   const canvas = useActiveProjectSelector((project) => project.canvas);
   const queueItems = useActiveProjectSelector((project) => project.queue.items);
-  const antialiasProgressImages = useActiveProjectSelector((project) => project.settings.antialiasProgressImages);
+  const antialiasProgressImages = useWorkbenchPreferenceSelector((preferences) => preferences.antialiasProgressImages);
   const { document, stagingArea } = canvas;
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
   const operation = useCanvasOperation(engine);
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
+  const stagingRecovery = useStagingRecovery();
 
   // Warm the split invocation chunk when Canvas mounts so the first submission need not download it.
   useMountEffect(preloadCanvasInvocation);
@@ -149,10 +149,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   }, [bboxGrid, engine]);
 
   // Feed persisted per-project view settings into engine stores; header controls write the widget values.
-  const settings = useActiveProjectSelector(
-    (project) => resolveCanvasSettings(getProjectWidgetValues(project, 'canvas')),
-    canvasSettingsEqual
-  );
+  const settings = useWidgetValuesSelector('canvas', resolveCanvasSettings, canvasSettingsEqual);
   useEffect(() => {
     if (!engine) {
       return;
@@ -193,14 +190,77 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       // Show progress only for this documentRevision; wholesale session swaps invalidate earlier denoise frames.
       item.snapshot.canvas.documentRevision === canvas.documentRevision
   );
-  const interactionCapabilities = getCanvasInteractionCapabilities({
-    hasCanvasEngine: engine !== null,
-    hasSelectedCandidate: selectedCandidate !== undefined,
-    hasStagingSlots,
-    isCanvasGenerationInFlight,
-    operationKind,
-  });
-  const isInteractionLocked = interactionCapabilities.isSurfaceInteractionLocked;
+  // Generation and staged results never lock the canvas; only a running operation (Filter, Select Object) holds the
+  // document, and the engine's own guards refuse what cannot run meanwhile.
+  const isDocumentEditingLocked = operationKind !== null;
+  const canAcceptStagedImage = engine !== null && selectedCandidate !== undefined && !isDocumentEditingLocked;
+
+  // A desktop file dropped on the canvas fills the selected control layer while it is empty, as the hint over it
+  // says. Every file drag is taken here, since the browser's default would navigate away from the app. While it
+  // hovers, the drop effect shows whether the canvas would take it; a drop that still arrives and cannot be used
+  // says why instead of doing nothing.
+  const queryClient = useQueryClient();
+  const showNotice = useCallback(
+    (notice: ControlSourceNotice | null) => {
+      if (notice) {
+        notifications.add({
+          kind: notice.kind,
+          message: notice.messageKey ? t(notice.messageKey) : notice.message,
+          title: t(notice.titleKey),
+        });
+      }
+    },
+    [notifications, t]
+  );
+  const handleFileDragOver = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      const { dataTransfer } = event;
+      if (!isFileDrag(dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+      const accepted =
+        engine !== null &&
+        resolveControlFileDrop({
+          document,
+          engine,
+          // File contents stay hidden until the drop, but each item's type is readable while it hovers.
+          files: [...dataTransfer.items].filter((item) => item.kind === 'file'),
+          isCanvasLocked: isDocumentEditingLocked,
+        }).status === 'accepted';
+      dataTransfer.dropEffect = accepted ? 'copy' : 'none';
+    },
+    [document, engine, isDocumentEditingLocked]
+  );
+  const handleFileDrop = useCallback(
+    (event: ReactDragEvent<HTMLDivElement>) => {
+      if (!isFileDrag(event.dataTransfer)) {
+        return;
+      }
+      event.preventDefault();
+      if (!engine) {
+        return;
+      }
+      const files = [...event.dataTransfer.files];
+      const resolution = resolveControlFileDrop({
+        document,
+        engine,
+        files,
+        isCanvasLocked: isDocumentEditingLocked,
+      });
+      if (resolution.status === 'refused') {
+        showNotice(resolution.notice);
+        return;
+      }
+      void uploadControlImageFile({
+        engine,
+        file: files[0]!,
+        layerId: resolution.layerId,
+        onUploaded: (owner) => void invalidateGallery(queryClient, owner),
+      }).then((outcome) => showNotice(getControlUploadNotice(outcome)));
+    },
+    [document, engine, isDocumentEditingLocked, queryClient, showNotice]
+  );
   const handleSurfaceContextMenu = useCallback(
     (event: ReactMouseEvent<HTMLDivElement>) => {
       // Preserve native menus in inline editors. Canvas context actions target the selected layer without changing
@@ -209,7 +269,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         clientX: event.clientX,
         clientY: event.clientY,
         isInlineEditor: event.target instanceof Element && !!event.target.closest(INLINE_EDIT_SELECTOR),
-        isInteractionLocked,
         selectedLayerId: engine?.tools.canTargetLayerFromContextMenu() ? canvas.document.selectedLayerId : null,
       });
       if (!resolution.preventDefault) {
@@ -218,7 +277,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       event.preventDefault();
       setContextMenuTarget(resolution.target);
     },
-    [canvas.document.selectedLayerId, engine, isInteractionLocked]
+    [canvas.document.selectedLayerId, engine]
   );
 
   const handleCanvasImageDrop = useCallback(
@@ -235,7 +294,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
 
       const execute = async (): Promise<void> => {
         try {
-          const result = await executeCanvasImageDropImport({
+          const notice = await executeCanvasImageDropImport({
             destination: resolution.destination,
             canvas: canvasCommands,
             engine: mountedEngine,
@@ -243,7 +302,6 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
             imageNames: resolution.imageNames,
             project,
           });
-          const notice = getCanvasImportNotice(result);
           notifications.add({ kind: notice.kind, title: t(notice.titleKey, notice.options ?? {}) });
         } catch (error: unknown) {
           recordCanvasImportError({
@@ -272,13 +330,17 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         if (!blob) {
           return;
         }
-        await copyBlobToClipboard(blob);
+        await copyImage(blob);
         if (cut) {
           // Only after the write succeeds — a failed copy must not destroy pixels.
           mountedEngine.selection.eraseSelection();
         }
-      } catch {
-        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.copyFailed') });
+      } catch (error) {
+        notifications.add({
+          kind: 'error',
+          message: error instanceof ClipboardUnavailableError ? t('common.copyUnavailable') : undefined,
+          title: t('widgets.canvas.clipboard.copyFailed'),
+        });
       }
     })();
   });
@@ -290,7 +352,18 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       return;
     }
     void (async () => {
-      const blob = await readClipboardImage();
+      let blob: Blob | null;
+      try {
+        blob = await readClipboardImage();
+      } catch (error) {
+        // A missing clipboard API (plain HTTP) gets its reason; an item that fails to yield its image does not.
+        notifications.add({
+          kind: 'error',
+          message: error instanceof ClipboardUnavailableError ? t('common.pasteUnavailable') : undefined,
+          title: t('widgets.canvas.clipboard.pasteFailed'),
+        });
+        return;
+      }
       if (!blob) {
         return;
       }
@@ -308,25 +381,32 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
 
   useDndMonitor({ onDragEnd: handleCanvasImageDrop });
 
-  useLayoutEffect(() => {
-    engine?.tools.setInteractionLocked(isInteractionLocked);
-    return () => engine?.tools.setInteractionLocked(false);
-  }, [engine, isInteractionLocked]);
-
   /* eslint-disable react/preserve-manual-memoization -- imperative engine payload is mutable by design */
   const commitSelectedStagedImage = useCallback(
     (continueStaging: boolean) => {
       if (selectedSlot?.kind !== 'candidate' || !engine) {
         return;
       }
+      const before = { documentRevision: canvas.documentRevision, pendingImages: stagingArea.pendingImages };
+      const setsAsideOthers = !continueStaging && stagingArea.pendingImages.length > 1;
+      let stoppedBatch = false;
       const result = acceptStagedCandidate(
         {
           commit: (options) => engine.layers.commitStagedImage(options),
-          stopBatch: (queueItemId) =>
-            queue.cancel(projectId, queueItemId, {
-              message: t('widgets.canvas.staging.acceptStopMessage'),
-              title: t('widgets.canvas.staging.acceptStopTitle'),
-            }),
+          // With results set aside, the accept's own notice says the batch stopped, beside its Undo.
+          stopBatch: (queueItemId) => {
+            stoppedBatch = true;
+            queue.cancel(
+              projectId,
+              queueItemId,
+              setsAsideOthers
+                ? null
+                : {
+                    message: t('widgets.canvas.staging.acceptStopMessage'),
+                    title: t('widgets.canvas.staging.acceptStopTitle'),
+                  }
+            );
+          },
         },
         {
           candidate: selectedSlot.candidate,
@@ -335,12 +415,28 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
           selectedImageIndex: stagingArea.selectedImageIndex,
         }
       );
-      if (result.status !== 'committed' && result.status !== 'busy') {
+      if (result.status === 'committed') {
+        if (setsAsideOthers) {
+          stagingRecovery.reportAccepted(before, selectedSlot.candidate, stoppedBatch);
+        }
+      } else if (result.status !== 'busy') {
         // A candidate that left staging is as stale as one that changed under the accept.
         reportLayerOperation(result.status === 'missing' ? 'stale' : result.status, notify.error, t);
       }
     },
-    [engine, notify, projectId, queue, queueItems, selectedSlot, stagingArea.selectedImageIndex, t]
+    [
+      canvas.documentRevision,
+      engine,
+      notify,
+      projectId,
+      queue,
+      queueItems,
+      selectedSlot,
+      stagingArea.pendingImages,
+      stagingArea.selectedImageIndex,
+      stagingRecovery,
+      t,
+    ]
   );
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
@@ -350,14 +446,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     (direction: -1 | 1) => canvasDispatch({ direction, type: 'cycleStagedImage' }),
     [canvasDispatch]
   );
-  const discardAllStagedImages = useCallback(
-    () => canvasDispatch({ type: 'discardAllStagedImages' }),
-    [canvasDispatch]
-  );
-  const discardSelectedStagedImage = useCallback(
-    () => canvasDispatch({ type: 'discardSelectedStagedImage' }),
-    [canvasDispatch]
-  );
+  const discardAllStagedImages = stagingRecovery.discardAll;
+  const discardSelectedStagedImage = stagingRecovery.discardSelected;
   const preloadStagedCandidate = useCallback(
     (imageName: string) => engine?.previews.preloadStagedPreview(imageName),
     [engine]
@@ -388,13 +478,10 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   const progressImage = settings[CANVAS_SHOW_PROGRESS_KEY] ? selectedPlaceholderProgressImage : null;
 
   const previewSource = selectStagedPreviewSource({
-    bboxHeight: document.bbox.height,
-    bboxWidth: document.bbox.width,
-    isGenerationInFlight: selectedPlaceholder !== null,
     isVisible: stagingArea.isVisible,
     progressImage,
-    selectedImageName: selectedCandidate?.imageName ?? null,
-    selectedPlacement: selectedCandidate?.placement ?? null,
+    progressRect: selectedPlaceholder ? getCanvasStagingSlotRect(selectedPlaceholder) : null,
+    selectedCandidate: selectedCandidate ?? null,
   });
   const previewKey = stagedPreviewKey(previewSource);
 
@@ -416,16 +503,20 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
     const selectedLayerIds = readLayerPanelState(projectId, document.selectedLayerId).selectedIds;
     executeCanvasHotkeyCommand(commandId, {
       copySelection,
+      cropAllLayers: () => {
+        if (engine) {
+          void cropAllLayersToFrame(engine.layers, notify, t);
+        }
+      },
       dispatch: canvasDispatch,
       document,
       engine,
-      hasSelectedStagedCandidate: selectedCandidate !== undefined,
-      hasStagingSlots,
-      isInteractionLocked,
+      hasMultipleStagingSlots,
       notifyLayerDuplicateFailed: () =>
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
       reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
+      reportTransformRefusal: (refusal) => reportTransformRefusal(refusal, notify.error, t),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
@@ -436,63 +527,14 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   });
 
   useEffect(() => {
-    const hotkeys = [
-      // Staging keeps `alt+[` / `alt+]`; bare left/right are registered as layer nudges,
-      // then intercepted above to cycle staging slots while any slot exists.
-      ['canvas.prevEntity', t('widgets.canvas.commands.previousEntity'), ['alt+[']],
-      ['canvas.nextEntity', t('widgets.canvas.commands.nextEntity'), ['alt+]']],
-      ['canvas.deleteSelected', t('widgets.canvas.commands.deleteSelected'), ['delete', 'backspace']],
-      ['canvas.resetSelected', t('widgets.canvas.commands.resetSelected'), ['shift+c']],
-      ['canvas.undo', t('widgets.canvas.commands.undo'), ['mod+z']],
-      ['canvas.redo', t('widgets.canvas.commands.redo'), ['mod+shift+z', 'mod+y']],
-      // Exclude editable targets so tool letters and size brackets do not intercept typing.
-      ['canvas.tool.view', t('widgets.canvas.commands.selectViewTool'), ['h']],
-      ['canvas.tool.move', t('widgets.canvas.commands.selectMoveTool'), ['v']],
-      ['canvas.transformSelected', t('widgets.canvas.commands.selectTransformTool'), ['mod+t']],
-      ['canvas.tool.bbox', t('widgets.canvas.commands.selectBboxTool'), []],
-      ['canvas.tool.brush', t('widgets.canvas.commands.selectBrushTool'), ['b']],
-      ['canvas.tool.eraser', t('widgets.canvas.commands.selectEraserTool'), ['e']],
-      ['canvas.tool.lasso', t('widgets.canvas.commands.selectLassoTool'), ['l']],
-      ['canvas.tool.marquee', t('widgets.canvas.commands.selectMarqueeTool'), ['u']],
-      ['canvas.toggleNonRasterLayers', t('widgets.canvas.commands.toggleNonRasterLayers'), ['shift+h']],
-      ['canvas.copySelection', t('widgets.canvas.commands.copySelection'), ['mod+c']],
-      ['canvas.cutSelection', t('widgets.canvas.commands.cutSelection'), ['mod+x']],
-      ['canvas.pasteImage', t('widgets.canvas.commands.pasteImage'), ['mod+v']],
-      ['canvas.tool.shape', t('widgets.canvas.commands.selectShapeTool'), ['r']],
-      ['canvas.tool.text', t('widgets.canvas.commands.selectTextTool'), ['t']],
-      ['canvas.tool.gradient', t('widgets.canvas.commands.selectGradientTool'), ['g']],
-      // Selection: select all / deselect / invert (engine-owned transient selection).
-      ['canvas.selectAll', t('widgets.canvas.commands.selectAll'), ['mod+a']],
-      ['canvas.deselect', t('widgets.canvas.commands.deselect'), ['mod+d']],
-      ['canvas.invertSelection', t('widgets.canvas.commands.invertSelection'), ['mod+shift+i']],
-      ['canvas.brushSizeDown', t('widgets.canvas.commands.decreaseBrushSize'), ['[']],
-      ['canvas.brushSizeUp', t('widgets.canvas.commands.increaseBrushSize'), [']']],
-      // The active color pair: X swaps, D resets to black/white.
-      ['canvas.toggleFillColor', t('widgets.canvas.commands.swapColors'), ['x']],
-      ['canvas.setFillColorsToDefault', t('widgets.canvas.commands.resetColors'), ['d']],
-      // Move the selected layer: arrows nudge 1px, shift+arrows 10px.
-      ['canvas.nudgeLeft', t('widgets.canvas.commands.nudgeLeft'), ['arrowleft']],
-      ['canvas.nudgeRight', t('widgets.canvas.commands.nudgeRight'), ['arrowright']],
-      ['canvas.nudgeUp', t('widgets.canvas.commands.nudgeUp'), ['arrowup']],
-      ['canvas.nudgeDown', t('widgets.canvas.commands.nudgeDown'), ['arrowdown']],
-      ['canvas.nudgeLeftLarge', t('widgets.canvas.commands.nudgeLeftLarge'), ['shift+arrowleft']],
-      ['canvas.nudgeRightLarge', t('widgets.canvas.commands.nudgeRightLarge'), ['shift+arrowright']],
-      ['canvas.nudgeUpLarge', t('widgets.canvas.commands.nudgeUpLarge'), ['shift+arrowup']],
-      ['canvas.nudgeDownLarge', t('widgets.canvas.commands.nudgeDownLarge'), ['shift+arrowdown']],
-      // Layer management.
-      ['canvas.duplicateLayer', t('widgets.canvas.commands.duplicateLayer'), ['mod+j']],
-      ['canvas.groupLayers', t('widgets.canvas.commands.groupLayers'), ['mod+g']],
-      ['canvas.ungroupLayers', t('widgets.canvas.commands.ungroupLayers'), ['mod+shift+g']],
-      ['canvas.mergeDown', t('widgets.canvas.commands.mergeDown'), ['mod+e']],
-      ['canvas.layerForward', t('widgets.canvas.commands.layerForward'), ['mod+]']],
-      ['canvas.layerBackward', t('widgets.canvas.commands.layerBackward'), ['mod+[']],
-      ['canvas.layerToFront', t('widgets.canvas.commands.layerToFront'), ['mod+shift+]']],
-      ['canvas.layerToBack', t('widgets.canvas.commands.layerToBack'), ['mod+shift+[']],
-    ] as const;
-    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
-      runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    // Exclude editable targets so tool letters and size brackets do not intercept typing.
+    const disposers = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS].flatMap(([id, titleKey, defaultKeys]) => {
+      const title = t(titleKey);
+      return [
+        runtime.commands.register({ handler: () => executeCanvasHotkey(id), id, title }),
+        runtime.hotkeys.register({ allowInEditable: false, commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
 
     return () => {
       disposers.forEach((dispose) => dispose());
@@ -508,7 +550,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
   );
   const contextMenuBranch = resolveCanvasContextMenuBranch(contextMenuTarget, engine !== null);
   // The two composite operations share one busy flag so they can't overlap.
-  const isCompositeMenuDisabled = !engine || isSaving || isCreating || isInteractionLocked;
+  const isCompositeMenuDisabled = !engine || isSaving || isCreating;
   const saveToGallerySubmenu = useMemo(
     () => <CanvasSaveToGallerySubmenu disabled={isCompositeMenuDisabled} onSave={saveToGallery} />,
     [isCompositeMenuDisabled, saveToGallery]
@@ -522,11 +564,17 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       <>
         {saveToGallerySubmenu}
         {createFromBboxSubmenu}
+        {engine ? (
+          <CanvasCropAllLayersMenuItem documentEditingLocked={isDocumentEditingLocked} layers={engine.layers} />
+        ) : null}
       </>
     ),
-    [createFromBboxSubmenu, saveToGallerySubmenu]
+    [createFromBboxSubmenu, engine, isDocumentEditingLocked, saveToGallerySubmenu]
   );
-  const canvasSurface = useMemo(() => (engine ? <CanvasSurface engine={engine} /> : null), [engine]);
+  const canvasSurface = useMemo(
+    () => (engine ? <CanvasSurface engine={engine} instanceId={instance.id} /> : null),
+    [engine, instance.id]
+  );
 
   return (
     <Box
@@ -537,6 +585,8 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
       position="relative"
       role="region"
       w="full"
+      onDragOver={handleFileDragOver}
+      onDrop={handleFileDrop}
     >
       {engine ? (
         <CanvasShortcutHintRegistration
@@ -547,23 +597,22 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
         />
       ) : null}
       <CanvasColorFeed engine={engine} />
+      {engine ? <CanvasFrameLockFeed key={projectId} engine={engine} projectId={projectId} /> : null}
       {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
+      {engine ? <CanvasStagedRegionsFeed key={projectId} engine={engine} projectId={projectId} /> : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />
         </Suspense>
       ) : null}
       <CanvasSurfaceContextLayout surface={canvasSurface} onContextMenu={handleSurfaceContextMenu}>
-        <CanvasImageDropOverlay
-          isDocumentEditingLocked={interactionCapabilities.isDocumentEditingLocked}
-          isInteractionLocked={isInteractionLocked}
-        />
+        <CanvasImageDropOverlay isDocumentEditingLocked={isDocumentEditingLocked} />
         {engine ? (
           <>
-            <ToolStrip engine={engine} isInteractionLocked={isInteractionLocked} />
+            <ToolStrip engine={engine} />
+            <ControlLayerCanvasOverlay engine={engine} />
             <CanvasLayerContextMenu
               beforeDangerItems={compositeSubmenus}
-              dispatch={canvasDispatch}
               engine={engine}
               showGroupLabels
               target={layerContextMenuTarget}
@@ -585,7 +634,7 @@ export const CanvasWidgetView = ({ runtime, instance }: WidgetViewProps) => {
                 antialiasProgressImages={antialiasProgressImages}
                 areThumbnailsVisible={stagingArea.areThumbnailsVisible}
                 autoSwitchMode={stagingArea.autoSwitchMode}
-                canAccept={interactionCapabilities.canAcceptStagedImage}
+                canAccept={canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}
                 isSavingToGallery={isSavingStagedResult}

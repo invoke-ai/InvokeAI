@@ -40,6 +40,7 @@ export {
 } from './core/historySummary';
 export {
   BACKEND_SUBMITTABLE_SOURCE_IDS,
+  getQueueSourceResultSelection,
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
@@ -66,4 +67,5 @@ export {
   queueCommands,
 } from './publicApi';
 export type { QueueRunLockPort } from './runtime';
+export { describeQueueRetry, type QueueRetryReport } from './core/retryReport';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';

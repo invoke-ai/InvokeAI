@@ -861,6 +861,22 @@ def test_graph_state_shallow_copy_reset_does_not_clear_original_runtime_state(co
     assert not copied._ready_queues
 
 
+@pytest.mark.parametrize(
+    "copy_state",
+    [pytest.param(lambda state: state.model_copy(), id="model_copy"), pytest.param(copy.copy, id="copy")],
+)
+def test_graph_state_shallow_copy_selected_if_preparation_cache_isolated(copy_state):
+    state = GraphExecutionState(graph=Graph())
+    cache_key = ("if", "true_input")
+    state._selected_if_frames_for_preparation[cache_key] = (((0,),), frozenset({(0,)}))
+
+    copied = copy_state(state)
+    copied._invalidate_selected_if_frames_for_preparation("if")
+
+    assert state._selected_if_frames_for_preparation == {cache_key: (((0,),), frozenset({(0,)}))}
+    assert not copied._selected_if_frames_for_preparation
+
+
 @pytest.mark.parametrize("port", ["type", "output_meta", "loop_linkage"])
 @pytest.mark.parametrize("effect_kind, token_kind", [("emit", "data"), ("close_stream", "stream_end")])
 def test_graph_state_apply_rejects_reserved_effect_ports(port: str, effect_kind: str, token_kind: str):
@@ -3019,6 +3035,43 @@ def test_graph_static_nested_ifs_ignore_unselected_loop_branch_context():
     assert state.is_complete()
 
 
+def test_nested_if_literal_condition_activates_selected_branch():
+    """A literal outer If must activate the branch containing an inner If.
+
+    The inner condition is only needed by the outer If's selected branch.
+    Waiting for that condition to be prepared before activating the outer
+    branch causes the compatibility scheduler to return None prematurely.
+    """
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="inner_condition", value=False))
+    graph.add_node(AddInvocation(id="inner_true", a=100, b=0))
+    graph.add_node(AddInvocation(id="inner_false", a=2, b=3))
+    graph.add_node(IfInvocation(id="inner_if"))
+    graph.add_node(AddInvocation(id="outer_true", a=10, b=20))
+    graph.add_node(IfInvocation(id="outer_if", condition=False))
+    graph.add_node(AddInvocation(id="sink", b=1))
+
+    graph.add_edge(create_edge("inner_condition", "value", "inner_if", "condition"))
+    graph.add_edge(create_edge("inner_true", "value", "inner_if", "true_input"))
+    graph.add_edge(create_edge("inner_false", "value", "inner_if", "false_input"))
+    graph.add_edge(create_edge("inner_if", "value", "outer_if", "false_input"))
+    graph.add_edge(create_edge("outer_true", "value", "outer_if", "true_input"))
+    graph.add_edge(create_edge("outer_if", "value", "sink", "a"))
+
+    state = GraphExecutionState(graph=graph)
+    assert not state._can_use_fresh_flat_if_activation()
+
+    executed_source_ids = execute_all_nodes(state)
+
+    assert state.is_complete(), (
+        "Scheduler returned no ready node with unfinished source nodes: "
+        f"{sorted(set(graph.nodes) - state._completed_source_ids())}"
+    )
+    assert {"inner_if", "outer_if", "sink"} <= set(executed_source_ids)
+    sink_exec_id = next(iter(state.source_prepared_mapping["sink"]))
+    assert state.results[sink_exec_id].value == 6
+
+
 def test_graph_for_final_state_materializes_after_last_direct_return():
     graph = Graph()
     graph.add_node(ForInvocation(id="for", collection=["alpha", "beta"]))
@@ -4204,6 +4257,27 @@ def test_graph_state_collects():
     assert sorted(g.results[n6[0].id].collection) == sorted(test_prompts)
 
 
+def test_single_if_in_iterate_body_completes():
+    graph = Graph()
+    graph.add_node(IntegerCollectionInvocation(id="collection", collection=[1, 2]))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=10))
+    graph.add_node(IfInvocation(id="if", condition=True))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("collection", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "if", "true_input"))
+    graph.add_edge(create_edge("if", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    executed_source_ids = execute_all_nodes(state)
+
+    assert state.is_complete(), f"stalled after executing source nodes: {executed_source_ids}"
+    assert not state.errors
+    collect_exec_id = next(iter(state.source_prepared_mapping["collect"]))
+    assert state.results[collect_exec_id].collection == [11, 12]
+
+
 def test_graph_state_empty_iterator_collects_and_completes():
     graph = Graph()
     graph.add_node(IntegerCollectionInvocation(id="collection", collection=[]))
@@ -5249,8 +5323,7 @@ def test_if_graph_optimized_behavior_executes_only_selected_simple_branch_and_re
     assert set(executed_source_ids) == {"condition", "true_value", "if", "selected_output"}
     assert "false_value" not in executed_source_ids
 
-    assert set(g.executed_history) == {"condition", "true_value", "if", "selected_output"}
-    assert "false_value" not in g.executed_history
+    assert set(g.executed_history) == {"condition", "true_value", "false_value", "if", "selected_output"}
 
 
 def test_if_graph_lowers_legacy_branch_choice_to_frame_scoped_activation_token():

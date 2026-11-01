@@ -6,9 +6,24 @@ import { createExternalStore } from '@platform/state/externalStore';
 
 import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
-/** Expose the mounted flow instance to outside-provider actions that insert nodes at viewport center. */
+/** Expose the mounted flow instance to outside-provider actions that insert nodes at the editor's center. */
 
 export type WorkflowFlowInstance = ReactFlowInstance<WorkflowFlowNode, WorkflowFlowEdge>;
+
+/**
+ * How far the editor toolbar reaches into the graph from the editor's left edge (its 8px inset, its 38px column, and
+ * a gap). Graph content a view is fitted to, or a fresh view opens on, starts right of it, so the toolbar never
+ * covers a node.
+ */
+export const WORKFLOW_TOOLBAR_CLEARANCE_PX = 56;
+
+/** Every fit of the editor's graph: XYFlow's 10% padding, with the toolbar's column kept clear on the left. */
+export const WORKFLOW_FIT_PADDING = {
+  bottom: 0.1,
+  left: `${WORKFLOW_TOOLBAR_CLEARANCE_PX}px`,
+  right: 0.1,
+  top: 0.1,
+} as const;
 
 let flowInstance: WorkflowFlowInstance | null = null;
 
@@ -23,6 +38,34 @@ export const releaseWorkflowFlowInstance = (instance: WorkflowFlowInstance): voi
 };
 
 export const getWorkflowFlowInstance = (): WorkflowFlowInstance | null => flowInstance;
+
+let viewElement: HTMLElement | null = null;
+
+/** A callback ref for the editor's on-screen frame, so actions outside the flow can place nodes in what it shows. */
+export const registerWorkflowViewElement = (element: HTMLElement | null): (() => void) | undefined => {
+  if (!element) {
+    return undefined;
+  }
+
+  viewElement = element;
+
+  return () => {
+    if (viewElement === element) {
+      viewElement = null;
+    }
+  };
+};
+
+/** The graph position at the middle of the editor as the user sees it, or null while no editor is shown. */
+export const getWorkflowViewCenter = (): XYPosition | null => {
+  if (!flowInstance || !viewElement?.isConnected) {
+    return null;
+  }
+
+  const rect = viewElement.getBoundingClientRect();
+
+  return flowInstance.screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+};
 
 export interface WorkflowFitViewTarget {
   id: string;

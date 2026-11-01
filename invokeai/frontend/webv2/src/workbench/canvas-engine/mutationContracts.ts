@@ -14,7 +14,10 @@ import type {
   CanvasMaskNoiseContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
+  CanvasRegionalLayoutContract,
+  CanvasSnapshotKind,
   CanvasStagingAreaContractV2,
+  CanvasStagingCandidateContract,
 } from './contracts';
 import type { CanvasNodeInsertion, CanvasNodeInsertionAnchor, CanvasNodeMove } from './document/insertionAnchors';
 import type { ReorderSiblingsCommand } from './document/layerStacks';
@@ -69,6 +72,8 @@ export type CanvasLayerConfigPatch =
       negativePrompt?: string | null;
       autoNegative?: boolean;
       referenceImages?: CanvasRegionalGuidanceLayerContract['referenceImages'];
+      /** Replaces the layout role whole; `null` (or the `undefined` an inverse records) removes it. */
+      layout?: CanvasRegionalLayoutContract | null;
     }
   | {
       layerType: 'inpaint_mask';
@@ -100,6 +105,17 @@ export type CanvasProjectMutation =
   | { type: 'cycleStagedImage'; direction: -1 | 1 }
   | { type: 'discardSelectedStagedImage' }
   | { type: 'discardAllStagedImages' }
+  | {
+      /**
+       * Puts discarded candidates back (the Undo of a discard, or of the results an accept set aside) in the order
+       * `previous` held them, after any still staged; a candidate already staged is kept once. Ignored once the
+       * canvas was replaced (`documentRevision` moved on).
+       */
+      type: 'restoreStagedImages';
+      images: readonly CanvasStagingCandidateContract[];
+      previous: readonly CanvasStagingCandidateContract[];
+      documentRevision: number;
+    }
   | { type: 'toggleCanvasStagingVisibility' }
   | { type: 'toggleCanvasStagingThumbnailsVisibility' }
   | { type: 'clearCanvasStaging' }
@@ -124,6 +140,14 @@ export type CanvasProjectMutation =
   | { type: 'reorderCanvasSiblings'; orders: readonly ReorderSiblingsCommand[] }
   | { type: 'updateCanvasLayer'; id: string; patch: CanvasLayerBasePatch }
   | { type: 'replaceCanvasLayer'; layerId: string; layer: CanvasLayerContract }
+  | {
+      /**
+       * Replaces several leaves in place, each by a contract of the same id and type, as one value edit. The whole
+       * mutation is refused when any id is missing, repeated, names a group, or would change its leaf's type.
+       */
+      type: 'replaceCanvasLayers';
+      replacements: readonly { layerId: string; layer: CanvasLayerContract }[];
+    }
   | { type: 'setCanvasLayersEnabled'; updates: readonly { id: string; isEnabled: boolean }[] }
   | { type: 'setCanvasLayerPositions'; updates: readonly { id: string; x: number; y: number }[] }
   | { type: 'setCanvasLayersHidden'; updates: readonly { id: string; isHidden: boolean }[] }
@@ -153,8 +177,24 @@ export type CanvasProjectMutation =
   /** Replaces text sources while preserving the document revision for one undoable font recovery edit. */
   | { type: 'replaceCanvasFontReferences'; document: CanvasDocumentContractV3 }
   | { type: 'replaceCanvasDocument'; document: CanvasDocumentContractV3 }
-  | { type: 'saveCanvasSnapshot'; id: string; name: string; createdAt: string }
-  | { type: 'restoreCanvasSnapshot'; snapshotId: string }
+  | {
+      /** Keeps the newest `MAX_CANVAS_SNAPSHOTS` restore points; `includeStaging` keeps the staged results too. */
+      type: 'saveCanvasSnapshot';
+      id: string;
+      name: string;
+      createdAt: string;
+      kind?: CanvasSnapshotKind;
+      includeStaging?: boolean;
+    }
+  | {
+      type: 'restoreCanvasSnapshot';
+      snapshotId: string;
+      /**
+       * Takes the restored point's place with a point of the canvas it replaces, so restoring stays undoable without
+       * pushing an older point out. A Discard all point re-stages its results and is used up instead.
+       */
+      keepCurrentAs?: { id: string; name: string; createdAt: string };
+    }
   | { type: 'deleteCanvasSnapshot'; snapshotId: string }
   | { type: 'setCanvasStagingAutoSwitch'; mode: CanvasStagingAreaContractV2['autoSwitchMode'] };
 

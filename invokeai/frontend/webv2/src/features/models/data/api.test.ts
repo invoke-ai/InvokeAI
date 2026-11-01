@@ -1,3 +1,4 @@
+import { ApiError } from '@platform/transport/http';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ModelsDataPort } from './transport';
@@ -55,6 +56,32 @@ describe('installModel', () => {
   });
 });
 
+describe('cancelModelInstall', () => {
+  it('returns the job state after the delete so a completed no-op is visible', async () => {
+    mocks.request.mockReset().mockResolvedValue(new Response());
+    const completed = { id: 4, source: 'org/model', status: 'completed' };
+    mocks.apiFetchJson.mockReset().mockResolvedValue(completed);
+    const { cancelModelInstall } = await import('./api');
+    const controller = new AbortController();
+
+    await expect(cancelModelInstall(4, controller.signal)).resolves.toEqual(completed);
+
+    expect(mocks.request).toHaveBeenCalledWith('/api/v2/models/install/4', {
+      method: 'DELETE',
+      signal: controller.signal,
+    });
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v2/models/install/4', { signal: controller.signal });
+  });
+
+  it('treats a post-delete 404 as a successfully pruned job', async () => {
+    mocks.request.mockReset().mockResolvedValue(new Response());
+    mocks.apiFetchJson.mockReset().mockRejectedValue(new ApiError('Not found', 404));
+    const { cancelModelInstall } = await import('./api');
+
+    await expect(cancelModelInstall(4)).resolves.toBeNull();
+  });
+});
+
 describe('account-owned model requests', () => {
   beforeEach(() => {
     mocks.request.mockReset().mockResolvedValue(new Response());
@@ -77,7 +104,7 @@ describe('account-owned model requests', () => {
     await getExternalProviderConfigs(controller.signal);
     await deleteOrphanedModels(['/models/orphan'], controller.signal);
     await addModelRelationship('model-a', 'model-b', controller.signal);
-    await pruneCompletedModelInstalls(controller.signal);
+    await expect(pruneCompletedModelInstalls(controller.signal)).resolves.toEqual([]);
     await updateModelImage('model-a', image, controller.signal);
 
     expect(mocks.apiFetchJson).toHaveBeenNthCalledWith(
@@ -100,12 +127,12 @@ describe('account-owned model requests', () => {
       method: 'POST',
       signal: controller.signal,
     });
-    expect(mocks.request).toHaveBeenNthCalledWith(2, '/api/v2/models/install', {
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v2/models/install', {
       method: 'DELETE',
       signal: controller.signal,
     });
     expect(mocks.request).toHaveBeenNthCalledWith(
-      3,
+      2,
       '/api/v2/models/i/model-a/image',
       expect.objectContaining({ method: 'PATCH', signal: controller.signal })
     );

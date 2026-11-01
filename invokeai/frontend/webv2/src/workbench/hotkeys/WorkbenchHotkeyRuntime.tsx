@@ -6,7 +6,7 @@ import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
-import { useEffect, useEffectEvent, useMemo } from 'react';
+import { useEffect, useEffectEvent, useMemo, useSyncExternalStore } from 'react';
 import { tinykeys } from 'tinykeys';
 
 import type { RegisteredHotkey } from './types';
@@ -14,7 +14,7 @@ import type { RegisteredHotkey } from './types';
 import { firstPartyHotkeyCatalog } from './catalog';
 import { useExtensionHotkeyDefinitions } from './extensionHotkeys';
 import { useRegisterFirstPartyCommands } from './firstPartyCommands';
-import { toTinykeysBinding } from './keys';
+import { acceptsHotkeyPress, toTinykeysBinding } from './keys';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from './targetWidget';
 
@@ -33,18 +33,30 @@ export const shouldPreventHotkeyDefault = (hotkey: RegisteredHotkey | null): boo
 export const WorkbenchHotkeyRuntime = () => {
   useRegisterFirstPartyCommands();
 
-  const { commands: commandApi } = useWorkbenchExtensions();
+  const { commands: commandApi, stores } = useWorkbenchExtensions();
+  const commandContributions = useSyncExternalStore(
+    stores.commands.subscribe,
+    stores.commands.list,
+    stores.commands.list
+  );
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const getFocusTarget = useWorkbenchFocusTarget();
 
   const registeredHotkeys = useMemo(() => {
-    const firstPartyHotkeys = firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
+    // The catalog lists every binding a widget can contribute, mounted or not. A row binds only while its command has
+    // a handler, so a key nothing is handling keeps its browser meaning; and a mounted widget's own contribution of the
+    // same id replaces the row, so one binding answers with the widget's scope and flags.
+    const handledCommandIds = new Set(commandContributions.map(({ id }) => id));
+    const contributedIds = new Set(extensionHotkeys.map(({ id }) => id));
+    const firstPartyHotkeys = firstPartyHotkeyCatalog
+      .filter((hotkey) => handledCommandIds.has(hotkey.commandId) && !contributedIds.has(hotkey.id))
+      .map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
     const widgetHotkeys = extensionHotkeys.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
 
     return [...firstPartyHotkeys, ...widgetHotkeys];
-  }, [customHotkeys, extensionHotkeys]);
+  }, [commandContributions, customHotkeys, extensionHotkeys]);
 
   const executeHotkey = useEffectEvent((hotkey: RegisteredHotkey, source: WidgetContributionSource | null) => {
     void commandApi.executeForSource(hotkey.commandId, getHotkeyExecutionSource(hotkey, source));
@@ -83,15 +95,15 @@ export const WorkbenchHotkeyRuntime = () => {
     const bindings: Record<string, (event: KeyboardEvent) => void> = {};
 
     for (const hotkey of registeredHotkeys) {
-      if (hotkey.implemented === false) {
-        continue;
-      }
-
       for (const key of hotkey.keys) {
         const tinykeysBinding = toTinykeysBinding(key);
 
         if (tinykeysBinding) {
-          bindings[tinykeysBinding] = (event) => handleHotkey(event, key);
+          bindings[tinykeysBinding] = (event) => {
+            if (acceptsHotkeyPress(event, key)) {
+              handleHotkey(event, key);
+            }
+          };
         }
       }
     }

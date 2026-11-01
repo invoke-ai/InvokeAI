@@ -59,10 +59,12 @@ let queryClient: QueryClient;
 const findInGallery = vi.fn();
 const videoAdapter = {
   findInGallery,
-  getUploadBoardId: () => 'none',
+  getUploadBoardId: () => Promise.resolve('none'),
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: vi.fn(),
   playVideoSpanInPreview: vi.fn(),
   reportError: vi.fn(),
+  refreshBoardDestinations: vi.fn(),
   touchGalleryImages: vi.fn(),
   videoSpanPlayback: { getState: () => null, subscribe: () => () => undefined },
 } as unknown as VideoUiAdapter;

@@ -1,7 +1,6 @@
 import type {
   OperationPropertyForm,
   ToolFormProps,
-  ToolFooterProps,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { ChangeEvent } from 'react';
@@ -34,6 +33,7 @@ import {
   type SamModel,
   type SelectObjectSaveTarget,
 } from '@workbench/canvas-operations/api';
+import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { useSamSession } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertySwitchRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { ChevronDownIcon, SquareMinusIcon, SquarePlusIcon } from 'lucide-react';
@@ -73,6 +73,9 @@ const SAM_STATUS_TRANSLATION_KEYS: Record<SamSessionSnapshot['status'], string> 
 };
 
 const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
+  'adjustment-error': 'widgets.layers.selectObject.errorAdjustment',
+  'adjustment-over-budget': 'widgets.layers.selectObject.errorAdjustmentOverBudget',
+  'adjustment-too-large': 'widgets.layers.selectObject.errorAdjustmentTooLarge',
   decode: 'widgets.layers.selectObject.errorDecode',
   empty: 'widgets.layers.selectObject.errorEmpty',
   invalid: 'widgets.layers.selectObject.errorInvalid',
@@ -83,6 +86,7 @@ const SAM_ERROR_TRANSLATION_KEYS: Record<SamSessionErrorCode, string> = {
   queue: 'widgets.layers.selectObject.errorQueue',
   reconcile: 'widgets.layers.selectObject.errorReconcile',
   unknown: 'widgets.layers.selectObject.errorUnknown',
+  unreadable: 'widgets.layers.selectObject.errorUnreadable',
   upload: 'widgets.layers.selectObject.errorUpload',
 };
 
@@ -150,12 +154,21 @@ export const getSamActionHandlers = (operations: CanvasOperationCapability) => (
   save: (target: SelectObjectSaveTarget) => void operations.saveSelectObjectSession(target, keepSamImageIntermediate),
 });
 
-export const getSamActionEligibility = (
-  session: SamSessionSnapshot,
-  isExternalInteractionLocked = false
-): SamActionEligibility => {
+/** Auto Process is also the account's preference, so the next session starts from the person's last choice. */
+export const toggleSamSetting = (
+  operations: Pick<CanvasOperationCapability, 'updateSelectObjectSession'>,
+  key: 'applyPolygonRefinement' | 'autoProcess' | 'isolatedPreview',
+  value: boolean
+): void => {
+  const result = operations.updateSelectObjectSession({ [key]: value });
+  if (key === 'autoProcess' && result === 'updated') {
+    void patchWorkbenchPreferences({ selectObjectAutoProcess: value });
+  }
+};
+
+export const getSamActionEligibility = (session: SamSessionSnapshot): SamActionEligibility => {
   const isProcessing = isSamProcessingStatus(session.status);
-  const actionsBlocked = session.status === 'committing' || isExternalInteractionLocked;
+  const actionsBlocked = session.status === 'committing';
   const hasReadyPreview = session.hasPreview && !isProcessing && !actionsBlocked;
   return {
     canApply: hasReadyPreview,
@@ -400,14 +413,14 @@ export const SamSettings = ({
 /** Input mode, the visual point labels or the prompt, and invert: what changes between previews. */
 
 /** The session's inputs: visual points or a prompt, plus the invert switch. */
-const SamInputSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const SamInputSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
   const operations = getCanvasOperations(engine);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   const viewModel = getSamPanelViewModel(session, (layerName, width, height) =>
     t('widgets.layers.selectObject.sourceLayerLabel', {
       height,
@@ -462,20 +475,20 @@ const SamInputSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps)
 };
 
 /** Set-once session settings: model, refinement, preview behavior. */
-const SamSettingsGroup = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const SamSettingsGroup = ({ engine }: ToolFormProps) => {
   const session = useSamSession(engine);
   const operations = getCanvasOperations(engine);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   return (
     <SamSettings
       eligibility={eligibility}
       isProcessing={isSamProcessingStatus(session.status)}
       session={session}
       onModelChange={(model) => operations.updateSelectObjectSession({ model })}
-      onToggle={(key, value) => operations.updateSelectObjectSession({ [key]: value })}
+      onToggle={(key, value) => toggleSamSetting(operations, key, value)}
     />
   );
 };
@@ -483,14 +496,14 @@ const SamSettingsGroup = ({ engine, isSurfaceInteractionLocked }: ToolFormProps)
 const APPLY_MENU_POSITIONING = { placement: 'top-end' } as const;
 
 /** The sticky footer: status chip, Reset, Process, Apply with its save-as menu, Cancel. */
-const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => {
+const SamFooter = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useSamSession(engine);
   const actions = useMemo(() => getSamActionHandlers(getCanvasOperations(engine)), [engine]);
   if (!session) {
     return null;
   }
-  const eligibility = getSamActionEligibility(session, isExternalInteractionLocked);
+  const eligibility = getSamActionEligibility(session);
   const isProcessing = isSamProcessingStatus(session.status);
   const isBusy = !session.error && (isProcessing || session.status === 'scheduled' || session.status === 'committing');
   const sourceLabel = t('widgets.layers.selectObject.sourceLayerLabel', {

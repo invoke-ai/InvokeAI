@@ -11,6 +11,8 @@ import {
   type CanvasNodeMove,
   type CanvasProjectMutation,
   type CanvasRasterLayerContractV2,
+  type CanvasSnapshotContract,
+  type CanvasSnapshotKind,
   type CanvasStackForests,
   type CanvasStateContractV3,
   type LayerStackKind,
@@ -44,14 +46,55 @@ import { isOverlayStack, layerStackOf, reorderSiblings } from '@workbench/canvas
 import { repairSelectedLayerId, selectionAfterAcceptedResult } from '@workbench/canvas-engine/document/selectionRepair';
 import { prependProjectEvent } from '@workbench/projectEvents';
 
-import { canvasDocumentRequiresFontSchemaV4, normalizeCanvasDocumentContract } from './canvasMigration';
+import {
+  createEmptyCanvasDocument,
+  newestCanvasSchemaVersion,
+  normalizeCanvasDocumentContract,
+  writableCanvasSchemaVersion,
+} from './canvasMigration';
 import {
   getCanvasStagingCandidateFingerprint,
   getCanvasStagingSlotCount,
   getCanvasStagingSlots,
+  hasPendingCanvasResults,
 } from './canvasStagingView';
 
 export type { CanvasLayerBasePatch, CanvasLayerConfigPatch, CanvasProjectMutation } from '@workbench/canvas-engine/api';
+
+/**
+ * Restore points a canvas keeps of each kind (Clear canvas and Discard all each make one); older ones of that kind
+ * are dropped, so a run of discards never pushes out a cleared canvas.
+ */
+export const MAX_CANVAS_SNAPSHOTS = 5;
+
+const snapshotKind = (snapshot: CanvasSnapshotContract): CanvasSnapshotKind => snapshot.kind ?? 'clear-canvas';
+
+/** `snapshots` plus `added`, keeping the newest `MAX_CANVAS_SNAPSHOTS` of each kind in their order. */
+const withRestorePoint = (
+  snapshots: readonly CanvasSnapshotContract[],
+  added: CanvasSnapshotContract
+): CanvasSnapshotContract[] => {
+  const all = [...snapshots, added];
+  const kept = new Map<CanvasSnapshotKind, number>();
+  const keep = new Set<CanvasSnapshotContract>();
+  for (let index = all.length - 1; index >= 0; index -= 1) {
+    const kind = snapshotKind(all[index]!);
+    const count = kept.get(kind) ?? 0;
+    if (count < MAX_CANVAS_SNAPSHOTS) {
+      kept.set(kind, count + 1);
+      keep.add(all[index]!);
+    }
+  }
+  return all.filter((snapshot) => keep.has(snapshot));
+};
+
+/**
+ * The restore points that outlive a document replacement. Discard all points belong to the document session they were
+ * taken in: their results' placements are pinned to that document, so they leave with it. Clear canvas points carry
+ * their own document and stay.
+ */
+const pointsSurvivingReplacement = (snapshots: readonly CanvasSnapshotContract[]): CanvasSnapshotContract[] =>
+  snapshots.filter((snapshot) => snapshotKind(snapshot) !== 'discard-results');
 
 const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProjectMutation['type']>([
   'commitStagedImage',
@@ -63,6 +106,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'cycleStagedImage',
   'deleteCanvasSnapshot',
   'discardAllStagedImages',
+  'restoreStagedImages',
   'discardSelectedStagedImage',
   'mergeCanvasLayersDown',
   'removeCanvasLayers',
@@ -70,6 +114,7 @@ const CANVAS_PROJECT_MUTATION_TYPES: ReadonlySet<string> = new Set<CanvasProject
   'replaceCanvasFontReferences',
   'replaceCanvasDocument',
   'replaceCanvasLayer',
+  'replaceCanvasLayers',
   'resizeCanvasDocument',
   'restoreCanvasSnapshot',
   'saveCanvasSnapshot',
@@ -117,8 +162,7 @@ const withRepairedSelection = (document: CanvasDocumentContractV3): CanvasDocume
 };
 
 const setCanvasDocument = (project: Project, document: CanvasDocumentContractV3): Project => {
-  const schemaVersion: 3 | 4 =
-    project.canvas.version === 4 || document.version === 4 || canvasDocumentRequiresFontSchemaV4(document) ? 4 : 3;
+  const schemaVersion = writableCanvasSchemaVersion([project.canvas.version, document.version], document);
   const nextDocument = document.version === schemaVersion ? document : { ...document, version: schemaVersion };
   return nextDocument === project.canvas.document && schemaVersion === project.canvas.version
     ? project
@@ -131,8 +175,11 @@ const updateCanvasDocument = (
 ): Project => setCanvasDocument(project, update(project.canvas.document));
 
 const setCanvasState = (project: Project, canvas: CanvasStateContractV3): Project => {
-  const hasV4Snapshot = canvas.snapshots.some((snapshot) => snapshot.document.version === 4);
-  const schemaVersion: 3 | 4 = canvas.version === 4 || canvas.document.version === 4 || hasV4Snapshot ? 4 : 3;
+  const schemaVersion = newestCanvasSchemaVersion([
+    canvas.version,
+    canvas.document.version,
+    ...canvas.snapshots.map((snapshot) => snapshot.document.version),
+  ]);
   const nextCanvas = canvas.version === schemaVersion ? canvas : { ...canvas, version: schemaVersion };
   return nextCanvas === project.canvas ? project : { ...project, canvas: nextCanvas };
 };
@@ -250,6 +297,26 @@ const replaceLeaf = (
     document,
     anchor ? insertNodesAtAnchor(stacks, anchor, [layer]) : { ...stacks, [target]: [layer, ...stacks[target]] }
   );
+};
+
+/** Same-id, same-type leaf replacements as one value edit; any invalid entry refuses them all, so replay is atomic. */
+const replaceLeavesInPlace = (
+  document: CanvasDocumentContractV3,
+  replacements: readonly { layerId: string; layer: CanvasLayerContract }[]
+): CanvasDocumentContractV3 => {
+  const ids = new Set(replacements.map(({ layerId }) => layerId));
+  const valid =
+    replacements.length > 0 &&
+    ids.size === replacements.length &&
+    replacements.every(
+      ({ layer, layerId }) => layer.id === layerId && getDocumentLayer(document, layerId)?.type === layer.type
+    );
+  return valid
+    ? mapNodes(
+        document,
+        replacements.map(({ layer, layerId }) => [layerId, () => layer])
+      )
+    : document;
 };
 
 /** The stack every leaf of `nodes` belongs to, or `null` when they disagree; an empty group fits any stack. */
@@ -567,7 +634,7 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
     };
   }
   if (layer.type === 'regional_guidance' && config.layerType === 'regional_guidance') {
-    return {
+    const next = {
       ...layer,
       ...(config.mask ? { mask: { ...layer.mask, ...config.mask } } : {}),
       ...(Object.hasOwn(config, 'positivePrompt') ? { positivePrompt: config.positivePrompt } : {}),
@@ -575,6 +642,15 @@ const patchLayerConfig = (layer: CanvasNodeContract, config: CanvasLayerConfigPa
       ...(Object.hasOwn(config, 'autoNegative') ? { autoNegative: config.autoNegative } : {}),
       ...(Object.hasOwn(config, 'referenceImages') ? { referenceImages: config.referenceImages } : {}),
     };
+    // A cleared role is absent, as on a layer that never had one; the inverse of adding one records `undefined`.
+    if (Object.hasOwn(config, 'layout')) {
+      if (config.layout) {
+        next.layout = config.layout;
+      } else {
+        delete next.layout;
+      }
+    }
+    return next;
   }
   if (layer.type === 'inpaint_mask' && config.layerType === 'inpaint_mask') {
     const next = {
@@ -655,6 +731,30 @@ const clearStagingArea = (stagingArea: CanvasStateContractV3['stagingArea']) => 
   selectedImageIndex: 0,
   sourceQueueItemId: undefined,
 });
+
+/** The canvas as a restore point; null when its document no longer normalizes. */
+const captureCanvasSnapshot = (
+  canvas: CanvasStateContractV3,
+  point: { id: string; name: string; createdAt: string; kind?: CanvasSnapshotKind; includeStaging?: boolean }
+): CanvasSnapshotContract | null => {
+  // A Discard all point brings back results only; an empty document of the canvas's size keeps the contract's shape
+  // without storing a copy nothing reads.
+  const document =
+    point.kind === 'discard-results'
+      ? createEmptyCanvasDocument(canvas.document.width, canvas.document.height)
+      : normalizeCanvasDocumentContract(structuredClone(canvas.document));
+  const { pendingImages } = canvas.stagingArea;
+  return document
+    ? {
+        createdAt: point.createdAt,
+        document,
+        id: point.id,
+        name: point.name,
+        ...(point.kind ? { kind: point.kind } : {}),
+        ...(point.includeStaging && pendingImages.length > 0 ? { stagedImages: structuredClone(pendingImages) } : {}),
+      }
+    : null;
+};
 
 const clampStagedImageIndex = (imageIndex: number, slotCount: number): number =>
   Math.min(Math.max(0, slotCount - 1), Math.max(0, imageIndex));
@@ -803,6 +903,50 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         },
       };
     }
+    case 'restoreStagedImages': {
+      const { stagingArea } = project.canvas;
+      if (project.canvas.documentRevision !== mutation.documentRevision || mutation.images.length === 0) {
+        return project;
+      }
+      const restoring = new Set(mutation.images.map(getCanvasStagingCandidateFingerprint));
+      const staged = new Set(stagingArea.pendingImages.map(getCanvasStagingCandidateFingerprint));
+      const known = new Set(mutation.previous.map(getCanvasStagingCandidateFingerprint));
+      const pendingImages = [
+        ...mutation.previous.filter((image) => {
+          const fingerprint = getCanvasStagingCandidateFingerprint(image);
+          return staged.has(fingerprint) || restoring.has(fingerprint);
+        }),
+        // Results that arrived after the discard stay, after the ones it brings back.
+        ...stagingArea.pendingImages.filter((image) => !known.has(getCanvasStagingCandidateFingerprint(image))),
+      ];
+      if (pendingImages.length === stagingArea.pendingImages.length) {
+        return project;
+      }
+      const canvas = {
+        ...project.canvas,
+        stagingArea: {
+          ...stagingArea,
+          isVisible: true,
+          pendingImageIds: pendingImages.map((image) => image.imageName),
+          pendingImages,
+          sourceQueueItemId: stagingArea.sourceQueueItemId ?? mutation.images[0]!.sourceQueueItemId,
+        },
+      };
+      // Review resumes on the first result brought back.
+      const firstRestored = getCanvasStagingSlots(canvas, project.queue.items).findIndex(
+        (slot) => slot.kind === 'candidate' && restoring.has(getCanvasStagingCandidateFingerprint(slot.candidate))
+      );
+      return {
+        ...project,
+        canvas: {
+          ...canvas,
+          stagingArea: {
+            ...canvas.stagingArea,
+            selectedImageIndex: firstRestored >= 0 ? firstRestored : canvas.stagingArea.selectedImageIndex,
+          },
+        },
+      };
+    }
     case 'toggleCanvasStagingVisibility':
       return getCanvasStagingSlotCount(project.canvas, project.queue.items) === 0
         ? project
@@ -851,6 +995,8 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       return mutation.layer.id === mutation.layerId
         ? updateCanvasDocument(project, (document) => replaceLeaf(project.id, document, mutation.layer))
         : project;
+    case 'replaceCanvasLayers':
+      return updateCanvasDocument(project, (document) => replaceLeavesInPlace(document, mutation.replacements));
     case 'setCanvasLayersEnabled':
       return updateCanvasDocument(project, (document) => setCanvasLayersEnabled(document, mutation.updates));
     case 'setCanvasLayerPositions':
@@ -915,7 +1061,12 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
       const height = Math.max(1, Math.round(mutation.height));
       const offsetX = mutation.offsetX ?? 0;
       const offsetY = mutation.offsetY ?? 0;
-      return updateCanvasDocument(project, (document) => ({
+      // An offset moves every leaf and the bbox but not the rects pending results were pinned to at submission, so
+      // it would land them off their content: refused while this session has any.
+      if ((offsetX !== 0 || offsetY !== 0) && hasPendingCanvasResults(project.canvas, project.queue.items)) {
+        return project;
+      }
+      const resized = updateCanvasDocument(project, (document) => ({
         ...document,
         bbox: clampBbox(
           { ...document.bbox, x: document.bbox.x + offsetX, y: document.bbox.y + offsetY },
@@ -949,6 +1100,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
               ),
         width,
       }));
+      // The move would land a Discard all point's results off their content too, so those points are dropped.
+      return resized === project || (offsetX === 0 && offsetY === 0)
+        ? resized
+        : {
+            ...resized,
+            canvas: { ...resized.canvas, snapshots: pointsSurvivingReplacement(resized.canvas.snapshots) },
+          };
     }
     case 'replaceCanvasDocument': {
       const document = normalizeCanvasDocumentContract(structuredClone(mutation.document));
@@ -957,6 +1115,7 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
             ...project.canvas,
             document: withRepairedSelection(document),
             documentRevision: project.canvas.documentRevision + 1,
+            snapshots: pointsSurvivingReplacement(project.canvas.snapshots),
             stagingArea: clearStagingArea(project.canvas.stagingArea),
           })
         : project;
@@ -971,27 +1130,65 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         : project;
     }
     case 'saveCanvasSnapshot': {
-      const document = normalizeCanvasDocumentContract(structuredClone(project.canvas.document));
-      return document
+      const snapshot = captureCanvasSnapshot(project.canvas, mutation);
+      return snapshot
         ? setCanvasState(project, {
             ...project.canvas,
-            snapshots: [
-              ...project.canvas.snapshots,
-              { createdAt: mutation.createdAt, document, id: mutation.id, name: mutation.name },
-            ],
+            snapshots: withRestorePoint(project.canvas.snapshots, snapshot),
           })
         : project;
     }
     case 'restoreCanvasSnapshot': {
       const snapshot = project.canvas.snapshots.find((entry) => entry.id === mutation.snapshotId);
-      const document = snapshot ? normalizeCanvasDocumentContract(structuredClone(snapshot.document)) : null;
-      return document
-        ? setCanvasState(project, {
-            ...project.canvas,
-            document: withRepairedSelection(document),
-            documentRevision: project.canvas.documentRevision + 1,
+      if (!snapshot) {
+        return project;
+      }
+      const remaining = project.canvas.snapshots.filter((entry) => entry !== snapshot);
+      if (snapshot.kind === 'discard-results') {
+        // The point records no revision, so the restoreStagedImages guard cannot fence it; dropping these points
+        // whenever the document is replaced is the only protection.
+        const restaged = applyCanvasProjectMutation(project, {
+          documentRevision: project.canvas.documentRevision,
+          images: snapshot.stagedImages ?? [],
+          previous: snapshot.stagedImages ?? [],
+          type: 'restoreStagedImages',
+        });
+        // Used up only once its results are back; when they all are already, the point stays.
+        return restaged === project ? project : { ...restaged, canvas: { ...restaged.canvas, snapshots: remaining } };
+      }
+      const document = normalizeCanvasDocumentContract(structuredClone(snapshot.document));
+      if (!document) {
+        return project;
+      }
+      const kept = mutation.keepCurrentAs
+        ? captureCanvasSnapshot(project.canvas, {
+            ...mutation.keepCurrentAs,
+            includeStaging: true,
+            kind: 'clear-canvas',
           })
-        : project;
+        : null;
+      const stagedImages = snapshot.stagedImages ? structuredClone(snapshot.stagedImages) : [];
+      const cleared = clearStagingArea(project.canvas.stagingArea);
+      // A new canvas session, like any document replacement: the outgoing staging, in-flight results and Discard all
+      // points belong to the replaced document. Results the point kept come back with it.
+      return setCanvasState(project, {
+        ...project.canvas,
+        document: withRepairedSelection(document),
+        documentRevision: project.canvas.documentRevision + 1,
+        snapshots: pointsSurvivingReplacement(
+          kept ? withRestorePoint(remaining, kept) : mutation.keepCurrentAs ? remaining : project.canvas.snapshots
+        ),
+        stagingArea:
+          stagedImages.length > 0
+            ? {
+                ...cleared,
+                isVisible: true,
+                pendingImageIds: stagedImages.map((image) => image.imageName),
+                pendingImages: stagedImages,
+                sourceQueueItemId: stagedImages[0]!.sourceQueueItemId,
+              }
+            : cleared,
+      });
     }
     case 'deleteCanvasSnapshot': {
       const snapshots = project.canvas.snapshots.filter((entry) => entry.id !== mutation.snapshotId);

@@ -22,7 +22,14 @@ import {
   SamModeToggle,
   SamStatusSlot,
   SamVisualInput,
+  toggleSamSetting,
 } from './SamOptions';
+
+const { patchWorkbenchPreferences } = vi.hoisted(() => ({ patchWorkbenchPreferences: vi.fn(() => Promise.resolve()) }));
+vi.mock('@workbench/settings/store', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  patchWorkbenchPreferences,
+}));
 
 const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
   eager: true,
@@ -106,17 +113,6 @@ describe('getSamActionEligibility', () => {
     const committing = snapshot({ hasPreview: true, status: 'committing' as never });
 
     expect(getSamActionEligibility(committing)).toEqual({
-      canApply: false,
-      canCancel: true,
-      canEditInputs: false,
-      canProcess: false,
-      canReset: false,
-      canSave: false,
-    });
-  });
-
-  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
-    expect(getSamActionEligibility(snapshot({ hasPreview: true }), true)).toEqual({
       canApply: false,
       canCancel: true,
       canEditInputs: false,
@@ -346,7 +342,7 @@ describe('single-row SAM inputs', () => {
     expect(en.widgets.layers.selectObject.autoProcess).toBe('Auto Process');
     expect(en.widgets.layers.selectObject.isolatedPreview).toBe('Isolated Preview');
     expect(en.widgets.layers.selectObject.settings).toBe('Select Object settings');
-    expect(en.widgets.layers.selectObject.bbox).toBe('BBox');
+    expect(en.widgets.layers.selectObject.bbox).toBe('Box');
     expect(en.widgets.layers.selectObject.technicalDetails).toBe('Technical details');
     expect(en.widgets.layers.selectObject.sourceLayerLabel).toContain('{{name}}');
     expect(en.widgets.layers.selectObject.sourceLayerLabel).toContain('{{width}}');
@@ -456,6 +452,27 @@ describe('getSamActionHandlers', () => {
   });
 });
 
+describe('toggleSamSetting', () => {
+  it('saves an applied Auto Process change as the account preference, and nothing else', () => {
+    const updateSelectObjectSession = vi.fn(() => 'updated' as const);
+
+    toggleSamSetting({ updateSelectObjectSession }, 'autoProcess', true);
+    toggleSamSetting({ updateSelectObjectSession }, 'isolatedPreview', false);
+
+    expect(updateSelectObjectSession).toHaveBeenNthCalledWith(1, { autoProcess: true });
+    expect(updateSelectObjectSession).toHaveBeenNthCalledWith(2, { isolatedPreview: false });
+    expect(patchWorkbenchPreferences).toHaveBeenCalledExactlyOnceWith({ selectObjectAutoProcess: true });
+  });
+
+  it('keeps the preference when the session refuses the change', () => {
+    patchWorkbenchPreferences.mockClear();
+
+    toggleSamSetting({ updateSelectObjectSession: () => 'stale' }, 'autoProcess', false);
+
+    expect(patchWorkbenchPreferences).not.toHaveBeenCalled();
+  });
+});
+
 describe('select object regions', () => {
   it('splits mode, points and invert into the bar, settings and secondary commands into More, and keeps Apply / Cancel in status', () => {
     const session = snapshot({
@@ -484,19 +501,13 @@ describe('select object regions', () => {
         )
       );
     const [inputGroup, settingsGroup] = selectObjectOperationForm.groups;
-    const input = render(
-      createElement(inputGroup!.body, { engine: engine as never, isSurfaceInteractionLocked: false })
-    );
-    const settings = render(
-      createElement(settingsGroup!.body, { engine: engine as never, isSurfaceInteractionLocked: false })
-    );
-    const footer = render(
-      createElement(selectObjectOperationForm.footer, { engine: engine as never, isExternalInteractionLocked: false })
-    );
+    const input = render(createElement(inputGroup!.body, { engine: engine as never }));
+    const settings = render(createElement(settingsGroup!.body, { engine: engine as never }));
+    const footer = render(createElement(selectObjectOperationForm.footer, { engine: engine as never }));
 
     // Input group: mode, points, bbox indicator, invert switch — no verbs.
     expect(input.indexOf('>Visual<')).toBeLessThan(input.indexOf('aria-label="Include 1"'));
-    expect(input.indexOf('aria-label="Include 1"')).toBeLessThan(input.indexOf('No bounding box'));
+    expect(input.indexOf('aria-label="Include 1"')).toBeLessThan(input.indexOf('No box prompt'));
     expect(input).toContain('>Invert<');
     expect(input).not.toContain('>Process<');
 

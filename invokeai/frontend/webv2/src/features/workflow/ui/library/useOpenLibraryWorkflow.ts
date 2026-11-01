@@ -1,12 +1,13 @@
-import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { LibraryOpenItem } from '@features/workflow/ui/workflowUiStore';
 
+import { getWorkflowRecordCategory } from '@features/workflow/data/api';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
-import { parseWorkflowJson } from '@features/workflow/utility';
+import { parseWorkflowJson, summarizeWorkflowLoadWarnings } from '@features/workflow/utility';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -116,7 +117,11 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           return;
         }
 
-        const source = { libraryWorkflowId: record.workflow_id, revision: record.revision };
+        const source: ProjectWorkflowSource = {
+          libraryWorkflowId: record.workflow_id,
+          revision: record.revision,
+          ...(getWorkflowRecordCategory(record) === 'user' ? { ownerUserId: record.user_id } : {}),
+        };
 
         if (target.kind === 'replace') {
           replaceWorkflow({ projectId, workflowId: target.workflowId }, document, {
@@ -133,8 +138,10 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           });
         }
 
-        for (const warning of warnings) {
-          notify.info(t('workflowLibrary.loadWarning'), warning);
+        const warningSummary = summarizeWorkflowLoadWarnings(warnings);
+
+        if (warningSummary) {
+          notify.info(t('workflowLibrary.loadWarning'), warningSummary);
         }
 
         void touchLibraryWorkflowOpenedAt(item.workflow_id, owner.signal).catch(() => {

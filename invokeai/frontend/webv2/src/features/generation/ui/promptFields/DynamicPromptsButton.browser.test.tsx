@@ -3,6 +3,7 @@ import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFi
 import { ChakraProvider } from '@chakra-ui/react';
 import { DynamicPromptsButton } from '@features/generation/ui/promptFields/DynamicPromptsButton';
 import { PromptTextarea } from '@features/generation/ui/promptFields/PromptTextarea';
+import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act } from 'react';
@@ -14,7 +15,9 @@ const parseDynamicPrompts = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/generation/data/promptUtilities', () => ({ parseDynamicPrompts }));
 
-vi.mock('@features/generation/data/wildcards', () => ({
+vi.mock('@features/generation/data/wildcards', async (importOriginal) => ({
+  // Partial: the real module's other exports (constants, mappers) stay available to what imports them.
+  ...(await importOriginal<Record<string, unknown>>()),
   createWildcard: vi.fn(),
   deleteWildcard: vi.fn(),
   invalidateWildcardDependents: vi.fn(),
@@ -28,6 +31,7 @@ let root: Root | null = null;
 
 const config: DynamicPromptsFieldConfig = {
   combinatorial: true,
+  enabled: true,
   isSeedFixed: false,
   maxPrompts: 100,
   onChange: vi.fn(),
@@ -35,6 +39,22 @@ const config: DynamicPromptsFieldConfig = {
   sampleSeed: 0,
   seedBehaviour: 'per-iteration',
 };
+
+const NO_PROMPT_ELEMENT = { element: () => null };
+
+/** The button with the expansion its prompt field would hand it. */
+const ExpandingButton = ({ onUsePrompt, prompt }: { onUsePrompt: (prompt: string) => void; prompt: string }) => (
+  <DynamicPromptsButton
+    batchCount={2}
+    config={config}
+    expansion={useDynamicPrompts(prompt, config)}
+    highlightExpandedPrompts
+    promptEditor={NO_PROMPT_ELEMENT}
+    showSyntaxHighlighting
+    onInsertText={vi.fn()}
+    onUsePrompt={onUsePrompt}
+  />
+);
 
 const render = async (prompt: string, onUsePrompt = vi.fn()) => {
   host = document.createElement('div');
@@ -56,14 +76,7 @@ const render = async (prompt: string, onUsePrompt = vi.fn()) => {
             showSyntaxHighlighting
             value={prompt}
           />
-          <DynamicPromptsButton
-            batchCount={2}
-            config={config}
-            positivePrompt={prompt}
-            showSyntaxHighlighting
-            onInsertText={vi.fn()}
-            onUsePrompt={onUsePrompt}
-          />
+          <ExpandingButton prompt={prompt} onUsePrompt={onUsePrompt} />
         </ChakraProvider>
       </QueryClientProvider>
     );

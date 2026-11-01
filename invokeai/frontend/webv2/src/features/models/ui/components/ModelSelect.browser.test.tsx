@@ -2,7 +2,8 @@ import type { ModelConfig } from '@features/models';
 
 import { ChakraProvider, Field as ChakraField } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { ModelsUiProvider } from '@features/models/ui/ModelsUiContext';
+import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/ModelsUiContext';
+import { getModelsUiSnapshotForTests } from '@features/models/ui/uiStore';
 import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
 import { Field } from '@platform/ui/Field';
 import { system } from '@theme/system';
@@ -41,9 +42,14 @@ const secondSdxlModel = { ...model, key: 'sdxl-other', name: 'Another SDXL' } as
 const MODELS_UI_ADAPTER = {
   canManageModels: true,
   enableModelDescriptions: true,
+  installInPlace: true,
   isProjectActive: () => true,
   managerProjectId: null,
+  schedulerPolicy: NO_SCHEDULER_POLICY,
+  setInstallInPlace: () => undefined,
 };
+const MANAGER_ADAPTER = { ...MODELS_UI_ADAPTER, managerProjectId: 'project-1' };
+const MEMBER_ADAPTER = { ...MANAGER_ADAPTER, canManageModels: false };
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];
 
@@ -145,6 +151,49 @@ describe('ModelSelect loading states', () => {
       );
     });
     expect(host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]')!.disabled).toBe(false);
+  });
+
+  it('leads a required picker with nothing installed to the Model Manager, filtered to its type', async () => {
+    setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+    const renderRequired = (canManageModels: boolean) =>
+      act(() => {
+        root.render(
+          <ChakraProvider value={system}>
+            <ModelsUiProvider adapter={canManageModels ? MANAGER_ADAPTER : MEMBER_ADAPTER}>
+              <ModelSelect installAction modelTypes={CONTROLNET_TYPES} value={null} onChange={vi.fn()} />
+            </ModelsUiProvider>
+          </ChakraProvider>
+        );
+      });
+    const originalHash = window.location.hash;
+
+    await renderRequired(true);
+    const install = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'models.installAModel'
+    );
+    expect(install).toBeDefined();
+    await act(() => install?.click());
+
+    // The filter is seeded before the navigation, once its module has loaded.
+    await expect.poll(() => window.location.hash).toBe('#/models?project=project-1');
+    expect(getModelsUiSnapshotForTests()).toMatchObject({ activeTab: 'add', addModelsTypeSeed: 'controlnet' });
+    window.location.hash = originalHash;
+
+    // Someone who cannot install models is told whom to ask instead of being sent to a page they cannot open.
+    await renderRequired(false);
+    expect(host.textContent).toContain('models.askAdminToInstall');
+    expect([...host.querySelectorAll('button')].map((button) => button.textContent)).not.toContain(
+      'models.installAModel'
+    );
+
+    // Once a compatible model exists the picker is all it needs.
+    setModelsSnapshotForTests({
+      error: null,
+      models: [{ ...model, key: 'cn', type: 'controlnet' } as ModelConfig],
+      status: 'loaded',
+    });
+    await renderRequired(true);
+    expect(host.textContent).not.toContain('models.installAModel');
   });
 
   const renderPicker = async (props: Partial<Parameters<typeof ModelSelect>[0]> = {}) => {

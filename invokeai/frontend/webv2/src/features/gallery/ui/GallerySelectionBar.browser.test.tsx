@@ -7,9 +7,13 @@ import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
 import { patchGalleryItemCaches } from '@features/gallery/data/queryCache';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createWorkbenchStore } from '@workbench/workbenchStore';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
@@ -35,6 +39,7 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+const actions = { clearSelection: vi.fn<(...args: unknown[]) => void>() };
 const itemActions = {
   deleteItems: vi.fn(async () => {}),
   downloadItem: vi.fn(async () => {}),
@@ -51,6 +56,7 @@ const createBoard = (overrides: Partial<GalleryBoard> & Pick<GalleryBoard, 'id' 
   assetVideoCount: 0,
   imageCount: 0,
   kind: 'board',
+  isInbox: false,
   projectId: null,
   videoCount: 0,
   ...overrides,
@@ -82,6 +88,7 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     items: [createItem('a.png', false), createItem('b.png', true)],
+    listingBoardId: 'dogs',
     pendingPlaceholders: [],
     projectBoardId: null,
     searchTerm: '',
@@ -99,14 +106,20 @@ let queryClient = new QueryClient();
 
 const renderBar = async (
   gallery: GalleryStateView,
-  starredStrip: { items: GalleryItem[]; total: number } | null = null
+  starredStrip: { items: GalleryItem[]; total: number } | null = null,
+  /** Stands in for the grid beside the bar. */
+  grid: ReactNode = null
 ) => {
   const strip = starredStrip ?? EMPTY_GALLERY_STARRED_STRIP;
   const contextValue = {
+    actions,
     filter: { boardId: gallery.selectedBoardId, starred: gallery.starredOnly === true },
     gallery,
     itemActions,
     loadedItems: mergeGalleryLoadedItems(strip.items, gallery.items),
+    projectId: 'p1',
+    projectName: 'Mahogany House',
+    projectNames: new Map([['p2', 'Harbor Tower']]),
     starredStrip: strip,
   } as unknown as GalleryWidgetContextValue;
 
@@ -115,6 +128,7 @@ const renderBar = async (
       <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
           <GalleryWidgetContext value={contextValue}>
+            {grid}
             <GallerySelectionBar />
           </GalleryWidgetContext>
         </ChakraProvider>
@@ -146,6 +160,7 @@ beforeEach(() => {
   root = createRoot(host);
   queryClient = new QueryClient();
   Object.values(itemActions).forEach((mock) => mock.mockClear());
+  actions.clearSelection.mockReset();
 });
 
 afterEach(async () => {
@@ -208,27 +223,6 @@ describe('GallerySelectionBar', () => {
         { kind: 'image', name: 'never-loaded-2.png' },
       ],
       false
-    );
-  });
-
-  it('stars a selection carried into Starred-only from the unfiltered listing whose members no page has loaded', async () => {
-    await renderBar(
-      createGallery({
-        items: [createItem('a.png', true)],
-        selectedItemKey: 'image:a.png',
-        selectedItemKeys: ['image:a.png', 'image:selected-unfiltered.png'],
-        selectionStarredOnly: false,
-        starredOnly: true,
-      })
-    );
-    await click(getButton('widgets.gallery.starSelection'));
-
-    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
-      [
-        { kind: 'image', name: 'a.png' },
-        { kind: 'image', name: 'selected-unfiltered.png' },
-      ],
-      true
     );
   });
 
@@ -360,10 +354,69 @@ describe('GallerySelectionBar', () => {
       ],
       gallery.items
     );
-    expect(itemActions.deleteItems).toHaveBeenCalledWith([
-      { kind: 'image', name: 'a.png' },
-      { kind: 'image', name: 'b.png' },
-    ]);
+    expect(itemActions.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'a.png' },
+        { kind: 'image', name: 'b.png' },
+      ],
+      { targetsOffScreen: false }
+    );
+  });
+
+  it('says a deletion reaches items off screen when a member is on no loaded page', async () => {
+    await renderBar(createGallery({ items: [createItem('a.png', false)] }));
+    await click(getButton('widgets.gallery.deleteSelection'));
+
+    expect(itemActions.deleteItems).toHaveBeenCalledWith(expect.anything(), { targetsOffScreen: true });
+  });
+
+  it('clears the selection from the bar, from the keyboard, handing focus to the tile that was primary', async () => {
+    const store = createWorkbenchStore(createInitialWorkbenchState());
+    store.commands.gallery.setItemMultiSelection(['image:a.png', 'image:b.png'], createItem('b.png', true));
+    // The App adapter hands the workbench command over as is: it takes an optional project id.
+    actions.clearSelection.mockImplementation((...args: unknown[]) =>
+      store.commands.gallery.clearSelection(...(args as [string?]))
+    );
+    const grid = (
+      <div role="list">
+        <button data-gallery-item-key="image:a.png" tabIndex={-1} type="button">
+          a
+        </button>
+        <button data-gallery-item-key="image:b.png" tabIndex={0} type="button">
+          b
+        </button>
+      </div>
+    );
+
+    await renderBar(createGallery({ primarySelectedItemKey: 'image:a.png' }), null, grid);
+    getButton('widgets.gallery.commands.clearSelection').focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery')).toMatchObject({
+      selectedImage: null,
+      selectedImageNames: [],
+    });
+    expect(document.activeElement?.getAttribute('data-gallery-item-key')).toBe('image:a.png');
+  });
+
+  it("hands focus to the grid's tab stop when the primary item is not listed", async () => {
+    const grid = (
+      <div role="list">
+        <button data-gallery-item-key="image:a.png" tabIndex={-1} type="button">
+          a
+        </button>
+        <button data-gallery-item-key="image:b.png" tabIndex={0} type="button">
+          b
+        </button>
+      </div>
+    );
+
+    await renderBar(createGallery({ primarySelectedItemKey: 'image:elsewhere.png' }), null, grid);
+    getButton('widgets.gallery.commands.clearSelection').focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(actions.clearSelection).toHaveBeenCalledExactlyOnceWith();
+    expect(document.activeElement?.getAttribute('data-gallery-item-key')).toBe('image:b.png');
   });
 
   it('offers only boards worth moving to — never a date board, an archived board, or where the items already are', async () => {
@@ -374,11 +427,70 @@ describe('GallerySelectionBar', () => {
       (element) => element.textContent
     );
 
-    expect(labels).toEqual(['Cats', 'Uncategorized']);
+    // Uncategorized is the move out of a board, not a board.
+    expect(labels).toEqual(['widgets.gallery.removeFromBoard', 'Cats']);
+  });
+
+  it('offers no move out of a board for items that are on none', async () => {
+    await renderBar(
+      createGallery({
+        items: [
+          { ...createItem('a.png', false), boardId: 'none' },
+          { ...createItem('b.png', true), boardId: 'none' },
+        ],
+        listingBoardId: 'none',
+        selectedBoardId: 'none',
+      })
+    );
+    await click(getButton('widgets.gallery.moveSelectionToBoard'));
+
+    const labels = Array.from(document.querySelectorAll('[data-part="item-text"]')).map(
+      (element) => element.textContent
+    );
+
+    expect(labels).toEqual(['dogs', 'Cats']);
+  });
+
+  it('groups move targets by the open project, the Library and other projects', async () => {
+    await renderBar(
+      createGallery({
+        boards: [
+          createBoard({ id: 'dogs', name: 'dogs' }),
+          createBoard({ id: 'theirs-member', name: 'Stripes', projectId: 'p2' }),
+          createBoard({ id: 'mine-member', name: 'Façades', projectId: 'p1' }),
+          createBoard({ id: 'mine', isInbox: true, name: 'Mahogany House', projectId: 'p1' }),
+          createBoard({ id: 'cats', name: 'Cats' }),
+        ],
+      })
+    );
+    await click(getButton('widgets.gallery.moveSelectionToBoard'));
+
+    const groups = Array.from(
+      document.querySelectorAll<HTMLElement>('[data-scope="menu"] [data-part="item-group"]')
+    ).map((group) => [
+      group.querySelector('[data-part="item-group-label"]')?.textContent,
+      Array.from(group.querySelectorAll('[data-part="item-text"]')).map((element) => element.textContent),
+    ]);
+
+    expect(groups).toEqual([
+      ['Mahogany House', ['widgets.gallery.inbox', 'Façades']],
+      ['widgets.gallery.boardGroups.library', ['Cats']],
+      ['Harbor Tower', ['Stripes']],
+    ]);
   });
 
   it('disables the move control when there is nowhere to move to', async () => {
-    await renderBar(createGallery({ boards: [createBoard({ id: 'dogs', name: 'dogs' })] }));
+    await renderBar(
+      createGallery({
+        boards: [createBoard({ id: 'none', kind: 'uncategorized', name: '' })],
+        items: [
+          { ...createItem('a.png', false), boardId: 'none' },
+          { ...createItem('b.png', true), boardId: 'none' },
+        ],
+        listingBoardId: 'none',
+        selectedBoardId: 'none',
+      })
+    );
 
     expect(getButton('widgets.gallery.moveSelectionToBoard').disabled).toBe(true);
   });

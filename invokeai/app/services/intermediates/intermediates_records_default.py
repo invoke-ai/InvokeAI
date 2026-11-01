@@ -306,7 +306,7 @@ class IntermediatesRecords:
         return self._queries.run(summarize, read_only=True)
 
     def get_projects(self, user_id: Optional[str]) -> dict[tuple[str, str], tuple[str, Optional[str]]]:
-        """Maps (owner, project) to (name, cover image): the newest durable image on the project's board."""
+        """Maps (owner, project) to (name, cover image): the newest durable image on any of the project's boards."""
         return {
             (owner, project_id): (name, cover)
             for owner, project_id, name, cover in self._queries.intermediates.projects(user_id)
@@ -449,7 +449,7 @@ class IntermediatesRecords:
         """Names of the referencing documents, one query per kind; client state has none."""
         wanted: dict[str, set[ReferenceOwner]] = defaultdict(set)
         for owner in owners:
-            if owner.owner_kind in ("project", "quarantined_project", "workflow"):
+            if owner.owner_kind in ("project", "project_workspace", "quarantined_project", "workflow"):
                 wanted[owner.owner_kind].add(owner)
 
         def names(q: Queries) -> dict[ReferenceOwner, str]:
@@ -462,7 +462,8 @@ class IntermediatesRecords:
                     if name is not None
                 }
                 for owner in kind_owners:
-                    name = named.get((None if owner_kind == "workflow" else owner.user_id, owner.owner_id))
+                    unowned = owner_kind in ("workflow", "project_workspace")
+                    name = named.get((None if unowned else owner.user_id, owner.owner_id))
                     if name is not None:
                         found[owner] = name
             return found

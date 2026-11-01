@@ -21,7 +21,7 @@ import { absolutizeApiUrl, ApiError } from '@platform/transport/http';
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
-import { PaletteSearchUnavailableError } from './entries';
+import { createTermsMatcher, PaletteSearchUnavailableError } from './entries';
 import { getObjectIdentity } from './objectIdentity';
 
 /** Factories receive host-owned workbench callbacks; extension searches adapt to the same provider contract. */
@@ -34,16 +34,6 @@ const PROVIDER_PAGE_SIZE = 8;
  */
 const loadActiveBoards = (): Promise<GalleryBoard[]> =>
   queryClient.fetchQuery(galleryBoardsOptions({ includeArchived: false }));
-
-const createTermsMatcher = (query: string): ((haystack: string) => boolean) => {
-  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-
-  return (haystack) => {
-    const lower = haystack.toLowerCase();
-
-    return terms.every((term) => lower.includes(term));
-  };
-};
 
 export const createWorkflowsProvider = ({
   openWorkflowWidget,
@@ -174,15 +164,16 @@ export const createPromptHistoryProvider = ({
   },
 });
 
+/** Picking a model switches Generate to it the way the model picker does, then opens the widget. */
 export const createModelsProvider = ({
-  applyModel,
   openGenerateWidget,
   openModelManager,
+  selectModel,
   t,
 }: {
-  applyModel: (model: GenerateModelConfig, models: readonly ModelConfig[]) => void;
   openGenerateWidget: () => void;
   openModelManager: () => void;
+  selectModel: (model: GenerateModelConfig, models: readonly ModelConfig[]) => void;
   t: TFunction;
 }): PaletteSearchProvider => ({
   contextKey: 'global',
@@ -206,7 +197,7 @@ export const createModelsProvider = ({
         isPersistentRecent: false,
         keywords: model.base,
         run: () => {
-          applyModel(model, models);
+          selectModel(model, models);
           openGenerateWidget();
         },
         secondary: { label: t('commandPalette.actions.openModelManager'), run: openModelManager },

@@ -4,8 +4,10 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
@@ -13,6 +15,7 @@ import { page } from 'vitest/browser';
 const workbench = vi.hoisted(() => ({
   galleryValues: {} as Record<string, unknown>,
   patchValues: vi.fn(),
+  updateGallerySettings: vi.fn(),
 }));
 
 const recovery = vi.hoisted(() => ({ status: vi.fn(), points: vi.fn() }));
@@ -28,7 +31,10 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   // setting that is a number or null makes the widget act on a value it could never be given in production.
   useWidgetValuesSelector: (widgetId: string, select: (values: Record<string, unknown>) => unknown) =>
     select(widgetId === 'gallery' ? workbench.galleryValues : {}),
-  useWorkbenchCommands: () => ({ widgets: { patchValues: workbench.patchValues } }),
+  useWorkbenchCommands: () => ({
+    gallery: { updateSettings: workbench.updateGallerySettings },
+    widgets: { patchValues: workbench.patchValues },
+  }),
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: {} }) }),
 }));
 vi.mock('@workbench/widgetState', async (importOriginal) => ({
@@ -61,11 +67,17 @@ const models = vi.hoisted(() => {
         return () => listeners.delete(listener);
       },
     },
+    canManageAppConfig: true,
     canManageModels: true,
     ensureStartersLoaded: vi.fn(),
     openAddModelsSearch: vi.fn(),
   };
 });
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useCapabilities: () => ({ canManageAppConfig: models.canManageAppConfig, canManageModels: models.canManageModels }),
+}));
 
 vi.mock('@features/models', async (importOriginal) => {
   const { useSyncExternalStore } = await import('react');
@@ -113,13 +125,27 @@ vi.mock('@workbench/image-map/imageMapStore', async (importOriginal) => {
     refreshImageIndexStatus: vi.fn(),
     refreshImageMapPoints: vi.fn(),
     setClusterLabelsEnabled: vi.fn(),
+    setImageMapMediaKind: vi.fn(),
   };
 });
 
 import { registerImageCluster } from '@features/gallery/contracts';
-import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from '@workbench/image-map/imageMapStore';
+import {
+  ensureImageMapLoaded,
+  imageMapStore,
+  refreshImageIndexStatus,
+  refreshImageMapPoints,
+  setImageMapMediaKind,
+} from '@workbench/image-map/imageMapStore';
 
 import { ImageMapWidgetView } from './ImageMapWidgetView';
+
+// The components read the global instance; give it the English catalog.
+await i18next.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -209,6 +235,7 @@ beforeEach(() => {
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
+  models.canManageAppConfig = true;
   models.canManageModels = true;
   host = document.createElement('div');
   document.body.append(host);
@@ -256,6 +283,84 @@ describe('Image Map unavailable states', () => {
       expect(buttonLabels()).toEqual(['Retry']);
     }
   );
+});
+
+describe('Image Map for a session that cannot change the server', () => {
+  it('says whom to ask instead of naming a configuration file', async () => {
+    models.canManageAppConfig = false;
+    await renderState('disabled');
+
+    expect(host?.textContent).toContain('Image indexing is off');
+    expect(host?.textContent).toContain('Ask an administrator to turn it on.');
+    expect(host?.textContent).not.toContain('image_index_enabled');
+  });
+});
+
+describe('Image Map media filter', () => {
+  it('says the shared media filter emptied the map and offers to show both kinds', async () => {
+    workbench.galleryValues = { mediaFilter: 'video' };
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      clusterLabelsEps: null,
+      clusterLabelsHash: null,
+      data: { ...dataFor('disabled'), state: 'empty' },
+      error: null,
+      indexCounts: null,
+      indexUpdatedAt: null,
+      loadState: 'loaded',
+      renderError: null,
+    });
+
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageMapWidgetView {...viewProps} />
+        </ChakraProvider>
+      )
+    );
+
+    expect(host?.textContent).toContain('No videos to map');
+    expect(host?.textContent).not.toContain('Nothing to map yet');
+
+    // The header's trigger, which the frame renders outside the view.
+    const trigger = document.createElement('button');
+    trigger.id = 'image-map-media-filter-trigger';
+    document.body.append(trigger);
+
+    await page.getByRole('button', { name: 'Show all media' }).click();
+
+    expect(workbench.updateGallerySettings).toHaveBeenCalledExactlyOnceWith({ mediaFilter: 'all' });
+    expect(document.activeElement).toBe(trigger);
+    trigger.remove();
+  });
+
+  it('pushes the shared media filter into the store before the first load', async () => {
+    workbench.galleryValues = { mediaFilter: 'video' };
+    imageMapStore.setSnapshot({
+      clusterLabels: null,
+      clusterLabelsEps: null,
+      clusterLabelsHash: null,
+      data: null,
+      error: null,
+      indexCounts: null,
+      indexUpdatedAt: null,
+      loadState: 'idle',
+      renderError: null,
+    });
+
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ImageMapWidgetView {...viewProps} />
+        </ChakraProvider>
+      )
+    );
+
+    expect(setImageMapMediaKind).toHaveBeenCalledWith('video');
+    expect(vi.mocked(setImageMapMediaKind).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(ensureImageMapLoaded).mock.invocationCallOrder[0]!
+    );
+  });
 });
 
 describe('Image Map missing-model link', () => {
@@ -325,8 +430,9 @@ describe('Image Map missing-model link', () => {
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
     expect(host?.textContent).toContain(
-      'install the image encoder model DFN2B-CLIP-ViT-L-14-39B from the Model Manager'
+      'Image indexing needs the image encoder model DFN2B-CLIP-ViT-L-14-39B. Ask an administrator to install it.'
     );
+    expect(host?.textContent).not.toContain('Model Manager');
     expect(buttonLabels()).toEqual(['Check again']);
   });
 

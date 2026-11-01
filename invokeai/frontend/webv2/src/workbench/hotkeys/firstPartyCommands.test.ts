@@ -24,7 +24,7 @@ describe('first-party hotkey commands', () => {
     });
   });
 
-  it('registers handlers for implemented app and shared image recall commands', () => {
+  it('registers handlers for every app and shared image recall command', () => {
     const sharedImageRecallCommands = new Set([
       'gallery.remix',
       'viewer.loadWorkflow',
@@ -36,7 +36,6 @@ describe('first-party hotkey commands', () => {
     ]);
     const expectedCentralCommands = new Set(
       firstPartyHotkeyCatalog
-        .filter((hotkey) => hotkey.implemented !== false)
         .filter((hotkey) => hotkey.category === 'app' || sharedImageRecallCommands.has(hotkey.commandId))
         .map((hotkey) => hotkey.commandId)
     );

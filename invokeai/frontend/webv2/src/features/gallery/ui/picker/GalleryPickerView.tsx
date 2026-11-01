@@ -8,7 +8,7 @@ import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core
 import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
-import { GalleryAnnouncer, GalleryLoadErrorState, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
+import { GalleryAnnouncer, GalleryLoadNotice } from '@features/gallery/ui/GalleryLoadError';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
 import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
@@ -18,7 +18,9 @@ import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
 import { isImeComposing } from '@platform/browser/imeComposition';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { LoadError } from '@platform/ui/LoadError';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -41,7 +43,7 @@ import {
 } from './galleryPicker';
 import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPickerBoards';
 import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
-import { useGalleryPickerScope } from './useGalleryPickerScope';
+import { useGalleryPickerScope, type GalleryPickerOpeningScope } from './useGalleryPickerScope';
 
 const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
@@ -64,21 +66,23 @@ const haveSameSlots = (left: GallerySparseListing | null, right: GallerySparseLi
 
 export const GalleryPickerView = ({
   accept,
+  openingScope,
   searchInputRef,
   selection,
   onClose,
   onPick,
 }: {
   accept: GalleryPickerAccept;
+  openingScope?: GalleryPickerOpeningScope;
   searchInputRef: RefObject<HTMLInputElement | null>;
   selection: GalleryPickerSelection;
   onClose: () => void;
   onPick: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
-  const { galleryValues, projectName, revealInGallery } = useGalleryHost();
+  const { galleryValues, projectId = null, projectName, projects, revealInGallery } = useGalleryHost();
   const { data, gallerySelectedItem, scope, selectBoard, setSearchTerm, setView, settings, togglePane } =
-    useGalleryPickerScope();
+    useGalleryPickerScope(openingScope);
   const idBase = useId();
   const listboxId = `${idBase}-options`;
   const boardsId = `${idBase}-boards`;
@@ -249,7 +253,8 @@ export const GalleryPickerView = ({
     const groups = getGalleryBoardGroups({
       boards: data.boards,
       projectBoardId: getGalleryProjectBoardId(galleryValues),
-      projectName,
+      projectId,
+      projectNames: new Map((projects ?? []).map((project) => [project.id, project.name])),
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
@@ -257,16 +262,25 @@ export const GalleryPickerView = ({
       showOtherProjects: true,
       t,
     });
-
     return [
-      { boards: groups.yourBoards, id: 'boards', label: t('widgets.gallery.boardGroups.boards') },
+      { boards: groups.projectBoards, id: 'project', label: projectName },
+      { boards: groups.libraryBoards, id: 'library', label: t('widgets.gallery.boardGroups.library') },
+      ...groups.otherProjects.map((group) => ({
+        boards: group.boards,
+        id: `project:${group.projectId}`,
+        label: group.label,
+      })),
+      { boards: groups.sharedBoards, id: 'shared', label: t('widgets.gallery.boardGroups.shared') },
+      { boards: groups.otherUsersBoards, id: 'other-users', label: t('widgets.gallery.boardGroups.otherUsers') },
       { boards: groups.dateBoards, id: 'dates', label: t('widgets.gallery.boardGroups.byDate') },
       { boards: groups.archivedBoards, id: 'archived', label: t('common.archived') },
     ].filter((group) => group.boards.length > 0);
   }, [
     data.boards,
     galleryValues,
+    projectId,
     projectName,
+    projects,
     scope.searchTerm,
     settings.showArchivedBoards,
     settings.showDateBoards,
@@ -422,8 +436,6 @@ export const GalleryPickerView = ({
         accept,
         activeItem,
         isSearching,
-        isWindowTruncated: data.isWindowTruncated,
-        loadedCount: itemSlots.size,
         pane: scope.pane,
         remaining: getGalleryPickerRemaining(accept, selection),
         total,
@@ -530,11 +542,16 @@ export const GalleryPickerView = ({
         role="tabpanel"
       >
         {scope.pane === 'boards' && isBoardListUnavailable ? (
-          <GalleryLoadErrorState
-            read={data.boardsState}
+          <LoadError
+            detail={data.boardsState.error ? getApiErrorMessage(data.boardsState.error, '') : null}
+            flex="1"
+            isRetrying={data.boardsState.isRetrying}
+            layout="state"
+            message={t('widgets.gallery.boardsLoadFailed')}
+            py="6"
             retryLabel={t('widgets.gallery.retryLoadingBoards')}
-            title={t('widgets.gallery.boardsLoadFailed')}
             onFocusLost={focusSearch}
+            onRetry={data.boardsState.retry}
           />
         ) : scope.pane === 'boards' ? (
           <GalleryPickerBoards
@@ -550,11 +567,16 @@ export const GalleryPickerView = ({
             onSelect={handleSelectBoard}
           />
         ) : data.listing.status === 'error' ? (
-          <GalleryLoadErrorState
-            read={data.listing}
+          <LoadError
+            detail={data.listing.error ? getApiErrorMessage(data.listing.error, '') : null}
+            flex="1"
+            isRetrying={data.listing.isRetrying}
+            layout="state"
+            message={t('widgets.gallery.listingLoadFailed')}
+            py="6"
             retryLabel={t('widgets.gallery.retryLoadingItems')}
-            title={t('widgets.gallery.listingLoadFailed')}
             onFocusLost={focusSearch}
+            onRetry={data.listing.retry}
           />
         ) : showsGrid ? (
           <GalleryPickerGrid

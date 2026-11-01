@@ -4,6 +4,7 @@ import type { ElementType } from 'react';
 
 import { Box, Flex, HStack, Icon, Input, InputGroup, Spinner, Stack, Text } from '@chakra-ui/react';
 import { collectBases, collectTypes } from '@features/models/core/library';
+import { isInModelsDir } from '@features/models/core/schemas';
 import {
   DEFAULT_STARTER_MODEL_FILTERS,
   filterStarterModels,
@@ -14,13 +15,15 @@ import {
   ensureExternalProvidersLoaded,
   useExternalProvidersSelector,
 } from '@features/models/data/externalProvidersStore';
+import { useModelsSelector } from '@features/models/data/modelsStore';
 import { ensureStartersLoaded, useStartersSelector } from '@features/models/data/startersStore';
+import { useModelsUi } from '@features/models/ui/ModelsUiContext';
 import {
-  clearAddModelsSeeds,
-  getAddModelsSeed,
+  clearAddModelsTypeSeed,
   getAddModelsTypeSeed,
   openExternalProviderKeys,
   openModelManagerTab,
+  setAddModelsQuery,
   updateModelsUi,
   useModelsUiSelector,
 } from '@features/models/ui/uiStore';
@@ -73,23 +76,27 @@ export const AddModelsView = () => {
   const loadError = useStartersSelector((snapshot) => snapshot.error);
   const response = useStartersSelector((snapshot) => snapshot.response);
   const status = useStartersSelector((snapshot) => snapshot.status);
-  const { hfLookup, scan, selectedBundleName } = useModelsUiSelector(
+  const { hfLookup, query, scan, selectedBundleName } = useModelsUiSelector(
     (snapshot) => ({
       hfLookup: snapshot.hfLookup,
+      query: snapshot.addModelsQuery,
       scan: snapshot.scan,
       selectedBundleName: snapshot.selectedBundleName,
     }),
     (left, right) =>
       left.hfLookup === right.hfLookup &&
+      left.query === right.query &&
       left.scan === right.scan &&
       left.selectedBundleName === right.selectedBundleName
   );
 
-  // Read the one-shot seed purely for StrictMode initialization; consume it after mount and keep subsequent input
-  // state local.
-  const [query, setQuery] = useState(getAddModelsSeed);
   const [accessToken, setAccessToken] = useState('');
-  const [inplace, setInplace] = useState(true);
+  // The account's last choice; a source inside the models folder is forced in place without changing it.
+  const { installInPlace: inplace, setInstallInPlace: setInplace } = useModelsUi();
+  const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
+  // Sources in the models folder always install in place; otherwise the install would move their files into a new
+  // managed folder within it.
+  const inplaceFor = (source: string) => inplace || isInModelsDir(source, modelsDir);
   const [fp8Storage, setFp8Storage] = useState(false);
   const { isBusy: isPulling, run: runPull } = useScopedAction();
   const { isBusy: isScanning, run: runScan } = useScopedAction();
@@ -114,8 +121,8 @@ export const AddModelsView = () => {
   });
 
   useMountEffect(() => {
-    // One-shot: a seed only ever fills the view it was opened with.
-    clearAddModelsSeeds();
+    // One-shot: a type seed only ever fills the view it was opened with.
+    clearAddModelsTypeSeed();
     ensureStartersLoaded();
 
     const owner = captureAccountScope();
@@ -232,7 +239,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: trimmed })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -254,7 +261,7 @@ export const AddModelsView = () => {
               (await install({ accessToken: token, config: installConfig, source: onlyUrl })) &&
               isAccountScopeCurrent(owner)
             ) {
-              setQuery('');
+              setAddModelsQuery('');
             }
 
             return;
@@ -269,12 +276,12 @@ export const AddModelsView = () => {
           (await install({
             accessToken: token,
             config: installConfig,
-            inplace: kind.looksLocal ? inplace : undefined,
+            inplace: kind.looksLocal ? inplaceFor(trimmed) : undefined,
             source: trimmed,
           })) &&
           isAccountScopeCurrent(owner)
         ) {
-          setQuery('');
+          setAddModelsQuery('');
         }
       },
       (message) => notify.error(t('models.installFailed'), message)
@@ -328,7 +335,7 @@ export const AddModelsView = () => {
               placeholder={t('models.searchOrAddPlaceholder')}
               size="lg"
               value={query}
-              onChange={(event) => setQuery(event.currentTarget.value)}
+              onChange={(event) => setAddModelsQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
                 if (event.key !== 'Enter') {
                   return;
@@ -398,6 +405,7 @@ export const AddModelsView = () => {
               <InstallOptions
                 fp8Storage={fp8Storage}
                 inplace={kind.localKind === 'file' ? inplace : undefined}
+                inplaceLocked={kind.localKind === 'file' && isInModelsDir(trimmed, modelsDir)}
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}
               />
@@ -468,12 +476,18 @@ export const AddModelsView = () => {
               <ScanResults
                 fp8Storage={fp8Storage}
                 inplace={inplace}
+                // Results carry resolved paths, so a symlinked spelling of the folder still locks.
+                inplaceLocked={
+                  scan.results.length > 0 && scan.results.every((result) => isInModelsDir(result.path, modelsDir))
+                }
                 pendingSources={pendingSources}
                 scan={scan}
                 onClear={() => updateModelsUi({ scan: null })}
-                onInstall={(path) => void install({ config: installConfig, inplace, source: path })}
+                onInstall={(path) => void install({ config: installConfig, inplace: inplaceFor(path), source: path })}
                 onInstallAll={(paths) =>
-                  void installAllSources(paths.map((path) => ({ config: installConfig, inplace, source: path })))
+                  void installAllSources(
+                    paths.map((path) => ({ config: installConfig, inplace: inplaceFor(path), source: path }))
+                  )
                 }
                 onSetFp8Storage={setFp8Storage}
                 onSetInplace={setInplace}

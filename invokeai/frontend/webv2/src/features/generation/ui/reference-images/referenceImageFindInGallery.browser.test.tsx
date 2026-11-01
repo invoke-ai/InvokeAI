@@ -20,7 +20,7 @@ await i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           gallery: { findNamedInGallery: 'Find {{name}} in Gallery' },
-          generate: { referenceImage: 'Reference Image' },
+          generate: { referenceImageNumbered: 'Reference image {{index}}' },
         },
       },
     },

@@ -1,7 +1,7 @@
 ---
 title: Gallery Reference
 description: Details of the Gallery — the board menu, archiving, downloading and deleting boards, the media menu, Gallery settings and keyboard shortcuts.
-lastUpdated: 2026-10-05
+lastUpdated: 2026-10-15
 sidebar:
   order: 2
 ---
@@ -20,15 +20,19 @@ This page describes the Gallery's menus, settings and shortcuts in detail. For a
 
 Hover over a board and click its **⋮** button, or right-click it, to open its menu:
 
-<Image src={boardMenu} alt="The board menu with Auto-add to this board, Download Board, Rename board, Archive Board and Delete Board." width={420} />
+<Image src={boardMenu} alt="The board menu with Save new results here, Download board, Rename board, Archive board and Delete board." width={420} />
 
-* **Auto-add to this board** — makes this the board that receives new results, marked **Auto**, whichever board is selected. On the auto-add board, the item is **Stop auto-adding here**, which goes back to sending results to the selected board. Not offered for date boards or archived boards. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
+* **Save new results here** — makes this the board that receives new results, marked with a crosshair-style icon in the board list, whichever board you are viewing; it also turns off **Follow the selected board**. On that board, the item is **Stop saving new results here**, which sends results back to the project's Inbox. Not offered for the Inbox itself, date boards, archived boards or boards you can only view. See [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes).
 * **Download Board** — downloads the board (see [below](#downloading-a-board)).
 * **Rename board** — opens a dialog to change the name.
+* **Access** — on a multi-user installation, who else can open the board: **Restricted**, **Everyone can view** or **Everyone can contribute**. Only the board's owner and administrators see it. See [Image Boards](/configuration/multi-user-mode/user-guide/#image-boards).
+* **Move to…** — moves one of your own boards to the **Library**, into the open project, or into one of your other projects, which the menu lists under **Projects**; an administrator cannot move another person's boards. A board keeps its general access when it moves. You can also drag your board onto another group: the open project's, the **Library**, or one of your projects under **Other projects**. When the board's new project is hidden because **Other projects' boards** is off: if it was the selected board, the Gallery selects **Uncategorized**; if new results went to it, they go to the project's Inbox again.
 * **Archive Board** / **Unarchive Board** — see [below](#archiving-a-board).
 * **Delete Board** — see [below](#deleting-a-board).
 
-Project boards are managed through their project: their menu has **Export project (.invk)**, **Auto-add to this board** and **Download Board** instead, and renaming the project renames its board. **Uncategorized** offers only **Auto-add to this board** and **Download Board**, and date boards have no menu. If the auto-add board is deleted, results go back to following the selected board.
+On a board someone else owns, the menu starts with whose board it is and what you can do there, and it offers only what your role allows. A viewer can download the board; a contributor can also make it where new results go; an editor can also rename and archive it. Only the owner and administrators share or delete it, and only the owner moves it between the Library and their projects.
+
+A project's **Inbox** is managed through its project: its menu has **Export project (.invk)** and **Download Board** instead, and renaming the project renames it. **Uncategorized** offers only **Save new results here** and **Download Board**, and date boards have no menu. If the board new results go to is deleted or archived, they go back to the project's Inbox. The same happens when you open a project after a board it used was deleted elsewhere — in another tab, or together with a project deleted from the Launchpad — or after you lost access to it: the project stops selecting it, saving new results to it and sending queued results to it.
 
 ### Archiving a board
 
@@ -42,18 +46,16 @@ Archived boards are not included in [semantic search](/users-guide/gallery/intro
 
 ### Deleting a board
 
-Choose **Delete Board** from the board's menu. The confirmation dialog shows how many images, videos and uploads the board holds, and offers two choices:
+Choose **Delete board** from the board's menu. The confirmation dialog says what the board holds, such as **98 images and 1 video**, and that deleting the board keeps it: its media moves to **Uncategorized** in the Library.
 
-<Image src={deleteBoard} alt="The Delete board dialog with Cancel, Delete Board Only and Delete Board and Media buttons." width={500} />
+<Image src={deleteBoard} alt="The Delete board dialog with the media it holds, the Also permanently delete its items checkbox, and Cancel and Delete board buttons." width={500} />
 
-* **Delete Board Only** — removes the board and moves everything on it to **Uncategorized**.
-* **Delete Board and Media** — removes the board and **permanently deletes** its images and videos.
+* **Delete board** — removes the board and moves everything on it to **Uncategorized**. This is the default.
+* **Also permanently delete its items** — tick it to delete the board's images and videos with it; the button then says how many, such as **Delete board and 99 items**. For a board with 50 items or more, you also type the board's name to confirm.
 
-:::danger
-**Delete Board and Media** cannot be undone.
-:::
+A deleted board cannot be restored, and deleted media cannot be undone. While media is being deleted, a notice says so; when it finishes, another says what was moved or deleted, and how much could not be deleted, if any.
 
-Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. Project boards cannot be deleted from the Gallery; delete the project instead.
+Queued or running jobs that were sending results to the deleted board send them to **Uncategorized** instead. A project's Inbox cannot be deleted from the Gallery; delete the project instead, which also asks what to do with the project's other boards.
 
 On a multi-user installation, only a board's owner or an administrator can delete it. When an owner deletes a shared board with its media, only their own media is deleted and other people's items move to Uncategorized; an administrator's deletion removes everything. If some files cannot be removed, those items are kept in Uncategorized and a warning says how many.
 
@@ -61,18 +63,20 @@ On a multi-user installation, only a board's owner or an administrator can delet
 
 Right-click an item, or several selected items, for its menu.
 
-<Image src={imageMenu} alt="The context menu for an image, with quick-action icons at the top followed by Load Workflow, Recall Metadata, Add to Current Canvas, New Project from Image, Send to Upscale, Send to Video, Use as Reference Image, Use as Prompt Template, Select for Compare, Find in Gallery, Change Board and Delete Image." width={420} />
+<Image src={imageMenu} alt="The context menu for an image: quick-action icons at the top, then Load workflow; under Continue working, Edit on Canvas, Upscale, Send to Video, Add to Canvas as… and New project from image; under Use image as, Use as reference image, Use as control and Use as prompt template; then Reuse from image, Select for compare, Generate PBR maps, Find in Gallery, Move to board and Delete image." width={420} />
 
 For an image, the menu offers:
 
 * **Quick actions** (the icons at the top) — open in a new tab, copy to the clipboard, download, open in the Preview, and star.
-* **Load Workflow** and **Recall Metadata** — restore the workflow or the settings that made the image. Recall Metadata includes **Recall All**, **Remix Image**, **Use Prompt**, **Use Seed**, **Use Size** and **Use CLIP Skip**; see [Resetting to defaults](/users-guide/image-generation/generate-panel/#resetting-to-defaults). These are unavailable for images without generation metadata.
-* **Add to Current Canvas** — add the image to the open project's canvas as a new layer of the kind you choose.
-* **New Project from Image** — start a new project whose canvas holds the image, sized to fit it.
-* **Send to Upscale**, **Send to Video**, **Use as Reference Image**, **Use as Prompt Template** and **Select for Compare** — use the image elsewhere in InvokeAI.
-* **Change Board** and **Delete Image**.
+* **Load workflow** — open the workflow that made the image. Unavailable for images without one.
+* **Continue working** — **Edit on Canvas** adds the image to the open project's canvas as an image layer and opens Canvas; **Upscale** sends it to the Upscale panel or upscales it at once; **Send to Video** uses it as the first frame in the Video panel; **Add to Canvas as…** adds it as a layer of the kind you choose; **New project from image** starts a new project whose canvas holds the image, sized to fit it.
+* **Use image as** — **Use as reference image**, **Use as control** and **Use as prompt template**. Its **Reuse from image** submenu restores the settings that made the image: **Remix image**, **All settings**, **Use prompt**, **Use seed**, **Use size** and **Use CLIP skip**; see [Resetting to defaults](/users-guide/image-generation/generate-panel/#resetting-to-defaults). Settings an image does not record are unavailable.
+* **Select for compare** — compare the image with the selected one; **Alt**-click (**Option**-click on macOS) on a thumbnail does the same.
+* **Generate PBR maps** — queue normal, roughness and displacement maps of the image. They are saved to the board new results go to, or to the project's Inbox if you can't add to that board (Uncategorized when there is neither), and a notice reports when they are ready. The first run downloads the PBR models.
+* **Find in Gallery** — select the image in its own board and scroll the grid to it, clearing a search or filter that would hide it.
+* **Move to board** and **Delete image**.
 
-A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as Reference Video** and **Use as Conditioning Clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star All**, **Download Selection**, **Change Board** and **Delete Selection**; for several images it also leads with **Add to Current Canvas** and **New Project from Images**.
+A video's menu has the equivalent actions for video, including **Extend in Video**, **Use as reference video** and **Use as conditioning clip**. With several items selected, the menu offers the actions that apply to all of them, such as **Star selection**, **Download selection**, **Move to board** and **Delete selection**; for several images it also leads with **Add to Canvas as…** and **New project from images**.
 
 Every image generated by InvokeAI also stores its generation metadata inside the file, so the prompt and settings travel with it when you download it.
 
@@ -88,7 +92,7 @@ The gear button in the Gallery header opens its settings:
 * **Show in-progress section** — shows generations that are still running at the top of the grid.
 * **Pagination** — **Infinite** scrolling or numbered **Pages**.
 
-**All Gallery settings…** at the bottom opens the full settings. They also include **Send new results to the selected board** (under **Destination**), which is on by default; turn it off to keep sending results to the current destination board, which then becomes the **Auto** board. The full settings also include the sort order and the board visibility and sorting options from the [Filter & sort boards](/users-guide/gallery/introduction/#finding-filtering-and-sorting-boards) menu. All Gallery settings are saved with the project.
+**All Gallery settings…** at the bottom opens the full settings. They also include **Middle-click opens media in a new tab** (under **Thumbnails**), off by default, which makes a middle click on an image or video tile open it in a new browser tab, and **Follow the selected board** (under **Destination**), off by default; turn it on to send new results to whichever board the Gallery shows, instead of the board named under **Saving to**. The full settings also include the sort order and the board visibility and sorting options from the [Filter & sort boards](/users-guide/gallery/introduction/#finding-filtering-and-sorting-boards) menu. All Gallery settings are saved with the project.
 
 ## Keyboard shortcuts
 
@@ -100,10 +104,18 @@ These work while the Gallery has focus:
 | **Enter** / double-click | Open the item in the Preview |
 | **Shift**-click / **Ctrl**-click | Select a range / add or remove an item |
 | **Ctrl+A** | Select everything loaded on the page |
-| **Escape** | Clear the selection |
 | **.** (period) | Star or unstar the selection |
 | **Delete** / **Backspace** | Delete the selection |
+| **A** | Recall all of the selected image's settings |
 | **R** | Remix the selected image: recall its settings, except the seed |
+| **P** | Recall the selected image's prompts |
+| **S** | Recall the selected image's seed |
+| **D** | Use the selected image's size |
+| **W** | Load the workflow saved with the selected image |
+
+**A**, **R**, **P**, **S**, **D** and **W** also work while the Preview has focus.
+
+Clearing the selection has no shortcut by default: click the **×** after the item's name in the Preview's title, or assign a key to **Clear gallery selection** in [Keyboard shortcuts](/users-guide/workbench/hotkeys/).
 
 On macOS, use **Cmd** in place of **Ctrl**. See [Hotkeys](/users-guide/workbench/hotkeys/) for all shortcuts.
 

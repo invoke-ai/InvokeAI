@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from queue import Empty, PriorityQueue
 from shutil import disk_usage
-from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Set
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, NoReturn, Optional, Set
 from urllib.parse import urljoin, urlparse
 
 import requests
@@ -18,6 +18,7 @@ from tqdm import tqdm
 
 from invokeai.app.services.config import InvokeAIAppConfig, get_config
 from invokeai.app.services.download.download_base import (
+    RESUME_REFUSED_MESSAGE,
     DownloadEventHandler,
     DownloadExceptionHandler,
     DownloadJob,
@@ -28,6 +29,7 @@ from invokeai.app.services.download.download_base import (
     MultiFileDownloadJob,
     ServiceInactiveException,
     UnknownJobIDException,
+    in_progress_path,
 )
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.app.util.ssrf import (
@@ -44,6 +46,9 @@ if TYPE_CHECKING:
 
 # Maximum number of bytes to download during each call to requests.iter_content()
 DOWNLOAD_CHUNK_SIZE = 100000
+
+# How long an idle worker blocks on the queue before rechecking the stop event, which bounds how long stop() waits.
+_QUEUE_POLL_SECONDS = 1.0
 
 
 class DownloadQueueService(DownloadQueueServiceBase):
@@ -389,7 +394,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 done = True
                 continue
             try:
-                job = self._queue.get(timeout=1)
+                job = self._queue.get(timeout=_QUEUE_POLL_SECONDS)
             except Empty:
                 continue
             try:
@@ -422,81 +427,27 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         url = job.canonical_url or str(job.source)
         header = {"Authorization": f"Bearer {job.access_token}"} if job.access_token else {}
-        had_resume_metadata = bool(job.etag or job.last_modified)
         open_mode = "wb"
         resume_from = 0
 
-        if not job.dest.is_dir():
-            job.download_path = job.dest
-            in_progress_path = self._in_progress_path(job.download_path)
-            if in_progress_path.exists():
-                resume_from = in_progress_path.stat().st_size
-                job.bytes = resume_from
-                self._logger.debug(
-                    f"Resume check: in-progress file found at {in_progress_path} size={resume_from} bytes"
-                )
-                if resume_from > 0:
-                    if job.etag:
-                        header["If-Range"] = job.etag
-                    elif job.last_modified:
-                        header["If-Range"] = job.last_modified
-                    header["Range"] = f"bytes={resume_from}-"
-                    open_mode = "ab"
-            else:
-                self._logger.debug(f"Resume check: no in-progress file at {in_progress_path}")
-        elif job.download_path:
-            # Resume for directory downloads when we already know the filename.
-            in_progress_path = self._in_progress_path(job.download_path)
-            if in_progress_path.exists():
-                resume_from = in_progress_path.stat().st_size
-                job.bytes = resume_from
-                self._logger.debug(
-                    f"Resume check (dir): in-progress file found at {in_progress_path} size={resume_from} bytes"
-                )
-                if resume_from > 0:
-                    if job.etag:
-                        header["If-Range"] = job.etag
-                    elif job.last_modified:
-                        header["If-Range"] = job.last_modified
-                    header["Range"] = f"bytes={resume_from}-"
-                    open_mode = "ab"
-            else:
-                self._logger.debug(f"Resume check (dir): no in-progress file at {in_progress_path}")
-        elif job.dest.is_dir():
-            # Attempt to infer a single in-progress file from disk for directory downloads.
+        if (expected_path := job.expected_download_path()) is not None:
+            job.download_path = expected_path
             try:
-                candidates = sorted(job.dest.glob("*.downloading"))
-            except OSError:
-                candidates = []
-            if len(candidates) == 1:
-                inferred = candidates[0].with_name(candidates[0].name.removesuffix(".downloading"))
-                job.download_path = inferred
-                try:
-                    resume_from = candidates[0].stat().st_size
-                except FileNotFoundError:
-                    # The .downloading file was renamed/deleted between glob and stat (race condition); skip resume.
-                    job.download_path = None
-                else:
-                    job.bytes = resume_from
-                    self._logger.debug(
-                        f"Resume check (dir): inferred in-progress file path={candidates[0]} size={resume_from} bytes"
-                    )
-                    if resume_from > 0:
-                        if job.etag:
-                            header["If-Range"] = job.etag
-                        elif job.last_modified:
-                            header["If-Range"] = job.last_modified
-                        header["Range"] = f"bytes={resume_from}-"
-                        open_mode = "ab"
-            else:
-                self._logger.debug(
-                    "Resume check (dir): no prior download_path available; cannot resume from disk "
-                    f"(candidates={len(candidates)})"
-                )
-
-        if resume_from == 0:
+                resume_from = in_progress_path(expected_path).stat().st_size
+            except FileNotFoundError:
+                pass
+        if resume_from > 0:
+            job.bytes = resume_from
+            self._logger.debug(f"Resume check: in-progress file for {job.download_path} has {resume_from} bytes")
+            if validator := job.resume_validator:
+                header["If-Range"] = validator
+            header["Range"] = f"bytes={resume_from}-"
+            open_mode = "ab"
+        else:
+            self._logger.debug(f"Resume check: no in-progress file for {job.dest}")
             job.bytes = 0
-            if had_resume_metadata:
+            job.resume_refused = False
+            if job.resume_validator:
                 job.resume_from_scratch = True
                 job.resume_message = "Partial file missing. Restarted download from the beginning."
 
@@ -534,28 +485,18 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 job.expected_total_bytes = expected
                 job.bytes = resume_from
                 job.download_path = job.download_path or job.dest
-                self._in_progress_path(job.download_path).rename(job.download_path)
+                in_progress_path(job.download_path).rename(job.download_path)
                 self._signal_job_started(job)
                 self._signal_job_complete(job)
                 return
-            job.resume_required = True
-            job.resume_message = "Resume refused by server. Restart required."
-            job.pause()
-            raise DownloadJobCancelledException("Resume refused by server. Restart required.")
+            self._refuse_resume(job)
         if not resp.ok:
-            host = urlparse(str(resp.url or url)).netloc
-            status = resp.status_code
-            reason = resp.reason
-            if status >= 500:
-                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
-                raise HTTPError(reason)
-            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
-            raise HTTPError(reason)
+            self._raise_http_error(resp, url)
 
-        job.content_type = resp.headers.get("Content-Type")
-        job.etag = resp.headers.get("ETag") or job.etag
-        job.last_modified = resp.headers.get("Last-Modified") or job.last_modified
-        content_length = int(resp.headers.get("content-length", 0))
+        if resume_from > 0 and resp.status_code == 200:
+            # The server ignored Range, or If-Range found the file changed. This response's validators describe the
+            # whole file it sends, not the partial on disk, so they must not be recorded for a later resume.
+            self._refuse_resume(job)
 
         if job.dest.is_dir():
             parsed_url = urlparse(str(url))
@@ -572,6 +513,11 @@ class DownloadQueueService(DownloadQueueServiceBase):
                 raise ValueError(f"Cannot derive a safe filename for {url} from '{file_name}'")
 
             job.download_path = job.dest / file_name
+            if resume_from > 0 and job.download_path != expected_path:
+                # The range continues the named file, not the partial being resumed. Keep that partial's path so a
+                # restart finds and removes it.
+                job.download_path = expected_path
+                self._refuse_resume(job)
 
         else:
             job.dest.parent.mkdir(parents=True, exist_ok=True)
@@ -579,14 +525,12 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         assert job.download_path
 
-        in_progress_path = self._in_progress_path(job.download_path)
+        job.content_type = resp.headers.get("Content-Type")
+        job.etag = resp.headers.get("ETag") or job.etag
+        job.last_modified = resp.headers.get("Last-Modified") or job.last_modified
+        content_length = int(resp.headers.get("content-length", 0))
 
-        if resume_from > 0 and resp.status_code == 200:
-            # Server ignored Range. Restart download from scratch.
-            job.resume_required = True
-            job.resume_message = "Resume refused by server. Restart required."
-            job.pause()
-            raise DownloadJobCancelledException("Resume refused by server. Restart required.")
+        partial_path = in_progress_path(job.download_path)
 
         if resume_from > 0 and resp.status_code == 206:
             content_range = resp.headers.get("Content-Range", "")
@@ -648,21 +592,14 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         # some other error
         elif resp.status_code != 200:
-            host = urlparse(str(resp.url or url)).netloc
-            status = resp.status_code
-            reason = resp.reason
-            if status >= 500:
-                self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
-                raise HTTPError(reason)
-            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
-            raise HTTPError(reason)
+            self._raise_http_error(resp, url)
 
         self._logger.debug(f"{job.source}: Downloading {job.download_path}")
         report_delta = job.total_bytes / 100  # report every 1% change
         last_report_bytes = 0
 
         # DOWNLOAD LOOP
-        with open(in_progress_path, open_mode) as file:
+        with open(partial_path, open_mode) as file:
             for data in resp.iter_content(chunk_size=DOWNLOAD_CHUNK_SIZE):
                 if job.cancelled:
                     raise DownloadJobCancelledException("Job was cancelled at caller's request")
@@ -680,7 +617,35 @@ class DownloadQueueService(DownloadQueueServiceBase):
 
         # if we get here we are done and can rename the file to the original dest
         self._logger.debug(f"{job.source}: saved to {job.download_path} (bytes={job.bytes})")
-        in_progress_path.rename(job.download_path)
+        partial_path.rename(job.download_path)
+
+    @staticmethod
+    def _refuse_resume(job: DownloadJob) -> NoReturn:
+        """Pause a job whose partial file the response cannot continue; the next attempt must start it over."""
+        job.resume_required = True
+        job.resume_refused = True
+        job.resume_message = RESUME_REFUSED_MESSAGE
+        job.pause()
+        raise DownloadJobCancelledException(RESUME_REFUSED_MESSAGE)
+
+    def _raise_http_error(self, resp: requests.Response, url: str) -> NoReturn:
+        host = urlparse(str(resp.url or url)).netloc
+        status = resp.status_code
+        reason = resp.reason
+        if status >= 500:
+            self._logger.error(f"Remote server error from {host}: HTTP {status} {reason}")
+        else:
+            self._logger.error(f"Download failed from {host}: HTTP {status} {reason}")
+        # Release the pooled connection now: the exception, which carries the response so callers can read its
+        # status code, may outlive this download.
+        resp.close()
+        raise HTTPError(reason, response=resp)
+
+    def head(self, url: str, headers: Optional[dict[str, str]] = None, timeout: float = 15) -> requests.Response:
+        self._validate_url(url)
+        return self._requests.head(
+            url, headers=headers or {}, allow_redirects=False, timeout=timeout, proxies=self._request_proxies
+        )
 
     def _validate_url(self, url: str) -> None:
         """Refuse to fetch URLs that point at addresses only the server can reach."""
@@ -721,9 +686,6 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if len(os.path.join(directory, filename)) > pc_path_max:
             return False
         return True
-
-    def _in_progress_path(self, path: Path) -> Path:
-        return path.with_name(path.name + ".downloading")
 
     def _lookup_access_token(self, source: AnyHttpUrl) -> Optional[str]:
         # Pull the token from config if it exists and matches the URL
@@ -769,9 +731,9 @@ class DownloadQueueService(DownloadQueueServiceBase):
         if job.status not in [DownloadJobStatus.RUNNING, DownloadJobStatus.WAITING]:
             return
         if job.download_path:
-            in_progress_path = self._in_progress_path(job.download_path)
-            if in_progress_path.exists():
-                job.bytes = in_progress_path.stat().st_size
+            partial_path = in_progress_path(job.download_path)
+            if partial_path.exists():
+                job.bytes = partial_path.stat().st_size
         job.status = DownloadJobStatus.PAUSED
         self._execute_cb(job, "on_cancelled")
         if self._event_bus:
@@ -796,7 +758,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._logger.debug(f"Cleaning up leftover files from cancelled download job {job.download_path}")
         try:
             if job.download_path:
-                partial_file = self._in_progress_path(job.download_path)
+                partial_file = in_progress_path(job.download_path)
                 partial_file.unlink()
         except OSError as excp:
             self._logger.warning(excp)
@@ -809,13 +771,16 @@ class DownloadQueueService(DownloadQueueServiceBase):
         with self._lock:
             mf_job = self._download_part2parent[download_job.id]
             if mf_job.waiting:
-                mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
                 mf_job.status = DownloadJobStatus.RUNNING
                 assert download_job.download_path is not None
                 path_relative_to_destdir = download_job.download_path.relative_to(mf_job.dest)
                 mf_job.download_path = (
                     mf_job.dest / path_relative_to_destdir.parts[0]
                 )  # keep just the first component of the path
+            if mf_job.running:
+                # Every part start, not only the first, so the owner can record the part's validators and file name
+                # while its partial file grows.
+                mf_job.total_bytes = sum(x.total_bytes for x in mf_job.download_parts)
                 self._execute_cb(mf_job, "on_start")
 
     def _mfd_progress(self, download_job: DownloadJob) -> None:

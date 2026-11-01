@@ -183,6 +183,8 @@ class FieldDescriptions:
     z_image_model = "Z-Image model (Transformer) to load"
     flux2_dev_model = "FLUX.2 [dev] model (Transformer) to load"
     krea2_model = "Krea-2 model (Transformer) to load"
+    qwen_image_2_1_model = "Qwen-Image-2.1 model (Transformer) to load"
+    flux3_model = "FLUX.3 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
@@ -202,6 +204,11 @@ class FieldDescriptions:
     ltx2_audio_conditioning = "A soundtrack to generate a picture for (audio-to-video)"
     ltx2_full_video_conditioning = "A clip to generate a soundtrack for (video-to-audio)"
     ltx2_video_conditioning = "First-frame (VAE-latent) conditioning for LTX-2"
+    moss_image_model = "MOSS-Image model (Transformer) to load"
+    moss_image_uncond_skip_layers = (
+        "Zero-based transformer blocks the negative (unconditional) branch skips. Empty skips none. Used only when "
+        "cfg_scale > 1."
+    )
     sdxl_main_model = "SDXL Main model (UNet, VAE, CLIP1, CLIP2) to load"
     sdxl_refiner_model = "SDXL Refiner Main Modde (UNet, VAE, CLIP2) to load"
     onnx_main_model = "ONNX Main model (UNet, VAE, CLIP) to load"
@@ -413,6 +420,18 @@ class Krea2ConditioningField(BaseModel):
     )
 
 
+class QwenImage21ConditioningField(BaseModel):
+    """A Qwen-Image-2.1 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Flux3ConditioningField(BaseModel):
+    """A FLUX.3 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
 class Krea2StyleReferenceField(BaseModel):
     """Style-reference conditioning for Krea-2 shared-KV reference attention.
 
@@ -513,6 +532,12 @@ class LTX2ConditioningField(BaseModel):
     LTX-2 conditioning is a pair of prompt streams, one per modality, already projected by the
     text connectors, plus the token mask the connectors emit alongside them.
     """
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class MossImageConditioningField(BaseModel):
+    """A MOSS-Image conditioning tensor primitive value."""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 

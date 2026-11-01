@@ -1,7 +1,13 @@
-import type { GalleryItem, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKind, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
-import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
+import type {
+  GalleryBoardOrderBy,
+  GalleryImageMetadata,
+  GalleryMediaMetadata,
+  GalleryOrderDir,
+  GalleryView,
+} from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
@@ -12,7 +18,12 @@ import {
   GALLERY_STARRED_STRIP_LIMIT,
 } from '@features/gallery/core/paging';
 import { toGallerySemanticQuery } from '@features/gallery/core/semanticImageQuery';
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import {
   hashKey,
   infiniteQueryOptions,
@@ -30,7 +41,9 @@ import {
   type GalleryItemLocation,
   type GalleryItemNames,
   fetchImageIndexAvailability,
+  getGalleryImageMetadata,
   getGalleryItemLocation,
+  getGalleryVideoMetadata,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
   listGalleryBoards,
@@ -65,6 +78,8 @@ export interface GalleryItemsFilter {
   /** Inclusive upper-bound calendar day (YYYY-MM-DD) on created_at. */
   createdTo?: string;
   galleryView: GalleryView;
+  /** Only this media kind; absent lists both. Applies to ordinary and semantic listings alike. */
+  mediaKind?: GalleryItemKind;
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   /**
@@ -82,6 +97,8 @@ export interface CanonicalGalleryItemsFilter {
   createdFrom?: string;
   createdTo?: string;
   galleryView: GalleryView;
+  /** Present only when restricted, so unrestricted keys match those from before the field existed. */
+  mediaKind?: GalleryItemKind;
   orderDir: GalleryOrderDir;
   searchTerm: string;
   /** Label-free semantic reference: a file query is keyed by its registry id. */
@@ -137,6 +154,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     return {
       boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
+      ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
       orderDir: 'DESC',
       searchTerm: '',
       semantic,
@@ -148,6 +166,7 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
     ...(filter.createdFrom ? { createdFrom: filter.createdFrom } : {}),
     ...(filter.createdTo ? { createdTo: filter.createdTo } : {}),
     galleryView: filter.galleryView,
+    ...(filter.mediaKind ? { mediaKind: filter.mediaKind } : {}),
     orderDir: filter.orderDir ?? 'DESC',
     searchTerm: filter.searchTerm.trim(),
     ...(filter.starred !== undefined ? { starred: filter.starred } : {}),
@@ -201,14 +220,109 @@ export const galleryKeys = {
   itemNames: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
     [...galleryKeys.itemNamesForAccount(owner), filter] as const,
   imageIndexAvailability: (owner: AccountScope) => [...galleryKeys.all, 'image-index', getAccountKey(owner)] as const,
+  /** An image's generation metadata: one entry shared by its menus, Preview Details, and recall commands. */
+  imageMetadata: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-metadata', getAccountKey(owner), imageName] as const,
+  /** Whether an image embeds a workflow, for listings that do not say. */
+  imageHasWorkflow: (owner: AccountScope, imageName: string) =>
+    [...galleryKeys.itemsRoot(), 'image-has-workflow', getAccountKey(owner), imageName] as const,
+  /** A video's generation metadata: one entry shared by its menu, Preview Details, and recall commands. */
+  videoMetadata: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-metadata', getAccountKey(owner), videoName] as const,
+  /** Whether a video embeds a workflow, for listings that do not say. */
+  videoHasWorkflow: (owner: AccountScope, videoName: string) =>
+    [...galleryKeys.itemsRoot(), 'video-has-workflow', getAccountKey(owner), videoName] as const,
 };
+
+/**
+ * Media generation metadata. Null when it records none or the server no longer has the item (404); any other failure
+ * rejects, so the errored entry holds no answer and is read again by its next consumer. Metadata never changes for an
+ * item, so an answer is never read again.
+ */
+const mediaMetadataOptions = <TKey extends QueryKey>(
+  owner: AccountScope,
+  queryKey: TKey,
+  readMetadata: (signal: AbortSignal) => Promise<GalleryMediaMetadata | null>
+) =>
+  queryOptions({
+    queryFn: async ({ signal }): Promise<GalleryMediaMetadata | null> => {
+      let metadata: GalleryMediaMetadata | null;
+
+      try {
+        metadata = await readMetadata(AbortSignal.any([signal, owner.signal]));
+      } catch (error: unknown) {
+        if (!(error instanceof ApiError && error.status === 404)) {
+          throw error;
+        }
+        metadata = null;
+      }
+
+      assertAccountScopeCurrent(owner);
+
+      return metadata;
+    },
+    queryKey,
+    // One policy whoever starts the read: a failure surfaces at once, and the next open or recall reads again.
+    retry: false,
+    staleTime: Infinity,
+  });
+
+/**
+ * Read a shared metadata entry outside React. A reader that unmounts mid-read cancels the fetch this call may have
+ * joined; the read then starts its own instead of failing. An explicit `cancelQueries` on the key is followed the same
+ * way while the account is current. An account change ends it.
+ */
+const fetchFollowingCancellation = async <TData>(owner: AccountScope, fetch: () => Promise<TData>): Promise<TData> => {
+  for (;;) {
+    try {
+      return await fetch();
+    } catch (error: unknown) {
+      if (!isCancelledError(error) || !isAccountScopeCurrent(owner)) {
+        throw error;
+      }
+    }
+  }
+};
+
+/** An image's generation metadata; see `mediaMetadataOptions`. */
+export const galleryImageMetadataOptions = (owner: AccountScope, imageName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.imageMetadata(owner, imageName), (signal) =>
+    getGalleryImageMetadata(imageName, signal)
+  );
+
+/** Read an image's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryImageMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  imageName: string
+): Promise<GalleryImageMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryImageMetadataOptions(owner, imageName)));
+
+/** A video's generation metadata; see `mediaMetadataOptions`. */
+export const galleryVideoMetadataOptions = (owner: AccountScope, videoName: string) =>
+  mediaMetadataOptions(owner, galleryKeys.videoMetadata(owner, videoName), (signal) =>
+    getGalleryVideoMetadata(videoName, signal)
+  );
+
+/** Read a video's metadata through the shared entry outside React; see `fetchFollowingCancellation`. */
+export const fetchGalleryVideoMetadata = (
+  client: QueryClient,
+  owner: AccountScope,
+  videoName: string
+): Promise<GalleryMediaMetadata | null> =>
+  fetchFollowingCancellation(owner, () => client.fetchQuery(galleryVideoMetadataOptions(owner, videoName)));
 
 const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
   queryOptions({
     queryFn: async ({ signal }) => {
       const requestSignal = AbortSignal.any([signal, owner.signal]);
       const result = await (filter.semantic
-        ? listSemanticGalleryItemNames({ boardId: filter.boardId, query: filter.semantic, signal: requestSignal })
+        ? listSemanticGalleryItemNames({
+            boardId: filter.boardId,
+            mediaKind: filter.mediaKind,
+            query: filter.semantic,
+            signal: requestSignal,
+          })
         : isDateBoardId(filter.boardId)
           ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
           : listGalleryItemNames({ ...filter, signal: requestSignal }));
@@ -245,6 +359,7 @@ interface PendingPageFetch<T> {
 }
 
 interface GalleryPageLifecycle {
+  pageReadFreshness: WeakMap<object, boolean>;
   lastUse: WeakMap<Query, number>;
   nextUse: number;
   queue: PendingPageFetch<unknown>[];
@@ -286,6 +401,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   }
 
   const lifecycle: GalleryPageLifecycle = {
+    pageReadFreshness: new WeakMap(),
     lastUse: new WeakMap(),
     nextUse: 0,
     queue: [],
@@ -346,6 +462,7 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   seedExistingPages();
   lifecycle.unsubscribe = client.getQueryCache().subscribe((event) => {
     if (event.type === 'removed') {
+      lifecycle.pageReadFreshness.delete(event.query);
       return;
     }
 
@@ -353,6 +470,16 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
 
     if (!identity) {
       return;
+    }
+
+    // Local cache patches and rollbacks are manual successes in Query. They must not certify an invalidated
+    // page as fresh, including when cancellation restores the state captured by one of those manual writes.
+    if (event.type === 'updated') {
+      if (event.query.state.isInvalidated || event.action.type === 'error') {
+        lifecycle.pageReadFreshness.set(event.query, false);
+      } else if (event.action.type === 'success' && !event.action.manual) {
+        lifecycle.pageReadFreshness.set(event.query, true);
+      }
     }
 
     // A failed page waits for its own Retry only while it stays in view. Once nothing observes it, forget the failure
@@ -383,6 +510,25 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
   lifecycles.set(client, lifecycle);
 
   return lifecycle;
+};
+
+/** A successful page read remains authoritative through local patches, but only another read ends invalidation. */
+export const getFreshGalleryItemsPage = (client: QueryClient, queryHash: string): GalleryItemsPage | undefined => {
+  const query = client.getQueryCache().get<GalleryItemsPage>(queryHash);
+
+  return query &&
+    query.state.status === 'success' &&
+    !query.state.isInvalidated &&
+    lifecycles.get(client)?.pageReadFreshness.get(query) === true
+    ? query.state.data
+    : undefined;
+};
+
+/** Manual or unobserved cache seeds are unknown, not suspended; only an invalidation or failure requires a reread. */
+export const isGalleryItemsPageAwaitingRefresh = (client: QueryClient, queryHash: string): boolean => {
+  const query = client.getQueryCache().get(queryHash);
+
+  return query !== undefined && lifecycles.get(client)?.pageReadFreshness.get(query) === false;
 };
 
 const schedulePageFetch = <T>(

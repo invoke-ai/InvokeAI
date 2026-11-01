@@ -1,3 +1,4 @@
+import type { GalleryBoard, GalleryBoardAction } from '@features/gallery/contracts';
 import type { GenerateModelConfig, GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { CanvasEngine } from '@workbench/canvas-engine/engine';
@@ -5,15 +6,17 @@ import type { RasterCompositeExportResult } from '@workbench/canvas-engine/expor
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
+import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { queryClient } from '@platform/query/client';
+import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { uploadCanvasImage } from './backend/canvasImages';
 
-import { saveCanvasToGallery } from './saveCanvasToGallery';
+import { getCanvasSaveBoardId, saveCanvasToGallery } from './saveCanvasToGallery';
 
 const model: MainModelConfig = {
   base: 'sd-1',
@@ -54,7 +57,8 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
     seed: 123,
     ...generateOverrides,
   };
-  gallery.state.values = { ...gallery.state.values, selectedBoardId: boardId };
+  // Following the selected board, so the board under test is where saves go.
+  gallery.state.values = { ...gallery.state.values, followSelectedBoard: true, selectedBoardId: boardId };
 
   return project;
 };
@@ -107,9 +111,37 @@ const createHarness = (
   };
 };
 
+/** A fresh listing of every readable board, as `ensureGalleryBoardDestinations` leaves it: the boards named are destinations. */
+const listGalleryBoardsInCache = (...boardIds: string[]) =>
+  queryClient.setQueryData(
+    galleryKeys.boards(captureAccountScope(), {
+      includeArchived: true,
+      includeDateBoards: false,
+      orderBy: 'created_at',
+      orderDir: 'DESC',
+    }),
+    boardIds.map((id) => ({
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: false,
+      kind: 'board' as const,
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    }))
+  );
+
 describe('saveCanvasToGallery', () => {
+  afterEach(() => {
+    queryClient.clear();
+  });
+
   beforeEach(() => {
     accountLifecycle.activate('save-canvas-test');
+    listGalleryBoardsInCache('board-1', 'board-physical', 'project-board');
   });
 
   afterEach(() => {
@@ -124,9 +156,10 @@ describe('saveCanvasToGallery', () => {
         engine: harness.engine,
         project: createProject(),
         region: 'canvas',
+        scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
-    ).resolves.toEqual({ imageName: 'saved.png', status: 'saved' });
+    ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
 
     expect(harness.order).toEqual(['flush', 'document', 'export', 'upload']);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'content' });
@@ -160,6 +193,7 @@ describe('saveCanvasToGallery', () => {
       engine: harness.engine,
       project: createProject(),
       region: 'bbox',
+      scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
@@ -178,6 +212,7 @@ describe('saveCanvasToGallery', () => {
       engine: harness.engine,
       project: createProject(selectedBoardId),
       region: 'canvas',
+      scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
@@ -192,12 +227,18 @@ describe('saveCanvasToGallery', () => {
     const project = createProject();
     const gallery = getProjectWidgetInstance(project, 'gallery')!;
 
-    gallery.state.values = { ...gallery.state.values, projectBoardId: 'project-board', selectedBoardId };
+    gallery.state.values = {
+      ...gallery.state.values,
+      followSelectedBoard: true,
+      projectBoardId: 'project-board',
+      selectedBoardId,
+    };
 
     await saveCanvasToGallery({
       engine: harness.engine,
       project,
       region: 'canvas',
+      scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
@@ -221,6 +262,7 @@ describe('saveCanvasToGallery', () => {
         negativePromptEnabled: false,
       }),
       region: 'canvas',
+      scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
@@ -238,6 +280,7 @@ describe('saveCanvasToGallery', () => {
         engine: harness.engine,
         project: createProject(),
         region: 'canvas',
+        scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
     ).resolves.toEqual({ status });
@@ -253,6 +296,7 @@ describe('saveCanvasToGallery', () => {
         engine: harness.engine,
         project: createProject(),
         region: 'bbox',
+        scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
     ).resolves.toEqual({ status: 'not-ready' });
@@ -270,6 +314,7 @@ describe('saveCanvasToGallery', () => {
         engine: harness.engine,
         project: createProject(),
         region: 'canvas',
+        scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
     ).rejects.toThrow('export failed');
@@ -286,6 +331,7 @@ describe('saveCanvasToGallery', () => {
         engine: harness.engine,
         project: createProject(),
         region: 'canvas',
+        scopedDefaults: {},
         uploadImage: harness.uploadImage,
       })
     ).rejects.toThrow('upload failed');
@@ -300,6 +346,7 @@ describe('saveCanvasToGallery', () => {
       engine: harness.engine,
       project: createProject(),
       region: 'canvas',
+      scopedDefaults: {},
       uploadImage: harness.uploadImage,
     });
 
@@ -309,5 +356,64 @@ describe('saveCanvasToGallery', () => {
 
     await expect(save).resolves.toEqual({ status: 'stale' });
     expect(harness.uploadImage).not.toHaveBeenCalled();
+  });
+});
+
+describe('getCanvasSaveBoardId', () => {
+  afterEach(() => {
+    queryClient.clear();
+  });
+
+  it('saves to the project inbox while the selected board is one the caller may only view', () => {
+    accountLifecycle.activate('save-canvas-destination');
+    const board = (id: string, actions: GalleryBoardAction[]): GalleryBoard => ({
+      access: {
+        actions,
+        adminOverride: false,
+        generalAccess: 'viewer',
+        role: actions.includes('rename') ? 'owner' : 'viewer',
+      },
+      archived: false,
+      assetCount: 0,
+      assetVideoCount: 0,
+      id,
+      imageCount: 0,
+      isInbox: id === 'inbox',
+      kind: 'board',
+      name: id,
+      projectId: null,
+      videoCount: 0,
+    });
+    queryClient.setQueryData(
+      galleryKeys.boards(captureAccountScope(), {
+        includeArchived: false,
+        includeDateBoards: false,
+        orderBy: 'created_at',
+        orderDir: 'DESC',
+      }),
+      [
+        board('inbox', ['read', 'add_media', 'rename']),
+        board('shared', ['read']),
+        board('moodboard', ['read', 'add_media']),
+      ]
+    );
+    const withInbox = (selected: string) => {
+      const project = createProject(selected);
+      const gallery = getProjectWidgetInstance(project, 'gallery')!;
+      gallery.state.values = { ...gallery.state.values, projectBoardId: 'inbox' };
+      return project;
+    };
+
+    expect(getCanvasSaveBoardId(withInbox('shared'), {})).toBe('inbox');
+    expect(getCanvasSaveBoardId(withInbox('moodboard'), {})).toBe('moodboard');
+
+    // A project that does not pin following the selected board follows the user's default for it.
+    const unpinned = withInbox('moodboard');
+    const gallery = getProjectWidgetInstance(unpinned, 'gallery')!;
+    const { followSelectedBoard: _pin, ...values } = gallery.state.values;
+    gallery.state.values = values;
+
+    expect(getCanvasSaveBoardId(unpinned, {})).toBe('inbox');
+    expect(getCanvasSaveBoardId(unpinned, { gallery: { followSelectedBoard: true } })).toBe('moodboard');
   });
 });

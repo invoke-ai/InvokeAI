@@ -68,12 +68,14 @@ afterEach(async () => {
 
 const Harness = ({
   activeKey = null,
+  inset,
   rows,
   onCheckedChange,
   onContextMenu,
   onPress,
 }: {
   activeKey?: string | null;
+  inset?: 'row' | 'none';
   rows: ListRow<Item>[];
   onCheckedChange?: (item: Item, checked: boolean) => void;
   onContextMenu?: (item: Item, anchor: ListContextMenuAnchor) => void;
@@ -84,6 +86,7 @@ const Harness = ({
       activeKey={activeKey}
       density="comfortable"
       emptyState={<span>nothing</span>}
+      inset={inset}
       label="subjects"
       renderItem={(item: Item, rowProps: ListRowProps) => (
         <ListItem
@@ -526,6 +529,27 @@ describe('List measured rows', () => {
       viewport().getBoundingClientRect().top - HEADER_PX / 2,
       0
     );
+  });
+});
+
+describe('List inset', () => {
+  const edgeOffsets = () => {
+    const list = viewport().getBoundingClientRect();
+    const row = host.querySelector<HTMLElement>('[data-list-row="a-0"]')!.getBoundingClientRect();
+    const header = pinnedHeader()!.firstElementChild!.getBoundingClientRect();
+
+    return { header: header.left - list.left, rowEnd: list.right - row.right, rowStart: row.left - list.left };
+  };
+
+  it('insets rows and headers from the list edges by default and runs them edge to edge with none', async () => {
+    const rows = rowsOf(section('a', 'Alpha', 3));
+
+    await render(<Harness rows={rows} />);
+    // LIST_ROW_INSET is 0.75rem.
+    expect(edgeOffsets()).toEqual({ header: 12, rowEnd: 12, rowStart: 12 });
+
+    await render(<Harness inset="none" rows={rows} />);
+    expect(edgeOffsets()).toEqual({ header: 0, rowEnd: 0, rowStart: 0 });
   });
 });
 

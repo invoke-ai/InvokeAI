@@ -5,12 +5,14 @@ import type {
   GalleryItemRef,
   GalleryItemsPage,
 } from '@features/gallery/core/items';
-import type { GalleryBoard } from '@features/gallery/core/types';
+import type { GalleryBoard, GalleryGeneralAccess } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { InfiniteData, Query, QueryClient, QueryKey } from '@tanstack/react-query';
 
+import { canOnBoard } from '@features/gallery/core/boardAccess';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { pruneImageClusterMembers } from '@features/gallery/core/semanticImageQuery';
+import { queryClient } from '@platform/query/client';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { rollBackUnclaimedEntries } from '@platform/state/compareAndSwapRollback';
 import { hashKey } from '@tanstack/react-query';
@@ -19,6 +21,7 @@ import { ALL_READABLE_BOARDS_ID, isDateBoardId } from './backend';
 import {
   fetchGalleryItemsRange,
   GALLERY_PAGE_SIZE,
+  galleryBoardsOptions,
   galleryKeys,
   getGalleryItemListingKey,
   getGalleryItemListQueries,
@@ -427,6 +430,176 @@ interface BoardCacheRollbackEntry {
 const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
   Array.isArray(value) && value.every((board) => typeof board === 'object' && board !== null && 'id' in board);
 
+/** The boards of a project that the account's cached board lists hold, archived ones included where a list has them. */
+export const getGalleryProjectBoardsFromCaches = (client: QueryClient, projectId: string): GalleryBoard[] => {
+  const boards = new Map<string, GalleryBoard>();
+
+  for (const query of client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })) {
+    const data = query.state.data;
+
+    if (!isGalleryBoardsData(data)) {
+      continue;
+    }
+
+    for (const board of data) {
+      if (board.projectId === projectId && !boards.has(board.id)) {
+        boards.set(board.id, board);
+      }
+    }
+  }
+
+  return [...boards.values()];
+};
+
+const isArchivedBoardsListing = (query: Query): boolean =>
+  (query.queryKey.at(-1) as { includeArchived?: boolean } | undefined)?.includeArchived === true;
+
+/** The account's cached board listings that hold data, newest first. */
+const getCachedGalleryBoardListings = (client: QueryClient): Query[] =>
+  client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })
+    // A listing whose refetch failed keeps its last data under an error status: it still decides, as the doc of
+    // `ensureGalleryBoardDestinations` promises, rather than sending every result to the inbox while offline.
+    .filter((query) => isGalleryBoardsData(query.state.data))
+    // Newest first; of two read in the same instant, the one not invalidated since.
+    .sort(
+      (left, right) =>
+        right.state.dataUpdatedAt - left.state.dataUpdatedAt ||
+        Number(left.state.isInvalidated) - Number(right.state.isInvalidated)
+    );
+
+/**
+ * The board as the newest cached listing holding it describes it, or undefined when none does: for saying why
+ * `canAddToCachedGalleryBoard` refused it (listed without `add_media`, or not listed at all) from the listing that
+ * decided, not from a panel's older view of the board.
+ */
+export const getCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): GalleryBoard | undefined => {
+  for (const listing of getCachedGalleryBoardListings(client)) {
+    const board = (listing.state.data as GalleryBoard[]).find((candidate) => candidate.id === boardId);
+    if (board) {
+      return board;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * Whether the account may add media to a board, as its cached board listings say, newest first. A board listed with
+ * `add_media` is a destination, archived or not: archiving hides a board from the panel, not from results sent to it
+ * on purpose. A board no listing holds is not one: it was deleted, stopped being readable, or was never asked about.
+ * Absence counts only from a listing that would have held the board: one of archived boards too, or a newer listing
+ * of live boards than one that held it live. A listing counts while it holds data, whatever its status: one whose
+ * refetch failed keeps the last data it read. The caller decides from a listing it ensured with
+ * `ensureGalleryBoardDestinations`: nothing is guessed, so a run never fails on its board after generating.
+ */
+export const canAddToCachedGalleryBoard = (boardId: string, client: QueryClient = queryClient): boolean => {
+  let isMissingFromNewerLiveListing = false;
+
+  for (const listing of getCachedGalleryBoardListings(client)) {
+    const board = (listing.state.data as GalleryBoard[]).find((candidate) => candidate.id === boardId);
+    if (board) {
+      return !(isMissingFromNewerLiveListing && !board.archived) && canOnBoard(board, 'add_media');
+    }
+    if (isArchivedBoardsListing(listing)) {
+      return false;
+    }
+    isMissingFromNewerLiveListing = true;
+  }
+  return false;
+};
+
+const GALLERY_BOARD_DESTINATIONS_STALE_MS = 60_000;
+
+/**
+ * Has a listing for `canAddToCachedGalleryBoard` to decide from before a submission or upload resolves its
+ * destination: every board the account can read, archived ones included, so an archived board chosen on purpose
+ * is found and a board missing from it is known to be gone. Returns null, without a tick, while any such listing
+ * holds data, whatever its age: a caller that must dispatch synchronously decides from it as it is. A listing older
+ * than a minute, or invalidated after a run or upload failed on its board, is read again in the background, so the
+ * next resolution decides from fresh data; the read is never awaited and its failure never reported. Only with no
+ * such listing at all does the caller await one read. A listing that cannot be read leaves the decision to what is
+ * cached: with nothing cached, no board is a destination and results go to the inbox rather than to a board that
+ * may refuse them.
+ */
+export const ensureGalleryBoardDestinations = (client: QueryClient = queryClient): Promise<void> | null => {
+  const options = galleryBoardsOptions({ includeArchived: true });
+  // Any listing of archived boards too will do, whatever its order: an open panel showing archived boards keeps one
+  // fresh, and then an invoke reads nothing.
+  const listings = client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(captureAccountScope()) })
+    .filter((query) => isArchivedBoardsListing(query) && isGalleryBoardsData(query.state.data));
+
+  if (listings.length === 0) {
+    return client
+      .fetchQuery({ ...options, staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS })
+      .then(() => undefined)
+      .catch(() => {
+        // Unanswered: the cached listings, if any, decide.
+      });
+  }
+
+  const now = Date.now();
+  const hasCurrentListing = listings.some(
+    (query) => !query.state.isInvalidated && now - query.state.dataUpdatedAt < GALLERY_BOARD_DESTINATIONS_STALE_MS
+  );
+
+  if (!hasCurrentListing) {
+    // The read is shared with one already in flight for the same listing and skipped while that listing is fresh.
+    void client.prefetchQuery({ ...options, staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS });
+  }
+
+  return null;
+};
+
+/**
+ * After a board refused a run or an upload, or answered as gone: nothing landed, so only the board listings are
+ * invalidated, and the listing of every readable board is read again at once rather than marked stale and left,
+ * since nothing need observe it and `ensureGalleryBoardDestinations` decides from whatever is cached. A resolution
+ * made before the read lands still decides from the old listing (and shares the read); one made after decides from
+ * the new one. The read's failure is not reported: the listings cached keep deciding.
+ */
+export const invalidateGalleryBoardDestinations = async (
+  client: QueryClient,
+  owner: AccountScope = captureAccountScope()
+): Promise<void> => {
+  await client.invalidateQueries({ queryKey: galleryKeys.boardsForAccount(owner) });
+  if (!isAccountScopeCurrent(owner)) {
+    return;
+  }
+  // The invalidation refetched any listing of archived boards too that a panel observes; that read serves.
+  const isReadInFlight = client
+    .getQueryCache()
+    .findAll({ queryKey: galleryKeys.boardsForAccount(owner) })
+    .some((query) => isArchivedBoardsListing(query) && query.state.fetchStatus === 'fetching');
+  if (!isReadInFlight) {
+    await client.prefetchQuery({
+      ...galleryBoardsOptions({ includeArchived: true }),
+      staleTime: GALLERY_BOARD_DESTINATIONS_STALE_MS,
+    });
+  }
+};
+
+/**
+ * Lists a board the account just created in every cached board listing of the account's, ahead of the refetch that
+ * orders it properly: a board selected as it is created is already where new results go. A listing read still in
+ * flight was asked before the board existed and would list it away again as it landed, so those reads are cancelled
+ * first; the refetch that follows the creation reads them again.
+ */
+export const addGalleryBoardToCaches = async (client: QueryClient, board: GalleryBoard): Promise<void> => {
+  const owner = captureAccountScope();
+  await client.cancelQueries({ queryKey: galleryKeys.boardsForAccount(owner) });
+  for (const query of client.getQueryCache().findAll({ queryKey: galleryKeys.boardsForAccount(owner) })) {
+    const boards = query.state.data;
+    if (isGalleryBoardsData(boards) && !boards.some((candidate) => candidate.id === board.id)) {
+      client.setQueryData<GalleryBoard[]>(query.queryKey, [...boards, board]);
+    }
+  }
+};
+
 /**
  * Patches one board across every cached board list and returns a rollback
  * that restores the prior lists — skipping any list something else has
@@ -435,8 +608,9 @@ const isGalleryBoardsData = (value: unknown): value is GalleryBoard[] =>
 export const patchGalleryBoardCaches = (
   client: QueryClient,
   boardId: string,
-  changes: Partial<Pick<GalleryBoard, 'archived' | 'name'>>
+  changes: Partial<Pick<GalleryBoard, 'archived' | 'name' | 'projectId'>> & { generalAccess?: GalleryGeneralAccess }
 ): (() => void) => {
+  const { generalAccess, ...fields } = changes;
   const owner = captureAccountScope();
   const rollbackEntries: BoardCacheRollbackEntry[] = [];
 
@@ -454,7 +628,11 @@ export const patchGalleryBoardCaches = (
       }
 
       changed = true;
-      return { ...board, ...changes };
+      return {
+        ...board,
+        ...fields,
+        ...(generalAccess !== undefined && board.access ? { access: { ...board.access, generalAccess } } : {}),
+      };
     });
 
     if (!changed) {

@@ -3,7 +3,7 @@ title: Stable Diffusion 3.5
 description: Generate images with Stability AI's Stable Diffusion 3.5 Medium and Large models, including text encoder options and PiD super-resolution decoding.
 lastUpdated: 2026-09-30
 sidebar:
-  order: 11
+  order: 12
 ---
 
 Stable Diffusion 3.5 is Stability AI's diffusion-transformer text-to-image family. It encodes prompts
@@ -57,6 +57,9 @@ you can replace any of them with a model you have installed separately:
 - **CLIP L**
 - **CLIP G**
 - **VAE**: only SD3 VAEs are offered
+
+The CLIP encoders can also be the single files ComfyUI uses, `clip_l` and `clip_g`; SD 3 then still tokenizes
+with the main model's tokenizers.
 
 ## Generation settings
 

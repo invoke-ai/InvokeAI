@@ -338,7 +338,7 @@
       "type": "invocation",
       "data": {
         "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
-        "version": "2.7.0",
+        "version": "2.8.0",
         "nodePack": "invokeai",
         "label": "Core Metadata",
         "notes": "Everything except the generation mode arrives over an edge from the node that used the value, so the record cannot go stale.",
@@ -628,7 +628,7 @@
       "type": "invocation",
       "data": {
         "id": "4b32c22b-679d-4d5e-a167-c3309265fcd9",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Joins the trimmed source and the generated continuation, cross-fading over the hand-off frame so the seam is not visible.",
@@ -657,6 +657,12 @@
             "label": "",
             "description": "",
             "value": "match_first"
+          },
+          "smart_render": {
+            "name": "smart_render",
+            "label": "",
+            "description": "",
+            "value": true
           }
         },
         "isOpen": true,

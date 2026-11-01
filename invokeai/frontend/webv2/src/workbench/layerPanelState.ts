@@ -25,7 +25,10 @@ export interface LayerPanelState {
   readonly filter: string;
 }
 
-/** Panel preferences that survive a primary change and a project switch. */
+/**
+ * Panel preferences that survive a primary change. Each open project keeps its own, so switching to another project
+ * and back finds them as they were; closing the project drops them.
+ */
 type LayerPanelCarry = Pick<
   LayerPanelState,
   'collapsedStacks' | 'expandedGroupIds' | 'collapsedChildLayerIds' | 'filter'
@@ -207,13 +210,26 @@ export const reconcileLayerPanelState = (
   const primary = primaryId ? index.byId.get(primaryId) : undefined;
   const validPrimaryId = primary ? primary.node.id : null;
   if (state.projectId !== projectId || state.primaryId !== validPrimaryId) {
+    // Another project's state is never carried over; this project's own lives under its id in the store.
     if (state.projectId !== projectId) {
       return createLayerPanelState(projectId, validPrimaryId, { expandedGroupIds: primary ? [...primary.path] : [] });
     }
     // The new primary is revealed: its stack opens and every group on its path expands.
     const carry = carryOf(state);
+    const filter = carry.filter.trim().toLocaleLowerCase();
+    // A group is also visible when a matching descendant keeps its ancestor path in the filtered tree.
+    const filterHidesPrimary =
+      primary &&
+      filter !== '' &&
+      !index.nodes.some(
+        (entry) =>
+          (entry.node.id === validPrimaryId || entry.path.includes(validPrimaryId!)) &&
+          entry.node.name.toLocaleLowerCase().includes(filter)
+      );
     return createLayerPanelState(projectId, validPrimaryId, {
       ...carry,
+      // An external navigation must reveal its target even when a name filter hid it.
+      filter: filterHidesPrimary ? '' : carry.filter,
       collapsedChildLayerIds: carry.collapsedChildLayerIds.filter((id) => index.byId.has(id)),
       collapsedStacks: primary
         ? carry.collapsedStacks.filter((stack) => stack !== primary.stack)

@@ -21,6 +21,7 @@ from invokeai.app.invocations.primitives import QwenImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.model_cache.model_cache import MB, MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
+from invokeai.backend.quantization.bnb_cast_notice import silence_int8_cast_notice
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_preprocessor_config_dict,
@@ -329,6 +330,8 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             attention_mask=model_inputs.attention_mask,
             pixel_values=getattr(model_inputs, "pixel_values", None),
             image_grid_thw=getattr(model_inputs, "image_grid_thw", None),
+            # Transformers 5 needs the processor's token types to build 3-D positions for image tokens.
+            mm_token_type_ids=getattr(model_inputs, "mm_token_type_ids", None),
             output_hidden_states=True,
         )
 
@@ -395,8 +398,6 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
         layers to the CPU, which BnB int8 refuses with "Some modules are dispatched on
         the CPU or the disk" (issue #9147).
         """
-        import warnings
-
         from transformers import BitsAndBytesConfig, Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
 
         encoder_config = context.models.get_config(self.qwen_vl_encoder.text_encoder)
@@ -415,6 +416,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             )
         else:  # int8
             bnb_config = BitsAndBytesConfig(load_in_8bit=True)
+            silence_int8_cast_notice()
 
         # Load onto this worker's execution device, never `device_map="auto"`: "auto" sizes its plan from whatever
         # VRAM is free *right now* and quietly spills to the CPU when the cached models fill the card, and it shards
@@ -464,9 +466,7 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             model_config = Qwen2_5_VLConfig.from_pretrained(str(encoder_path), local_files_only=True)
             state_dict = _read_checkpoint(encoder_path)
 
-            with MODEL_LOAD_LOCK.write_lock(), warnings.catch_warnings():
-                # BnB int8 internally casts bfloat16→float16; the warning is harmless
-                warnings.filterwarnings("ignore", message="MatMul8bitLt.*cast.*float16")
+            with MODEL_LOAD_LOCK.write_lock():
                 text_encoder = Qwen2_5_VLForConditionalGeneration.from_pretrained(
                     None if state_dict is not None else str(encoder_path),
                     config=model_config,

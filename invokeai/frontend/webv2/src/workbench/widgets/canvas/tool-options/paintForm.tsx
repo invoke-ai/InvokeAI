@@ -1,6 +1,5 @@
 import type {
   ToolFormProps,
-  ToolFooterProps,
   ToolPropertyForm,
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
@@ -41,7 +40,7 @@ const usePaintOptions = (engine: ToolFormProps['engine']) => {
   return { defaults: isEraser ? DEFAULT_ERASER_OPTIONS : DEFAULT_BRUSH_OPTIONS, isEraser, options, set };
 };
 
-const PaintPreview = ({ engine }: ToolFooterProps) => {
+const PaintPreview = ({ engine }: ToolFormProps) => {
   const { isEraser, options } = usePaintOptions(engine);
   const pair = useActiveColorPair();
   return (
@@ -103,49 +102,57 @@ const PaintColorSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/** Width and opacity are separate pressure responses (opacity also costs a scratch refill per frame). */
+/**
+ * Width and opacity are separate pressure responses (opacity also costs a scratch refill per frame). The eraser
+ * exposes width only: pressure never modulates erase strength.
+ */
 const PaintDynamicsSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
+  const { isEraser, options, set } = usePaintOptions(engine);
   const brush = useBrushOptions(engine);
-  const set = useCallback(
-    (changes: Partial<typeof brush>) => engine.interaction.set('brushOptions', { ...brush, ...changes }),
-    [brush, engine]
-  );
   const onWidth = useCallback((pressureAffectsWidth: boolean) => set({ pressureAffectsWidth }), [set]);
-  const onOpacity = useCallback((pressureAffectsOpacity: boolean) => set({ pressureAffectsOpacity }), [set]);
+  const onOpacity = useCallback(
+    (pressureAffectsOpacity: boolean) =>
+      engine.interaction.set('brushOptions', { ...engine.interaction.get('brushOptions'), pressureAffectsOpacity }),
+    [engine]
+  );
   return (
     <>
       <PropertySwitchRow
-        checked={brush.pressureAffectsWidth}
+        checked={options.pressureAffectsWidth}
         label={t('widgets.canvas.toolOptions.pressureAffectsWidth')}
         onCheckedChange={onWidth}
       />
-      <PropertySwitchRow
-        checked={brush.pressureAffectsOpacity}
-        label={t('widgets.canvas.toolOptions.pressureAffectsOpacity')}
-        onCheckedChange={onOpacity}
-      />
+      {isEraser ? null : (
+        <PropertySwitchRow
+          checked={brush.pressureAffectsOpacity}
+          label={t('widgets.canvas.toolOptions.pressureAffectsOpacity')}
+          onCheckedChange={onOpacity}
+        />
+      )}
     </>
   );
 };
 
-/** Shared literal: the same object in both forms, so id, type and DOM survive the switch. */
+/** Shared literals: the same objects in both forms, so id, type and DOM survive the switch. */
 const STROKE_GROUP: ToolPropertyGroup = {
   body: PaintStrokeSettings,
   id: 'paint-stroke',
   labelKey: 'widgets.properties.groups.stroke',
 };
 
+const DYNAMICS_GROUP: ToolPropertyGroup = {
+  body: PaintDynamicsSettings,
+  collapsible: 'collapsed',
+  id: 'paint-dynamics',
+  labelKey: 'widgets.properties.groups.dynamics',
+};
+
 export const brushForm: ToolPropertyForm = {
   groups: [
     STROKE_GROUP,
     { body: PaintColorSettings, id: 'paint-color', labelKey: 'widgets.properties.rows.color' },
-    {
-      body: PaintDynamicsSettings,
-      collapsible: 'collapsed',
-      id: 'paint-dynamics',
-      labelKey: 'widgets.properties.groups.dynamics',
-    },
+    DYNAMICS_GROUP,
   ],
   id: 'brush',
   paintsLeaf: true,
@@ -153,7 +160,7 @@ export const brushForm: ToolPropertyForm = {
 };
 
 export const eraserForm: ToolPropertyForm = {
-  groups: [STROKE_GROUP],
+  groups: [STROKE_GROUP, DYNAMICS_GROUP],
   id: 'eraser',
   paintsLeaf: true,
   preview: PaintPreview,

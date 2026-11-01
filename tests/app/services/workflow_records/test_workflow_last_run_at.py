@@ -42,10 +42,12 @@ def test_update_last_run_at_sets_timestamp(workflow_records: WorkflowRecordsStor
     fetched = workflow_records.get(created.workflow_id)
     assert fetched.last_run_at is not None
 
+    # Only user workflows: the bundled ones share its millisecond `created_at` on a coarse clock (Windows), and the
+    # `workflow_id` tie-break then pushes it off the page at random.
     listed = workflow_records.get_many(
         order_by=WorkflowRecordOrderBy.CreatedAt,
         direction=SQLiteDirection.Descending,
-        categories=None,
+        categories=[WorkflowCategory.User],
         page=0,
         per_page=10,
     )

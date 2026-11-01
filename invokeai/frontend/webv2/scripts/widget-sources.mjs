@@ -12,7 +12,6 @@ export const WIDGET_SOURCES = new Map([
   ['src/workbench/widgets/layers/implementation.ts', 'layers'],
   ['src/workbench/widgets/notifications/implementation.ts', 'notifications'],
   ['src/workbench/widgets/preview/implementation.ts', 'preview'],
-  ['src/workbench/widgets/project/implementation.ts', 'project'],
   ['src/workbench/widgets/queue-status/implementation.ts', 'queue-status'],
   ['src/workbench/widgets/server-status/implementation.ts', 'server-status'],
   ['src/workbench/widgets/shortcuts/implementation.ts', 'shortcuts'],

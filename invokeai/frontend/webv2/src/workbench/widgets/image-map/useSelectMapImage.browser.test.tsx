@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   selectBoard: vi.fn(),
   selectItem: vi.fn(),
   locatorControllers: [] as AbortController[],
+  locatorReleases: [] as ReturnType<typeof vi.fn>[],
   setPage: vi.fn(),
   settings: { imageOrderDir: 'DESC', paginationMode: 'paginated' } as Record<string, unknown>,
   setView: vi.fn(),
@@ -42,9 +43,11 @@ vi.mock('@features/gallery/utility', () => ({
   },
   createGalleryLocatorRequest: () => {
     const controller = new AbortController();
+    const release = vi.fn();
     mocks.locatorControllers.push(controller);
+    mocks.locatorReleases.push(release);
 
-    return { signal: controller.signal, release: vi.fn() };
+    return { signal: controller.signal, release };
   },
 }));
 
@@ -62,6 +65,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@workbench/widgetState', () => ({
   getProjectWidgetValues: () => mocks.galleryValues,
+  getResolvedProjectWidgetValues: () => mocks.galleryValues,
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({
@@ -161,6 +165,7 @@ beforeEach(() => {
   mocks.galleryValues = {};
   mocks.settings = { imageOrderDir: 'DESC', paginationMode: 'paginated' };
   mocks.locatorControllers.length = 0;
+  mocks.locatorReleases.length = 0;
   // Empty boards read as "still loading" — the reveal gives the board the
   // benefit of the doubt, matching the gallery's own fallback rules.
   mocks.fetchBoards.mockResolvedValue([]);
@@ -562,6 +567,22 @@ describe('useMapSelection', () => {
       expect(mocks.patchValues).not.toHaveBeenCalled();
       expect(mocks.selectItem).not.toHaveBeenCalled();
       expect(mocks.requestReveal).not.toHaveBeenCalled();
+    });
+
+    it('holds a locator request while its primary image hydrates, so no unrequested reveal supersedes it', async () => {
+      const pending = deferred<{ boardId: string; category: string; kind: string; name: string }>();
+      mocks.resolve.mockReturnValueOnce(pending.promise);
+      await mount();
+
+      await flush(() => handle.clickCluster?.({ kind: 'image', name: 'a.png' }, ['image:a.png'], 'nearby'));
+
+      expect(mocks.locatorReleases).toHaveLength(1);
+      expect(mocks.locatorReleases[0]).not.toHaveBeenCalled();
+
+      await flush(() => pending.resolve({ boardId: 'board-a', category: 'general', kind: 'image', name: 'a.png' }));
+
+      expect(mocks.selectItem).toHaveBeenCalledOnce();
+      expect(mocks.locatorReleases[0]).toHaveBeenCalledOnce();
     });
 
     it('retires a cluster click still hydrating when its account epoch changes', async () => {

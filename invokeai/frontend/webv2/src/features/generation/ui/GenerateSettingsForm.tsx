@@ -1,8 +1,12 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
+import type { GenerationIssue, GenerationIssueFix } from '@features/generation/core/generationIssues';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
 
 import { Separator, Stack } from '@chakra-ui/react';
+import { getGenerateInvocationIssues } from '@features/generation/core/baseGenerationPolicies';
+import { getGenerationIssueFixPatch } from '@features/generation/core/generationIssues';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
@@ -22,10 +26,15 @@ import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { getSettingsWithLatestPromptFields } from './generateFormViewModel';
 import { GenerateGuidanceSection } from './GenerateGuidanceSection';
 import { GenerateModelCard } from './GenerateModelCard';
+import { GenerateProviderOptionsSection } from './GenerateProviderOptionsSection';
+import { GenerateRefinerSection } from './GenerateRefinerSection';
 import { GenerateRenderSection } from './GenerateRenderSection';
+import { useGenerationUi } from './GenerationUiContext';
 import { GeneratePromptFields } from './promptFields';
+import { areGenerationIssuesEqual, GenerateIssuesProvider } from './shared/GenerateIssues';
 
 const GENERATE_INPUT_DEBOUNCE_MS = 250;
+const NO_ISSUES: readonly GenerationIssue[] = [];
 
 interface GenerateSettingsFormProps {
   isLoadingModels: boolean;
@@ -53,6 +62,8 @@ export const GenerateSettingsForm = ({
   settings,
   supportedModels,
 }: GenerateSettingsFormProps) => {
+  const ui = useGenerationUi();
+  const isCanvasSource = ui.project.invocationSourceId === 'canvas';
   const [draft] = useState(() => createExternalStoreCore(settings));
   const latestSettingsRef = useRef(settings);
   const pendingUpdateRef = useRef<PendingGenerateSettingsUpdate>(null);
@@ -214,8 +225,9 @@ export const GenerateSettingsForm = ({
     [draft, onCommitSettings]
   );
 
-  const commitPatchImmediately = useCallback(
-    (patch: Partial<GenerateSettings>) => {
+  /** Folds pending edits under `patch` and hands the change to `send` now, so no late debounce can follow it. */
+  const sendPatchNow = useCallback(
+    (patch: Partial<GenerateSettings>, send: (patch: Partial<GenerateSettings>, projectId: string) => void) => {
       const previousSettings = latestSettingsRef.current;
       const nextSettings = applyGenerateSettingsPatch(
         applyGenerateSettingsUpdate(latestSettingsRef.current, pendingUpdateRef.current),
@@ -230,64 +242,120 @@ export const GenerateSettingsForm = ({
       pendingUpdateRef.current = null;
       latestSettingsRef.current = nextSettings;
       draft.setSnapshot(nextSettings);
-      onPatchSettings(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
+      send(getChangedGenerateSettingsPatch(previousSettings, nextSettings), projectIdRef.current);
     },
-    [draft, onPatchSettings]
+    [draft]
+  );
+
+  const commitPatchImmediately = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
+    [onPatchSettings, sendPatchNow]
+  );
+
+  // A size reset lands at once, ahead of a pending size edit; on the canvas the frame keeps its centre, as for any size.
+  const commitSizeReset = useCallback(
+    (patch: Partial<GenerateSettings>) => sendPatchNow(patch, onPatchSettings),
+    [onPatchSettings, sendPatchNow]
+  );
+
+  // The route's own checks on the settings as the form shows them. On a Canvas source the width and height are the
+  // frame, which the route reads from the Canvas and keeps in sync with them.
+  const selectIssues = useCallback(
+    (current: GenerateSettings): readonly GenerationIssue[] => {
+      if (!selectedModel) {
+        return NO_ISSUES;
+      }
+
+      const issues = getGenerateInvocationIssues(
+        { ...current, model: selectedModel },
+        {
+          ...(isCanvasSource ? { canvasFrame: { height: current.height, width: current.width } } : {}),
+          // An unread catalog would name every model as missing.
+          ...(models.length > 0 ? { models } : {}),
+        }
+      );
+
+      return issues.length > 0 ? issues : NO_ISSUES;
+    },
+    [isCanvasSource, models, selectedModel]
+  );
+  const issues = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectIssues, areGenerationIssuesEqual);
+  // Read when the fix runs, so it acts on the latest values rather than those the note rendered with.
+  const applyIssueFix = useCallback(
+    (fix: GenerationIssueFix) => commitPatchImmediately(getGenerationIssueFixPatch(draft.getSnapshot(), fix)),
+    [commitPatchImmediately, draft]
   );
 
   return (
-    <Stack gap={1} p={1}>
-      <GenerateModelCard
-        draft={draft}
-        isLoadingModels={isLoadingModels}
-        loadError={loadError}
-        models={models}
-        selectedModel={selectedModel}
-        supportedModels={supportedModels}
-        onCommitSettings={commitSettingsImmediately}
-      />
+    <GenerateIssuesProvider applyFix={applyIssueFix} issues={issues}>
+      <Stack gap={1} p={1}>
+        <GenerateModelCard
+          draft={draft}
+          isLoadingModels={isLoadingModels}
+          loadError={loadError}
+          models={models}
+          selectedModel={selectedModel}
+          supportedModels={supportedModels}
+          onCommitSettings={commitSettingsImmediately}
+        />
 
-      {/* The same hairline the collapsible sections draw between one another. */}
-      <Separator />
+        {/* The same hairline the collapsible sections draw between one another. */}
+        <Separator />
 
-      <GeneratePromptFields
-        draft={draft}
-        projectId={projectId}
-        selectedModel={selectedModel}
-        onCommit={commitPromptDraftPatch}
-        onCommitImmediate={commitPatchImmediately}
-      />
+        <GeneratePromptFields
+          draft={draft}
+          projectId={projectId}
+          selectedModel={selectedModel}
+          onCommit={commitPromptDraftPatch}
+          onCommitImmediate={commitPatchImmediately}
+        />
 
-      <GenerateDimensionFields draft={draft} projectId={projectId} selectedModel={selectedModel} onCommit={commit} />
+        <GenerateDimensionFields
+          draft={draft}
+          projectId={projectId}
+          selectedModel={selectedModel}
+          onCommit={commit}
+          onResetSize={commitSizeReset}
+        />
 
-      <GenerateGuidanceSection
-        draft={draft}
-        loraModels={loraModels}
-        models={models}
-        projectId={projectId}
-        selectedModel={selectedModel}
-        onCommitImmediate={commitPatchImmediately}
-        onConceptCommit={commitDebouncedDraftUpdate}
-        onReferenceCommit={commit}
-      />
+        <GenerateGuidanceSection
+          draft={draft}
+          loraModels={loraModels}
+          models={models}
+          projectId={projectId}
+          selectedModel={selectedModel}
+          onCommitImmediate={commitPatchImmediately}
+          onConceptCommit={commitDebouncedDraftUpdate}
+          onReferenceCommit={commit}
+        />
 
-      <GenerateRenderSection
-        draft={draft}
-        selectedModel={selectedModel}
-        onCommit={commit}
-        onCommitImmediate={commitPatchImmediately}
-      />
+        <GenerateRenderSection
+          draft={draft}
+          selectedModel={selectedModel}
+          onCommit={commit}
+          onCommitImmediate={commitPatchImmediately}
+        />
 
-      <GenerateComponentsSection draft={draft} selectedModel={selectedModel} onCommit={commitPatchImmediately} />
+        <GenerateProviderOptionsSection draft={draft} selectedModel={selectedModel} onCommit={commit} />
 
-      <GenerateAdvancedFields
-        draft={draft}
-        selectedModel={selectedModel}
-        onCommit={commit}
-        onCommitImmediate={commitPatchImmediately}
-      />
+        <GenerateComponentsSection draft={draft} selectedModel={selectedModel} onCommit={commitPatchImmediately} />
 
-      <GenerateCanvasSections />
-    </Stack>
+        <GenerateRefinerSection
+          draft={draft}
+          selectedModel={selectedModel}
+          onCommit={commit}
+          onCommitImmediate={commitPatchImmediately}
+        />
+
+        <GenerateAdvancedFields
+          draft={draft}
+          selectedModel={selectedModel}
+          onCommit={commit}
+          onCommitImmediate={commitPatchImmediately}
+        />
+
+        <GenerateCanvasSections />
+      </Stack>
+    </GenerateIssuesProvider>
   );
 };

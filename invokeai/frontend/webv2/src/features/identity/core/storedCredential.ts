@@ -15,8 +15,7 @@ const decodeBase64Url = (value: string): string => {
   return new TextDecoder().decode(Uint8Array.from(binary, (character) => character.charCodeAt(0)));
 };
 
-/** Read the backend's `user_id` claim without verifying it; the backend remains the authority for who a token is. */
-export const readTokenUserId = (token: string): string | null => {
+const readTokenClaims = (token: string): object | null => {
   const payload = token.split('.')[1];
 
   if (payload === undefined) {
@@ -26,12 +25,29 @@ export const readTokenUserId = (token: string): string | null => {
   try {
     const claims: unknown = JSON.parse(decodeBase64Url(payload));
 
-    return typeof claims === 'object' && claims !== null && 'user_id' in claims && typeof claims.user_id === 'string'
-      ? claims.user_id
-      : null;
+    return typeof claims === 'object' && claims !== null ? claims : null;
   } catch {
     return null;
   }
+};
+
+/** Read the backend's `user_id` claim without verifying it; the backend remains the authority for who a token is. */
+export const readTokenUserId = (token: string): string | null => {
+  const claims = readTokenClaims(token);
+
+  return claims !== null && 'user_id' in claims && typeof claims.user_id === 'string' ? claims.user_id : null;
+};
+
+/**
+ * When the token stops being honored, in epoch milliseconds, from its unverified `exp` claim (seconds); null when it
+ * carries none. Only a hint for warning the user: the backend decides, and renews it on activity.
+ */
+export const readTokenExpiry = (token: string): number | null => {
+  const claims = readTokenClaims(token);
+
+  return claims !== null && 'exp' in claims && typeof claims.exp === 'number' && Number.isFinite(claims.exp)
+    ? claims.exp * 1000
+    : null;
 };
 
 /**

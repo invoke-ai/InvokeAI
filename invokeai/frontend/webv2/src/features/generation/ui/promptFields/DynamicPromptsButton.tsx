@@ -1,26 +1,36 @@
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
+import type { PromptEditor } from '@features/generation/ui/promptFields/promptEditor';
+import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
 import { Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { DynamicPromptsPanel } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
-import { WildcardsPanel } from '@features/generation/ui/promptFields/WildcardsPanel';
-import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
+import { useFocusAfterPromptWrite } from '@features/generation/ui/promptFields/promptEditor';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { BracesIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const POPOVER_POSITIONING_BOTTOM_END = { placement: 'bottom-end' } as const;
+
+// The wildcard manager and its list load with the popover, not with every prompt field at editor boot.
+const loadWildcardsPanel = () => import('@features/generation/ui/promptFields/WildcardsPanel');
+const WildcardsPanel = lazy(() => loadWildcardsPanel().then((module) => ({ default: module.WildcardsPanel })));
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 
 interface DynamicPromptsButtonProps {
   config: DynamicPromptsFieldConfig;
   batchCount: number;
-  positivePrompt: string;
+  /** The expansion of the prompt as it generates (inside its template). */
+  expansion: DynamicPromptsExpansion;
+  /** Where focus returns after a pick lands in the prompt. */
+  promptEditor: Pick<PromptEditor, 'element'>;
   showSyntaxHighlighting: boolean;
+  /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
+  highlightExpandedPrompts: boolean;
   onUsePrompt: (prompt: string) => void;
   onInsertText: (text: string) => void;
 }
@@ -28,9 +38,11 @@ interface DynamicPromptsButtonProps {
 export const DynamicPromptsButton = ({
   batchCount,
   config,
+  expansion,
+  highlightExpandedPrompts,
   onInsertText,
   onUsePrompt,
-  positivePrompt,
+  promptEditor,
   showSyntaxHighlighting,
 }: DynamicPromptsButtonProps) => {
   const { t } = useTranslation();
@@ -38,18 +50,25 @@ export const DynamicPromptsButton = ({
   const tabsIdBase = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<'preview' | 'wildcards'>('preview');
-  const expansion = useDynamicPrompts(positivePrompt, config);
   const catalog = useWildcards();
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const { finalFocusEl, keepFocusAfterWrite } = useFocusAfterPromptWrite(promptEditor);
 
-  const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
+  const handleOpenChange = useCallback((event: { open: boolean }) => {
+    if (event.open) {
+      // Ready before the Wildcards tab is chosen, so it opens without a loading gap.
+      void loadWildcardsPanel();
+    }
+    setIsOpen(event.open);
+  }, []);
   const handleTabChange = useCallback((value: 'preview' | 'wildcards') => setTab(value), []);
   const closeWith = useCallback(
     (apply: (value: string) => void) => (value: string) => {
       apply(value);
+      keepFocusAfterWrite();
       setIsOpen(false);
     },
-    []
+    [keepFocusAfterWrite]
   );
   const handleUsePrompt = useMemo(() => closeWith(onUsePrompt), [closeWith, onUsePrompt]);
   const handleInsert = useMemo(() => closeWith(onInsertText), [closeWith, onInsertText]);
@@ -62,13 +81,22 @@ export const DynamicPromptsButton = ({
     [t]
   );
 
-  const tooltip = expansion.isDynamic
-    ? t('widgets.generate.dynamicPrompts.showPrompts')
-    : t('widgets.generate.dynamicPrompts.noDynamicSyntax');
-  const countLabel = !expansion.isDynamic ? null : expansion.isLoading ? '—' : String(expansion.count);
+  const tooltip = !config.enabled
+    ? t('widgets.generate.dynamicPrompts.offTooltip')
+    : expansion.isDynamic
+      ? t('widgets.generate.dynamicPrompts.showPrompts')
+      : t('widgets.generate.dynamicPrompts.noDynamicSyntax');
+  const countLabel = !config.enabled
+    ? t('widgets.generate.dynamicPrompts.off')
+    : !expansion.isDynamic
+      ? null
+      : expansion.isLoading
+        ? '—'
+        : String(expansion.count);
 
   return (
     <Popover.Root
+      finalFocusEl={finalFocusEl}
       ids={popoverIds}
       lazyMount
       open={isOpen}
@@ -79,7 +107,11 @@ export const DynamicPromptsButton = ({
       <Tooltip content={tooltip} ids={popoverIds}>
         <Popover.Trigger asChild>
           <IconButton
-            aria-label={t('widgets.generate.dynamicPrompts.showPrompts')}
+            aria-label={
+              config.enabled
+                ? t('widgets.generate.dynamicPrompts.showPrompts')
+                : t('widgets.generate.dynamicPrompts.offLabel')
+            }
             color={expansion.isError ? 'fg.error' : undefined}
             opacity={expansion.isDynamic ? undefined : 0.5}
             px="1"
@@ -123,15 +155,17 @@ export const DynamicPromptsButton = ({
                       batchCount={batchCount}
                       config={config}
                       expansion={expansion}
-                      showSyntaxHighlighting={showSyntaxHighlighting}
+                      showSyntaxHighlighting={highlightExpandedPrompts}
                       onUsePrompt={handleUsePrompt}
                     />
                   ) : (
-                    <WildcardsPanel
-                      catalog={catalog}
-                      showSyntaxHighlighting={showSyntaxHighlighting}
-                      onInsert={handleInsert}
-                    />
+                    <Suspense fallback={null}>
+                      <WildcardsPanel
+                        catalog={catalog}
+                        showSyntaxHighlighting={showSyntaxHighlighting}
+                        onInsert={handleInsert}
+                      />
+                    </Suspense>
                   )}
                 </Stack>
               </Stack>
