@@ -624,11 +624,11 @@ def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled
     specs,
 ) -> None:
     """Warm RTX 4090 SD fp16 decodes at 512 and 1024 px under the native allocator raise the untiled line they
-    measure, and never lower it. The tiled SD decodes sit on that line at their tile, so the raised line prices more of
-    each tile, and the fit of the lines above takes less: the tiled line's slope falls. That is the estimate reading
-    the tile's cost off the line beneath, not a lower reservation: every shipped point stays covered and within its
-    bound, which raising the lines above as well, charging the tile twice, would break. SD fp16, as FLUX's decode lines
-    on this platform have no headroom for a raise (`bounds.UPPER_BOUND_EXCEPTIONS`)."""
+    measure, and never lower it. The tiled SD decodes sit on that line at their tile. Those with an untiled reference at
+    their tile are covered above it, so the raise adds to their estimates byte for byte; those without one are covered
+    above the raised line, and the fit of the lines above takes less for them: a tiled or assembly value falls. Every
+    shipped point stays covered and within its bound. SD fp16, as FLUX's decode lines on this platform have no headroom
+    for a raise (`bounds.UPPER_BOUND_EXCEPTIONS`); a 1024 px probe of 4.8 GB, as 4.9 GB breaks a tiled bound (below)."""
     native = {"conv_backend": "cudnn", "allocator": "native"}
     probes = [
         MeasuredPoint(
@@ -676,12 +676,39 @@ def test_probes_on_the_untiled_line_raise_it_and_may_shift_tile_cost_off_a_tiled
     assert any(shifted[name] < value for name, value in sd_decode(entries_before).items()), "tile cost moved off"
 
 
+def test_an_untiled_raise_that_breaks_a_tiled_bound_is_refused_though_a_steeper_raise_would_keep_it(
+    tmp_path: Path, machine, capsys
+) -> None:
+    """A known limitation, not the behaviour wanted: the warm SD fp16 decodes of the test above with a 1024 px probe
+    of 4.9 GB. `fit.raised_pair` raises the untiled line by the least its own points' bounds allow, the base, without
+    the tiled bounds (`bounds.line_bounds` gives none), which lifts the decodes at a 512 px tile at 1536 and 3072 px to
+    1.30x and 1.31x of their measured peaks, over their bound. The builder refuses it and writes nothing, though a
+    steeper raise would keep every tiled bound: the earlier rule, the larger per coefficient of the fit on all points
+    and on the fresh-process ones, accepted these probes. A joint fit of the untiled and tiled lines would fix it."""
+    machine(None, "linux")
+    windows = [
+        _window(1, _sd_fp16_decode(512), 1_300_000_000, estimator="vae.sd"),
+        _window(2, _sd_fp16_decode(1024), 4_900_000_000, estimator="vae.sd"),
+    ]
+    export = _export(tmp_path / f"20261017-120000-box-1-{RTX_4090.id}.json", RTX_4090, windows)
+    data_dir, before = _data_copy(tmp_path)
+
+    assert main([str(export), "--data-dir", str(data_dir), "--write"]) == 1
+
+    captured = capsys.readouterr()
+    assert "the bounds of these points reject the result" in captured.err
+    for side in (1536, 3072):
+        violation = f"vae.sd-cudnn,native-decode-fp16-{side}x{side}-tile512-RTX4090-demand_peak: reserves"
+        assert violation in captured.err
+    assert _files(data_dir) == before
+
+
 def test_a_probe_no_hull_edge_covers_within_the_bounds_raises_the_line_between_them(specs) -> None:
     """A CogView4 probe decode of 4000 MiB at 640px on the RTX 4090, above its cuDNN bf16 line (8696 bytes per pixel, a
     63 MiB base: 3460 MiB there). Every line through it and a fresh-process point or the origin reserves more than a
     fresh-process point priced on the line allows, the 512px decodes among them; a line between them covers it by 5%
-    and keeps every bound. No tiled decode sits on this line, whose bounds the raise does not see (`bounds.line_bounds`).
-    """
+    and keeps every bound. No tiled decode sits on this line, whose bounds the raise would not see
+    (`bounds.line_bounds`)."""
     probe = MeasuredPoint(
         estimator="vae.cogview4",
         version=specs["vae.cogview4"].version,

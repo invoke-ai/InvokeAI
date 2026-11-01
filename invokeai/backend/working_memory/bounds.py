@@ -343,10 +343,13 @@ def line_bounds(
     line, this holds the line to more than `bound_violation` asks: the line still lies within the point's ratio.
 
     A point on a line that sits on another (`fit.Line.sits_on`, a tiled VAE operation) bounds neither line. That line is
-    not raised (`fit.sitting_pair`), and it is fitted after the line beneath, on what that one prices the point's tile
-    at (`fit.base_values`): a raise beneath moves the tile's cost off the line above rather than adding to it, which a
-    bound holding the line above at its carried values would forbid. The result is checked against the point's bound
-    all the same (`bound_violation`, in the data test and the builder).
+    not raised (`fit.sitting_pair`); it is fitted after the line beneath, on what that one prices the point's tile at
+    (`fit.base_values`). A point with an untiled reference measured at its tile is covered above that reference
+    (`fit.point_reading`), so a raise beneath adds to its estimate byte for byte; only a point without one, covered
+    above the line beneath, can hand the tile's cost from the line above to it. The result is checked against the
+    point's bound (`bound_violation`, in the data test and the builder). That is a known limitation: `fit.raised_pair`
+    picks the least raise without the tiled bounds, so the builder can refuse a probe on the untiled line (exit 1) for
+    which a steeper raise would keep every tiled bound. A joint fit of the untiled and tiled lines would remove it.
 
     The other terms keep the bytes of the values `data` carries, before any refit: a term on a second line that the
     same refit moves would be priced at its old value here. No shipped estimator prices a point that bounds a line on a

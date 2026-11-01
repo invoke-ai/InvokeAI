@@ -21,9 +21,9 @@ A stand-in stays one until fresh-process points at two sizes far enough apart me
 can raise it, never lower it. A line that already covers its points by the shipped margin stays as it is; one that does
 not is raised by the least that keeps the upper bounds of the points priced on it (`fit.raised_pair`,
 `bounds.line_bounds`); a stand-in line that sits on another, a tiled VAE operation's, to the fit of its points read
-above their offsets (`fit.point_reading`), with its assembly line. A `legacy` entry is replaced by its fit where the points fit every line it carries within those
-bounds and each line has a point that holds the upper bound, a fresh-process one: probe windows alone never replace
-hand-set values. It keeps them otherwise.
+above their offsets (`fit.point_reading`), with its assembly line. A `legacy` entry is replaced by its fit where the
+points fit every line it carries within those bounds and each line has a point that holds the upper bound, a
+fresh-process one: probe windows alone never replace hand-set values. It keeps them otherwise.
 
 Without `--write` the changes are printed only. Exit status 2 refuses input the build cannot use: an export or point of
 another estimator version than the registered spec, features the spec's terms cannot evaluate, a platform
@@ -486,7 +486,8 @@ def refit(data: Mapping[str, WorkingMemoryData], specs: Mapping[str, EstimatorSp
     Every fit and raise of a line that sits on none keeps the upper bounds the points set (`bounds.line_bounds`): a
     stand-in that covers its points by the shipped margin is kept, and one that does not is raised by the least the
     bounds allow (`fit.raised_pair`). A stand-in that sits on another rises to the fit of its points read above their
-    offsets, with its assembly line, and the bounds are checked on the result (`bound_violations`). Raises `BoundConflict` where no line keeps the bounds, `BuildError` where the points cannot fit a line."""
+    offsets, with its assembly line, and the bounds are checked on the result (`bound_violations`). Raises
+    `BoundConflict` where no line keeps the bounds, `BuildError` where the points cannot fit a line."""
     groups = fit_points(data.values(), specs)
     ceilings = line_bounds(data.values(), specs)
     bases = base_values([entry for file in data.values() for entry in file.coefficients], groups, ceilings)
