@@ -2950,6 +2950,7 @@
       "addReferenceImage": "Add reference image",
       "advanced": "Advanced",
       "aspectRatio": "Aspect ratio",
+      "aspectRatioPresetDeleted": "Deleted ratio {{name}}",
       "capabilitiesLoadFailed": "Could not load model capabilities from the backend.",
       "capabilitiesUnavailableForRecall": "Model capabilities are not loaded, so settings that depend on the model cannot be applied yet. Prompts and seed can. If loading failed, retry from the Generate panel.",
       "capabilitiesUnavailableForSetup": "Model capabilities are not loaded, so this project cannot be set up for Generate yet. If loading failed, retry from the Generate panel.",

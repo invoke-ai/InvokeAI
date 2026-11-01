@@ -115,6 +115,11 @@ export {
   isZImageQwen3Encoder,
 } from './core/componentCompatibility';
 export {
+  getLockedAspectRatioSettings,
+  MAX_ASPECT_RATIO_PRESETS,
+  normalizeAspectRatioPresets,
+} from './core/aspectRatioPresets';
+export {
   isValidKrea2RebalanceWeights,
   normalizeRebalancePresets,
   type RebalancePreset,

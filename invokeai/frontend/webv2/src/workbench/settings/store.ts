@@ -3,6 +3,7 @@ import type {
   ProjectSortId,
   ProjectsViewId,
   ScopedDefaults,
+  StoredAspectRatioPreset,
   StoredGeneratePreset,
   StoredRebalancePreset,
   WorkbenchPreferences,
@@ -40,6 +41,7 @@ export const DEVELOPER_LOG_NAMESPACES: readonly LogNamespace[] = LOG_NAMESPACES;
 export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   alphaNoticeAcknowledged: false,
   antialiasProgressImages: false,
+  aspectRatioPresets: [],
   autoSwitchInvocationRoute: true,
   canvasToolMemory: {},
   confirmImageDeletion: true,
@@ -275,6 +277,48 @@ const CONTROL_MODEL_KEY_MAX_LENGTH = 255;
 const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isStoredAspectRatioPreset = (entry: unknown): entry is StoredAspectRatioPreset => {
+  if (!isPlainRecord(entry)) {
+    return false;
+  }
+
+  const { height, id, label, width } = entry;
+
+  return (
+    typeof id === 'string' &&
+    id !== '' &&
+    typeof label === 'string' &&
+    label.trim() !== '' &&
+    typeof width === 'number' &&
+    Number.isFinite(width) &&
+    typeof height === 'number' &&
+    Number.isFinite(height)
+  );
+};
+
+/**
+ * Shape-only, like {@link normalizeRebalancePresets}: generation drops ratios it cannot use when reading them, so a
+ * newer build's wider rules survive this one's writes. An already-valid list comes back as is, keeping its identity
+ * across unrelated preference patches.
+ */
+const normalizeAspectRatioPresetRecords = (values: unknown): StoredAspectRatioPreset[] => {
+  if (!Array.isArray(values)) {
+    return DEFAULT_PREFERENCES.aspectRatioPresets;
+  }
+
+  const seen = new Set<string>();
+  const kept = values.filter((entry): entry is StoredAspectRatioPreset => {
+    if (!isStoredAspectRatioPreset(entry) || seen.has(entry.id)) {
+      return false;
+    }
+
+    seen.add(entry.id);
+    return true;
+  });
+
+  return kept.length === values.length ? (values as StoredAspectRatioPreset[]) : kept;
+};
+
 /** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
 const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
 
@@ -371,6 +415,7 @@ type WorkbenchPreferencesInput = Omit<
 
 export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferencesInput): WorkbenchPreferences => ({
   antialiasProgressImages: preferences?.antialiasProgressImages === true,
+  aspectRatioPresets: normalizeAspectRatioPresetRecords(preferences?.aspectRatioPresets),
   autoSwitchInvocationRoute:
     typeof preferences?.autoSwitchInvocationRoute === 'boolean'
       ? preferences.autoSwitchInvocationRoute

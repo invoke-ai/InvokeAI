@@ -69,6 +69,17 @@ export interface StoredRebalancePreset {
 }
 
 /**
+ * A user-named aspect ratio as it is persisted, kept local for the same bundle reason as {@link StoredRebalancePreset}.
+ * Generation owns the ratio rules and revalidates the terms on read.
+ */
+export interface StoredAspectRatioPreset {
+  id: string;
+  label: string;
+  width: number;
+  height: number;
+}
+
+/**
  * A named Generate settings snapshot ("recipe") as it is persisted. `values` is
  * opaque to Settings for the same bundle reason as {@link StoredRebalancePreset}:
  * the generation feature owns the shape and re-normalizes it on apply.
@@ -147,6 +158,8 @@ export interface WorkbenchPreferences {
   launchpadProjectsSort: ProjectSortId;
   /** Projects pinned to the top of the library, oldest pin first. */
   launchpadPinnedProjectIds: string[];
+  /** User-named aspect ratios (ratios only, never sizes), in the order they were saved. */
+  aspectRatioPresets: StoredAspectRatioPreset[];
   /** User-saved Krea-2 conditioning rebalance curves, in the order they were saved. */
   krea2RebalancePresets: StoredRebalancePreset[];
   /** User-saved Generate settings snapshots ("recipes"), in the order they were saved. */

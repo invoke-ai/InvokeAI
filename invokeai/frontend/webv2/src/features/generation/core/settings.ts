@@ -170,6 +170,9 @@ export const isAspectRatioLocked = (
   settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
 ): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
 
+/** How far apart two ratios may be and still count as the same one. */
+export const ASPECT_RATIO_TOLERANCE = 0.0001;
+
 /** Best-matching preset for existing dimensions, falling back to Free. */
 export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
   if (height <= 0) {
@@ -179,7 +182,7 @@ export const deriveAspectRatioId = (width: number, height: number): AspectRatioI
   const ratio = width / height;
 
   for (const [id, entry] of Object.entries(ASPECT_RATIO_MAP)) {
-    if (Math.abs(entry.ratio - ratio) < 0.0001) {
+    if (Math.abs(entry.ratio - ratio) < ASPECT_RATIO_TOLERANCE) {
       return id as AspectRatioId;
     }
   }
