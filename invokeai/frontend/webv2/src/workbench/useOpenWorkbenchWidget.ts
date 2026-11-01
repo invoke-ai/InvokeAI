@@ -3,10 +3,11 @@ import type { OpenWorkbenchWidgetOptions, RegisteredWidget, WidgetTypeId } from 
 
 import { useCallback } from 'react';
 
-import type { WorkbenchWidgetCommands } from './workbenchStore';
+import type { WorkbenchFocusController } from './focusRegions';
+import type { WorkbenchQueries, WorkbenchWidgetCommands } from './workbenchStore';
 
 import { useWorkbenchFocus } from './focusRegions';
-import { openWidgetPlacement } from './widgetPlacementCommands';
+import { openWidgetPlacement, revealPlacedWidget } from './widgetPlacementCommands';
 import { useOptionalWorkbenchCommands, useWorkbenchCommands } from './WorkbenchContext';
 import { useOptionalWorkbenchWidgetRegistry, useWorkbenchWidgetRegistry } from './WorkbenchWidgetRegistryContext';
 
@@ -40,6 +41,35 @@ const openAndFocus = (
   }
 
   return result;
+};
+
+/**
+ * For "show me" controls: where the layout already has the widget, bring that one forward (raising its window) rather
+ * than open another; otherwise open it. Either way it takes focus.
+ */
+export const revealOrOpenWorkbenchWidget = (
+  {
+    focus,
+    getWidgetsForRegion,
+    queries,
+    widgets,
+  }: {
+    focus: Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion'>;
+    getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[];
+    queries: Pick<WorkbenchQueries, 'getSnapshot'>;
+    widgets: WorkbenchWidgetCommands;
+  },
+  widgetId: WidgetTypeId
+): void => {
+  const revealed = revealPlacedWidget({ project: queries.getSnapshot().activeProject, typeId: widgetId, widgets });
+
+  if (revealed?.kind === 'floating') {
+    focus.focusFloating(revealed.instanceId);
+  } else if (revealed) {
+    focus.focusRegion(revealed.region, widgetId);
+  } else {
+    openAndFocus(widgets, getWidgetsForRegion, focus.focusRegion, widgetId);
+  }
 };
 
 export const useOpenWorkbenchWidget = () => {

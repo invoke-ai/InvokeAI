@@ -53,7 +53,6 @@ export interface TransformEditingControllerOptions {
   readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
-  readonly isInteractionLocked: () => boolean;
   readonly hasFloatingSelection: () => boolean;
   /** The tool the user is on: a Space, Alt or C hold only lends the surface to another tool. */
   readonly getUserToolId: () => ToolId;
@@ -142,12 +141,7 @@ export class TransformEditingController {
     if (!persisted && !isTransformEligible(leaf.layer, document, this.deps.peekCacheRect(layerId))) {
       return 'ineligible';
     }
-    if (
-      this.deps.isInteractionLocked() ||
-      this.deps.isGestureActive() ||
-      this.deps.hasFloatingSelection() ||
-      !this.deps.canEdit()
-    ) {
+    if (this.deps.isGestureActive() || this.deps.hasFloatingSelection() || !this.deps.canEdit()) {
       return 'busy';
     }
     if (document.selectedLayerId !== layerId) {

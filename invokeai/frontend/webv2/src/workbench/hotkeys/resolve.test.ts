@@ -16,7 +16,6 @@ const context = {
 const base = {
   category: 'app',
   defaultKeys: ['x'] as string[],
-  implemented: true,
   keys: ['x'] as string[],
   preventDefault: true,
 } as const;
@@ -290,7 +289,6 @@ describe('resolveHotkey', () => {
       commandId: id,
       defaultKeys,
       id,
-      implemented: true,
       scope,
       title: id,
     });

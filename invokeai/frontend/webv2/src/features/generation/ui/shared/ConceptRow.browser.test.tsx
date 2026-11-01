@@ -63,7 +63,7 @@ const renderList = async (loras: GenerateLora[], handlers: Handlers = {}) => {
             </Profiler>
           ))}
         </ConceptList>
-        <GenerateFieldContextMenu copyValue={copySteps}>
+        <GenerateFieldContextMenu copyValue={copySteps} fieldLabel="Steps">
           <div data-testid="steps-field" style={STEPS_STYLE}>
             Steps
           </div>

@@ -50,3 +50,6 @@ registerAccountOwnedResource({
 export const useModelLoads = (): ModelLoadInfo[] => store.useSelector((snapshot) => snapshot.activeLoads);
 
 export const getModelLoads = (): ModelLoadInfo[] => store.getSnapshot().activeLoads;
+
+/** For callers outside React that only need to know when loads change. */
+export const subscribeModelLoads = (listener: () => void): (() => void) => store.subscribe(listener);

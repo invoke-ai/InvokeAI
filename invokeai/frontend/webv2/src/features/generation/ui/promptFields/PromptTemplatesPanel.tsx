@@ -19,6 +19,7 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { LoadError } from '@platform/ui/LoadError';
 import { Row } from '@platform/ui/Row';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -137,9 +138,28 @@ export const PromptTemplatesPanel = ({
       />
       <Separator />
 
+      {/* A failed refresh keeps the templates read before; only a failure with nothing to show fills the list. */}
+      {catalog.isError && catalog.templates.length > 0 ? (
+        <LoadError
+          detail={catalog.errorDetail}
+          isRetrying={catalog.isRetrying}
+          layout="inline"
+          message={t('widgets.generate.promptTemplates.couldNotRefresh')}
+          onRetry={catalog.retry}
+        />
+      ) : null}
+
       <Scrollable h="16rem" label={t('widgets.generate.promptTemplates.title')}>
         {catalog.isLoading ? (
           <PanelMessage>{t('widgets.generate.promptTemplates.loading')}</PanelMessage>
+        ) : catalog.isError && catalog.templates.length === 0 ? (
+          <LoadError
+            detail={catalog.errorDetail}
+            isRetrying={catalog.isRetrying}
+            layout="state"
+            message={t('widgets.generate.promptTemplates.couldNotLoad')}
+            onRetry={catalog.retry}
+          />
         ) : !hasResults ? (
           <PanelMessage>
             {searchTerm.trim()
@@ -383,8 +403,8 @@ const TemplateRow = ({
       >
         <button type="button" onClick={handleApply}>
           <TemplateThumbnail template={template} />
-          <Stack align="start" flex="1" gap="0" minW="0">
-            <Text as="span" fontSize="md" fontWeight={isActive ? '600' : '400'}>
+          <Stack flex="1" gap="0" minW="0" textAlign="start">
+            <Text as="span" fontSize="md" fontWeight={isActive ? '600' : '400'} truncate>
               {template.name}
             </Text>
             <Text as="span" color="fg.muted" fontFamily="mono" fontSize="xs" truncate>

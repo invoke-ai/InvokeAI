@@ -3,18 +3,28 @@ import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { ListStack } from '@platform/ui/list/ListStack';
 import { useTranslation } from 'react-i18next';
 
+import type { QueueFilterId } from './queueFilters';
 import type { QueueItemRevealRequest } from './queueUiStore';
 
 import { useCurrentBatchItems } from './queueDataStore';
 import { QueueItemRow } from './QueueItemRow';
 
-/** CURRENT BATCH — the running item plus every pending item in the same backend batch. */
-export const CurrentBatchSection = ({ revealRequest = null }: { revealRequest?: QueueItemRevealRequest | null }) => {
+/**
+ * CURRENT BATCH — the running item plus every pending item in the same backend batch. Its items are all unfinished, so
+ * it shows under All and Active and steps aside for the finished-status filters.
+ */
+export const CurrentBatchSection = ({
+  filter,
+  revealRequest = null,
+}: {
+  filter: QueueFilterId;
+  revealRequest?: QueueItemRevealRequest | null;
+}) => {
   const { t } = useTranslation();
   const items = useCurrentBatchItems();
   const count = items.length;
 
-  if (count === 0) {
+  if (count === 0 || (filter !== 'all' && filter !== 'active')) {
     return null;
   }
 

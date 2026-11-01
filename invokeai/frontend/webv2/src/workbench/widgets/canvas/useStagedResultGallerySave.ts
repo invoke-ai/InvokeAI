@@ -1,5 +1,4 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
-import type { ToastAction } from '@platform/ui/toaster';
 import type { Project } from '@workbench/projectContracts';
 
 import { invalidateGallery } from '@features/gallery/queries';
@@ -9,6 +8,7 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 import { createKeyedTransientStore } from '@platform/state/externalStore';
+import { ACTION_TOAST_DURATION_MS, createActionToast, type ToastAction } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   retryStagedResultBoard,
@@ -20,7 +20,7 @@ import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { ACTION_TOAST_DURATION_MS, announce, describeBoard } from './gallerySaveToast';
+import { describeBoard } from './gallerySaveToast';
 
 /** Staged images with a save or board retry in flight; the bar and the thumbnail menu share the gate. */
 const savingImages = createKeyedTransientStore<string, true>();
@@ -77,7 +77,13 @@ export const useStagedResultGallerySave = (
 
         // The listing, its paging and the board counts are server-owned; refetch rather than guess where it lands.
         void invalidateGallery(queryClient, owner);
-        const board = await describeBoard(queryClient, project, outcome.boardId, t);
+        const board = await describeBoard(
+          queryClient,
+          project,
+          queries.getSnapshot().scopedDefaults,
+          outcome.boardId,
+          t
+        );
 
         if (!isAccountScopeCurrent(owner)) {
           return;
@@ -92,7 +98,8 @@ export const useStagedResultGallerySave = (
               ? t('widgets.canvas.staging.savedToBoard', { board: board.label })
               : t('widgets.canvas.staging.saved');
 
-          announce(owner, {
+          createActionToast({
+            signal: owner.signal,
             actions: showActions,
             description,
             ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
@@ -104,7 +111,8 @@ export const useStagedResultGallerySave = (
 
         if (board.kind === 'missing') {
           // Retrying cannot bring a deleted board back.
-          announce(owner, {
+          createActionToast({
+            signal: owner.signal,
             actions: showActions,
             description: t('widgets.canvas.staging.boardMissingDescription', { name }),
             ...(showActions.length > 0 ? { duration: ACTION_TOAST_DURATION_MS } : {}),
@@ -122,7 +130,8 @@ export const useStagedResultGallerySave = (
             ),
         };
 
-        announce(owner, {
+        createActionToast({
+          signal: owner.signal,
           actions: [retry, ...showActions],
           description: t('widgets.canvas.staging.boardFailedDescription', { name }),
           duration: ACTION_TOAST_DURATION_MS,
@@ -134,7 +143,12 @@ export const useStagedResultGallerySave = (
         });
       } catch {
         if (isAccountScopeCurrent(owner)) {
-          announce(owner, { actions: [], title: t('widgets.canvas.staging.saveError'), type: 'error' });
+          createActionToast({
+            actions: [],
+            signal: owner.signal,
+            title: t('widgets.canvas.staging.saveError'),
+            type: 'error',
+          });
         }
       } finally {
         savingImages.delete(name);
@@ -142,9 +156,12 @@ export const useStagedResultGallerySave = (
     };
 
     return (name: string) => {
-      const origin = { owner: captureAccountScope(), project: queries.getSnapshot().activeProject };
+      const snapshot = queries.getSnapshot();
+      const origin = { owner: captureAccountScope(), project: snapshot.activeProject };
 
-      return run(name, origin, () => saveStagedResultToGallery({ imageName: name, project: origin.project }));
+      return run(name, origin, () =>
+        saveStagedResultToGallery({ imageName: name, project: origin.project, scopedDefaults: snapshot.scopedDefaults })
+      );
     };
   }, [findGalleryItem, queries, queryClient, t]);
 

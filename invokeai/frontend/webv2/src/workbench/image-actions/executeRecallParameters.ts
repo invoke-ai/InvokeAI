@@ -101,7 +101,7 @@ export const executeRecallParameters = async ({
       commands.notifications.add({
         kind: 'info',
         message: getMissingGenerateValuesMessage(t),
-        title: 'Cannot apply recalled parameters',
+        title: t('widgets.gallery.itemActions.recall.parameters.cannotApply'),
       });
       return false;
     }
@@ -110,7 +110,7 @@ export const executeRecallParameters = async ({
       commands.notifications.add({
         kind: 'info',
         message: t('widgets.generate.capabilitiesUnavailableForRecall'),
-        title: 'Cannot apply recalled parameters',
+        title: t('widgets.gallery.itemActions.recall.parameters.cannotApply'),
       });
       return false;
     }
@@ -127,13 +127,13 @@ export const executeRecallParameters = async ({
       }
     }
 
-    const skipMessage = result.skipped.length > 0 ? getRecallParametersSkipMessage(result.skipped) : null;
+    const skipMessage = result.skipped.length > 0 ? getRecallParametersSkipMessage(result.skipped, t) : null;
 
     if (result.fields.length === 0) {
       commands.notifications.add({
         kind: 'info',
-        message: skipMessage ?? 'The request did not include any parameters the Generate panel uses.',
-        title: 'No recalled parameters applied',
+        message: skipMessage ?? t('widgets.gallery.itemActions.recall.parameters.nothingAppliedDescription'),
+        title: t('widgets.gallery.itemActions.recall.parameters.nothingApplied'),
       });
       return false;
     }
@@ -141,14 +141,14 @@ export const executeRecallParameters = async ({
     commands.generation.setSettings(result.values, projectId);
     commands.notifications.add({
       kind: 'success',
-      message: getRecallParametersMessage(result.fields),
-      title: 'Recalled parameters',
+      message: getRecallParametersMessage(result.fields, t),
+      title: t('widgets.gallery.itemActions.recall.parameters.applied'),
     });
     if (skipMessage) {
       commands.notifications.add({
         kind: 'info',
         message: skipMessage,
-        title: 'Some recalled parameters were not applied',
+        title: t('widgets.gallery.itemActions.recall.parameters.partiallyApplied'),
       });
     }
     return true;

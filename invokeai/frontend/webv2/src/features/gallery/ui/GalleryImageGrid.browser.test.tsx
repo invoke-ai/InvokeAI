@@ -228,7 +228,6 @@ void i18n.use(initReactI18next).init({
             starredItems: 'Starred',
             unstarImage: 'Unstar {{name}}',
             uncategorized: 'Uncategorized',
-            windowLimit: 'Limited to {{count}}',
           },
           preview: {
             compare: 'Compare',
@@ -549,7 +548,6 @@ const Harness = ({
     filter: getStableFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: currentListing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
@@ -635,7 +633,6 @@ const QueryBackedGalleryHarness = ({
     filter: sparseData.filter,
     gallery,
     itemActions: imageActionMocks,
-    isWindowTruncated: false,
     listing: sparseData.listing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, sparseData.items ?? []),
     projectName: 'Project',
@@ -1443,6 +1440,43 @@ describe('GalleryImageGrid mixed item cells', () => {
     );
   });
 
+  it('says a hotkey deletion reaches an item off screen when a selected member is on no loaded page', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'loaded.png')],
+        selectedItemKey: 'image:loaded.png',
+        selectedItemKeys: ['image:loaded.png', 'video:unloaded.mp4'],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'loaded.png' },
+        { kind: 'video', name: 'unloaded.mp4' },
+      ],
+      expect.objectContaining({ targetsOffScreen: true })
+    );
+  });
+
+  it('leaves a primary item no listed page holds out of the hotkeys', async () => {
+    await renderGallery(
+      createGallery({
+        items: [createItem('image', 'listed.png')],
+        primarySelectedItemKey: 'image:elsewhere.png',
+        selectedItemKey: null,
+        selectedItemKeys: [],
+      })
+    );
+
+    registeredCommands.get('gallery.deleteSelection')?.();
+    registeredCommands.get('gallery.starImage')?.();
+
+    expect(imageActionMocks.deleteItems).not.toHaveBeenCalled();
+    expect(imageActionMocks.setItemsStarred).not.toHaveBeenCalled();
+  });
+
   it('select-all and common hotkeys target ordered same-name mixed refs independently', async () => {
     const items = [createItem('image', 'shared'), createItem('video', 'shared')];
     await renderGallery(
@@ -1470,7 +1504,7 @@ describe('GalleryImageGrid mixed item cells', () => {
         { kind: 'image', name: 'shared' },
         { kind: 'video', name: 'shared' },
       ],
-      { returnFocus: undefined }
+      { returnFocus: undefined, targetsOffScreen: false }
     );
     expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
       [
@@ -3755,9 +3789,9 @@ describe('shared gallery progress section', () => {
     for (const [boardState, status] of cases) {
       currentListing = { ...READY_LISTING, status };
       await renderGallery(createGallery(boardState));
-      expect(host?.querySelector('button[title^="Workflow A ·"]')).not.toBeNull();
+      expect(host?.querySelector('button[aria-label^="Workflow A ·"]')).not.toBeNull();
     }
-    await click(host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!);
+    await click(host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!);
     expect(followProgressSession).toHaveBeenCalledWith('run:1', { revealPreview: true });
     expect(host?.querySelectorAll('[role="listitem"]')).toHaveLength(currentGallery.items.length);
   });
@@ -3901,18 +3935,18 @@ describe('shared gallery progress section', () => {
       label: `Slot ${index + 1}`,
     }));
     await renderGallery();
-    const tile = host!.querySelector<HTMLButtonElement>('button[title^="Slot 4 ·"]')!;
+    const tile = host!.querySelector<HTMLButtonElement>('button[aria-label^="Slot 4 ·"]')!;
     const image = tile.querySelector('img');
     expect(image).not.toBeNull();
     tile.focus();
     host!.style.width = '520px';
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, imageDensityPercent: 100 } }));
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
     currentProgressSessions = currentProgressSessions.slice(1);
     await renderGallery();
-    expect(host!.querySelector('button[title^="Slot 4 ·"]')).toBe(tile);
+    expect(host!.querySelector('button[aria-label^="Slot 4 ·"]')).toBe(tile);
     expect(tile.querySelector('img')).toBe(image);
     expect(document.activeElement).toBe(tile);
   });
@@ -3933,6 +3967,40 @@ describe('shared gallery progress section', () => {
     await click(finishing);
     expect(followProgressSession).not.toHaveBeenCalled();
     expect(finishing.getAttribute('aria-disabled')).toBe('true');
+  });
+  it('shows the spinner, not an indeterminate ring, until progress is known', async () => {
+    currentProgressSessions = [session];
+    await renderGallery();
+    const indicator = host!.querySelector('[aria-label="In progress"] [role="progressbar"]');
+    expect(indicator?.classList.contains('chakra-spinner')).toBe(true);
+    expect(indicator?.getAttribute('aria-label')).toBe('Preparing');
+  });
+  it('letterboxes placeholders to the output aspect only in aspect thumbnail mode', async () => {
+    currentProgressSessions = [
+      { ...session, width: 1024, height: 512, state: 'queued' },
+      { ...session, id: 'run:2', width: 512, height: 1024 },
+      { ...session, id: 'run:3', width: 0, height: 1024, state: 'queued' },
+    ];
+    const placeholderRatios = () =>
+      [...host!.querySelectorAll<HTMLElement>('[aria-label="In progress"] button[aria-pressed]')].map((tile) => {
+        const cell = tile.firstElementChild!.getBoundingClientRect();
+        const placeholder = tile.firstElementChild!.firstElementChild!.getBoundingClientRect();
+        return [placeholder.width / cell.width, placeholder.height / cell.height].map((ratio) => ratio.toFixed(2));
+      });
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'aspect' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '0.50'],
+      ['0.50', '1.00'],
+      ['1.00', '1.00'],
+    ]);
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, thumbnailFit: 'square' } }));
+    expect(placeholderRatios()).toEqual([
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+      ['1.00', '1.00'],
+    ]);
   });
   it('updates tile spacing when density changes without changing the batch', async () => {
     currentProgressSessions = [session, { ...session, id: 'run:2', itemIndex: 2 }];
@@ -3969,7 +4037,7 @@ describe('shared gallery progress section', () => {
     setStrip([createItem('image', 'starred.png', { starred: true })]);
     const gallery = createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] });
     await renderGallery(gallery);
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     await renderGallery(gallery);
     const current = host!.querySelector('button[aria-current="true"]');
@@ -4003,7 +4071,7 @@ describe('shared gallery progress section', () => {
     await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, progressSectionCollapsed: true } }));
     expect(host?.querySelector('[data-progress-disclosure]')?.getAttribute('aria-expanded')).toBe('false');
     await renderGallery(createGallery());
-    host!.querySelector<HTMLButtonElement>('button[title^="Workflow A ·"]')!.focus();
+    host!.querySelector<HTMLButtonElement>('button[aria-label^="Workflow A ·"]')!.focus();
     currentProgressSessions = [];
     mocks.progressFrame = null;
     await renderGallery();

@@ -141,6 +141,7 @@ it('announces engines registering and releasing their held media', () => {
   sources.subscribe(onChange);
   let notifyEngine = () => undefined as void;
   const release = sources.register('project-1', {
+    commitFrame: () => false,
     flushPendingPixels: () => Promise.resolve(),
     heldAssets: () => ({ images: ['undo.png'], videos: [] }),
     subscribe: (listener) => {
@@ -159,6 +160,7 @@ it("crosses a registered engine's paint barrier and treats an unregistered proje
   const sources = createLiveCanvasEngines();
   const flushPendingPixels = vi.fn(() => Promise.reject(new Error('upload failed')));
   sources.register('project-1', {
+    commitFrame: () => false,
     flushPendingPixels,
     heldAssets: () => ({ images: [], videos: [] }),
     subscribe: () => () => undefined,
@@ -167,6 +169,23 @@ it("crosses a registered engine's paint barrier and treats an unregistered proje
   await expect(sources.flushPendingPixels('project-1')).rejects.toThrow('upload failed');
   await expect(sources.flushPendingPixels('project-2')).resolves.toBeUndefined();
   expect(flushPendingPixels).toHaveBeenCalledOnce();
+});
+
+it("records a frame resize in a registered engine's history, and reports none without one", () => {
+  const sources = createLiveCanvasEngines();
+  const commitFrame = vi.fn(() => true);
+  sources.register('project-1', {
+    commitFrame,
+    flushPendingPixels: () => Promise.resolve(),
+    heldAssets: () => ({ images: [], videos: [] }),
+    subscribe: () => () => undefined,
+  });
+  const from = { height: 8, width: 8, x: 0, y: 0 };
+  const to = { height: 8, width: 16, x: -4, y: 0 };
+
+  expect(sources.commitFrame('project-1', from, to, 'Resize frame')).toBe(true);
+  expect(commitFrame).toHaveBeenCalledExactlyOnceWith(from, to, 'Resize frame');
+  expect(sources.commitFrame('project-2', from, to, 'Resize frame')).toBe(false);
 });
 
 const projectDocument = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({

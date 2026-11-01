@@ -119,12 +119,31 @@ export interface GenerationUiAdapter {
     openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
+    /** Reads the catalog again, even after a read that half failed; settles when the read does. */
+    refresh(): Promise<void>;
     status: 'error' | 'idle' | 'loaded' | 'loading';
   };
   notifications: {
     error(title: string, message?: string): void;
     info(title: string, message?: string): void;
+    /**
+     * Offers a choice about something that arrived on its own (a result held back), as buttons in a toast that stays
+     * until the user picks one or closes it, and closes with the account. Each `onClick` must check its target still
+     * exists.
+     */
+    offer(
+      title: string,
+      notice: { actions: readonly { label: string; onClick: () => void }[]; message?: string }
+    ): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
+    /**
+     * Reports a change that already happened, with Undo. `onUndo` must capture the ids it reverts (the toast outlives
+     * tab switches); with `projectId`, Undo is withdrawn once that project closes.
+     */
+    undoable(
+      title: string,
+      notice: { message?: string; onUndo: () => void; projectId?: string; supersedes?: string }
+    ): void;
   };
   /** The active project's stored Generate values; a store so edits do not re-render every adapter consumer. */
   generateValues: ReadableExternalStore<Record<string, unknown>>;
@@ -134,17 +153,25 @@ export interface GenerationUiAdapter {
     showPromptSyntaxHighlighting: boolean;
   };
   promptHistory: {
+    /** The active project's history. */
     items: readonly PromptHistoryItem[];
-    clear(): void;
+    clear(projectId: string): void;
     remove(prompt: PromptHistoryItem): void;
+    /** Undoes a clear: puts `items` back into that project's history, behind entries added since. */
+    restore(items: readonly PromptHistoryItem[], projectId: string): void;
   };
   presets: {
+    /** Whether a new preset keeps the prompts too; the save dialog's last choice, remembered per account. */
+    includePrompts: boolean;
+    setIncludePrompts(includePrompts: boolean): void;
     /** User-saved Generate settings snapshots ("recipes"), in save order. */
     presets: readonly GeneratePresetRecord[];
     /** Adds a snapshot under a new id and returns it. */
     save(label: string, values: Record<string, unknown>): GeneratePresetRecord;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
+    /** Undoes a remove: puts `preset` back at `index` (or last), unless a preset with its id is still there. */
+    restore(preset: GeneratePresetRecord, index: number): void;
   };
   /**
    * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
@@ -158,6 +185,8 @@ export interface GenerationUiAdapter {
     save(label: string, weights: string, multiplier: number): RebalancePreset;
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
+    /** Undoes a remove: puts `preset` back at `index` among the saved curves (or last), unless its id is still there. */
+    restore(preset: RebalancePreset, index: number): void;
   };
   sectionPreferences: {
     /** Persisted per-user open/closed overrides for panel sections; absent = section default. */
@@ -166,11 +195,8 @@ export interface GenerationUiAdapter {
   };
   settings: {
     patchGenerateSettings(values: Partial<GenerateSettings>, projectId?: string, origin?: 'user' | 'system'): void;
-    /**
-     * Applies a Reset size choice: the same patch, marked as a reset so a surface that frames the size (the canvas)
-     * can keep its centre rather than its top-left. Generation does not know which surface that is.
-     */
-    resetDimensions(values: Partial<GenerateSettings>, projectId?: string): void;
+    /** A project's stored Generate values, read when an Undo runs; null once the project is closed. */
+    readGenerateValues(projectId: string): Record<string, unknown> | null;
   };
 }
 

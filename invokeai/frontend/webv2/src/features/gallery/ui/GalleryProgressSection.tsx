@@ -1,12 +1,14 @@
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
-import { Box, chakra, Icon, ProgressCircle, Skeleton, Text } from '@chakra-ui/react';
+import { Box, chakra, Icon, Skeleton, Text } from '@chakra-ui/react';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
-import { CheckIcon, ChevronRightIcon, HourglassIcon } from 'lucide-react';
+import { Tooltip } from '@platform/ui/Tooltip';
+import { ChevronRightIcon, HourglassIcon } from 'lucide-react';
 import { useCallback, useEffectEvent, useId, useLayoutEffect, useRef } from 'react';
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -180,6 +182,14 @@ const GalleryProgressGrid = ({
   );
 };
 
+const FILL_CELL = { h: 'full', w: 'full' } as const;
+const FILL_WIDTH = { w: 'full' } as const;
+const FILL_HEIGHT = { h: 'full' } as const;
+
+/** The output's width-to-height ratio, for letterboxing a placeholder like an aspect-fit thumbnail. */
+const getPlaceholderAspectRatio = ({ width, height }: QueueProgressSession): number | null =>
+  width > 0 && height > 0 && Number.isFinite(width / height) ? width / height : null;
+
 const GalleryProgressTile = ({
   session,
   size,
@@ -236,60 +246,57 @@ const GalleryProgressTile = ({
   );
 
   const isShownSelected = selected && session.state !== 'queued';
+  // Aspect fit letterboxes the placeholder inside the square cell, as completed thumbnails are: the longer side fills
+  // the cell and the other follows the output's ratio.
+  const placeholderAspectRatio = fit === 'aspect' ? getPlaceholderAspectRatio(session) : null;
+  const placeholderSize =
+    placeholderAspectRatio === null ? FILL_CELL : placeholderAspectRatio >= 1 ? FILL_WIDTH : FILL_HEIGHT;
 
   return (
-    <chakra.button
-      ref={buttonRef}
-      type="button"
-      focusVisibleRing="inside"
-      aria-label={`${label} · ${status}`}
-      aria-pressed={isShownSelected}
-      aria-disabled={session.state !== 'running'}
-      data-gallery-session-id={session.id}
-      tabIndex={session.state === 'running' ? 0 : -1}
-      borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
-      borderWidth="2px"
-      css={isShownSelected ? SELECTED_TILE_CSS : undefined}
-      flexShrink={0}
-      minW="0"
-      overflow="hidden"
-      rounded="md"
-      textAlign="start"
-      title={`${label} · ${status}`}
-      position="relative"
-      w={`${size}px`}
-      onClick={follow}
-    >
-      <StreamingImageFrame
-        aspectRatio={1}
-        fit={fit === 'aspect' ? 'contain' : 'cover'}
-        liveImage={progressImageToStreamingSource(image)}
-        shouldAntialiasLiveImage={antialiasProgressImages}
-        w="full"
+    <Tooltip content={`${label} · ${status}`}>
+      <chakra.button
+        ref={buttonRef}
+        type="button"
+        focusVisibleRing="inside"
+        aria-label={`${label} · ${status}`}
+        aria-pressed={isShownSelected}
+        aria-disabled={session.state !== 'running'}
+        data-gallery-session-id={session.id}
+        tabIndex={session.state === 'running' ? 0 : -1}
+        borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
+        borderWidth="2px"
+        css={isShownSelected ? SELECTED_TILE_CSS : undefined}
+        flexShrink={0}
+        minW="0"
+        overflow="hidden"
+        rounded="md"
+        textAlign="start"
+        position="relative"
+        w={`${size}px`}
+        onClick={follow}
       >
-        {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
-      </StreamingImageFrame>
-      <Box
-        position="absolute"
-        bottom="1"
-        right="1"
-        pointerEvents="none"
-        bg="bg/85"
-        rounded="full"
-        p="0.5"
-        display="flex"
-      >
-        {session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} value={percentage}>
-            <ProgressCircle.Circle>
-              <ProgressCircle.Track />
-              <ProgressCircle.Range />
-            </ProgressCircle.Circle>
-          </ProgressCircle.Root>
-        ) : (
-          <Icon as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="4" aria-label={status} />
-        )}
-      </Box>
-    </chakra.button>
+        <StreamingImageFrame
+          alignItems="center"
+          aspectRatio={1}
+          display="flex"
+          fit={fit === 'aspect' ? 'contain' : 'cover'}
+          justifyContent="center"
+          liveImage={progressImageToStreamingSource(image)}
+          shouldAntialiasLiveImage={antialiasProgressImages}
+          w="full"
+        >
+          {session.state === 'queued' ? (
+            <Box bg="bg.subtle" aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+          ) : (
+            <Skeleton aspectRatio={placeholderAspectRatio ?? undefined} {...placeholderSize} />
+          )}
+        </StreamingImageFrame>
+        <ProgressBadge
+          label={status}
+          percentage={percentage}
+          state={session.state === 'settling' ? 'completed' : session.state}
+        />
+      </chakra.button>
+    </Tooltip>
   );
 };
