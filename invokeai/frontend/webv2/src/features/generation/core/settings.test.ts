@@ -731,6 +731,17 @@ describe('dimension helpers', () => {
     expect(wide.width / wide.height).toBeCloseTo(16 / 9, 1);
   });
 
+  it('keeps the ratio at the size limits, scaling both sides instead of clamping one', () => {
+    // 6144² at 16:9 is 8192×4608; halved to fit 4096.
+    expect(calculateNewSize(16 / 9, 6144 * 6144)).toEqual({ height: 2304, width: 4096 });
+    // 2048² at 8:1 is 5792.6×724.1; scaled to fit 4096 wide, the height is exactly 512.
+    expect(calculateNewSize(8, 2048 * 2048)).toEqual({ height: 512, width: 4096 });
+    // 32² is below the 64px minimum on both sides.
+    expect(calculateNewSize(1, 32 * 32)).toEqual({ height: 64, width: 64 });
+    // 48² at 4:1 is 96×24; scaled so the short side is 64, then 256×64.
+    expect(calculateNewSize(4, 48 * 48)).toEqual({ height: 64, width: 256 });
+  });
+
   it('moves a reference image one step through the stack, and no-ops at the ends', () => {
     const referenceImages = ['a', 'b', 'c'].map((id) => ({
       config: { image: null, model: null, type: 'flux_kontext_reference_image' as const },
