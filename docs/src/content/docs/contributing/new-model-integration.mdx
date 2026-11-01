@@ -572,10 +572,12 @@ Packages are discovered automatically. A directory of node modules without an `_
 
 3. **Denoise** (`new_model/new_model_denoise.py`)
 
+   Every denoise node must inherit `WithMetadata` (and must **not** inherit `WithBoard`), implement `_build_metadata(self) -> MetadataField` via `build_denoise_metadata(...)` without mutating `self.metadata.root`, and return `LatentsMetaOutput` (or a custom output subclassing `MetadataOutput` for multi-tensor outputs). Never create a separate `*_denoise_meta` wrapper node.
+
    ```python title="invokeai/app/invocations/new_model/new_model_denoise.py"
    @invocation("new_model_denoise", title="Denoise - NewModel", tags=["image", "new_model"],
                category="image", version="1.0.0", classification=Classification.Prototype)
-   class NewModelDenoiseInvocation(BaseInvocation):
+   class NewModelDenoiseInvocation(BaseInvocation, WithMetadata):
        latents: Optional[LatentsField] = InputField(default=None, description=FieldDescriptions.latents,
                                                     input=Input.Connection)
        denoise_mask: Optional[DenoiseMaskField] = InputField(default=None, description=FieldDescriptions.denoise_mask,
@@ -596,12 +598,31 @@ Packages are discovered automatically. A directory of node modules without an `_
        steps: int = InputField(default=8, gt=0, description=FieldDescriptions.steps)
        seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
-       def invoke(self, context: InvocationContext) -> LatentsOutput:
+       def _build_metadata(self) -> MetadataField:
+           updates: dict[str, Any] = {
+               "generation_mode": "new_model_inpaint"
+               if self.denoise_mask is not None
+               else ("new_model_img2img" if self.latents is not None else "new_model_txt2img"),
+               "width": self.width,
+               "height": self.height,
+               "steps": self.steps,
+               "cfg_scale": self.cfg_scale,
+               "denoising_start": self.denoising_start,
+               "denoising_end": self.denoising_end,
+               "seed": self.seed,
+               "model": self.transformer.transformer,
+           }
+           loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+           if loras:
+               updates["loras"] = loras
+           return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
+       def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
            # 1. Noise from the seed; init latents for img2img; clip the schedule by denoising_start/end.
            # 2. Load the transformer with a working-memory estimate; apply LoRA patches.
            # 3. Loop: model prediction, optional CFG, scheduler step,
            #    RectifiedFlowInpaintExtension merge when a denoise_mask is set, step callback.
-           # 4. Save and return the latents.
+           # 4. Save and return LatentsMetaOutput.build(..., metadata=self._build_metadata(), width=self.width, height=self.height).
            ...
    ```
 
@@ -620,7 +641,7 @@ Packages are discovered automatically. A directory of node modules without an `_
 - [ ] Package `invocations/new_model/` with `__init__.py`
 - [ ] Model loader with `ui_model_base` / `ui_model_type`, and `accepted_vae_bases()` on the VAE field
 - [ ] Text encoder matching the reference encoding, with a test
-- [ ] Denoise: grid equals `dimension_grid`, guidance bounds equal the facet, img2img, inpaint, previews, cancel, working memory
+- [ ] Denoise: inherits `WithMetadata` (never `WithBoard`), returns `LatentsMetaOutput`, builds metadata via `build_denoise_metadata`, grid equals `dimension_grid`, guidance bounds equal the facet, img2img, inpaint, previews, cancel, working memory
 - [ ] VAE encode and decode with the correct normalization
 :::
 
@@ -933,6 +954,7 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/backend/architectures/test_variants.py` | A `base=Any` variant enum in `BASE_AGNOSTIC_VARIANT_ENUMS`; an architecture that gains variants out of the pinned list of variant-less ones. Otherwise it checks the variant lists and unique values itself |
 | `tests/backend/architectures/test_modality.py` | Nothing if `GENERATION_MODES` matches `ModalityFacet` |
 | `tests/backend/architectures/test_capabilities_fixture.py` | Regenerate the webv2 fixture (see section 11) |
+| `tests/app/invocations/test_denoise_metadata.py` | Automatically checks `WithMetadata` and `MetadataOutput` on every `*denoise*` node; add a per-node metadata contract test for the new denoise node |
 | `tests/app/invocations/test_frontend_graph_node_types.py` | `SUPPORTED_BASE_COUNTS`, possibly `LITERAL_FLOORS` |
 | `tests/app/invocations/test_ideal_size.py` | A row in `IDEAL_SIZE_AT_NODE_DEFAULTS`: the size Ideal Size returns for the base at the node's defaults, derived by hand from the declared default size and `dimension_grid` |
 | `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |

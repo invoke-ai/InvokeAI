@@ -2,7 +2,7 @@
   "id": "default_wan22_t2v_b1c4f0a2-2d3e-4a5b-9f6c-7d8e0a1b2c3d",
   "name": "Text to Image - Wan 2.2",
   "author": "InvokeAI",
-  "description": "Text-to-image generation with Wan 2.2 (T2V A14B or TI2V-5B). For A14B GGUFs, wire the second-expert transformer into 'Transformer (Low Noise)' and pick a Diffusers Wan as the Component Source (or use standalone VAE + UMT5-XXL encoder). TI2V-5B is a single-transformer model — leave the low-noise slot empty.",
+  "description": "Text-to-image generation with Wan 2.2 (T2V A14B or TI2V-5B). For A14B GGUFs, wire the second-expert transformer into 'Transformer (Low Noise)' and pick a Diffusers Wan as the Component Source (or use standalone VAE + UMT5-XXL encoder). TI2V-5B is a single-transformer model \u2014 leave the low-noise slot empty.",
   "version": "1.0.0",
   "contact": "",
   "tags": "wan2.2, text to image",
@@ -75,14 +75,32 @@
         "isIntermediate": true,
         "useCache": false,
         "inputs": {
-          "model": { "name": "model", "label": "" },
-          "transformer_low_noise_model": { "name": "transformer_low_noise_model", "label": "" },
-          "vae_model": { "name": "vae_model", "label": "" },
-          "wan_t5_encoder_model": { "name": "wan_t5_encoder_model", "label": "" },
-          "component_source": { "name": "component_source", "label": "" }
+          "model": {
+            "name": "model",
+            "label": ""
+          },
+          "transformer_low_noise_model": {
+            "name": "transformer_low_noise_model",
+            "label": ""
+          },
+          "vae_model": {
+            "name": "vae_model",
+            "label": ""
+          },
+          "wan_t5_encoder_model": {
+            "name": "wan_t5_encoder_model",
+            "label": ""
+          },
+          "component_source": {
+            "name": "component_source",
+            "label": ""
+          }
         }
       },
-      "position": { "x": 200, "y": 0 }
+      "position": {
+        "x": 200,
+        "y": 0
+      }
     },
     {
       "id": "2b1f7d8c-ae3f-5c4d-9f2b-3a4e5d6c7b8f",
@@ -97,11 +115,21 @@
         "isIntermediate": true,
         "useCache": true,
         "inputs": {
-          "prompt": { "name": "prompt", "label": "", "value": "a cat" },
-          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": "a cat"
+          },
+          "wan_t5_encoder": {
+            "name": "wan_t5_encoder",
+            "label": ""
+          }
         }
       },
-      "position": { "x": 700, "y": -200 }
+      "position": {
+        "x": 700,
+        "y": -200
+      }
     },
     {
       "id": "3c2a8e9d-bf4a-6d5e-af3c-4b5f6e7d8c9a",
@@ -116,11 +144,21 @@
         "isIntermediate": true,
         "useCache": true,
         "inputs": {
-          "prompt": { "name": "prompt", "label": "", "value": " " },
-          "wan_t5_encoder": { "name": "wan_t5_encoder", "label": "" }
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "value": " "
+          },
+          "wan_t5_encoder": {
+            "name": "wan_t5_encoder",
+            "label": ""
+          }
         }
       },
-      "position": { "x": 700, "y": 100 }
+      "position": {
+        "x": 700,
+        "y": 100
+      }
     },
     {
       "id": "5e4cab0b-d16c-8faf-c05e-6d7baf90ebbc",
@@ -135,11 +173,22 @@
         "isIntermediate": true,
         "useCache": false,
         "inputs": {
-          "low": { "name": "low", "label": "", "value": 0 },
-          "high": { "name": "high", "label": "", "value": 2147483647 }
+          "low": {
+            "name": "low",
+            "label": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "value": 2147483647
+          }
         }
       },
-      "position": { "x": 700, "y": 400 }
+      "position": {
+        "x": 700,
+        "y": 400
+      }
     },
     {
       "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
@@ -147,31 +196,87 @@
       "data": {
         "id": "4d3b9faf-c05b-7e6f-bf4d-5c6a7f8e9dab",
         "type": "wan_denoise",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "label": "",
         "notes": "",
         "isOpen": true,
         "isIntermediate": true,
         "useCache": true,
         "inputs": {
-          "transformer": { "name": "transformer", "label": "" },
-          "positive_conditioning": { "name": "positive_conditioning", "label": "" },
-          "negative_conditioning": { "name": "negative_conditioning", "label": "" },
-          "ref_image": { "name": "ref_image", "label": "" },
-          "latents": { "name": "latents", "label": "" },
-          "denoise_mask": { "name": "denoise_mask", "label": "" },
-          "denoising_start": { "name": "denoising_start", "label": "", "value": 0 },
-          "denoising_end": { "name": "denoising_end", "label": "", "value": 1 },
-          "add_noise": { "name": "add_noise", "label": "", "value": true },
-          "guidance_scale": { "name": "guidance_scale", "label": "CFG", "value": 5.0 },
-          "guidance_scale_low_noise": { "name": "guidance_scale_low_noise", "label": "CFG (Low)" },
-          "width": { "name": "width", "label": "", "value": 1024 },
-          "height": { "name": "height", "label": "", "value": 1024 },
-          "steps": { "name": "steps", "label": "", "value": 30 },
-          "seed": { "name": "seed", "label": "", "value": 0 }
+          "transformer": {
+            "name": "transformer",
+            "label": ""
+          },
+          "positive_conditioning": {
+            "name": "positive_conditioning",
+            "label": ""
+          },
+          "negative_conditioning": {
+            "name": "negative_conditioning",
+            "label": ""
+          },
+          "ref_image": {
+            "name": "ref_image",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "denoise_mask": {
+            "name": "denoise_mask",
+            "label": ""
+          },
+          "denoising_start": {
+            "name": "denoising_start",
+            "label": "",
+            "value": 0
+          },
+          "denoising_end": {
+            "name": "denoising_end",
+            "label": "",
+            "value": 1
+          },
+          "add_noise": {
+            "name": "add_noise",
+            "label": "",
+            "value": true
+          },
+          "guidance_scale": {
+            "name": "guidance_scale",
+            "label": "CFG",
+            "value": 5.0
+          },
+          "guidance_scale_low_noise": {
+            "name": "guidance_scale_low_noise",
+            "label": "CFG (Low)"
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "value": 1024
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "value": 30
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "value": 0
+          }
         }
       },
-      "position": { "x": 1100, "y": -50 }
+      "position": {
+        "x": 1100,
+        "y": -50
+      }
     },
     {
       "id": "6f5dcb1c-e27d-9fb0-d16f-7e8cbaa1fcbd",
@@ -186,13 +291,28 @@
         "isIntermediate": false,
         "useCache": true,
         "inputs": {
-          "board": { "name": "board", "label": "" },
-          "metadata": { "name": "metadata", "label": "" },
-          "latents": { "name": "latents", "label": "" },
-          "vae": { "name": "vae", "label": "" }
+          "board": {
+            "name": "board",
+            "label": ""
+          },
+          "metadata": {
+            "name": "metadata",
+            "label": ""
+          },
+          "latents": {
+            "name": "latents",
+            "label": ""
+          },
+          "vae": {
+            "name": "vae",
+            "label": ""
+          }
         }
       },
-      "position": { "x": 1550, "y": -50 }
+      "position": {
+        "x": 1550,
+        "y": -50
+      }
     }
   ],
   "edges": [

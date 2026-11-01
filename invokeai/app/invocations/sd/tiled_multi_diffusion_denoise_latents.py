@@ -1,6 +1,6 @@
 import copy
 from contextlib import ExitStack, nullcontext
-from typing import Iterator
+from typing import Any, Iterator, Optional
 
 import torch
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -15,10 +15,18 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     UIType,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_ip_adapter_ref_images,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import UNetField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd.controlnet import ControlField
 from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation, get_scheduler
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -59,9 +67,9 @@ def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> C
     title="Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
     tags=["upscale", "denoise"],
     category="latents",
-    version="1.0.1",
+    version="1.1.0",
 )
-class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
+class TiledMultiDiffusionDenoiseLatents(BaseInvocation, WithMetadata):
     """Tiled Multi-Diffusion denoising.
 
     This node handles automatically tiling the input image, and is primarily intended for global refinement of images
@@ -166,8 +174,58 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             requires_safety_checker=False,
         )
 
+    def _build_metadata(self, width: int, height: int, context: Optional[InvocationContext] = None) -> MetadataField:
+        suffix = (
+            "inpaint"
+            if getattr(self, "denoise_mask", None) is not None
+            else ("img2img" if getattr(self, "latents", None) is not None else "txt2img")
+        )
+        prefix = "sdxl_" if getattr(self.unet.unet, "base", None) == BaseModelType.StableDiffusionXL else ""
+        updates: dict[str, Any] = {
+            "generation_mode": f"{prefix}{suffix}",
+            "width": width,
+            "height": height,
+            "cfg_scale": self.cfg_scale,
+            "steps": self.steps,
+            "scheduler": self.scheduler,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "cfg_rescale_multiplier": self.cfg_rescale_multiplier,
+            "model": self.unet.unet,
+            "seamless_x": "x" in (getattr(self.unet, "seamless_axes", []) or []),
+            "seamless_y": "y" in (getattr(self.unet, "seamless_axes", []) or []),
+            "tile_width": self.tile_width,
+            "tile_height": self.tile_height,
+            "tile_overlap": self.tile_overlap,
+        }
+        if getattr(self.unet, "freeu_config", None) is not None:
+            updates["freeu_s1"] = self.unet.freeu_config.s1
+            updates["freeu_s2"] = self.unet.freeu_config.s2
+            updates["freeu_b1"] = self.unet.freeu_config.b1
+            updates["freeu_b2"] = self.unet.freeu_config.b2
+
+        loras = serialize_lora_metadata(getattr(self.unet, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        controlnets = serialize_adapter_metadata(self.control)
+        if controlnets:
+            updates["controlnets"] = controlnets
+        ref_images = serialize_ip_adapter_ref_images(
+            getattr(self, "ip_adapter", None), context=context, default_width=width, default_height=height
+        )
+        if ref_images:
+            updates["ref_images"] = ref_images
+
+        if self.noise and self.noise.seed is not None:
+            updates["seed"] = self.noise.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         # Convert tile image-space dimensions to latent-space dimensions.
         latent_tile_height = self.tile_height // LATENT_SCALE_FACTOR
         latent_tile_width = self.tile_width // LATENT_SCALE_FACTOR
@@ -299,4 +357,13 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
         TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=result_latents)
-        return LatentsOutput.build(latents_name=name, latents=result_latents, seed=None)
+        width = result_latents.shape[-1] * LATENT_SCALE_FACTOR
+        height = result_latents.shape[-2] * LATENT_SCALE_FACTOR
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=result_latents,
+            seed=None,
+            metadata=self._build_metadata(width, height, context),
+            width=width,
+            height=height,
+        )

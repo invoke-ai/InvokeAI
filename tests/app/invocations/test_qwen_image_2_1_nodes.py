@@ -594,13 +594,19 @@ def test_the_metadata_records_whether_the_prefix_was_cached(cache_fits: bool, mo
     node = _denoise(
         reference_latents=LatentsField(latents_name="ref"),
         cfg_scale=4.0,
-        metadata=MetadataField.model_validate({"seed": 7, "steps": 3}),
+        seed=7,
+        steps=3,
+        metadata=MetadataField.model_validate({"positive_prompt": "a cat"}),
     )
 
     output = node.invoke(context)
 
-    # What the graph recorded passes through, with the mode this run took beside it.
-    assert output.metadata.root == {"seed": 7, "steps": 3, PREFIX_CACHE_METADATA_KEY: cache_fits}
+    # What the graph recorded passes through, with the denoise fields and cache mode beside it.
+    assert output.metadata.root["positive_prompt"] == "a cat"
+    assert output.metadata.root["seed"] == 7
+    assert output.metadata.root["steps"] == 3
+    assert output.metadata.root["cfg_scale"] == 4.0
+    assert output.metadata.root[PREFIX_CACHE_METADATA_KEY] is cache_fits
     assert (output.latents.latents_name, output.width, output.height) == ("out", 64, 64)
 
 

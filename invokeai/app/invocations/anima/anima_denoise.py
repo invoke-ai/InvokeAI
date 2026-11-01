@@ -18,7 +18,7 @@ Key differences from Z-Image denoise:
 
 import math
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -36,10 +36,18 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
 )
 from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_ip_adapter_ref_images,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.anima.anima_transformer import IPAdapterBlockFn
 from invokeai.backend.anima.anima_transformer_patch import patch_anima_for_regional_prompting
@@ -184,7 +192,7 @@ class AnimaInpaintExtension(RectifiedFlowInpaintExtension):
     version="1.9.0",
     classification=Classification.Prototype,
 )
-class AnimaDenoiseInvocation(BaseInvocation):
+class AnimaDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with an Anima model.
 
     Uses rectified flow sampling with shift=3.0 and the Cosmos Predict2 DiT
@@ -245,12 +253,63 @@ class AnimaDenoiseInvocation(BaseInvocation):
         ui_choice_labels=ANIMA_SCHEDULER_LABELS,
     )
 
+    def _build_metadata(self, context: Optional[InvocationContext] = None) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "anima_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("anima_img2img" if getattr(self, "latents", None) is not None else "anima_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "scheduler": self.scheduler,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "model": self.transformer.transformer,
+        }
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        controlnets = serialize_adapter_metadata(self.control_lllite)
+        if controlnets:
+            updates["controlnets"] = controlnets
+
+        ref_images = serialize_ip_adapter_ref_images(
+            getattr(self, "ip_adapter", None), context=context, default_width=self.width, default_height=self.height
+        )
+        if ref_images:
+            updates["ref_images"] = ref_images
+
+        if (
+            self.noise is not None
+            and self.noise.seed is not None
+            and (self.latents is None or getattr(self, "add_noise", True))
+        ):
+            updates["seed"] = self.noise.seed
+        elif self.seed is not None:
+            updates["seed"] = self.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(context),
+            width=self.width,
+            height=self.height,
+        )
 
     def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
         """Prepare the inpaint mask for Anima.

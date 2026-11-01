@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -14,9 +14,15 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.flux2.latent_norm import bn_denormalize, bn_normalize, read_vae_bn_stats
@@ -46,7 +52,7 @@ from invokeai.backend.util.devices import TorchDevice
     version="1.0.0",
     classification=Classification.Prototype,
 )
-class Flux3DenoiseInvocation(BaseInvocation):
+class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a FLUX.3 Image transformer (Klein or Klein Base).
 
     Klein is step-distilled (a flow map) and samples without CFG; Klein Base takes CFG with a negative
@@ -99,11 +105,41 @@ class Flux3DenoiseInvocation(BaseInvocation):
         title="Reference Images",
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "flux3_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("flux3_img2img" if getattr(self, "latents", None) is not None else "flux3_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+            "vae": self.vae.vae,
+        }
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context).detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()

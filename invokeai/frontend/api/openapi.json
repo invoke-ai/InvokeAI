@@ -19123,6 +19123,22 @@
         "description": "Run the denoising process with an Anima model.\n\nUses rectified flow sampling with shift=3.0 and the Cosmos Predict2 DiT\nbackbone with integrated LLM Adapter for text conditioning.\n\nSupports txt2img, img2img (via latents input), and inpainting (via denoise_mask).",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -19423,13 +19439,13 @@
         "type": "object",
         "version": "1.9.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "AnimaDenoiseMetaInvocation": {
         "category": "metadata",
         "class": "invocation",
-        "classification": "prototype",
+        "classification": "deprecated",
         "description": "Run denoising process with an Anima transformer model + metadata.",
         "node_pack": "invokeai",
         "properties": {
@@ -26701,22 +26717,6 @@
         "description": "Run the denoising process with a CogView4 model.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
-          },
           "metadata": {
             "anyOf": [
               {
@@ -26950,9 +26950,9 @@
         "tags": ["image", "cogview4"],
         "title": "Denoise - CogView4",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "CogView4ImageToLatentsInvocation": {
@@ -33170,6 +33170,22 @@
         "description": "Denoises noisy latents to decodable images",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -33556,15 +33572,15 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "DenoiseLatentsMetaInvocation": {
         "category": "metadata",
         "class": "invocation",
-        "classification": "stable",
+        "classification": "deprecated",
         "node_pack": "invokeai",
         "properties": {
           "metadata": {
@@ -33969,7 +33985,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -34982,6 +34998,22 @@
         "description": "Run the ERNIE-Image denoising loop and emit packed latents.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -35185,9 +35217,9 @@
         "tags": ["latents", "denoise", "ernie-image"],
         "title": "Denoise - ERNIE-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "ErnieImageModelLoaderInvocation": {
@@ -38393,6 +38425,22 @@
         "description": "Run denoising process with a FLUX.2 transformer model, Klein or [dev].\n\nRegional prompting is supported via per-conditioning masks (single mask is applied\nto every transformer block via `joint_attention_kwargs`). FLUX.2 [dev] takes the\nFun-ControlNet-Union through `control`; Klein takes no ControlNet, and IP-Adapters\nare not supported. Regional masking is skipped when reference images are attached.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -38699,9 +38747,9 @@
         "tags": ["image", "flux", "flux2", "klein", "denoise"],
         "title": "FLUX2 Denoise",
         "type": "object",
-        "version": "1.7.0",
+        "version": "1.8.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "Flux2DevLoRACollectionLoader": {
@@ -40245,6 +40293,22 @@
         "description": "Run the denoising process with a FLUX.3 Image transformer (Klein or Klein Base).\n\nKlein is step-distilled (a flow map) and samples without CFG; Klein Base takes CFG with a negative\nconditioning. Reference images condition an edit: describe the result in the prompt and refer to them as\n<ref_image_0>, <ref_image_1>, ... in the order they are connected.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -40490,7 +40554,7 @@
         "type": "object",
         "version": "1.0.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "Flux3ModelLoaderInvocation": {
@@ -41151,6 +41215,22 @@
         "description": "Run denoising process with a FLUX transformer model.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -41638,15 +41718,15 @@
         "tags": ["image", "flux"],
         "title": "FLUX Denoise",
         "type": "object",
-        "version": "4.6.0",
+        "version": "4.7.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "FluxDenoiseLatentsMetaInvocation": {
         "category": "metadata",
         "class": "invocation",
-        "classification": "stable",
+        "classification": "deprecated",
         "description": "Run denoising process with a FLUX transformer model + metadata.",
         "node_pack": "invokeai",
         "properties": {
@@ -42153,7 +42233,7 @@
         "tags": ["flux", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "FLUX Denoise + Metadata",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -49932,6 +50012,22 @@
         "description": "Runs the Ideogram 4 dual-branch flow-matching denoising loop (text-to-image).",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -50116,9 +50212,9 @@
         "tags": ["image", "ideogram4"],
         "title": "Denoise - Ideogram 4",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "Ideogram4LatentsToImageInvocation": {
@@ -59354,7 +59450,7 @@
             "$ref": "#/components/schemas/MaskOutput"
           },
           "anima_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "anima_denoise_meta": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
@@ -59438,7 +59534,7 @@
             "$ref": "#/components/schemas/CLIPSkipInvocationOutput"
           },
           "cogview4_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "cogview4_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -59513,7 +59609,7 @@
             "$ref": "#/components/schemas/StringOutput"
           },
           "denoise_latents": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "denoise_latents_meta": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
@@ -59531,7 +59627,7 @@
             "$ref": "#/components/schemas/StringCollectionOutput"
           },
           "ernie_image_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "ernie_image_model_loader": {
             "$ref": "#/components/schemas/ErnieImageModelLoaderOutput"
@@ -59588,7 +59684,7 @@
             "$ref": "#/components/schemas/Flux2ControlOutput"
           },
           "flux2_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "flux2_dev_lora_collection_loader": {
             "$ref": "#/components/schemas/Flux2DevLoRALoaderOutput"
@@ -59624,7 +59720,7 @@
             "$ref": "#/components/schemas/LatentsOutput"
           },
           "flux3_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "flux3_model_loader": {
             "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
@@ -59639,7 +59735,7 @@
             "$ref": "#/components/schemas/FluxControlNetOutput"
           },
           "flux_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "flux_denoise_meta": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
@@ -59717,7 +59813,7 @@
             "$ref": "#/components/schemas/StringOutput"
           },
           "ideogram4_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "ideogram4_l2i": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -59867,7 +59963,7 @@
             "$ref": "#/components/schemas/Krea2ConditioningOutput"
           },
           "krea2_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "krea2_lora_collection_loader": {
             "$ref": "#/components/schemas/Krea2LoRALoaderOutput"
@@ -60098,7 +60194,7 @@
             "$ref": "#/components/schemas/ModelIdentifierOutput"
           },
           "moss_image_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "moss_image_layout_prompt": {
             "$ref": "#/components/schemas/StringOutput"
@@ -60170,7 +60266,7 @@
             "$ref": "#/components/schemas/QwenImageControlOutput"
           },
           "qwen_image_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "qwen_image_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -60224,7 +60320,7 @@
             "$ref": "#/components/schemas/SchedulerOutput"
           },
           "sd3_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "sd3_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -60341,7 +60437,7 @@
             "$ref": "#/components/schemas/TileToPropertiesOutput"
           },
           "tiled_multi_diffusion_denoise_latents": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "tomask": {
             "$ref": "#/components/schemas/ImageOutput"
@@ -60365,7 +60461,7 @@
             "$ref": "#/components/schemas/ImageOutput"
           },
           "wan_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "wan_i2l": {
             "$ref": "#/components/schemas/LatentsOutput"
@@ -60398,7 +60494,7 @@
             "$ref": "#/components/schemas/IdealSizeOutput"
           },
           "wan_video_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "workflow_return": {
             "$ref": "#/components/schemas/WorkflowReturnOutput"
@@ -60413,7 +60509,7 @@
             "$ref": "#/components/schemas/ZImageControlOutput"
           },
           "z_image_denoise": {
-            "$ref": "#/components/schemas/LatentsOutput"
+            "$ref": "#/components/schemas/LatentsMetaOutput"
           },
           "z_image_denoise_meta": {
             "$ref": "#/components/schemas/LatentsMetaOutput"
@@ -65586,22 +65682,6 @@
         "description": "Run the denoising process with a Krea-2 model.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
-          },
           "metadata": {
             "anyOf": [
               {
@@ -65922,7 +66002,7 @@
         "type": "object",
         "version": "1.4.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "Krea2LoRACollectionLoader": {
@@ -67245,6 +67325,22 @@
         "description": "Generates LTX-2 video and audio latents together.\n\nOne transformer forward produces both modalities at every step, so the soundtrack is generated\nwith the picture rather than dubbed onto it. Wire an image conditioning to start the clip from\na frame.\n\nThe guidance-distilled checkpoint runs a fixed eight-step schedule with no guidance at all: its\nstep count and guidance scales below are ignored, and the negative prompt never reaches it.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -67601,7 +67697,7 @@
         "tags": ["ltx", "ltx2", "video", "audio", "denoise"],
         "title": "Denoise - LTX-2",
         "type": "object",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "output": {
           "$ref": "#/components/schemas/LTX2DenoiseOutput"
         }
@@ -67610,6 +67706,19 @@
         "class": "output",
         "description": "Joint video and audio latents from one LTX-2 denoise run.",
         "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataField",
+            "description": "Metadata Dict",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ltx2_denoise_output",
+            "default": "ltx2_denoise_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          },
           "video_latents": {
             "$ref": "#/components/schemas/LatentsField",
             "description": "Video latents [1, 128, T_lat, H/32, W/32].",
@@ -67642,16 +67751,19 @@
             "title": "Num Frames",
             "type": "integer",
             "ui_hidden": false
-          },
-          "type": {
-            "const": "ltx2_denoise_output",
-            "default": "ltx2_denoise_output",
-            "field_kind": "node_attribute",
-            "title": "type",
-            "type": "string"
           }
         },
-        "required": ["output_meta", "video_latents", "audio_latents", "width", "height", "num_frames", "type", "type"],
+        "required": [
+          "output_meta",
+          "metadata",
+          "type",
+          "video_latents",
+          "audio_latents",
+          "width",
+          "height",
+          "num_frames",
+          "type"
+        ],
         "title": "LTX2DenoiseOutput",
         "type": "object"
       },
@@ -70058,7 +70170,7 @@
       },
       "LatentsMetaOutput": {
         "class": "output",
-        "description": "Latents + metadata",
+        "description": "Base class for invocations that output latents with metadata",
         "properties": {
           "metadata": {
             "$ref": "#/components/schemas/MetadataField",
@@ -85853,6 +85965,7 @@
             "description": "Label for this metadata item",
             "enum": [
               "* CUSTOM LABEL *",
+              "generation_mode",
               "positive_prompt",
               "positive_style_prompt",
               "negative_prompt",
@@ -85860,6 +85973,7 @@
               "width",
               "height",
               "seed",
+              "rand_device",
               "cfg_scale",
               "cfg_rescale_multiplier",
               "steps",
@@ -85871,7 +85985,104 @@
               "seamless_y",
               "guidance",
               "cfg_scale_start_step",
-              "cfg_scale_end_step"
+              "cfg_scale_end_step",
+              "denoising_start",
+              "denoising_end",
+              "strength",
+              "init_image",
+              "add_noise",
+              "shift",
+              "dype_preset",
+              "dype_scale",
+              "dype_exponent",
+              "freeu_s1",
+              "freeu_s2",
+              "freeu_b1",
+              "freeu_b2",
+              "hidiffusion",
+              "hidiffusion_raunet",
+              "hidiffusion_window_attn",
+              "hidiffusion_t1_ratio",
+              "hidiffusion_t2_ratio",
+              "hrf_enabled",
+              "hrf_method",
+              "hrf_strength",
+              "refiner_model",
+              "refiner_cfg_scale",
+              "refiner_steps",
+              "refiner_scheduler",
+              "refiner_positive_aesthetic_score",
+              "refiner_negative_aesthetic_score",
+              "refiner_start",
+              "pid_mode",
+              "pid_steps",
+              "pid_decoder",
+              "gemma2_encoder",
+              "tile_width",
+              "tile_height",
+              "tile_overlap",
+              "num_frames",
+              "fps",
+              "source_video_start_frame",
+              "source_video_end_frame",
+              "t5_encoder",
+              "clip_embed_model",
+              "clip_l_model",
+              "clip_g_model",
+              "mistral_encoder",
+              "qwen3_encoder",
+              "qwen3_source",
+              "qwen3_5_encoder",
+              "qwen3_vl_encoder",
+              "ideogram4_caption",
+              "ideogram4_color_palette",
+              "ideogram4_guidance_scale",
+              "ideogram4_mu",
+              "ideogram4_sampler_preset",
+              "ideogram4_steps",
+              "ideogram4_unconditional_model",
+              "krea2_rebalance_enabled",
+              "krea2_rebalance_multiplier",
+              "krea2_rebalance_weights",
+              "krea2_reference_kv_cache",
+              "krea2_seed_variance_enabled",
+              "krea2_seed_variance_randomize_percent",
+              "krea2_seed_variance_strength",
+              "krea2_style_strength",
+              "ltx2_audio_cfg_scale",
+              "ltx2_base_height",
+              "ltx2_base_width",
+              "ltx2_component_source",
+              "ltx2_conditioning_role",
+              "ltx2_context_frames",
+              "ltx2_guidance_rescale",
+              "ltx2_modality_scale",
+              "ltx2_noise_scale",
+              "ltx2_schedule",
+              "ltx2_stg_scale",
+              "ltx2_text_encoder_model",
+              "ltx2_two_stage",
+              "minimax_h3_component_source",
+              "minimax_h3_hybrid_base_model",
+              "minimax_h3_hybrid_start_block",
+              "minimax_h3_text_encoder_model",
+              "minimax_h3_transformer_model",
+              "moss_image_layout_prompt",
+              "moss_image_uncond_skip_layers",
+              "qwen_image_2_1_prefix_kv_cache",
+              "qwen_image_component_source",
+              "qwen_image_quantization",
+              "qwen_image_qwen_vl_encoder",
+              "qwen_image_shift",
+              "qwen_image_vae",
+              "wan_component_source",
+              "wan_guidance_scale_low_noise",
+              "wan_t5_encoder_model",
+              "wan_transformer_low_noise",
+              "z_image_seed_variance_enabled",
+              "z_image_seed_variance_randomize_percent",
+              "z_image_seed_variance_strength",
+              "z_image_shift"
             ],
             "field_kind": "input",
             "input": "direct",
@@ -86022,7 +86233,22 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "seamless_x", "seamless_y"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "seamless_x",
+              "seamless_y",
+              "add_noise",
+              "hidiffusion",
+              "hidiffusion_raunet",
+              "hidiffusion_window_attn",
+              "hrf_enabled",
+              "krea2_rebalance_enabled",
+              "krea2_reference_kv_cache",
+              "krea2_seed_variance_enabled",
+              "ltx2_two_stage",
+              "qwen_image_2_1_prefix_kv_cache",
+              "z_image_seed_variance_enabled"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -86133,7 +86359,22 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "seamless_x", "seamless_y"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "seamless_x",
+              "seamless_y",
+              "add_noise",
+              "hidiffusion",
+              "hidiffusion_raunet",
+              "hidiffusion_window_attn",
+              "hrf_enabled",
+              "krea2_rebalance_enabled",
+              "krea2_reference_kv_cache",
+              "krea2_seed_variance_enabled",
+              "ltx2_two_stage",
+              "qwen_image_2_1_prefix_kv_cache",
+              "z_image_seed_variance_enabled"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -86327,7 +86568,44 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "cfg_scale", "cfg_rescale_multiplier", "guidance"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "cfg_scale",
+              "cfg_rescale_multiplier",
+              "guidance",
+              "denoising_start",
+              "denoising_end",
+              "strength",
+              "shift",
+              "dype_scale",
+              "dype_exponent",
+              "freeu_s1",
+              "freeu_s2",
+              "freeu_b1",
+              "freeu_b2",
+              "hidiffusion_t1_ratio",
+              "hidiffusion_t2_ratio",
+              "hrf_strength",
+              "refiner_cfg_scale",
+              "refiner_positive_aesthetic_score",
+              "refiner_negative_aesthetic_score",
+              "refiner_start",
+              "fps",
+              "ideogram4_guidance_scale",
+              "ideogram4_mu",
+              "krea2_rebalance_multiplier",
+              "krea2_seed_variance_strength",
+              "krea2_style_strength",
+              "ltx2_audio_cfg_scale",
+              "ltx2_guidance_rescale",
+              "ltx2_modality_scale",
+              "ltx2_noise_scale",
+              "ltx2_stg_scale",
+              "qwen_image_shift",
+              "wan_guidance_scale_low_noise",
+              "z_image_seed_variance_strength",
+              "z_image_shift"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -86438,7 +86716,44 @@
           "label": {
             "default": "* CUSTOM LABEL *",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "cfg_scale", "cfg_rescale_multiplier", "guidance"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "cfg_scale",
+              "cfg_rescale_multiplier",
+              "guidance",
+              "denoising_start",
+              "denoising_end",
+              "strength",
+              "shift",
+              "dype_scale",
+              "dype_exponent",
+              "freeu_s1",
+              "freeu_s2",
+              "freeu_b1",
+              "freeu_b2",
+              "hidiffusion_t1_ratio",
+              "hidiffusion_t2_ratio",
+              "hrf_strength",
+              "refiner_cfg_scale",
+              "refiner_positive_aesthetic_score",
+              "refiner_negative_aesthetic_score",
+              "refiner_start",
+              "fps",
+              "ideogram4_guidance_scale",
+              "ideogram4_mu",
+              "krea2_rebalance_multiplier",
+              "krea2_seed_variance_strength",
+              "krea2_style_strength",
+              "ltx2_audio_cfg_scale",
+              "ltx2_guidance_rescale",
+              "ltx2_modality_scale",
+              "ltx2_noise_scale",
+              "ltx2_stg_scale",
+              "qwen_image_shift",
+              "wan_guidance_scale_low_noise",
+              "z_image_seed_variance_strength",
+              "z_image_shift"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "* CUSTOM LABEL *",
@@ -86641,7 +86956,24 @@
               "steps",
               "clip_skip",
               "cfg_scale_start_step",
-              "cfg_scale_end_step"
+              "cfg_scale_end_step",
+              "refiner_steps",
+              "pid_steps",
+              "tile_width",
+              "tile_height",
+              "tile_overlap",
+              "num_frames",
+              "fps",
+              "source_video_start_frame",
+              "source_video_end_frame",
+              "ideogram4_steps",
+              "krea2_seed_variance_randomize_percent",
+              "ltx2_base_height",
+              "ltx2_base_width",
+              "ltx2_context_frames",
+              "minimax_h3_hybrid_start_block",
+              "moss_image_uncond_skip_layers",
+              "z_image_seed_variance_randomize_percent"
             ],
             "field_kind": "input",
             "input": "direct",
@@ -86761,7 +87093,24 @@
               "steps",
               "clip_skip",
               "cfg_scale_start_step",
-              "cfg_scale_end_step"
+              "cfg_scale_end_step",
+              "refiner_steps",
+              "pid_steps",
+              "tile_width",
+              "tile_height",
+              "tile_overlap",
+              "num_frames",
+              "fps",
+              "source_video_start_frame",
+              "source_video_end_frame",
+              "ideogram4_steps",
+              "krea2_seed_variance_randomize_percent",
+              "ltx2_base_height",
+              "ltx2_base_width",
+              "ltx2_context_frames",
+              "minimax_h3_hybrid_start_block",
+              "moss_image_uncond_skip_layers",
+              "z_image_seed_variance_randomize_percent"
             ],
             "field_kind": "input",
             "input": "direct",
@@ -87091,7 +87440,34 @@
           "label": {
             "default": "model",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "model"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "model",
+              "refiner_model",
+              "pid_decoder",
+              "gemma2_encoder",
+              "t5_encoder",
+              "clip_embed_model",
+              "clip_l_model",
+              "clip_g_model",
+              "mistral_encoder",
+              "qwen3_encoder",
+              "qwen3_source",
+              "qwen3_5_encoder",
+              "qwen3_vl_encoder",
+              "ideogram4_unconditional_model",
+              "ltx2_component_source",
+              "ltx2_text_encoder_model",
+              "minimax_h3_component_source",
+              "minimax_h3_hybrid_base_model",
+              "minimax_h3_text_encoder_model",
+              "minimax_h3_transformer_model",
+              "qwen_image_component_source",
+              "qwen_image_qwen_vl_encoder",
+              "wan_component_source",
+              "wan_t5_encoder_model",
+              "wan_transformer_low_noise"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "model",
@@ -87365,7 +87741,34 @@
           "label": {
             "default": "model",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "model"],
+            "enum": [
+              "* CUSTOM LABEL *",
+              "model",
+              "refiner_model",
+              "pid_decoder",
+              "gemma2_encoder",
+              "t5_encoder",
+              "clip_embed_model",
+              "clip_l_model",
+              "clip_g_model",
+              "mistral_encoder",
+              "qwen3_encoder",
+              "qwen3_source",
+              "qwen3_5_encoder",
+              "qwen3_vl_encoder",
+              "ideogram4_unconditional_model",
+              "ltx2_component_source",
+              "ltx2_text_encoder_model",
+              "minimax_h3_component_source",
+              "minimax_h3_hybrid_base_model",
+              "minimax_h3_text_encoder_model",
+              "minimax_h3_transformer_model",
+              "qwen_image_component_source",
+              "qwen_image_qwen_vl_encoder",
+              "wan_component_source",
+              "wan_t5_encoder_model",
+              "wan_transformer_low_noise"
+            ],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "model",
@@ -87532,7 +87935,7 @@
           "label": {
             "default": "scheduler",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "scheduler"],
+            "enum": ["* CUSTOM LABEL *", "scheduler", "refiner_scheduler"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "scheduler",
@@ -87670,10 +88073,26 @@
             "description": "Label for this metadata item",
             "enum": [
               "* CUSTOM LABEL *",
+              "generation_mode",
               "positive_prompt",
               "positive_style_prompt",
               "negative_prompt",
-              "negative_style_prompt"
+              "negative_style_prompt",
+              "rand_device",
+              "init_image",
+              "hrf_method",
+              "pid_mode",
+              "dype_preset",
+              "ideogram4_caption",
+              "ideogram4_color_palette",
+              "ideogram4_sampler_preset",
+              "krea2_rebalance_weights",
+              "ltx2_conditioning_role",
+              "ltx2_schedule",
+              "moss_image_layout_prompt",
+              "qwen_image_quantization",
+              "qwen_image_shift",
+              "z_image_shift"
             ],
             "field_kind": "input",
             "input": "direct",
@@ -87787,10 +88206,26 @@
             "description": "Label for this metadata item",
             "enum": [
               "* CUSTOM LABEL *",
+              "generation_mode",
               "positive_prompt",
               "positive_style_prompt",
               "negative_prompt",
-              "negative_style_prompt"
+              "negative_style_prompt",
+              "rand_device",
+              "init_image",
+              "hrf_method",
+              "pid_mode",
+              "dype_preset",
+              "ideogram4_caption",
+              "ideogram4_color_palette",
+              "ideogram4_sampler_preset",
+              "krea2_rebalance_weights",
+              "ltx2_conditioning_role",
+              "ltx2_schedule",
+              "moss_image_layout_prompt",
+              "qwen_image_quantization",
+              "qwen_image_shift",
+              "z_image_shift"
             ],
             "field_kind": "input",
             "input": "direct",
@@ -87986,7 +88421,7 @@
           "label": {
             "default": "vae",
             "description": "Label for this metadata item",
-            "enum": ["* CUSTOM LABEL *", "vae"],
+            "enum": ["* CUSTOM LABEL *", "vae", "qwen_image_vae"],
             "field_kind": "input",
             "input": "direct",
             "orig_default": "vae",
@@ -88112,6 +88547,22 @@
         "description": "Run the MiniMax H3 joint audio-video denoising loop.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -88306,7 +88757,7 @@
         "tags": ["latents", "video", "audio", "minimax"],
         "title": "Denoise - MiniMax H3",
         "type": "object",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "output": {
           "$ref": "#/components/schemas/MiniMaxH3DenoiseOutput"
         }
@@ -88315,6 +88766,19 @@
         "class": "output",
         "description": "Joint video + audio latents from one MiniMax H3 denoise run.",
         "properties": {
+          "metadata": {
+            "$ref": "#/components/schemas/MetadataField",
+            "description": "Metadata Dict",
+            "field_kind": "output",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "minimax_h3_denoise_output",
+            "default": "minimax_h3_denoise_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          },
           "video_latents": {
             "$ref": "#/components/schemas/LatentsField",
             "description": "5D video latents [1, 24, T_lat, H/16, W/16].",
@@ -88347,16 +88811,19 @@
             "title": "Num Frames",
             "type": "integer",
             "ui_hidden": false
-          },
-          "type": {
-            "const": "minimax_h3_denoise_output",
-            "default": "minimax_h3_denoise_output",
-            "field_kind": "node_attribute",
-            "title": "type",
-            "type": "string"
           }
         },
-        "required": ["output_meta", "video_latents", "audio_latents", "width", "height", "num_frames", "type", "type"],
+        "required": [
+          "output_meta",
+          "metadata",
+          "type",
+          "video_latents",
+          "audio_latents",
+          "width",
+          "height",
+          "num_frames",
+          "type"
+        ],
         "title": "MiniMaxH3DenoiseOutput",
         "type": "object"
       },
@@ -94764,6 +95231,22 @@
         "description": "Run the MOSS-Image denoising loop.\n\nTakes and returns latents in the FLUX.2 VAE's raw layout, so the FLUX.2 VAE encode and decode nodes work on either\nside. The schedule is the model's own shifted Euler schedule; with CFG the negative branch skips the transformer\nblocks in `uncond_skip_layers`, as the reference pipeline does.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -94987,9 +95470,9 @@
         "tags": ["image", "moss_image", "moss-image"],
         "title": "Denoise - MOSS-Image",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "MossImageLayoutPromptInvocation": {
@@ -100895,22 +101378,6 @@
         "description": "Run the denoising process with a Qwen-Image-2.1 model.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
-          },
           "metadata": {
             "anyOf": [
               {
@@ -102205,22 +102672,6 @@
         "description": "Run the denoising process with a Qwen Image model.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
-          },
           "metadata": {
             "anyOf": [
               {
@@ -102504,9 +102955,9 @@
         "tags": ["image", "qwen_image"],
         "title": "Denoise - Qwen Image",
         "type": "object",
-        "version": "1.1.1",
+        "version": "1.2.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "QwenImageImageToLatentsInvocation": {
@@ -105110,22 +105561,6 @@
         "description": "Run denoising process with a SD3 model.",
         "node_pack": "invokeai",
         "properties": {
-          "board": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/BoardField"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "The board to save the image to",
-            "field_kind": "internal",
-            "input": "direct",
-            "orig_required": false,
-            "ui_hidden": false
-          },
           "metadata": {
             "anyOf": [
               {
@@ -105359,9 +105794,9 @@
         "tags": ["image", "sd3"],
         "title": "Denoise - SD3",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "SD3ImageToLatentsInvocation": {
@@ -113995,6 +114430,22 @@
         "description": "Tiled Multi-Diffusion denoising.\n\nThis node handles automatically tiling the input image, and is primarily intended for global refinement of images\nin tiled upscaling workflows. Future Multi-Diffusion nodes should allow the user to specify custom regions with\ndifferent parameters for each region to harness the full power of Multi-Diffusion.\n\nThis node has a similar interface to the `DenoiseLatents` node, but it has a reduced feature set (no IP-Adapter,\nT2I-Adapter, masking, etc.).",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -114278,9 +114729,9 @@
         "tags": ["upscale", "denoise"],
         "title": "Tiled Multi-Diffusion Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "TinyAutoencoder_Checkpoint_FLUX_Config": {
@@ -120373,6 +120824,22 @@
         "description": "Run the denoising process with a Wan 2.2 model.\n\nDrives the flow-matching schedule the model ships with (UniPC with flow\nsigmas for the Wan 2.2 reference repos; see ``_build_scheduler``). CFG is\nsupported when negative conditioning is provided and ``guidance_scale != 1.0``.\n\nFor Wan 2.2 A14B the high-noise expert handles timesteps at and above\n``boundary_ratio * num_train_timesteps``; the low-noise expert handles\ntimesteps below. Both experts share the model cache; only the active one is\nGPU-resident at any time.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -120613,9 +121080,9 @@
         "tags": ["image", "wan"],
         "title": "Denoise - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "WanI2VIdealDimensionsInvocation": {
@@ -122042,6 +122509,22 @@
         "description": "Run the Wan 2.2 denoising loop on a multi-frame latent tensor.\n\nThe output is a 5D ``[1, C, T_lat, H/8, W/8]`` latent tensor ready for\n:class:`WanLatentsToVideoInvocation` to VAE-decode and encode as MP4.\n\nMirrors :class:`WanDenoiseInvocation` for the per-step logic (CFG, MoE\nexpert swap at the boundary timestep, LoRA patching, scheduler selection).\nDifferences from the image denoise:\n\n* The noise tensor has a real temporal dim built from ``num_frames``.\n* The I2V condition is built across all latent frames (frame 0\n  conditioned, rest zero) via\n  :func:`encode_reference_image_to_video_condition` upstream \u2014 the\n  ``ref_image`` field on this node carries a tensor of shape\n  ``[1, 20, T_lat, H_lat, W_lat]`` instead of ``[1, 20, 1, ...]``.\n* No ``denoising_start`` / ``denoising_end`` / initial-latents inputs.\n  The image denoise node uses those for img2img (noise injection on an\n  existing latent), but image-conditioned video generation flows through\n  the reference-frame conditioning mechanism instead \u2014 the first frame\n  drives subsequent frames at every step, so a partial-schedule run from\n  an initial latent has no analogue here. Run the schedule from t=1\n  to t=0 every time. The base ``WanDenoiseInvocation`` still handles\n  the img2img case for stills.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -122227,9 +122710,9 @@
         "tags": ["video", "wan"],
         "title": "Denoise Video - Wan 2.2",
         "type": "object",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "WildcardChanges": {
@@ -125061,6 +125544,22 @@
         "description": "Run the denoising process with a Z-Image model.\n\nSupports regional prompting by connecting multiple conditioning inputs with masks.",
         "node_pack": "invokeai",
         "properties": {
+          "metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetadataField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Optional metadata to be saved with the image",
+            "field_kind": "internal",
+            "input": "connection",
+            "orig_required": false,
+            "ui_hidden": false
+          },
           "id": {
             "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
             "field_kind": "node_attribute",
@@ -125360,15 +125859,15 @@
         "tags": ["image", "z-image"],
         "title": "Denoise - Z-Image",
         "type": "object",
-        "version": "1.6.1",
+        "version": "1.7.0",
         "output": {
-          "$ref": "#/components/schemas/LatentsOutput"
+          "$ref": "#/components/schemas/LatentsMetaOutput"
         }
       },
       "ZImageDenoiseMetaInvocation": {
         "category": "metadata",
         "class": "invocation",
-        "classification": "stable",
+        "classification": "deprecated",
         "description": "Run denoising process with a Z-Image transformer model + metadata.",
         "node_pack": "invokeai",
         "properties": {
@@ -125687,7 +126186,7 @@
         "tags": ["z-image", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - Z-Image + Metadata",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
