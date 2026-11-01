@@ -9,6 +9,21 @@ const event = {} as Parameters<EnabledPredicate>[0];
 const hotkey = {} as Parameters<EnabledPredicate>[1];
 
 describe('getRegisteredHotkeyOptions', () => {
+  it.each([false, true])('preserves the path-edit ignore guard with enabled=%s', (enabled) => {
+    let isEditing = true;
+    const ignoreEventWhen = vi.fn(() => isEditing);
+    const result = getRegisteredHotkeyOptions({ enabled, ignoreEventWhen }, () => false);
+
+    expect(result.ignoreEventWhen?.(event)).toBe(true);
+    isEditing = false;
+    expect(result.ignoreEventWhen?.(event)).toBe(false);
+    if (enabled) {
+      expect((result.enabled as EnabledPredicate)(event, hotkey)).toBe(true);
+    } else {
+      expect(result.enabled).toBe(false);
+    }
+  });
+
   it('keeps a statically disabled hotkey disabled so it does not intercept a shared key', () => {
     const options: Options = { enabled: false, preventDefault: true };
     const isTextSessionActive = vi.fn(() => false);
