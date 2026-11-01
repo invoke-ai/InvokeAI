@@ -12,7 +12,6 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
 
 import { PreviewActionStrip } from './PreviewActionStrip';
 import { PreviewFilmstrip } from './PreviewFilmstrip';
@@ -100,7 +99,6 @@ void i18n.use(initReactI18next).init({
           generating: 'Generating',
         },
         widgets: {
-          canvas: { import: { control: 'Control Layer', raster: 'Raster Layer' } },
           gallery: {
             progressPreparing: 'Preparing',
             progressQueued: 'Queued',
@@ -110,7 +108,6 @@ void i18n.use(initReactI18next).init({
           preview: {
             copyCurrentFrame: 'Copy Current Frame',
             details: 'Details',
-            editOnCanvas: 'Edit on Canvas',
             framesPerSecond: '{{count}} fps',
             imageActions: 'Image actions',
             itemCount_one: '{{count}} item',
@@ -121,6 +118,7 @@ void i18n.use(initReactI18next).init({
             starVideo: 'Star video',
             unstarImage: 'Unstar image',
             unstarVideo: 'Unstar video',
+            use: 'Use',
             videoDuration: 'Duration {{duration}}',
           },
           queue: {
@@ -386,7 +384,7 @@ describe('Preview mixed media actions', () => {
     // Image-only verbs: a video has no compare partner and no canvas
     // destination.
     expect(host?.querySelector('[aria-label="Select for Compare"]')).toBeNull();
-    expect(host?.querySelector('[aria-label="Edit on Canvas"]')).toBeNull();
+    expect(host?.querySelector('[aria-label="Edit"]')).toBeNull();
 
     const copyFrame = host?.querySelector<HTMLButtonElement>('[aria-label="Copy Current Frame"]');
     const star = host?.querySelector<HTMLButtonElement>('[aria-label="Unstar video"]');
@@ -447,7 +445,7 @@ describe('Preview mixed media actions', () => {
     }
   });
 
-  it('opens Edit onto the canvas layer destinations and sends the image to the chosen one', async () => {
+  it("leads an image with the labelled Edit and Use menus; their contents are the header tests' concern", async () => {
     const actions = {
       copyImage: vi.fn(() => Promise.resolve()),
       downloadItem: vi.fn(() => Promise.resolve()),
@@ -459,18 +457,14 @@ describe('Preview mixed media actions', () => {
     await render(
       <PreviewActionStrip actions={actions} density="full" item={sharedImage} onOpenMenu={() => undefined} />
     );
-    const editOnCanvas = host?.querySelector<HTMLButtonElement>('[aria-label="Edit on Canvas"]');
+    const buttons = [...(host?.querySelectorAll<HTMLButtonElement>('button') ?? [])];
 
-    expect(editOnCanvas).not.toBeNull();
-    // Leads the strip and carries a visible label, not just a glyph.
-    expect(host?.querySelector('button')).toBe(editOnCanvas);
-    expect(editOnCanvas?.textContent).toContain('Edit');
+    // Both carry a visible label, not just a glyph, and open menus rather than acting at once.
+    expect(buttons.slice(0, 2).map((button) => [button.textContent, button.getAttribute('aria-haspopup')])).toEqual([
+      ['Edit', 'menu'],
+      ['Use', 'menu'],
+    ]);
     expect(host?.querySelector('[aria-label="Copy Current Frame"]')).toBeNull();
-
-    await page.getByRole('button', { name: 'Edit on Canvas' }).click();
-    await expect.element(page.getByRole('menuitem', { name: 'Raster Layer' })).toBeVisible();
-    await page.getByRole('menuitem', { name: 'Control Layer' }).click();
-    expect(actions.sendToCanvas).toHaveBeenCalledWith([expect.objectContaining({ imageName: 'shared' })], 'control');
   });
 
   it('leaves copy and download to the image-actions dropdown', async () => {

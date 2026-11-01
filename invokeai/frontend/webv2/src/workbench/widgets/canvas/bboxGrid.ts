@@ -4,6 +4,8 @@
  * readers when policy arrives.
  */
 
+import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/api';
+
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getDimensionGrid } from '@features/generation/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -32,3 +34,17 @@ export const useModelGridSize = (base: string | null | undefined, variant?: stri
     getArchitectureCapabilitiesSnapshot,
     useCallback(() => gridSizeForModelBase(base, variant), [base, variant])
   );
+
+type Bbox = CanvasDocumentContractV3['bbox'];
+
+/**
+ * The frame resized to `size` around its centre; the position rounds to whole pixels. Generate's size sync and the
+ * Frame tool's size fields share it, so both resize around the same anchor.
+ */
+export const resizeBboxAroundCentre = (bbox: Bbox, size: Pick<Bbox, 'height' | 'width'>): Bbox => ({
+  height: size.height,
+  width: size.width,
+  // `+ 0` folds the -0 that rounding a small negative offset yields.
+  x: Math.round(bbox.x + (bbox.width - size.width) / 2) + 0,
+  y: Math.round(bbox.y + (bbox.height - size.height) / 2) + 0,
+});

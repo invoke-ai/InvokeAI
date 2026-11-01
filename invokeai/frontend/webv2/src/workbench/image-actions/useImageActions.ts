@@ -5,7 +5,6 @@ import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
-  galleryImages,
   galleryItemOrganization,
   galleryItems,
   galleryTransfers,
@@ -18,7 +17,6 @@ import {
   type GalleryItemKey,
   type GalleryItemMutationResult,
   type GalleryItemRef,
-  galleryVideos,
   type GalleryVideoItem,
 } from '@features/gallery';
 import {
@@ -30,6 +28,7 @@ import {
 import {
   canAddToCachedGalleryBoard,
   ensureGalleryBoardDestinations,
+  fetchGalleryImageMetadata,
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,
   invalidateGallery,
@@ -64,14 +63,16 @@ import {
   type GalleryCanvasImportDestination,
 } from '@workbench/canvas-operations/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useRevealLayerProperties } from '@workbench/widgets/layers/revealLayerProperties';
-import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetInstance, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
+import type { VideoRecallKind } from './videoRecall';
 
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
@@ -101,12 +102,6 @@ import {
 } from './imageRecall';
 import { collectMediaUsage } from './mediaUsage';
 import { buildPbrMapsGraph } from './pbrMapsGraph';
-import {
-  EMPTY_VIDEO_RECALL_CAPABILITIES,
-  getVideoRecallCapabilities as deriveVideoRecallCapabilitiesFromMetadata,
-  type VideoRecallCapabilities,
-  type VideoRecallKind,
-} from './videoRecall';
 
 /**
  * Share backend image mutations across surfaces; patch Gallery caches optimistically and invalidate affected
@@ -132,13 +127,8 @@ export interface ImageActions extends GalleryItemActions {
   downloadImages: (imageNames: string[]) => Promise<void>;
   /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
   generatePbrMaps: (image: GalleryImage) => Promise<void>;
-  getImageRecallCapabilities: (image: GalleryImage, signal?: AbortSignal) => Promise<ImageRecallCapabilities>;
   /** Opens the image's embedded workflow or generation graph in the workflow editor. */
   loadImageWorkflow: (image: GalleryImage) => Promise<void>;
-  /** Recall availability for a gallery video, from its recorded core_metadata. */
-  getVideoRecallCapabilities: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<VideoRecallCapabilities>;
-  /** Whether the video embeds a workflow; the listing does not say, so an unknown answer reads the record. */
-  hasVideoWorkflow: (item: GalleryVideoItem, signal?: AbortSignal) => Promise<boolean>;
   /** Opens the video's embedded workflow or generation graph in the workflow editor. */
   loadVideoWorkflow: (item: GalleryVideoItem) => Promise<void>;
   moveImagesToBoard: (imageNames: string[], boardId: string) => Promise<void>;
@@ -227,6 +217,7 @@ export const useImageActions = ({
   const revealLayerProperties = useRevealLayerProperties();
   const commands = useWorkbenchCommands();
   const { gallery, generation, notifications } = commands;
+  const notify = useNotify();
   const queries = useWorkbenchQueries();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
@@ -283,7 +274,10 @@ export const useImageActions = ({
     const getBoardName = (boardId: string) => {
       const board = boards.find((board) => board.id === boardId);
 
-      return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
+      // Uncategorized has no entry of its own in every host's list; another board missing from it is not Uncategorized.
+      return board
+        ? getGalleryBoardLabel(board, t)
+        : t(boardId === 'none' ? 'widgets.gallery.uncategorized' : 'widgets.gallery.unknownBoard');
     };
     const getLatestProject = () => {
       const snapshot = queries.getSnapshot();
@@ -293,7 +287,8 @@ export const useImageActions = ({
     const getLatestWidgetValues = (widgetId: 'gallery' | 'generate' | 'video') => {
       const project = getLatestProject();
 
-      return project ? getProjectWidgetValues(project, widgetId) : {};
+      // Read as the widget does: auto-add follows the Gallery's resolved `followSelectedBoard`.
+      return project ? getResolvedProjectWidgetValues(project, widgetId, queries.getSnapshot().scopedDefaults) : {};
     };
     const getLatestGenerateValues = () => getLatestWidgetValues('generate');
     const getLatestVideoValues = () => getLatestWidgetValues('video');
@@ -329,7 +324,8 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar',
       requestedCount: number,
       result: GalleryItemMutationResult,
-      boardId?: string
+      boardId?: string,
+      onUndo?: (() => void) | null
     ) => {
       if (result.failed.length > 0) {
         recordError(
@@ -345,17 +341,22 @@ export const useImageActions = ({
         return;
       }
 
-      recordSuccess(
-        t(`widgets.gallery.itemActions.${action}.success`, {
-          board: boardId ? getBoardName(boardId) : undefined,
-          count: result.succeeded.length,
-        })
-      );
+      const title = t(`widgets.gallery.itemActions.${action}.success`, {
+        board: boardId ? getBoardName(boardId) : undefined,
+        count: result.succeeded.length,
+      });
+
+      if (onUndo) {
+        notify.undoable(title, { onUndo, projectId });
+      } else {
+        recordSuccess(title);
+      }
     };
     const runItemMutation = async ({
       action,
       applyConfirmed,
       boardId,
+      getUndo,
       mutate,
       requested,
       rollback,
@@ -363,6 +364,8 @@ export const useImageActions = ({
       action: 'delete' | 'move' | 'star' | 'unstar';
       applyConfirmed: (result: GalleryItemMutationResult, signal: AbortSignal) => Promise<void> | void;
       boardId?: string;
+      /** How to revert a change that fully succeeded, offered as Undo; null when there is nothing it could revert. */
+      getUndo?: (succeeded: readonly GalleryItemRef[]) => (() => void) | null;
       mutate: (signal: AbortSignal) => Promise<GalleryItemMutationResult>;
       requested: GalleryItemRef[];
       /** Undo the optimistic apply. Runs once, only when the account scope that requested
@@ -405,7 +408,13 @@ export const useImageActions = ({
         return;
       }
 
-      reportMutationOutcome(action, requested.length, result, boardId);
+      reportMutationOutcome(
+        action,
+        requested.length,
+        result,
+        boardId,
+        result.failed.length === 0 ? getUndo?.(result.succeeded) : null
+      );
     };
     const deleteItemsConfirmed = (items: GalleryItemRef[]): Promise<void> => {
       // Capture successor context before optimistic removal. Any rejected items restore the widget snapshot; the
@@ -565,25 +574,130 @@ export const useImageActions = ({
       const project = projectId ? queries.getProject(projectId) : queries.getSnapshot().activeProject;
       const usage = project ? collectMediaUsage(project, items) : [];
 
-      // Media the project still uses is always confirmed: the opt-out covers routine deletions, not ones that
-      // leave authored work pointing at nothing.
-      return confirmImageDeletion || usage.length > 0
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus, usage)
+      // The opt-out covers deleting one item the user is looking at. A batch, an item off screen and media the
+      // project still uses always ask: the dialog names what goes, and authored work would point at nothing.
+      const canSkipFutureConfirmations = items.length === 1 && options?.targetsOffScreen !== true;
+
+      return confirmImageDeletion || usage.length > 0 || !canSkipFutureConfirmations
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), {
+            canSkipFutureConfirmations,
+            returnFocus: options?.returnFocus,
+            usage,
+          })
         : deleteItemsConfirmed(items);
     };
-    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
-      // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,
-      // preferring cache; invalidation reconciles conflicts.
-      const previousBoardIds = new Map<GalleryItemKey, string>(
-        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
+    /** Groups refs by a known prior value; refs whose prior value is unknown are left out. */
+    const groupByPrior = <Value>(
+      refs: readonly GalleryItemRef[],
+      getPrior: (key: GalleryItemKey) => Value | undefined
+    ): Map<Value, GalleryItemRef[]> => {
+      const groups = new Map<Value, GalleryItemRef[]>();
+
+      for (const ref of refs) {
+        const prior = getPrior(toGalleryItemKey(ref));
+
+        if (prior === undefined) {
+          continue;
+        }
+
+        const group = groups.get(prior);
+
+        if (group) {
+          group.push(ref);
+        } else {
+          groups.set(prior, [ref]);
+        }
+      }
+
+      return groups;
+    };
+    // Known boards and star flags from cache and store, preferring cache; invalidation reconciles conflicts.
+    const readKnownBoardIds = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, string> => {
+      const boardIds = new Map<GalleryItemKey, string>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
           key,
           fields.boardId,
         ])
       );
 
-      for (const [key, cachedBoardId] of getGalleryItemBoardIdsFromCaches(queryClient, items)) {
-        previousBoardIds.set(key, cachedBoardId);
+      for (const [key, cachedBoardId] of getGalleryItemBoardIdsFromCaches(queryClient, refs)) {
+        boardIds.set(key, cachedBoardId);
       }
+
+      return boardIds;
+    };
+    const readKnownStarred = (refs: readonly GalleryItemRef[]): Map<GalleryItemKey, boolean> => {
+      const starred = new Map<GalleryItemKey, boolean>(
+        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, refs)].map(([key, fields]) => [
+          key,
+          fields.starred,
+        ])
+      );
+
+      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, refs)) {
+        starred.set(key, cachedStarred);
+      }
+
+      return starred;
+    };
+    /**
+     * Undo for a move or star: each item back to its own prior value. The toast outlives later actions, so at undo
+     * time only items still holding this action's value are reverted; a later move or star of the same item wins.
+     * Items whose prior value was not known stay as the action left them. Anything not restored is reported.
+     */
+    const getGalleryItemUndo = <Value>({
+      getCurrent,
+      painted,
+      previous,
+      revert,
+      succeeded,
+    }: {
+      getCurrent: (refs: readonly GalleryItemRef[]) => ReadonlyMap<GalleryItemKey, Value>;
+      painted: Value;
+      previous: ReadonlyMap<GalleryItemKey, Value>;
+      revert: (refs: GalleryItemRef[], prior: Value) => void;
+      succeeded: readonly GalleryItemRef[];
+    }): (() => void) | null => {
+      // An item already holding the painted value has nothing to undo.
+      const changed = succeeded.filter((ref) => previous.get(toGalleryItemKey(ref)) !== painted);
+      const groups = groupByPrior(changed, (key) => previous.get(key));
+
+      if (groups.size === 0) {
+        return null;
+      }
+
+      return () => {
+        const restorable = [...groups.values()].flat();
+        const current = getCurrent(restorable);
+        const unchanged = new Set(
+          selectItemKeysUnchangedSince(restorable.map(toGalleryItemKey), painted, (key) => current.get(key))
+        );
+        let restored = 0;
+
+        for (const [prior, refs] of groups) {
+          const kept = refs.filter((ref) => unchanged.has(toGalleryItemKey(ref)));
+
+          if (kept.length > 0) {
+            restored += kept.length;
+            revert(kept, prior);
+          }
+        }
+
+        if (restored < changed.length) {
+          notifications.add({
+            kind: 'info',
+            title:
+              restored === 0
+                ? t('widgets.gallery.itemActions.undoStale.none', { count: changed.length })
+                : t('widgets.gallery.itemActions.undoStale.partial', { count: changed.length, restored }),
+          });
+        }
+      };
+    };
+    // Undo is the same mutation back, reported without an Undo of its own.
+    const moveItemsToBoard = (items: GalleryItemRef[], boardId: string, offerUndo = true): Promise<void> => {
+      // On partial move failure, restore then reapply confirmed items.
+      const previousBoardIds = readKnownBoardIds(items);
 
       const rollbackCaches = patchGalleryItemCaches(queryClient, {
         boardId,
@@ -651,6 +765,16 @@ export const useImageActions = ({
           }
         },
         boardId,
+        getUndo: (succeeded) =>
+          offerUndo
+            ? getGalleryItemUndo({
+                getCurrent: readKnownBoardIds,
+                painted: boardId,
+                previous: previousBoardIds,
+                revert: (refs, previousBoardId) => void moveItemsToBoard(refs, previousBoardId, false),
+                succeeded,
+              })
+            : null,
         mutate: (signal) => galleryItemOrganization.moveToBoard(items, boardId, signal),
         requested: items,
         rollback: () => {
@@ -666,19 +790,10 @@ export const useImageActions = ({
 
       gallery.patchItems(keys, { starred });
     };
-    const setItemsStarred = (items: GalleryItemRef[], starred: boolean): Promise<void> => {
+    const setItemsStarred = (items: GalleryItemRef[], starred: boolean, offerUndo = true): Promise<void> => {
       // Cache star changes move items between listing partitions and need snapshot/CAS rollback. Store restoration
       // uses each actual prior flag, never blanket inversion.
-      const previousStarred = new Map<GalleryItemKey, boolean>(
-        [...collectGalleryStoreKnownItemFields(queries.getSnapshot().projects, items)].map(([key, fields]) => [
-          key,
-          fields.starred,
-        ])
-      );
-
-      for (const [key, cachedStarred] of getGalleryItemStarredFromCaches(queryClient, items)) {
-        previousStarred.set(key, cachedStarred);
-      }
+      const previousStarred = readKnownStarred(items);
 
       let rollbackCaches: (() => void) | null = patchGalleryItemCaches(queryClient, {
         kind: 'star',
@@ -709,6 +824,16 @@ export const useImageActions = ({
           });
           patchStarredStoreOnly(result.failed.map(toGalleryItemKey), !starred);
         },
+        getUndo: (succeeded) =>
+          offerUndo
+            ? getGalleryItemUndo({
+                getCurrent: readKnownStarred,
+                painted: starred,
+                previous: previousStarred,
+                revert: (refs, prior) => void setItemsStarred(refs, prior, false),
+                succeeded,
+              })
+            : null,
         mutate: (signal) => galleryItemOrganization.setStarred(items, starred, signal),
         requested: items,
         // Restore known prior flags only where this action's painted value remains; cache rollback restores its
@@ -840,7 +965,8 @@ export const useImageActions = ({
       metadata: GalleryImageMetadata | null
     ): ImageRecallCapabilities => {
       if (!currentGenerateValues) {
-        return EMPTY_IMAGE_RECALL_CAPABILITIES;
+        // Loading an embedded workflow does not go through the Generate panel.
+        return { ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: image.hasWorkflow === true };
       }
 
       return getImageRecallCapabilities({
@@ -1003,44 +1129,6 @@ export const useImageActions = ({
           t('widgets.gallery.itemActions.pbrMaps.queuedMessage', { name: image.imageName })
         );
       },
-      getImageRecallCapabilities: async (image, signal) => {
-        const owner = captureAccountScope();
-        const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-        // Grid listings do not say whether an image embeds a workflow; images that
-        // came through the record endpoints already do.
-        const hasWorkflow =
-          image.hasWorkflow !== undefined
-            ? Promise.resolve(image.hasWorkflow)
-            : galleryImages
-                .resolve(image.imageName, requestSignal)
-                .then((record) => record.hasWorkflow === true)
-                .catch(() => false);
-
-        if (!currentGenerateValues) {
-          return { ...EMPTY_IMAGE_RECALL_CAPABILITIES, workflow: await hasWorkflow };
-        }
-
-        try {
-          const [metadata, workflow] = await Promise.all([
-            galleryImages.metadata(image.imageName, requestSignal),
-            hasWorkflow,
-          ]);
-
-          assertAccountScopeCurrent(owner);
-          return deriveImageRecallCapabilities({ ...image, hasWorkflow: workflow }, metadata);
-        } catch {
-          if (!isAccountScopeCurrent(owner)) {
-            return EMPTY_IMAGE_RECALL_CAPABILITIES;
-          }
-
-          return {
-            ...EMPTY_IMAGE_RECALL_CAPABILITIES,
-            dimensions:
-              Number.isFinite(image.width) && image.width >= 64 && Number.isFinite(image.height) && image.height >= 64,
-            workflow: await hasWorkflow,
-          };
-        }
-      },
       loadImageWorkflow: (image) =>
         executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
@@ -1050,35 +1138,6 @@ export const useImageActions = ({
             openWorkbenchWidget('workflow', { preferredRegions: ['center'], requireCenterView: true }).ok,
           t,
         }),
-      getVideoRecallCapabilities: async (item, signal) => {
-        const owner = captureAccountScope();
-
-        try {
-          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-          const metadata = await galleryVideos.metadata(item.name, requestSignal);
-
-          assertAccountScopeCurrent(owner);
-          return deriveVideoRecallCapabilitiesFromMetadata(metadata);
-        } catch {
-          return EMPTY_VIDEO_RECALL_CAPABILITIES;
-        }
-      },
-      hasVideoWorkflow: async (item, signal) => {
-        if (item.hasWorkflow !== undefined) {
-          return item.hasWorkflow;
-        }
-
-        const owner = captureAccountScope();
-
-        try {
-          const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
-          const record = await galleryItems.resolve({ kind: 'video', name: item.name }, requestSignal);
-
-          return record.kind === 'video' && record.hasWorkflow === true;
-        } catch {
-          return false;
-        }
-      },
       loadVideoWorkflow: (item) =>
         executeLoadMediaWorkflow({
           isProjectActive: () => !projectId || queries.isActiveProject(projectId),
@@ -1097,6 +1156,8 @@ export const useImageActions = ({
           kind,
           models,
           projectId,
+          queryClient,
+          t,
         });
 
         // The value patch auto-routes invocation; the caller reveals the widget.
@@ -1108,7 +1169,7 @@ export const useImageActions = ({
         const owner = captureAccountScope();
 
         try {
-          const metadata = await galleryImages.metadata(image.imageName, owner.signal);
+          const metadata = await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
 
           assertAccountScopeCurrent(owner);
 
@@ -1142,13 +1203,13 @@ export const useImageActions = ({
         const owner = captureAccountScope();
         const didRecall = await executeImageRecall({
           commands,
-          generateValues,
           getGenerateValues: getLatestGenerateValues,
           image,
           isCanvasFrame: getLatestProject()?.invocation.sourceId === 'canvas',
           kind,
           models,
           projectId,
+          queryClient,
           t,
         });
 
@@ -1373,11 +1434,11 @@ export const useImageActions = ({
     currentGenerateValues,
     commands,
     gallery,
-    generateValues,
     generation,
     getItemActionContext,
     models,
     notifications,
+    notify,
     onImagesDeleted,
     openWorkbenchWidget,
     projectId,

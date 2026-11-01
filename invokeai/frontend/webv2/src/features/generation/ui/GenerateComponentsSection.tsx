@@ -1,9 +1,10 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { ComponentModelConfig, GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
 
-import { Stack, Text } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import {
   getComponentSectionPolicy,
+  getComponentSlotIssue,
   type ComponentPolicyContext,
   type ComponentSlotPolicy,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -24,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { GenerationModelSelect as ModelSelect } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
 
 interface GenerateComponentsSectionProps {
@@ -96,21 +98,26 @@ const ComponentPicker = ({
   onChange: (model: ModelConfig | null) => void;
   slot: ComponentSlotPolicy;
 }) => {
+  const { t } = useTranslation();
   const value = ctx.selectedComponents[slot.key];
   const filter = useCallback((model: ModelConfig) => slot.filter?.(model, ctx) ?? false, [ctx, slot]);
   const modelTypes = useMemo(() => [...slot.modelTypes], [slot.modelTypes]);
   const isIncompatible = Boolean(value && slot.filter && !filter(value as ModelConfig));
+  const isRequired = Boolean(slot.required?.(ctx));
+  const error = getComponentSlotIssue(slot, ctx) ?? undefined;
   // A slot that names an incompatible selection keeps it visible, so the error has a value to point at and clear.
-  const error = isIncompatible ? slot.incompatibleMessage : undefined;
-  const selectedValue = value && (!isIncompatible || error) ? value.key : null;
+  const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
 
   return (
     <Field label={slot.label} helpText={slot.helpText} error={error}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
+        invalid={Boolean(error)}
         isClearable
         modelTypes={modelTypes}
-        placeholder={slot.placeholder ?? 'Model default'}
+        placeholder={
+          slot.placeholder ?? (isRequired ? t('widgets.generate.selectComponent') : t('widgets.generate.modelDefault'))
+        }
         value={selectedValue}
         onChange={onChange}
       />
@@ -170,6 +177,7 @@ export const GenerateComponentsSection = ({ draft, onCommit, selectedModel }: Ge
             onCommit={onCommit}
           />
         ) : null}
+        <GenerateIssueNotes section="components" />
       </Stack>
     </GenerateCollapsibleSection>
   );
@@ -206,15 +214,10 @@ const AnimaInpaintAdapterControls = ({
     <Stack gap="1.5">
       <GenerateToggleSwitch
         checked={enabled}
+        helpText={enabled ? undefined : t('widgets.generate.animaInpaintAdapterOffHelp')}
         label={t('widgets.generate.animaInpaintAdapterEnabled')}
-        labelVisible
         onCheckedChange={onEnabledChange}
       />
-      {enabled ? null : (
-        <Text color="fg.muted" fontSize="xs">
-          {t('widgets.generate.animaInpaintAdapterOffHelp')}
-        </Text>
-      )}
       <ScrubberField
         defaultValue={DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT}
         disabled={!enabled}

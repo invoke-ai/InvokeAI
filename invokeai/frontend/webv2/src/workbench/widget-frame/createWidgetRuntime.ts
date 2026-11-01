@@ -1,6 +1,6 @@
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { WidgetRegion } from '@workbench/layoutContracts';
-import type { Project } from '@workbench/projectContracts';
+import type { WorkbenchState } from '@workbench/projectContracts';
 import type {
   WidgetHotkeyApi,
   OpenWorkbenchWidgetOptions,
@@ -18,6 +18,7 @@ import type { WorkbenchWidgetCommands } from '@workbench/workbenchStore';
 import { createLogger } from '@platform/logging/logger';
 import { isWidgetRegion as isKnownWidgetRegion } from '@workbench/layoutContracts';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { resolveWidgetValues } from '@workbench/widgetState';
 import { useWorkbenchExtensions, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 
@@ -53,13 +54,17 @@ export const cloneWidgetRuntimeState = <State extends Record<string, unknown>>(s
   }
 };
 
+/** A copy of the instance's values as it reads them: its pins over the user's defaults for its type. */
 export const getProjectWidgetRuntimeState = <State extends Record<string, unknown>>(
-  projects: readonly Project[],
+  { projects, scopedDefaults }: Pick<WorkbenchState, 'projects' | 'scopedDefaults'>,
   projectId: string,
   instanceId: string
 ): State =>
   cloneWidgetRuntimeState(
-    (projects.find((project) => project.id === projectId)?.widgetInstances[instanceId]?.state.values ?? {}) as State
+    resolveWidgetValues(
+      projects.find((project) => project.id === projectId)?.widgetInstances[instanceId],
+      scopedDefaults
+    ) as State
   );
 
 export const createWidgetRuntime = ({
@@ -172,7 +177,7 @@ export const useWidgetRuntime = ({
   const projectId = project.projectId ?? store.getSnapshot().activeProject.id;
   const state = useMemo<WidgetRuntimeStateApi>(
     () => ({
-      getSnapshot: () => getProjectWidgetRuntimeState(store.getState().projects, projectId, instance.id),
+      getSnapshot: () => getProjectWidgetRuntimeState(store.getState(), projectId, instance.id),
       patch: (values) => widgets.patchInstanceValues(instance.id, cloneWidgetRuntimeState(values), projectId),
       set: (values) => widgets.setInstanceValues(instance.id, cloneWidgetRuntimeState(values), projectId),
     }),

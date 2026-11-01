@@ -48,6 +48,12 @@ const SURFACE_HINTS: Record<string, ShortcutHintSnapshot> = {
     titleKey: 'widgets.labels.workflow',
     hints: [
       { commandId: 'workflows.addNode', labelKey: 'workbench.shortcuts.actions.addNode' },
+      // The editor pans on a middle or right drag; a left drag selects.
+      {
+        labelKey: 'workbench.shortcuts.actions.pan',
+        parts: [],
+        pointerKey: 'workbench.shortcuts.pointer.middleOrRightDrag',
+      },
       { commandId: 'workflows.selectAll', labelKey: 'workbench.shortcuts.actions.selectNodes' },
     ],
   },

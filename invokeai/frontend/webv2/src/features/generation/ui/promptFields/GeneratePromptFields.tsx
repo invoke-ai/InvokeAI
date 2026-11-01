@@ -2,12 +2,15 @@ import type { PromptHistoryItem } from '@features/generation/contracts';
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
 import type { GenerateModelConfig, GenerateSettings } from '@features/generation/core/types';
+import type { PromptTemplateChange } from '@features/generation/ui/promptFields/PromptTemplatesButton';
 
-import { HStack, Stack, Tag } from '@chakra-ui/react';
+import { Stack } from '@chakra-ui/react';
 import { getImageExpandPromptSuggestion, getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
 import { type GenerateDraft, pickGenerateSettings } from '@features/generation/ui/generateDebounce';
+import { flushGenerateDrafts } from '@features/generation/ui/generateDraftRegistry';
+import { offerGenerateUndo } from '@features/generation/ui/generateUndo';
 import { useGenerateValues, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useCallback, useMemo } from 'react';
@@ -35,6 +38,7 @@ interface GeneratePromptValues {
 /** The flat GenerateSettings field behind each dynamic prompts config key. */
 const DYNAMIC_PROMPT_SETTING_KEYS = {
   combinatorial: 'dynamicPromptsCombinatorial',
+  enabled: 'dynamicPromptsEnabled',
   maxPrompts: 'dynamicPromptsMaxPrompts',
   resample: 'dynamicPromptsResample',
   sampleSeed: 'dynamicPromptsSampleSeed',
@@ -53,6 +57,7 @@ const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues 
 
 const selectPromptSettings = pickGenerateSettings([
   'dynamicPromptsCombinatorial',
+  'dynamicPromptsEnabled',
   'dynamicPromptsMaxPrompts',
   'dynamicPromptsResample',
   'dynamicPromptsSampleSeed',
@@ -75,7 +80,8 @@ export const GeneratePromptFields = ({
   selectedModel,
 }: GeneratePromptFieldsProps) => {
   const { t } = useTranslation();
-  const { showPromptSyntaxHighlighting } = useGenerationUi().project;
+  const ui = useGenerationUi();
+  const { showPromptSyntaxHighlighting } = ui.project;
   const promptValues = useGenerateValues(getPromptValues);
   const batchCount = useGenerateValues(selectBatchCount, Object.is);
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectPromptSettings);
@@ -90,19 +96,53 @@ export const GeneratePromptFields = ({
     }
   );
 
+  /**
+   * Applies a prompt change that reaches past the prompt text, which Ctrl+Z in the prompt cannot undo, with an Undo
+   * toast. Drafts flush first so the Undo restores what the user saw. `isWhole` changes undo all or nothing.
+   */
+  const commitWithUndo = useCallback(
+    (patch: Partial<GenerateSettings>, title: string, isWhole = false) => {
+      flushGenerateDrafts();
+      const before = ui.settings.readGenerateValues(projectId) ?? {};
+
+      onCommitImmediate(patch);
+      offerGenerateUndo({ after: { ...before, ...patch }, before, isWhole, projectId, slot: 'prompt', t, title, ui });
+    },
+    [onCommitImmediate, projectId, t, ui]
+  );
+
+  // The positive prompt also lands in the prompt box as an edit (Ctrl+Z); replacing the negative prompt as well
+  // needs the toast's Undo.
   const usePromptHistoryItem = useCallback(
     (prompt: PromptHistoryItem) => {
-      onCommitImmediate(
-        promptPolicy.negativeVisible
-          ? {
-              negativePrompt: prompt.negativePrompt ?? '',
-              negativePromptEnabled: prompt.negativePrompt ? true : promptValues.negativePromptEnabled,
-              positivePrompt: prompt.positivePrompt,
-            }
-          : { positivePrompt: prompt.positivePrompt }
-      );
+      if (!promptPolicy.negativeVisible) {
+        onCommitImmediate({ positivePrompt: prompt.positivePrompt });
+        return;
+      }
+
+      const patch = {
+        negativePrompt: prompt.negativePrompt ?? '',
+        negativePromptEnabled: prompt.negativePrompt ? true : promptValues.negativePromptEnabled,
+        positivePrompt: prompt.positivePrompt,
+      };
+
+      if (
+        patch.negativePrompt === promptValues.negativePrompt &&
+        patch.negativePromptEnabled === promptValues.negativePromptEnabled
+      ) {
+        onCommitImmediate(patch);
+      } else {
+        commitWithUndo(patch, t('widgets.generate.promptHistoryUsed'));
+      }
     },
-    [onCommitImmediate, promptPolicy.negativeVisible, promptValues.negativePromptEnabled]
+    [
+      commitWithUndo,
+      onCommitImmediate,
+      promptPolicy.negativeVisible,
+      promptValues.negativePrompt,
+      promptValues.negativePromptEnabled,
+      t,
+    ]
   );
 
   const handlePositivePromptChange = useCallback((positivePrompt: string) => onCommit({ positivePrompt }), [onCommit]);
@@ -112,11 +152,23 @@ export const GeneratePromptFields = ({
     [onCommitImmediate]
   );
 
-  // Reset view mode when the template changes so prompts do not become unexpectedly read-only.
+  // Reset view mode when the template changes so prompts do not become unexpectedly read-only. Choosing or clearing
+  // one changes what generates without touching the prompt text, so it gets an Undo; keeping it in step with the
+  // catalog does not.
   const applyPromptTemplate = useCallback(
-    (promptTemplate: PromptTemplateSnapshot | null) =>
-      onCommitImmediate({ promptTemplate, promptTemplateViewMode: false }),
-    [onCommitImmediate]
+    (promptTemplate: PromptTemplateSnapshot | null, change: PromptTemplateChange = 'chosen') => {
+      const patch = { promptTemplate, promptTemplateViewMode: false };
+      const previous = settings.promptTemplate;
+
+      if (change === 'synced' || promptTemplate?.id === previous?.id) {
+        onCommitImmediate(patch);
+      } else if (promptTemplate) {
+        commitWithUndo(patch, t('widgets.generate.promptTemplateApplied', { name: promptTemplate.name }));
+      } else {
+        commitWithUndo(patch, t('widgets.generate.promptTemplateCleared', { name: previous?.name ?? '' }));
+      }
+    },
+    [commitWithUndo, onCommitImmediate, settings.promptTemplate, t]
   );
 
   /** Bake the template into the authored prompt and stop applying it. */
@@ -127,15 +179,18 @@ export const GeneratePromptFields = ({
         return;
       }
 
-      onCommitImmediate(
+      commitWithUndo(
         flattenPromptTemplateExpansion({
           authoredNegativePrompt: promptValues.negativePrompt,
           selectedPositivePrompt: positivePrompt,
           template: settings.promptTemplate,
-        })
+        }),
+        t('widgets.generate.promptTemplateMerged', { name: settings.promptTemplate.name }),
+        // Half a merge (the negative prompt without its positive) would be a prompt nobody wrote.
+        true
       );
     },
-    [onCommitImmediate, promptValues.negativePrompt, settings.promptTemplate]
+    [commitWithUndo, onCommitImmediate, promptValues.negativePrompt, settings.promptTemplate, t]
   );
 
   const handleDynamicPromptsChange = useCallback(
@@ -154,6 +209,7 @@ export const GeneratePromptFields = ({
   const dynamicPrompts = useMemo(
     () => ({
       combinatorial: settings.dynamicPromptsCombinatorial,
+      enabled: settings.dynamicPromptsEnabled,
       isSeedFixed: settings.seedMode === 'fixed',
       maxPrompts: settings.dynamicPromptsMaxPrompts,
       onChange: handleDynamicPromptsChange,
@@ -164,6 +220,7 @@ export const GeneratePromptFields = ({
     [
       handleDynamicPromptsChange,
       settings.dynamicPromptsCombinatorial,
+      settings.dynamicPromptsEnabled,
       settings.dynamicPromptsMaxPrompts,
       settings.dynamicPromptsResample,
       settings.dynamicPromptsSampleSeed,
@@ -188,8 +245,6 @@ export const GeneratePromptFields = ({
     (negativePromptHeightPx: number) => onCommitImmediate({ negativePromptHeightPx }),
     [onCommitImmediate]
   );
-
-  const clearPromptTemplate = useCallback(() => applyPromptTemplate(null), [applyPromptTemplate]);
 
   const savedPromptModels = useMemo(
     () => ({
@@ -225,20 +280,6 @@ export const GeneratePromptFields = ({
         onUsePrompt={usePromptHistoryItem}
       />
 
-      {settings.promptTemplate ? (
-        <HStack>
-          <Tag.Root variant="surface">
-            <Tag.Label>{settings.promptTemplate.name}</Tag.Label>
-            <Tag.EndElement>
-              <Tag.CloseTrigger
-                aria-label={t('widgets.generate.clearPromptTemplate')}
-                title={t('widgets.generate.clearPromptTemplate')}
-                onClick={clearPromptTemplate}
-              />
-            </Tag.EndElement>
-          </Tag.Root>
-        </HStack>
-      ) : null}
       {promptPolicy.negativeVisible ? (
         <NegativePromptField
           heightPx={promptValues.negativePromptHeightPx}

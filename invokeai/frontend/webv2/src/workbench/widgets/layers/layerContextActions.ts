@@ -32,6 +32,7 @@ import {
   CopyIcon,
   CropIcon,
   DropletIcon,
+  EyeClosedIcon,
   EyeIcon,
   FilmIcon,
   FingerprintPatternIcon,
@@ -133,7 +134,7 @@ export interface LayerContextActionState {
   hasEngine: boolean;
   hasSupportedContent: boolean;
   hasWorkflowBindings: boolean;
-  interactionLocked: boolean;
+  operationLocked: boolean;
   layer: CanvasLayerContract;
   /** The selected generation model's base; gates model-dependent actions like reference images. */
   modelBase: string | null;
@@ -308,7 +309,7 @@ const INPAINT_ONLY = ['inpaint_mask'] as const;
 const REGIONAL_ONLY = ['regional_guidance'] as const;
 
 const alwaysVisible = (): boolean => true;
-const isInteractionFree = (context: LayerContextActionState): boolean => !context.interactionLocked;
+const isOperationFree = (context: LayerContextActionState): boolean => !context.operationLocked;
 const layerEntry = (context: LayerContextActionState) => getDocumentIndex(context.document).byId.get(context.layer.id);
 /** The nodes a selection-wide action applies to: the whole selection when the layer is in it. */
 export const actionTargets = (context: Pick<LayerContextActionState, 'layer' | 'selectedIds'>): readonly string[] =>
@@ -330,9 +331,9 @@ const allTargetsInpaintMasks = (context: LayerContextActionState): boolean =>
 const isLayerFrozen = (context: LayerContextActionState): boolean =>
   context.layer.isLocked || (layerEntry(context)?.ancestorsLocked ?? false);
 const isLayerMutable = (context: LayerContextActionState): boolean =>
-  isInteractionFree(context) && !isLayerFrozen(context);
+  isOperationFree(context) && !isLayerFrozen(context);
 const CANVAS_NOT_READY_REASON = 'widgets.layers.actions.canvasNotReady';
-const INTERACTION_LOCKED_REASON = 'widgets.layers.actions.interactionLocked';
+const OPERATION_LOCKED_REASON = 'widgets.layers.actions.operationLocked';
 /** Any target locked, by itself or by a group above it: the model refuses to move it out. */
 const isAnyTargetFrozen = (context: LayerContextActionState): boolean => {
   const index = getDocumentIndex(context.document);
@@ -342,7 +343,7 @@ const isAnyTargetFrozen = (context: LayerContextActionState): boolean => {
   });
 };
 const hasReadablePixels = (context: LayerContextActionState): boolean =>
-  context.hasEngine && context.hasSupportedContent && !context.interactionLocked;
+  context.hasEngine && context.hasSupportedContent && !context.operationLocked;
 const hasMutablePixels = (context: LayerContextActionState): boolean =>
   isLayerMutable(context) && hasReadablePixels(context);
 const hasTransformablePixels = (context: LayerContextActionState): boolean =>
@@ -391,12 +392,12 @@ const siblingPosition = (context: LayerContextActionState): { index: number; cou
 
 const canMoveForward = (context: LayerContextActionState): boolean => {
   const position = siblingPosition(context);
-  return isInteractionFree(context) && !!position && position.index > 0;
+  return isOperationFree(context) && !!position && position.index > 0;
 };
 
 const canMoveBackward = (context: LayerContextActionState): boolean => {
   const position = siblingPosition(context);
-  return isInteractionFree(context) && !!position && position.index < position.count - 1;
+  return isOperationFree(context) && !!position && position.index < position.count - 1;
 };
 
 const hasMergeableLayerBelow = (context: LayerContextActionState): boolean =>
@@ -474,7 +475,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.duplicate(),
     icon: CopyIcon,
     id: 'duplicate',
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.duplicate',
     order: 10,
@@ -490,7 +491,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.group(),
     icon: FolderPlusIcon,
     id: 'group',
-    isEnabled: (context) => isInteractionFree(context) && context.canGroupSelection,
+    isEnabled: (context) => isOperationFree(context) && context.canGroupSelection,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.group',
     order: 20,
@@ -504,13 +505,13 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
         ? CANVAS_NOT_READY_REASON
         : isAnyTargetFrozen(context)
           ? 'widgets.layers.actions.removeFromGroupLocked'
-          : context.interactionLocked
-            ? INTERACTION_LOCKED_REASON
+          : context.operationLocked
+            ? OPERATION_LOCKED_REASON
             : undefined,
     handler: ({ effects }) => effects.removeFromGroup(),
     icon: UngroupIcon,
     id: 'remove-from-group',
-    isEnabled: (context) => isInteractionFree(context) && context.canRemoveFromGroup,
+    isEnabled: (context) => isOperationFree(context) && context.canRemoveFromGroup,
     isVisible: (context) => removeFromGroupCommand(context.document, actionTargets(context)) !== null,
     labelKey: 'widgets.layers.actions.removeFromGroup',
     order: 21,
@@ -534,7 +535,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.openRename(),
     icon: PencilIcon,
     id: 'rename',
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.rename',
     order: 20,
@@ -734,7 +735,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.mergeSelected(),
     icon: MergeIcon,
     id: 'merge-selected',
-    isEnabled: (context) => isInteractionFree(context) && context.canMergeSelection,
+    isEnabled: (context) => isOperationFree(context) && context.canMergeSelection,
     // A mask-only selection merges through Merge masks instead; raster merge never accepts masks.
     isVisible: (context) => isMultiTarget(context) && !allTargetsInpaintMasks(context),
     labelKey: 'widgets.layers.actions.mergeSelected',
@@ -751,11 +752,11 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
           ? 'widgets.layers.actions.mergeMasksSettingsDiffer'
           : context.mergeMasksEligibility === 'ineligible'
             ? 'widgets.layers.actions.mergeMasksIneligible'
-            : INTERACTION_LOCKED_REASON,
+            : OPERATION_LOCKED_REASON,
     handler: ({ effects }) => effects.mergeMasks(),
     icon: MergeIcon,
     id: 'merge-masks',
-    isEnabled: (context) => isInteractionFree(context) && context.mergeMasksEligibility === 'eligible',
+    isEnabled: (context) => isOperationFree(context) && context.mergeMasksEligibility === 'eligible',
     isVisible: (context) => isMultiTarget(context) && allTargetsInpaintMasks(context),
     labelKey: 'widgets.layers.actions.mergeMasks',
     order: 1,
@@ -961,45 +962,47 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     section: 'output',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // One visibility model: hiding a layer takes it off the canvas and out of generation alike.
   {
-    defaultLabel: 'Enable/disable',
+    defaultLabel: 'Show or hide layer',
     getDefaultLabel: (context) =>
       isMultiTarget(context)
         ? allTargetsEnabled(context)
-          ? 'Disable selected'
-          : 'Enable selected'
+          ? 'Hide selected'
+          : 'Show selected'
         : context.layer.isEnabled
-          ? 'Disable layer'
-          : 'Enable layer',
-    getIcon: (context) => (allTargetsEnabled(context) ? CircleOffIcon : CircleIcon),
+          ? 'Hide layer'
+          : 'Show layer',
+    getIcon: (context) => (allTargetsEnabled(context) ? EyeOffIcon : EyeIcon),
     getLabelKey: (context) =>
       isMultiTarget(context)
         ? allTargetsEnabled(context)
-          ? 'widgets.layers.actions.disableSelected'
-          : 'widgets.layers.actions.enableSelected'
+          ? 'widgets.layers.actions.hideSelected'
+          : 'widgets.layers.actions.showSelected'
         : context.layer.isEnabled
-          ? 'widgets.layers.actions.disableLayer'
-          : 'widgets.layers.actions.enableLayer',
+          ? 'widgets.layers.actions.hideLayer'
+          : 'widgets.layers.actions.showLayer',
     handler: ({ effects }) => effects.toggleVisibility(),
-    icon: CircleIcon,
+    icon: EyeOffIcon,
     id: 'toggle-visibility',
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: alwaysVisible,
-    labelKey: 'widgets.layers.actions.toggleVisibility',
+    labelKey: 'widgets.layers.actions.toggleActive',
     order: 0,
     section: 'state',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
+  // Overlays only: off the canvas to see the image under them, still used by generation.
   {
-    defaultLabel: 'Show/hide layer',
-    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show layer' : 'Hide layer'),
-    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeOffIcon),
+    defaultLabel: 'Hide on canvas only',
+    getDefaultLabel: (context) => (isNodeHidden(context.layer) ? 'Show on canvas' : 'Hide on canvas only'),
+    getIcon: (context) => (isNodeHidden(context.layer) ? EyeIcon : EyeClosedIcon),
     getLabelKey: (context) =>
-      isNodeHidden(context.layer) ? 'widgets.layers.actions.showLayer' : 'widgets.layers.actions.hideLayer',
+      isNodeHidden(context.layer) ? 'widgets.layers.actions.showOnCanvas' : 'widgets.layers.actions.hideOnCanvas',
     handler: ({ effects }) => effects.toggleHidden(),
-    icon: EyeOffIcon,
+    icon: EyeClosedIcon,
     id: 'toggle-hidden',
-    isEnabled: (context) => isInteractionFree(context) && !context.hiddenByAncestor,
+    isEnabled: (context) => isOperationFree(context) && !context.hiddenByAncestor,
     isVisible: (context) => isHideableLayer(context.layer),
     labelKey: 'widgets.layers.actions.toggleHidden',
     order: 5,
@@ -1028,7 +1031,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.toggleLock(),
     icon: LockIcon,
     id: 'toggle-lock',
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.toggleLock',
     order: 10,
@@ -1049,7 +1052,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     hint: 'q',
     icon: BookmarkIcon,
     id: 'bookmark-quick-switch',
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: (context) => context.hasEngine,
     labelKey: 'widgets.layers.actions.bookmarkForQuickSwitch',
     order: 12,
@@ -1063,7 +1066,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     icon: CircleIcon,
     iconColor: item.hex,
     id: `color-label-${item.value}`,
-    isEnabled: isInteractionFree,
+    isEnabled: isOperationFree,
     isVisible: alwaysVisible,
     labelKey: item.labelKey,
     order: 15 + index,
@@ -1076,7 +1079,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.setColorLabel(null),
     icon: CircleOffIcon,
     id: 'color-label-none',
-    isEnabled: (context) => isInteractionFree(context) && context.layer.colorLabel !== undefined,
+    isEnabled: (context) => isOperationFree(context) && context.layer.colorLabel !== undefined,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.labels.none',
     order: 15 + COLOR_LABEL_ITEMS.length,
@@ -1093,7 +1096,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     handler: ({ effects }) => effects.delete(),
     icon: Trash2Icon,
     id: 'delete',
-    isEnabled: (context) => isInteractionFree(context) && context.canDeleteSelection,
+    isEnabled: (context) => isOperationFree(context) && context.canDeleteSelection,
     isVisible: alwaysVisible,
     labelKey: 'widgets.layers.actions.delete',
     order: 0,

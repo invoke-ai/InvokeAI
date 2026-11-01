@@ -1,8 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { ImageMapPoint } from './api';
 
 import { describeClusters, summarizeClusters } from './clusterStats';
+
+const englishCatalog = Object.values(
+  import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+)[0] as Record<string, unknown>;
+const instance = i18n.createInstance();
+const t = (key: string, values?: Record<string, unknown>) => instance.t(key, values);
+
+beforeAll(async () => {
+  await instance.init({
+    initAsync: false,
+    interpolation: { escapeValue: false },
+    lng: 'en',
+    resources: { en: { translation: englishCatalog } },
+  });
+});
 
 const points = (...clusters: number[]): ImageMapPoint[] =>
   clusters.map((cluster, index) => ({
@@ -48,14 +64,14 @@ describe('summarizeClusters', () => {
 
 describe('describeClusters', () => {
   it('agrees with the noun it is counting', () => {
-    expect(describeClusters(summarizeClusters(points(0, 0, 1, -1)))).toBe(
-      'Cluster count: 2, Largest cluster: 2 media points, Unclustered: 1 media point'
+    expect(describeClusters(summarizeClusters(points(0, 0, 1, -1)), t)).toBe(
+      'Cluster count: 2, largest cluster: 2 media points, unclustered: 1 media point'
     );
   });
 
   it('groups digits, so it reads consistently beside the index progress in the same row', () => {
     const noise: number[] = Array.from({ length: 1500 }, () => -1);
 
-    expect(describeClusters(summarizeClusters(points(...noise)))).toContain('Unclustered: 1,500 media points');
+    expect(describeClusters(summarizeClusters(points(...noise)), t)).toContain('unclustered: 1,500 media points');
   });
 });
