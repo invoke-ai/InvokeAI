@@ -10,6 +10,7 @@ from dynamicprompts.commands import (
     WildcardCommand,
     WrapCommand,
 )
+from dynamicprompts.commands.variable_commands import VariableAccessCommand, VariableAssignmentCommand
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from dynamicprompts.parser.parse import parse
 from dynamicprompts.wildcards import WildcardManager
@@ -32,7 +33,14 @@ def _iter_wildcard_names(command: Command) -> Iterator[str]:
     elif isinstance(command, WrapCommand):
         yield from _iter_wildcard_names(command.wrapper)
         yield from _iter_wildcard_names(command.inner)
-    # LiteralCommand and variable commands reference no wildcards we can resolve statically.
+    elif isinstance(command, VariableAssignmentCommand):
+        # `${c={__nope__|x}}` evaluates its value just like the bare variant would.
+        yield from _iter_wildcard_names(command.value)
+    elif isinstance(command, VariableAccessCommand):
+        # `${c:{__nope__|x}}` falls back to its default when `c` is unset.
+        if command.default is not None:
+            yield from _iter_wildcard_names(command.default)
+    # LiteralCommand references no wildcards.
 
 
 def find_missing_wildcards(prompt: str, wildcard_manager: WildcardManager | None = None) -> list[str]:
