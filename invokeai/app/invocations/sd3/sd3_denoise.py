@@ -25,6 +25,7 @@ from invokeai.app.invocations.text_encoder.sd3_text_encoder import SD3_T5_MAX_SE
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import SD3ConditioningInfo
@@ -270,7 +271,11 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         step_callback = self._build_step_callback(context)
 
-        with transformer_info.model_on_device() as (cached_weights, transformer):
+        # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover. Passed alone
+        # because this node has no activation estimate, so the cache floors it at `device_working_mem_gb`; zero for a
+        # Diffusers build, which leaves the reservation as it was.
+        dequant_bytes = peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+        with transformer_info.model_on_device(working_mem_bytes=dequant_bytes) as (cached_weights, transformer):
             assert isinstance(transformer, SD3Transformer2DModel)
 
             # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
