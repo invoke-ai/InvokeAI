@@ -121,9 +121,9 @@ export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
 export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
 export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
-export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
-export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
-export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
+export const DEFAULT_HIDIFFUSION_T1_RATIO = null;
+export const DEFAULT_HIDIFFUSION_T2_RATIO = null;
+export const MIN_HIDIFFUSION_T1_RATIO = 0;
 export const MAX_HIDIFFUSION_RATIO = 1;
 /** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
 export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
@@ -881,20 +881,32 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       typeof values.hiDiffusionRauNetEnabled === 'boolean' ? values.hiDiffusionRauNetEnabled : true,
     hiDiffusionWindowAttentionEnabled:
       typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' ? values.hiDiffusionWindowAttentionEnabled : true,
-    hiDiffusionT1Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT1Ratio',
-      MIN_HIDIFFUSION_T1_RATIO,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T1_RATIO
-    ),
-    hiDiffusionT2Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT2Ratio',
-      0,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T2_RATIO
-    ),
+    ...(Object.hasOwn(values, 'hiDiffusionManualRatios')
+      ? {
+          hiDiffusionManualRatios: {
+            t1: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't1',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0.4
+            ),
+            t2: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't2',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0
+            ),
+          },
+        }
+      : {}),
+    hiDiffusionT1Ratio: !hasFiniteNumber(values, 'hiDiffusionT1Ratio')
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0.4),
+    hiDiffusionT2Ratio: !hasFiniteNumber(values, 'hiDiffusionT2Ratio')
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
     dynamicPromptsEnabled: values.dynamicPromptsEnabled !== false,

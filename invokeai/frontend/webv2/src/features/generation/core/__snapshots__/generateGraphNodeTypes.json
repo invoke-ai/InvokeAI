@@ -709,16 +709,19 @@
           768
         ],
         "hidiffusion": [
-          false
+          false,
+          true
         ],
         "hidiffusion_raunet": [
           true
         ],
         "hidiffusion_t1_ratio": [
-          0.4
+          0,
+          null
         ],
         "hidiffusion_t2_ratio": [
-          0
+          0,
+          null
         ],
         "hidiffusion_window_attn": [
           true
@@ -876,10 +879,17 @@
           0.8
         ],
         "hidiffusion": [
-          false
+          false,
+          true
         ],
         "hidiffusion_raunet": [
           true
+        ],
+        "hidiffusion_t1_ratio": [
+          0
+        ],
+        "hidiffusion_t2_ratio": [
+          0
         ],
         "hidiffusion_window_attn": [
           true

@@ -268,7 +268,7 @@ const getHiDiffusionPatch = (
     | 'hiDiffusionWindowAttentionEnabled'
   >
 > => {
-  if (!getGenerationUiPolicy(model).hiDiffusionVisible) {
+  if (!getGenerationUiPolicy(model).hiDiffusionVisible || !isRecord(metadata)) {
     return {};
   }
 
@@ -282,6 +282,12 @@ const getHiDiffusionPatch = (
     ...(enabled !== null ? { hiDiffusionEnabled: enabled } : {}),
     ...(rauNetEnabled !== null ? { hiDiffusionRauNetEnabled: rauNetEnabled } : {}),
     ...(windowAttentionEnabled !== null ? { hiDiffusionWindowAttentionEnabled: windowAttentionEnabled } : {}),
+    ...(metadata.hidiffusion_t1_ratio === null || (metadata.hidiffusion_t1_ratio === undefined && enabled !== null)
+      ? { hiDiffusionT1Ratio: null }
+      : {}),
+    ...(metadata.hidiffusion_t2_ratio === null || (metadata.hidiffusion_t2_ratio === undefined && enabled !== null)
+      ? { hiDiffusionT2Ratio: null }
+      : {}),
     ...(t1Ratio !== null && t1Ratio >= MIN_HIDIFFUSION_T1_RATIO && t1Ratio <= MAX_HIDIFFUSION_RATIO
       ? { hiDiffusionT1Ratio: t1Ratio }
       : {}),

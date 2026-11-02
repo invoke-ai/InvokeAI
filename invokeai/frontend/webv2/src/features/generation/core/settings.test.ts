@@ -56,6 +56,43 @@ const legacyStoredValues = {
 seedArchitectureCapabilities();
 
 describe('normalizeGenerateSettings', () => {
+  it.each([null, 0, 0.4])('preserves saved HiDiffusion ratio values (%s)', (ratio) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio })
+    ).toMatchObject({ hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio });
+  });
+
+  it('round-trips remembered manual ratios without changing automatic generation settings', () => {
+    const saved = {
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    };
+    const normalized = normalizeGenerateSettings(JSON.parse(JSON.stringify(saved)));
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 0.7, t2: 0 },
+    });
+    expect(isGenerateSettings(normalized)).toBe(true);
+  });
+
+  it('normalizes malformed remembered positions without activating manual ratios', () => {
+    const normalized = normalizeGenerateSettings({
+      ...legacyStoredValues,
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 99, t2: Number.NaN },
+    });
+    expect(normalized).toMatchObject({
+      hiDiffusionT1Ratio: null,
+      hiDiffusionT2Ratio: null,
+      hiDiffusionManualRatios: { t1: 1, t2: 0 },
+    });
+    expect(isGenerateSettings({ ...normalized, hiDiffusionManualRatios: null })).toBe(false);
+  });
+
   it('reads the seed mode saved before modes existed from the random toggle', () => {
     expect(normalizeGenerateSettings(legacyStoredValues)?.seedMode).toBe('fixed');
     expect(normalizeGenerateSettings({ ...legacyStoredValues, shouldRandomizeSeed: true })?.seedMode).toBe('random');
@@ -270,8 +307,8 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.negativePromptEnabled).toBe(true);
     expect(normalized?.negativePromptHeightPx).toBe(56);
@@ -314,8 +351,8 @@ describe('normalizeGenerateSettings', () => {
     expect(normalized?.hiDiffusionEnabled).toBe(false);
     expect(normalized?.hiDiffusionRauNetEnabled).toBe(true);
     expect(normalized?.hiDiffusionWindowAttentionEnabled).toBe(true);
-    expect(normalized?.hiDiffusionT1Ratio).toBe(0.4);
-    expect(normalized?.hiDiffusionT2Ratio).toBe(0);
+    expect(normalized?.hiDiffusionT1Ratio).toBeNull();
+    expect(normalized?.hiDiffusionT2Ratio).toBeNull();
     expect(normalized?.loras).toEqual([]);
     expect(normalized?.vae).toBeNull();
     expect(normalized?.vaePrecision).toBe('fp32');

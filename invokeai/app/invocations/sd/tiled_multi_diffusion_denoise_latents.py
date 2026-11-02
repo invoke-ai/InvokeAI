@@ -271,7 +271,7 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                     )
                 )
 
-            timesteps, init_timestep, scheduler_step_kwargs = DenoiseLatentsInvocation.init_scheduler(
+            scheduler_init = DenoiseLatentsInvocation.init_scheduler(
                 scheduler,
                 device=device,
                 steps=self.steps,
@@ -279,6 +279,9 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
                 denoising_end=self.denoising_end,
                 seed=seed,
             )
+            timesteps = scheduler_init.timesteps
+            init_timestep = scheduler_init.init_timestep
+            scheduler_step_kwargs = scheduler_init.scheduler_step_kwargs
 
             # Run Multi-Diffusion denoising.
             # SageAttention is validated on SDXL only; SD1.5's head sizes never qualify, SD2 is unmeasured.

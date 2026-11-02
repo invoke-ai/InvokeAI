@@ -19,9 +19,9 @@ class RegionalIPData:
         dtype: torch.dtype,
         device: torch.device,
         cond_mode: ConditioningMode,  # TODO: attention kwargs
-        max_downscale_factor: int = 8,
+        max_downscale_factor: int = 32,
     ):
-        """Initialize a `IPAdapterConditioningData` object."""
+        """Initialize IP-Adapter conditioning; both HiDiffusion stages can require a 32x downscale."""
         assert len(image_prompt_embeds) == len(scales) == len(masks)
         self.cond_mode = cond_mode
 

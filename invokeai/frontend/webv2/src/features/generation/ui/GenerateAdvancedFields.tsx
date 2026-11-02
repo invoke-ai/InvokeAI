@@ -62,6 +62,7 @@ const selectAdvancedSettings = pickGenerateSettings([
   'clipSkip',
   'colorCompensation',
   'hiDiffusionEnabled',
+  'hiDiffusionManualRatios',
   'hiDiffusionRauNetEnabled',
   'hiDiffusionT1Ratio',
   'hiDiffusionT2Ratio',
@@ -143,6 +144,25 @@ export const GenerateAdvancedFields = ({
 
       onCommit({ [key]: Math.min(max, Math.max(min, value)) });
     };
+
+  const manualHiDiffusionRatios = {
+    t1: settings.hiDiffusionT1Ratio ?? settings.hiDiffusionManualRatios?.t1 ?? 0.4,
+    t2: settings.hiDiffusionT2Ratio ?? settings.hiDiffusionManualRatios?.t2 ?? 0,
+  };
+  const setHiDiffusionRatiosAutomatic = (automatic: boolean) => {
+    onCommit(
+      automatic
+        ? {
+            hiDiffusionManualRatios: manualHiDiffusionRatios,
+            hiDiffusionT1Ratio: null,
+            hiDiffusionT2Ratio: null,
+          }
+        : {
+            hiDiffusionT1Ratio: manualHiDiffusionRatios.t1,
+            hiDiffusionT2Ratio: manualHiDiffusionRatios.t2,
+          }
+    );
+  };
 
   const customVae = policy.sdVaeVisible && Boolean(settings.vae?.key);
 
@@ -312,39 +332,54 @@ export const GenerateAdvancedFields = ({
             label={t('widgets.generate.hiDiffusionWindowAttn')}
             onCheckedChange={(checked) => onCommit({ hiDiffusionWindowAttentionEnabled: checked })}
           />
+          <GenerateToggleSwitch
+            checked={settings.hiDiffusionT1Ratio === null && settings.hiDiffusionT2Ratio === null}
+            disabled={!settings.hiDiffusionEnabled || !settings.hiDiffusionRauNetEnabled}
+            hint="hidiffusionRatiosAuto"
+            label={t('widgets.generate.hiDiffusionRatiosAuto')}
+            onCheckedChange={setHiDiffusionRatiosAutomatic}
+          />
           <GenerateFieldContextMenu
             fieldLabel={t('widgets.generate.hiDiffusionT1Ratio')}
-            copyValue={() => String(settings.hiDiffusionT1Ratio)}
+            copyValue={() => String(settings.hiDiffusionT1Ratio ?? t('widgets.generate.hiDiffusionRatioAutoValue'))}
             isAtDefault={settings.hiDiffusionT1Ratio === DEFAULT_HIDIFFUSION_T1_RATIO}
-            onReset={() => onCommit({ hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO })}
+            onReset={() => setHiDiffusionRatiosAutomatic(true)}
           >
             <ScrubberField
-              defaultValue={DEFAULT_HIDIFFUSION_T1_RATIO}
-              disabled={!settings.hiDiffusionEnabled}
+              defaultValue={0.4}
+              disabled={
+                !settings.hiDiffusionEnabled ||
+                !settings.hiDiffusionRauNetEnabled ||
+                settings.hiDiffusionT1Ratio === null
+              }
               hint="hidiffusionT1Ratio"
               label={t('widgets.generate.hiDiffusionT1Ratio')}
               max={MAX_HIDIFFUSION_RATIO}
               min={MIN_HIDIFFUSION_T1_RATIO}
               step={0.05}
-              value={settings.hiDiffusionT1Ratio}
+              value={manualHiDiffusionRatios.t1}
               onChange={updateNumber('hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO)}
             />
           </GenerateFieldContextMenu>
           <GenerateFieldContextMenu
             fieldLabel={t('widgets.generate.hiDiffusionT2Ratio')}
-            copyValue={() => String(settings.hiDiffusionT2Ratio)}
+            copyValue={() => String(settings.hiDiffusionT2Ratio ?? t('widgets.generate.hiDiffusionRatioAutoValue'))}
             isAtDefault={settings.hiDiffusionT2Ratio === DEFAULT_HIDIFFUSION_T2_RATIO}
-            onReset={() => onCommit({ hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO })}
+            onReset={() => setHiDiffusionRatiosAutomatic(true)}
           >
             <ScrubberField
-              defaultValue={DEFAULT_HIDIFFUSION_T2_RATIO}
-              disabled={!settings.hiDiffusionEnabled}
+              defaultValue={0}
+              disabled={
+                !settings.hiDiffusionEnabled ||
+                !settings.hiDiffusionRauNetEnabled ||
+                settings.hiDiffusionT2Ratio === null
+              }
               hint="hidiffusionT2Ratio"
               label={t('widgets.generate.hiDiffusionT2Ratio')}
               max={MAX_HIDIFFUSION_RATIO}
               min={0}
               step={0.05}
-              value={settings.hiDiffusionT2Ratio}
+              value={manualHiDiffusionRatios.t2}
               onChange={updateNumber('hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO)}
             />
           </GenerateFieldContextMenu>
