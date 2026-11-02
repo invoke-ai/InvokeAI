@@ -7,9 +7,12 @@ import { Tooltip } from './Tooltip';
 
 const TAB_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
 const TAB_SHOWN_BG = 'gray.hoverTint/15';
-// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does.
+const TAB_DISABLED_PROPS = { layerStyle: 'disabled' } as const;
+const ENABLED_TAB = '[role="tab"]:not([aria-disabled="true"])';
+// A hovered tab's background replaces its neighbouring dividers, as the shown tab's does. The theme's `_hover` condition
+// already skips `aria-disabled` controls, so a disabled tab gets no hover fill; this raw selector must skip it too.
 const TABLIST_CSS = {
-  '& > [role="tab"]:hover + [data-segment-divider], & > [data-segment-divider]:has(+ [role="tab"]:hover)': {
+  [`& > ${ENABLED_TAB}:hover + [data-segment-divider], & > [data-segment-divider]:has(+ ${ENABLED_TAB}:hover)`]: {
     opacity: 0,
   },
 };
@@ -23,9 +26,16 @@ export interface SegmentTab<T extends string = string> {
   label: ReactNode;
   /** The tab's name when its label is an icon; it is also shown as the tab's tooltip. */
   ariaLabel?: string;
+  /** Nothing to show: the tab stays in place, reads as disabled, ignores clicks and is skipped by the arrow keys. */
+  disabled?: boolean;
 }
 
-/** Roving focus for a horizontal tablist: arrows cycle, Home/End jump. */
+const isTabEnabled = (tab: HTMLElement): boolean => tab.getAttribute('aria-disabled') !== 'true';
+
+/**
+ * Roving focus for a horizontal tablist: arrows cycle, Home/End jump, all over enabled tabs. A focused disabled tab (the
+ * selected one, when it has nothing to show) still steps to its enabled neighbours.
+ */
 const focusSibling = (event: ReactKeyboardEvent<HTMLElement>) => {
   if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {
     return;
@@ -36,13 +46,20 @@ const focusSibling = (event: ReactKeyboardEvent<HTMLElement>) => {
     return;
   }
   event.preventDefault();
-  const next =
-    event.key === 'Home'
-      ? 0
-      : event.key === 'End'
-        ? tabs.length - 1
-        : (current + (event.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
-  tabs[next]?.focus();
+  const enabled = tabs.filter(isTabEnabled);
+  let next: HTMLElement | undefined;
+  if (event.key === 'Home') {
+    next = enabled[0];
+  } else if (event.key === 'End') {
+    next = enabled.at(-1);
+  } else {
+    const step = event.key === 'ArrowRight' ? 1 : tabs.length - 1;
+    for (let offset = 1; offset < tabs.length && !next; offset += 1) {
+      const candidate = tabs[(current + step * offset) % tabs.length]!;
+      next = isTabEnabled(candidate) ? candidate : undefined;
+    }
+  }
+  next?.focus();
 };
 
 /**
@@ -106,6 +123,7 @@ export const SegmentTabs = <T extends string>({
           ) : null}
           <SegmentTabButton
             ariaLabel={tab.ariaLabel}
+            disabled={tab.disabled ?? false}
             id={tab.id}
             idBase={idBase}
             isSelected={tab.id === activeId}
@@ -125,6 +143,7 @@ export const segmentTabsTabId = (idBase: string, tabId: string): string => `${id
 
 const SegmentTabButton = <T extends string>({
   ariaLabel,
+  disabled,
   id,
   idBase,
   isSelected,
@@ -133,6 +152,7 @@ const SegmentTabButton = <T extends string>({
   onSelect,
 }: {
   ariaLabel?: string;
+  disabled: boolean;
   id: T;
   idBase: string;
   isSelected: boolean;
@@ -146,6 +166,8 @@ const SegmentTabButton = <T extends string>({
   const button = (
     <chakra.button
       aria-controls={isShown ? segmentTabsPanelId(idBase) : undefined}
+      // Not native `disabled`: a selected tab with nothing to show keeps the tablist reachable.
+      aria-disabled={disabled || undefined}
       aria-label={ariaLabel}
       aria-selected={isSelected}
       bg={isShown ? TAB_SHOWN_BG : 'transparent'}
@@ -162,8 +184,9 @@ const SegmentTabButton = <T extends string>({
       tabIndex={isSelected ? 0 : -1}
       transition="background var(--wb-motion-duration-fast), color var(--wb-motion-duration-fast)"
       type="button"
+      _disabled={TAB_DISABLED_PROPS}
       _hover={isShown ? undefined : TAB_HOVER_PROPS}
-      onClick={select}
+      onClick={disabled ? undefined : select}
     >
       <Text as="span" truncate>
         {label}

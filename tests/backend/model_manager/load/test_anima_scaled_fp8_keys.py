@@ -1,7 +1,7 @@
 """A scaled-fp8 Anima checkpoint must load, and its layer flags must survive the prefix strip.
 
 Two separate failures are covered here. Before scaled-fp8 support reached `AnimaCheckpointModel`,
-`_filter_non_model_keys` let the scale and marker keys through and the loader raised on them --
+`filter_non_model_keys` let the scale and marker keys through and the loader raised on them --
 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant` markers, so
 such a checkpoint did not load at all.
 
@@ -15,9 +15,9 @@ import json
 
 import torch
 
-from invokeai.backend.model_manager.load.model_loaders.anima import (
-    _filter_non_model_keys,
-    _strip_anima_bundle_prefix,
+from invokeai.backend.anima.checkpoint_layout import (
+    filter_non_model_keys,
+    strip_anima_bundle_prefix,
 )
 from invokeai.backend.quantization.fp8_scaled import (
     FP8_DTYPE,
@@ -59,7 +59,7 @@ def _build_state_dict() -> dict[str, torch.Tensor]:
             sd[key] = torch.full(token_extents(shape), 2.5, dtype=torch_dtype)
         else:
             sd[key] = torch.zeros(token_extents(shape), dtype=torch_dtype)
-    return _filter_non_model_keys(_strip_anima_bundle_prefix(sd))
+    return filter_non_model_keys(strip_anima_bundle_prefix(sd))
 
 
 def test_nothing_the_loader_would_reject_is_left_behind() -> None:

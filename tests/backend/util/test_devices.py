@@ -379,6 +379,26 @@ def test_a_backend_that_rejects_bfloat16_falls_back_by_device(monkeypatch, devic
     assert TorchDevice.choose_bfloat16_safe_dtype(torch.device(device_name)) is expected
 
 
+@pytest.mark.parametrize("dtype", [torch.float32, torch.bfloat16])
+def test_the_flux_vae_dtype_keeps_a_configured_float32_or_bfloat16(dtype):
+    assert TorchDevice.dtype_avoiding_float16(dtype, torch.device("cpu")) is dtype
+
+
+@pytest.mark.parametrize("bfloat16_supported, expected", [(True, torch.bfloat16), (False, torch.float32)])
+def test_the_flux_vae_dtype_replaces_float16_with_bfloat16_or_else_float32(monkeypatch, bfloat16_supported, expected):
+    """Full width also on CUDA, unlike `choose_bfloat16_safe_dtype`: the FLUX autoencoders are broken in float16."""
+    empty = torch.empty
+
+    def answer(*args, dtype, device):
+        if not bfloat16_supported:
+            raise TypeError("BFloat16 is not supported on this device")
+        return empty(0, dtype=dtype)
+
+    monkeypatch.setattr(torch, "empty", answer)
+
+    assert TorchDevice.dtype_avoiding_float16(torch.float16, torch.device("cuda")) is expected
+
+
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
 
 

@@ -96,6 +96,56 @@ describe('renderOverlay', () => {
     expect(target.callLog.some((e) => e.op === 'arc')).toBe(false);
   });
 
+  it('outlines each pending result over a dark halo, under the bbox frame, emphasizing the selected one', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    renderOverlay(
+      target,
+      baseState({
+        stagedRegions: [
+          { rect: { height: 10, width: 10, x: 0, y: 0 }, selected: false },
+          { rect: { height: 20, width: 30, x: 60, y: 70 }, selected: true },
+        ],
+        view: scale(identity(), 2),
+      })
+    );
+
+    const strokes = target.callLog.flatMap((entry, index) =>
+      entry.op === 'strokeRect' ? [{ args: entry.args, index }] : []
+    );
+    // A halo then the dashes for each region, then the bbox frame drawn last over them.
+    expect(strokes.map((stroke) => stroke.args)).toEqual([
+      [0, 0, 20, 20],
+      [0, 0, 20, 20],
+      [120, 140, 60, 40],
+      [120, 140, 60, 40],
+      [20, 20, 80, 80],
+    ]);
+    const lastSetBefore = (prop: string, index: number) =>
+      target.callLog
+        .slice(0, index)
+        .filter((entry) => entry.op === 'set' && entry.args[0] === prop)
+        .at(-1)?.args[1];
+    const look = (index: number) =>
+      ['lineWidth', 'globalAlpha', 'strokeStyle'].map((prop) => lastSetBefore(prop, strokes[index]!.index));
+    const [otherHalo, otherDash, selectedHalo, selectedDash] = [0, 1, 2, 3].map(look);
+    // The halo is wider than its dashes and dark; the selected outline is wider and opaque.
+    expect(otherHalo![0]).toBeGreaterThan(otherDash![0] as number);
+    expect(otherHalo![2]).not.toBe(otherDash![2]);
+    expect(selectedDash![0] as number).toBeGreaterThan(otherDash![0] as number);
+    expect(selectedDash![1]).toBe(1);
+    expect(otherDash![1] as number).toBeLessThan(1);
+    expect(selectedHalo![2]).toBe(otherHalo![2]);
+    expect(lastSetBefore('strokeStyle', strokes[4]!.index)).not.toBe(selectedDash![2]);
+  });
+
+  it('draws no pending-result outline without regions', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(200, 200);
+    renderOverlay(target, baseState({ stagedRegions: [] }));
+    expect(target.callLog.filter((e) => e.op === 'strokeRect')).toHaveLength(1);
+  });
+
   it('strokes the bbox in its own accent color (no document-outline color)', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);

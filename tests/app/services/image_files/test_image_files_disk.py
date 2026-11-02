@@ -609,6 +609,21 @@ def test_large_16_bit_png_save_creates_thumbnail(tmp_path: Path):
         image.close()
 
 
+def test_32_bit_integer_image_saves_as_clipped_16_bit_png(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image = Image.new("I", (2, 1))
+    image.putdata([70000, 5])
+
+    storage.save(image=image, image_name="int32.png")
+
+    with Image.open(storage.get_path("int32.png")) as saved:
+        assert saved.mode == "I;16"
+        assert list(saved.get_flattened_data()) == [65535, 5]
+
+
 def test_palette_transparency_survives_thumbnail_save(tmp_path: Path):
     storage = DiskImageFileStorage(tmp_path)
     mock_invoker = MagicMock()

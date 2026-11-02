@@ -39,6 +39,7 @@ import type {
 } from '@workbench/canvas-engine/capabilities';
 import type {
   CanvasCompositeExecutorDeps,
+  CaptureRasterSnapshotOptions,
   CaptureRasterSnapshotResult,
   RasterReadLease,
 } from '@workbench/canvas-engine/rasterTransactions';
@@ -212,7 +213,7 @@ import { createLayerExportGuards, isSupportedExportSource, layerUnreadable } fro
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
-import { createCompositeFrame } from './render/compositeFrame';
+import { createCompositeFrame, isEditingStagingHiddenStack } from './render/compositeFrame';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
@@ -271,6 +272,8 @@ export interface CanvasEngineErrorReport {
 /** Options for {@link createCanvasEngine}. */
 export interface CanvasEngineOptions {
   projectId: string;
+  /** Undo steps the project's previous engine was disposed with; History reports them until it is next cleared. */
+  droppedHistorySteps?: number;
   mutationPort: CanvasProjectMutationPort;
   /**
    * Uploads engine bitmaps durably because document layer refs must survive garbage collection. Networking remains
@@ -316,7 +319,7 @@ export interface CanvasEngineInternalExportCapability extends CanvasEngineExport
   captureRasterSnapshot(
     documentSnapshot: CanvasDocumentSnapshot,
     layerIds: readonly string[],
-    options?: { signal?: AbortSignal; includeDisabled?: boolean }
+    options?: CaptureRasterSnapshotOptions
   ): Promise<CaptureRasterSnapshotResult>;
   exportBakedLayerPixels(
     layerId: string,
@@ -448,7 +451,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['text', createTextTool()],
     ['sam', createSamTool()],
   ]);
-  let interactionLocked = false;
 
   // Render-time transform previews leave the mirror untouched; move overrides position, transform overrides the
   // full matrix.
@@ -665,6 +667,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const persistenceController = new PersistenceController(bitmapStore);
 
   const historyController = new HistoryController({
+    droppedSteps: opts.droppedHistorySteps ?? 0,
     // A live float holds pixels no history entry knows about, and a preview holds unrecorded document values:
     // replaying over either would land on state the entry never saw. Put both back first; neither is itself
     // undoable until it commits.
@@ -1028,7 +1031,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       hasFloatingSelection: () => floatingSelection.has(),
       invalidate: (payload) => scheduler.invalidate(payload),
       isGestureActive: () => pipeline.isGestureActive(),
-      isInteractionLocked: () => interactionLocked,
       peekCacheRect: (layerId) => layerCache.peek(layerId)?.rect,
       pending: stores.pendingTransformLayerId,
       reportRefusal: reportEditRefusal,
@@ -1139,6 +1141,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     createPath2D: createPath2DImpl,
     dispatch: (action) => dispatchCanvasMutation(action),
     beginStrokeEdit: (initialBytes) => strokeEdits.begin(initialBytes),
+    reportEditRefusal,
     getDocument: () => mirror.getDocument(),
     getSelectedLayerIds: () => {
       const document = mirror.getDocument();
@@ -1507,7 +1510,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
-    clearPreview: () => clearStagedPreview(),
     // Stable handlers: detach removes exactly the listeners attach added.
     getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
     isEngineDisposed: () => disposed,
@@ -1521,9 +1523,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const scheduler: RenderScheduler = renderController.scheduler;
 
-  /** Whether staging holds a candidate, even while its preview is toggled off; the screen then hides masks. */
-  const hasStagedCandidates = (): boolean => (mutationPort.getCanvasState()?.stagingArea.pendingImages.length ?? 0) > 0;
-  let hadStagedCandidates = hasStagedCandidates();
   const compositeFrame = createCompositeFrame({
     backend,
     derivedSurfaceCache,
@@ -1538,7 +1537,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     layerCache,
     previews: renderController.previews,
     raster: rasterController,
-    hasStagedCandidates,
     // A source that just failed waits out its retry backoff (or a change to it) rather than failing again every frame;
     // the backoff's end invalidates the layer, so the display retries on its own.
     rasterizeLayer: (layer, doc) => {
@@ -1568,6 +1566,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return area ? { checker: getCheckerboardTile(), color: area.center, pixels: area.pixels, point } : null;
     },
     getOverlayCursor: () => overlayCursor,
+    getStagedRegions: () => renderController.previews.getStagedRegions(),
     selection,
     stores,
     transformOverrides,
@@ -1579,7 +1578,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // ---- Staged generation and filter previews ------------------------------
 
   const previewPublisher = createPreviewPublisher({
-    decodeBlob: (blob, dimensions) => rasterController.decodeBlob(blob, dimensions),
+    decodeBlob: (blob) => rasterController.decodeBlob(blob),
     getDocument: () => mirror.getDocument(),
     invalidateAll: () => scheduler.invalidate({ all: true }),
     invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
@@ -1600,7 +1599,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const controlView = new ControlViewController({
     getDocument: () => mirror.getDocument(),
     invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
-    isLocked: () => interactionLocked || stores.documentEditingLocked.get(),
+    isLocked: () => stores.documentEditingLocked.get(),
     publish: (view) => stores.controlLayerView.set(view),
     rasterize: (source, document, signal) => rasterizeSource(source, rasterizeDeps(document, signal)),
     reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' }),
@@ -1611,17 +1610,31 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
   let lastSelectedLayerId: string | null = null;
+  /** Whether the selection is a mask or region, which a shown staged preview otherwise hides on the screen. */
+  let selectionEditsHiddenStack = false;
+  let toolsReady = false;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => {
       editingController.transform.onDocumentChanged();
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
+      // Selecting into or out of a mask or region, or converting the selected layer between them and raster or
+      // control work (same id), shows or hides those stacks across the screen while a preview is shown.
+      const document = mirror.getDocument();
+      const editsHiddenStack = !!document && isEditingStagingHiddenStack(document);
+      if (editsHiddenStack !== selectionEditsHiddenStack) {
+        selectionEditsHiddenStack = editsHiddenStack;
+        if (renderController.previews.getStaged()) {
+          scheduler.invalidate({ all: true });
+        }
+      }
+      // A tool's cursor reads the selected layer (not-allowed over a locked or hidden one), which this may change.
+      // Skipped until the interaction controller exists, which the cursor reads.
+      if (toolsReady) {
+        updateCursor();
+      }
     },
-    // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
-    // Explicitly placed candidates stay fixed.
-    onBboxChanged: () => {
-      const staged = renderController.previews.getStaged();
-      scheduler.invalidate(staged && !staged.placement ? { all: true } : { overlay: true });
-    },
+    // Staged previews sit at the rect pinned at submission, so a bbox change redraws only the overlay.
+    onBboxChanged: () => scheduler.invalidate({ overlay: true }),
     onDocumentReplaced: () => {
       const cleanup = createCleanupAccumulator();
       cleanup.run(() => groupSurfaces.clear());
@@ -1792,15 +1805,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(() => scheduler.invalidate({ overlay: true }));
       cleanup.throwIfFailed();
     },
-    // Gaining the first candidate or losing the last shows or hides masks across the whole screen.
-    onStagingChanged: () => {
-      const staged = hasStagedCandidates();
-      scheduler.invalidate(staged === hadStagedCandidates ? { overlay: true } : { all: true });
-      hadStagedCandidates = staged;
-    },
   });
   // The mirror seeds silently from the current state, so the memory starts from that selection too.
   lastSelectedLayerId = mirror.getDocument()?.selectedLayerId ?? null;
+  const seededDocument = mirror.getDocument();
+  selectionEditsHiddenStack = !!seededDocument && isEditingStagingHiddenStack(seededDocument);
 
   let fontSourceStacks: CanvasDocumentContractV3['stacks'] | null = null;
   let documentFontSources: CanvasTextSource[] = [];
@@ -1946,11 +1955,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getTool: (toolId) => tools.get(toolId),
     getToolContext: () => toolContext,
     invalidateOverlay: () => scheduler.invalidate({ overlay: true }),
-    isLocked: () => interactionLocked,
     publishActiveTool: (toolId) => stores.activeTool.set(toolId),
     stepBrushSize: stepActiveBrushSize,
     updateCursor,
   });
+  toolsReady = true;
   const setTool = (toolId: ToolId, options?: { temporary?: boolean }): void => {
     colorSamples.onToolChange(toolId);
     interactionController.setTool(toolId, options);
@@ -2055,19 +2064,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
 
   // ---- Public API ---------------------------------------------------------
-
-  const setInteractionLocked = (locked: boolean): void => {
-    if (interactionLocked === locked) {
-      return;
-    }
-    interactionLocked = locked;
-    if (locked) {
-      // A generation or staging holds the canvas; the user cannot switch the view back meanwhile.
-      controlView.clear();
-      pipeline.cancelActiveGesture();
-      setTool('view', { temporary: true });
-    }
-  };
 
   const attach = (
     screenCanvas: HTMLCanvasElement,
@@ -2449,6 +2445,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ctx: mutationContext,
     getCanvasState: () => mutationPort.getCanvasState(),
     now: () => new Date().toISOString(),
+    settleEditSessions: () => {
+      if (floatingSelection.has()) {
+        floatingSelection.commit();
+      }
+      if (stores.transformSession.get()) {
+        editingController.transform.apply();
+      }
+      return !floatingSelection.has() && stores.transformSession.get() === null;
+    },
   });
   const commitStagedImage = stagedResultController.commit.bind(stagedResultController);
 
@@ -2947,6 +2952,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getEditRevision: () => mutationContext.getEditRevision(),
     model: currentDocumentModel,
     replaceDocument: (document) => dispatchCanvasMutation({ document, type: 'replaceCanvasDocument' }, 'user'),
+    restoreSnapshot: (snapshotId, keepCurrentAs) =>
+      dispatchCanvasMutation(
+        { snapshotId, type: 'restoreCanvasSnapshot', ...(keepCurrentAs ? { keepCurrentAs } : {}) },
+        'user'
+      ),
   };
   const selectionCapability: CanvasEngineSelectionCapability = {
     deselect,
@@ -2969,7 +2979,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onStrokeCommitted,
     requestColorSample: () => colorSamples.requestSample(),
     setColorSampleRouter: (router) => colorSamples.setRouter(router),
-    setInteractionLocked,
   };
   const layersCapability: CanvasEngineLayerCapability = {
     ...layerController.layers,
@@ -3068,6 +3077,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     setControlLayerView: (layerId, view) => controlView.set(layerId, view),
     setGuardedFilterPreview,
     setStagedPreview,
+    setStagedRegions: (regions) => {
+      if (renderController.previews.setStagedRegions(regions)) {
+        scheduler.invalidate({ overlay: true });
+      }
+    },
   };
   const diagnosticsCapability: CanvasDiagnosticsCapability = {
     clearCaches,
@@ -3093,7 +3107,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getCompositeExecutorDeps,
     getDocument: () => mirror.getDocument(),
     isGuardCurrent: isLayerExportGuardCurrent,
-    isInteractionLocked: () => interactionLocked,
     isSamToolActive: () => interactionController.getActiveToolId() === 'sam',
     prepareSelectObjectStart,
     publishFilterPreview: (layerId, imageName, rect, guard, filterType) =>

@@ -1,7 +1,7 @@
 ---
 title: Guided tour
 description: How the Invoke workbench is laid out, how to arrange panels in the rails and the center, and how to save favourite arrangements as layout presets.
-lastUpdated: 2026-09-29
+lastUpdated: 2026-10-30
 ---
 
 import WorkbenchLayout from './assets/workbench-layout.svg';
@@ -20,13 +20,13 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 
 | | Part | What it does |
 | --- | --- | --- |
-| 1 | **App menu** | Links to Projects, the Model Manager, Fonts, the Queue, Settings and help. |
+| 1 | **App menu** | Links to Projects, the Model Manager, Fonts, the Queue, **Widgets…**, Settings and help. The search button beside the project switcher opens the command palette. |
 | 2 | **Project switcher** | Shows the active project and switches between projects. See [Working with Projects](/users-guide/projects/introduction/). |
-| 3 | **Layout preset tabs** | One tab per saved layout. A dot on a tab's icon means that layout has unsaved changes in this project; the active tab's arrow opens the preset menu. |
+| 3 | **Layout preset tabs** | One tab per saved layout. A dot on a tab's icon means that layout has unsaved changes in this project; the active tab's arrow opens the preset menu. When there are more tabs than fit, the row fades at its edge and an arrow scrolls to the rest. |
 | 4 | **Save as new preset** | Saves the current arrangement as a new preset. |
-| 5 | **Invoke controls** | The number of iterations, the **Invoke** button, and routing, which chooses where the settings come from and where results go. |
+| 5 | **Invoke controls** | The number of iterations and the **Invoke** button. Its card, shown on hover, sets the route: where the settings come from and where results go. See [When Invoke is blocked](#when-invoke-is-blocked). |
 | 6 | **Rails** | A strip of icons down each edge of the window, one icon per panel placed on that side. |
-| 7 | **Rail menu (…)** | Adds panels to a rail or removes them. |
+| 7 | **Rail menu (…)** | Adds panels to a rail or removes them. **Widgets…** at its foot lists every panel. |
 | 8 | **Side panels** | Show the selected panel from the neighbouring rail. |
 | 9 | **Resize handle** | Drag to make a side panel wider or narrower, or to collapse it. |
 | 10 | **Center panel** | The main work area: Preview, Canvas, Gallery, Workflow editor or Image Map. |
@@ -49,13 +49,13 @@ Side panels shrink as needed when the window gets narrow, so the center always k
 
 The center panel shows one **view** at a time. The button in its top-left corner (for example **Preview**) names the current view; click it to open the center view menu:
 
-- **Center Views** lists the views already placed in the center. Choose one to switch to it.
-- **Add To Center** lists other panels that can be shown in the center.
+- **Center views** lists the views already placed in the center. Choose one to switch to it.
+- **Add to center** lists other panels that can be shown in the center.
 - **Close** removes the current view. The center always keeps at least one view.
 
 Press <kbd>Z</kbd> to swap the Preview into the center and back to the view you had before. It is a quick way to check a result while you work on the canvas or a workflow.
 
-The Preview's **Auto-switch** menu, in its header, chooses what it shows while work runs:
+The Preview's **Auto-switch** button, in its header, shows the current mode as its icon (hover over it to see the name) and opens a menu that chooses what the Preview shows while work runs:
 
 - **In progress**: each image as it is being generated, then the finished result. New projects start here.
 - **Newest**: each finished result, without the in-progress frames.
@@ -63,7 +63,9 @@ The Preview's **Auto-switch** menu, in its header, chooses what it shows while w
 
 Choosing an item yourself, in the Gallery or with the Preview's arrows, turns Auto-switch **Off** so your choice stays on screen; clicking a generating tile in the Gallery turns it back to **In progress**. The setting is saved with the project. Projects created before this setting existed open with it **Off**.
 
-To step through the Gallery's items in the Preview, press the arrow keys, or hover over the image and click the arrows at its left and right edges.
+The Preview's header holds the next steps for the image it shows. Click the board and item name at its start to open a mini gallery and jump to another image or video. **Edit** opens Edit on Canvas, Upscale, Send to Video, Add to Canvas as… and New project from image; **Use** offers the image as a reference, a control or a prompt template, and reuses its settings: **Remix image** (<kbd>R</kbd>), **All settings** (<kbd>A</kbd>), **Use prompt** (<kbd>P</kbd>), **Use seed** (<kbd>S</kbd>), **Use size** (<kbd>D</kbd>) and **Use CLIP skip**. Each item says what it does. The **⋮** menu holds the rest: copy, download, Load workflow, Select for compare, Move to board, Delete and more. A Preview narrower than 560 pixels, and a Preview in a side rail at any width, shows **Edit** and **Use** as icons and moves **Select for compare** into **⋮**. Below 280 pixels only the star and **⋮** remain, and **⋮** holds everything.
+
+To step through the Gallery's items in the Preview, press the arrow keys, or hover over the image and click the arrows at its left and right edges. To show or hide the filmstrip along the Preview's bottom edge, turn **Show filmstrip** on or off in the settings behind the gear in the Preview's header, or press <kbd>T</kbd>.
 
 ### The status bar and bottom panel
 
@@ -79,6 +81,7 @@ The status bar along the bottom holds small chips. Hover over **Server Status**,
 - **Collapse** shrinks the window to just its title bar and **Expand** opens it again. The panel keeps what you were doing while collapsed.
 - Click a window, or move keyboard focus into it, to make it the active one: it comes to the front and is outlined like a focused panel, and keyboard shortcuts for its panel apply to it.
 - The dock button in the title bar, named for where the window came from (for example **Dock to right panel**), returns the panel to the place it floated from.
+- The **×** button closes the window and takes the panel out of the layout. **Undo** in the notice that follows brings it back.
 - The panel's dashed rail icon keeps its place while the window floats. Click it to bring the window to the front and expand it; right-click it to dock or remove the panel.
 
 A window remembers where it was. Dock or remove a floating panel and float it again later, and it reopens at the same position and size.
@@ -86,6 +89,15 @@ A window remembers where it was. Dock or remove a floating panel and float it ag
 If the panel you float was also the only view in the center, the center shows where it went, with **Show window** and a dock button. Docking or removing the window gives the center its view back.
 
 A floating Preview is handy on the **Edit** layout: keep the canvas in the center and watch results in a small window beside your work.
+
+### When Invoke is blocked
+
+When something stands in the way, **Invoke** turns grey and says how many issues there are, for example *Invoke · 2 issues*. Hover over it to see them; click it, or press <kbd>Enter</kbd> on it, to open the list and move into it. The list shows:
+
+- **Source** and **Destination**: the panel Invoke takes its settings from (Generate, Canvas, Workflow, Upscale or Video) and where results go. If that panel isn't in the layout, or isn't the one you meant, choose another source right there among the panels the layout holds.
+- Each issue, with a way to fix it: **Show** opens the panel and section that needs attention (a Generate setting, the prompt, a widget), **Show node** selects the workflow node and zooms to it, **Show layer** selects the canvas layer, **Open Model Manager** when no usable model is installed, **Add** for a missing source panel, and a one-click fix where Generate has one (for example a size that fits the model). A lost server connection is listed without a button; it clears when the connection returns.
+
+<kbd>Ctrl</kbd>+<kbd>Enter</kbd> still queues whenever nothing is in the way.
 
 ## Arranging panels
 
@@ -101,17 +113,18 @@ Each panel can be placed only where it makes sense:
 | Gallery | ✓ | ✓ | ✓ | ✓ | |
 | Image Map | ✓ | ✓ | ✓ | | ✓ |
 | Preview | | ✓ | ✓ | | ✓ |
-| Project | ✓ | ✓ | | | |
 | Layers, Queue | | ✓ | | | |
-| Diagnostics | | ✓ | | ✓ | |
+| Diagnostics | | ✓ | | | |
 
-A panel can appear in more than one place at once, for example the Gallery in the right rail *and* in the center, but only once in each place. The **Project** panel isn't in any built-in layout; add it to a rail to keep the project's name, sync status and details in view.
+A panel can appear in more than one place at once, for example the Gallery in the right rail *and* in the center, but only once in each place.
 
 ### Adding and removing panels
 
 Click the **…** button at the bottom of a rail, or right-click an empty part of the rail, to open its menu (**Create widgets** on the left, **Inspect widgets** on the right). It lists every panel that rail can hold, with a check mark beside those already placed. Choose a panel to add it, or choose a checked panel to remove it.
 
-To remove a panel quickly, right-click its rail icon and choose **Remove**. Removing a panel only takes it out of the layout. Its contents and settings are kept, and it comes back as you left it when you add it again.
+To remove a panel quickly, right-click its rail icon and choose **Remove**. Removing a panel only takes it out of the layout. Its contents and settings are kept, and it comes back as you left it when you add it again. A notice confirms the removal with an **Undo** button.
+
+**Widgets…**, in the app menu, at the foot of each rail menu and in the command palette (**Show widgets**), opens one list of every panel, split into those in this layout and those not. Each row says where the panel is (a rail, the center, the status bar or a floating window) and offers **Show** to bring it forward, **Add** to put it back in the layout, **Dock** for a floating window, and **Remove**. The command palette also has a **Show** entry for each panel, such as **Show Image Map**.
 
 Center views are added and closed from the [center view menu](#the-center-panel).
 
@@ -131,10 +144,13 @@ On a touchscreen, press and hold an icon briefly before dragging.
 | <kbd>G</kbd> | Collapse or expand the right panel |
 | <kbd>F</kbd> | Collapse or expand all side and bottom panels at once, for a clear view of the center |
 | <kbd>Z</kbd> | Swap the Preview into or out of the center |
-| <kbd>Shift</kbd>+<kbd>R</kbd> | Revert to the active preset's saved layout |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd> | Undo the last layout change: adding, removing, moving or resizing a panel, floating or docking a window, a preset switch, a revert, a route change |
+| <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> | Redo the layout change you undid |
 | <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> | Switch to the Compose, Edit, Video or Workflow preset |
 
-These shortcuts don't fire while you are typing in a text field. You can change any of them; see [Hotkeys](/users-guide/workbench/hotkeys/).
+On macOS, use <kbd>Cmd</kbd> in place of <kbd>Ctrl</kbd>. These shortcuts don't fire while you are typing in a text field. You can change any of them; see [Hotkeys](/users-guide/workbench/hotkeys/).
+
+Layout undo only moves panels, windows and routing back. What you typed or set inside a panel since then, such as a prompt, stays as it is, and a panel the undo takes out of the layout keeps its settings for when you add it again. The **Undo** in a layout notice works while that change is still your latest; after another layout change, or once you have undone it with the shortcut, the notice goes away.
 
 ## Layout presets
 
@@ -151,13 +167,13 @@ Invoke comes with four presets:
 | **Video**: generate video | Preview | Video, Upscale | Gallery, Queue |
 | **Workflow**: build and run workflows | Workflow editor (Preview also available) | Workflow | Queue, Preview, Gallery, Image Map |
 
-Each preset also sets where **Invoke** takes its settings from and where results go. For example, Compose generates from the Generate panel into the Gallery, while Edit works from and into the Canvas. A source or destination you have locked from the routing control next to **Invoke** is left alone.
+Each preset also sets where **Invoke** takes its settings from and where results go. For example, Compose generates from the Generate panel into the Gallery, while Edit works from and into the Canvas. A route you have locked from the **Invoke** card is left alone.
 
 New projects open with Compose unless you choose a different starting point when you create them.
 
 ### Switching presets
 
-Click a preset's tab, or press <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> for the built-in presets. Switching changes only the arrangement: every panel keeps its contents, so a half-written prompt or a scrolled gallery is exactly as you left it.
+Click a preset's tab, or press <kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd> for the built-in presets. Switching changes only the arrangement: every panel keeps its contents, so a half-written prompt or a scrolled gallery is exactly as you left it. A short notice confirms the switch with **Undo**, and says so when the switch changed what **Invoke** runs or where results go.
 
 When the window is narrow, the tabs show only their icons. Hover over one to see its name.
 
@@ -168,7 +184,7 @@ Once you move, add or remove panels, the active preset's tab shows a dot on its 
 Click the arrow on the active tab, or right-click any tab, to open the preset menu:
 
 - **Save changes** stores the preset's arrangement in the preset, so it opens that way from now on. On a tab that isn't active, it saves the arrangement that preset was left in without switching to it.
-- **Revert to saved layout** puts the panels back as the preset saved them. <kbd>Shift</kbd>+<kbd>R</kbd> does the same for the active preset, and so does choosing the active preset again with its shortcut (<kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd>) or from the command palette. On a tab that isn't active, it forgets that preset's unsaved arrangement. Either way, undo brings the arrangement back.
+- **Revert layout to saved preset** puts the panels back as the preset saved them. Choosing the active preset again with its shortcut (<kbd>Alt</kbd>+<kbd>1</kbd> to <kbd>Alt</kbd>+<kbd>4</kbd>) or from the command palette does the same. On a tab that isn't active, it forgets that preset's unsaved arrangement. Either way, **Undo** in the notice, or <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Z</kbd>, brings the arrangement back.
 - **Edit preset…** changes the preset's name, icon and default routing.
 - **Delete preset…** removes a preset you created.
 - **Manage presets** opens the list of all presets.
@@ -204,7 +220,7 @@ Deleting a preset only removes the saved preset. Projects that were using it kee
 - **The current arrangement belongs to the project.** Each project remembers its own panels, sizes, center view and floating windows, so switching projects also switches layouts. See [Working with Projects](/users-guide/projects/introduction/).
 - **Presets belong to your account.** Custom presets, changes to built-in presets and the order of the tabs are available in all of your projects. With [multiple users](/configuration/multi-user-mode/user-guide/), each person has their own presets.
 
-To start over, press <kbd>Shift</kbd>+<kbd>R</kbd>, or use **Reset layout** under **Data & workspace** in Settings. Both put the current project's panels back as the active preset saved them.
+To start over, choose **Revert layout to saved preset** in the command palette, or **Reset layout** under **Data & workspace** in Settings. Both put the current project's panels back as the active preset saved them, and the notice that follows offers **Undo**. This is different from **Restore built-in** in **Manage presets**, which resets a built-in *preset itself* to the version Invoke ships with.
 
 ## Tips
 
@@ -212,4 +228,4 @@ To start over, press <kbd>Shift</kbd>+<kbd>R</kbd>, or use **Reset layout** unde
 - **Keep the center for the work itself.** Use <kbd>F</kbd> to hide all side panels when you need the whole window for the canvas, and press it again to bring them back.
 - **Use the Gallery in the center for triage.** Add the Gallery to the center to review a large batch at full width, then press <kbd>Z</kbd> to jump between it and the Preview.
 - **Save built-in changes you like.** If you always move the Queue to the left, save that change into the preset rather than repeating it in each project.
-- **Highlight the focused area.** **Highlight focused regions** in Settings (on by default) outlines the part of the workbench that keyboard shortcuts will act on.
+- **Highlight the focused area.** **Highlight focused regions** in Settings (on by default) outlines the part of the workbench that keyboard shortcuts will act on. The center is focused when a project opens, until you click or move focus elsewhere, and takes focus back when a focused window docks or closes.

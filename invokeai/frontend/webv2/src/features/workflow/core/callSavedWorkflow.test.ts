@@ -18,6 +18,7 @@ import {
 } from './callSavedWorkflow';
 import { CONNECTOR_OUTPUT_HANDLE } from './connectorHandles';
 import { buildConnectorNode, buildInvocationNode, createProjectGraph, projectGraphReducer } from './document';
+import { formatWorkflowReadinessReason } from './readinessIssues';
 import { parseWorkflowJson, serializeWorkflowJson } from './workflowJson';
 
 const field = (name: string, typeName: string, overrides: Partial<FieldInputTemplate> = {}): FieldInputTemplate => ({
@@ -485,7 +486,9 @@ describe('Call Saved Workflow dynamic fields', () => {
     const readiness = getProjectGraphReadiness(document, { error: null, status: 'loaded', templates });
 
     expect(readiness.canInvoke).toBe(false);
-    expect(readiness.reasons).toContain('Call Saved Workflow inputs are still loading.');
+    expect(readiness.reasons.map(formatWorkflowReadinessReason)).toContain(
+      '"Call Saved Workflow" is still loading its saved workflow\'s inputs.'
+    );
   });
 
   it('blocks empty and incompatible Call Saved Workflow selections', () => {
@@ -505,14 +508,15 @@ describe('Call Saved Workflow dynamic fields', () => {
       type: 'setCallSavedWorkflowStatus',
     });
 
-    expect(emptyReadiness).toMatchObject({
-      canInvoke: false,
-      reasons: ['Call Saved Workflow requires a saved workflow.'],
-    });
-    expect(getProjectGraphReadiness(incompatible, { error: null, status: 'loaded', templates })).toMatchObject({
-      canInvoke: false,
-      reasons: ['The selected saved workflow is unavailable or incompatible.'],
-    });
+    expect(emptyReadiness.canInvoke).toBe(false);
+    expect(emptyReadiness.reasons.map(formatWorkflowReadinessReason)).toEqual([
+      '"Call Saved Workflow" requires a saved workflow.',
+    ]);
+    expect(
+      getProjectGraphReadiness(incompatible, { error: null, status: 'loaded', templates }).reasons.map(
+        formatWorkflowReadinessReason
+      )
+    ).toEqual(['The saved workflow "Call Saved Workflow" calls is unavailable or incompatible.']);
   });
 
   it('removes dynamic edges whose exposed field disappeared or changed type', () => {
@@ -601,7 +605,9 @@ describe('Call Saved Workflow dynamic fields', () => {
     const readiness = getProjectGraphReadiness(document, { error: null, status: 'loaded', templates });
 
     expect(readiness.canInvoke).toBe(false);
-    expect(readiness.reasons).toContain('"Call Saved Workflow" is missing required input "Left Addend".');
+    expect(readiness.reasons.map(formatWorkflowReadinessReason)).toContain(
+      '"Call Saved Workflow" is missing required input "Left Addend".'
+    );
   });
 
   /** A call to `child-1` with an upstream node wired into both of its exposed inputs. */

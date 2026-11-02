@@ -52,7 +52,7 @@ class _FakeVram:
         self.available = available
         self.moved: list[tuple[str, int]] = []
 
-    def get_physical_vram_available(self):
+    def get_physical_vram_available(self, working_mem_bytes=None):
         return self.available
 
     def move_model_to_ram(self, cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):

@@ -32,7 +32,8 @@ export const CONTROL_ADAPTER_DEFAULTS: Readonly<
     model: null,
     weight: 0.75,
   },
-  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred.
+  // The Fun-ControlNet-Union's recommended 0.70–0.95 context scale, centred. An InstantX union on Qwen Image 2512
+  // wants about 1.5–2.0, which the user sets.
   qwen_image_control: {
     beginEndStepPct: [0, 1],
     controlMode: null,

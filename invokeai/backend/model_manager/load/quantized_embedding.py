@@ -24,26 +24,7 @@ from typing import Any
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
-
-# Measured, not derived: reading the dequantizers suggests 2 (an intermediate plus the result), and
-# for the 8-bit formats that is what happens -- but the k-quant, 5-bit and 4-bit kernels unpack
-# through full-size temporaries that coexist with both, and BF16 is not torch-compatible here
-# (`TORCH_COMPATIBLE_QTYPES` is F32/F16 only) so it shuffles rather than passing through. Peak host
-# RSS over one 256 MB bf16 dequantization, sampled during the call, one format per fresh process:
-#
-#     Q8_0 2.01x   Q4_0 3.04x   Q4_K 3.14x   Q2_K 3.32x   BF16 4.01x   Q5_K 4.01x
-#     Q6_K 4.08x   Q3_K 4.16x   Q5_1 5.37x   Q5_0 5.38x
-#     SDNQ: int8 2.00x   uint4 3.99x   int5 4.64x
-#
-# Q5_0/Q5_1 are the outliers and the reason for the headroom: `dequantize_blocks_Q5_0` expands the
-# high bits through a full-size int32 shift table, which coexists with three uint8 temporaries, the
-# fp16 product and the cast. The numpy fallback branch, despite going through float32, stays at ~4x.
-#
-# 6 clears the worst of them. It over-reserves for the 8-bit formats, which costs at most an
-# eviction the cache can undo -- where under-reserving costs the swap this reservation exists to
-# prevent, so the error belongs on this side. A per-format table would be exact and would silently
-# rot the first time a new quant type lands, so the constant is deliberately blunt.
-_PEAK_COPIES = 6
+from invokeai.backend.quantization.gguf.ggml_tensor import HOST_DEQUANT_PEAK_COPIES
 
 
 def materialize_quantized_embedding(embedding: torch.nn.Module, *, ram_cache: ModelCache) -> bool:
@@ -60,6 +41,6 @@ def materialize_quantized_embedding(embedding: torch.nn.Module, *, ram_cache: Mo
     # `.shape` is the dequantized shape on both wrapper types; `Tensor.numel()` is not overridden and
     # would report the packed element count instead -- for a 4-bit quant, roughly half of what is
     # about to be allocated.
-    ram_cache.make_room(_PEAK_COPIES * weight.shape.numel() * weight.compute_dtype.itemsize)
+    ram_cache.make_room(HOST_DEQUANT_PEAK_COPIES * weight.shape.numel() * weight.compute_dtype.itemsize)
     embedding.weight = torch.nn.Parameter(dequantize(), requires_grad=False)
     return True

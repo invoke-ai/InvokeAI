@@ -21,7 +21,7 @@ import {
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
 import type { GroupCompositeScope, GroupSurfaceContent } from './groupCompositeScopes';
@@ -60,18 +60,16 @@ export const REGION_OVERLAY_ALPHA = 0.5;
 /** Strength of a control layer's map over its original in the Overlay view, relative to the layer's opacity. */
 export const CONTROL_OVERLAY_MAP_ALPHA = 0.5;
 
-/** Dashed outline drawn around a staged-generation preview so it reads as pending, not committed. */
-const STAGED_PREVIEW_OUTLINE_COLOR = '#3b82f6';
-const STAGED_PREVIEW_OUTLINE_WIDTH = 2;
-const STAGED_PREVIEW_OUTLINE_DASH = 6;
-
 /** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
   /** Allocates mask, control-effect and group intermediates; every composite renders through it. */
   backend: RasterBackend;
   /** Clips document layers to this document-space rect without clipping the background or staged preview. */
   clipRect?: Rect | null;
-  /** A staged generation candidate to draw at its placement (document space). */
+  /**
+   * A staged generation candidate to draw at its placement (document space), above the raster and control stacks and
+   * below masks and regions, which show over it only when the staging view leaves them on. The overlay outlines it.
+   */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
    * Checker tile fills the unbounded viewport. Null/absence disables it, revealing themed widget background
@@ -590,13 +588,35 @@ export const compositeDocument = (
   ctx.clearRect(repaint.x, repaint.y, repaint.width, repaint.height);
   drawBackground(ctx, opts.checkerboardTile ?? null, repaint);
 
-  if (opts.clipRect) {
+  const applyClipRect = (): void => {
+    if (opts.clipRect) {
+      ctx.save();
+      setTransformFromMat(ctx, view);
+      ctx.beginPath();
+      ctx.rect(opts.clipRect.x, opts.clipRect.y, opts.clipRect.width, opts.clipRect.height);
+      ctx.clip();
+    }
+  };
+  applyClipRect();
+
+  // The staged preview lands once, unclipped, before the first mask or region leaf (or after every leaf).
+  const staged = isIsolated(opts) ? null : (opts.stagedPreview ?? null);
+  let stagedPending = staged !== null;
+  const drawStaged = (): void => {
+    stagedPending = false;
+    if (!staged || !reaches(staged.rect, view, repaint)) {
+      return;
+    }
+    if (opts.clipRect) {
+      ctx.restore();
+    }
     ctx.save();
     setTransformFromMat(ctx, view);
-    ctx.beginPath();
-    ctx.rect(opts.clipRect.x, opts.clipRect.y, opts.clipRect.width, opts.clipRect.height);
-    ctx.clip();
-  }
+    ctx.globalAlpha = staged.opacity ?? 1;
+    ctx.drawImage(staged.surface.canvas, staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
+    ctx.restore();
+    applyClipRect();
+  };
 
   const { leaves, matrices, scopes } = plan;
   const boundsAt = (index: number): Rect | null => {
@@ -648,6 +668,9 @@ export const compositeDocument = (
   };
 
   for (let index = 0; index < leaves.length; index += 1) {
+    if (stagedPending && leaves[index]!.stack !== 'raster' && leaves[index]!.stack !== 'control') {
+      drawStaged();
+    }
     const scope = scopeIndex < scopes.length ? scopes[scopeIndex]! : null;
     if (scope && index === scope.start) {
       scopeIndex += 1;
@@ -702,27 +725,10 @@ export const compositeDocument = (
     drawLeafFlat(index);
   }
 
-  if (opts.clipRect) {
-    ctx.restore();
+  if (stagedPending) {
+    drawStaged();
   }
-
-  // Draw staged preview in document space with a dashed outline distinguishing pending pixels.
-  const staged = isIsolated(opts) ? null : opts.stagedPreview;
-  // Half the outline lands outside the rect, so a repaint beside it must still redraw that half.
-  if (staged && reaches(staged.rect, view, expand(repaint, STAGED_PREVIEW_OUTLINE_WIDTH))) {
-    ctx.save();
-    setTransformFromMat(ctx, view);
-    ctx.globalAlpha = staged.opacity ?? 1;
-    ctx.drawImage(staged.surface.canvas, staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
-    // Keep the outline visually constant regardless of zoom by dividing the
-    // document-space stroke by the view scale (√det of the linear part).
-    const viewScale = Math.sqrt(Math.abs(view.a * view.d - view.b * view.c)) || 1;
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = STAGED_PREVIEW_OUTLINE_COLOR;
-    ctx.lineWidth = STAGED_PREVIEW_OUTLINE_WIDTH / viewScale;
-    ctx.setLineDash([STAGED_PREVIEW_OUTLINE_DASH / viewScale, STAGED_PREVIEW_OUTLINE_DASH / viewScale]);
-    ctx.strokeRect(staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
-    ctx.setLineDash([]);
+  if (opts.clipRect) {
     ctx.restore();
   }
 

@@ -4,24 +4,26 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
-# Every variable torch reads its caching-allocator configuration from.
-_ALLOCATOR_CONF_ENV_VARS = ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF")
+ALLOCATOR_CONF_ENV_VARS = ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH_HIP_ALLOC_CONF")
+"""Every variable torch reads its caching-allocator configuration from."""
 
 ROCM_WINDOWS_ALLOC_CONF = "expandable_segments:True"
 
 
-def expandable_segments_enabled() -> bool:
-    """Whether the torch caching allocator runs in expandable-segments mode.
+def expandable_segments_enabled(environ: Mapping[str, str] = os.environ) -> bool:
+    """Whether the torch caching allocator runs in expandable-segments mode, by default in this process.
 
     The mode is configured through the allocator env vars before torch import (InvokeAI's own
     `pytorch_cuda_alloc_conf` setting is plumbed into PYTORCH_CUDA_ALLOC_CONF the same way), so
     parsing them is authoritative for the life of the process. It lives here, beside the variables, because this
-    module imports neither torch nor its callers: the model cache and the working-memory platform.
+    module imports neither torch nor its callers: the model cache and the working-memory platform. `environ` is
+    another process's variables, as a working-memory measurement recorded them.
     """
-    for var in _ALLOCATOR_CONF_ENV_VARS:
-        if "expandable_segments:true" in os.environ.get(var, "").replace(" ", "").lower():
+    for var in ALLOCATOR_CONF_ENV_VARS:
+        if "expandable_segments:true" in environ.get(var, "").replace(" ", "").lower():
             return True
     return False
 
@@ -74,7 +76,7 @@ def apply_rocm_windows_allocator_default(logger: logging.Logger) -> None:
     Must run before torch is imported. Any allocator variable already in the environment, like an explicit
     `pytorch_cuda_alloc_conf` (whose caller skips this default), wins.
     """
-    if sys.platform != "win32" or any(os.environ.get(var) for var in _ALLOCATOR_CONF_ENV_VARS):
+    if sys.platform != "win32" or any(os.environ.get(var) for var in ALLOCATOR_CONF_ENV_VARS):
         return
     if not _installed_torch_is_rocm():
         return

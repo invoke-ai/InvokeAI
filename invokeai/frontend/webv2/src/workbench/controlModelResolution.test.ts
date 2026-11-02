@@ -198,6 +198,23 @@ describe('resolveControlModel with a type', () => {
     });
   });
 
+  it('resolves a Qwen-Image InstantX union only for the families it was trained on', () => {
+    const instantx = model('qwen-instantx-union', 'qwen-image', 'controlnet', {
+      control_architecture: 'instantx_union',
+    });
+
+    expect(resolve(layer('edges', { detector: 'canny_edge_detection' }), 'qwen-image', [instantx])).toMatchObject({
+      how: 'union',
+      kind: 'qwen_image_control',
+      model: instantx,
+    });
+    expect(resolve(layer('edges', { detector: 'mlsd_detection' }), 'qwen-image', [instantx])).toMatchObject({
+      how: 'missing',
+      model: null,
+      unresolved: 'no_model_for_type',
+    });
+  });
+
   it('tells no control models apart from none for this type', () => {
     expect(resolve(layer('pose'), 'sdxl', [depthA, sd1Depth])).toMatchObject({
       how: 'missing',

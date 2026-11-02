@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { GenerateReferenceImage } from './types';
+
 import {
   applyReferenceImageCrop,
   clearReferenceImageCrop,
@@ -8,6 +10,7 @@ import {
   generatedImageToReferenceImage,
   getEffectiveReferenceImage,
   getReferenceImageCropBoxPct,
+  getReferenceImagePromptTags,
   normalizeCroppableImage,
   resolveReferenceImageCrop,
 } from './referenceImage';
@@ -120,5 +123,34 @@ describe('reference images', () => {
         original: { image: original },
       })
     ).toBeNull();
+  });
+});
+
+describe('reference image prompt tags', () => {
+  const asset = { original: { image: original } };
+  const reference = (id: string, overrides: Partial<GenerateReferenceImage> = {}): GenerateReferenceImage => ({
+    config: { image: asset, type: 'flux2_reference_image' },
+    id,
+    isEnabled: true,
+    ...overrides,
+  });
+  const references = [
+    reference('a'),
+    reference('disabled', { isEnabled: false }),
+    reference('empty', { config: { image: null, type: 'flux2_reference_image' } }),
+    reference('other-type', { config: { image: asset, type: 'qwen_image_reference_image' } }),
+    reference('b'),
+  ];
+
+  it('numbers FLUX.3 references by their position in the denoiser input', () => {
+    expect([...getReferenceImagePromptTags('flux3', references)]).toEqual([
+      ['a', '<ref_image_0>'],
+      ['b', '<ref_image_1>'],
+    ]);
+  });
+
+  it('gives no tags to bases that do not name references in the prompt', () => {
+    expect(getReferenceImagePromptTags('flux2', references).size).toBe(0);
+    expect(getReferenceImagePromptTags(undefined, references).size).toBe(0);
   });
 });

@@ -26,6 +26,7 @@ from invokeai.backend.util.vae_working_memory import (
     VAE_FLUX_SPEC,
     VAE_SD3_SPEC,
     VAE_SD_SPEC,
+    estimate_untiled_vae_decode,
     estimate_vae_working_memory_cogview4,
     estimate_vae_working_memory_flux,
     estimate_vae_working_memory_flux2,
@@ -429,3 +430,61 @@ def test_expandable_segments_off_windows_are_priced_as_the_native_allocator_ther
     )
     assert linux.reservation_bytes == native.reservation_bytes >= 3600 * 2 * 1024 * 1024
     assert "priced as conv_backend=miopen,allocator=native" in linux.source
+
+
+@pytest.mark.parametrize(
+    "spec, estimate, vae_dtype, dtype",
+    [
+        pytest.param(
+            VAE_SD_SPEC,
+            lambda device, vae: estimate_vae_working_memory_sd15_sdxl("decode", LATENTS_1024, vae, None, False, device),
+            torch.float16,
+            "fp16",
+            id="sd",
+        ),
+        pytest.param(
+            VAE_SD3_SPEC,
+            lambda device, vae: estimate_vae_working_memory_sd3("decode", LATENTS_1024, vae, device),
+            torch.bfloat16,
+            "bf16",
+            id="sd3",
+        ),
+        pytest.param(
+            VAE_COGVIEW4_SPEC,
+            lambda device, vae: estimate_vae_working_memory_cogview4("decode", LATENTS_1024, vae, device),
+            torch.bfloat16,
+            "bf16",
+            id="cogview4",
+        ),
+        pytest.param(
+            VAE_FLUX_SPEC,
+            lambda device, vae: estimate_vae_working_memory_flux("decode", LATENTS_1024, vae, device=device),
+            torch.bfloat16,
+            "bf16",
+            id="flux",
+        ),
+        pytest.param(
+            VAE_FLUX2_SPEC,
+            lambda device, vae: estimate_vae_working_memory_flux2(
+                "decode", torch.zeros(1, 32, 128, 128), vae, device=device
+            ),
+            torch.bfloat16,
+            "bf16",
+            id="flux2",
+        ),
+    ],
+)
+def test_a_planned_untiled_decode_is_priced_as_its_decode_node_prices_it(spec, estimate, vae_dtype, dtype) -> None:
+    """The calibration plan sizes its cases without a VAE; its features must stay the decode nodes' own, the score
+    matrix included (held to a stand-in that depends on its shape)."""
+    device = torch.device("cuda", 0)
+    with patch(
+        "invokeai.backend.util.vae_working_memory.sdpa_score_matrix_bytes",
+        side_effect=lambda **kwargs: kwargs["num_heads"] * kwargs["seq_len"] ** 2 * 3,
+    ):
+        cls = AutoencoderKLFlux2 if spec is VAE_FLUX2_SPEC else AutoencoderKL
+        node = estimate(device, _vae(cls, vae_dtype))
+        planned = estimate_untiled_vae_decode(spec.id, 1024, 1024, dtype, device)
+
+    assert dict(planned.features) == dict(node.features)
+    assert planned.reservation_bytes == node.reservation_bytes

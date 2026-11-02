@@ -1,7 +1,5 @@
 import type { QueueCounts, QueueItemStatus } from '@features/queue/core/types';
 
-import { getPersonalQueueActivity } from '@features/queue/core/types';
-
 /** Status filters for the RECENT list, matching the screenshot's tab row. */
 export type QueueFilterId = 'all' | 'active' | 'completed' | 'failed' | 'canceled';
 
@@ -25,14 +23,16 @@ export const matchesFilter = (status: QueueItemStatus, filter: QueueFilterId): b
   return status === filter;
 };
 
-/** Count for a filter, derived from the server-wide status counts (not the windowed list). */
+/**
+ * Count for a filter, derived from the scope's status counts (not the windowed list). Every tab counts what its list
+ * shows, everyone's items alike, so Active is the pending, running and waiting items `matchesFilter` keeps.
+ */
 export const getFilterCount = (counts: QueueCounts, filter: QueueFilterId): number => {
   switch (filter) {
     case 'all':
       return counts.total;
     case 'active':
-      const activity = getPersonalQueueActivity(counts);
-      return activity.pending + activity.inProgress;
+      return counts.pending + counts.inProgress + counts.waiting;
     case 'completed':
       return counts.completed;
     case 'failed':

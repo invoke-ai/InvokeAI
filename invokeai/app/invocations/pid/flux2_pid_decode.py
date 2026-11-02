@@ -6,28 +6,15 @@ super-resolved image from a FLUX.2 latent in a single 4-step distill pass. The
 4B and 9B FLUX.2 Klein variants share the same 32-channel VAE, so this one node
 covers both.
 
-Latent layout (the important difference from the FLUX.1 node):
+Latent layout and normalization (the important difference from the FLUX.1 node):
 
 * ``flux2_denoise`` stores an *unpacked* ``(B, 32, H/8, W/8)`` latent that is
-  already **BN-denormalized** (``x * bn_std + bn_mean`` is applied before the
-  unpack, see ``flux2_denoise.py``). That is exactly the raw latent the FLUX.2
-  VAE's conv decoder consumes.
-* PiD's FLUX.2 backbone expects the **packed** ``(B, 128, H/16, W/16)``
-  representation (``lq_latent_channels=128``, ``latent_spatial_down_factor=16``
-  in ``backend/pid/decode.py``). We therefore patchify the stored latent
-  (2x2 spatial patches folded into channels: 32*4 = 128) *before* handing it to
-  PiD - mirroring ``pack_flux2`` but keeping a spatial ``(B, C, h, w)`` layout
-  instead of the transformer's ``(B, seq, C)`` sequence layout.
-
-Denormalization: unlike FLUX.1 (single ``scale``/``shift``) and Z-Image
-(checkpoint-specific ``scaling_factor``/``shift_factor``), the FLUX.2 VAE
-(``AutoencoderKLFlux2``) exposes **no** scalar ``scaling_factor``/``shift_factor``
-at all - its only normalization is the per-channel BatchNorm applied/inverted
-*outside* the VAE in ``flux2_denoise``. So the packed latent is already in PiD's
-expected raw space and no further scaling is needed (identity fallbacks below).
-We still accept an optional ``vae`` input and read the constants at runtime (like
-the Z-Image node) so any future FLUX.2 VAE variant that does expose scalar
-constants is honored automatically.
+  already **BN-denormalized** - the raw latent the FLUX.2 VAE's conv decoder
+  consumes.
+* PiD's FLUX.2 backbone was trained on what the upstream FLUX.2 tokenizer encodes
+  to: the 2x2-patchified ``(B, 128, H/16, W/16)`` latent, **BN-normalized** with
+  the VAE's running statistics. ``pack_flux2_latent_for_pid`` restores that, so
+  this node needs the FLUX.2 VAE for its BatchNorm statistics.
 """
 
 from contextlib import ExitStack
@@ -50,6 +37,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.flux2.latent_norm import read_vae_bn_stats
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
@@ -58,16 +46,9 @@ from invokeai.backend.pid.decode import (
     assert_pid_decoder_matches_base,
     encode_caption_for_pid,
     estimate_pid_decode_working_memory,
+    pack_flux2_latent_for_pid,
 )
 from invokeai.backend.util.devices import TorchDevice
-
-# FLUX.2 uses per-channel BatchNorm (affine=False) for latent normalization, and
-# that BN is already inverted in flux2_denoise before the latent is stored. The
-# FLUX.2 VAE (AutoencoderKLFlux2) has no scalar scaling_factor/shift_factor, so
-# the identity transform below is the correct default: the stored (packed) latent
-# is already the raw representation PiD was trained on.
-_FLUX2_VAE_SCALING_FACTOR_FALLBACK: float = 1.0
-_FLUX2_VAE_SHIFT_FACTOR_FALLBACK: float = 0.0
 
 
 @invocation(
@@ -75,16 +56,15 @@ _FLUX2_VAE_SHIFT_FACTOR_FALLBACK: float = 0.0
     title="Latents to Image - FLUX.2 + PiD (4x SR)",
     tags=["latents", "image", "pid", "flux2", "klein", "upscale"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Decode a FLUX.2 Klein latent with the PiD pixel-diffusion decoder.
 
     Produces a 4x super-resolved image in a single pass. The stored FLUX.2 latent
-    is patchified from ``(B, 32, H/8, W/8)`` to the ``(B, 128, H/16, W/16)`` layout
-    PiD's FLUX.2 backbone expects, then decoded directly (it is already in raw,
-    BN-denormalized space; see the module docstring).
+    is patchified from ``(B, 32, H/8, W/8)`` to ``(B, 128, H/16, W/16)`` and
+    BN-normalized with the VAE's statistics, the form PiD's FLUX.2 backbone expects.
     """
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
@@ -102,12 +82,9 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         description="PiD FLUX.2 decoder checkpoint.",
         input=Input.Connection,
     )
-    vae: VAEField | None = InputField(
-        default=None,
+    vae: VAEField = InputField(
         title="VAE",
-        description="FLUX.2 VAE, used only to read a scalar scaling_factor / shift_factor if one exists. "
-        "FLUX.2 normalises latents with BatchNorm (already inverted in flux2_denoise), so this is "
-        "normally an identity transform and the input can be left unconnected.",
+        description="FLUX.2 VAE. Its BatchNorm statistics normalize the latent the way PiD was trained on.",
         input=Input.Connection,
     )
     num_inference_steps: int = InputField(
@@ -131,39 +108,21 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         latents = context.tensors.load(self.latents.latents_name)
 
-        # 1) Patchify the stored FLUX.2 latent into PiD's expected layout.
-        #    flux2_denoise stores an unpacked (B, 32, H/8, W/8) latent; PiD's
-        #    FLUX.2 backbone wants the packed (B, 128, H/16, W/16) form (32*4=128
-        #    channels, spatial halved). This mirrors pack_flux2's 2x2 patchify but
-        #    keeps a spatial (B, C, h, w) layout rather than a (B, seq, C) sequence.
-        if latents.shape[-3] != 32:
+        # 1) Patchify and BN-normalize the stored latent into the form PiD's FLUX.2 backbone was trained on.
+        with context.models.load(self.vae.vae).model_on_device() as (_, vae):
+            bn_stats = read_vae_bn_stats(vae)
+        if bn_stats is None:
             raise ValueError(
-                f"FLUX.2 PiD decode expected a 32-channel latent from flux2_denoise, got shape "
-                f"{tuple(latents.shape)}. The upstream node must output the unpacked FLUX.2 latent."
+                "FLUX.2 PiD decode needs the FLUX.2 VAE's BatchNorm statistics to normalize the latent, "
+                "but the connected VAE has none. Connect the FLUX.2 VAE."
             )
-        packed = rearrange(latents, "b c (h ph) (w pw) -> b (c ph pw) h w", ph=2, pw=2)
+        packed = pack_flux2_latent_for_pid(latents, *bn_stats)
         context.logger.info(
             f"FLUX.2 PiD decode: stored latent shape={tuple(latents.shape)} -> packed for PiD "
             f"shape={tuple(packed.shape)} (expect [B, 128, H/16, W/16]) dtype={packed.dtype}"
         )
 
-        # 2) Resolve the scalar scaling/shift (identity for current FLUX.2 VAEs).
-        scaling_factor = _FLUX2_VAE_SCALING_FACTOR_FALLBACK
-        shift_factor = _FLUX2_VAE_SHIFT_FACTOR_FALLBACK
-        if self.vae is not None:
-            vae_info = context.models.load(self.vae.vae)
-            with vae_info.model_on_device() as (_, vae):
-                config = getattr(vae, "config", None)
-                if config is not None and hasattr(config, "scaling_factor"):
-                    scaling_factor = float(config.scaling_factor)
-                    shift_factor = float(getattr(config, "shift_factor", None) or 0.0)
-                else:
-                    scaling_factor = float(getattr(vae, "scale_factor", scaling_factor))
-                    shift_factor = float(getattr(vae, "shift_factor", shift_factor))
-            del vae_info
-            TorchDevice.empty_cache()
-
-        # 3) Encode caption with Gemma-2.
+        # 2) Encode caption with Gemma-2.
         gemma_text_encoder_info = context.models.load(self.gemma2_encoder.text_encoder)
         gemma_tokenizer_info = context.models.load(self.gemma2_encoder.tokenizer)
         with ExitStack() as stack:
@@ -199,7 +158,7 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         context.models.offload_from_vram(self.gemma2_encoder.text_encoder)
         TorchDevice.empty_cache()
 
-        # 4) Run PiD decode (the loader already returns a live PidNet).
+        # 3) Run PiD decode (the loader already returns a live PidNet).
         pid_info = context.models.load(self.pid_decoder.decoder)
         # The working-memory estimate scales with the OUTPUT pixel count, so it must see the PACKED latent
         # (spatial H/16), not the unpacked one - otherwise it over-reserves by 4x.
@@ -218,20 +177,13 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            # The packed latent is already BN-denormalized (raw VAE-input space); the scalar transform below is
-            # identity for current FLUX.2 VAEs and only bites if a VAE ever exposes real scalar constants.
-            denorm_latent = packed.to(device=device, dtype=dtype) / scaling_factor + shift_factor
-            context.logger.info(
-                f"FLUX.2 PiD denorm_latent stats[min={denorm_latent.min().item():.3f} "
-                f"max={denorm_latent.max().item():.3f} mean={denorm_latent.mean().item():.3f}] "
-                f"using scale={scaling_factor:.4f} shift={shift_factor:.4f}"
-            )
+            latent = packed.to(device=device, dtype=dtype)
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")
             decoder = PiDDecoder(pid_net, backbone=BaseModelType.Flux2)
             x0 = decoder.decode(
-                latent=denorm_latent,
+                latent=latent,
                 caption_embs=caption_embs,
                 caption_mask=caption_mask,
                 config=PiDDecodeConfig(

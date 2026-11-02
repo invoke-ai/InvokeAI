@@ -57,6 +57,13 @@ export {
   shouldSubmitPendingQueueItem,
 } from './core/submissionRules';
 export { extractGenerationMeta, getResultImageName, type QueueGenerationMeta } from './core/generationMeta';
+export { getQueueItemSnapshotLabel } from './core/itemLabels';
+export { getQueueActivity, type QueueActivity } from './core/queueActivity';
+export {
+  planGenerateSubmissionBatch,
+  type GeneratePromptBatchPlan,
+  type GeneratePromptSubmission,
+} from './core/promptBatch';
 export {
   buildProjectQueueItemOriginPrefix,
   buildQueueItemOrigin,

@@ -1,7 +1,9 @@
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Text } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { act, useCallback, useState } from 'react';
+import { createInstance } from 'i18next';
+import { act, useCallback, useState, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
@@ -9,6 +11,15 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { closingFrames, recordDialogExit } from './dialogExit.testing';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+// Registered as react-i18next's instance, so the dialog's default dismiss label comes from this catalog.
+await createInstance()
+  .use(initReactI18next)
+  .init({
+    initAsync: false,
+    lng: 'en',
+    resources: { en: { translation: { common: { cancel: 'Cancel' } } } },
+  });
 
 const noop = () => undefined;
 // A control in the body, which a dialog left to itself might focus first.
@@ -109,7 +120,67 @@ describe('ConfirmDialog', () => {
     }
   });
 
-  const renderDialog = async (isDestructive: boolean) => {
+  it('is described by a text body, which looks as the plain paragraph it was before', async () => {
+    // Long enough to wrap in the dialog, so a line height of its own shows in the box too.
+    const BODY =
+      'Queued runs are canceled, and all of this calibration’s measurements are discarded, finished runs included.';
+    /** Opens a dialog with `body` and reads how the paragraph holding BODY renders. */
+    const readParagraph = async (body: ReactNode) => {
+      host = document.createElement('div');
+      document.body.append(host);
+      root = createRoot(host);
+      await act(() =>
+        root?.render(
+          <ChakraProvider value={system}>
+            <ConfirmDialog body={body} confirmLabel="Stop" isOpen title="Stop?" onClose={noop} onConfirm={noop} />
+          </ChakraProvider>
+        )
+      );
+      await expect.poll(() => document.querySelector('[role="alertdialog"]')?.getAttribute('data-state')).toBe('open');
+      const dialog = document.querySelector('[role="alertdialog"]')!;
+      const paragraph = [...dialog.querySelectorAll<HTMLElement>('*')].find(
+        (element) => element.childElementCount === 0 && element.textContent === BODY
+      )!;
+      // The wrap depends on the loaded font's metrics.
+      await document.fonts.ready;
+      const style = getComputedStyle(paragraph);
+      const read = {
+        describes: dialog.getAttribute('aria-describedby') === paragraph.id,
+        style: {
+          color: style.color,
+          fontSize: style.fontSize,
+          fontWeight: style.fontWeight,
+          // Layout height: the content is still scaling in from 0.95 when it reports open, which the rect would include.
+          height: paragraph.offsetHeight,
+          letterSpacing: style.letterSpacing,
+          lineHeight: style.lineHeight,
+          margin: style.margin,
+        },
+      };
+
+      await act(() => root?.unmount());
+      host.remove();
+      host = null;
+      root = null;
+      return read;
+    };
+
+    const described = await readParagraph(BODY);
+    // What a text body rendered before it described the dialog.
+    const plain = await readParagraph(<Text fontSize="md">{BODY}</Text>);
+
+    expect(described.describes).toBe(true);
+    expect(plain.describes).toBe(false);
+    expect(described.style).toEqual(plain.style);
+    // It wraps, so the comparison covers the lines' spacing.
+    expect(described.style.height).toBeGreaterThan(Number.parseFloat(described.style.lineHeight) * 1.5);
+  });
+
+  const renderDialog = async (
+    isDestructive: boolean,
+    labels: { cancelLabel?: string; confirmLabel: string } = { confirmLabel: 'Go' },
+    onClose: () => void = noop
+  ) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -118,12 +189,12 @@ describe('ConfirmDialog', () => {
         <ChakraProvider value={system}>
           <ConfirmDialog
             body={OPTION_BODY}
-            confirmLabel="Go"
+            {...labels}
             isDestructive={isDestructive}
             isOpen
             title="Sure?"
-            onClose={noop}
-            onConfirm={noop}
+            onClose={onClose}
+            onConfirm={handleConfirm}
           />
         </ChakraProvider>
       )
@@ -146,5 +217,25 @@ describe('ConfirmDialog', () => {
     expect(document.activeElement).not.toBe(
       [...document.querySelectorAll('button')].find((button) => button.textContent === 'Cancel')
     );
+  });
+
+  it('names its way out apart from a confirm label that is itself a cancel', async () => {
+    confirmCalls = 0;
+    let closeCalls = 0;
+    await renderDialog(true, { cancelLabel: 'Keep running', confirmLabel: 'Cancel queue item' }, () => {
+      closeCalls += 1;
+    });
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    const labels = [...dialog.querySelectorAll('button')].map((button) => button.textContent?.trim());
+
+    expect(labels).toContain('Keep running');
+    expect(labels).toContain('Cancel queue item');
+    expect(labels).not.toContain('Cancel');
+    // The dismiss button keeps its role whatever it is called: it takes initial focus and closes without confirming.
+    expect(focusedLabel()).toBe('Keep running');
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(closeCalls).toBe(1);
+    expect(confirmCalls).toBe(0);
   });
 });
