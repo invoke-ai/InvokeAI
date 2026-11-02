@@ -3,6 +3,7 @@ import type { ToolId } from '@workbench/canvas-engine/api';
 import { filterOperationForm } from '@workbench/widgets/canvas/tool-options/FilterOptions';
 import { bboxForm, moveForm, transformForm } from '@workbench/widgets/canvas/tool-options/geometryForm';
 import { gradientForm } from '@workbench/widgets/canvas/tool-options/GradientOptions';
+import { paintBucketForm } from '@workbench/widgets/canvas/tool-options/PaintBucketOptions';
 import { brushForm, eraserForm } from '@workbench/widgets/canvas/tool-options/paintForm';
 import { selectObjectOperationForm } from '@workbench/widgets/canvas/tool-options/SamOptions';
 import { lassoForm, marqueeForm } from '@workbench/widgets/canvas/tool-options/selectionForm';
@@ -20,6 +21,7 @@ export const TOOL_PRESENTATION_ADAPTERS: Readonly<Record<ToolId, ToolPropertyFor
   lasso: lassoForm,
   marquee: marqueeForm,
   move: moveForm,
+  paintBucket: paintBucketForm,
   sam: { groups: [], id: 'sam' },
   shape: shapeForm,
   text: textForm,

@@ -125,10 +125,10 @@ const SelectedControlLayerOverlay = ({
       : persistedState
   );
   const isGalleryDrag = isGalleryImageDragData(active?.data.current);
-  // Draw hides the hint: the user is about to give the layer its pixels by hand. A gallery drag shows the drop zones
-  // in its place. An upload on its way (from Properties or a dropped file) keeps the card up, saying so.
-  const isHintVisible =
-    imageState === 'empty' && (isUploading || (!isGalleryDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
+  // A painting tool hides the hint: the user is about to give the layer its pixels by hand. A gallery drag shows the
+  // drop zones in its place. An upload on its way (from Properties or a dropped file) keeps the card up, saying so.
+  const isPainting = activeTool === 'brush' || activeTool === 'eraser' || activeTool === 'paintBucket';
+  const isHintVisible = imageState === 'empty' && (isUploading || (!isGalleryDrag && !isPainting));
   // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
   // a view while an operation holds the document, and a layer that does not draw has nothing to compare.
   const isViewSwitchVisible =

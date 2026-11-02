@@ -129,4 +129,23 @@ describe('Canvas gesture guidance', () => {
     // Alt skips the grid on these tools, so it advertises no color sample.
     expect([...bbox, ...moveHints]).not.toContain('workbench.shortcuts.actions.sample');
   });
+
+  it('teaches the paint bucket click, tolerance drag, Alt pick and Escape under its own title', () => {
+    const bucket = getCanvasShortcutHints({ ...state, activeTool: 'paintBucket' });
+    expect(bucket.titleKey).toBe('widgets.canvas.tools.paintBucket');
+    expect(bucket.hints.slice(0, 4)).toEqual([
+      { labelKey: 'workbench.shortcuts.actions.fill', parts: [], pointerKey: 'workbench.shortcuts.pointer.click' },
+      {
+        labelKey: 'workbench.shortcuts.actions.adjustTolerance',
+        parts: [],
+        pointerKey: 'workbench.shortcuts.pointer.drag',
+      },
+      {
+        labelKey: 'workbench.shortcuts.actions.sample',
+        parts: ['alt'],
+        pointerKey: 'workbench.shortcuts.pointer.click',
+      },
+      { labelKey: 'workbench.shortcuts.actions.cancel', parts: ['esc'], pointerKey: undefined },
+    ]);
+  });
 });

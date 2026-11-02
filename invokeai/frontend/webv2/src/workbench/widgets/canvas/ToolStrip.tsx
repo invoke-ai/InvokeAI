@@ -20,6 +20,7 @@ import {
   HandIcon,
   LassoIcon,
   MousePointer2Icon,
+  PaintBucketIcon,
   PenLineIcon,
   PentagonIcon,
   ScalingIcon,
@@ -34,7 +35,13 @@ import { useCallback, useEffect, useMemo, type ElementType, type ReactNode } fro
 import { useTranslation } from 'react-i18next';
 
 import { useCanvasActiveTool, useShapeOptions } from './engineStoreHooks';
-import { recordSelectFamilyTool, useSelectFamilyTool, type SelectFamilyTool } from './toolFamilyStore';
+import {
+  familyMemberOf,
+  recordFamilyTool,
+  useRememberedFamilyTool,
+  type ToolFamily,
+  type ToolFamilyMember,
+} from './toolFamilyStore';
 import { ToolFamilyButton, type ToolFlyoutItem } from './ToolStripFlyout';
 
 type ToolStripEngine = CanvasCoreStoreCapability & { readonly tools: CanvasToolCapability };
@@ -149,18 +156,37 @@ const toolHotkeys = (
   return definition ? applyCustomHotkeys(definition, customHotkeys).keys : undefined;
 };
 
+/**
+ * A family slot's state: the active tool when it belongs to the family, else the remembered member. A switch into
+ * the family by any route (strip, hotkey, a restored session) becomes its memory.
+ */
+const useFamilySlot = <Family extends ToolFamily>(engine: ToolStripEngine, family: Family) => {
+  const active = familyMemberOf(family, useCanvasActiveTool(engine));
+  const remembered = useRememberedFamilyTool(family);
+  useEffect(() => {
+    if (active !== null) {
+      recordFamilyTool(family, active);
+    }
+  }, [active, family]);
+  const current = active ?? remembered;
+  const onActivate = useCallback(() => engine.tools.setTool(current), [current, engine]);
+  const onSelectSubtool = useCallback(
+    (id: string) => {
+      const member = familyMemberOf(family, id);
+      if (member !== null) {
+        recordFamilyTool(family, member);
+        engine.tools.setTool(member);
+      }
+    },
+    [engine, family]
+  );
+  return { current, isActive: active !== null, onActivate, onSelectSubtool };
+};
+
 /** The Select slot: marquee and lasso as one family; the slot stands for the last one used. */
 const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
   const { t } = useTranslation();
-  const activeTool = useCanvasActiveTool(engine);
-  const stored = useSelectFamilyTool();
-  // A hotkey or programmatic switch into the family also becomes its memory.
-  useEffect(() => {
-    if (activeTool === 'marquee' || activeTool === 'lasso') {
-      recordSelectFamilyTool(activeTool);
-    }
-  }, [activeTool]);
-  const current: SelectFamilyTool = activeTool === 'marquee' || activeTool === 'lasso' ? activeTool : stored;
+  const { current, isActive, onActivate, onSelectSubtool } = useFamilySlot(engine, 'select');
   const hotkeyDefinitions = useExtensionHotkeyDefinitions();
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const items: ToolFlyoutItem[] = useMemo(
@@ -182,21 +208,52 @@ const SelectFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
     ],
     [customHotkeys, hotkeyDefinitions, t]
   );
-  const onActivate = useCallback(() => engine.tools.setTool(current), [current, engine]);
-  const onSelectSubtool = useCallback(
-    (id: string) => {
-      recordSelectFamilyTool(id as SelectFamilyTool);
-      engine.tools.setTool(id as ToolId);
-    },
-    [engine]
-  );
   return (
     <ToolFamilyButton
       currentId={current}
       icon={current === 'lasso' ? LassoIcon : SquareDashedMousePointerIcon}
-      isActive={activeTool === 'marquee' || activeTool === 'lasso'}
+      isActive={isActive}
       items={items}
       label={t(current === 'lasso' ? 'widgets.canvas.tools.lasso' : 'widgets.canvas.tools.marquee')}
+      onActivate={onActivate}
+      onSelectSubtool={onSelectSubtool}
+    />
+  );
+};
+
+const FILL_FAMILY_ICONS: Record<ToolFamilyMember<'fill'>, ElementType> = {
+  gradient: GradientIcon,
+  paintBucket: PaintBucketIcon,
+};
+
+/** The Fill slot: Gradient and Paint Bucket as one family, which G selects and toggles between. */
+const FillFamilyButton = ({ engine }: { engine: ToolStripEngine }) => {
+  const { t } = useTranslation();
+  const { current, isActive, onActivate, onSelectSubtool } = useFamilySlot(engine, 'fill');
+  const hotkeyDefinitions = useExtensionHotkeyDefinitions();
+  const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
+  const items: ToolFlyoutItem[] = useMemo(() => {
+    const familyKeys = toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.gradient');
+    const bucketKeys = toolHotkeys(hotkeyDefinitions, customHotkeys, 'canvas.tool.paintBucket');
+    return [
+      { hotkeys: familyKeys, icon: GradientIcon, id: 'gradient', label: t('widgets.canvas.tools.gradient') },
+      {
+        description: t('widgets.canvas.tools.paintBucketHelp'),
+        // The bucket's own binding when it has one; otherwise the family key, which reaches it too.
+        hotkeys: bucketKeys?.length ? bucketKeys : familyKeys,
+        icon: PaintBucketIcon,
+        id: 'paintBucket',
+        label: t('widgets.canvas.tools.paintBucket'),
+      },
+    ];
+  }, [customHotkeys, hotkeyDefinitions, t]);
+  return (
+    <ToolFamilyButton
+      currentId={current}
+      icon={FILL_FAMILY_ICONS[current]}
+      isActive={isActive}
+      items={items}
+      label={t(`widgets.canvas.tools.${current}`)}
       onActivate={onActivate}
       onSelectSubtool={onSelectSubtool}
     />
@@ -268,13 +325,7 @@ const ToolStripRoot = ({ engine }: { engine: ToolStripEngine }) => {
           toolId="eraser"
         />
         <ShapeFamilyButton engine={engine} hotkey={hotkeyFor('canvas.tool.shape')} />
-        <ToolStripButton
-          engine={engine}
-          hotkey={hotkeyFor('canvas.tool.gradient')}
-          icon={GradientIcon}
-          label={t('widgets.canvas.tools.gradient')}
-          toolId="gradient"
-        />
+        <FillFamilyButton engine={engine} />
         <ToolStripButton
           engine={engine}
           hotkey={hotkeyFor('canvas.tool.text')}
