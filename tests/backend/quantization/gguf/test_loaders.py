@@ -15,7 +15,13 @@ from invokeai.backend.quantization.gguf.loaders import (
     gguf_tensor_bytes,
     unpack_ggml_at_load,
 )
-from tests.fixtures.quantized_payloads import q8_cr_marker, quantize_convrot, write_gguf
+from tests.fixtures.quantized_payloads import (
+    q4_cr_marker,
+    q8_cr_marker,
+    quantize_convrot,
+    quantize_convrot_int4,
+    write_gguf,
+)
 
 
 def _write_gguf(path, *, orig_shape: Sequence[float] | None) -> None:
@@ -101,7 +107,7 @@ def test_a_q8_cr_layer_loads_as_an_int8_tensorwise_export(tmp_path):
         q8_0={"blocks.0.mlp.up.weight": torch.randn(4, 64)},
     )
 
-    sd = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode")
 
     weight, scale = sd["blocks.0.attn.wq.weight"], sd["blocks.0.attn.wq.weight_scale"]
     assert not isinstance(weight, GGMLTensor) and torch.equal(weight, tensors["blocks.0.attn.wq.weight"])
@@ -118,7 +124,7 @@ def test_a_q8_cr_file_is_refused_unless_the_caller_decodes_int8(tmp_path):
     path = tmp_path / "model.gguf"
     write_gguf(path, _q8_cr_layer("blocks.0.attn.wq"), quant={"blocks.0.attn.wq.weight": q8_cr_marker()})
 
-    with pytest.raises(ValueError, match=r"model\.gguf holds 1 ComfyUI-GGUF Q8_CR"):
+    with pytest.raises(ValueError, match=r"model\.gguf holds 1 ComfyUI-GGUF convrot \(Q8_CR or Q4_CR\)"):
         gguf_sd_loader(path, compute_dtype=torch.float32)
 
 
@@ -148,7 +154,7 @@ def test_a_convrot_layer_not_marked_weight_rotated_is_read_unrotated(tmp_path, w
         del marker["weight_rotated"]
     write_gguf(path, _q8_cr_layer("proj"), quant={"proj.weight": marker})
 
-    markers = extract_int8_convrot_markers(gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode"))
+    markers = extract_int8_convrot_markers(gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode"))
 
     assert markers["proj"]["convrot"] is False
     assert "convrot_groupsize" not in markers["proj"]
@@ -161,7 +167,7 @@ def test_an_int8_layers_bias_is_read_as_a_plain_tensor(tmp_path):
     bias = torch.arange(4, dtype=torch.float32)
     write_gguf(path, {**_q8_cr_layer("proj"), "proj.bias": bias}, quant={"proj.weight": q8_cr_marker()})
 
-    sd = gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode")
 
     assert not isinstance(sd["proj.bias"], GGMLTensor)
     assert torch.equal(sd["proj.bias"], bias)
@@ -171,10 +177,10 @@ def test_an_int8_layers_bias_is_read_as_a_plain_tensor(tmp_path):
     ("quant", "tensors", "message"),
     [
         pytest.param(
-            {"proj.weight": {"format": "int4_cr", "backing": "w4a4"}},
+            {"proj.weight": {"format": "int4_pytorch"}},
             {},
-            "quantization 'int4_cr', which is not supported",
-            id="int4",
+            "quantization 'int4_pytorch', which is not supported",
+            id="retired-int4",
         ),
         pytest.param({"proj.weight": "{not json"}, {}, "is not valid quantization JSON", id="malformed-json"),
         pytest.param({"proj": q8_cr_marker()}, {}, "names 'proj', not a weight", id="not-a-weight"),
@@ -198,7 +204,70 @@ def test_a_q8_cr_file_the_decode_cannot_read_is_refused(tmp_path, quant, tensors
     write_gguf(path, {k: v for k, v in layer.items() if v is not None}, quant=quant)
 
     with pytest.raises(ValueError, match=message):
-        gguf_sd_loader(path, compute_dtype=torch.float32, q8_cr="decode")
+        gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode")
+
+
+def _q4_cr_layer(name: str, out_features: int = 4, in_features: int = 256, seed: int = 0) -> dict[str, torch.Tensor]:
+    """One Q4_CR layer's tensors as ComfyUI-GGUF writes them: packed codes and an F16 scale per row."""
+    torch.manual_seed(seed)
+    payload = quantize_convrot_int4(torch.randn(out_features, in_features))
+    return {f"{name}.weight": payload.packed, f"{name}.weight_scale": payload.scale.view(-1).half()}
+
+
+def test_a_q4_cr_layer_loads_as_an_int4_tensorwise_export(tmp_path):
+    """Packed codes as stored, the scale widened to the fp32 the int4 module holds, and a marker the int4 decode
+    reads as rotated: the w4a4 backing has no `weight_rotated` flag and is rotated by definition."""
+    from invokeai.backend.quantization.int8_convrot import extract_int8_convrot_markers, marker_layout
+
+    path = tmp_path / "model.gguf"
+    tensors = _q4_cr_layer("blocks.0.attn.wq")
+    write_gguf(path, tensors, quant={"blocks.0.attn.wq.weight": q4_cr_marker(4, 256)})
+
+    sd = gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode")
+
+    assert torch.equal(sd["blocks.0.attn.wq.weight"], tensors["blocks.0.attn.wq.weight"])
+    scale = sd["blocks.0.attn.wq.weight_scale"]
+    assert scale.dtype is torch.float32 and torch.equal(scale, tensors["blocks.0.attn.wq.weight_scale"].float())
+    (marker,) = extract_int8_convrot_markers(sd, accept_int4=True).values()
+    assert marker_layout(marker).packed_int4 and marker_layout(marker).convrot
+
+
+@pytest.mark.parametrize(
+    ("marker", "tensors", "message"),
+    [
+        pytest.param(
+            q4_cr_marker(4, 512),
+            {},
+            r"stored as \(4, 128\), which does not hold the packed codes of its declared \(4, 512\)",
+            id="orig-shape-mismatch",
+        ),
+        pytest.param(q4_cr_marker(4, 256, orig_shape=None), {}, "no usable orig_shape", id="no-orig-shape"),
+        pytest.param(
+            q4_cr_marker(4, 256),
+            {"proj.weight_scale": torch.ones(4)},
+            "'proj.weight_scale' is stored as F32, expected F16",
+            id="scale-not-f16",
+        ),
+        pytest.param(
+            q4_cr_marker(4, 256, backing="w4a16"),
+            {},
+            "'int4_cr' with backing 'w4a16', which is not supported",
+            id="retired-backing",
+        ),
+        pytest.param(q4_cr_marker(4, 256, sym=False), {}, "sym=False.*only symmetric", id="asymmetric"),
+        pytest.param(
+            q4_cr_marker(4, 256, weight_rotated=False), {}, "weight_rotated=False.*pre-rotated", id="unrotated"
+        ),
+        pytest.param(q4_cr_marker(4, 256, convrot_groupsize=None), {}, "no usable convrot_groupsize", id="no-group"),
+        pytest.param('"int4_cr"', {}, "is not a quantization object", id="not-an-object"),
+    ],
+)
+def test_a_q4_cr_file_the_decode_cannot_read_is_refused(tmp_path, marker, tensors, message):
+    path = tmp_path / "model.gguf"
+    write_gguf(path, {**_q4_cr_layer("proj"), **tensors}, quant={"proj.weight": marker})
+
+    with pytest.raises(ValueError, match=message):
+        gguf_sd_loader(path, compute_dtype=torch.float32, convrot="decode")
 
 
 def test_keep_reads_only_the_tensors_it_selects(tmp_path):
