@@ -123,7 +123,7 @@ import {
   needsBakedControlPixels,
 } from './layerOps';
 import { LayerSaveToBoardSubmenu } from './LayerSaveToBoardSubmenu';
-import { useRevealLayerProperties } from './revealLayerProperties';
+import { revealLayerSection, useRevealLayerProperties } from './revealLayerProperties';
 import { RunLayerWorkflowDialog, useLayerWorkflowAvailability } from './RunLayerWorkflowDialog';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
@@ -744,6 +744,7 @@ const LayerMenu = ({
   const handleOpenProperties = useCallback(() => {
     revealProperties(layer.id);
     focusRegion('right', 'layers');
+    revealLayerSection();
   }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(

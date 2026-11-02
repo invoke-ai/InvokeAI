@@ -58,6 +58,7 @@ export const LayerSection = ({ disabled }: { disabled: boolean }) => {
   return (
     <PropertiesSection
       disabled={disabled}
+      sectionId="layer"
       subtitle={child ? child.subtitle : (node?.name ?? t('widgets.transform.noSelection'))}
       title={t('widgets.properties.sections.layer')}
     >
