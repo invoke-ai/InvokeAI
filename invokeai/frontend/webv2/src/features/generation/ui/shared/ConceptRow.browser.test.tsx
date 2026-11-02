@@ -142,6 +142,14 @@ describe('ConceptRow', () => {
   it('keeps a drag local to its row and commits its final weight once', async () => {
     const onUpdate = vi.fn();
     const list = await renderList([makeLora(), makeLora({ key: 'lora-2', name: 'Chalk' })], { onUpdate });
+    // Initial text measurements reveal the stops; finish those commits before measuring drag isolation.
+    await expect
+      .poll(() =>
+        [...list.querySelectorAll('[data-scope="scrubber"]')].map(
+          (scrubber) => scrubber.querySelector('[data-part="mark"]:not([data-hidden])') !== null
+        )
+      )
+      .toEqual([true, true]);
     const frame = list.querySelector<HTMLElement>('[data-scope="scrubber"]')!;
     const rect = frame.getBoundingClientRect();
     const pointer = (target: EventTarget, type: string, fraction: number) =>
