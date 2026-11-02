@@ -152,8 +152,15 @@ class FieldDescriptions:
     hidiffusion = "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising"
     hidiffusion_raunet = "Apply HiDiffusion RAU-Net blocks"
     hidiffusion_window_attn = "Apply HiDiffusion window attention blocks"
-    hidiffusion_t1_ratio = "Override HiDiffusion early switch threshold (T1 ratio)"
-    hidiffusion_t2_ratio = "Override HiDiffusion late switch threshold (T2 ratio)"
+    hidiffusion_t1_ratio = (
+        "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). "
+        "At extreme resolutions this is the later of the two RAU-Net cutoffs."
+    )
+    hidiffusion_t2_ratio = (
+        "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key "
+        "T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values "
+        "can reduce composition diversity or introduce artifacts."
+    )
     scheduler = "Scheduler to use during inference"
     positive_cond = "Positive conditioning tensor"
     negative_cond = "Negative conditioning tensor"

@@ -35,6 +35,7 @@ export const FEATURE_HINTS = {
   height: {},
   hidiffusion: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionRauNet: { href: 'https://github.com/megvii-research/HiDiffusion' },
+  hidiffusionRatiosAuto: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionT1Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionT2Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionWindowAttn: { href: 'https://github.com/megvii-research/HiDiffusion' },

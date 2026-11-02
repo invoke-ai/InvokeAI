@@ -602,6 +602,25 @@ describe('image recall', () => {
     expect(result?.fields).toContain('hiDiffusion');
   });
 
+  it.each([null, undefined, 0])('recalls automatic or explicit zero ratios (%s)', (ratio) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_t1_ratio: ratio,
+        hidiffusion_t2_ratio: ratio,
+        model: { key: sd1Model.key },
+      },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+    expect(result?.values.hiDiffusionT1Ratio).toBe(ratio === undefined ? null : ratio);
+    expect(result?.values.hiDiffusionT2Ratio).toBe(ratio === undefined ? null : ratio);
+  });
+
   it('ignores HiDiffusion metadata for unsupported models', () => {
     const result = buildImageRecallSettings({
       currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),

@@ -1071,18 +1071,25 @@
         "Can improve structure and detail at higher resolutions."
       ]
     },
+    "hidiffusionRatiosAuto": {
+      "heading": "HiDiffusion: Automatic ratios",
+      "paragraphs": [
+        "Uses the model- and resolution-specific T1 and T2 ratios recommended by HiDiffusion.",
+        "Disable this to set explicit ratio overrides below. Manual T1 must be at least T2; zero is an explicit override."
+      ]
+    },
     "hidiffusionT1Ratio": {
       "heading": "HiDiffusion: T1 Ratio",
       "paragraphs": [
-        "Controls the early switch point for HiDiffusion (T1).",
-        "Lower values switch earlier; higher values preserve global structure longer."
+        "Controls how long the primary HiDiffusion RAU-Net stage remains active (T1).",
+        "Lower values end the primary stage sooner; at extreme resolutions this is the later of the two RAU-Net cutoffs."
       ]
     },
     "hidiffusionT2Ratio": {
       "heading": "HiDiffusion: T2 Ratio",
       "paragraphs": [
-        "Controls the late switch point for HiDiffusion (T2).",
-        "Higher values keep window attention active longer."
+        "Controls the duration of the additional HiDiffusion RAU-Net stage (T2).",
+        "This is the earlier cutoff at extreme resolutions. It cannot exceed T1 and does not control Window Attention."
       ]
     },
     "hidiffusionWindowAttn": {
@@ -3123,6 +3130,8 @@
       "height": "Height",
       "hiDiffusion": "HiDiffusion",
       "hiDiffusionRauNet": "HiDiffusion: RAU-Net",
+      "hiDiffusionRatiosAuto": "HiDiffusion: Automatic ratios",
+      "hiDiffusionRatioAutoValue": "Automatic",
       "hiDiffusionT1Ratio": "HiDiffusion: T1 Ratio",
       "hiDiffusionT2Ratio": "HiDiffusion: T2 Ratio",
       "hiDiffusionWindowAttn": "HiDiffusion: Window Attention",
