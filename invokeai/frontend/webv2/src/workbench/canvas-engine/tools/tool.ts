@@ -37,8 +37,11 @@ export interface StrokeCommittedEvent {
   beforeImageData: ImageData;
   /** Cache pixels within `dirtyRect` after the stroke. */
   afterImageData: ImageData;
-  /** Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer. */
-  tool: 'brush' | 'eraser' | 'shape';
+  /**
+   * Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer, and the paint bucket records
+   * a fill or an erase.
+   */
+  tool: 'brush' | 'eraser' | 'shape' | 'paintBucket' | 'paintBucketErase';
   /** Optional auto-created layer and insertion placement let stroke history remove/recreate both layer and pixels. */
   createdLayer?: { layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor };
 }
