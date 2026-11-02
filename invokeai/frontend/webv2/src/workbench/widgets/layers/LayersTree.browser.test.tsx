@@ -39,6 +39,7 @@ import { userEvent } from 'vitest/browser';
 
 import type { ProjectedChildRow } from './layerChildRows';
 import type { LayerRowCommands } from './layerRowCommands';
+import type * as LayerStackHeaderModule from './LayerStackHeader';
 
 import { ADJUSTMENT_SPINNER_DELAY_MS } from './AdjustmentStatusIcon';
 import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
@@ -51,35 +52,56 @@ import { buildLayerStackRows } from './layerTreeRows';
 
 vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
-vi.mock('./LayerStackHeader', () => ({
-  LayerStackHeader: ({
-    commands,
-    focused,
-    pinned,
-    rowKey,
-    stack,
-  }: {
-    commands: { focus(key: string): void; keyDown(key: string, event: React.KeyboardEvent<HTMLElement>): void };
-    focused: boolean;
-    pinned?: boolean;
-    rowKey: string;
-    stack: string;
-  }) => (
-    <div
-      aria-label={stack}
-      aria-level={1}
-      data-layer-row-id={pinned ? undefined : rowKey}
-      aria-hidden={pinned || undefined}
-      data-testid="stack-header"
-      role="treeitem"
-      tabIndex={pinned ? undefined : focused ? 0 : -1}
-      onFocus={() => commands.focus(rowKey)}
-      onKeyDown={(event) => commands.keyDown(rowKey, event)}
-    >
-      {stack}
-    </div>
-  ),
-}));
+/** Most cases use a stand-in header; geometry cases render the real one with the real action order. */
+const realStackHeader = vi.hoisted(() => ({ on: false }));
+vi.mock('./useLayerStackActions', async () => {
+  const { getStackActions } = await import('./layerStackActions');
+  const { PlusIcon } = await import('lucide-react');
+  const labels = {
+    exportPsd: 'Export to PSD',
+    mergeVisible: 'Merge visible',
+    new: 'New layer',
+    toggleVisibility: 'Hide all on canvas',
+  };
+  return {
+    useLayerStackActions: (stack: Parameters<typeof getStackActions>[0]) =>
+      getStackActions(stack).map((id) => ({ disabled: false, icon: PlusIcon, id, label: labels[id], run: () => {} })),
+  };
+});
+const StubStackHeader = ({
+  commands,
+  focused,
+  pinned,
+  rowKey,
+  stack,
+}: {
+  commands: { focus(key: string): void; keyDown(key: string, event: React.KeyboardEvent<HTMLElement>): void };
+  focused: boolean;
+  pinned?: boolean;
+  rowKey: string;
+  stack: string;
+}) => (
+  <div
+    aria-label={stack}
+    aria-level={1}
+    data-layer-row-id={pinned ? undefined : rowKey}
+    aria-hidden={pinned || undefined}
+    data-testid="stack-header"
+    role="treeitem"
+    tabIndex={pinned ? undefined : focused ? 0 : -1}
+    onFocus={() => commands.focus(rowKey)}
+    onKeyDown={(event) => commands.keyDown(rowKey, event)}
+  >
+    {stack}
+  </div>
+);
+vi.mock('./LayerStackHeader', async (importOriginal) => {
+  const actual = await importOriginal<typeof LayerStackHeaderModule>();
+  return {
+    LayerStackHeader: (props: Parameters<typeof actual.LayerStackHeader>[0]) =>
+      realStackHeader.on ? <actual.LayerStackHeader {...props} /> : <StubStackHeader {...props} />,
+  };
+});
 /** The command handle the tree last gave its surface host, which menus drive. */
 const surfaceCommands = vi.hoisted(() => ({ current: null as LayerRowCommands | null }));
 vi.mock('./LayerSurfaceHost', () => ({
@@ -392,6 +414,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  realStackHeader.on = false;
   host?.remove();
   host = null;
   root = null;
@@ -650,6 +673,86 @@ describe('LayersTree selection, surfaces and structure', () => {
     await act(() => userEvent.click(eye));
     expect(eye).toHaveAttribute('aria-pressed', 'false');
     expect(output('selected-layer')).toBe('none');
+  });
+
+  it('ends every row with the eye then the lock, each in one column at any depth', async () => {
+    await renderTree([
+      paint('top', 'Top'),
+      groupContract('g', [paint('inner', 'Inner'), groupContract('h', [paint('deep', 'Deep')], { name: 'H' })], {
+        name: 'G',
+      }),
+      layerContract('masked', 'inpaint_mask', { isHidden: true, name: 'Masked' }),
+    ]);
+    await act(() => userEvent.click(treeitem('G').querySelector('button[aria-label="Expand group"]')!));
+    await act(() => userEvent.click(treeitem('H').querySelector('button[aria-label="Expand group"]')!));
+    const ids = ['top', 'g', 'inner', 'h', 'deep', 'masked'];
+    const rowButtons = (id: string) =>
+      [...host!.querySelectorAll<HTMLButtonElement>(`[data-layer-row-id="${id}"] button`)].map((button) => ({
+        label: button.getAttribute('aria-label'),
+        rect: button.getBoundingClientRect(),
+      }));
+
+    for (const id of ids) {
+      const labels = rowButtons(id).map((button) => button.label);
+      expect(labels.slice(-2)).toEqual(['Toggle layer active', 'Toggle lock']);
+    }
+    // The canvas-only marker appears only where it applies, ahead of the eye column rather than in it.
+    expect(
+      rowButtons('masked')
+        .map((button) => button.label)
+        .slice(-3)
+    ).toEqual(['Show on canvas', 'Toggle layer active', 'Toggle lock']);
+
+    const columnLefts = (label: string) =>
+      new Set(ids.map((id) => rowButtons(id).find((button) => button.label === label)!.rect.left));
+    expect(columnLefts('Toggle layer active').size).toBe(1);
+    expect(columnLefts('Toggle lock').size).toBe(1);
+    // Nesting indents the leading edge only.
+    const thumbnailLeft = (id: string) =>
+      host!.querySelector(`[data-layer-row-id="${id}"] [data-testid="thumbnail"]`)!.getBoundingClientRect().left;
+    expect(thumbnailLeft('deep') - thumbnailLeft('inner')).toBe(16);
+    expect(thumbnailLeft('inner') - thumbnailLeft('top')).toBe(16);
+  });
+
+  it('puts the stack headers’ and child rows’ eyes in the layer rows’ eye column', async () => {
+    realStackHeader.on = true;
+    await renderTree([
+      layerContract('top', 'raster', {
+        adjustments: [{ id: 'a1', isEnabled: true, saturation: 0.1, type: 'hsl' }],
+        name: 'Top',
+      }),
+      layerContract('mask', 'inpaint_mask', { name: 'Mask' }),
+      groupContract(
+        'mg',
+        [layerContract('nested', 'inpaint_mask', { name: 'Nested', noise: { isEnabled: true, level: 0.25 } })],
+        { name: 'Mask group' }
+      ),
+    ]);
+    await act(() => userEvent.click(treeitem('Mask group').querySelector('button[aria-label="Expand group"]')!));
+    const lefts = (selector: string) =>
+      [...host!.querySelectorAll<HTMLElement>(`[role="tree"] ${selector}`)].map(
+        (element) => element.getBoundingClientRect().left
+      );
+    const rowLefts = (label: string) =>
+      ['top', 'mask', 'mg', 'nested'].flatMap((id) =>
+        lefts(`[data-layer-row-id="${id}"] button[aria-label="${label}"]`)
+      );
+
+    const eyes = rowLefts('Toggle layer active');
+    const locks = rowLefts('Toggle lock');
+    expect(eyes).toHaveLength(4);
+    expect(locks).toHaveLength(4);
+    // The inpaint header's eye, and both headers' New buttons (raster has no eye).
+    expect(lefts('button[aria-label="Hide all on canvas"]')).toEqual([eyes[0]]);
+    expect(lefts('button[aria-label="New layer"]')).toEqual([locks[0], locks[0]]);
+    expect(new Set(eyes).size).toBe(1);
+    expect(new Set(locks).size).toBe(1);
+    // Modifier rows at depth 1 and 2: the same eye, with the lock column held open.
+    for (const name of ['Saturation', 'Noise']) {
+      const eye = treeitem(name).querySelector('button[aria-label="Toggle active"]')!;
+      expect(eye.getBoundingClientRect().left).toBe(eyes[0]);
+      expect(eye.querySelector('svg.lucide-eye')).not.toBeNull();
+    }
   });
 
   it('marks an overlay hidden on the canvas only, and brings it back from the row', async () => {
@@ -921,10 +1024,10 @@ describe('LayersTree projected child rows', () => {
     expect(treeitem('Reference image 2')).not.toBeNull();
   });
 
-  it('toggles the item from the dot and removes it with Delete, leaving siblings alone', async () => {
+  it('toggles the item from its eye and removes it with Delete, leaving siblings alone', async () => {
     await renderTree(regionWithRefs());
-    const dot = treeitem('Reference image 1').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
-    await act(() => userEvent.click(dot));
+    const eye = treeitem('Reference image 1').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(eye));
     expect(output('regional-refs')).toBe('rg[ref1:off,ref2:on]');
     expect(output('selected-layer')).toBe('none');
     treeitem('Reference image 2').focus();
@@ -943,7 +1046,7 @@ describe('LayersTree projected child rows', () => {
     expect(getLayerChildSelection()).toBeNull();
   });
 
-  it('projects mask noise and denoise rows whose dots and Delete edit the modifiers', async () => {
+  it('projects mask noise and denoise rows whose eyes and Delete edit the modifiers', async () => {
     await renderTree([
       layerContract('mask', 'inpaint_mask', {
         denoise: { isEnabled: true, limit: 0.8 },
@@ -953,8 +1056,8 @@ describe('LayersTree projected child rows', () => {
     ]);
     expect(treeitem('Noise')).toHaveAttribute('aria-level', '3');
     expect(treeitem('Denoise limit')).toHaveAttribute('aria-posinset', '2');
-    const dot = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
-    await act(() => userEvent.click(dot));
+    const eye = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(eye));
     expect(output('mask-modifiers')).toBe('noise:off:0.25,denoise:on:0.8');
     treeitem('Denoise limit').focus();
     await act(() => userEvent.keyboard('{Delete}'));
@@ -973,13 +1076,13 @@ describe('LayersTree projected child rows', () => {
         layerContract('mask', 'inpaint_mask', { name: 'Mask', noise: { isEnabled: true, level: 0.5 } }),
       ]),
     };
-    const dot = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
-    await act(() => userEvent.click(dot));
+    const eye = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(eye));
 
     expect(committedEdits.at(-1)!.forward).toMatchObject({ config: { noise: { isEnabled: false, level: 0.5 } } });
   });
 
-  it('projects adjustment rows in stack order; the dot toggles one entry', async () => {
+  it('projects adjustment rows in stack order; the eye toggles one entry', async () => {
     await renderTree([
       layerContract('r1', 'raster', {
         adjustments: [
@@ -994,9 +1097,11 @@ describe('LayersTree projected child rows', () => {
     expect(treeitem('Saturation')).toHaveAttribute('aria-posinset', '2');
     expect(treeitem('Curves')).toHaveAttribute('aria-setsize', '3');
     expect(treeitem('Saturation').textContent).toContain('-40%');
-    const dot = treeitem('Saturation').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
-    await act(() => userEvent.click(dot));
+    const eye = treeitem('Saturation').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(eye));
     expect(output('raster-adjustments')).toBe('a1:on,a2:off,a3:on');
+    expect(eye).toHaveAttribute('aria-pressed', 'false');
+    expect(eye.querySelector('svg.lucide-eye-off')).not.toBeNull();
   });
 
   it('renames an adjustment entry inline with F2 and restores the kind name on an empty draft', async () => {

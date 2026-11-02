@@ -3146,7 +3146,6 @@
       "source:src/workbench/widgets/layers/ControlSourceRow.tsx",
       "source:src/workbench/widgets/layers/ControlTypeRow.tsx",
       "source:src/workbench/widgets/layers/InpaintMaskSettings.tsx",
-      "source:src/workbench/widgets/layers/LayerActiveDot.tsx",
       "source:src/workbench/widgets/layers/LayerBlendRow.tsx",
       "source:src/workbench/widgets/layers/LayerChildMenu.tsx",
       "source:src/workbench/widgets/layers/LayerChildRow.tsx",
