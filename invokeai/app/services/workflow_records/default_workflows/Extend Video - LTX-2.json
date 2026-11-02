@@ -579,7 +579,7 @@
       "type": "invocation",
       "data": {
         "id": "core_metadata",
-        "version": "2.8.0",
+        "version": "2.9.0",
         "nodePack": "invokeai",
         "label": "",
         "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count and steps arrive over edges from the nodes that set them. The frame rate is recorded as 24 and CFG as 3 whatever the source and the Denoise node say: the join delivers the source's own frame rate, and edit this node if you change CFG.",
