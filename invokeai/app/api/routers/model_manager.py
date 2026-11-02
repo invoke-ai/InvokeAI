@@ -238,7 +238,6 @@ example_model_config = {
     "variant": "normal",
     "prediction_type": "epsilon",
     "repo_variant": "fp16",
-    "upcast_attention": False,
 }
 
 example_model_input = {
@@ -635,7 +634,7 @@ def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfi
         },
         400: {"description": "Bad request"},
         404: {"description": "The model could not be found"},
-        409: {"description": "There is already a model corresponding to the new name"},
+        409: {"description": "The change cannot be applied to this model"},
     },
     status_code=200,
 )
