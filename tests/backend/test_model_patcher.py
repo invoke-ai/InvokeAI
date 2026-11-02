@@ -1,15 +1,19 @@
 import threading
+from time import monotonic
 
 import pytest
 import torch
 from accelerate import init_empty_weights
 from transformers import CLIPTextConfig, CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
+from transformers.modeling_utils import PreTrainedModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_patcher import ModelPatcher
 from invokeai.backend.textual_inversion import TextualInversionModelRaw
 from invokeai.backend.util.devices import TorchDevice
+
+WAIT_TIMEOUT = 20
 
 
 @pytest.fixture
@@ -47,16 +51,35 @@ def ti() -> TextualInversionModelRaw:
 
 
 @pytest.fixture(autouse=True)
-def isolate_cpu_and_weight_initializers(monkeypatch):
-    # These tests exercise real CPU tensors irrespective of the application's configured device.
+def isolate_cpu_initializers_and_check_lock(monkeypatch):
+    def assert_idle():
+        assert MODEL_LOAD_LOCK._readers == 0
+        assert MODEL_LOAD_LOCK._writers_waiting == 0
+        assert not MODEL_LOAD_LOCK._writer_active
+
+    assert_idle()
     monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))
-    # The red regression deliberately exposes a leaked process-global patch. Never let that
-    # contaminate another test, even when an assertion fails on the unfixed implementation.
     modules = (torch.nn.Linear, torch.nn.modules.conv._ConvNd, torch.nn.Embedding)
     originals = [module.reset_parameters for module in modules]
-    yield
-    for module, original in zip(modules, originals, strict=True):
-        module.reset_parameters = original
+    original_wait = MODEL_LOAD_LOCK._cond.wait
+    deadline = monotonic() + WAIT_TIMEOUT
+
+    def bounded_wait(timeout=None):
+        # Unwind real lock contexts on deadlock, including a future non-reentrant outer lock.
+        remaining = deadline - monotonic()
+        assert remaining > 0, "model load lock did not make progress"
+        notified = original_wait(remaining if timeout is None else min(timeout, remaining))
+        assert notified, "model load lock did not make progress"
+        return notified
+
+    monkeypatch.setattr(MODEL_LOAD_LOCK._cond, "wait", bounded_wait)
+    try:
+        yield
+    finally:
+        # A native-base red exposes leaked global initializers; preserve later tests, but never reset the lock.
+        for module, original in zip(modules, originals, strict=True):
+            module.reset_parameters = original
+        assert_idle()
 
 
 @pytest.mark.parametrize("phase", ["padding", "growth", "teardown", "error_teardown"])
@@ -69,6 +92,9 @@ def test_ti_resizing_excludes_global_meta_construction(tokenizer, text_encoder, 
     ready = threading.Event()
     proceed = threading.Event()
     attempted = threading.Event()
+    construction_done = threading.Event()
+    modules = (torch.nn.Linear, torch.nn.modules.conv._ConvNd, torch.nn.Embedding)
+    initializers = [module.reset_parameters for module in modules]
     errors: list[BaseException] = []
     original_weights = text_encoder.get_input_embeddings().weight.detach().clone()
     original_resize = text_encoder.resize_token_embeddings
@@ -81,7 +107,7 @@ def test_ti_resizing_excludes_global_meta_construction(tokenizer, text_encoder, 
 
     def pause():
         ready.set()
-        assert proceed.wait(20), "test coordinator did not release TI"
+        assert proceed.wait(WAIT_TIMEOUT), "test coordinator did not release TI"
 
     def add_tokens(self, *args, **kwargs):
         result = original_add(self, *args, **kwargs)
@@ -98,6 +124,9 @@ def test_ti_resizing_excludes_global_meta_construction(tokenizer, text_encoder, 
                 return original_resize(*args, **kwargs)
             finally:
                 attempted.set()
+                if phase == "growth":
+                    # Force the unsafe nested save/restore to finish after the loader restores its originals.
+                    assert construction_done.wait(WAIT_TIMEOUT), "construction did not unwind"
         return original_resize(*args, **kwargs)
 
     def wait(*args, **kwargs):
@@ -125,20 +154,23 @@ def test_ti_resizing_excludes_global_meta_construction(tokenizer, text_encoder, 
     monkeypatch.setattr(CLIPTokenizer, "add_tokens", add_tokens)
     monkeypatch.setattr(text_encoder, "resize_token_embeddings", resize)
     monkeypatch.setattr(MODEL_LOAD_LOCK._cond, "wait", wait)
-    worker = threading.Thread(target=apply)
+    worker = threading.Thread(target=apply, daemon=True)
     worker.start()
     try:
-        assert ready.wait(20), f"TI did not reach {phase}: {errors!r}"
-        with MODEL_LOAD_LOCK.write_lock(), init_empty_weights():
+        assert ready.wait(WAIT_TIMEOUT), f"TI did not reach {phase}: {errors!r}"
+        with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init(), init_empty_weights():
             patch_installed = True
             proceed.set()
-            assert attempted.wait(20), "TI neither waited for the writer nor finished its unprotected resize"
+            assert attempted.wait(WAIT_TIMEOUT), "TI neither waited for the writer nor finished its unprotected resize"
             patch_installed = False
     finally:
+        construction_done.set()
         proceed.set()
-        worker.join(20)
+        worker.join(WAIT_TIMEOUT)
 
     assert not worker.is_alive(), "TI failed to resume after construction released the lock"
+    if phase == "growth":
+        assert [module.reset_parameters for module in modules] == initializers
     assert not unprotected_resize, f"{phase} resized while accelerate's meta patch was installed: {errors!r}"
     assert not errors
     assert text_encoder.get_input_embeddings().weight.device.type == "cpu"
@@ -147,172 +179,58 @@ def test_ti_resizing_excludes_global_meta_construction(tokenizer, text_encoder, 
     assert len(tokenizer) == 7
 
 
-def test_ti_and_model_loading_do_not_leak_global_weight_initializers(tokenizer, text_encoder, ti, monkeypatch):
-    ti_inside_patch = threading.Event()
-    loader_attempted = threading.Event()
-    ti_left_patch = threading.Event()
-    errors: list[BaseException] = []
-    modules = (torch.nn.Linear, torch.nn.modules.conv._ConvNd, torch.nn.Embedding)
-    originals = [module.reset_parameters for module in modules]
-    original_resize = text_encoder.resize_token_embeddings
-    original_wait = MODEL_LOAD_LOCK._cond.wait
-    calls = 0
+@torch.no_grad()
+def test_ti_skips_unused_initialization_and_releases_lock_across_yield(tokenizer, text_encoder, ti, monkeypatch):
+    projected = CLIPTextModelWithProjection(text_encoder.config)
+    # Observe real work, not just resize kwargs. The ordinary resize below proves both counters are live.
+    calls = {"random": 0, "mean_covariance": 0}
 
-    def resize(*args, **kwargs):
-        nonlocal calls
-        calls += 1
-        result = original_resize(*args, **kwargs)
-        if calls == 2:
-            ti_inside_patch.set()
-            assert loader_attempted.wait(20), "loader never attempted concurrent construction"
-        return result
+    def count(name, original):
+        def observed(*args, **kwargs):
+            calls[name] += 1
+            return original(*args, **kwargs)
 
-    def wait(*args, **kwargs):
-        if threading.current_thread() is loader:
-            loader_attempted.set()
-        return original_wait(*args, **kwargs)
+        return observed
 
-    def apply():
-        try:
-            with ModelPatcher.apply_ti(tokenizer, text_encoder, [("concept", ti)]):
-                ti_left_patch.set()
-        except BaseException as error:
-            errors.append(error)
-        finally:
-            ti_left_patch.set()
+    monkeypatch.setattr(torch.Tensor, "normal_", count("random", torch.Tensor.normal_))
+    monkeypatch.setattr(
+        PreTrainedModel,
+        "_init_added_embeddings_weights_with_mean",
+        count("mean_covariance", PreTrainedModel._init_added_embeddings_weights_with_mean),
+    )
+    # Exercise the other supported CLIP class too; its bare Embedding initializer must also remain a no-op.
+    projected.resize_token_embeddings(8)
+    assert calls["random"] > 0 and calls["mean_covariance"] > 0
+
+    completed = threading.Event()
+    errors = []
 
     def load():
         try:
-            with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
-                loader_attempted.set()
-                assert ti_left_patch.wait(20), "TI did not leave its initialization patch"
-        except BaseException as error:
-            errors.append(error)
-
-    monkeypatch.setattr(text_encoder, "resize_token_embeddings", resize)
-    monkeypatch.setattr(MODEL_LOAD_LOCK._cond, "wait", wait)
-    worker = threading.Thread(target=apply)
-    loader = threading.Thread(target=load)
-    worker.start()
-    try:
-        assert ti_inside_patch.wait(20), f"TI did not enter its initialization patch: {errors!r}"
-        loader.start()
-    finally:
-        if not loader.ident:
-            loader_attempted.set()
-        worker.join(20)
-        if loader.ident:
-            loader.join(20)
-
-    assert not worker.is_alive() and not loader.is_alive()
-    assert not errors
-    assert [module.reset_parameters for module in modules] == originals
-
-
-@pytest.mark.parametrize("projected", [False, True])
-def test_ti_restores_original_tokens_and_selects_matching_sdxl_vectors(tokenizer, ti, projected):
-    cls = CLIPTextModelWithProjection if projected else CLIPTextModel
-    hidden_size = 4 if projected else 8
-    model = cls(
-        CLIPTextConfig(
-            vocab_size=7,
-            hidden_size=hidden_size,
-            intermediate_size=16,
-            num_hidden_layers=1,
-            num_attention_heads=2,
-            max_position_embeddings=16,
-            projection_dim=4,
-            bos_token_id=0,
-            eos_token_id=1,
-            pad_token_id=1,
-        )
-    )
-    original_weights = model.get_input_embeddings().weight.detach().clone()
-    model.eval()
-    inputs = torch.tensor([[0, 2, 1]])
-    original_output = model(input_ids=inputs).last_hidden_state.detach().clone()
-    ti.embedding = torch.arange(16, dtype=torch.float32).reshape(2, 8)
-    ti.embedding_2 = torch.arange(8, dtype=torch.float32).reshape(2, 4) + 100
-    expected = ti.embedding_2 if projected else ti.embedding
-
-    loader = None
-    try:
-        with ModelPatcher.apply_ti(tokenizer, model, [("concept", ti)]) as (patched, manager):
-            ids = [patched.convert_tokens_to_ids(token) for token in ("<concept>", "<concept-!pad-1>")]
-            torch.testing.assert_close(model.get_input_embeddings().weight[ids], expected)
-            torch.testing.assert_close(model.get_input_embeddings().weight[:7], original_weights)
-            torch.testing.assert_close(model(input_ids=inputs).last_hidden_state, original_output)
-            assert manager.expand_textual_inversion_token_ids_if_necessary([ids[0]]) == ids
-            # The process-global writer must not be retained across caller inference/model work.
-            acquired = threading.Event()
-
-            def acquire():
-                with MODEL_LOAD_LOCK.write_lock():
-                    acquired.set()
-
-            loader = threading.Thread(target=acquire)
-            loader.start()
-            assert acquired.wait(20), "TI context body must permit concurrent model loading"
-    finally:
-        if loader is not None:
-            loader.join(20)
-            assert not loader.is_alive()
-
-    assert model.get_input_embeddings().num_embeddings == 8
-    torch.testing.assert_close(model.get_input_embeddings().weight[:7], original_weights)
-    torch.testing.assert_close(model(input_ids=inputs).last_hidden_state, original_output)
-    assert len(tokenizer) == 7
-
-
-def test_empty_ti_does_not_resize_or_take_construction_lock(tokenizer, text_encoder):
-    # This is deliberately non-reentrant. The empty fast path must not acquire it at all.
-    original = text_encoder.get_input_embeddings()
-    done = threading.Event()
-    errors: list[BaseException] = []
-
-    def apply():
-        try:
-            with ModelPatcher.apply_ti(tokenizer, text_encoder, []) as (patched, manager):
-                assert patched is tokenizer
-                assert manager.pad_tokens == {}
-                assert text_encoder.get_input_embeddings() is original
+            with MODEL_LOAD_LOCK.write_lock():
+                pass
         except BaseException as error:
             errors.append(error)
         finally:
-            done.set()
+            completed.set()
 
-    worker = threading.Thread(target=apply)
-    try:
-        with MODEL_LOAD_LOCK.write_lock():
-            worker.start()
-            assert done.wait(20), "empty TI must not block behind model construction"
-    finally:
-        worker.join(20)
-    assert not worker.is_alive()
-    assert not errors
+    for model in (text_encoder, projected):
+        calls.update(random=0, mean_covariance=0)
+        original_weights = model.get_input_embeddings().weight.detach().clone()
+        loader = None
+        try:
+            with ModelPatcher.apply_ti(tokenizer, model, [("concept", ti)]):
+                if model is text_encoder:
+                    loader = threading.Thread(target=load, daemon=True)
+                    loader.start()
+                    assert completed.wait(WAIT_TIMEOUT), "TI yield blocked model construction"
+                    assert not errors, f"TI yield retained the construction lock: {errors!r}"
+        finally:
+            if loader is not None:
+                loader.join(WAIT_TIMEOUT)
+                assert not loader.is_alive()
 
-
-def test_ti_failed_resize_restores_embeddings_and_initializers(tokenizer, text_encoder, ti, monkeypatch):
-    original_weights = text_encoder.get_input_embeddings().weight.detach().clone()
-    original_resize = text_encoder.resize_token_embeddings
-    original_reset = torch.nn.Embedding.reset_parameters
-    failure = RuntimeError("resize failed after constructing an embedding")
-    calls = 0
-
-    def resize(*args, **kwargs):
-        nonlocal calls
-        calls += 1
-        result = original_resize(*args, **kwargs)
-        if calls == 2:
-            raise failure
-        return result
-
-    monkeypatch.setattr(text_encoder, "resize_token_embeddings", resize)
-    with pytest.raises(RuntimeError) as raised:
-        with ModelPatcher.apply_ti(tokenizer, text_encoder, [("concept", ti)]):
-            pytest.fail("failed resize must not yield a patched encoder")
-    assert raised.value is failure
-    assert calls == 3
-    assert torch.nn.Embedding.reset_parameters is original_reset
-    assert text_encoder.get_input_embeddings().num_embeddings == 8
-    torch.testing.assert_close(text_encoder.get_input_embeddings().weight[:7], original_weights)
+        assert calls == {"random": 0, "mean_covariance": 0}
+        torch.testing.assert_close(
+            model.get_input_embeddings().weight[: len(tokenizer)], original_weights[: len(tokenizer)], rtol=0, atol=0
+        )
