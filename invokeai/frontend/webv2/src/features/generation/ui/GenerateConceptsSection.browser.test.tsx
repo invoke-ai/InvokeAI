@@ -1,3 +1,4 @@
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop */
 import type {
   GenerateLora,
   GenerateModelConfig,
@@ -18,6 +19,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { GenerateConceptsContent } from './GenerateConceptsSection';
 import { GenerationUiProvider, type GenerationUiAdapter } from './GenerationUiContext';
+import { GenerateIssuesProvider } from './shared/GenerateIssues';
 
 vi.mock('react-i18next', () => {
   const t = (key: string) => key;
@@ -217,5 +219,54 @@ describe('GenerateConceptsContent', () => {
     });
 
     expect(row.textContent).toContain('widgets.generate.incompatible');
+  });
+});
+
+describe('a concept that is not installed', () => {
+  it('reads as blocked: its saved state, a locked switch, an error badge, and the issue with its Remove fix', async () => {
+    const missing: LoraModelConfig = { base: 'sdxl', key: 'gone', name: 'Gone', type: 'lora' };
+    const applyFix = vi.fn();
+    const issue = {
+      fix: { kind: 'removeConcept' as const, modelKey: missing.key },
+      id: `concepts:notInstalled:${missing.key}`,
+      message: 'Concept "Gone" is not installed. Remove it, or reinstall it.',
+      messageKey: 'widgets.generate.issues.conceptNotInstalled',
+      target: { field: 'concepts' as const, section: 'guidance' as const },
+    };
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <GenerationUiProvider
+            adapter={{ models: { ...ADAPTER.models, status: 'loaded' } } as unknown as GenerationUiAdapter}
+          >
+            <GenerateIssuesProvider applyFix={applyFix} issues={[issue]}>
+              <GenerateConceptsContent
+                loraModels={LORA_MODELS}
+                loras={[LORA, { isEnabled: true, model: missing, weight: 0.5 }]}
+                projectId="project-1"
+                selectedModel={MAIN_MODEL}
+                onCommit={vi.fn()}
+              />
+            </GenerateIssuesProvider>
+          </GenerationUiProvider>
+        </ChakraProvider>
+      )
+    );
+    const missingRow = host.querySelector('[role="group"][aria-label="Gone"]')!.closest('[role="listitem"]')!;
+    const installedRow = host.querySelector('[role="group"][aria-label="Ink Wash"]')!.closest('[role="listitem"]')!;
+    const toggle = missingRow.querySelector<HTMLElement>('[role="switch"], input[type="checkbox"]')!;
+
+    expect(missingRow.textContent).toContain('widgets.generate.notInstalled');
+    expect(toggle.matches(':checked') || toggle.getAttribute('aria-checked') === 'true').toBe(true);
+    expect(toggle.matches(':disabled') || toggle.getAttribute('aria-disabled') === 'true').toBe(true);
+    expect(missingRow.textContent).toContain('widgets.generate.issues.conceptNotInstalled');
+    expect(installedRow.querySelector('[data-issue-fix]')).toBeNull();
+
+    await act(() => missingRow.querySelector<HTMLButtonElement>('[data-issue-fix]')!.click());
+
+    expect(applyFix).toHaveBeenCalledExactlyOnceWith(issue.fix);
   });
 });

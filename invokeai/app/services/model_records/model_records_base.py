@@ -24,6 +24,7 @@ from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ClipVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     FluxVariantType,
     Krea2VariantType,
     LTX2VariantType,
@@ -137,6 +138,7 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | ClipVariantType
         | FluxVariantType
         | Flux2VariantType
+        | Flux3VariantType
         | ZImageVariantType
         | QwenImageVariantType
         | WanVariantType

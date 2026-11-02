@@ -31,7 +31,6 @@ const baseOptions = {
   clientX: 240,
   clientY: 160,
   isInlineEditor: false,
-  isInteractionLocked: false,
 };
 
 describe('resolveCanvasContextMenu', () => {
@@ -40,15 +39,6 @@ describe('resolveCanvasContextMenu', () => {
       preventDefault: false,
       target: null,
     });
-  });
-
-  it('opens the global menu while interaction is locked, ignoring the selected layer', () => {
-    expect(resolveCanvasContextMenu({ ...baseOptions, isInteractionLocked: true, selectedLayerId: 'layer-1' })).toEqual(
-      {
-        preventDefault: true,
-        target: { layerId: null, x: 240, y: 160 },
-      }
-    );
   });
 
   it('opens the layer menu at the pointer for the SELECTED layer', () => {

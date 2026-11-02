@@ -294,7 +294,7 @@ describe('blend mode preview', () => {
     expect(getDocumentLayer(stub.document(), 'r1')).toBeNull();
     await stub.engine.history.undo();
     expect(layer('r1').blendMode).toBe('normal');
-    expect(stub.history.entries()).toEqual({ future: ['Delete'], past: [] });
+    expect(stub.history.entries()).toEqual({ evicted: 0, future: ['Delete'], past: [] });
   });
 });
 

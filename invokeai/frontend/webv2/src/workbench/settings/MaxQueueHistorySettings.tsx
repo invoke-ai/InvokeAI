@@ -1,3 +1,4 @@
+import type { SettingLayer } from '@platform/ui/settings/contracts';
 import type { ChangeEvent, FormEvent } from 'react';
 
 import { HStack, Input, Spinner, Stack, Text } from '@chakra-ui/react';
@@ -5,11 +6,13 @@ import { useCapabilities } from '@features/identity';
 import { refreshGenerationDevices, updateMaxQueueHistory, useGenerationDevices } from '@features/queue/devices';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LIMIT_PATTERN = /^\d+$/;
+/** A limit is set: changed from the built-in (keep everything). The field itself clears it. */
+const CHANGED_LAYER: SettingLayer = { state: 'default' };
 
 /** Blank keeps every finished item; 0 prunes all of them; a count keeps the newest N. */
 const parseLimit = (text: string): number | null | 'invalid' => {
@@ -144,7 +147,7 @@ export const MaxQueueHistorySettings = () => {
           {t('common.save')}
         </Button>
         {typeof maxQueueHistory === 'number' ? (
-          <ModifiedSettingIndicator label={t('settings.maxQueueHistory.modified')} />
+          <SettingLayerIndicator label={t('settings.maxQueueHistory.modified')} layer={CHANGED_LAYER} />
         ) : null}
       </HStack>
       {parsed === 'invalid' ? (

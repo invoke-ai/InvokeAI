@@ -154,7 +154,10 @@ describe('ScrubberField', () => {
     host?.remove();
 
     const empty = await mount({ value: 0 });
-    expect(part(empty.frame, 'fill').right).toBeGreaterThan(part(empty.frame, 'thumb').right);
+    const emptyClearance = part(empty.frame, 'fill').right - part(empty.frame, 'thumb').right;
+    // The fill's rounded end wraps the thumb but stays close to it.
+    expect(emptyClearance).toBeGreaterThan(0);
+    expect(emptyClearance).toBeLessThanOrEqual(3.5);
   });
 
   it('scrubs relative to the current value from wherever the press lands, snapped to the step', async () => {

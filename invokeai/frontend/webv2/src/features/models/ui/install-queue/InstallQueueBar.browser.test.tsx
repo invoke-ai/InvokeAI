@@ -15,7 +15,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { InstallQueueBar } from './InstallQueueBar';
 
@@ -465,7 +465,12 @@ describe('InstallQueueBar', () => {
     updateModelsUi({ queueExpanded: true, queueMaximized: false });
     let resolvePrune!: (jobIds: number[]) => void;
     const afterPrune = [{ ...JOBS[0]!, status: 'completed' as const }, JOBS[1]!];
-    api.listModelInstalls.mockReset().mockResolvedValueOnce(JOBS).mockResolvedValueOnce(afterPrune);
+    // The completion event also schedules a coalesced refresh, which lands within this test on a slow machine.
+    api.listModelInstalls
+      .mockReset()
+      .mockResolvedValue(afterPrune)
+      .mockResolvedValueOnce(JOBS)
+      .mockResolvedValueOnce(afterPrune);
     api.pruneCompletedModelInstalls.mockReturnValue(
       new Promise<number[]>((resolve) => {
         resolvePrune = resolve;
@@ -579,6 +584,48 @@ describe('InstallQueueBar', () => {
     expect(api.listModelInstalls).toHaveBeenCalledTimes(2);
     expect(rowByStatus('downloading')).toBeUndefined();
     expect(rows()).toHaveLength(JOBS.length - 1);
+  });
+
+  it('stops with a stop icon, removes with an X, and asks before discarding a download that has progress', async () => {
+    updateModelsUi({ queueExpanded: true, queueMaximized: false });
+    api.listModelInstalls.mockResolvedValue(JOBS.map((job) => (job.id === 1 ? { ...job, bytes: 2_000_000_000 } : job)));
+    await render();
+
+    const cancel = rowByStatus('downloading')?.querySelector('button[aria-label="Cancel install"] svg');
+    const remove = rowByStatus('cancelled')?.querySelector('button[aria-label="Remove from list"] svg');
+    // Stopping work and tidying the list must not look alike.
+    expect(cancel?.innerHTML).toBeTruthy();
+    expect(cancel?.innerHTML).not.toBe(remove?.innerHTML);
+
+    await click('Cancel install', rowByStatus('downloading'));
+    await expect
+      .poll(() => document.querySelector('[role="alertdialog"]')?.textContent ?? '')
+      .toContain('has downloaded 2.0 GB of 7.0 GB');
+    await click('Keep downloading', document.body);
+    await settle();
+    expect(api.cancelModelInstall).not.toHaveBeenCalled();
+
+    await click('Cancel install', rowByStatus('downloading'));
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).not.toBeNull();
+    await click('Cancel download', document.querySelector('[role="alertdialog"]')!);
+    await settle();
+    expect(api.cancelModelInstall).toHaveBeenCalledWith(1, expect.any(AbortSignal));
+  });
+
+  it('confirms Cancel all with the number of installs it stops, and stops exactly those', async () => {
+    updateModelsUi({ queueExpanded: true, queueMaximized: false });
+    await render();
+
+    await click('More queue actions');
+    await userEvent.click(page.getByRole('menuitem', { exact: true, name: 'Cancel all…' }));
+    await expect
+      .poll(() => document.querySelector('[role="alertdialog"]')?.textContent ?? '')
+      .toContain('Cancel 2 installs?');
+    expect(api.cancelModelInstall).not.toHaveBeenCalled();
+
+    await click('Cancel 2 installs', document.querySelector('[role="alertdialog"]')!);
+    await settle();
+    expect(api.cancelModelInstall.mock.calls.map(([id]) => id).sort()).toEqual([1, 2]);
   });
 
   it('refreshes after a 409 resume response that may have changed backend status', async () => {

@@ -287,23 +287,12 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         step_callback = self._build_step_callback(context)
 
-        step_callback(
-            PipelineIntermediateState(
-                step=0,
-                order=1,
-                total_steps=total_steps,
-                timestep=int(timesteps[0]),
-                latents=latents,
-            ),
-        )
-
         # Loaded before the lock, so a LoRA that does not fit fails before the transformer moves, and the
         # reservation below can be sized from the patches.
         lora_patch_specs = self._materialize_lora_patches(context)
         self._raise_unless_loras_fit(context, transformer_info.model, lora_patch_specs)
-        transformer_config = context.models.get_config(self.transformer.transformer)
         force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
-            transformer_info.model, transformer_config.format
+            transformer_info.model, context.models.get_config(self.transformer.transformer).format
         )
         # The patcher also picks the sidecar on its own for fp8 weights (FP8 Storage), which cannot be added to.
         lora_on_device = force_sidecar or (
@@ -334,6 +323,17 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                         force_sidecar_patching=force_sidecar,
                     )
                 )
+
+            # Inside the lock: a Tiny AutoEncoder preview loads its TAE only if it fits next to the locked model.
+            step_callback(
+                PipelineIntermediateState(
+                    step=0,
+                    order=1,
+                    total_steps=total_steps,
+                    timestep=int(timesteps[0]),
+                    latents=latents,
+                ),
+            )
 
             # 6. Denoising loop
             for step_idx, (t_curr, t_prev) in tqdm(
@@ -401,6 +401,8 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         Medium and Large name the same modules at different widths, so the patcher would only log and skip every
         layer; and a LoRA for SD 3.5 Medium's dual attention (`attn2`) targets modules SD 3 Medium lacks.
         """
+        if not patch_specs:
+            return
         width = int(transformer.config.num_attention_heads) * int(transformer.config.attention_head_dim)
         model_variant = sd3_variant_from_width(width)
         for lora, spec in zip(self.transformer.loras, patch_specs, strict=True):

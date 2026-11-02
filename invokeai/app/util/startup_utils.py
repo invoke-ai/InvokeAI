@@ -10,6 +10,7 @@ from pathlib import Path
 import torch
 
 from invokeai.app.services.config.config_default import ATTENTION_BACKEND
+from invokeai.backend.util.sdpa_scope import SDPA_KERNELS, describe_sdpa_priority_order, install_default_sdpa_priority
 
 
 def find_open_port(port: int) -> int:
@@ -167,29 +168,31 @@ def probe_attention_backends(device: torch.device) -> dict[str, bool] | None:
         return None
 
 
-# Devices already reported. The line answers a support question ("which kernels does this build
-# have?"), so it is worth exactly once per device per process and nothing after that.
-_logged_attention_backends: set[str] = set()
+# Devices already probed, whatever the outcome. The line answers a support question ("which kernels
+# does this build have?"), so it is worth exactly once per device per process and nothing after that --
+# and a probe that failed must not allocate and flush the allocator again on every later item.
+_probed_attention_devices: set[str] = set()
 
 
 def log_attention_backends(logger: logging.Logger, device: torch.device) -> None:
-    """Log this device's SDPA backend availability, once per device.
+    """Log this device's SDPA backend availability and the priority order torch picks by, once per device.
 
     The point is support: a question about attention performance can then be answered by reading a
     log line instead of asking the user to run a probe script. Call it from a generation path rather
     than from startup -- `probe_attention_backends` explains why.
     """
     key = str(device)
-    if key in _logged_attention_backends:
+    if key in _probed_attention_devices:
         return
+    _probed_attention_devices.add(key)
     available = probe_attention_backends(device)
     if available is None:
         return
-    _logged_attention_backends.add(key)
     summary = " ".join(f"{name}={'yes' if ok else 'no'}" for name, ok in available.items())
     logger.info(
         f"SDPA attention backends on {device} "
-        f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}"
+        f"(fp16, {_PROBE_HEADS} heads, seq {_PROBE_SEQ_LEN}, head_dim {_PROBE_HEAD_DIM}, no mask): {summary}; "
+        f"priority {describe_sdpa_priority_order()}"
     )
 
 
@@ -240,6 +243,22 @@ def apply_monkeypatches(attention_backend: ATTENTION_BACKEND = "auto") -> None:
     from invokeai.backend.util.attention import install_rocm_sdpa_guard
 
     install_rocm_sdpa_guard()
+
+    # Rank torch's exact SDPA kernels flash, cuDNN, memory-efficient, math for every model in the process, with a
+    # pinned kernel ahead of them. The calls SageAttention does not serve use this order too.
+    pinned = SDPA_KERNELS.get(attention_backend)
+    if install_default_sdpa_priority(pinned) and pinned is not None:
+        # A pinned kernel is never exclusive: log the attention it does not serve. Outside the ROCm guard, so it sees
+        # the heads the guard sends to math; inside the cuDNN fallback, so a retry is reported on its kernel.
+        from invokeai.backend.util.attention import install_pinned_sdpa_kernel_report
+
+        install_pinned_sdpa_kernel_report(pinned)
+
+    # cuDNN's eligibility is checked statically, so a cuDNN attention call can still fail at run time. Demote cuDNN
+    # and retry instead of failing the generation. Before SageAttention, so its own fallback calls are covered too.
+    from invokeai.backend.util.attention import install_cudnn_sdpa_fallback
+
+    install_cudnn_sdpa_fallback()
 
     # Opt-in SageAttention for diffusion-model attention. Installs nothing unless asked for, and never on ROCm.
     if attention_backend == "sage":

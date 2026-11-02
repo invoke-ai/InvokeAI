@@ -1,9 +1,9 @@
 ---
 title: Z-Image
-description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4 and SDNQ builds, ControlNets and regional prompting.
-lastUpdated: 2026-09-30
+description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4, int8 and SDNQ builds, ControlNets and regional prompting.
+lastUpdated: 2026-11-01
 sidebar:
-  order: 12
+  order: 13
 ---
 
 Z-Image is a 6B-parameter text-to-image family from Tongyi-MAI that understands both English and Chinese
@@ -59,12 +59,16 @@ The starter models:
 | Z-Image Turbo (quantized)          | GGUF Q4_K                   | ~4 GB   | Qwen3 encoder (GGUF Q6_K, ~3.3 GB) + FLUX VAE  |
 | Z-Image Turbo (Q8)                 | GGUF Q8_0                   | ~6.6 GB | Qwen3 encoder (GGUF Q6_K) + FLUX VAE           |
 | Z-Image Turbo (NVFP4)              | Comfy-Org nvfp4 single file | ~4.5 GB | Qwen3 encoder (FP4 mixed, ~3.5 GB) + FLUX VAE  |
+| Z-Image Turbo (int8)               | Comfy-Org int8 single file  | ~6.2 GB | Qwen3 encoder (FP4 mixed, ~3.5 GB) + FLUX VAE  |
 | Z-Image Turbo (SDNQ uint4 + SVD)   | SDNQ Diffusers pipeline     | ~5 GB   | nothing, everything is bundled                 |
 
-A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) is also available as a separate starter.
+A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) and its community **int8** build (~4.4 GB download,
+about 4.4 GB once loaded) are also available as separate starters.
 
 The NVFP4 build keeps its quantized layers packed in memory and decodes them on the fly, so it needs about
-a third of the full-precision transformer's memory.
+a third of the full-precision transformer's memory. The int8 build keeps its int8 layers as well, about 6.2 GB
+once loaded on every supported GPU, and [int8 Compute](/configuration/optimization/int8-compute/) can run
+them on NVIDIA int8 tensor cores.
 
 ### Choosing components
 
@@ -110,9 +114,18 @@ Two Z-Image ControlNets are available as starters (both are part of the bundle):
 - **Z-Image ControlNet Tile** is useful for upscaling and adding detail. The **Upscale** tool can use it as an
   optional anchor; see [Upscaling](/users-guide/image-generation/upscale/).
 
+Every Z-Image Turbo Fun-ControlNet alibaba-pai has published can be installed from its `.safetensors` file:
+the first Union release, Union 2.0, the Union and Tile 2.1 builds (8-step, 2601 and 2602 included) and the 2.1
+Lite builds. Invoke tells them apart by their weights. Invoke does not inpaint through a Z-Image ControlNet:
+a control layer takes a control image only.
+
 On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
 ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the
 recommended range. **Only one** Z-Image control layer can be used per generation.
+
+Earlier Invoke versions placed the hints of the Lite and first Union builds after the wrong layers, and left
+out the refiner hints of 2.0 and 2.1 (2.0 also refined its control through the wrong blocks). Applied as they were trained, these ControlNets now follow the control image
+more strongly at the same weight; lower the weight if a control image constrains the result too much.
 
 In the workflow editor, the same thing is the **Z-Image ControlNet** node feeding the **Control** input of
 **Denoise - Z-Image**. That node also needs the **VAE** input connected, which it uses to encode the
@@ -120,8 +133,9 @@ control image.
 
 ## Regional prompting
 
-Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts. Regional negative
-prompts, auto-negative and regional reference images are not supported for Z-Image.
+Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts, together with a
+control layer if you like. Regional negative prompts, auto-negative and regional reference images are not
+supported for Z-Image.
 
 In the workflow editor, **Prompt - Z-Image** takes an optional mask, and **Denoise - Z-Image** accepts
 either one conditioning or a collection of them.

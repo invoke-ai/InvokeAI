@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { classifyStoredCredential, readTokenUserId } from './storedCredential';
+import { classifyStoredCredential, readTokenExpiry, readTokenUserId } from './storedCredential';
 
 /** JWT segments are base64url-encoded UTF-8 JSON. */
 const encodeSegment = (value: unknown): string =>
@@ -36,5 +36,12 @@ describe('stored credential classification', () => {
     // Without an active principal there is nothing to renew: a signed-out tab follows a sign-in.
     expect(classifyStoredCredential(renewed, null, null)).toBe('principal-changed');
     expect(classifyStoredCredential(renewed, 'held', null)).toBe('principal-changed');
+  });
+
+  it('reads the expiry claim in milliseconds, and nothing from tokens without a numeric one', () => {
+    expect(readTokenExpiry(tokenFor({ exp: 1_800_000_000, user_id: 'user-a' }))).toBe(1_800_000_000_000);
+    expect(readTokenExpiry(tokenFor({ user_id: 'user-a' }))).toBeNull();
+    expect(readTokenExpiry(tokenFor({ exp: '1800000000' }))).toBeNull();
+    expect(readTokenExpiry('opaque-token')).toBeNull();
   });
 });

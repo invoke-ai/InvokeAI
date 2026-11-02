@@ -10,6 +10,8 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
+import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
+import { getResolvedProjectWidgetValues, resolveWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
@@ -17,7 +19,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { settingsDialogResource } from './dialogResource';
 import { SettingsDialogHost } from './SettingsDialogHost';
@@ -40,6 +42,20 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
     const store = storeRef.current!;
     return useExternalStoreSelector(store.subscribe, store.getSnapshot, selector);
   },
+  useWidgetInstanceValuesSelector: (instanceId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    const store = storeRef.current!;
+    return useExternalStoreSelector(store.subscribe, store.getSnapshot, (snapshot) =>
+      selector(resolveWidgetValues(snapshot.activeProject.widgetInstances[instanceId], snapshot.scopedDefaults))
+    );
+  },
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    const store = storeRef.current!;
+    return useExternalStoreSelector(store.subscribe, store.getSnapshot, (snapshot) =>
+      selector(getResolvedProjectWidgetValues(snapshot.activeProject, widgetId, snapshot.scopedDefaults))
+    );
+  },
+  useOptionalWorkbenchCommands: () => storeRef.current!.commands,
+  useOptionalWorkbenchQueries: () => storeRef.current!.queries,
   useWorkbenchCommands: () => storeRef.current!.commands,
   useWorkbenchQueries: () => storeRef.current!.queries,
   useWorkbenchSubscription: () => storeRef.current!.subscribe,
@@ -61,15 +77,16 @@ let widgetProps: WidgetViewProps;
 beforeEach(async () => {
   accountLifecycle.activate('settings-target-test');
   await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
-  await Promise.all([settingsDialogResource.load(), import('./WidgetQuickSettings')]);
+  await settingsDialogResource.load();
   const state = createInitialWorkbenchState();
   const project = state.projects[0]!;
+  // Pins live on the project's Canvas; the other Canvas only targets the cog, which edits those same pins.
   const canvas = project.widgetInstances.canvas!;
-  project.widgetInstances['canvas-copy'] = {
+  project.widgetInstances.canvas = {
     ...canvas,
-    id: 'canvas-copy',
     state: { ...canvas.state, values: { ...canvas.state.values, showGrid: true } },
   };
+  project.widgetInstances['canvas-copy'] = { ...canvas, id: 'canvas-copy' };
   storeRef.current = createWorkbenchStore(state);
   widgetProps = {
     instance: { ...project.widgetInstances['canvas-copy']!, title: 'Other Canvas' },
@@ -102,6 +119,11 @@ it('edits another widget through global search while retaining the originating C
     )
   );
   await act(() => page.getByRole('button', { name: 'Canvas settings', exact: true }).click());
+  // The quick settings suspend on first open and then push the dialog button down. A click that starts on the button
+  // during the fallback releases over a settings row instead, so it never activates the button.
+  await expect
+    .element(page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true }))
+    .toBeVisible();
   await act(() =>
     page
       .getByRole('button', { name: i18n.t('settingsDialog.allWidgetSettings', { widget: 'Canvas' }), exact: true })
@@ -125,9 +147,95 @@ it('edits another widget through global search while retaining the originating C
   const grid = page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true });
   await expect.element(grid).toBeChecked();
   await act(() => page.getByText(i18n.t('widgets.canvas.settings.grid'), { exact: true }).click());
-  await expect
-    .poll(() => store.getSnapshot().activeProject.widgetInstances['canvas-copy']!.state.values.showGrid)
-    .toBe(false);
-  expect(store.getSnapshot().activeProject.widgetInstances.canvas).toBe(before.widgetInstances.canvas);
+  await expect.poll(() => store.getSnapshot().activeProject.widgetInstances.canvas!.state.values.showGrid).toBe(false);
+  expect(store.getSnapshot().activeProject.widgetInstances['canvas-copy']).toBe(before.widgetInstances['canvas-copy']);
   expect(settingsDialogStore.getSnapshot().target).toEqual({ projectId: before.id, instanceId: 'canvas-copy' });
+});
+
+it('opens the pinned-setting menu from the gear popover and keeps focus inside the popover', async () => {
+  const store = storeRef.current!;
+  await act(() =>
+    root.render(
+      <ChakraProvider value={system}>
+        <I18nextProvider i18n={i18n}>
+          <WidgetSettingsButton {...widgetProps} />
+        </I18nextProvider>
+      </ChakraProvider>
+    )
+  );
+  await act(() => page.getByRole('button', { name: 'Canvas settings', exact: true }).click());
+  const popoverContent = () => document.querySelector('[data-scope="popover"][data-part="content"]');
+  const grid = page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid'), exact: true });
+  await expect.element(grid).toBeChecked();
+  // The project's Canvas pins its grid, which the other Canvas's cog shows; only that row carries the dot.
+  const dot = page.getByRole('button', {
+    name: i18n.t('settingsDialog.layer.pinnedNamed', { setting: i18n.t('widgets.canvas.settings.grid') }),
+    exact: true,
+  });
+  await expect.element(dot).toBeVisible();
+  expect(dot.elements()).toHaveLength(1);
+
+  await act(() => dot.click());
+  const follow = page.getByRole('menuitem', { name: /Follow my default/ });
+  await expect.element(follow).toBeVisible();
+  await expect.element(page.getByText('Invoke default: Off', { exact: true })).toBeVisible();
+  await userEvent.keyboard('{Escape}');
+  await expect.element(follow).not.toBeInTheDocument();
+  await expect.poll(() => popoverContent()?.contains(document.activeElement)).toBe(true);
+  await expect.poll(() => document.activeElement).toBe(dot.element());
+
+  await act(() => dot.click());
+  await act(() => page.getByRole('menuitem', { name: /Follow my default/ }).click());
+  await expect
+    .poll(() => Object.hasOwn(store.getSnapshot().activeProject.widgetInstances.canvas!.state.values, 'showGrid'))
+    .toBe(false);
+  await expect.element(grid).not.toBeChecked();
+  await expect.poll(() => popoverContent()?.contains(document.activeElement)).toBe(true);
+  await expect.poll(() => document.activeElement).toBe(grid.element());
+});
+
+it("shows the project's generation flags behind the Generate cog, and pins and follows them there", async () => {
+  const store = storeRef.current!;
+  const project = store.getSnapshot().activeProject;
+  const generate = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'generate')!;
+  await act(() =>
+    root.render(
+      <ChakraProvider value={system}>
+        <I18nextProvider i18n={i18n}>
+          <WidgetSettingsButton
+            {...widgetProps}
+            instance={{ ...generate, title: 'Generate' }}
+            manifest={generateWidgetManifest}
+          />
+        </I18nextProvider>
+      </ChakraProvider>
+    )
+  );
+  await act(() => page.getByRole('button', { name: 'Generate settings', exact: true }).click());
+  for (const id of ['useCpuNoise', 'useNsfwChecker', 'useWatermark']) {
+    await expect
+      .element(page.getByRole('checkbox', { name: i18n.t(`settings.catalog.${id}.label`), exact: true }))
+      .toBeVisible();
+  }
+
+  await act(() => page.getByText(i18n.t('settings.catalog.useNsfwChecker.label'), { exact: true }).click());
+  // A project setting, not a value of the Generate widget.
+  await expect.poll(() => store.getSnapshot().activeProject.settings.useNsfwChecker).toBe(true);
+  expect(store.getSnapshot().activeProject.widgetInstances[generate.id]!.state.values).not.toHaveProperty(
+    'useNsfwChecker'
+  );
+
+  await act(() =>
+    page
+      .getByRole('button', {
+        name: i18n.t('settingsDialog.layer.pinnedNamed', { setting: i18n.t('settings.catalog.useNsfwChecker.label') }),
+        exact: true,
+      })
+      .click()
+  );
+  await act(() => page.getByRole('menuitem', { name: 'Follow my default', exact: true }).click());
+  await expect.poll(() => Object.hasOwn(store.getSnapshot().activeProject.settings, 'useNsfwChecker')).toBe(false);
+  await expect
+    .element(page.getByRole('checkbox', { name: i18n.t('settings.catalog.useNsfwChecker.label'), exact: true }))
+    .not.toBeChecked();
 });

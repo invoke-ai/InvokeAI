@@ -1,5 +1,6 @@
 import type { GalleryImage } from '@features/gallery';
 import type { Project } from '@workbench/projectContracts';
+import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { galleryDurability, galleryOrganization } from '@features/gallery';
 import {
@@ -54,7 +55,7 @@ const assignBoard = async (
  * a failed board assignment is reported as such, since the image is in the gallery either way.
  */
 export const saveStagedResultToGallery = async (
-  { imageName, project }: { imageName: string; project: Project },
+  { imageName, project, scopedDefaults }: { imageName: string; project: Project; scopedDefaults: ScopedDefaults },
   transports: StagedResultTransports = {}
 ): Promise<SaveStagedResultOutcome> => {
   const owner = captureAccountScope();
@@ -63,7 +64,7 @@ export const saveStagedResultToGallery = async (
   let record: GalleryImage;
 
   try {
-    canvasBoardId = (await resolveCanvasSaveBoardId(project)) ?? 'none';
+    canvasBoardId = (await resolveCanvasSaveBoardId(project, scopedDefaults)) ?? 'none';
     assertAccountScopeCurrent(owner);
     record = await promote(imageName);
     assertAccountScopeCurrent(owner);

@@ -121,6 +121,7 @@ void i18n.use(initReactI18next).init({
               reorder: 'Reorder layer',
               select: 'Select {{name}}',
               showModifiers: 'Show modifiers',
+              showOnCanvas: 'Show on canvas',
               toggleLock: 'Toggle lock',
               toggleActive: 'Toggle layer active',
               toggleVisibility: 'Toggle visibility',
@@ -641,14 +642,33 @@ describe('LayersTree selection, surfaces and structure', () => {
     expect(output('layer-order')).toBe('');
   });
 
-  it('keeps the visibility dot isolated from row selection', async () => {
+  it('keeps the visibility eye isolated from row selection', async () => {
     await renderTree(trio());
-    const dot = host!.querySelector<HTMLButtonElement>(
+    const eye = host!.querySelector<HTMLButtonElement>(
       '[data-layer-row-id="first"] button[aria-label="Toggle layer active"]'
     )!;
-    await act(() => userEvent.click(dot));
-    expect(dot).toHaveAttribute('aria-pressed', 'false');
+    await act(() => userEvent.click(eye));
+    expect(eye).toHaveAttribute('aria-pressed', 'false');
     expect(output('selected-layer')).toBe('none');
+  });
+
+  it('marks an overlay hidden on the canvas only, and brings it back from the row', async () => {
+    await renderTree([
+      layerContract('shown', 'inpaint_mask', { name: 'Shown' }),
+      layerContract('masked', 'inpaint_mask', { isHidden: true, name: 'Masked' }),
+    ]);
+    const showOnCanvas = (id: string) =>
+      host!.querySelector<HTMLButtonElement>(`[data-layer-row-id="${id}"] button[aria-label="Show on canvas"]`);
+    expect(showOnCanvas('shown')).toBeNull();
+    // Still used by generation, so its own eye stays open.
+    expect(
+      host!.querySelector('[data-layer-row-id="masked"] button[aria-label="Toggle layer active"]')
+    ).toHaveAttribute('aria-pressed', 'true');
+    await act(() => userEvent.click(showOnCanvas('masked')!));
+    expect(committedEdits.at(-1)!.forward).toEqual({
+      type: 'setCanvasLayersHidden',
+      updates: [{ id: 'masked', isHidden: false }],
+    });
   });
 
   it('routes the row menu and right-click to the panel surface host by id', async () => {
@@ -686,9 +706,7 @@ describe('LayersTree selection, surfaces and structure', () => {
         return true;
       },
       selectedLayerIds: ['l59'],
-      hasStagingSlots: false,
-      hasSelectedStagedCandidate: false,
-      isInteractionLocked: false,
+      hasMultipleStagingSlots: false,
       copySelection: vi.fn(),
       cropAllLayers: vi.fn(),
       swapActiveColors: vi.fn(),

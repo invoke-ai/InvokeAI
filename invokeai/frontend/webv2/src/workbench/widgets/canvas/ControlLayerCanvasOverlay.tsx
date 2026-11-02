@@ -56,26 +56,16 @@ const TOP_SLOT_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
  * top-center chip while its map is detected in the background, and in its place once the map is current, an
  * Original / Map / Overlay switch comparing the map with the picture it was detected from.
  */
-export const ControlLayerCanvasOverlay = ({
-  engine,
-  isInteractionLocked,
-}: {
-  engine: OverlayEngine;
-  isInteractionLocked: boolean;
-}) => {
+export const ControlLayerCanvasOverlay = ({ engine }: { engine: OverlayEngine }) => {
   const layer = useActiveProjectSelector(selectSelectedControlLayer);
-  return layer ? (
-    <SelectedControlLayerOverlay engine={engine} isInteractionLocked={isInteractionLocked} layer={layer} />
-  ) : null;
+  return layer ? <SelectedControlLayerOverlay engine={engine} layer={layer} /> : null;
 };
 
 const SelectedControlLayerOverlay = ({
   engine,
-  isInteractionLocked,
   layer,
 }: {
   engine: OverlayEngine;
-  isInteractionLocked: boolean;
   layer: CanvasControlLayerContract;
 }) => {
   const { t } = useTranslation();
@@ -135,21 +125,18 @@ const SelectedControlLayerOverlay = ({
       : persistedState
   );
   const isGalleryDrag = isGalleryImageDragData(active?.data.current);
-  // Draw hides the hint: the user is about to give the layer its pixels by hand. A locked surface (staging, a running
-  // canvas generation) refuses drops, and a gallery drag shows the drop zones in its place.
-  // An upload on its way (from Properties or a dropped file) keeps the card up, saying so.
+  // Draw hides the hint: the user is about to give the layer its pixels by hand. A gallery drag shows the drop zones
+  // in its place. An upload on its way (from Properties or a dropped file) keeps the card up, saying so.
   const isHintVisible =
-    imageState === 'empty' &&
-    (isUploading || (!isInteractionLocked && !isGalleryDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
+    imageState === 'empty' && (isUploading || (!isGalleryDrag && activeTool !== 'brush' && activeTool !== 'eraser'));
   // Idle status keeps the switch and the detection chip apart: one or the other occupies the slot. The engine refuses
-  // a view while the canvas is locked, and a layer that does not draw has nothing to compare.
+  // a view while an operation holds the document, and a layer that does not draw has nothing to compare.
   const isViewSwitchVisible =
     layer.original !== undefined &&
     !!layer.detection &&
     isControlMapCurrent(layer) &&
     isDisplayed &&
     status.status === 'idle' &&
-    !isInteractionLocked &&
     !isDocumentEditingLocked &&
     !isGalleryDrag;
   const detector =
