@@ -1364,13 +1364,12 @@ describe('getVideoModelSelectionResult', () => {
     expect(result.settings.fps).toBe(24);
     expect(result.settings.acceleratorEnabled).toBe(false);
     expect(result.settings.steps).toBe(50);
-    expect(result.settings.loras).toEqual([]); // wan LoRAs are incompatible with H3
+    // The Lightning pair goes with the accelerator; the user's own Wan LoRA stays, skipped by H3 and badged.
+    expect(result.settings.loras).toEqual([{ isEnabled: true, model: lora('Style LoRA'), weight: 0.5 }]);
     expect(result.settings.vae).toBeNull();
     expect(result.settings.wanT5EncoderModel).toBeNull();
     expect(result.adjustments).toEqual(expect.arrayContaining(['targetResolution', 'frames', 'fps', 'acceleration']));
-    // The Lightning pair goes with the accelerator; only the user's own LoRA is reported as lost.
     expect(result.losses).toEqual([
-      { count: 1, key: 'loras' },
       { count: 1, key: 'vae' },
       { count: 1, key: 'wanT5EncoderModel' },
     ]);
@@ -1510,15 +1509,13 @@ describe('getVideoValidationReasons', () => {
     ]);
   });
 
-  it('surfaces Wan LoRA family mismatches instead of silently dropping them', () => {
+  it('does not block on a Wan LoRA for the other family, which the graph skips and the row badges', () => {
     const model = wanModel('ti2v_5b', 'diffusers');
     const settings = settingsFor(model, {
       loras: [{ isEnabled: true, model: LIGHTNING_T2V_HIGH as never, weight: 1 }],
     });
 
-    expect(getVideoValidationReasons(model, settings)).toEqual([
-      expect.stringContaining('targets a different Wan model family'),
-    ]);
+    expect(getVideoValidationReasons(model, settings)).toEqual([]);
   });
 
   it('accepts a fully valid H3 first-frame setup', () => {
@@ -1545,6 +1542,18 @@ describe('getVideoModelAvailabilityReasons', () => {
     const installed = getVideoModelAvailabilityReasons(model, settingsFor(model), [model]);
 
     expect(installed).toEqual([]);
+  });
+
+  it('ignores LoRAs the graph would skip: disabled ones and ones for another family', () => {
+    const model = wanModel('i2v_a14b');
+    const settings = settingsFor(model, {
+      loras: [
+        { isEnabled: false, model: LIGHTNING_T2V_HIGH as never, weight: 1 },
+        { isEnabled: true, model: { base: 'sdxl', key: 'sdxl-style', name: 'SDXL style', type: 'lora' }, weight: 1 },
+      ],
+    });
+
+    expect(getVideoModelAvailabilityReasons(model, settings, [model])).toEqual([]);
   });
 });
 
@@ -2733,7 +2742,7 @@ describe('what a model switch discards', () => {
     expect(trimmed.losses).toEqual([{ count: 1, key: 'trimmedInitialVideo' }]);
   });
 
-  it("counts only the user's own LoRAs, not the accelerator pair the switch reconciles", () => {
+  it("keeps the user's own LoRAs through a switch, reconciling only the accelerator pair", () => {
     const wan = wanModel('t2v_a14b');
     const catalog = [wan, LIGHTNING_T2V_HIGH, LIGHTNING_T2V_LOW];
     const on = getAcceleratorToggleResult(settingsFor(wan, { modelKey: wan.key }), wan, catalog, true).settings;
@@ -2748,8 +2757,8 @@ describe('what a model switch discards', () => {
 
     const result = getVideoModelSelectionResult({ currentSettings: styled, model: h3Model(), models: catalog });
 
-    expect(result.settings.loras).toEqual([]);
-    expect(result.losses).toEqual([{ count: 2, key: 'loras' }]);
+    expect(result.settings.loras).toEqual(styled.loras.slice(-2));
+    expect(result.losses).toEqual([]);
     expect(result.adjustments).toContain('acceleration');
   });
 

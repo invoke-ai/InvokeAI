@@ -119,6 +119,7 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   hiDiffusionT2Ratio: 0,
   hiDiffusionWindowAttentionEnabled: true,
   dynamicPromptsCombinatorial: true,
+  dynamicPromptsEnabled: true,
   dynamicPromptsMaxPrompts: 100,
   dynamicPromptsSampleSeed: 0,
   dynamicPromptsResample: true,

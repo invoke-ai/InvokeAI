@@ -491,8 +491,23 @@ test('video DTO, Details, poster, full media, HEAD, and Range routes use the che
     assert.equal(dto.height, 64);
 
     assert.deepEqual(await getJson(backend, `/api/v1/videos/i/${encodedName}/metadata`), {
-      codec: 'h264',
-      prompt: 'wan fixture',
+      cfg_scale: 5,
+      fps: 16,
+      generation_mode: 'wan_t2v',
+      height: 480,
+      model: {
+        base: 'wan',
+        hash: 'blake3:fixture-wan-2-2-t2v-a14b',
+        key: 'fixture-wan-t2v-a14b',
+        name: 'Wan 2.2 T2V A14B',
+        type: 'main',
+      },
+      negative_prompt: 'blurry, low quality, static frame',
+      num_frames: 81,
+      positive_prompt: 'wan fixture',
+      seed: 1234567,
+      steps: 30,
+      width: 832,
     });
     assert.deepEqual(await getJson(backend, `/api/v1/videos/i/${encodedName}/workflow`), {
       graph: '{"nodes":[{"id":"fixture-video-output","type":"wan_l2v"}]}',

@@ -5,6 +5,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { useSearch } from '@tanstack/react-router';
 import { preloadBootWidgets } from '@workbench/bootWidgetPreload';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { StartupLaunchSettled } from '@workbench/launchpad/StartupLaunchSettled';
 import { WorkbenchCommandPalette } from '@workbench/palette/WorkbenchCommandPalette';
 import { WorkbenchShell } from '@workbench/shell';
 import { WidgetHosts } from '@workbench/widget-frame/WidgetHosts';
@@ -54,6 +55,7 @@ export const WorkbenchApp = () => {
             <WorkbenchSessionController search={search} />
             <WidgetHosts />
             <WorkbenchShell />
+            <StartupLaunchSettled />
           </WorkbenchUiPorts>
         </WorkbenchFocusProvider>
       </WorkbenchWidgetRegistryProvider>

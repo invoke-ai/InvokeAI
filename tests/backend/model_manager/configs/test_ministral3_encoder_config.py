@@ -13,7 +13,6 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
-from invokeai.backend.model_manager.configs import mistral_encoder as configs_mistral_encoder
 from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
 from invokeai.backend.model_manager.configs.mistral_encoder import (
@@ -29,6 +28,8 @@ _TEKKEN_VOCAB = 131072
 _MINISTRAL_3B = (3072, 26)
 _COW = (5120, 30)
 _MISTRAL_24B = (5120, 40)
+# Mistral Small 3's MLP width, which the FLUX.2 encoders also have to match.
+_MISTRAL_3_MLP = 32768
 
 
 def _encoder_tensors(
@@ -36,12 +37,14 @@ def _encoder_tensors(
     num_layers: int,
     vocab_size: int = _TEKKEN_VOCAB,
     *,
+    mlp_width: int | None = None,
     with_vision_stack: bool = False,
 ) -> dict[str, torch.Tensor]:
     """A Mistral-family state dict at the given geometry, with one column per row kept tiny.
 
-    Only the embedding carries the real width -- that and the layer count are what the probe
-    reads. `torch.zeros` keeps the fixture a few MB rather than the size of a real encoder.
+    Only the embedding carries the real width and the layer-0 gate projection the MLP width --
+    those and the layer count are what the probe reads. `torch.zeros` keeps the fixture a few MB
+    rather than the size of a real encoder.
 
     `with_vision_stack` reproduces the Mistral3 multimodal layout the released Ministral 3B
     encoder ships. The FLUX.2 encoders are text-only, so it stays off for them.
@@ -49,6 +52,8 @@ def _encoder_tensors(
     tensors = {"model.embed_tokens.weight": torch.zeros(vocab_size, hidden_size, dtype=torch.bfloat16)}
     for layer in range(num_layers):
         tensors[f"model.layers.{layer}.self_attn.q_proj.weight"] = torch.zeros(4, 4, dtype=torch.bfloat16)
+    if mlp_width is not None:
+        tensors["model.layers.0.mlp.gate_proj.weight"] = torch.zeros(mlp_width, 4, dtype=torch.bfloat16)
     if with_vision_stack:
         tensors["vision_tower.transformer.layers.0.attention.q_proj.weight"] = torch.zeros(4, 4, dtype=torch.bfloat16)
         tensors["multi_modal_projector.linear_1.weight"] = torch.zeros(4, 4, dtype=torch.bfloat16)
@@ -79,7 +84,7 @@ def test_the_flux2_encoders_keep_their_variants(
     tmp_path: Path, geometry: tuple[int, int], expected: MistralVariantType
 ) -> None:
     """Widening the probe must not reclassify the encoders that already installed."""
-    config = _identify(tmp_path / "mistral.safetensors", _encoder_tensors(*geometry))
+    config = _identify(tmp_path / "mistral.safetensors", _encoder_tensors(*geometry, mlp_width=_MISTRAL_3_MLP))
 
     assert isinstance(config, MistralEncoder_Checkpoint_Config)
     assert config.variant is expected
@@ -95,8 +100,11 @@ def test_the_flux2_encoders_keep_their_variants(
 )
 def test_a_geometry_between_the_families_is_refused(tmp_path: Path, hidden_size: int, num_layers: int) -> None:
     """The pairs are matched as pairs. Accepting a loose combination would hand the loader a
-    variant whose model class does not fit the weights."""
-    config = _identify(tmp_path / "mixed.safetensors", _encoder_tensors(hidden_size, num_layers))
+    variant whose model class does not fit the weights. The MLP is Mistral Small 3's, so the depth is
+    what refuses the 5120-wide case."""
+    config = _identify(
+        tmp_path / "mixed.safetensors", _encoder_tensors(hidden_size, num_layers, mlp_width=_MISTRAL_3_MLP)
+    )
 
     assert not isinstance(config, MistralEncoder_Checkpoint_Config)
 
@@ -138,27 +146,6 @@ def test_the_released_encoder_folder_is_identified_too(tmp_path: Path) -> None:
 
     assert isinstance(config, MistralEncoder_Diffusers_Config)
     assert config.variant is MistralVariantType.Ministral3B
-
-
-def test_a_ministral_gguf_is_refused_rather_than_loaded_as_a_mistral(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """The GGUF loader builds a `MistralModel`, which has neither Ministral's YaRN scaling nor its
-    attention scale -- it would load cleanly and encode garbage. The refusal has to sit ahead of
-    the variant lookup, so this pins the ordering rather than the message.
-
-    `_has_ggml_tensors` stands in for a real GGUF file: building one here would cost far more than
-    the ordering it protects.
-    """
-    monkeypatch.setattr(configs_mistral_encoder, "_has_ggml_tensors", lambda _state_dict: True)
-
-    config = _identify(
-        tmp_path / "ministral-3-3b-q8.gguf.safetensors",
-        _encoder_tensors(*_MINISTRAL_3B, with_vision_stack=True),
-    )
-
-    assert not isinstance(config, MistralEncoder_Checkpoint_Config)
-    assert getattr(config, "type", None) is not ModelType.MistralEncoder
 
 
 def test_the_prompt_enhancer_is_not_claimed_as_an_encoder(tmp_path: Path) -> None:

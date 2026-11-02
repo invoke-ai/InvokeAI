@@ -10,6 +10,7 @@ import pytest
 from PIL import Image
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
+from invokeai.app.invocations.image import BlankImageInvocation
 from invokeai.app.services.events.events_common import (
     InvocationStartedEvent,
     QueueItemsRetriedEvent,
@@ -391,7 +392,7 @@ def test_enqueue_workflow_call_child_inherits_workflow_for_image_metadata(
             mock_invoker.services,
             InvocationContextData(
                 queue_item=child_queue_item,
-                invocation=MagicMock(is_intermediate=False, id=f"image-node-{index}"),
+                invocation=BlankImageInvocation(is_intermediate=False, id=f"image-node-{index}", width=4, height=4),
                 source_invocation_id=f"image-node-{index}",
             ),
             MagicMock(),

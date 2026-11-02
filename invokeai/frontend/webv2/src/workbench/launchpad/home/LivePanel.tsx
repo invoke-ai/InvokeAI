@@ -8,11 +8,13 @@ import { lazy, Suspense } from 'react';
 const loadLivePanels = () => import('./livePanels');
 
 const ModelsNotice = lazy(() => loadLivePanels().then((module) => ({ default: module.ModelsNotice })));
+const ModelsRequiredHint = lazy(() => loadLivePanels().then((module) => ({ default: module.ModelsRequiredHint })));
 const QueueStatusBand = lazy(() => loadLivePanels().then((module) => ({ default: module.QueueStatusBand })));
 const RecentOutputs = lazy(() => loadLivePanels().then((module) => ({ default: module.RecentOutputs })));
 
 const PANELS = {
   models: ModelsNotice,
+  modelsRequired: ModelsRequiredHint,
   outputs: RecentOutputs,
   queue: QueueStatusBand,
 } as const;

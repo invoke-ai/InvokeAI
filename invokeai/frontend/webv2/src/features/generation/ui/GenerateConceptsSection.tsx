@@ -18,6 +18,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { ConceptList, ConceptRow } from './shared/ConceptRow';
+import { GenerateIssueNotes } from './shared/GenerateIssues';
 
 interface GenerateConceptsContentProps {
   loraModels: LoraModelConfig[];
@@ -26,6 +27,13 @@ interface GenerateConceptsContentProps {
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
 }
+
+/** Whether a concept is installed; until the catalog has loaded every concept counts as installed. */
+export const isConceptInstalled = (
+  lora: GenerateLora,
+  loraModels: readonly LoraModelConfig[],
+  catalogStatus: 'error' | 'idle' | 'loaded' | 'loading'
+): boolean => catalogStatus !== 'loaded' || loraModels.some((model) => model.key === lora.model.key);
 
 /** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
 export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
@@ -80,6 +88,13 @@ export const GenerateConceptsContent = ({
             <ConceptRow
               key={lora.model.key}
               isCompatible={isCompatibleLora(lora, selectedModel)}
+              isInstalled={isConceptInstalled(lora, loraModels, models.status)}
+              // Only a missing concept gets notes, so installed rows keep their memoized props.
+              issue={
+                isConceptInstalled(lora, loraModels, models.status) ? undefined : (
+                  <GenerateIssueNotes conceptKey={lora.model.key} field="concepts" section="guidance" />
+                )
+              }
               lora={lora}
               models={models}
               onRemove={removeLora}

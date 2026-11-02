@@ -45,7 +45,7 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
 vi.mock('@workbench/WorkbenchContext', () => {
   const project = (id: string) => ({ id, widgetInstances: {} });
   const queries = {
-    getSnapshot: () => ({ activeProject: project(mocks.activeProjectId) }),
+    getSnapshot: () => ({ activeProject: project(mocks.activeProjectId), scopedDefaults: {} }),
     isActiveProject: (id: string) => id === mocks.activeProjectId,
   };
 

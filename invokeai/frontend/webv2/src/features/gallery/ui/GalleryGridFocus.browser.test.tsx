@@ -57,6 +57,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));
@@ -263,7 +265,7 @@ const itemActions = {
   },
   deleteItems: (refs: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }) =>
     state.confirmDeletion
-      ? confirmationRef.current!(refs, () => applyDeletion(refs), options?.returnFocus)
+      ? confirmationRef.current!(refs, () => applyDeletion(refs), { returnFocus: options?.returnFocus })
       : applyDeletion(refs),
   // The listing holds unstarred items only, so starring moves an item into the strip and back.
   setItemsStarred: (refs: GalleryItemRef[], starred: boolean) => {
@@ -332,7 +334,6 @@ const GalleryRegion = ({ runtime }: { runtime: ReturnType<typeof createGalleryRu
     boardsState: READY_LISTING,
     filter,
     gallery,
-    isWindowTruncated: false,
     itemActions,
     listing,
     loadedItems: mergeGalleryLoadedItems(strip, gallery.items),
@@ -893,6 +894,26 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKeys()).toEqual(['image:image-0.png']);
   });
 
+  it('keeps the selection on Escape, clearing it only by the command or a key the user assigned', async () => {
+    const items = createItems(40);
+    await renderGrid(items);
+    await tabIntoGallery();
+    await press('{Shift>}{ArrowRight}{/Shift}');
+    expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
+
+    // Esc in the Gallery is left to Preview; it neither deselects nor moves focus.
+    await press('{Escape}');
+    expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
+    expect(selectedKey()).toBe('image:image-1.png');
+    expect(focusedThumbnail()).toBe('image-1.png');
+
+    await act(() => patchWorkbenchPreferences({ customHotkeys: { 'gallery.clearSelection': ['x'] } }));
+    await press('x');
+
+    expect(selectedKeys()).toEqual([]);
+    expect(selectedKey()).toBeNull();
+  });
+
   it('follows the arrows between the starred strip, running sessions and the listing', async () => {
     const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
     await renderGrid(createItems(40), {
@@ -1052,8 +1073,9 @@ describe('Gallery grid keyboard focus', () => {
     await renderGrid(createItems(40), { sessions: [createSession('running', 'running')], strip });
     await act(() => userEvent.click(thumbnail('image-1.png')!));
     await settle();
-    // With no selection, the Tab stop is the thumbnail focus was last on.
-    await press('{Escape}');
+    // With no selection, the Tab stop is the thumbnail focus was last on. Preview's clear button runs this command.
+    await act(() => runtimeMocks.extensions.commands.executeForSource('gallery.clearSelection', gallerySource));
+    await settle();
     expect(selectedKey()).toBeNull();
     expect(focusedThumbnail()).toBe('image-1.png');
 

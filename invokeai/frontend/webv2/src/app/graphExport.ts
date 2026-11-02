@@ -20,6 +20,7 @@ import {
 import { planGenerateSubmissionBatch } from '@features/queue/contracts';
 import { resolveRandDeviceMetadata } from '@features/queue/devices';
 import { SEED_MAX } from '@platform/core/seed';
+import { BUILT_IN_PROJECT_SETTINGS } from '@workbench/settings/projectSettings';
 import { DEFAULT_CANVAS_COMPOSITING } from '@workbench/widgets/canvas/invoke/canvasCompositing';
 import { DEFAULT_CANVAS_SCALING } from '@workbench/widgets/canvas/invoke/canvasScaling';
 import { DEFAULT_CANVAS_DENOISING_STRENGTH } from '@workbench/widgets/canvas/invoke/canvasStrength';
@@ -30,8 +31,6 @@ const GRAPH_EXPORT_VERSION = 1;
 const DESTINATION = 'gallery';
 /** Not a webv2 origin, so no open editor adopts the items as its own submissions. */
 const ORIGIN_PREFIX = 'graphs-export:';
-/** `DEFAULT_PROJECT_SETTINGS` (workbench/settings/store.ts); importing it would load the whole settings runtime. */
-const PROJECT_SETTINGS = { useCpuNoise: true, useNsfwChecker: false, useWatermark: false };
 /** ROCm builds of torch report their GPUs as CUDA devices as well. */
 const GPU_DEVICE_OPTIONS = [{ device: 'cuda:0', name: 'GPU' }];
 const MODES: readonly GraphExportMode[] = ['txt2img', 'img2img', 'controlnet'];
@@ -236,8 +235,8 @@ export const exportGraphs = (request: unknown): GraphExportResponse => {
     },
     destination: DESTINATION,
     models,
-    projectSettings: PROJECT_SETTINGS,
-    randDevice: resolveRandDeviceMetadata(PROJECT_SETTINGS.useCpuNoise, GPU_DEVICE_OPTIONS),
+    projectSettings: BUILT_IN_PROJECT_SETTINGS,
+    randDevice: resolveRandDeviceMetadata(BUILT_IN_PROJECT_SETTINGS.useCpuNoise, GPU_DEVICE_OPTIONS),
   };
 
   return withArchitectureCapabilities(capabilities, () => ({

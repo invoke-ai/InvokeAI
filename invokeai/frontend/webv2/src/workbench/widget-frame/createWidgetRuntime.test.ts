@@ -54,6 +54,8 @@ const createDispatch = () => {
   };
 
   const widgets: WorkbenchWidgetCommands = {
+    clearInstanceValues: (instanceId, keys, projectId) =>
+      dispatch({ instanceId, keys, projectId, type: 'clearWidgetInstanceValues' }),
     dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
     float: (instanceId, region) =>
@@ -126,7 +128,9 @@ describe('createWidgetRuntime', () => {
   });
 
   it('returns an empty runtime state snapshot when the scoped project is missing', () => {
-    expect(getProjectWidgetRuntimeState([], 'missing-project', 'generate')).toEqual({});
+    expect(getProjectWidgetRuntimeState({ projects: [], scopedDefaults: {} }, 'missing-project', 'generate')).toEqual(
+      {}
+    );
   });
 
   it('exposes widget state reads and writes through the state namespace', () => {

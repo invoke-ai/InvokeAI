@@ -261,10 +261,8 @@ class LoadedModelWithoutConfig:
                 f"Working memory for {self._cache_record.key}: {working_memory.estimator} reserves "
                 f"{working_mem_bytes / 2**20:.0f} MB ({working_memory.source})"
             )
-            scope = probe.current_scope()
-            if scope is not None and self.compute_device.type != "cpu":
-                calibration = scope
-                working_mem_bytes = probe.calibration_reservation(working_mem_bytes)
+            calibration, working_mem_bytes = probe.lock_reservation(working_mem_bytes, self.compute_device)
+            if calibration is not None:
                 message += f"; the calibration lock reserves {working_mem_bytes / 2**20:.0f} MB"
             InvokeAILogger.get_logger(__name__).debug(message)
         self._lock_on_device(working_mem_bytes, offload_others=calibration is not None)

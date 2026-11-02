@@ -162,12 +162,6 @@ def test_regions_are_appended_to_a_compiled_layout_which_keeps_everything_else()
 @pytest.mark.parametrize(
     "prompt",
     [
-        # An uncompiled OpenMOSS draft: absolute xyxy boxes, which the new centred yxyx boxes must not join.
-        pytest.param(
-            '{"width":1024,"height":1024,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"x"},'
-            '"items":[]}',
-            id="uncompiled-draft",
-        ),
         pytest.param(
             '{"summary":{"caption":"x"},"items":[],"bbox_coord_space":"normalized_1000","bbox_format":"yxyx"}',
             id="other-coord-space",
@@ -219,3 +213,168 @@ def test_regions_need_a_prompt_to_caption_the_layout(prompt: str) -> None:
     # OpenMOSS requires a non-blank summary.caption.
     with pytest.raises(ValueError, match="need a prompt"):
         build_moss_image_layout_prompt(prompt, [_region("object", "a cup", [0, 0, 16, 16])], 1024, 1024)
+
+
+# Layout drafts: the absolute-pixel JSON that Expand Prompt's MOSS-Image Prompt Enhancer asks an LLM to write.
+
+_DRAFT = (
+    '{"width":1536,"height":1024,"bbox_coord_space":"abs","bbox_format":"xyxy",'
+    '"summary":{"meta":["poster"],"canvas":"single","caption":"A ceramic campaign."},"items":['
+    '{"label":"object","caption":"An ivory cup.","bbox":[176,224,800,864],"tags":["product"]},'
+    '{"label":"text","caption":"Dark-green lettering.","text":"把日常，过成诗。\\n\\"MOSS\\" 🪴","bbox":[928,272,1408,448]},'
+    '{"label":"character","caption":"A potter.","palette":["ochre"],"bbox":[10.9,20.1,100.01,200.99]}]}'
+)
+# What the OpenMOSS reference `compile_prompt` returns for _DRAFT, captured from it at the commit named above.
+_DRAFT_COMPILED_BY_REFERENCE = (
+    '{"summary":{"meta":["poster"],"canvas":"single","caption":"A ceramic campaign."},"items":['
+    '{"label":"object","caption":"An ivory cup.","bbox":[-288,-592,352,32],"tags":["product"]},'
+    '{"label":"text","caption":"Dark-green lettering.","text":"把日常，过成诗。\\n\\"MOSS\\" 🪴","bbox":[-240,160,-64,640]},'
+    '{"label":"character","caption":"A potter.","palette":["ochre"],"bbox":[-492,-758,-311,-667]}'
+    '],"bbox_coord_space":"abs_centralized","bbox_format":"yxyx"}'
+)
+
+
+def _draft(**changes: object) -> dict:
+    draft = json.loads(_DRAFT)
+    draft.update(changes)
+    return draft
+
+
+def _items(*items: object) -> dict:
+    return _draft(items=list(items))
+
+
+def _compile(draft: dict, width: int = 1536, height: int = 1024) -> dict:
+    return json.loads(build_moss_image_layout_prompt(json.dumps(draft, ensure_ascii=False), [], width, height))
+
+
+def test_a_draft_at_its_own_size_compiles_exactly_as_the_reference_does() -> None:
+    assert build_moss_image_layout_prompt(_DRAFT, [], 1536, 1024) == _DRAFT_COMPILED_BY_REFERENCE
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        pytest.param(f"\n  {_DRAFT}\n", id="whitespace"),
+        pytest.param(f"```json\n{_DRAFT}\n```", id="json-fence"),
+        pytest.param(f"  ```\n{_DRAFT}\n```\n", id="bare-fence"),
+        pytest.param(f"```json5\n{_DRAFT}\n```", id="json5-fence"),
+        pytest.param(f"```ld-json \t\n{_DRAFT}\n```", id="ld-json-fence"),
+        pytest.param(f"```json\r\n{_DRAFT}\r\n```", id="crlf-fence"),
+    ],
+)
+def test_a_draft_wrapped_the_way_llms_reply_is_compiled(prompt: str) -> None:
+    assert build_moss_image_layout_prompt(prompt, [], 1536, 1024) == _DRAFT_COMPILED_BY_REFERENCE
+
+
+def test_a_draft_is_scaled_per_axis_to_the_generation_size() -> None:
+    # 1536 -> 1024 wide (2/3), height unchanged; edges are enclosed in whole pixels after scaling.
+    layout = _compile(_draft(), 1024, 1024)
+
+    assert [item["bbox"] for item in layout["items"]] == [
+        [-288, -395, 352, 22],
+        [-240, 106, -64, 427],
+        [-492, -505, -311, -445],
+    ]
+
+
+def test_a_draft_frame_need_not_be_a_multiple_of_16() -> None:
+    # Small LLMs write sizes like 1000; they only set the frame the boxes are measured in.
+    draft = _draft(
+        width=1000, height=1000, items=[{"label": "object", "caption": "a cup", "bbox": [250, 500, 750, 1000]}]
+    )
+    assert _compile(draft, 1024, 1024)["items"][0]["bbox"] == [0, -256, 512, 256]
+
+
+def test_regions_follow_the_compiled_draft_items() -> None:
+    prompt = build_moss_image_layout_prompt(_DRAFT, [_region("object", "a vase", [0, 0, 16, 16])], 1536, 1024)
+
+    items = json.loads(prompt)["items"]
+    assert [item["caption"] for item in items] == ["An ivory cup.", "Dark-green lettering.", "A potter.", "a vase"]
+    assert items[-1]["bbox"] == [-512, -768, -496, -752]
+
+
+def test_unknown_fields_are_dropped_and_unknown_labels_become_objects_or_text() -> None:
+    draft = _draft(id="draft-1", notes="ignore", width=1000, height=1000)
+    draft["summary"]["mood"] = "calm"
+    draft["items"] = [
+        {"id": 1, "label": "product", "caption": "a cup", "bbox": [0, 0, 500, 500], "children": []},
+        {"label": "headline", "caption": "a title", "text": "TEA", "bbox": [500, 0, 1000, 500]},
+    ]
+
+    assert _compile(draft, 1024, 1024) == {
+        "summary": {"meta": ["poster"], "canvas": "single", "caption": "A ceramic campaign."},
+        "items": [
+            {"label": "object", "caption": "a cup", "bbox": [-512, -512, 0, 0]},
+            {"label": "text", "caption": "a title", "text": "TEA", "bbox": [-512, 0, 0, 512]},
+        ],
+        "bbox_coord_space": "abs_centralized",
+        "bbox_format": "yxyx",
+    }
+
+
+def test_boxes_leaving_the_canvas_are_clamped_and_boxes_without_area_dropped() -> None:
+    layout = _compile(
+        _items(
+            {"label": "object", "caption": "clamped", "bbox": [-20, -20, 1600, 512]},
+            {"label": "object", "caption": "off canvas", "bbox": [1600, 0, 1700, 100]},
+            {"label": "object", "caption": "inverted", "bbox": [100, 0, 50, 100]},
+            {"label": "object", "caption": "a hairline", "bbox": [0, 0, 0.00000000001, 100]},
+        )
+    )
+
+    assert layout["items"] == [{"label": "object", "caption": "clamped", "bbox": [-512, -768, 0, 768]}]
+
+
+def test_a_draft_without_any_box_on_the_canvas_is_refused() -> None:
+    with pytest.raises(ValueError, match="no item has a box on the canvas"):
+        _compile(_items({"label": "object", "caption": "off canvas", "bbox": [1600, 0, 1700, 100]}))
+
+
+@pytest.mark.parametrize(
+    ("draft", "message"),
+    [
+        # OpenMOSS: text items require literal text.
+        (_items({"label": "text", "caption": "a title", "bbox": [0, 0, 16, 16]}), "item 1 has no text"),
+        (_items({"label": "text", "caption": "a title", "text": " ", "bbox": [0, 0, 16, 16]}), "item 1 has blank text"),
+        (_items({"label": "object", "caption": "", "bbox": [0, 0, 16, 16]}), "item 1 has no caption"),
+        (_items({"label": "object", "caption": "a cup", "bbox": [0, 0, 16]}), "item 1 needs a box"),
+        # OpenMOSS: booleans and numeric strings are not coordinates.
+        (_items({"label": "object", "caption": "a cup", "bbox": [True, 0, 16, 16]}), "item 1 needs a box"),
+        (_items({"label": "object", "caption": "a cup", "bbox": [0, 0, "16", 16]}), "item 1 needs a box"),
+        (_items({"label": "object", "caption": "a cup", "tags": "cup", "bbox": [0, 0, 16, 16]}), "item 1: its tags"),
+        (_items("a cup"), "item 1 is not an object"),
+        (_draft(items=[]), "it has no items"),
+        (_draft(summary={"meta": ["poster"]}), "the summary has no caption"),
+        (_draft(summary={"caption": "  "}), "the summary has no caption"),
+        (_draft(summary={"caption": "x", "canvas": "grid"}), "the summary canvas"),
+        (_draft(summary={"caption": "x", "meta": "poster"}), "the summary meta"),
+        # OpenMOSS rejects these sizes too; a frame that is not a multiple of 16 is accepted here.
+        (_draft(width=0), "width and height"),
+        (_draft(width=True), "width and height"),
+        (_draft(height="1024"), "width and height"),
+    ],
+)
+def test_an_invalid_draft_is_refused_naming_what_is_wrong(draft: dict, message: str) -> None:
+    with pytest.raises(ValueError, match=f"^Layout draft: {message}"):
+        _compile(draft)
+
+
+def test_a_draft_number_that_is_not_json_makes_the_prompt_a_caption() -> None:
+    # OpenMOSS rejects NaN; such text is not JSON, so it passes through like any other caption.
+    prompt = _DRAFT.replace("[176,224,800,864]", "[176,224,NaN,864]")
+    assert build_moss_image_layout_prompt(prompt, [], 1536, 1024) == prompt
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # Other conventions are not drafts; without regions they pass through as before.
+        '{"width":1024,"height":1024,"bbox_coord_space":"abs_centralized","bbox_format":"xyxy","summary":{},"items":[]}',
+        '{"width":1024,"height":1024,"bbox_coord_space":"normalized_1000","bbox_format":"xyxy","items":[]}',
+        # Prose around a fence is not unwrapped.
+        f"Here is the layout:\n```json\n{_DRAFT}\n```",
+    ],
+)
+def test_json_that_is_not_a_draft_is_left_alone(prompt: str) -> None:
+    assert build_moss_image_layout_prompt(prompt, [], 1536, 1024) == prompt
