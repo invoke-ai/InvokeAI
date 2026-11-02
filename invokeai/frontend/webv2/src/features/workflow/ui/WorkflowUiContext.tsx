@@ -59,6 +59,8 @@ export interface WorkflowProjectSnapshot {
 }
 
 export interface WorkflowCapabilities {
+  /** Whether this account may install node packs, so a missing node type can lead to the Nodes Manager. */
+  canManageNodes: boolean;
   canUseCache: boolean;
 }
 
@@ -107,6 +109,8 @@ export interface WorkflowUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
   openAddModels(query: string): void;
+  /** Leaves the editor for the Nodes Manager, where node packs are installed. */
+  openNodesManager(): void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
     subscribe(nodeId: string, listener: () => void): () => void;
@@ -181,6 +185,8 @@ export const useWorkflowGraphPreview = (): WorkflowGraphPreviewPort => {
 export const useWorkflowNotifications = () => useWorkflowUi().notifications;
 
 export const useOpenAddModels = (): ((query: string) => void) => useWorkflowUi().openAddModels;
+
+export const useOpenNodesManager = (): (() => void) => useWorkflowUi().openNodesManager;
 
 export const useWorkflowPersistenceSelector = <Selected,>(
   selector: (persistence: WorkflowProjectPersistence) => Selected,

@@ -1,7 +1,7 @@
 ---
 title: Qwen Image
-description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
-lastUpdated: 2026-10-19
+description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF and fp8 installs, the Lightning LoRAs and the Fun and InstantX ControlNet Unions.
+lastUpdated: 2026-11-01
 sidebar:
   order: 9
 ---
@@ -30,26 +30,29 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 ## Hardware
 
 Qwen Image is a large model: the full Diffusers pipeline is a ~40 GB download. To run it on a
-consumer GPU, use a **GGUF** transformer together with the standalone VAE and fp8 text encoder:
+consumer GPU, use a **GGUF** or **fp8** transformer together with the standalone VAE and fp8 text encoder:
 
-| Transformer build | Download |
-| ----------------- | -------- |
-| Q2_K              | ~7.5 GB  |
-| Q4_K_M            | ~13 GB   |
-| Q6_K              | ~17 GB   |
-| Q8_0              | ~22 GB   |
+| Transformer build                | Download |
+| -------------------------------- | -------- |
+| Q2_K                             | ~7.5 GB  |
+| Q4_K_M                           | ~13 GB   |
+| Q6_K                             | ~17 GB   |
+| Q8_0                             | ~22 GB   |
+| fp8 (Qwen Image 2512)            | ~20.4 GB |
+| fp8 mixed (Qwen Image Edit 2511) | ~20.5 GB |
 
 The Qwen2.5-VL encoder is loaded in addition to the transformer (~7 GB for the fp8 build). If your GPU
 cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mode/). Single-file
-checkpoints that ship scaled fp8 weights can be kept in fp8 with
-[FP8 Storage](/configuration/optimization/fp8-storage/).
+checkpoints that ship fp8 weights are kept in fp8 with
+[FP8 Storage](/configuration/optimization/fp8-storage/), which is switched on for them when they are installed.
 
 ## Installing
 
 The easiest path is the **Qwen Image** bundle in the Model Manager's Starter Models. It installs the
 standalone VAE and fp8 encoder, the Diffusers and the Q4_K_M / Q8_0 GGUF builds of both *Qwen Image
 2512* and *Qwen Image Edit 2511*, and the Lightning LoRAs for each. The other GGUF builds (Q2_K, Q6_K)
-are available as individual starter models.
+and the fp8 single files, *Qwen Image 2512 (fp8)* and *Qwen Image Edit 2511 (fp8 mixed)*, are available
+as individual starter models.
 
 Qwen Image needs three components:
 
@@ -64,8 +67,13 @@ Qwen Image needs three components:
 - **GGUF** (from `unsloth/Qwen-Image-2512-GGUF` and `unsloth/Qwen-Image-Edit-2511-GGUF`): the file
   contains only the transformer. The GGUF starter models install the **Qwen Image VAE** (~250 MB) and
   the **Qwen2.5-VL Encoder (fp8 scaled)** (~7 GB) as dependencies, so you never need the full pipeline.
-- **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style fp8-scaled or nvfp4 builds)
-  can be installed by path or URL; like GGUF, they need a standalone VAE and encoder.
+- **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style plain fp8, fp8-scaled or nvfp4
+  builds) can be installed by path or URL; like GGUF, they need a standalone VAE and encoder. The two fp8
+  starter models (from `Comfy-Org/Qwen-Image` and `Comfy-Org/Qwen-Image-Edit`) install the same VAE and
+  encoder as dependencies. FP8 Storage is switched on for them at install, so each takes about 20.5 GB once
+  loaded, which fills most of a 24 GB card; with the working memory a generation needs, partial loading may
+  keep part of it in RAM. The 2512 file is plain fp8 without scales: loading it briefly needs about 41 GB of
+  free system RAM, because it is widened to bf16 before FP8 Storage casts it back.
 
 Three Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
 bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), and **Diffusers** (~16 GB,

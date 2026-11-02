@@ -15,9 +15,13 @@ import { createContext, use, useMemo, type ComponentType, type ReactNode } from 
 export interface GalleryItemActions {
   /**
    * `returnFocus` names where keyboard focus goes when a confirmation dialog closes, resolved then: the deletion can
-   * remove the control that opened it.
+   * remove the control that opened it. `targetsOffScreen` says some item is not on screen, so the deletion asks even
+   * when the user turned routine confirmations off; so does any deletion of more than one item.
    */
-  deleteItems(items: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }): Promise<void>;
+  deleteItems(
+    items: GalleryItemRef[],
+    options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
+  ): Promise<void>;
   downloadItem(item: GalleryItem): Promise<void>;
   downloadItems(items: GalleryItemRef[], loadedItems?: GalleryItem[]): Promise<void>;
   moveItemsToBoard(items: GalleryItemRef[], boardId: string): Promise<void>;
@@ -50,6 +54,8 @@ export interface GalleryItemContextMenuTarget {
   allStarred?: boolean;
   itemRefs: GalleryItemRef[];
   items: GalleryItem[];
+  /** The board the listing the targets were selected in reads, where targets `items` omits sit. */
+  listingBoardId?: string;
   x: number;
   y: number;
 }
@@ -80,12 +86,21 @@ export interface GalleryCommandsPort {
   setView(view: GalleryView): void;
   /** `selectionPage` is the grid page of whichever item becomes primary: `item` when added, else `nextPrimaryItem`. */
   toggleItemSelection(item: GalleryItem, nextPrimaryItem: GalleryItem | null, selectionPage?: number): void;
-  updateSettings(settings: Partial<GallerySettings>): void;
+  /**
+   * Writes the gallery settings of the open project while it is active; with `projectId`, of that project while it is
+   * open, for work that finishes after the user moved on (an Undo).
+   */
+  updateSettings(settings: Partial<GallerySettings>, projectId?: string): void;
 }
 
 export interface GalleryNotificationsPort {
   add(notification: { kind: 'info' | 'success'; message?: string; title: string }): void;
   reportError(error: { area: string; message: string; namespace: 'gallery' }): void;
+  /**
+   * Reports a reversible change that already happened, with an Undo that may run minutes later. Absent on hosts without
+   * one, which report a plain success instead. A newer Undo with the same `supersedes` key withdraws the older one.
+   */
+  undoable?(title: string, notice: { message?: string; onUndo: () => void; supersedes?: string }): void;
 }
 
 export interface GalleryWidgetRuntime {
@@ -113,6 +128,10 @@ export interface GalleryUiAdapter {
   gallery: GalleryCommandsPort;
   galleryValues: Record<string, unknown>;
   generateValues: Record<string, unknown>;
+  /** A project's gallery values as they are now, or null once it is closed; absent for hosts without projects. */
+  getProjectGalleryValues?(projectId: string): Record<string, unknown> | null;
+  /** The user picked a board in the board list to look at it: the host may explain where new results still go. */
+  noteBoardBrowsed?(boardId: string): void;
   /** Resolves an item's best image-map vocabulary label, or null when it has none. */
   getItemLabel(item: GalleryItemRef): Promise<string | null>;
   notifications: GalleryNotificationsPort;

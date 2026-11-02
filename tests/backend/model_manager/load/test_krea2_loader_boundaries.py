@@ -21,7 +21,7 @@ from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     Qwen3VLEncoderLoader,
 )
 from invokeai.backend.model_manager.taxonomy import Krea2VariantType, Qwen3VLVariantType, SubModelType
-from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 
 
 class _TinyVisionTowerHost(torch.nn.Module):
@@ -173,6 +173,80 @@ def test_single_file_loader_decodes_an_int8_convrot_checkpoint(monkeypatch, tmp_
     assert torch.corrcoef(torch.stack([dequantized, rotated.flatten()]))[0, 1].abs() < 0.2
 
 
+def test_single_file_loader_keeps_a_mixed_int4_build_named_only_in_its_header_packed(monkeypatch, tmp_path) -> None:
+    """The Starnodes converter deletes every per-tensor marker and names its layers in `_quantization_metadata`
+    alone, and most published int4 builds mix int8 layers in. Both have to be read, each layer installed as it is
+    stored, and the reservation has to charge the packed layer the half byte per weight it actually occupies."""
+    import json
+
+    import diffusers
+    import safetensors.torch
+
+    from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE
+    from tests.fixtures.quantized_payloads import (
+        comfy_quant_marker,
+        convrot_w4a4_marker,
+        quantize_convrot,
+        quantize_convrot_int4,
+    )
+
+    torch.manual_seed(0)
+    original = torch.randn(4, CONVROT_GROUP_SIZE)
+    int4 = quantize_convrot_int4(original)
+    int8 = quantize_convrot(torch.randn(4, CONVROT_GROUP_SIZE))
+    int8_marker = {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": CONVROT_GROUP_SIZE}
+    state_dict = {
+        "packed.weight": int4.packed,
+        "packed.weight_scale": int4.scale.view(-1),
+        "wide.weight": int8.codes,
+        "wide.weight_scale": int8.scale,
+        "wide.comfy_quant": comfy_quant_marker(int8_marker),
+    }
+    header = {
+        "_quantization_metadata": json.dumps({"format_version": "1.0", "layers": {"packed": convrot_w4a4_marker()}})
+    }
+
+    class _TinyMixedKrea2Transformer(torch.nn.Module):
+        def __init__(self, **_kwargs) -> None:
+            super().__init__()
+            self.packed = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+            self.wide = torch.nn.Linear(CONVROT_GROUP_SIZE, 4, bias=False)
+
+    checkpoint_path = tmp_path / "krea2Int4Convrot_v10Turbo.safetensors"
+    checkpoint_path.touch()
+    config = Main_Checkpoint_Krea2_Config.model_construct(
+        path=str(checkpoint_path), variant=Krea2VariantType.Turbo, fp8_storage=None
+    )
+    loader = object.__new__(Krea2CheckpointModel)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
+    loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
+
+    monkeypatch.setattr(diffusers, "Krea2Transformer2DModel", _TinyMixedKrea2Transformer, raising=False)
+    monkeypatch.setattr(safetensors.torch, "load_file", lambda _path: state_dict)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.read_safetensors_metadata", lambda *_args: header
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
+        lambda: torch.device("cpu"),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
+
+    model = loader._load_from_singlefile(config)
+
+    (reserved,), _ = loader._ram_cache.make_room.call_args
+    assert reserved == (4 * CONVROT_GROUP_SIZE // 2 + 4 * 4) + (4 * CONVROT_GROUP_SIZE + 4 * 4)
+    assert type(model.packed) is Int4ConvrotLinear and type(model.wide) is Int8ConvrotLinear
+    decoded = model.packed._dequantized_weight(torch.device("cpu"), torch.float32)
+    assert torch.allclose(decoded, int4.dequantized, atol=1e-5)
+    assert torch.corrcoef(torch.stack([decoded.flatten(), original.flatten()]))[0, 1] > 0.98
+
+
 def test_diffusers_loader_reaches_transformer_from_pretrained(monkeypatch, tmp_path) -> None:
     config = Main_Diffusers_Krea2_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(Krea2DiffusersModel)
@@ -273,6 +347,35 @@ def test_gguf_loader_keeps_a_q8_cr_layer_int8_through_the_native_rename(monkeypa
     assert to_q.weight.dtype is torch.int8
     assert torch.allclose(to_q._dequantized_weight(torch.device("cpu"), torch.float32), payload.dequantized, atol=1e-5)
     assert isinstance(model.img_in.weight, GGMLTensor)
+
+
+def test_gguf_loader_keeps_a_q4_cr_layer_packed_through_the_native_rename(monkeypatch, tmp_path) -> None:
+    """Q4_CR's codes are stored packed and its scale in fp16; both have to reach an `Int4ConvrotLinear` under the
+    weight's diffusers name, decoding to the round trip with the scale ComfyUI-GGUF actually stored."""
+    from tests.fixtures.quantized_payloads import q4_cr_marker, quantize_convrot_int4, write_gguf
+
+    width = _TinyNativeKrea2.WIDTH
+    group_size = 4
+    torch.manual_seed(8)
+    payload = quantize_convrot_int4(torch.randn(width, width), group_size=group_size)
+    stored_scale = payload.scale.view(-1).half()
+    tensors = {
+        **_native_block(width),
+        "blocks.0.attn.wq.weight": payload.packed,
+        "blocks.0.attn.wq.weight_scale": stored_scale,
+    }
+    path = tmp_path / "krea2TurboINT4GGUF.gguf"
+    write_gguf(path, tensors, quant={"blocks.0.attn.wq.weight": q4_cr_marker(width, width, group_size=group_size)})
+    loader, config = _gguf_driver(monkeypatch, path, _TinyNativeKrea2)
+
+    model = loader._load_from_gguf(config)
+
+    to_q = model.transformer_blocks[0].attn.to_q
+    assert isinstance(to_q, Int4ConvrotLinear)
+    assert to_q.weight.shape == (width, width // 2)
+    # Each row of the round trip is proportional to its scale, so the fp16 rounding of the stored scale is exact.
+    expected = payload.dequantized * (stored_scale.float() / payload.scale.view(-1)).unsqueeze(1)
+    assert torch.allclose(to_q._dequantized_weight(torch.device("cpu"), torch.float32), expected, atol=1e-5)
 
 
 def test_gguf_loader_refuses_an_i8_tensor_no_metadata_claims(monkeypatch, tmp_path) -> None:
@@ -587,7 +690,7 @@ def test_a_checkpoint_mixing_int8_and_fp8_is_refused(monkeypatch, tmp_path) -> N
     }
     loader, config = _int8_transformer_driver(monkeypatch, tmp_path, _TinyMixedKrea2, state_dict)
 
-    with pytest.raises(ValueError, match=r"weight scale\(s\) that no `int8_tensorwise` marker claims"):
+    with pytest.raises(ValueError, match=r"weight scale\(s\) that no int8 or int4 convrot marker claims"):
         loader._load_from_singlefile(config)
 
 

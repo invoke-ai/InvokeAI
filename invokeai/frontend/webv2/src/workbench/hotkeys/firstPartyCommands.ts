@@ -1,15 +1,14 @@
 import type { ImageRecallKind } from '@workbench/image-actions/imageRecall';
 import type { ResultDestination } from '@workbench/invocationContracts';
 
-import { invalidateGallery } from '@features/gallery/queries';
 import {
   adjustFocusedPromptAttention,
   flushGenerateDrafts,
   focusPositivePrompt,
   promptHistoryNavigation,
 } from '@features/generation/react';
-import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
-import { queueCommands } from '@features/queue';
+import { ensureModelsLoaded, getModelsSnapshot, openModelManager } from '@features/models';
+import { requestQueueAction } from '@features/queue/reveal';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -26,6 +25,7 @@ import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { getWorkbenchPreferences } from '@workbench/settings/store';
 import { openProjectSwitcher } from '@workbench/shell/topbar/projectSwitcherStore';
+import { openWidgetsDialog } from '@workbench/shell/widgetsDialogStore';
 import { cycleRegionWidget, openWidgetPlacement, toggleCenterPreview } from '@workbench/widgetPlacementCommands';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { getWidgetsForRegion } from '@workbench/widgetRegistry';
@@ -66,9 +66,11 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.clearQueue',
   'app.selectGenerateTab',
   'app.selectCanvasTab',
+  'app.selectUpscalingTab',
   'app.selectWorkflowsTab',
   'app.selectModelsTab',
   'app.selectQueueTab',
+  'app.openWidgets',
   'app.promptHistoryPrev',
   'app.promptHistoryNext',
   'app.promptWeightUp',
@@ -76,6 +78,8 @@ export const FIRST_PARTY_APP_COMMAND_IDS = [
   'app.focusPrompt',
   'app.toggleLeftPanel',
   'app.toggleRightPanel',
+  'app.undoLayoutChange',
+  'app.redoLayoutChange',
   'app.resetPanelLayout',
   'app.togglePanels',
   'app.togglePreview',
@@ -102,9 +106,9 @@ export const useRegisterFirstPartyCommands = () => {
   const queries = useWorkbenchQueries();
   const focus = useWorkbenchFocus();
   const getFocusTarget = useWorkbenchFocusTarget();
-  const queryClient = useQueryClient();
   const { t } = useTranslation();
-  const { layout, notifications, queue, widgets } = commands;
+  const { layout, notifications, widgets } = commands;
+  const queryClient = useQueryClient();
   useInvocationTemplatesSelector((snapshot) => snapshot.status);
 
   useMountEffect(() => {
@@ -131,6 +135,7 @@ export const useRegisterFirstPartyCommands = () => {
 
   const notifyNoImageSelected = () =>
     notifications.add({
+      actions: [{ kind: 'open-widget', widgetId: 'gallery' }],
       kind: 'info',
       message: 'Select an image in Gallery or Preview first.',
       title: 'No image selected',
@@ -190,13 +195,20 @@ export const useRegisterFirstPartyCommands = () => {
 
       const didRecall = await executeImageRecall({
         commands,
-        generateValues: getProjectWidgetValues(activeProject, 'generate'),
+        // Re-read on every call: recall awaits the image record, and a snapshot from the keypress would overwrite
+        // edits and recalls committed meanwhile.
+        getGenerateValues: () => {
+          const project = queries.getProject(activeProject.id);
+
+          return project ? getProjectWidgetValues(project, 'generate') : {};
+        },
         image,
         isCanvasFrame: activeProject.invocation.sourceId === 'canvas',
         kind,
         models: getAvailableModels() ?? [],
         owner,
         projectId: activeProject.id,
+        queryClient,
         t,
       });
 
@@ -299,23 +311,16 @@ export const useRegisterFirstPartyCommands = () => {
       ...layoutPresetCommands.map(({ id, presetId, title }) =>
         commandApi.register({ handler: () => void layout.activatePreset(presetId), id, title })
       ),
+      // The queue menus' own actions: scoped like them, and confirming by the same rules.
       commandApi.register({
-        handler: () => {
-          const owner = captureAccountScope();
-
-          void queueCommands.cancelCurrentItem().finally(() => {
-            if (isAccountScopeCurrent(owner)) {
-              return invalidateGallery(queryClient, owner);
-            }
-          });
-        },
+        handler: () => requestQueueAction('cancel-current'),
         id: 'app.cancelQueueItem',
         title: 'Cancel current queue item',
       }),
       commandApi.register({
-        handler: () => queue.cancelAll(queries.getSnapshot().activeProject.id),
+        handler: () => requestQueueAction('cancel-all'),
         id: 'app.clearQueue',
-        title: 'Clear queue',
+        title: 'Cancel all queue items',
       }),
       commandApi.register({
         handler: () =>
@@ -326,7 +331,7 @@ export const useRegisterFirstPartyCommands = () => {
             widgets,
           }),
         id: 'app.selectGenerateTab',
-        title: 'Select Generate tab',
+        title: 'Open Generate',
       }),
       commandApi.register({
         handler: () =>
@@ -337,7 +342,18 @@ export const useRegisterFirstPartyCommands = () => {
             widgets,
           }),
         id: 'app.selectCanvasTab',
-        title: 'Select Canvas tab',
+        title: 'Open Canvas',
+      }),
+      commandApi.register({
+        handler: () =>
+          openWidgetPlacement({
+            getWidgetsForRegion,
+            options: { preferredRegions: ['left'] },
+            typeId: 'upscale',
+            widgets,
+          }),
+        id: 'app.selectUpscalingTab',
+        title: 'Open Upscale',
       }),
       commandApi.register({
         handler: () =>
@@ -348,13 +364,12 @@ export const useRegisterFirstPartyCommands = () => {
             widgets,
           }),
         id: 'app.selectWorkflowsTab',
-        title: 'Select Workflows tab',
+        title: 'Open Workflow editor',
       }),
       commandApi.register({
-        handler: () =>
-          (window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`),
+        handler: () => openModelManager({ projectId: queries.getSnapshot().activeProject.id }),
         id: 'app.selectModelsTab',
-        title: 'Select Models tab',
+        title: 'Open Model Manager',
       }),
       commandApi.register({
         handler: () =>
@@ -365,8 +380,9 @@ export const useRegisterFirstPartyCommands = () => {
             widgets,
           }),
         id: 'app.selectQueueTab',
-        title: 'Select Queue tab',
+        title: 'Open Queue',
       }),
+      commandApi.register({ handler: openWidgetsDialog, id: 'app.openWidgets', title: 'Show widgets' }),
       commandApi.register({
         handler: () => {
           openWidgetPlacement({
@@ -448,10 +464,13 @@ export const useRegisterFirstPartyCommands = () => {
         id: 'app.toggleRightPanel',
         title: 'Toggle right panel',
       }),
+      // Steps back or forward through the active project's layout history; with none left, the key does nothing.
+      commandApi.register({ handler: () => layout.undo(), id: 'app.undoLayoutChange', title: 'Undo layout change' }),
+      commandApi.register({ handler: () => layout.redo(), id: 'app.redoLayoutChange', title: 'Redo layout change' }),
       commandApi.register({
         handler: layout.reset,
         id: 'app.resetPanelLayout',
-        title: 'Reset panel layout',
+        title: 'Revert layout to saved preset',
       }),
       commandApi.register({
         handler: () => {

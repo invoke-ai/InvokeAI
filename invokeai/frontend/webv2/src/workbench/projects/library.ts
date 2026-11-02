@@ -1,3 +1,5 @@
+import type { TFunction } from 'i18next';
+
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -8,7 +10,9 @@ import {
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION, isCanvasSchemaVersionSupported } from '@workbench/canvasSchemaVersion';
+import { forgetStartupLaunchProject } from '@workbench/launchpad/startupLaunch';
 
 import type { DuplicateProjectDeps } from './invk/duplicateProject';
 import type { ProjectTransferIssues } from './invk/transfer';
@@ -150,7 +154,8 @@ export const refreshProjectLibrary = (): Promise<void> =>
           }
 
           store.patchSnapshot({
-            error: error instanceof Error ? error.message : 'Failed to load projects.',
+            // The server's own reason, not its raw JSON body: the Launchpad shows it under its own title.
+            error: getApiErrorMessage(error, 'Failed to load projects.'),
             status: 'error',
           });
         })
@@ -192,6 +197,32 @@ export const isProjectSummaryCompatible = (summary: ProjectSummary): boolean =>
 /** Open projects mutate through their sync engine; closed projects use the HTTP API directly. */
 
 /**
+ * Why a delete was refused before anything was sent: `active-runs` while queue runs for the project are still active
+ * (in any tab), `runs-unverified` when the queue-run journal could not be read, `coordination-unavailable` when the
+ * cross-tab lock could not be requested. Callers translate it and offer the way forward (the queue for active runs).
+ */
+export type ProjectDeletionRefusal = 'active-runs' | 'runs-unverified' | 'coordination-unavailable';
+
+export class ProjectDeletionRefusedError extends Error {
+  constructor(readonly reason: ProjectDeletionRefusal) {
+    super(`Project deletion refused: ${reason}.`);
+    this.name = 'ProjectDeletionRefusedError';
+  }
+}
+
+/**
+ * What to tell the viewer about a failed delete, for the editor's notice and the Launchpad's toast alike: a refusal's
+ * reason, or the server's message; `offersQueue` when the runs holding it are the way forward.
+ */
+export const describeProjectDeletionFailure = (
+  error: unknown,
+  t: TFunction
+): { message: string; offersQueue: boolean } =>
+  error instanceof ProjectDeletionRefusedError
+    ? { message: t(`projects.deleteRefused.${error.reason}`), offersQueue: error.reason === 'active-runs' }
+    : { message: getApiErrorMessage(error, t('common.unknownError')), offersQueue: false };
+
+/**
  * Permanently remove a project from the server, its inbox with it. The only deletion path. Its other boards are
  * released to the Library unless asked to go too; media survives either way.
  */
@@ -206,10 +237,10 @@ export const deleteLibraryProject = async (
   const openProject = getOpenProject(projectId);
   const mutationLock = withSingleTabFallback(await acquireProjectMutationLock(owner.storageSuffix, projectId));
   if (mutationLock.kind === 'contended') {
-    throw new Error('Wait for active queue runs to finish before deleting this project.');
+    throw new ProjectDeletionRefusedError('active-runs');
   }
   if (mutationLock.kind === 'unavailable') {
-    throw new Error('Project deletion is unavailable because cross-tab coordination could not be established.');
+    throw new ProjectDeletionRefusedError('coordination-unavailable');
   }
   let journal;
 
@@ -217,10 +248,10 @@ export const deleteLibraryProject = async (
     journal = await createAccountOwnedQueueRunJournal(owner);
     const queueRuns = await journal.listForProject(projectId);
     if (queueRuns.kind === 'unavailable') {
-      throw new Error('Project deletion is unavailable because active queue runs could not be verified.');
+      throw new ProjectDeletionRefusedError('runs-unverified');
     }
     if (queueRuns.entries.length > 0) {
-      throw new Error('Wait for active queue runs to finish before deleting this project.');
+      throw new ProjectDeletionRefusedError('active-runs');
     }
 
     if (openProject) {
@@ -234,6 +265,7 @@ export const deleteLibraryProject = async (
     await journal.deleteForProject(projectId);
     openProject?.close();
     forgetProjectCover(projectId, owner);
+    forgetStartupLaunchProject(projectId);
     store.patchSnapshot({ summaries: store.getSnapshot().summaries.filter((summary) => summary.id !== projectId) });
 
     // Remove deleted projects from durable session state so missing records do not reopen.

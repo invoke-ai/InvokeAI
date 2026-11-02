@@ -107,16 +107,14 @@ export const getGalleryPickerDefaultIndex = (
 };
 
 export type GalleryPickerStatusPart =
-  | { count: number; kind: 'boardCount' | 'itemCount' | 'matchCount' | 'remainingCount' | 'windowLimit' }
+  | { count: number; kind: 'boardCount' | 'itemCount' | 'matchCount' | 'remainingCount' }
   | { kind: 'remainingNone' | 'unsupportedImage' | 'unsupportedVideo' };
 
-/** Footer priority: board count, incompatible-highlight explanation, capacity, then window cap or listing size. */
+/** Footer priority: board count, incompatible-highlight explanation, capacity, then listing size. */
 export const getGalleryPickerStatus = ({
   accept,
   activeItem,
   isSearching,
-  isWindowTruncated,
-  loadedCount,
   pane,
   remaining,
   total,
@@ -125,8 +123,6 @@ export const getGalleryPickerStatus = ({
   accept: GalleryPickerAccept;
   activeItem: GalleryItem | undefined;
   isSearching: boolean;
-  isWindowTruncated: boolean;
-  loadedCount: number;
   pane: 'boards' | 'items';
   remaining: number | null;
   total: number | null;
@@ -146,9 +142,7 @@ export const getGalleryPickerStatus = ({
     parts.push(remaining > 0 ? { count: remaining, kind: 'remainingCount' } : { kind: 'remainingNone' });
   }
 
-  if (isWindowTruncated) {
-    parts.push({ count: loadedCount, kind: 'windowLimit' });
-  } else if (total !== null) {
+  if (total !== null) {
     parts.push({ count: total, kind: isSearching ? 'matchCount' : 'itemCount' });
   }
 
