@@ -1003,6 +1003,13 @@ def _resize_controlnet_residual(residual: torch.Tensor, target: torch.Tensor) ->
     return F.interpolate(residual, target.shape[-2:], mode="bicubic")
 
 
+def _resize_adapter_residual(residual: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Resize only the spatial dimensions of a T2I-Adapter residual for HiDiffusion."""
+    if residual.shape[-2:] == target.shape[-2:]:
+        return residual
+    return F.adaptive_avg_pool2d(residual, output_size=target.shape[-2:])
+
+
 def make_diffusers_unet_2d_condition(block_class):
     class unet_2d_condition(block_class):
         # Save for unpatching later
@@ -1284,7 +1291,10 @@ def make_diffusers_unet_2d_condition(block_class):
                     # For t2i-adapter CrossAttnDownBlock2D
                     additional_residuals = {}
                     if is_adapter and len(down_intrablock_additional_residuals) > 0:
-                        additional_residuals["additional_residuals"] = down_intrablock_additional_residuals.pop(0)
+                        adapter_residual = down_intrablock_additional_residuals.pop(0)
+                        additional_residuals["additional_residuals"] = _resize_adapter_residual(
+                            adapter_residual, sample
+                        )
 
                     sample, res_samples = downsample_block(
                         hidden_states=sample,
@@ -1299,7 +1309,8 @@ def make_diffusers_unet_2d_condition(block_class):
                     # sample, res_samples = downsample_block(hidden_states=sample, temb=emb, scale=lora_scale)
                     sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
                     if is_adapter and len(down_intrablock_additional_residuals) > 0:
-                        sample += down_intrablock_additional_residuals.pop(0)
+                        adapter_residual = down_intrablock_additional_residuals.pop(0)
+                        sample += _resize_adapter_residual(adapter_residual, sample)
 
                 down_block_res_samples += res_samples
 
@@ -1332,12 +1343,11 @@ def make_diffusers_unet_2d_condition(block_class):
                     sample = self.mid_block(sample, emb)
 
                 # To support T2I-Adapter-XL
-                if (
-                    is_adapter
-                    and len(down_intrablock_additional_residuals) > 0
-                    and sample.shape == down_intrablock_additional_residuals[0].shape
-                ):
-                    sample += down_intrablock_additional_residuals.pop(0)
+                if is_adapter and len(down_intrablock_additional_residuals) > 0:
+                    adapter_residual = down_intrablock_additional_residuals[0]
+                    if sample.shape[:-2] == adapter_residual.shape[:-2]:
+                        sample += _resize_adapter_residual(adapter_residual, sample)
+                        down_intrablock_additional_residuals.pop(0)
 
             if is_controlnet:
                 mid_block_additional_residual = _resize_controlnet_residual(mid_block_additional_residual, sample)
@@ -1683,10 +1693,7 @@ def make_diffusers_cross_attn_down_block(block_class: Type[torch.nn.Module]) -> 
 
                 # apply additional residuals to the output of the last pair of resnet and attention blocks
                 if i == len(blocks) - 1 and additional_residuals is not None:
-                    if additional_residuals.shape[-2:] != hidden_states.shape[-2:]:
-                        additional_residuals = F.adaptive_avg_pool2d(
-                            additional_residuals, output_size=hidden_states.shape[-2:]
-                        )
+                    additional_residuals = _resize_adapter_residual(additional_residuals, hidden_states)
                     hidden_states = hidden_states + additional_residuals
 
                 if i == 0:
@@ -1987,6 +1994,7 @@ def apply_hidiffusion(
     is_playground=False,
     generator: torch.Generator | None = None,
     has_controlnet: bool = False,
+    has_t2i_adapter: bool = False,
     is_controlnet_text_to_image: bool = False,
     t1_ratio: float | None = None,
     t2_ratio: float | None = None,
@@ -2045,7 +2053,7 @@ def apply_hidiffusion(
         diffusion_model = model.unet if hasattr(model, "unet") else model
 
         if (
-            has_controlnet
+            (has_controlnet or has_t2i_adapter)
             and apply_raunet
             and not (is_sdxl_controlnet_inpaint or is_sd_controlnet_inpaint or is_sdxl_controlnet or is_sd_controlnet)
         ):

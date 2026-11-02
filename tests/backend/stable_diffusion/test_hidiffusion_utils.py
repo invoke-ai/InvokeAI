@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
-from diffusers import DDIMScheduler, EulerDiscreteScheduler, HeunDiscreteScheduler
+from diffusers import DDIMScheduler, EulerDiscreteScheduler, HeunDiscreteScheduler, UNet2DConditionModel
 from diffusers.models.unets.unet_2d_blocks import CrossAttnDownBlock2D
 
 from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation
@@ -480,6 +480,7 @@ def test_hidiffusion_patch_forwards_generation_context():
         with hidiffusion_patch(
             model,
             name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+            has_t2i_adapter=True,
             is_inpainting_task=True,
             full_timestep_count=50,
             start_step_index=12,
@@ -488,6 +489,7 @@ def test_hidiffusion_patch_forwards_generation_context():
 
     kwargs = mock_apply_hidiffusion.call_args.kwargs
     assert kwargs["is_inpainting_task"] is True
+    assert kwargs["has_t2i_adapter"] is True
     assert kwargs["full_timestep_count"] == 50
     assert kwargs["start_step_index"] == 12
 
@@ -782,6 +784,7 @@ def test_hidiffusion_extension_sets_logical_step_on_patched_unet():
 def test_hidiffusion_extension_forwards_selected_schedule_indices():
     extension = HiDiffusionExt(
         name_or_path="runwayml/stable-diffusion-v1-5",
+        has_t2i_adapter=True,
         full_timestep_count=50,
         start_step_index=25,
     )
@@ -791,43 +794,66 @@ def test_hidiffusion_extension_forwards_selected_schedule_indices():
             pass
 
     kwargs = mock_patch.call_args.kwargs
+    assert kwargs["has_t2i_adapter"] is True
     assert kwargs["full_timestep_count"] == 50
     assert kwargs["start_step_index"] == 25
 
 
-def test_t2i_adapter_residual_is_resized_for_active_raunet():
-    patched_block = make_diffusers_cross_attn_down_block(CrossAttnDownBlock2D)
-    module = patched_block(
+def test_t2i_adapter_residuals_follow_active_raunet_through_whole_unet():
+    model = UNet2DConditionModel(
+        sample_size=16,
         in_channels=4,
         out_channels=4,
-        temb_channels=4,
-        num_layers=2,
-        resnet_groups=1,
-        num_attention_heads=1,
-        cross_attention_dim=4,
-        add_downsample=False,
+        down_block_types=("DownBlock2D", "CrossAttnDownBlock2D", "DownBlock2D"),
+        up_block_types=("UpBlock2D", "CrossAttnUpBlock2D", "UpBlock2D"),
+        block_out_channels=(4, 8, 8),
+        layers_per_block=1,
+        cross_attention_dim=8,
+        attention_head_dim=1,
+        norm_num_groups=1,
     )
-    module.info = {
-        "size": (64, 64),
-        "pipeline": SimpleNamespace(_num_timesteps=10),
-        "text_to_img_controlnet": False,
-        "is_inpainting_task": False,
-        "is_playground": False,
-        "step_index": 0,
-        "switching_threshold_overrides": {"T1_ratio": 1.0, "T2_ratio": 1.0},
-    }
-    module.model = "sd15"
-    module.switching_threshold_ratio = "T2_ratio"
-
-    hidden_states, output_states = module(
-        hidden_states=torch.randn(1, 4, 8, 8),
-        temb=torch.randn(1, 4),
-        encoder_hidden_states=torch.randn(1, 2, 4),
-        additional_residuals=torch.randn(1, 4, 8, 8),
+    model._num_timesteps = 10
+    sample = torch.randn(1, 4, 16, 16)
+    adapter_residuals = (
+        torch.randn(1, 4, 8, 8),
+        torch.randn(1, 8, 8, 8),
+        torch.randn(1, 8, 4, 4),
+        torch.randn(1, 8, 4, 4),
     )
 
-    assert hidden_states.shape[-2:] == (4, 4)
-    assert output_states[-1].shape[-2:] == (4, 4)
+    with hidiffusion_patch(
+        model,
+        name_or_path="stabilityai/stable-diffusion-xl-base-1.0",
+        apply_window_attn=False,
+        t1_ratio=1.0,
+        t2_ratio=0.5,
+        full_timestep_count=10,
+        has_t2i_adapter=True,
+    ):
+        model.info["step_index"] = 0
+        encoder_hidden_states = torch.randn(1, 2, 8)
+
+        def run_with_residuals(residuals: tuple[torch.Tensor, ...]) -> torch.Tensor:
+            return model(
+                sample,
+                timestep=1,
+                encoder_hidden_states=encoder_hidden_states,
+                down_intrablock_additional_residuals=list(residuals),
+            ).sample
+
+        zero_residuals = tuple(torch.zeros_like(residual) for residual in adapter_residuals)
+        zero_output = run_with_residuals(zero_residuals)
+        individual_outputs = []
+        for index, adapter_residual in enumerate(adapter_residuals):
+            residuals = list(zero_residuals)
+            residuals[index] = adapter_residual
+            individual_outputs.append(run_with_residuals(tuple(residuals)))
+        output = run_with_residuals(adapter_residuals)
+
+    assert output.shape == sample.shape
+    assert not torch.allclose(output, zero_output)
+    for index, individual_output in enumerate(individual_outputs):
+        assert not torch.allclose(individual_output, zero_output), f"adapter residual {index} had no effect"
 
 
 def test_sdxl_primary_raunet_is_active_after_aggressive_stage_until_t1():

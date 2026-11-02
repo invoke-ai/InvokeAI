@@ -23,6 +23,7 @@ class HiDiffusionExt(ExtensionBase):
         t2_ratio: Optional[float] = None,
         generator: torch.Generator | None = None,
         has_controlnet: bool = False,
+        has_t2i_adapter: bool = False,
         is_controlnet_text_to_image: bool = False,
         is_inpainting_task: bool | None = None,
         full_timestep_count: int | None = None,
@@ -33,6 +34,7 @@ class HiDiffusionExt(ExtensionBase):
         self._apply_raunet = apply_raunet
         self._apply_window_attn = apply_window_attn
         self._has_controlnet = has_controlnet
+        self._has_t2i_adapter = has_t2i_adapter
         self._is_controlnet_text_to_image = is_controlnet_text_to_image
         self._is_inpainting_task = is_inpainting_task
         self._full_timestep_count = full_timestep_count
@@ -55,6 +57,7 @@ class HiDiffusionExt(ExtensionBase):
             apply_raunet=self._apply_raunet,
             apply_window_attn=self._apply_window_attn,
             has_controlnet=self._has_controlnet,
+            has_t2i_adapter=self._has_t2i_adapter,
             is_controlnet_text_to_image=self._is_controlnet_text_to_image,
             t1_ratio=self._t1_ratio,
             t2_ratio=self._t2_ratio,
