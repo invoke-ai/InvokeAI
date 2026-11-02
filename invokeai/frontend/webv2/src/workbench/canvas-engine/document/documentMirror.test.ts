@@ -102,7 +102,6 @@ const spyCallbacks = () => ({
   onLayersChanged: vi.fn<DocumentMirrorCallbacks['onLayersChanged']>(),
   onLayersRecomposite: vi.fn<NonNullable<DocumentMirrorCallbacks['onLayersRecomposite']>>(),
   onSelectionChanged: vi.fn<NonNullable<DocumentMirrorCallbacks['onSelectionChanged']>>(),
-  onStagingChanged: vi.fn<DocumentMirrorCallbacks['onStagingChanged']>(),
 });
 
 describe('createDocumentMirror: selection changes', () => {
@@ -407,18 +406,6 @@ describe('createDocumentMirror', () => {
     expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
   });
 
-  it('fires onStagingChanged when the staging area reference changes', () => {
-    const doc = makeDoc([rasterLayer('a')]);
-    const canvas = makeCanvas(doc);
-    const store = createFakeStore([{ canvas, id: 'p1' }]);
-    const callbacks = spyCallbacks();
-    createDocumentMirror(store, 'p1', callbacks);
-
-    store.setState({ projects: [{ canvas: { ...canvas, stagingArea: makeStaging() }, id: 'p1' }] });
-    expect(callbacks.onStagingChanged).toHaveBeenCalledTimes(1);
-    expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
-  });
-
   it('is silent when an unrelated project changes (identity short-circuit)', () => {
     const docA = makeDoc([rasterLayer('a')]);
     const canvasA = makeCanvas(docA);
@@ -441,7 +428,6 @@ describe('createDocumentMirror', () => {
     expect(callbacks.onLayersChanged).not.toHaveBeenCalled();
     expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
     expect(callbacks.onBboxChanged).not.toHaveBeenCalled();
-    expect(callbacks.onStagingChanged).not.toHaveBeenCalled();
   });
 
   it('reports null and stays no-op safe when the project is deleted', () => {

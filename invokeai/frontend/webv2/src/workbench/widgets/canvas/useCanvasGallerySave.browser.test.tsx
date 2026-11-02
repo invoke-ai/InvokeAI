@@ -19,16 +19,18 @@ const mocks = vi.hoisted(() => ({
   notifyError: vi.fn(),
   notifyInfo: vi.fn(),
   reportError: vi.fn(),
+  resolveCanvasSaveBoardId: vi.fn<() => Promise<string | undefined>>(),
   saveCanvasToGallery: vi.fn<(options: { region: CanvasGallerySaveRegion }) => Promise<unknown>>(),
 }));
 
 vi.mock('@workbench/canvas-operations/api', () => ({
+  resolveCanvasSaveBoardId: () => mocks.resolveCanvasSaveBoardId(),
   saveCanvasToGallery: (...args: [{ region: CanvasGallerySaveRegion }]) => mocks.saveCanvasToGallery(...args),
 }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({ notifications: { reportError: mocks.reportError } }),
   useWorkbenchQueries: () => ({
-    getSnapshot: () => ({ activeProject: { id: 'project-1', widgetInstances: {} } }),
+    getSnapshot: () => ({ activeProject: { id: 'project-1', widgetInstances: {} }, scopedDefaults: {} }),
     isActiveProject: (id: string) => id === mocks.activeProjectId,
   }),
 }));
@@ -197,5 +199,20 @@ describe('useCanvasGallerySave feedback', () => {
 
     await until(() => expect(toastRoot()?.textContent).toContain('Board B'));
     expect(toastButton('widgets.canvas.staging.showInGallery')).toBeNull();
+  });
+});
+
+describe('useCanvasGallerySave destination', () => {
+  it('names the board a save would go to, as the save resolves it, and Uncategorized without one', async () => {
+    mocks.resolveCanvasSaveBoardId.mockResolvedValueOnce('board-b').mockResolvedValueOnce(undefined);
+
+    await expect(header.current!.describeDestination()).resolves.toBe('Board B');
+    await expect(header.current!.describeDestination()).resolves.toBe('widgets.gallery.uncategorized');
+  });
+
+  it('names nothing when the destination cannot be resolved', async () => {
+    mocks.resolveCanvasSaveBoardId.mockRejectedValueOnce(new Error('offline'));
+
+    await expect(header.current!.describeDestination()).resolves.toBeNull();
   });
 });

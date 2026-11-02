@@ -39,7 +39,7 @@ export const WidgetInstanceContextMenu = ({
   onDock,
   onRemove,
   onSetAlignment,
-  removeDisabledLabel = 'Required',
+  removeDisabledLabel,
   target,
 }: WidgetInstanceContextMenuProps) => {
   const { t } = useTranslation();
@@ -111,7 +111,7 @@ export const WidgetInstanceContextMenu = ({
                 <Menu.ItemText>{t('widgets.removeWidget', { label: target.item.label })}</Menu.ItemText>
                 {isDisabled ? (
                   <Text color="fg.subtle" fontSize="xs" ms="auto">
-                    {removeDisabledLabel}
+                    {removeDisabledLabel ?? t('widgets.required')}
                   </Text>
                 ) : null}
               </Menu.Item>

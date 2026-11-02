@@ -35,11 +35,13 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     i18n: { resolvedLanguage: 'en' },
     t: (key: string, options?: Record<string, unknown>) =>
-      options && Object.keys(options).length > 0
-        ? `${key}(${Object.entries(options)
-            .map(([name, value]) => `${name}=${String(value)}`)
-            .join(',')})`
-        : key,
+      key === 'intermediates.dialog.confirmWord'
+        ? 'DELETE'
+        : options && Object.keys(options).length > 0
+          ? `${key}(${Object.entries(options)
+              .map(([name, value]) => `${name}=${String(value)}`)
+              .join(',')})`
+          : key,
   }),
 }));
 

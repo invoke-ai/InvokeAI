@@ -2,9 +2,9 @@
 import type { ModelLibraryFilters, ModelSortField } from '@features/models/core/library';
 import type { ModelTaxonomyType } from '@features/models/core/types';
 
-import { HStack, Icon, Input, InputGroup } from '@chakra-ui/react';
+import { HStack } from '@chakra-ui/react';
 import { FilterMenuItem, ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
-import { SearchIcon } from 'lucide-react';
+import { ManagerSearchField } from '@platform/ui/ManagerLayout';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -60,14 +60,12 @@ export const ModelFilterBar = ({
   );
   return (
     <HStack gap="1.5" w="full" px="3" pt="3">
-      <InputGroup startElement={<Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />}>
-        <Input
-          aria-label={t('models.searchModels')}
-          placeholder={t('models.searchModelsPlaceholder')}
-          value={filters.searchTerm}
-          onChange={(event) => handleSearchChange(event.currentTarget.value)}
-        />
-      </InputGroup>
+      <ManagerSearchField
+        label={t('models.searchModels')}
+        placeholder={t('models.searchModelsPlaceholder')}
+        value={filters.searchTerm}
+        onChange={handleSearchChange}
+      />
       <ModelFilterMenu
         ariaLabel={t('models.filterAndSort')}
         availableBases={availableBases}

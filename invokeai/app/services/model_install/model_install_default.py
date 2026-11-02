@@ -509,14 +509,24 @@ class ModelInstallService(ModelInstallServiceBase):
             return self._single_hf_file_token(source)
         return source.access_token
 
+    def _download_token_for(
+        self, source: HFModelSource | URLModelSource, trusted_endpoint: Optional[str] = None
+    ) -> Callable[[str], Optional[str]]:
+        """The token a download of a URL of this source sends: `_download_access_token`, else the `remote_api_tokens`
+        entry that the download queue matches against that URL. Requests made to list a repository's files send it
+        too, so a gated repository that will serve the files also serves its index."""
+        return lambda url: self._download_access_token(source, trusted_endpoint) or self._configured_api_token(url)
+
     def _single_hf_file_token(self, source: URLModelSource) -> Optional[str]:
         """The token a download of this source's file sends: the source's own, else the configured `remote_api_tokens`
         entry matching the URL as the user gave it. The download URL names a commit instead, so the token is resolved
         here, once, and sent explicitly."""
-        if source.access_token:
-            return source.access_token
+        return source.access_token or self._configured_api_token(str(source.url))
+
+    def _configured_api_token(self, url: str) -> Optional[str]:
+        """The token of the first `remote_api_tokens` entry whose pattern matches `url`."""
         for pair in self._app_config.remote_api_tokens or []:
-            if re.search(pair.url_regex, str(source.url)):
+            if re.search(pair.url_regex, url):
                 return pair.token
         return None
 
@@ -1618,6 +1628,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     subfolder=source.subfolder if len(subfolders) <= 1 else None,
                     subfolders=subfolders if len(subfolders) > 1 else None,
                     session=self._session,
+                    access_token_for=self._download_token_for(source, trusted_endpoint),
                 ),
                 metadata,
             )
@@ -1628,7 +1639,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 kwargs: dict[str, Any] = {"session": self._session}
                 metadata = fetcher(**kwargs).from_url(source.url, revision=revision, pin_to_commit=True)
                 assert isinstance(metadata, ModelMetadataWithFiles)
-                return metadata.download_urls(session=self._session), metadata
+                return (
+                    metadata.download_urls(
+                        session=self._session, access_token_for=self._download_token_for(source, trusted_endpoint)
+                    ),
+                    metadata,
+                )
             except ValueError:
                 pass
 

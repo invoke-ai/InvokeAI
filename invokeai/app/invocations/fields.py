@@ -184,6 +184,7 @@ class FieldDescriptions:
     flux2_dev_model = "FLUX.2 [dev] model (Transformer) to load"
     krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_2_1_model = "Qwen-Image-2.1 model (Transformer) to load"
+    flux3_model = "FLUX.3 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
@@ -421,6 +422,12 @@ class Krea2ConditioningField(BaseModel):
 
 class QwenImage21ConditioningField(BaseModel):
     """A Qwen-Image-2.1 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Flux3ConditioningField(BaseModel):
+    """A FLUX.3 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 

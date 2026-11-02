@@ -38,16 +38,10 @@ const CANVAS_IMAGE_DROP_ZONES = CANVAS_IMAGE_DROP_LAYOUT.map((zone) => ({
   labelKey: LABEL_KEYS[zone.destination],
 })) satisfies readonly CanvasImageDropZoneProps[];
 
-export const CanvasImageDropOverlay = ({
-  isDocumentEditingLocked,
-  isInteractionLocked,
-}: {
-  isDocumentEditingLocked: boolean;
-  isInteractionLocked: boolean;
-}) => {
+export const CanvasImageDropOverlay = ({ isDocumentEditingLocked }: { isDocumentEditingLocked: boolean }) => {
   const { active } = useDndContext();
 
-  if (isDocumentEditingLocked || isInteractionLocked || !isGalleryImageDragData(active?.data.current)) {
+  if (isDocumentEditingLocked || !isGalleryImageDragData(active?.data.current)) {
     return null;
   }
 

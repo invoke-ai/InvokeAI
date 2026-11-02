@@ -17,10 +17,11 @@ export type PendingConnection = {
 export const zWorkflowMode = z.enum(['edit', 'view']);
 export type WorkflowMode = z.infer<typeof zWorkflowMode>;
 export const zNodesState = z.object({
+  // zod rejects .omit() on refined schemas, so spread the shape first and let nodes/edges below replace it.
+  ...zWorkflowV3.shape,
   _version: z.literal(1),
   nodes: z.array(zAnyNode),
   edges: z.array(zAnyEdge),
   formFieldInitialValues: z.record(z.string(), zStatefulFieldValue),
-  ...zWorkflowV3.omit({ nodes: true, edges: true }).shape,
 });
 export type NodesState = z.infer<typeof zNodesState>;

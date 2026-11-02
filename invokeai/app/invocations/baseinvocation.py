@@ -76,6 +76,37 @@ def _services_with_invocation_cache_bypassed(services: "InvocationServices") -> 
     return effect_services
 
 
+class _UserScopedInvocationCache:
+    """Cache facade whose keys are scoped to one queueing user; everything else hits the real cache."""
+
+    def __init__(self, cache: Any, user_id: str) -> None:
+        self._cache = cache
+        self._user_id = user_id
+
+    def create_key(self, invocation: "BaseInvocation") -> int:
+        return hash((self._user_id, self._cache.create_key(invocation)))
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._cache, name)
+
+
+def services_for_queue_user(services: "InvocationServices", user_id: Optional[str]) -> "InvocationServices":
+    """Services for one node dispatch on behalf of the queue item's user.
+
+    In multiuser mode nodes authorize and scope work by the queueing user inside invoke(), so a cache
+    hit must never cross accounts. Without a usable user id the cache is bypassed (fail closed).
+    Single-user mode shares the cache across sessions as before.
+    """
+    if not services.configuration.multiuser:
+        return services
+    user_services = copy(services)
+    if isinstance(user_id, str) and user_id:
+        user_services.invocation_cache = _UserScopedInvocationCache(services.invocation_cache, user_id)
+    else:
+        user_services.invocation_cache = _InvocationCacheBypass(services.invocation_cache)
+    return user_services
+
+
 class InvalidVersionError(ValueError):
     pass
 

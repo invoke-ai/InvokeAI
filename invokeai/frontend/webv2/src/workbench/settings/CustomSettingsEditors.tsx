@@ -1,41 +1,37 @@
 import type { LogNamespace } from '@platform/logging/contracts';
-import type { SettingFieldProps } from '@platform/ui/settings/contracts';
+import type { SettingFieldProps, SettingLayer } from '@platform/ui/settings/contracts';
 import type { WorkbenchThemeId } from '@theme/themes';
 
 import { Box, chakra, Checkbox, Flex, HStack, Icon, SimpleGrid, Stack, Text, useSlotRecipe } from '@chakra-ui/react';
 import { useCapabilities } from '@features/identity';
 import { INTERMEDIATES_SETTING_ID } from '@features/intermediates';
-import { Button, ConfirmDialog } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { themeCardRecipe } from '@theme/recipes';
 import { previewSwatches, THEMES, type ThemeDefinition } from '@theme/system';
 import { areLoggingPreferencesDefault, resetLoggingPreferences } from '@workbench/diagnostics/loggingPreferences';
-import { clearAllWorkbenchData } from '@workbench/projects/syncedPersistence';
-import { useOptionalWorkbenchCommands, useOptionalWorkbenchPersistenceService } from '@workbench/WorkbenchContext';
-import { BrushCleaningIcon, CheckIcon, DatabaseIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
+import { useOptionalWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { BrushCleaningIcon, CheckIcon, DatabaseIcon, RotateCcwIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { AboutSettings } from './AboutSettings';
-import { clearWorkspaceData, rememberWorkspaceClearFailure } from './clearWorkspaceData';
+import { ClearSavedDataSettings } from './ClearSavedDataSettings';
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
 import { ImageStorageSettings } from './ImageStorageSettings';
 import { MaxQueueHistorySettings } from './MaxQueueHistorySettings';
 import {
-  clearWorkbenchSettings,
   DEFAULT_PREFERENCES,
   DEVELOPER_LOG_NAMESPACES,
   patchWorkbenchPreferences,
   useWorkbenchPreferenceSelector,
-  useWorkbenchSettingsSelector,
 } from './store';
 
 const THEME_GRID_COLUMNS = { base: 2, md: 3 };
 const DEVELOPER_GRID_COLUMNS = { base: 1, md: 2 };
-const DANGER_BUTTON_HOVER_STYLES = { bg: 'fg.error', color: 'bg.subtle' };
 const LazyDatabaseMaintenanceDialog = lazy(() =>
   import('./DatabaseMaintenanceDialog').then((module) => ({ default: module.DatabaseMaintenanceDialog }))
 );
@@ -172,31 +168,10 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
   const { t } = useTranslation();
   const { canManageAppConfig } = useCapabilities();
   const commands = useOptionalWorkbenchCommands();
-  const mountedPersistence = useOptionalWorkbenchPersistenceService();
-  const scope = useWorkbenchSettingsSelector((snapshot) => snapshot.scope);
-  const [isClearConfirmOpen, setIsClearConfirmOpen] = useState(false);
   const [isDatabaseDialogMounted, setIsDatabaseDialogMounted] = useState(false);
   const [isDatabaseDialogOpen, setIsDatabaseDialogOpen] = useState(false);
 
-  const clearSavedData = useCallback(async () => {
-    const failures = await clearWorkspaceData(
-      () => (mountedPersistence ? mountedPersistence.clearWorkbench() : clearAllWorkbenchData()),
-      clearWorkbenchSettings
-    );
-    if (failures.length === 0) {
-      window.location.reload();
-      return;
-    }
-    const message = failures.includes('projects')
-      ? 'Saved project data could not be fully cleared. Reloading to restore a consistent workspace.'
-      : 'Projects were cleared, but some local settings could not be. Reloading the workspace.';
-    rememberWorkspaceClearFailure(message, window.sessionStorage);
-    commands?.notifications.reportError({ area: 'workspace-clear', message, namespace: 'system' });
-    window.location.reload();
-  }, [commands, mountedPersistence]);
   const resetLayout = useCallback(() => commands?.layout.reset(), [commands]);
-  const openClearConfirm = useCallback(() => setIsClearConfirmOpen(true), []);
-  const closeClearConfirm = useCallback(() => setIsClearConfirmOpen(false), []);
   const openDatabaseConfirmation = useCallback(() => {
     setIsDatabaseDialogMounted(true);
     setIsDatabaseDialogOpen(true);
@@ -210,7 +185,7 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
         {commands ? (
           <Button size="lg" variant="outline" onClick={resetLayout}>
             <RotateCcwIcon />
-            Reset layout
+            {t('settings.revertLayout')}
           </Button>
         ) : null}
         {onReveal ? (
@@ -225,35 +200,12 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
             {t('settings.databaseMaintenance.compactDatabase')}
           </Button>
         ) : null}
-        <Button
-          borderColor="border.emphasized"
-          color="fg.error"
-          size="lg"
-          variant="outline"
-          _hover={DANGER_BUTTON_HOVER_STYLES}
-          onClick={openClearConfirm}
-        >
-          <Trash2Icon />
-          Clear saved data…
-        </Button>
       </HStack>
       {canManageAppConfig ? (
         <Suspense fallback={null}>
           <LazyGalleryMaintenance />
         </Suspense>
       ) : null}
-      <ConfirmDialog
-        body={
-          scope === 'user'
-            ? 'This permanently deletes all projects and settings for your account on this server. It cannot be undone.'
-            : 'This permanently deletes all projects and settings for this install. It cannot be undone.'
-        }
-        confirmLabel="Delete everything"
-        isOpen={isClearConfirmOpen}
-        title="Clear saved data?"
-        onClose={closeClearConfirm}
-        onConfirm={clearSavedData}
-      />
       {canManageAppConfig && isDatabaseDialogMounted ? (
         <Suspense fallback={null}>
           <LazyDatabaseMaintenanceDialog isOpen={isDatabaseDialogOpen} onClose={closeDatabaseConfirmation} />
@@ -284,6 +236,21 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     }
     return false;
   });
+  const layer = useMemo<SettingLayer | undefined>(
+    () =>
+      isModified
+        ? {
+            onResetToBuiltIn: () =>
+              void patchWorkbenchPreferences(
+                field.id === 'themeId'
+                  ? { themeId: DEFAULT_PREFERENCES.themeId }
+                  : { developerLogNamespaces: DEFAULT_PREFERENCES.developerLogNamespaces }
+              ),
+            state: 'default',
+          }
+        : undefined,
+    [field.id, isModified]
+  );
   let editor: ReactNode;
 
   switch (field.id) {
@@ -299,6 +266,14 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     case 'workspaceActions':
       editor = <WorkspaceSettings onReveal={onReveal} />;
       break;
+    case 'clearSavedData':
+      // A danger area of its own, apart from the everyday workspace actions; it carries its own heading.
+      return (
+        <ClearSavedDataSettings
+          description={field.description ? resolveSettingsText(field.description, t) : ''}
+          label={resolveSettingsText(field.label, t)}
+        />
+      );
     case 'about':
       editor = <AboutSettings />;
       break;
@@ -332,7 +307,7 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
           <Text color="fg" fontSize="lg" fontWeight="500">
             {resolveSettingsText(field.label, t)}
           </Text>
-          {isModified ? <ModifiedSettingIndicator label={resolveSettingsText(field.label, t)} /> : null}
+          {layer ? <SettingLayerIndicator label={resolveSettingsText(field.label, t)} layer={layer} /> : null}
         </HStack>
         {field.description ? (
           <Text color="fg.muted" fontSize="md">

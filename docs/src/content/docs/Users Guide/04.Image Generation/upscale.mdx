@@ -9,6 +9,8 @@ The **Upscale** panel enlarges an image. A Spandrel upscaling model (such as a R
 
 Open it from the left rail. It is available in the Compose, Edit and Video layouts. To upscale a gallery image without opening the panel, use its context menu (see [Upscaling from the image menu](#upscaling-from-the-image-menu)).
 
+When no model of a kind the panel needs is installed (a Spandrel upscaler, a supported main model, or the Tile or Union ControlNet a model requires), its picker says so and offers **Install a model**, which opens Add Models in the Model Manager filtered to that kind. Users who cannot manage models are asked to contact an administrator instead.
+
 ## Refine or Model only
 
 The **Mode** switch at the top of the panel picks how the image is upscaled. Projects open in **Refine**, including projects saved before the switch existed.
@@ -82,11 +84,11 @@ For all model families, encoding and decoding the enlarged image with the VAE ru
 
 ## Upscaling from the image menu
 
-Right-click an image in the gallery and open **Upscale**:
+Right-click an image in the gallery, or open **Edit** in the Preview's header, and open **Upscale**:
 
 - **Send to Upscale** opens the Upscale panel with the image as its source.
 - Under **Upscale now, model only**, each installed upscaler is listed by name with its native scale when it is known. Each one opens a list of factors: 1.5×, 2× and its native scale, marked "(native)". A factor offered twice is listed once, so a 2× upscaler offers 1.5× and 2×, and a 4× upscaler offers 1.5×, 2× and 4×. A 1× (restoration) model offers only 1×. Picking a factor queues a Model only upscale of the image straight away, without changing the Upscale panel or the current Invoke settings. Every factor runs as Model only mode runs it at that Scale, so the result has the same size as one from the Upscale panel (see [Native scale](#native-scale)): the native scale runs the upscaler once, and other factors resize the result to the factor.
 
 When no upscaler is installed, the model-only entry is disabled. An upscaler whose native scale is unknown offers **Native scale**, which runs it once at whatever size it produces, and a disabled **Other factors** entry with a note to re-identify it in the Model Manager. For other factors, or a fractional Scale such as 2.5×, use **Send to Upscale**.
 
-Results go to the gallery's auto-add board, wherever Invoke is currently set to send results. Their metadata is the source image's metadata plus the upscaler and its scale. If the source image's metadata cannot be read, nothing is queued and a notification says so.
+Results go to the board the Gallery names under **Saving to**, where new results go. Their metadata is the source image's metadata plus the upscaler and its scale. If the source image's metadata cannot be read, nothing is queued and a notification says so.

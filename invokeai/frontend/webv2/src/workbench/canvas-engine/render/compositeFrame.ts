@@ -2,6 +2,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type {
   PreviewStateController,
   SamPreviewState,
+  StagedPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
@@ -13,7 +14,9 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
+import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { isLayerContributing } from '@workbench/canvas-engine/document/layerEligibility';
+import { isOverlayStack } from '@workbench/canvas-engine/document/layerStacks';
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import {
   compositeDocument,
@@ -46,15 +49,28 @@ export interface CreateCompositeFrameDeps {
   readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
-  /** Whether the staging area holds a candidate, shown or not. */
-  readonly hasStagedCandidates: () => boolean;
 }
 
 /**
- * While a generation is staged (a candidate waits, or a staged or progress preview is published) masks and regions
- * stop tinting the screen, so the result reads as it would be accepted; control layers stay.
+ * While a staged or progress preview shows, masks and regions stop tinting the screen, so the result reads as it
+ * would be accepted; control layers stay.
  */
 const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
+
+/** Whether the selection sits in a stack the staging view hides: the user is editing a mask or a region. */
+export const isEditingStagingHiddenStack = (doc: CanvasDocumentContractV3): boolean => {
+  const stack = doc.selectedLayerId ? getDocumentIndex(doc).byId.get(doc.selectedLayerId)?.stack : undefined;
+  return stack !== undefined && isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
+};
+
+/**
+ * Whether the screen hides masks, regions and the regenerate tint for a shown preview. Selecting a mask or a region
+ * shows them again, drawn above the preview, so what the user edits is never painted blind.
+ */
+export const hidesOverlayStacksForStaging = (
+  doc: CanvasDocumentContractV3,
+  stagedPreview: StagedPreviewState | null
+): boolean => stagedPreview !== null && !isEditingStagingHiddenStack(doc);
 
 export interface CompositeFrame {
   /** Composites the document onto the screen surface and enforces the surface budget. */
@@ -194,10 +210,9 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   return {
     draw: (screen, doc, view, floatFrame, samPreview, damage) => {
       const stagedPreview = previews.getStaged();
-      const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      const staging = stagedPreview !== null || deps.hasStagedCandidates();
+      const staging = hidesOverlayStacksForStaging(doc, stagedPreview);
       const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
@@ -238,20 +253,17 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         // Screen frames are display-time: the region tint may draw, except over a staged result.
         regionOverlays: !staging,
         showOverlayStacks,
-        // Candidate-specific placement wins for final images. Progress frames
-        // and legacy image inputs continue to follow the CURRENT bbox origin.
+        // Candidates and progress frames alike land at the rect pinned at submission, never the live bbox.
         stagedPreview:
           !isolatedGuard && stagedPreview
             ? {
-                opacity: stagedPlacement?.opacity ?? 1,
-                rect: stagedPlacement
-                  ? {
-                      height: stagedPlacement.height,
-                      width: stagedPlacement.width,
-                      x: stagedPlacement.x,
-                      y: stagedPlacement.y,
-                    }
-                  : { height: stagedPreview.height, width: stagedPreview.width, x: doc.bbox.x, y: doc.bbox.y },
+                opacity: stagedPreview.placement.opacity,
+                rect: {
+                  height: stagedPreview.placement.height,
+                  width: stagedPreview.placement.width,
+                  x: stagedPreview.placement.x,
+                  y: stagedPreview.placement.y,
+                },
                 surface: stagedPreview.surface,
               }
             : null,

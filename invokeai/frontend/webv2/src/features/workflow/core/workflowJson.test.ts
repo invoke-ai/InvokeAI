@@ -14,7 +14,12 @@ import {
 } from './document';
 import validForLoop from './fixtures/for-loop-valid.json';
 import { validateForLoopGraph } from './forLoops';
-import { parseWorkflowJson, serializeWorkflowJson, serializeWorkflowJsonForSubmission } from './workflowJson';
+import {
+  parseWorkflowJson,
+  serializeWorkflowJson,
+  serializeWorkflowJsonForSubmission,
+  summarizeWorkflowLoadWarnings,
+} from './workflowJson';
 
 const template: InvocationTemplate = {
   category: 'test',
@@ -606,5 +611,20 @@ describe('batch and generator nodes', () => {
     expect(serialized.nodes[0]?.data.inputs.generator?.value).toEqual(generator);
     expect(serialized.nodes[1]?.data.inputs.batch_group_id?.value).toBe('Group 2');
     expect(serialized.nodes[1]?.data.inputs.floats?.value).toEqual([1, 2]);
+  });
+});
+
+describe('summarizeWorkflowLoadWarnings', () => {
+  it('says each warning of a load once, counting repeats, so a load shows one notice', () => {
+    const { warnings } = parseWorkflowJson({
+      edges: [],
+      name: 'unknowns',
+      nodes: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+    });
+
+    expect(summarizeWorkflowLoadWarnings([...warnings, 'Removed 1 connection.'])).toBe(
+      'Skipped an unrecognized node. (×3) Removed 1 connection.'
+    );
+    expect(summarizeWorkflowLoadWarnings([])).toBeNull();
   });
 });

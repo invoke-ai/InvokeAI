@@ -9,7 +9,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 )
 from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
-from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 
 
@@ -41,7 +41,7 @@ class CustomDequantizingLinear(DequantizingLinear, CustomModuleMixin):
     def _cast_weight_bias_for_input(self, input: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor | None]:
         # A meta tensor lets patch types without an optimized sidecar path read the weight's shape but never its
         # quantized values; LoRA layers take the residual path and never get here. Patches are reshaped to this
-        # shape, so it has to be the unpacked one, which the weight buffer's is not for nvfp4.
+        # shape, so it has to be the unpacked one, which the weight buffer's is not for nvfp4 or int4.
         weight = torch.empty((self.out_features, self.in_features), device="meta")
         bias = self._cast_tensor_for_input(self.bias, input)
         return weight, bias
@@ -62,6 +62,10 @@ class CustomDequantizingLinear(DequantizingLinear, CustomModuleMixin):
 
 
 class CustomInt8ConvrotLinear(CustomDequantizingLinear, Int8ConvrotLinear):
+    pass
+
+
+class CustomInt4ConvrotLinear(CustomDequantizingLinear, Int4ConvrotLinear):
     pass
 
 

@@ -67,4 +67,5 @@ export {
   queueCommands,
 } from './publicApi';
 export type { QueueRunLockPort } from './runtime';
+export { describeQueueRetry, type QueueRetryReport } from './core/retryReport';
 export { hasPendingWorkflowQueueItem } from './ui/queueViewModel';

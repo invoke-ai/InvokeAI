@@ -110,14 +110,14 @@ def lora_token_vector_length(checkpoint: dict[str | int, torch.Tensor]) -> Optio
         elif "lokr_" in lora_key:
             if model_key + ".lokr_w1" in checkpoint:
                 _lokr_w1 = checkpoint[model_key + ".lokr_w1"]
-            elif model_key + "lokr_w1_b" in checkpoint:
+            elif model_key + ".lokr_w1_b" in checkpoint:
                 _lokr_w1 = checkpoint[model_key + ".lokr_w1_b"]
             else:
                 return lora_token_vector_length  # unknown format
 
             if model_key + ".lokr_w2" in checkpoint:
                 _lokr_w2 = checkpoint[model_key + ".lokr_w2"]
-            elif model_key + "lokr_w2_b" in checkpoint:
+            elif model_key + ".lokr_w2_b" in checkpoint:
                 _lokr_w2 = checkpoint[model_key + ".lokr_w2_b"]
             else:
                 return lora_token_vector_length  # unknown format
