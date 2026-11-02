@@ -238,26 +238,13 @@ describe('filter previews', () => {
 });
 
 describe('the staged candidate', () => {
-  const publishStaged = (placement?: Record<string, number>) => {
+  it('lands at its pinned placement, never at the bbox', () => {
     harness.previews.publishStaged(harness.previews.nextStagedToken(), {
       height: 16,
-      placement,
+      placement: { height: 2, opacity: 0.5, width: 3, x: 20, y: 30 },
       surface: surface(16, 16),
       width: 16,
-    } as never);
-  };
-
-  it('follows the bbox origin when it carries no placement', () => {
-    publishStaged();
-    draw();
-    expect(lastCompositeOptions().stagedPreview).toMatchObject({
-      opacity: 1,
-      rect: { height: 16, width: 16, x: 4, y: 6 },
     });
-  });
-
-  it('uses its own placement when it has one', () => {
-    publishStaged({ height: 2, opacity: 0.5, width: 3, x: 20, y: 30 });
     draw();
     expect(lastCompositeOptions().stagedPreview).toMatchObject({
       opacity: 0.5,
@@ -340,5 +327,70 @@ describe('the surface budget', () => {
   it('enforces the budget after compositing, never before', () => {
     draw();
     expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
+  });
+});
+
+describe('masks while a result is staged', () => {
+  const mask = (id: string) =>
+    layer(id, {
+      mask: { bitmap: { height: 8, imageName: `${id}.png`, width: 8 }, fill: { color: '#e07575', style: 'solid' } },
+      source: undefined,
+      type: 'inpaint_mask',
+    });
+  const region = (id: string) => ({ ...mask(id), type: 'regional_guidance' }) as unknown as CanvasLayerContract;
+  const control = (id: string) => layer(id, { type: 'control' });
+  const doc = documentOf([layer('a'), control('c'), mask('m'), region('r')]);
+  const drawnIds = () =>
+    (lastCompositeOptions().preparation as compositor.CompositePreparation).leaves.map((leaf) => leaf.id).sort();
+  const demandedIds = () => [...(harness.enforce.mock.calls.at(-1)![0] as Set<string>)].sort();
+  for (const id of ['c', 'm', 'r']) {
+    beforeEach(() => harness.entries.set(id, entryFor()));
+  }
+
+  const publishPreview = () =>
+    harness.previews.publishStaged(harness.previews.nextStagedToken(), {
+      height: 8,
+      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+      surface: surface(8, 8),
+      width: 8,
+    });
+
+  it('hides mask and region stacks and the region tint under a shown preview, rebuilding the description per flip', () => {
+    const frame = createCompositeFrame(harness.deps);
+    const drawFrame = () => frame.draw(surface(), doc, VIEW, null, null);
+
+    const description = () => (lastCompositeOptions().preparation as compositor.CompositePreparation).leaves;
+    drawFrame();
+    const shown = description();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
+
+    publishPreview();
+    drawFrame();
+    const hidden = description();
+    expect(hidden).not.toBe(shown);
+    expect(drawnIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a', 'c']);
+    expect(lastCompositeOptions().regionOverlays).toBe(false);
+    drawFrame();
+    expect(description()).toBe(hidden);
+
+    // Toggling the preview off (or accepting/discarding) shows them again.
+    harness.previews.clearStaged();
+    drawFrame();
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+  });
+
+  it.each(['m', 'r'])('shows them over the preview while %s, a mask or region, is selected for editing', (id) => {
+    publishPreview();
+    draw({ ...doc, selectedLayerId: id });
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
+    expect(lastCompositeOptions().stagedPreview).not.toBeNull();
+
+    // Selecting raster or control work hides them again.
+    draw({ ...doc, selectedLayerId: 'c' });
+    expect(drawnIds()).toEqual(['a', 'c']);
   });
 });

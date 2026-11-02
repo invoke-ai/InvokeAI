@@ -21,16 +21,13 @@ interface DecodedPreview {
   surface: RasterSurface;
   width: number;
   height: number;
-  placement?: StagedPreviewPlacement;
+  placement: StagedPreviewPlacement;
 }
 
 export interface CreatePreviewPublisherDeps {
   readonly previews: PreviewStateController;
   readonly resolveImage: ImageResolver;
-  readonly decodeBlob: (
-    blob: Blob,
-    dimensions?: { width: number; height: number; scale?: boolean }
-  ) => Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }>;
+  readonly decodeBlob: (blob: Blob) => Promise<{ surface: RasterSurface; decodedWidth: number; decodedHeight: number }>;
   readonly invalidateAll: () => void;
   readonly invalidateLayer: (layerId: string) => void;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
@@ -103,48 +100,48 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
     stagedImageDecodes.clear();
   };
 
-  /** Decodes a preview input to a surface (imageName via resolver, dataUrl via the backend seam). */
-  const decodePreview = async (
-    input: StagedPreviewInput,
+  /** Decodes a named image to a surface through the resolver, coalescing staged decodes of the same image. */
+  const decodeNamedImage = async (
+    imageName: string,
     useStagedBlobCache = false,
     isCurrent?: () => boolean
-  ): Promise<DecodedPreview> => {
-    if ('imageName' in input) {
-      const blob = useStagedBlobCache
-        ? await stagedPreviewBlobs.get(input.imageName)
-        : await deps.resolveImage(input.imageName);
-      // Blob resolution is an async boundary. A rapid selection change may
-      // supersede this request while it waits; do not spend a full bitmap
-      // decode on a candidate that can no longer be published.
-      if (isCurrent && !isCurrent()) {
-        throw new Error('Staged preview request was superseded before decode.');
-      }
-      let pendingDecode = useStagedBlobCache ? stagedImageDecodes.get(input.imageName) : undefined;
-      if (!pendingDecode) {
-        pendingDecode = deps.decodeBlob(blob);
-        if (useStagedBlobCache) {
-          stagedImageDecodes.set(input.imageName, pendingDecode);
-          const forget = (): void => {
-            if (stagedImageDecodes.get(input.imageName) === pendingDecode) {
-              stagedImageDecodes.delete(input.imageName);
-            }
-          };
-          // The awaiting caller owns rejection handling; this side chain only
-          // bounds the coalescing map to the lifetime of the decode.
-          void pendingDecode.then(forget, forget);
-        }
-      }
-      const decoded = await pendingDecode;
-      return {
-        height: decoded.decodedHeight,
-        placement: input.placement ? { ...input.placement } : undefined,
-        surface: decoded.surface,
-        width: decoded.decodedWidth,
-      };
+  ): Promise<{ surface: RasterSurface; width: number; height: number }> => {
+    const blob = useStagedBlobCache ? await stagedPreviewBlobs.get(imageName) : await deps.resolveImage(imageName);
+    // Blob resolution is an async boundary. A rapid selection change may
+    // supersede this request while it waits; do not spend a full bitmap
+    // decode on a candidate that can no longer be published.
+    if (isCurrent && !isCurrent()) {
+      throw new Error('Staged preview request was superseded before decode.');
     }
-    const { dataUrl, height, width } = input;
-    const decoded = await deps.decodeBlob(dataUrlToBlob(dataUrl), { height, scale: true, width });
-    return { height, surface: decoded.surface, width };
+    let pendingDecode = useStagedBlobCache ? stagedImageDecodes.get(imageName) : undefined;
+    if (!pendingDecode) {
+      pendingDecode = deps.decodeBlob(blob);
+      if (useStagedBlobCache) {
+        stagedImageDecodes.set(imageName, pendingDecode);
+        const forget = (): void => {
+          if (stagedImageDecodes.get(imageName) === pendingDecode) {
+            stagedImageDecodes.delete(imageName);
+          }
+        };
+        // The awaiting caller owns rejection handling; this side chain only
+        // bounds the coalescing map to the lifetime of the decode.
+        void pendingDecode.then(forget, forget);
+      }
+    }
+    const decoded = await pendingDecode;
+    return { height: decoded.decodedHeight, surface: decoded.surface, width: decoded.decodedWidth };
+  };
+
+  /** Decodes a staged preview (a candidate via the resolver, a progress frame via the backend seam) at its rect. */
+  const decodeStagedPreview = async (input: StagedPreviewInput, isCurrent: () => boolean): Promise<DecodedPreview> => {
+    const placement = { ...input.placement };
+    if ('imageName' in input) {
+      return { ...(await decodeNamedImage(input.imageName, true, isCurrent)), placement };
+    }
+    // Progress frames are low-resolution latents of the submitted region. They decode at their own size, which is
+    // small even for an upscale whose output rect is large; the compositor scales them into the rect.
+    const decoded = await deps.decodeBlob(dataUrlToBlob(input.dataUrl));
+    return { height: decoded.decodedHeight, placement, surface: decoded.surface, width: decoded.decodedWidth };
   };
 
   /**
@@ -173,7 +170,7 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
       return beforeDecode;
     }
     try {
-      const decoded = await decodePreview({ imageName: input.imageName });
+      const decoded = await decodeNamedImage(input.imageName);
       if (input.filterType && (decoded.width !== input.rect.width || decoded.height !== input.rect.height)) {
         throw new LayerFilterOutputDimensionError(
           input.filterType,
@@ -237,7 +234,7 @@ export const createPreviewPublisher = (deps: CreatePreviewPublisherDeps): Previe
         return;
       }
       const token = previews.nextStagedToken();
-      decodePreview(input, true, () => previews.isStagedTokenCurrent(token))
+      decodeStagedPreview(input, () => previews.isStagedTokenCurrent(token))
         .then((decoded) => {
           // A newer set/clear superseded this decode while it was in flight.
           if (previews.publishStaged(token, decoded)) {

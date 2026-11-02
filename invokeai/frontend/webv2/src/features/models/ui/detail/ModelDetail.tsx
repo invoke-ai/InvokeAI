@@ -11,6 +11,7 @@ import {
 import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref, getUnrecordedModelFact } from '@features/models/core/taxonomy';
+import { supportsWorkingMemoryCalibration } from '@features/models/core/workingMemory';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
 import {
   discardModelDraft,
@@ -42,6 +43,7 @@ import { RelatedModelsSection } from './RelatedModelsSection';
 import { MemoizedTriggerPhrasesEditor } from './TriggerPhrasesEditor';
 import { UnrecordedFactNotice } from './UnrecordedFactNotice';
 import { UpdatePathDialog } from './UpdatePathDialog';
+import { WorkingMemorySection } from './WorkingMemorySection';
 
 const TRIGGER_PHRASE_TYPES = new Set(['main', 'lora', 'embedding']);
 const EMPTY_TRIGGER_PHRASES: readonly string[] = [];
@@ -182,6 +184,7 @@ export const ModelDetail = ({
 }) => {
   const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectModelShell(snapshot, modelKey));
+  const { canManageModels } = useModelsUi();
 
   if (!model) {
     return (
@@ -229,6 +232,14 @@ export const ModelDetail = ({
         <>
           <Separator borderColor="border.subtle" />
           <TriggerPhrasesEditorContainer modelKey={model.key} />
+        </>
+      ) : null}
+
+      {/* Last and collapsed: calibration is a rare, admin-only task. */}
+      {canManageModels && supportsWorkingMemoryCalibration(model) ? (
+        <>
+          <Separator borderColor="border.subtle" />
+          <WorkingMemorySection modelKey={model.key} />
         </>
       ) : null}
     </Stack>

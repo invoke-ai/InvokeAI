@@ -9,6 +9,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { appearanceSettings, developerSettings, hotkeysSettings, workspaceSettings } from './applicationContributions';
 import CustomSettingField from './CustomSettingsEditors';
@@ -22,7 +23,18 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
   lng: 'en',
-  resources: { en: { translation: { settingsDialog: { changedSetting: '{{setting}} differs from its default' } } } },
+  resources: {
+    en: {
+      translation: {
+        settingsDialog: {
+          layer: {
+            changedNamed: '{{setting}} differs from its default',
+            resetToBuiltIn: 'Reset to Invoke default',
+          },
+        },
+      },
+    },
+  },
 });
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement;
@@ -38,7 +50,7 @@ const render = async (field: SettingDefinition, onReveal?: (sectionId: string, e
     )
   );
 };
-const modifiedIndicators = () => host.querySelectorAll('[role="img"][aria-label$="differs from its default"]');
+const modifiedIndicators = () => host.querySelectorAll('[aria-label*="differs from its default"]');
 
 beforeEach(async () => {
   accountLifecycle.activate('custom-settings-test');
@@ -71,6 +83,15 @@ describe('custom setting modified indicators', () => {
     expect(getWorkbenchPreferences().themeId).toBe(alternate.id);
     expect(modifiedIndicators()).toHaveLength(1);
     await selectTheme(THEMES.find((theme) => theme.id === DEFAULT_PREFERENCES.themeId)!.label);
+    expect(modifiedIndicators()).toHaveLength(0);
+  });
+
+  it('resets a changed theme to the built-in from its indicator menu', async () => {
+    await patchWorkbenchPreferences({ themeId: THEMES.find((theme) => theme.id !== DEFAULT_PREFERENCES.themeId)!.id });
+    await render(appearanceSettings.fields.find((field) => field.id === 'themeId')!);
+    await act(() => page.getByRole('button', { name: 'Theme differs from its default', exact: true }).click());
+    await act(() => page.getByRole('menuitem', { name: 'Reset to Invoke default' }).click());
+    expect(getWorkbenchPreferences().themeId).toBe(DEFAULT_PREFERENCES.themeId);
     expect(modifiedIndicators()).toHaveLength(0);
   });
 

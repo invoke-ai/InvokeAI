@@ -54,7 +54,7 @@ describe('LayerController', () => {
     ctx: {} as never,
     exportBaked: vi.fn(),
     hasExportableContent: () => false,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     layers: {} as never,
     needsPixelPersistence: () => false,
     peekAdjustedSurface: () => null,
@@ -64,7 +64,7 @@ describe('LayerController', () => {
     backend: {} as never,
     ctx: {} as never,
     exportBaked: vi.fn(),
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     isGuardCurrent: () => true,
   };
   const extractMaskedArea = {
@@ -76,7 +76,7 @@ describe('LayerController', () => {
     getAdjustedSurface: vi.fn(),
     getMaskPattern: () => null,
     hasExportableContent: () => false,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready' as const,
     isGuardCurrent: () => true,
     layers: {} as never,
     rasterize: vi.fn(),
@@ -87,6 +87,7 @@ describe('LayerController', () => {
     ctx: {} as never,
     discardPersisted: vi.fn(),
     exportBaked: vi.fn(),
+    flushPendingPixels: () => Promise.resolve(),
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
   };

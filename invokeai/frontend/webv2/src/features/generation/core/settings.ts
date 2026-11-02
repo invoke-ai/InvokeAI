@@ -16,6 +16,7 @@ import type {
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  ModelIdentifierConfig,
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
@@ -100,6 +101,7 @@ export const getDynamicPromptsConfig = (
   settings: Pick<
     GenerateSettings,
     | 'dynamicPromptsCombinatorial'
+    | 'dynamicPromptsEnabled'
     | 'dynamicPromptsMaxPrompts'
     | 'dynamicPromptsResample'
     | 'dynamicPromptsSampleSeed'
@@ -107,6 +109,7 @@ export const getDynamicPromptsConfig = (
   >
 ): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
+  enabled: settings.dynamicPromptsEnabled,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
   resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
@@ -270,6 +273,37 @@ export const MAX_ZIMAGE_SEED_VARIANCE_STRENGTH = 2;
 export const MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 1;
 export const DEFAULT_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT = 50;
 export const QWEN_IMAGE_ENCODER_QUANTIZATIONS: QwenImageEncoderQuantization[] = ['none', 'int8', 'nf4'];
+/** `moss_image_denoise.uncond_skip_layers` defaults to block 22, as the reference pipeline does. */
+export const DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS: readonly number[] = [22];
+/** MOSS-Image has 42 transformer blocks. The node checks the list against the loaded model's count again. */
+export const MAX_MOSS_IMAGE_SKIP_LAYER = 41;
+
+const toUniqueAscending = (values: readonly number[]): number[] =>
+  [...new Set(values)].sort((left, right) => left - right);
+
+/**
+ * Comma-separated block indices to the stored form, unique and ascending; empty entries are ignored, so an empty
+ * field skips none. Null when an entry is not a whole number. The range is checked separately, by
+ * `isValidMossImageSkipLayers`.
+ */
+export const parseMossImageSkipLayers = (text: string): number[] | null => {
+  const entries = text
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry !== '');
+
+  return entries.every((entry) => /^\d+$/.test(entry)) ? toUniqueAscending(entries.map(Number)) : null;
+};
+
+export const isValidMossImageSkipLayers = (layers: readonly number[]): boolean =>
+  layers.every((layer) => Number.isInteger(layer) && layer >= 0 && layer <= MAX_MOSS_IMAGE_SKIP_LAYER);
+
+/**
+ * A stored or recorded list in the stored form, or null unless it is a list of integers. Keeps out-of-range blocks, so
+ * validation names them rather than the list changing silently.
+ */
+export const normalizeMossImageSkipLayers = (value: unknown): number[] | null =>
+  Array.isArray(value) && value.every((entry) => Number.isInteger(entry)) ? toUniqueAscending(value) : null;
 
 const isIdeogram4SamplerPreset = (value: unknown): value is Ideogram4SamplerPreset =>
   IDEOGRAM4_SAMPLER_PRESETS.includes(value as Ideogram4SamplerPreset);
@@ -317,8 +351,10 @@ const REFERENCE_IMAGE_CONFIG_TYPES = new Set([
   'flux_kontext_reference_image',
   'flux_redux',
   'ip_adapter',
+  'krea2_edit_reference_image',
   'krea2_reference_image',
   'qwen_image_reference_image',
+  'qwen_image_2_1_reference_image',
 ]);
 
 const isClipVisionModel = (value: unknown): value is 'ViT-H' | 'ViT-G' | 'ViT-L' =>
@@ -353,7 +389,9 @@ const normalizeReferenceImageConfig = (value: unknown): GenerateReferenceImageCo
   switch (value.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { image, type: value.type };
     case 'flux_kontext_reference_image':
       return { image, model: getMainModelOrNull(value.model), type: value.type };
@@ -424,8 +462,10 @@ const cloneReferenceImageConfig = (config: GenerateReferenceImageConfig): Genera
   switch (config.type) {
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return { ...config, image: config.image ? cloneCroppableImage(config.image) : null };
     case 'flux_kontext_reference_image':
       return {
@@ -496,6 +536,19 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+/**
+ * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
+ * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
+ * a file registered differently is not taken for it.
+ */
+export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  Boolean(saved.hash) &&
+  candidate.hash === saved.hash &&
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
+/** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
   const modelsByKey = new Map<string, LoraModelConfig>();
 
@@ -505,9 +558,23 @@ export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: reado
     }
   }
 
+  // Keys the list holds, and keys a rematch in this pass has given out: two removed concepts with the same file must
+  // not both become the one reinstalled concept.
+  const claimedKeys = new Set(loras.map((lora) => lora.model.key));
+  const findReinstalled = (saved: LoraModelConfig): LoraModelConfig | undefined => {
+    for (const model of modelsByKey.values()) {
+      if (isSameModelFile(model, saved) && !claimedKeys.has(model.key)) {
+        claimedKeys.add(model.key);
+        return model;
+      }
+    }
+
+    return undefined;
+  };
+
   let didSync = false;
   const syncedLoras = loras.map((lora) => {
-    const currentModel = modelsByKey.get(lora.model.key);
+    const currentModel = modelsByKey.get(lora.model.key) ?? findReinstalled(lora.model);
 
     if (!currentModel || areModelSnapshotsEqual(currentModel, lora.model)) {
       return lora;
@@ -571,6 +638,7 @@ export const cloneGenerateWidgetValues = (
   ideogram4UnconditionalModel: values.ideogram4UnconditionalModel ? { ...values.ideogram4UnconditionalModel } : null,
   refinerModel: values.refinerModel ? { ...values.refinerModel } : null,
   ideogram4ColorPalette: [...values.ideogram4ColorPalette],
+  mossImageUncondSkipLayers: [...values.mossImageUncondSkipLayers],
   referenceImages: cloneReferenceImages(values.referenceImages),
   t5EncoderModel: values.t5EncoderModel ? { ...values.t5EncoderModel } : null,
   vae: values.vae ? { ...values.vae } : null,
@@ -594,8 +662,10 @@ const syncReferenceImageConfigWithModels = (
     }
     case 'external_reference_image':
     case 'flux2_reference_image':
+    case 'krea2_edit_reference_image':
     case 'krea2_reference_image':
     case 'qwen_image_reference_image':
+    case 'qwen_image_2_1_reference_image':
       return config;
   }
 };
@@ -736,6 +806,25 @@ export const GENERATE_TOOL_MODEL_PICK_KEYS = [
   'imageToPromptModelKey',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
+/**
+ * What reverts `after` back to `before`: the earlier value of every key the change touched, the model included. Keys
+ * the change left alone stay out, so an Undo keeps edits made since (a prompt typed after a model switch). Batch count
+ * belongs to the top bar and is never reverted.
+ */
+export const getGenerateValuesRevertPatch = (before: object, after: object): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  const beforeValues = before as Readonly<Record<string, unknown>>;
+  const afterValues = after as Readonly<Record<string, unknown>>;
+
+  for (const key of new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])) {
+    if (key !== 'batchCount' && !areJsonValuesStructurallyEqual(beforeValues[key], afterValues[key])) {
+      patch[key] = beforeValues[key];
+    }
+  }
+
+  return patch;
+};
+
 /** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
 export const GENERATE_UI_STATE_KEYS = {
   aspectRatioIsLocked: true,
@@ -808,6 +897,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     ),
     dynamicPromptsCombinatorial:
       typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
+    dynamicPromptsEnabled: values.dynamicPromptsEnabled !== false,
     dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
     dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
     dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,
@@ -899,6 +989,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       100,
       DEFAULT_KREA2_SEED_VARIANCE_RANDOMIZE_PERCENT
     ),
+    krea2ReferenceKvCache: values.krea2ReferenceKvCache === true,
     fluxDypePreset: isFluxDypePreset(values.fluxDypePreset) ? values.fluxDypePreset : 'off',
     fluxDypeScale: getClampedNumber(values, 'fluxDypeScale', 0, MAX_FLUX_DYPE_SCALE, DEFAULT_FLUX_DYPE_SCALE),
     fluxDypeExponent: getClampedNumber(
@@ -928,6 +1019,9 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwenImageEncoderQuantization: isQwenImageEncoderQuantization(values.qwenImageEncoderQuantization)
       ? values.qwenImageEncoderQuantization
       : 'none',
+    mossImageUncondSkipLayers: normalizeMossImageSkipLayers(values.mossImageUncondSkipLayers) ?? [
+      ...DEFAULT_MOSS_IMAGE_UNCOND_SKIP_LAYERS,
+    ],
     pidMode: isPidMode(values.pidMode) ? values.pidMode : 'off',
     pidDecoderModel: getModelIdentifierOrNull(values.pidDecoderModel),
     gemma2EncoderModel: getModelIdentifierOrNull(values.gemma2EncoderModel),

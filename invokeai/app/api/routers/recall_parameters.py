@@ -65,10 +65,10 @@ class ReferenceImageRecallParameter(BaseModel):
 
     Used for reference images that feed directly into the main model rather
     than through a separate IP-Adapter / ControlNet model — for example
-    FLUX.2 Klein, FLUX Kontext, and Qwen Image Edit. The receiving frontend
-    picks the correct config type (``flux2_reference_image`` /
-    ``qwen_image_reference_image`` / ``flux_kontext_reference_image``) based
-    on the currently-selected main model.
+    FLUX.2 Klein, FLUX Kontext, Qwen Image Edit and Qwen-Image-2.1. The
+    receiving frontend picks the correct config type (``flux2_reference_image`` /
+    ``qwen_image_reference_image`` / ``qwen_image_2_1_reference_image`` /
+    ``flux_kontext_reference_image``) based on the currently-selected main model.
     """
 
     image_name: str = Field(description="The filename of the reference image in outputs/images")

@@ -14,8 +14,14 @@ import torch
 from tqdm import tqdm
 
 from invokeai.backend.ernie_image.sampling_utils import unpatchify_latents
+from invokeai.backend.flux.schedulers import set_heun_timesteps_from_sigmas
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+
+
+def _shift_flow_sigmas(sigmas: list[float], shift: float) -> list[float]:
+    """Map raw flow sigmas through the scheduler's own shift, as `set_timesteps` does."""
+    return [shift * s / (1.0 + (shift - 1.0) * s) for s in sigmas]
 
 
 def denoise(
@@ -86,15 +92,16 @@ def denoise(
             scheduler.sigmas = scheduler.sigmas[:-1]
             scheduler.timesteps = scheduler.timesteps[:-1]
         else:
-            # FlowMatchHeunDiscreteScheduler.set_timesteps only takes a step count and derives its
-            # own sigmas, so a partial-denoise range cannot be honored. Refuse instead of silently
-            # running a full denoise with the wrong schedule.
-            if not (math.isclose(timesteps[0], 1.0) and math.isclose(timesteps[-1], 0.0, abs_tol=1e-6)):
-                raise ValueError(
-                    f"{type(scheduler).__name__} does not accept an explicit sigma schedule, so it cannot honor "
-                    "denoising_start/denoising_end. Use the euler or lcm scheduler for partial denoising."
-                )
-            scheduler.set_timesteps(num_inference_steps=len(timesteps) - 1, device=img.device)
+            # `FlowMatchHeunDiscreteScheduler.set_timesteps` only takes a step count: it derives
+            # its own schedule and applies `shift` to it, so it cannot be handed a sigma window
+            # directly. Rebuild its expanded two-evaluation layout from the requested window --
+            # shifted the way `set_timesteps` would shift it -- so a partial denoise starts at
+            # `denoising_start` and stops at `denoising_end` instead of being refused. This is
+            # the same layout the FLUX driver installs for Heun.
+            shift = float(getattr(scheduler.config, "shift", 1.0))
+            shifted = _shift_flow_sigmas(list(timesteps[:-1]), shift)
+            terminal_sigma = _shift_flow_sigmas([timesteps[-1]], shift)[0]
+            set_heun_timesteps_from_sigmas(scheduler, shifted, terminal_sigma, img.device)
 
         if init_latents is not None:
             # `scheduler.sigmas[0]` is the *shifted* first sigma; `timesteps[0]` is the raw one.

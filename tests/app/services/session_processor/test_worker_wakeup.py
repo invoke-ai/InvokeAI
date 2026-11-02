@@ -50,10 +50,11 @@ def _poll_events(processor):
 
 def _stop_and_join(processor, gates=()):
     try:
-        if hasattr(processor, "_stop_event"):
-            processor.stop()
+        # Opened first: stop() waits for the workers, and a gated worker exits only once its gate opens.
         for gate in gates:
             gate.set()
+        if hasattr(processor, "_stop_event"):
+            processor.stop()
         for event in _poll_events(processor).values():
             event.set()
         for worker in processor._workers:
@@ -130,6 +131,8 @@ def test_started_worker_keeps_notification_when_sibling_clears(monkeypatch, proc
 
     monkeypatch.setattr(WorkflowCallQueueLifecycle, "run_queue_item", run_item)
 
+    stopper = threading.Thread(target=processor.stop, name="stopper", daemon=True)
+
     def notify():
         nonlocal available
         if producer == "release":
@@ -139,7 +142,11 @@ def test_started_worker_keeps_notification_when_sibling_clears(monkeypatch, proc
                 available = True
             asyncio.run(processor._on_batch_enqueued(("batch_enqueued", None)))
         else:
-            processor.stop()
+            # stop() waits for the workers, which these gates hold: it runs beside the test, which goes on once every
+            # worker has been notified, as a stop() that returned at once had done before B's clear.
+            stopper.start()
+            for name, event in _poll_events(processor).items():
+                assert event.wait(20), f"stop did not notify {name}"
 
     try:
         processor.start(invoker)
@@ -167,7 +174,10 @@ def test_started_worker_keeps_notification_when_sibling_clears(monkeypatch, proc
                 assert claims == [str(devices[0])]
     finally:
         _stop_and_join(processor, gates.values())
+        if stopper.ident is not None:
+            stopper.join(20)
 
+    assert not stopper.is_alive()
     assert all(worker.thread is not None and not worker.thread.is_alive() for worker in processor._workers)
     assert errors == [], f"worker coordination failed: {errors}"
     invoker.services.logger.error.assert_not_called()

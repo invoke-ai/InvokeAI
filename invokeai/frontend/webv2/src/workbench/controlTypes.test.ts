@@ -142,6 +142,11 @@ describe('classifyControlModel', () => {
     ],
     ['a Z-Image Fun union whatever its name', model('Z-Image-Turbo-Fun-Controlnet', 'z-image'), FUN_COVERS],
     ['a Qwen-Image Fun union', model('Qwen-Image-2512-Fun-Controlnet-Union', 'qwen-image'), FUN_COVERS],
+    [
+      'a Qwen-Image InstantX union, which has no MLSD condition',
+      { ...model('Qwen-Image-InstantX-ControlNet-Union', 'qwen-image'), control_architecture: 'instantx_union' },
+      ['canny', 'softedge', 'depth', 'openpose'],
+    ],
     ['a FLUX.2 Fun union', model('FLUX.2-dev-Fun-Controlnet', 'flux2'), FUN_COVERS],
   ] as const)('classifies %s', (_label, input, covers) => {
     expect(classifyControlModel(input)).toEqual({ covers, family: null, purpose: null, union: true });

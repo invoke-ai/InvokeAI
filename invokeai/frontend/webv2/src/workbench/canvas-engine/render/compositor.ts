@@ -12,6 +12,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
+import type { OverlayStackKind } from '@workbench/canvas-engine/document/layerStacks';
 import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -20,7 +21,7 @@ import {
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
 import type { GroupCompositeScope, GroupSurfaceContent } from './groupCompositeScopes';
@@ -59,18 +60,16 @@ export const REGION_OVERLAY_ALPHA = 0.5;
 /** Strength of a control layer's map over its original in the Overlay view, relative to the layer's opacity. */
 export const CONTROL_OVERLAY_MAP_ALPHA = 0.5;
 
-/** Dashed outline drawn around a staged-generation preview so it reads as pending, not committed. */
-const STAGED_PREVIEW_OUTLINE_COLOR = '#3b82f6';
-const STAGED_PREVIEW_OUTLINE_WIDTH = 2;
-const STAGED_PREVIEW_OUTLINE_DASH = 6;
-
 /** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
   /** Allocates mask, control-effect and group intermediates; every composite renders through it. */
   backend: RasterBackend;
   /** Clips document layers to this document-space rect without clipping the background or staged preview. */
   clipRect?: Rect | null;
-  /** A staged generation candidate to draw at its placement (document space). */
+  /**
+   * A staged generation candidate to draw at its placement (document space), above the raster and control stacks and
+   * below masks and regions, which show over it only when the staging view leaves them on. The overlay outlines it.
+   */
   stagedPreview?: { surface: RasterSurface; rect: Rect; opacity?: number } | null;
   /**
    * Checker tile fills the unbounded viewport. Null/absence disables it, revealing themed widget background
@@ -111,6 +110,8 @@ export interface CompositeOptions {
   layerPreviews?: ReadonlyMap<string, { surface: RasterSurface; rect: Rect }> | null;
   /** Isolate one leaf and suppress staged/filter previews; disabled or hidden leaves remain undrawn. */
   isolationLayerId?: string | null;
+  /** Overlay stacks the screen draws; absence draws all. An isolated target draws whatever its stack. */
+  showOverlayStacks?: Readonly<Record<OverlayStackKind, boolean>>;
   /**
    * Memoized adjusted raster surface, or null for raw pixels. Optional provider; without it adjustments are
    * ignored. Cache versions prevent per-frame recomputation.
@@ -138,7 +139,7 @@ export interface CompositeOptions {
   diagnostics?: CanvasDiagnostics | null;
   /**
    * Reused frame description from {@link prepareComposite}; ignored unless it was prepared for this document,
-   * isolation, grouping and transform overrides.
+   * isolation, overlay stacks, grouping and transform overrides.
    */
   preparation?: CompositePreparation | null;
   /**
@@ -178,14 +179,21 @@ export const transformOverridesKey = (overrides: TransformOverrides | null | und
   return key;
 };
 
+/** A stable key for the overlay stack switches; absence shows every stack. */
+const overlayStacksKey = (shown: CompositeOptions['showOverlayStacks']): string => {
+  const stacks = shown ?? ALL_OVERLAY_STACKS_SHOWN;
+  return `${+stacks.control}${+stacks.inpaint_mask}${+stacks.regional_guidance}`;
+};
+
 /**
  * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the
  * isolated group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document,
- * isolation, grouping and override contents are, so frame demand, compositing and sampling share it.
+ * isolation, overlay stacks, grouping and override contents are, so frame demand, compositing and sampling share it.
  */
 export interface CompositePreparation {
   readonly document: CanvasDocumentContractV3;
   readonly isolationLayerId: string | null;
+  readonly overlayStacksKey: string;
   readonly grouped: boolean;
   readonly overridesKey: string;
   readonly leaves: readonly SemanticLeaf[];
@@ -212,13 +220,13 @@ const effectiveMatrix = (leaf: SemanticLeaf, overrides: TransformOverrides | nul
 /** Plans the draw order, placement and isolated group scopes for `doc`, for callers compositing it repeatedly. */
 export const prepareComposite = (
   doc: CanvasDocumentContractV3,
-  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'transformOverrides'> = {}
+  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'showOverlayStacks' | 'transformOverrides'> = {}
 ): CompositePreparation => {
   const isolationLayerId = opts.isolationLayerId ?? null;
   // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
   const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
     isolationLayerId,
-    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
+    showOverlayStacks: opts.showOverlayStacks ?? ALL_OVERLAY_STACKS_SHOWN,
   });
   // Isolation mode inspects raw members, so scopes are bypassed while active.
   const grouped = !!opts.groupSurface && isolationLayerId === null;
@@ -230,6 +238,7 @@ export const prepareComposite = (
     isolationLayerId,
     leaves,
     matrices: leaves.map((leaf) => effectiveMatrix(leaf, overrides)),
+    overlayStacksKey: overlayStacksKey(opts.showOverlayStacks),
     overridesKey: transformOverridesKey(overrides),
     scopes,
   };
@@ -243,6 +252,7 @@ const isPreparedFor = (
   !!preparation &&
   preparation.document === doc &&
   preparation.isolationLayerId === (opts.isolationLayerId ?? null) &&
+  preparation.overlayStacksKey === overlayStacksKey(opts.showOverlayStacks) &&
   preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
   preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
 
@@ -578,13 +588,35 @@ export const compositeDocument = (
   ctx.clearRect(repaint.x, repaint.y, repaint.width, repaint.height);
   drawBackground(ctx, opts.checkerboardTile ?? null, repaint);
 
-  if (opts.clipRect) {
+  const applyClipRect = (): void => {
+    if (opts.clipRect) {
+      ctx.save();
+      setTransformFromMat(ctx, view);
+      ctx.beginPath();
+      ctx.rect(opts.clipRect.x, opts.clipRect.y, opts.clipRect.width, opts.clipRect.height);
+      ctx.clip();
+    }
+  };
+  applyClipRect();
+
+  // The staged preview lands once, unclipped, before the first mask or region leaf (or after every leaf).
+  const staged = isIsolated(opts) ? null : (opts.stagedPreview ?? null);
+  let stagedPending = staged !== null;
+  const drawStaged = (): void => {
+    stagedPending = false;
+    if (!staged || !reaches(staged.rect, view, repaint)) {
+      return;
+    }
+    if (opts.clipRect) {
+      ctx.restore();
+    }
     ctx.save();
     setTransformFromMat(ctx, view);
-    ctx.beginPath();
-    ctx.rect(opts.clipRect.x, opts.clipRect.y, opts.clipRect.width, opts.clipRect.height);
-    ctx.clip();
-  }
+    ctx.globalAlpha = staged.opacity ?? 1;
+    ctx.drawImage(staged.surface.canvas, staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
+    ctx.restore();
+    applyClipRect();
+  };
 
   const { leaves, matrices, scopes } = plan;
   const boundsAt = (index: number): Rect | null => {
@@ -636,6 +668,9 @@ export const compositeDocument = (
   };
 
   for (let index = 0; index < leaves.length; index += 1) {
+    if (stagedPending && leaves[index]!.stack !== 'raster' && leaves[index]!.stack !== 'control') {
+      drawStaged();
+    }
     const scope = scopeIndex < scopes.length ? scopes[scopeIndex]! : null;
     if (scope && index === scope.start) {
       scopeIndex += 1;
@@ -690,27 +725,10 @@ export const compositeDocument = (
     drawLeafFlat(index);
   }
 
-  if (opts.clipRect) {
-    ctx.restore();
+  if (stagedPending) {
+    drawStaged();
   }
-
-  // Draw staged preview in document space with a dashed outline distinguishing pending pixels.
-  const staged = isIsolated(opts) ? null : opts.stagedPreview;
-  // Half the outline lands outside the rect, so a repaint beside it must still redraw that half.
-  if (staged && reaches(staged.rect, view, expand(repaint, STAGED_PREVIEW_OUTLINE_WIDTH))) {
-    ctx.save();
-    setTransformFromMat(ctx, view);
-    ctx.globalAlpha = staged.opacity ?? 1;
-    ctx.drawImage(staged.surface.canvas, staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
-    // Keep the outline visually constant regardless of zoom by dividing the
-    // document-space stroke by the view scale (√det of the linear part).
-    const viewScale = Math.sqrt(Math.abs(view.a * view.d - view.b * view.c)) || 1;
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = STAGED_PREVIEW_OUTLINE_COLOR;
-    ctx.lineWidth = STAGED_PREVIEW_OUTLINE_WIDTH / viewScale;
-    ctx.setLineDash([STAGED_PREVIEW_OUTLINE_DASH / viewScale, STAGED_PREVIEW_OUTLINE_DASH / viewScale]);
-    ctx.strokeRect(staged.rect.x, staged.rect.y, staged.rect.width, staged.rect.height);
-    ctx.setLineDash([]);
+  if (opts.clipRect) {
     ctx.restore();
   }
 

@@ -9,7 +9,6 @@ import { imageMapWidgetManifest } from './image-map/manifest';
 import { layersWidgetManifest } from './layers/manifest';
 import { notificationsWidgetManifest } from './notifications/manifest';
 import { previewWidgetManifest } from './preview/manifest';
-import { projectWidgetManifest } from './project/manifest';
 import { queueStatusWidgetManifest } from './queue-status/manifest';
 import { queueWidgetManifest } from './queue/manifest';
 import { remoteWorkersWidgetManifest } from './remote-workers/manifest';
@@ -30,7 +29,6 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   galleryWidgetManifest,
   imageMapWidgetManifest,
   previewWidgetManifest,
-  projectWidgetManifest,
   layersWidgetManifest,
   queueWidgetManifest,
   remoteWorkersWidgetManifest,

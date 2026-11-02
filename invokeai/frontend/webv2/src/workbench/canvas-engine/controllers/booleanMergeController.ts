@@ -1,5 +1,6 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -16,7 +17,9 @@ import {
   layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
+  readinessOfAll,
   rgbaBytes,
+  type LayerCacheReadiness,
   type LayerStepContext,
   type LayerEditRefusal,
 } from './editSteps';
@@ -29,11 +32,13 @@ export type BooleanRasterResult =
   | 'empty'
   | 'failed'
   | LayerEditRefusal
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface BooleanMergeControllerOptions {
@@ -49,7 +54,7 @@ export interface BooleanMergeControllerOptions {
       | 'isPermitCurrent'
     >;
   readonly backend: RasterBackend;
-  readonly isCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
+  readonly cacheReadiness: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => LayerCacheReadiness;
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
 }
@@ -86,8 +91,12 @@ export class BooleanMergeController {
     }
     const upper = getDocumentLayer(document, eligibility.upperId)!;
     const below = getDocumentLayer(document, eligibility.lowerId)!;
-    if (!this.deps.isCacheReady(upper, document) || !this.deps.isCacheReady(below, document)) {
-      return 'not-ready';
+    const readiness = readinessOfAll([
+      this.deps.cacheReadiness(upper, document),
+      this.deps.cacheReadiness(below, document),
+    ]);
+    if (readiness !== 'ready') {
+      return readiness;
     }
     const owned: Extract<ExportResult, { status: 'ok' }>[] = [];
     const acquire = async (layerId: string): Promise<ExportResult> => {
@@ -115,6 +124,9 @@ export class BooleanMergeController {
         }
         if (upperPixels.status === 'over-budget' || belowPixels.status === 'over-budget') {
           return 'over-budget';
+        }
+        if (upperPixels.status === 'unreadable' || belowPixels.status === 'unreadable') {
+          return upperPixels.status === 'unreadable' ? upperPixels : (belowPixels as LayerUnreadable);
         }
         if (upperPixels.status === 'not-ready' || belowPixels.status === 'not-ready') {
           return 'not-ready';

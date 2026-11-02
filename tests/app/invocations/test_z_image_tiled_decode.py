@@ -20,19 +20,23 @@ def _flux_reservation(*args, **kwargs) -> int:
     return estimate_vae_working_memory_flux(*args, **kwargs).reservation_bytes
 
 
-def _k(conv_backend: str, operation: str) -> float:
-    """The shipped FLUX.1 VAE coefficient the estimator resolves for one convolution backend and operation."""
-    return shipped_coefficients(VAE_FLUX_SPEC, Platform(conv_backend)).values[f"k_{operation}"]
+CPU = Platform("cpu", "native", "linux")
+
+
+def _line(platform: Platform, operation: str, pixels: float, dtype: str = "bf16") -> float:
+    """What the shipped FLUX.1 VAE line the estimator resolves on `platform` prices over `pixels` output pixels."""
+    values = shipped_coefficients(VAE_FLUX_SPEC, platform).values
+    return values[f"k_{operation}_{dtype}"] * pixels + values[f"b_{operation}_{dtype}"]
 
 
 def _mock_flux_vae(element_size_bytes: int = 2) -> MagicMock:
-    """A stand-in for the estimator cells only: they read nothing but the parameter element size.
+    """A stand-in for the estimator cells only: they read nothing but the parameter dtype.
 
     The node-wiring cells below use a real `AutoencoderKL`, because they are about tiling state a
     mock cannot have -- `tile_overlap_factor` is set in `__init__`, so a spec'd mock lacks it.
     """
     vae = MagicMock(spec=AutoencoderKL)
-    dtype = torch.float16 if element_size_bytes == 2 else torch.float32
+    dtype = torch.bfloat16 if element_size_bytes == 2 else torch.float32
     # A fresh iterator per call: the decode path reads `parameters()` after the estimator already
     # has, and a single stored iterator would be exhausted by then.
     vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=dtype)])
@@ -85,14 +89,14 @@ class TestFluxWorkingMemoryEstimate:
             operation=operation, image_tensor=tensor, vae=_mock_flux_vae(), device=torch.device("cpu")
         )
 
-        assert estimate == 512 * 512 * 2 * _k(conv_backend, operation)
-        assert on_cpu == 512 * 512 * 2 * _k("cudnn", operation), "a cpu_only VAE runs on cuDNN terms"
+        assert estimate == int(_line(Platform(conv_backend, "native", "linux"), operation, 512 * 512))
+        assert on_cpu == int(_line(CPU, operation, 512 * 512)), "a cpu_only VAE runs on cuDNN terms"
 
     def test_the_default_reproduces_the_untiled_estimate(self):
         """Regression guard for the six call sites that pass no tile_size at all."""
         latents = torch.zeros(1, 16, 128, 128)
-        # 1024x1024 output px * 2 bytes * the cuDNN decode coefficient
-        expected = 1024 * 1024 * 2 * _k("cudnn", "decode")
+        # The bf16 decode line over 1024x1024 output pixels
+        expected = int(_line(CPU, "decode", 1024 * 1024))
         actual = _flux_reservation(operation="decode", image_tensor=latents, vae=_mock_flux_vae())
         assert actual == expected
 
@@ -104,8 +108,8 @@ class TestFluxWorkingMemoryEstimate:
         margin or halving the per-pixel image cost would be a several-hundred-megabyte
         under-reservation that no other assertion here can see.
         """
-        # 512px tiles, fp16, over a 1536x1536 output.
-        decode_term = 512 * 512 * 2 * _k("cudnn", "decode") * 1.25
+        # 512px tiles, bf16, over a 1536x1536 output.
+        decode_term = _line(CPU, "decode", 512 * 512 * 1.25)
         # 4 RGB buffers at the VAE's element size, plus the 8-bit one the node hands to PIL. Four
         # is measured, not assumed: the assembled image grows the device peak by ~1.6 copies on a
         # diffusers VAE and ~0.1 on the host-merging BFL one, and the node adds its in-window
@@ -116,17 +120,14 @@ class TestFluxWorkingMemoryEstimate:
         )
         assert estimate == int(decode_term + image_term)
 
-    def test_both_tiled_terms_scale_with_the_vaes_element_size(self):
-        """An fp32 VAE costs twice the bytes per pixel, in the tile and in the assembled image
-        alike. Only the 8-bit buffer is fixed, which is why this is a little under 2x."""
+    def test_both_tiled_terms_follow_the_vaes_dtype(self):
+        """An fp32 VAE prices its tile at the fp32 line, which is not twice the bf16 one, and its assembled image at
+        four bytes per value. Only the 8-bit buffer is fixed."""
         latents = torch.zeros(1, 16, 192, 192)
-        fp16 = _flux_reservation(
-            operation="decode", image_tensor=latents, vae=_mock_flux_vae(element_size_bytes=2), tile_size=512
-        )
         fp32 = _flux_reservation(
             operation="decode", image_tensor=latents, vae=_mock_flux_vae(element_size_bytes=4), tile_size=512
         )
-        assert 1.95 < fp32 / fp16 < 2.0
+        assert fp32 == int(_line(CPU, "decode", 512 * 512 * 1.25, "fp32") + 1536 * 1536 * 3 * (4 * 4 + 1))
 
     @pytest.mark.parametrize("latent_hw", [(128, 128), (192, 192), (256, 256)])
     def test_a_tiled_estimate_stays_a_fraction_of_the_untiled_one(self, latent_hw):
@@ -179,7 +180,7 @@ class TestFluxWorkingMemoryEstimate:
         estimate = _flux_reservation(
             operation="decode", image_tensor=torch.zeros(1, 16, 1024, 1024), vae=_mock_flux_vae(), tile_size=512
         )
-        tile_term = int(512 * 512 * 2 * _k("cudnn", "decode") * 1.25)
+        tile_term = int(_line(CPU, "decode", 512 * 512 * 1.25))
         one_full_resolution_buffer = 8192 * 8192 * 3 * 2
         # The assembled output plus at least one of the post-processing copies.
         assert estimate >= tile_term + 2 * one_full_resolution_buffer
@@ -201,7 +202,7 @@ class TestFluxWorkingMemoryEstimate:
         # sibling dereferences `vae.tile_sample_min_size` directly and would raise here.
         latents = torch.zeros(1, 16, 192, 192)
         vae = MagicMock(spec=AutoencoderKL)
-        vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.float16)])
+        vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.bfloat16)])
         del vae.tile_sample_min_size
         estimate = _flux_reservation(operation="decode", image_tensor=latents, vae=vae, tile_size=0)
         assert estimate == _flux_reservation(
@@ -235,7 +236,7 @@ class TestTheEncodeEstimate:
     def test_an_untiled_encode_is_the_whole_image_at_the_encode_coefficient(self):
         """What the call sites that pass no tile reserve: the full image, priced at the cuDNN encode coefficient."""
         image = torch.zeros(1, 3, 1024, 1024)
-        assert _flux_reservation("encode", image, _mock_flux_vae()) == 1024 * 1024 * 2 * _k("cudnn", "encode")
+        assert _flux_reservation("encode", image, _mock_flux_vae()) == int(_line(CPU, "encode", 1024 * 1024))
 
     def test_a_tiled_estimate_is_flat_in_the_image_size_where_the_untiled_one_is_not(self):
         vae = _mock_flux_vae()
@@ -247,7 +248,7 @@ class TestTheEncodeEstimate:
         # But they are a rounding error beside the tile term, which is what "flat" has to mean.
         assert max(estimates) < min(estimates) * 1.2
         untiled = [_flux_reservation("encode", torch.zeros(1, 3, edge, edge), vae) for edge in (1024, 3072)]
-        assert untiled[1] == untiled[0] * 9
+        assert untiled == [int(_line(CPU, "encode", edge * edge)) for edge in (1024, 3072)]
 
     def test_the_tiled_estimate_is_one_tile_plus_the_input_and_every_live_copy_of_the_moments(self):
         """The moments are not one copy. `AutoencoderKL._tiled_encode` keeps every encoded tile in
@@ -256,7 +257,7 @@ class TestTheEncodeEstimate:
         vae = _mock_flux_vae()
         edge, tile = 2048, 512
         live_moment_copies = 1.0 / (1.0 - 0.25) ** 2 + 2.0
-        expected = tile * tile * 2 * _k("cudnn", "encode") * 1.25
+        expected = _line(CPU, "encode", tile * tile * 1.25)
         expected += edge * edge * 3 * 2
         expected += (edge // 8) * (edge // 8) * 2 * 16 * 2 * live_moment_copies
         assert _flux_reservation("encode", torch.zeros(1, 3, edge, edge), vae, tile_size=tile) == int(expected)

@@ -9,7 +9,7 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
@@ -49,7 +49,7 @@ describe('reconcileCanvasDims (pure)', () => {
     ).toEqual({ kind: 'none' });
   });
 
-  it('maps a bbox size change onto the generate dims and re-derives the aspect id', () => {
+  it('maps a free bbox size change onto the generate dims, leaving the ratio free', () => {
     const result = reconcileCanvasDims({
       bbox: bbox(512, 768),
       dims: { height: 1024, width: 1024 },
@@ -57,12 +57,43 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: snapshot(1024, 1024, 1024, 1024),
     });
 
+    // Even though 512×768 is 2:3: a preset the person did not pick would lock the frame they left free.
     expect(result).toEqual({
-      aspectRatioId: '2:3',
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
       aspectRatioValue: 512 / 768,
       height: 768,
       kind: 'patch-dims',
       width: 512,
+    });
+  });
+
+  it('keeps the person’s lock as it is for a frame of its ratio, and carries it to a frame of another', () => {
+    const locked = { aspectRatioId: '4:3', aspectRatioIsLocked: true, aspectRatioValue: 4 / 3 } as const;
+    expect(
+      reconcileCanvasDims({
+        aspect: locked,
+        bbox: bbox(1024, 768),
+        dims: { height: 1024, width: 1024 },
+        grid: 8,
+        prev: snapshot(1024, 1024, 1024, 1024),
+      })
+    ).toEqual({ height: 768, kind: 'patch-dims', width: 1024 });
+    expect(
+      reconcileCanvasDims({
+        aspect: locked,
+        bbox: bbox(1024, 576),
+        dims: { height: 1024, width: 1024 },
+        grid: 8,
+        prev: snapshot(1024, 1024, 1024, 1024),
+      })
+    ).toEqual({
+      aspectRatioId: '16:9',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 1024 / 576,
+      height: 576,
+      kind: 'patch-dims',
+      width: 1024,
     });
   });
 
@@ -75,18 +106,7 @@ describe('reconcileCanvasDims (pure)', () => {
     });
 
     // Update the numeric ratio too; getActiveRatio prefers it over the aspect id.
-    expect(result).toMatchObject({ aspectRatioId: '4:3', aspectRatioValue: 1024 / 768, kind: 'patch-dims' });
-  });
-
-  it('re-derives a preset aspect id for a matching bbox ratio', () => {
-    const result = reconcileCanvasDims({
-      bbox: bbox(1024, 768),
-      dims: { height: 1024, width: 1024 },
-      grid: 8,
-      prev: snapshot(1024, 1024, 1024, 1024),
-    });
-
-    expect(result).toMatchObject({ aspectRatioId: '4:3', kind: 'patch-dims' });
+    expect(result).toMatchObject({ aspectRatioId: 'Free', aspectRatioValue: 1024 / 768, kind: 'patch-dims' });
   });
 
   it('re-derives Free for a non-preset bbox ratio', () => {
@@ -111,7 +131,7 @@ describe('reconcileCanvasDims (pure)', () => {
     expect(result).toEqual({ kind: 'none' });
   });
 
-  it('resizes the bbox to changed dims, keeping the top-left position', () => {
+  it('resizes the bbox to changed dims around its centre', () => {
     const result = reconcileCanvasDims({
       bbox: bbox(512, 768, 40, 24),
       dims: { height: 768, width: 768 },
@@ -119,7 +139,7 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: snapshot(512, 768, 512, 768),
     });
 
-    expect(result).toEqual({ bbox: { height: 768, width: 768, x: 40, y: 24 }, kind: 'set-bbox' });
+    expect(result).toEqual({ bbox: { height: 768, width: 768, x: -88, y: 24 }, kind: 'set-bbox' });
   });
 
   it('snaps dims to the grid when resizing the bbox', () => {
@@ -130,7 +150,7 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: snapshot(512, 512, 512, 512, 16),
     });
 
-    expect(result).toEqual({ bbox: { height: 96, width: 96, x: 0, y: 0 }, kind: 'set-bbox' });
+    expect(result).toEqual({ bbox: { height: 96, width: 96, x: 208, y: 208 }, kind: 'set-bbox' });
   });
 
   it('clamps a tiny dimension up to the shared generation minimum', () => {
@@ -141,7 +161,7 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: snapshot(512, 512, 512, 512, 16),
     });
 
-    expect(result).toEqual({ bbox: { height: 64, width: 64, x: 0, y: 0 }, kind: 'set-bbox' });
+    expect(result).toEqual({ bbox: { height: 64, width: 64, x: 224, y: 224 }, kind: 'set-bbox' });
   });
 
   it('clamps an oversized bbox to the shared processing maximum without changing its footprint', () => {
@@ -154,6 +174,7 @@ describe('reconcileCanvasDims (pure)', () => {
 
     expect(result).toEqual({
       aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
       aspectRatioValue: 5 / 6,
       height: 4096,
       kind: 'patch-dims',
@@ -180,7 +201,8 @@ describe('reconcileCanvasDims (pure)', () => {
       prev: null,
     });
 
-    expect(result).toEqual({ aspectRatioId: '1:1', aspectRatioValue: 1, height: 512, kind: 'patch-dims', width: 512 });
+    // The aspect fields already say free 1:1.
+    expect(result).toEqual({ height: 512, kind: 'patch-dims', width: 512 });
   });
 
   it('converges: applying each direction twice is a fixed point', () => {
@@ -265,6 +287,85 @@ const setupCanvasStore = () => {
   return { getSyncDispatches: () => syncDispatches, store, sync };
 };
 
+describe('Generate size edits on the canvas (wiring)', () => {
+  seedArchitectureCapabilities();
+
+  const SQUARE_RESET = {
+    aspectRatioId: '1:1',
+    aspectRatioIsLocked: true,
+    aspectRatioValue: 1,
+    height: 1024,
+    width: 1024,
+  } as const;
+
+  it('resizes the canvas frame around its centre, then settles', () => {
+    const { store, sync } = setupCanvasStore();
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    store.commands.generation.patchSettings(SQUARE_RESET);
+
+    const { bbox: nextBbox, values } = getActiveGenerate(store.getState());
+    expect(nextBbox).toEqual({ height: 1024, width: 1024, x: 4, y: 196 });
+    expect(values).toMatchObject(SQUARE_RESET);
+    expect(store.getState().projects[0]?.invocation.sourceId).toBe('canvas');
+    // No canvas engine is open, so the frame write is the sync's own.
+    expect(apply.mock.calls.map((call) => call[2])).toEqual(['system']);
+
+    // Frame and size now agree, so the next reconciliation writes nothing.
+    apply.mockClear();
+    store.commands.generation.patchSettings({ steps: 31 });
+    expect(apply).not.toHaveBeenCalled();
+
+    // A later size edit keeps the centre too.
+    store.commands.generation.patchSettings({ height: 1024, width: 512 });
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 512, x: 260, y: 196 });
+    sync.dispose();
+  });
+
+  it('records the frame resize as a canvas step while the canvas is open, so canvas undo can reverse it', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('canvas');
+    store.commands.generation.patchSettings({ height: 1024, model, modelKey: model.key, width: 1024 });
+    const commits: { from: unknown; to: unknown }[] = [];
+    const sync = createCanvasDimsSync(store, (projectId, from, to) => {
+      commits.push({ from, to });
+      // Stands in for the engine's commitStructural, which dispatches the same mutation as a user edit.
+      return store.commands.canvas.apply(projectId, { bbox: to, type: 'setCanvasBbox' });
+    });
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    store.commands.generation.patchSettings({ width: 512 });
+
+    expect(commits).toEqual([
+      { from: { height: 1024, width: 1024, x: 0, y: 0 }, to: { height: 1024, width: 512, x: 256, y: 0 } },
+    ]);
+    // Only the commit's own write; no system write follows it.
+    expect(apply.mock.calls.map((call) => call[2])).toEqual([undefined]);
+    expect(getActiveGenerate(store.getState()).bbox).toEqual({ height: 1024, width: 512, x: 256, y: 0 });
+    sync.dispose();
+  });
+
+  it('changes only the fields when the project is not generating into the canvas', () => {
+    const store = createWorkbenchStore();
+    store.commands.generation.setSource('generate');
+    store.commands.generation.toggleSourceLock();
+    store.commands.generation.patchSettings({ height: 1216, model, modelKey: model.key, width: 832 });
+    dispatchCanvas(store, { bbox: { height: 1216, width: 832, x: 100, y: 100 }, type: 'setCanvasBbox' });
+    const sync = createCanvasDimsSync(store);
+    const apply = vi.spyOn(store.commands.canvas, 'apply');
+
+    store.commands.generation.patchSettings(SQUARE_RESET);
+
+    expect(getActiveGenerate(store.getState())).toMatchObject({
+      bbox: { height: 1216, width: 832, x: 100, y: 100 },
+      values: SQUARE_RESET,
+    });
+    expect(apply).not.toHaveBeenCalled();
+    sync.dispose();
+  });
+});
+
 describe('createCanvasDimsSync (wiring)', () => {
   seedArchitectureCapabilities();
 
@@ -283,7 +384,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     const { values } = getActiveGenerate(store.getState());
     expect(values.width).toBe(512);
     expect(values.height).toBe(768);
-    expect(values.aspectRatioId).toBe('2:3');
+    expect(values.aspectRatioId).toBe('Free');
     // Re-derive numeric aspectRatioValue because downstream constraints prefer it over the id.
     expect(values.aspectRatioValue).toBeCloseTo(512 / 768);
     // Exactly one sync dispatch (the echo is a no-op, so no unbounded loop).
@@ -323,7 +424,7 @@ describe('createCanvasDimsSync (wiring)', () => {
     // Drag the bbox to a non-square 4:3 frame; dims should follow.
     dispatchCanvas(store, { bbox: { height: 768, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
     const { values } = getActiveGenerate(store.getState());
-    expect(values.aspectRatioId).toBe('4:3');
+    expect(values.aspectRatioId).toBe('Free');
     expect(values.aspectRatioValue).toBeCloseTo(1024 / 768);
 
     const aspectRatioValue = values.aspectRatioValue as number;
@@ -343,14 +444,14 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('resizes the bbox when the generate dims change, without looping', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
-    // Move the frame first so the resize must preserve the top-left position.
+    // Move the frame first so the resize must keep its centre.
     dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
     const before = getSyncDispatches();
 
     store.commands.generation.patchSettings({ width: 512 });
 
     const { bbox: nextBbox } = getActiveGenerate(store.getState());
-    expect(nextBbox).toEqual({ height: 1024, width: 512, x: 32, y: 48 });
+    expect(nextBbox).toEqual({ height: 1024, width: 512, x: 288, y: 48 });
     expect(getSyncDispatches() - before).toBe(1);
     sync.dispose();
   });
@@ -358,7 +459,7 @@ describe('createCanvasDimsSync (wiring)', () => {
   it('driving the dims off-grid still keeps the dispatch count bounded (no snap/reconcile loop)', () => {
     const { getSyncDispatches, store, sync } = setupCanvasStore();
 
-    // Move the frame first so the resize must preserve the top-left position.
+    // Move the frame first so the resize must keep its centre.
     dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 32, y: 48 }, type: 'setCanvasBbox' });
     const before = getSyncDispatches();
 
@@ -685,15 +786,15 @@ describe('createCanvasDimsSync (manual render size)', () => {
     const sync = createCanvasDimsSync(store);
     store.commands.widgets.patchValues('canvas', { scaleMethod: 'manual', scaledHeight: 1024, scaledWidth: 1536 });
 
-    // The frame labels these bboxes 3:2 and 1:1, which the Size section shows as locked; the person never locked them.
+    // These frames are 3:2 and 1:1, but the person never locked them, so the ratio stays free and nothing follows.
     dispatchCanvas(store, { bbox: { height: 832, width: 1248, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('3:2');
+    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('Free');
     expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
     dispatchCanvas(store, { bbox: { height: 1024, width: 1024, x: 0, y: 0 }, type: 'setCanvasBbox' });
-    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('1:1');
+    expect(getActiveGenerate(store.getState()).values.aspectRatioId).toBe('Free');
     expect(getRenderSize(store)).toEqual({ height: 1024, width: 1536 });
 
-    // Choosing the 1:1 preset the frame already shows is a new lock at the same ratio.
+    // Choosing the 1:1 preset the frame already has is a new lock at the same ratio.
     store.commands.generation.patchSettings({ aspectRatioId: '1:1', aspectRatioIsLocked: true, aspectRatioValue: 1 });
 
     // 1:1 at the same area: sqrt(1,572,864) ≈ 1254.1 per side, to the nearest multiple of 8.

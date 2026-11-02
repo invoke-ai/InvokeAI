@@ -81,6 +81,10 @@ export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
 export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
 
+/** MOSS-Image conditions on the Qwen3.5 9B; the 4B's hidden size does not fit its text embedder. */
+export const isMossImageQwen35Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_9b';
+
 /** Z-Image's caption embedder is 2560 wide, the Qwen3 4B hidden size; the 8B encoder's 4096 cannot feed it. */
 export const isZImageQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant === 'qwen3_4b';
@@ -97,8 +101,8 @@ export const isFlux2MistralEncoder: GenerateComponentFilter = (model) =>
 export const isErnieImageMistralEncoder: GenerateComponentFilter = (model) =>
   model.type === 'mistral_encoder' && model.variant === MINISTRAL_3B_VARIANT;
 
-/** Krea-2 conditions on the 4B encoder; Ideogram 4 and Qwen-Image-2.1 on the 8B one. The two are not interchangeable. */
-export const isKrea2Qwen3VlEncoder: GenerateComponentFilter = (model) =>
+/** Krea-2 and FLUX.3 condition on the 4B encoder; Ideogram 4 and Qwen-Image-2.1 on the 8B one. The two are not interchangeable. */
+export const isQwen3Vl4bEncoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_vl_encoder' && model.variant === 'qwen3_vl_4b';
 
 export const isQwen3Vl8bEncoder: GenerateComponentFilter = (model) =>

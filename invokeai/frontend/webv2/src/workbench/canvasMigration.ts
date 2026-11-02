@@ -8,6 +8,7 @@ import type {
   CanvasSnapshotContract,
   CanvasStackForests,
   CanvasStagingAreaContractV2,
+  CanvasStagingCandidateContract,
   CanvasStateContractV3,
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
@@ -16,6 +17,7 @@ import { createItemId } from '@platform/browser/randomUuid';
 import {
   CANVAS_MAX_NODE_COUNT,
   CANVAS_MAX_NODE_DEPTH,
+  CANVAS_REGIONAL_LAYOUT_KINDS,
   CONTROL_TYPES,
   LAYER_STACK_ORDER,
 } from '@workbench/canvas-engine/api';
@@ -276,6 +278,13 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
+    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
+    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    layout: z
+      .object({ kind: z.string(), text: z.string().optional() })
+      .optional()
+      .catch(undefined)
+      .pipe(z.object({ kind: z.enum(CANVAS_REGIONAL_LAYOUT_KINDS), text: z.string().optional() }).optional()),
     mask: zMask,
     negativePrompt: z.string().nullable(),
     positivePrompt: z.string().nullable(),
@@ -362,7 +371,11 @@ const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   type: 'inpaint_mask',
 });
 
-/** A fresh canvas state for a newly created project: an empty document with one selected empty inpaint mask. */
+/**
+ * A fresh canvas state for a newly created project: an empty document with one empty inpaint mask, ready for
+ * inpainting. Nothing is selected, so the first brush stroke lands on a new paint layer, as the empty Layers panel
+ * says; selecting the mask paints the area to inpaint.
+ */
 export const createNewCanvasState = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
@@ -371,7 +384,7 @@ export const createNewCanvasState = (
   const mask = createInitialInpaintMaskLayer();
   return {
     ...base,
-    document: { ...base.document, selectedLayerId: mask.id, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
+    document: { ...base.document, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
   };
 };
 
@@ -762,6 +775,14 @@ const loadCanvasDocument = (
   };
 };
 
+const isStagedImageRecord = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.imageName === 'string' &&
+  value.imageName.length > 0 &&
+  typeof value.sourceQueueItemId === 'string' &&
+  Number.isFinite(value.width) &&
+  Number.isFinite(value.height);
+
 const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapshotContract> => {
   if (!isRecord(value)) {
     return invalid('snapshot', [{ message: 'snapshot is not an object', path }]);
@@ -774,13 +795,27 @@ const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapsh
     );
   }
   const document = loadCanvasDocument(value.document, 'snapshot', `${path}.document`);
-  return document.status === 'loaded'
-    ? {
-        diagnostics: document.diagnostics,
-        status: 'loaded',
-        value: { ...value, document: document.value } as CanvasSnapshotContract,
-      }
-    : document;
+  if (document.status !== 'loaded') {
+    return document;
+  }
+  // Restore points from before kinds and staged results existed restore the document alone, as they always did.
+  const kind = value.kind === 'clear-canvas' || value.kind === 'discard-results' ? value.kind : undefined;
+  // Results the point keeps, minus any entry that could never be staged again (no image, size or source batch).
+  const stagedImages = Array.isArray(value.stagedImages)
+    ? (value.stagedImages.filter(isStagedImageRecord) as CanvasStagingCandidateContract[])
+    : undefined;
+  return {
+    diagnostics: document.diagnostics,
+    status: 'loaded',
+    value: {
+      createdAt: value.createdAt as string,
+      document: document.value,
+      id: value.id as string,
+      name: value.name as string,
+      ...(kind ? { kind } : {}),
+      ...(stagedImages && stagedImages.length > 0 ? { stagedImages } : {}),
+    },
+  };
 };
 
 const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> => {

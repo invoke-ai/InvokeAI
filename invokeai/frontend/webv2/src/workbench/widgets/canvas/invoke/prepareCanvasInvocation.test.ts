@@ -151,6 +151,8 @@ interface HarnessOptions {
   outputOnlyMaskedRegions?: boolean;
   scaling?: RunCanvasInvocationDeps['scaling'];
   generateValues?: Record<string, unknown>;
+  /** Replaces the uniform-alpha coverage readback. */
+  readImageData?: GenerationCompositeExecutorDeps['readImageData'];
   controlModelMemory?: RunCanvasInvocationDeps['controlModelMemory'];
 }
 
@@ -226,7 +228,7 @@ const makeHarness = (options: HarnessOptions = {}): Harness => {
   const executorDeps: GenerationCompositeExecutorDeps = {
     backend,
     hashBlob: (blob: Blob) => blob.text(),
-    readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
+    readImageData: options.readImageData ?? ((_surface, rect) => uniformImageData(rect.width, rect.height, alpha)),
     uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
   };
 
@@ -704,6 +706,26 @@ describe('runCanvasInvocation', () => {
     ]);
   });
 
+  it.each([
+    [
+      { layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' } as const,
+      '“Sky” could not be read (its image may have been deleted or damaged). Disable or delete that layer, then invoke again.',
+    ],
+    [{ status: 'not-ready' } as const, 'Some layers are still loading. Wait a moment, then invoke again.'],
+    [
+      { status: 'over-budget' } as const,
+      'Generation exceeds the browser’s canvas-memory limit. Try again after layers finish loading. If it still fails, crop or resize large source images, or disable unnecessary layers. A smaller generation frame alone may not help.',
+    ],
+  ])('explains a %o capture and dispatches nothing', async (result, message) => {
+    const harness = makeHarness();
+    harness.deps.composeForGeneration = () => Promise.resolve(result);
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices().map((notice) => notice.message)).toEqual([message]);
+  });
+
   it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
     let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
     liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
@@ -911,9 +933,7 @@ describe('runCanvasInvocation', () => {
     const harness = makeHarness({ model });
     await runCanvasInvocation(harness.deps);
     expect(harness.submittedGraphs()).toHaveLength(0);
-    expect(harness.notices().map((notice) => notice.message)).toEqual([
-      'OpenAI Image supports a maximum size of 32×64.',
-    ]);
+    expect(harness.notices().map((notice) => notice.message)).toEqual(['OpenAI Image supports at most 32×64.']);
   });
 
   it('counts the captured init image against the Seedream budget before enqueue', async () => {
@@ -1347,6 +1367,34 @@ describe('runCanvasInvocation', () => {
       });
     });
 
+    it('hands an InstantX union, as its record says it is, the control image alone when the canvas inpaints', async () => {
+      const instantx = {
+        ...union,
+        control_architecture: 'instantx_union' as const,
+        hash: 'qwen-instantx-hash',
+        key: 'qwen-instantx',
+        name: 'Qwen Image InstantX ControlNet Union',
+      };
+      const harness = makeHarness({
+        document: docWithLayers([
+          rasterLayer('base'),
+          qwenLayer('q-layer', { model: instantx.key }),
+          inpaintMaskLayer('mask'),
+        ]),
+        model: qwenImage,
+        models: [union, instantx],
+      });
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+      expect(nodes['qwen_image_control_q-layer']).toMatchObject({ control_model: { key: 'qwen-instantx' } });
+      expect(nodes['qwen_image_control_q-layer']).not.toHaveProperty('inpaint_image');
+      expect(nodes['qwen_image_control_mask_q-layer']).toBeUndefined();
+      expect(nodes.create_gradient_mask).toBeDefined();
+    });
+
     it('blocks a second enabled nonempty control', async () => {
       const harness = makeHarness({
         document: docWithLayers([qwenLayer('first'), qwenLayer('second')]),
@@ -1619,7 +1667,7 @@ const regionalLayer = (
   overrides: Partial<
     Pick<
       CanvasLayerContract & { type: 'regional_guidance' },
-      'positivePrompt' | 'negativePrompt' | 'autoNegative' | 'referenceImages'
+      'positivePrompt' | 'negativePrompt' | 'autoNegative' | 'referenceImages' | 'layout'
     >
   > = {}
 ): CanvasLayerContract => ({
@@ -1720,6 +1768,80 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
     const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
     expect(graph?.nodes.denoise_latents?.type).toBe('anima_denoise');
     expect(graph?.nodes.rg_mask_to_tensor_rg).toBeUndefined();
+  });
+});
+
+describe('runCanvasInvocation — layout regions on MOSS-Image', () => {
+  const mossModel: MainModelConfig = {
+    base: 'moss-image',
+    format: 'diffusers',
+    key: 'moss-model',
+    name: 'MOSS-Image',
+    type: 'main',
+  };
+  /** Every regional mask covers x 8–23, y 4–35 of the 64×64 bbox. */
+  const maskScan: GenerationCompositeExecutorDeps['readImageData'] = (_surface, rect) => {
+    const image = uniformImageData(rect.width, rect.height, 0);
+    for (let y = 4; y < 36; y += 1) {
+      for (let x = 8; x < 24; x += 1) {
+        image.data[(y * rect.width + x) * 4 + 3] = 255;
+      }
+    }
+    return image;
+  };
+  const makeMossHarness = (
+    layers: CanvasLayerContract[],
+    generateValues: Record<string, unknown> = {},
+    readImageData = maskScan
+  ) =>
+    makeHarness({
+      document: docWithLayers(layers),
+      generateValues,
+      model: mossModel,
+      readImageData,
+    });
+
+  it("places each region's mask bounds and role in the layout prompt, skipping a text region without text", async () => {
+    // Each composited mask is read back once; identical masks would share one upload, so count the readbacks.
+    const readImageData = vi.fn(maskScan);
+    const harness = makeMossHarness(
+      [
+        regionalLayer('sign', { layout: { kind: 'text', text: 'OPEN' }, positivePrompt: 'a neon sign' }),
+        regionalLayer('blank', { layout: { kind: 'text' }, positivePrompt: 'a poster' }),
+      ],
+      {},
+      readImageData
+    );
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    // The text region without text never composites.
+    expect(readImageData).toHaveBeenCalledTimes(1);
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.layout_prompt).toMatchObject({
+      height: 64,
+      regions: [{ bbox: [8, 4, 24, 36], caption: 'a neon sign', kind: 'text', text: 'OPEN' }],
+      type: 'moss_image_layout_prompt',
+      width: 64,
+    });
+    expect(Object.values(graph?.nodes ?? {}).some((node) => node.type === 'alpha_mask_to_tensor')).toBe(false);
+  });
+
+  it('blocks the invocation with a notice when regions would be laid out around a blank prompt', async () => {
+    const harness = makeMossHarness([regionalLayer('hero', { layout: { kind: 'character' } })], {
+      positivePrompt: '',
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({
+        message:
+          'MOSS-Image needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.',
+      }),
+    ]);
   });
 });
 

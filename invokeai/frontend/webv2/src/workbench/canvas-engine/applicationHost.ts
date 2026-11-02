@@ -17,6 +17,7 @@ import type {
   CommitMaskImageResultOptions,
 } from '@workbench/canvas-engine/controllers/maskResultController';
 import type { LayerFlushOptions, LayerFlushResult } from '@workbench/canvas-engine/controllers/persistenceController';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasCompositeExecutorDeps } from '@workbench/canvas-engine/rasterTransactions';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -56,12 +57,12 @@ export interface CanvasApplicationHost extends CanvasControlDerivationCapability
   ): Promise<
     | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
     | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+    | LayerUnreadable
     | AdjustmentRefusal
   >;
   getCompositeExecutorDeps(): CanvasCompositeExecutorDeps;
   getDocument(): CanvasDocumentContractV3 | null;
   isGuardCurrent(guard: LayerExportGuard): boolean;
-  isInteractionLocked(): boolean;
   isSamToolActive(): boolean;
   prepareSelectObjectStart(layerId: string): SelectObjectStartContext;
   publishFilterPreview(

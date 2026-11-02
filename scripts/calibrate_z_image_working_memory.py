@@ -1,71 +1,197 @@
-"""Calibrate the Z-Image denoise working-memory estimate against measured peak CUDA/HIP memory.
+"""Measure the working memory of one Z-Image transformer forward, as shipped-data points for `denoise.z_image`.
 
-Background
-----------
-The Z-Image transformer attends over one unified sequence -- image tokens and caption tokens, each padded to a
-multiple of 32 -- through diffusers' `dispatch_attention_fn`. Three numbers decide how much VRAM the model cache has
-to keep free for one transformer forward (``ZImageDenoiseInvocation._estimate_working_memory``):
+What a point measures
+---------------------
+The demand of one transformer forward, measured as a fresh window (`invokeai/backend/working_memory/measurement.py`,
+whose definitions the in-server probe's windows share). With the model and its inputs resident: synchronize, release the
+allocator's cached blocks, read the baseline and reset the peaks; run the forward; the demand is then the largest growth
+of three counters over the baseline: the driver's figure for this process, torch's reserved peak and its allocated peak.
+A forward whose allocations failed, or only succeeded after the allocator released its cache and retried (a squeezed
+peak), or after which Windows keeps more than `measurement.SPILL_TOLERANCE_BYTES` of the process in shared memory, is
+invalid: it is recorded as such, not as a point.
 
-1. the activation cost per attended token on a fused SDPA kernel, which scales linearly with the sequence;
-2. the materialized score matrix, only where SDPA has no fused kernel for these shapes -- ROCm/Windows without
-   the experimental AOTriton kernels, MPS -- which `sdpa_score_matrix_bytes` charges at the shipped
-   `SDPA_MATH_BYTES_PER_SCORE_ELEMENT`;
-3. with a ControlNet attached, the adapter's hints: one per control block, live next to the transformer's own
-   activations.
+Every point runs in a fresh process (`scripts/working_memory/fresh_points.py`, which the calibration scripts share),
+which first applies the server's runtime (`apply_server_runtime` in `invokeai/app/run_app.py`): the `MIOPEN_FIND_MODE`
+default, the integrated-GPU check, the allocator, the AOTriton decision and the monkeypatches, the ROCm SDPA guard among
+them, in the server's order. Its settings are those of a server without a config file, except the allocator
+configuration: `--alloc-conf`, or without one the platform default the server uses (expandable segments for ROCm on
+Windows, torch's native allocator elsewhere). This script's own process runs the integrated-GPU check once before the
+first point: the measuring processes inherit the `HIP_VISIBLE_DEVICES` it sets, which their own check keeps, as the
+server keeps an exported one.
 
-This measures all three on the real geometry (dim 3840, 30 heads of 128, caption features 2560 wide) with randomly
-initialized models and a reduced transformer block count: memory depends on shapes, not on weight values, and a
-no-grad forward frees each block's intermediates. `--extra-blocks` re-checks that on the build at hand. Every point
-runs in a fresh subprocess, so the caching allocator's history cannot contaminate the peak-reserved reading, and a
-point that runs out of memory is recorded as such rather than aborting the run.
+The forward then runs twice, cold and warm, and the point takes the larger demand (`measure_cold_and_warm` and
+`measured_bytes_and_method` in `measurement.py`, which every calibration script shares): a `demand_peak` where both
+forwards read the driver's figure, else a `reserved_peak` of torch's counters alone.
 
-Peak *reserved*, not allocated: the estimate is compared against free memory, so it has to bound what the
-allocator actually takes off the card.
+The transformer has the real geometry (dim 3840, 30 heads of 128, caption features 2560 wide) and random weights in the
+measured dtype, because memory depends on shapes, not on weight values. It has 2 main blocks and one refiner block each:
+a no-grad forward frees each block's intermediates, which `--extra-blocks 4` re-checks at 1024px. A ControlNet point
+runs the control through the denoise's hooks (`install_fun_control`) with its main-stage hints on consecutive main
+blocks, and with the real transformer's two refiner blocks, on which its refiner chain lands its hints. The hints are all
+computed as the first main block starts and dropped after the last one they land on, so where in between they land does
+not move the peak, and packing them keeps the transformer at one main block per hint. A point carries the
+features of `estimate_z_image_denoise_working_memory`, taken in the measuring process after the runtime setup, so its
+`score_matrix_bytes` reflects the attention kernel this build really runs.
 
-Every point is priced before it runs -- the node's own estimate for it, the forced-math score matrix where that is
-the point, and the weights -- and skipped when that exceeds free device memory. An oversized allocation does not
-always fail: where the driver backs it with system RAM (NVIDIA's sysmem fallback, AMD on Windows) it pages and can
-stall the whole machine. On a build whose default kernel materializes the score matrix, that skips every size above
-1024px. `--force` runs them anyway.
+Each point is priced before it runs: the estimate for it plus its weights in its dtype. It is skipped when that exceeds
+free device memory, unless `--force`. An oversized allocation does not always fail: where the driver backs it with
+system RAM (NVIDIA's sysmem fallback, AMD on Windows) it pages, which can stall the whole machine.
+
+Modes
+-----
+- `fit` (default): the fit grid, in each of `--dtypes` (bfloat16, float16, float32). The `--sizes` (512, 768, 1024,
+  1440, 2048 px) run with a `--text-tokens` caption (512). Those among `--short-text-sizes` (1024, 1440) also run with
+  a `--short-text-tokens` caption (77), for the text slope. `--extra-blocks N` adds one forward with N main blocks at
+  1024px, in the first dtype.
+- `math`: SDPA forced onto the math kernel at 1024px, next to the default kernel, per dtype: what a materialized score
+  matrix costs per element, against what the estimate charges for it.
+- `control`: a `--control-variant` Fun ControlNet layout (2.1) at 1024px, next to no control, per dtype: how many
+  hint-sized tensors it keeps, against the n + 4 the estimate charges.
+
+Only the fit grid's points are fit points (`"fit": true`). The checks' points, the extra-blocks forward included, test
+analytic terms or assumptions rather than the line: they are marked `"fit": false`, and their `in_fit` is false. A fit
+point is `in_fit` only where the estimator's line admits its features (`Line.fits`): on a build whose SDPA kernel
+materializes the score matrix, the fit grid's forwards carry a score term on top of the line, so they measure that term
+rather than the line, as a check does.
+
+Output
+------
+Every measured point is appended to `--out` as one JSON object per line, the point file
+`scripts/working_memory/build_shipped.py --points` reads. It carries the fields of a `MeasuredPoint`
+(`invokeai/backend/working_memory/coefficients.py`):
+
+- `estimator`, `version` and `features`, the estimate's own;
+- `platform`, as `platform_for` gives it, OS included; the builder names the OS only where the data needs it;
+- `measured_bytes` (the demand), `method`, `device` and `in_fit`;
+- `provenance`, which names the GPU, the torch build, the OS, the allocator configuration, on ROCm `MIOPEN_FIND_MODE`,
+  the AOTriton switch and the SDPA guard, the block count and the date.
+
+The other keys are the script's, which the builder ignores: `fit`, `point` (the grid entry) and `raw` (each forward's
+counter deltas, the prediction and the runtime facts). An invalid, skipped or failed forward is no point: it shows in
+the table on stdout, with its reasons, and stays out of the file.
 
 Usage
 -----
-    python scripts/calibrate_z_image_working_memory.py
-    python scripts/calibrate_z_image_working_memory.py --extra-blocks 4 --control-blocks 6
-    python scripts/calibrate_z_image_working_memory.py --max-px 1024 --control-blocks 0
+RTX 4090 (CUDA): the native allocator, then `cudaMallocAsync`; the checks once.
+
+    python scripts/calibrate_z_image_working_memory.py --out 4090-native.jsonl --extra-blocks 4
+    python scripts/calibrate_z_image_working_memory.py --out 4090-async.jsonl --alloc-conf backend:cudaMallocAsync
+    python scripts/calibrate_z_image_working_memory.py --out 4090-checks.jsonl --mode math
+    python scripts/calibrate_z_image_working_memory.py --out 4090-checks.jsonl --mode control
+
+RX 9060 XT (ROCm on Windows): the server's default expandable segments, then the native allocator; the checks once.
+
+    python scripts/calibrate_z_image_working_memory.py --out 9060xt-expandable.jsonl --extra-blocks 4
+    python scripts/calibrate_z_image_working_memory.py --out 9060xt-native.jsonl --alloc-conf expandable_segments:False
+    python scripts/calibrate_z_image_working_memory.py --out 9060xt-checks.jsonl --mode math
+    python scripts/calibrate_z_image_working_memory.py --out 9060xt-checks.jsonl --mode control
+
+`--dry-run` prints the planned points without touching a device.
 """
 
 import argparse
-import json
-import subprocess
+import dataclasses
+import datetime
 import sys
+from collections.abc import Mapping, Sequence
 from contextlib import nullcontext
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal
 
-import torch
-from torch.nn.attention import SDPBackend, sdpa_kernel
+# None of these imports torch: a measuring process has to configure the allocator before torch is imported.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR  # noqa: E402
+from scripts.working_memory import fresh_points  # noqa: E402
 
-from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.app.invocations.z_image.z_image_denoise import (
-    Z_IMAGE_ATTENTION_HEADS,
-    Z_IMAGE_HIDDEN_SIZE,
-    ZImageDenoiseInvocation,
-    _padded,
-)
-from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+if TYPE_CHECKING:
+    import torch
 
-GIB = 1024**3
-MIB = 1024**2
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControlVariant
+
+GIB = 2**30
+MIB = 2**20
 
 CAP_FEAT_DIM = 2560
 PATCH_SIZE = 2
-CONTROL_IN_DIM = 33  # V2.0 adapters; the channel count only sizes the patch embedder
-# One transformer block at full width: attention 4 dim^2, SwiGLU 8 dim^2, adaLN and norms, rounded up.
-BLOCK_PARAMS = 13 * Z_IMAGE_HIDDEN_SIZE**2
+CONTROL_VARIANTS = {
+    "1.0": "Z_IMAGE_FUN_CONTROL_1_0",
+    "2.0": "Z_IMAGE_FUN_CONTROL_2_0",
+    "2.1": "Z_IMAGE_FUN_CONTROL_2_1",
+    "2.1-lite": "Z_IMAGE_FUN_CONTROL_2_1_LITE",
+}
+"""The control check's layouts by `--control-variant`: the names of their `ZImageFunControlVariant`s in
+`invokeai.backend.fun_controlnet.z_image`, which imports torch."""
+CONTROL_REFINER_BLOCKS = 2
+"""The real transformer's refiner blocks, which a ControlNet point's transformer has: the control's refiner chain adds
+its hints after both."""
+CHECK_PX = 1024
+"""The size the checks and the extra-blocks forward run at."""
 
-SIZES = (1024, 1440, 2048)
-TEXT_TOKENS = 512
+DTYPES = ("bfloat16", "float16", "float32")
+LOGGER_NAME = "calibrate_z_image_working_memory"
 
-DTYPES = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
+Kind = Literal["fit", "blocks", "reference", "math", "control"]
+Mode = Literal["fit", "math", "control"]
+
+
+@dataclass(frozen=True)
+class Point:
+    """One transformer forward to measure, in a process of its own."""
+
+    kind: Kind
+    """`fit` for a point of the fit grid; otherwise the check it serves: another block count (`blocks`), the
+    default-kernel forward a check compares with (`reference`), the forced math kernel (`math`) or a ControlNet
+    (`control`)."""
+    px: int
+    text_tokens: int
+    """The caption's tokens, unpadded."""
+    dtype: str
+    """A torch dtype name, one of `DTYPES`."""
+    blocks: int
+    force_math: bool = False
+    control_variant: str | None = None
+    """A key of `CONTROL_VARIANTS`, for a ControlNet point."""
+
+    @property
+    def fit(self) -> bool:
+        return self.kind == "fit"
+
+
+def plan(
+    mode: Mode,
+    *,
+    sizes: Sequence[int],
+    dtypes: Sequence[str],
+    text_tokens: int,
+    short_text_tokens: int,
+    short_text_sizes: Sequence[int],
+    blocks: int,
+    extra_blocks: int,
+    control_variant: str,
+) -> list[Point]:
+    """The forwards a run measures, in order: per dtype, the fit grid or a check's pair of forwards."""
+    points: list[Point] = []
+    for dtype in dtypes:
+        if mode == "fit":
+            points += [Point("fit", px, text_tokens, dtype, blocks) for px in sizes]
+            points += [Point("fit", px, short_text_tokens, dtype, blocks) for px in sizes if px in short_text_sizes]
+            continue
+        points.append(Point("reference", CHECK_PX, text_tokens, dtype, blocks))
+        points.append(
+            Point(
+                mode,
+                CHECK_PX,
+                text_tokens,
+                dtype,
+                blocks,
+                force_math=mode == "math",
+                control_variant=control_variant if mode == "control" else None,
+            )
+        )
+    if mode == "fit" and extra_blocks:
+        points.append(Point("blocks", CHECK_PX, text_tokens, dtypes[0], extra_blocks))
+    return points
 
 
 def image_tokens(px: int) -> int:
@@ -73,83 +199,63 @@ def image_tokens(px: int) -> int:
     return side * side
 
 
-def unified_tokens(px: int, text_tokens: int) -> int:
-    return _padded(image_tokens(px)) + _padded(text_tokens)
-
-
-def predicted_bytes(px: int, blocks: int, dtype: torch.dtype, force_math: bool, control_blocks: int) -> int:
-    """What a point is expected to take: working memory as the node estimates it, plus the weights."""
-    working = ZImageDenoiseInvocation._estimate_working_memory(
-        image_seq_len=image_tokens(px),
-        text_seq_len=TEXT_TOKENS,
-        num_loras=0,
-        num_control_blocks=control_blocks,
-        has_attention_mask=control_blocks > 0,
-        device=torch.device("cuda"),
-        dtype=dtype,
-    )
-    if force_math:
-        tokens = unified_tokens(px, TEXT_TOKENS)
-        working += Z_IMAGE_ATTENTION_HEADS * tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-    # Main blocks plus refiners and embedders; adapter blocks plus its refiners.
-    modules = blocks + 4 + (control_blocks + 2 if control_blocks else 0)
-    return working + modules * BLOCK_PARAMS * dtype.itemsize
-
-
-def _peak_reserved(fn) -> int | None:
-    """Run ``fn`` and return the growth in peak reserved bytes, or ``None`` if it ran out of memory."""
-    torch.cuda.synchronize()
-    torch.cuda.empty_cache()
-    torch.cuda.reset_peak_memory_stats()
-    baseline = torch.cuda.memory_reserved()
-    try:
-        fn()
-        torch.cuda.synchronize()
-    except (torch.cuda.OutOfMemoryError, RuntimeError) as e:
-        if "out of memory" not in str(e).lower():
-            raise
+def _control_variant(point: Point) -> "ZImageFunControlVariant | None":
+    """The ControlNet layout of `point`, with its main-stage hints packed onto main blocks 0, 1, 2, ...: the same peak
+    on the fewest blocks. Imports torch."""
+    if point.control_variant is None:
         return None
-    return torch.cuda.max_memory_reserved() - baseline
+    from invokeai.backend.fun_controlnet import z_image
+
+    variant = getattr(z_image, CONTROL_VARIANTS[point.control_variant])
+    return dataclasses.replace(variant, main_layers=tuple(range(len(variant.main_layers))))
 
 
-def _control_adapter(blocks: int, device: torch.device, dtype: torch.dtype) -> torch.nn.Module:
-    """A randomly initialized adapter, allocated directly in ``dtype`` on the device: 15 blocks are ~3B parameters,
-    which would otherwise pass through the host in float32 first."""
-    from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
-
-    with torch.device("meta"):
-        adapter = ZImageControlAdapter(
-            num_control_blocks=blocks,
-            control_in_dim=CONTROL_IN_DIM,
-            dim=Z_IMAGE_HIDDEN_SIZE,
-            n_heads=Z_IMAGE_ATTENTION_HEADS,
-            n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
-        )
-    adapter = adapter.to(dtype).to_empty(device=device)
-    for param in adapter.parameters():
-        torch.nn.init.normal_(param, std=0.02)
-    return adapter.eval()
+def _transformer_blocks(point: Point) -> tuple[int, int]:
+    """The main and refiner blocks of `point`'s transformer: for a ControlNet point, one main block per hint at least
+    and the real refiner blocks. Imports torch for a ControlNet point."""
+    variant = _control_variant(point)
+    if variant is None:
+        return point.blocks, 1
+    return max(point.blocks, len(variant.main_layers)), CONTROL_REFINER_BLOCKS
 
 
-@torch.inference_mode()
-def measure(px: int, text_tokens: int, blocks: int, dtype: torch.dtype, force_math: bool, control_blocks: int) -> dict:
-    """Peak reserved memory for one transformer forward at one resolution."""
+def provenance(point: Point, facts: Mapping[str, Any], date: str) -> str:
+    """A measured point's `provenance`: where and how it was measured."""
+    main_blocks, refiner_blocks = _transformer_blocks(point)
+    regime = {
+        "math": ", SDPA forced onto the math kernel",
+        "control": f", the {point.control_variant} Fun ControlNet through the denoise's hooks, its hints on consecutive "
+        "main blocks",
+    }
+    blocks = f"{main_blocks} main block{'' if main_blocks == 1 else 's'}"
+    refiners = "one refiner block" if refiner_blocks == 1 else f"{refiner_blocks} refiner blocks"
+    return (
+        f"scripts/calibrate_z_image_working_memory.py ({date}): {fresh_points.runtime_provenance(facts)}. Random-init "
+        f"Z-Image transformer with the real geometry, {blocks} and {refiners} each{regime.get(point.kind, '')}; "
+        "memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a "
+        "cold and a warm forward; no failed allocation, allocator retry or spill."
+    )
+
+
+# The measuring process. Everything below imports torch, so it runs only after `fresh_points.apply_server_runtime`.
+
+
+def _transformer(blocks: int, refiner_blocks: int) -> "torch.nn.Module":
+    """The Z-Image transformer's geometry with `blocks` main blocks and `refiner_blocks` refiner blocks each, on the
+    meta device."""
+    import torch
     from diffusers import ZImageTransformer2DModel
 
-    from invokeai.backend.z_image.z_image_controlnet_extension import (
-        ZImageControlNetExtension,
-        z_image_forward_with_control,
-    )
+    from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_ATTENTION_HEADS, Z_IMAGE_HIDDEN_SIZE
 
-    device = torch.device("cuda")
-    model = (
-        ZImageTransformer2DModel(
+    with torch.device("meta"):
+        return ZImageTransformer2DModel(
             all_patch_size=(PATCH_SIZE,),
             all_f_patch_size=(1,),
             in_channels=16,
             dim=Z_IMAGE_HIDDEN_SIZE,
             n_layers=blocks,
-            n_refiner_layers=1,
+            n_refiner_layers=refiner_blocks,
             n_heads=Z_IMAGE_ATTENTION_HEADS,
             n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
             norm_eps=1e-05,
@@ -160,143 +266,307 @@ def measure(px: int, text_tokens: int, blocks: int, dtype: torch.dtype, force_ma
             axes_dims=[32, 48, 48],
             axes_lens=[1024, 512, 512],
         )
-        .to(device=device, dtype=dtype)
-        .eval()
-    )
-    latent = px // LATENT_SCALE_FACTOR
-    x = [torch.randn(16, 1, latent, latent, device=device, dtype=dtype)]
-    t = torch.full((1,), 0.5, device=device, dtype=dtype)
-    cap_feats = [torch.randn(text_tokens, CAP_FEAT_DIM, device=device, dtype=dtype)]
-
-    extension = None
-    if control_blocks:
-        extension = ZImageControlNetExtension(
-            control_adapter=_control_adapter(control_blocks, device, dtype),
-            control_cond=torch.randn(CONTROL_IN_DIM, 1, latent, latent, device=device, dtype=dtype),
-        )
-
-    def forward() -> None:
-        with sdpa_kernel(SDPBackend.MATH) if force_math else nullcontext():
-            if extension is None:
-                model(x=x, t=t, cap_feats=cap_feats)
-            else:
-                z_image_forward_with_control(
-                    transformer=model, x=x, t=t, cap_feats=cap_feats, control_extension=extension
-                )
-
-    row = {
-        "px": px,
-        "tokens": unified_tokens(px, text_tokens),
-        "blocks": blocks,
-        "force_math": force_math,
-        "control_blocks": control_blocks,
-    }
-    # Warm up first: the cold call pays one-off workspace costs the per-token slope must not absorb.
-    if _peak_reserved(forward) is None:
-        return row | {"oom": True}
-    peak = _peak_reserved(forward)
-    return row | ({"oom": True} if peak is None else {"oom": False, "reserved_delta": peak})
 
 
-def _run_point(px: int, blocks: int, dtype_name: str, force_math: bool, control_blocks: int) -> dict | None:
-    args = [str(px), str(TEXT_TOKENS), str(blocks), dtype_name, "1" if force_math else "0", str(control_blocks)]
-    proc = subprocess.run([sys.executable, __file__, "--single", *args], capture_output=True, text=True)
-    line = proc.stdout.strip().splitlines()[-1] if proc.stdout.strip() else ""
-    try:
-        return json.loads(line)
-    except Exception:
-        tail = proc.stderr.strip().splitlines()[-1:] or ["(no stderr)"]
-        print(f"  FAILED {' '.join(args)}: {tail[0]}")
-        return None
+def _control(variant: "ZImageFunControlVariant") -> "torch.nn.Module":
+    """The Fun ControlNet of `variant` at the transformer's width, on the meta device."""
+    import torch
+
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
+    from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_ATTENTION_HEADS, Z_IMAGE_HIDDEN_SIZE
+
+    with torch.device("meta"):
+        return ZImageFunControl(variant, hidden_size=Z_IMAGE_HIDDEN_SIZE, num_attention_heads=Z_IMAGE_ATTENTION_HEADS)
 
 
-def report(
-    dtype_name: str, blocks: int, extra_blocks: int | None, control_blocks: int, max_px: int, force: bool
-) -> None:
-    dtype = DTYPES[dtype_name]
-    sizes = [px for px in SIZES if px <= max_px]
-    free, _ = torch.cuda.mem_get_info()
-    print(f"{'kernel':>7} {'blocks':>6} {'control':>7} {'px':>5} {'tokens':>7} {'reserved(GiB)':>14}")
-    print("-" * 52)
+def _materialize(module: "torch.nn.Module", device: "torch.device", dtype: "torch.dtype") -> "torch.nn.Module":
+    """A meta-device module allocated directly in `dtype` on `device`, randomly initialized: a 15-block control is ~3B
+    parameters, which would otherwise pass through the host in float32 first."""
+    import torch
 
-    def run(kernel: str, count: int, px: int, force_math: bool, control: int) -> int | None:
-        need = predicted_bytes(px, count, dtype, force_math, control)
-        if need > free and not force:
-            print(
-                f"{kernel:>7} {count:>6} {control:>7} {px:>5} {'':>7} {'skipped':>14}"
-                f"  needs ~{need / GIB:.1f} GiB, {free / GIB:.1f} GiB free"
+    module = module.to(dtype).to_empty(device=device)
+    for param in module.parameters():
+        torch.nn.init.normal_(param, std=0.02)
+    return module.eval()
+
+
+def _measure(point: Point, force: bool) -> dict[str, Any]:
+    """The output line of `point`, measured in this process after `fresh_points.apply_server_runtime`."""
+    import torch
+    from torch.nn.attention import SDPBackend, sdpa_kernel
+
+    from invokeai.backend.fun_controlnet.hooks import install_fun_control
+    from invokeai.backend.util.devices import TorchDevice
+    from invokeai.backend.working_memory.measurement import measure_cold_and_warm
+    from invokeai.backend.working_memory.platform import platform_for
+    from invokeai.backend.z_image import denoise_working_memory
+    from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
+
+    # The device the node itself takes.
+    device = TorchDevice.choose_torch_device()
+    if device.type != "cuda":
+        raise SystemExit(f"Needs a CUDA or ROCm device; this process would run on {device}.")
+    dtype = getattr(torch, point.dtype)
+    variant = _control_variant(point)
+
+    def kernel():
+        return sdpa_kernel(SDPBackend.MATH) if point.force_math else nullcontext()
+
+    with torch.inference_mode():
+        # In the forward's kernel regime, so the score matrix is priced for the kernel that runs.
+        with kernel():
+            estimate = estimate_z_image_denoise_working_memory(
+                # The point runs a randomly initialized dense model, which dequantizes nothing per forward.
+                torch.nn.Module(),
+                image_seq_len=image_tokens(point.px),
+                text_seq_len=point.text_tokens,
+                lora_count=0,
+                control_blocks=len(variant.main_layers) if variant is not None else 0,
+                # The forward passes no attention mask at batch size 1, and a ControlNet's blocks take exactly the
+                # arguments the base blocks take.
+                has_attention_mask=False,
+                device=device,
+                dtype=dtype,
             )
-            return None
-        row = _run_point(px, count, dtype_name, force_math, control)
-        if row is None or row.get("oom"):
-            print(f"{kernel:>7} {count:>6} {control:>7} {px:>5} {'':>7} {'OOM':>14}")
-            return None
-        print(f"{kernel:>7} {count:>6} {control:>7} {px:>5} {row['tokens']:>7} {row['reserved_delta'] / GIB:>14.3f}")
-        return row["reserved_delta"]
+        platform = platform_for(device)
+        facts = fresh_points.runtime_facts(device, platform.os, denoise_working_memory.__file__)
+        common = {
+            "estimator": estimate.estimator,
+            "version": estimate.version,
+            "platform": dataclasses.asdict(platform),
+            "features": dict(estimate.features),
+            "device": facts["device"],
+        }
 
-    counts = [blocks] + ([extra_blocks] if extra_blocks else [])
-    fused: dict[int, dict[int, int]] = {}
-    for count in counts:
-        for px in sizes:
-            if (peak := run("auto", count, px, False, 0)) is not None:
-                fused.setdefault(count, {})[px] = peak
-    math_peak = run("math", blocks, SIZES[0], True, 0)
-    control_peak = run("auto", blocks, SIZES[0], False, control_blocks) if control_blocks else None
+        transformer = _transformer(*_transformer_blocks(point))
+        control = _control(variant) if variant is not None else None
+        on_meta = [module for module in (transformer, control) if module is not None]
+        weight_bytes = sum(param.numel() for module in on_meta for param in module.parameters()) * dtype.itemsize
+        free, _ = TorchDevice.cuda_mem_get_info(device)
+        raw = {
+            "reservation_bytes": estimate.reservation_bytes,
+            "weight_bytes": weight_bytes,
+            "predicted_bytes": estimate.reservation_bytes + weight_bytes,
+            "free_bytes": free,
+            "runtime": facts,
+        }
+        if raw["predicted_bytes"] > free and not force:
+            return fresh_points.skipped_line(point, common, raw)
 
-    print()
-    for count, peaks in fused.items():
-        for px, peak in peaks.items():
-            tokens = unified_tokens(px, TEXT_TOKENS)
-            print(f"auto kernel, {count} blocks, {px}px: {peak / tokens / MIB:.4f} MB per attended token")
-        if len(peaks) >= 2:
-            lo, hi = min(peaks), max(peaks)
-            slope = (peaks[hi] - peaks[lo]) / (unified_tokens(hi, TEXT_TOKENS) - unified_tokens(lo, TEXT_TOKENS))
-            base = peaks[lo] - slope * unified_tokens(lo, TEXT_TOKENS)
-            print(f"auto kernel, {count} blocks: {slope / MIB:.4f} MB/token, intercept {base / GIB:.3f} GiB")
+        transformer = _materialize(transformer, device, dtype)
+        latent = point.px // LATENT_SCALE_FACTOR
+        x = [torch.randn(16, 1, latent, latent, device=device, dtype=dtype)]
+        t = torch.full((1,), 0.5, device=device, dtype=dtype)
+        cap_feats = [torch.randn(point.text_tokens, CAP_FEAT_DIM, device=device, dtype=dtype)]
+        control_context = None
+        if control is not None:
+            control = _materialize(control, device, dtype)
+            control_context = torch.randn(1, image_tokens(point.px), control.control_in_dim, device=device, dtype=dtype)
 
-    tokens = unified_tokens(SIZES[0], TEXT_TOKENS)
-    reference = fused.get(blocks, {}).get(SIZES[0])
-    if math_peak is not None and reference is not None:
-        extra = math_peak - reference
-        charged = Z_IMAGE_ATTENTION_HEADS * tokens * tokens * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        print(
-            f"math kernel, {SIZES[0]}px: {extra / GIB:.3f} GiB over the auto kernel, "
-            f"{extra / (Z_IMAGE_ATTENTION_HEADS * tokens * tokens):.2f} bytes/score element; shipped constant charges "
-            f"{charged / GIB:.3f} GiB ({SDPA_MATH_BYTES_PER_SCORE_ELEMENT})"
+        def forward() -> object:
+            hooks = (
+                install_fun_control(transformer, control, control_context, scale=0.75)
+                if control is not None and control_context is not None
+                else nullcontext()
+            )
+            with kernel(), hooks:
+                return transformer(x=x, t=t, cap_feats=cap_feats)
+
+        windows = measure_cold_and_warm(device, forward)
+    date = datetime.date.today().isoformat()
+    return fresh_points.point_line(
+        point, common=common, provenance=provenance(point, facts, date), windows=windows, raw=raw
+    )
+
+
+_COLUMNS = f"{'kind':>9} {'dtype':>8} {'blocks':>6} {'control':>8} {'px':>5} {'text':>5} {'tokens':>7}"
+
+
+def _grid(point: Mapping[str, Any]) -> str:
+    return (
+        f"{point['kind']:>9} {point['dtype']:>8} {point['blocks']:>6} {point['control_variant'] or '':>8} "
+        f"{point['px']:>5} {point['text_tokens']:>5}"
+    )
+
+
+def _head(line: Mapping[str, Any]) -> str:
+    """A line's grid columns in the table."""
+    return f"{_grid(line['point'])} {line.get('features', {}).get('tokens', ''):>7}"
+
+
+def _tokens(line: Mapping[str, Any]) -> int:
+    return line["features"]["tokens"]
+
+
+def _px(line: Mapping[str, Any]) -> int:
+    return line["point"]["px"]
+
+
+def _summarize_fit(lines: Sequence[Mapping[str, Any]], text_tokens: int) -> None:
+    measured = [line for line in lines if line["status"] == "point"]
+    grid = [line for line in measured if line["fit"]]
+    # The line's slopes from the points that fit it; the extra-blocks forward compares with any grid point.
+    fit = [line for line in grid if line["in_fit"]]
+    for dtype in dict.fromkeys(line["point"]["dtype"] for line in fit):
+        of_dtype = [line for line in fit if line["point"]["dtype"] == dtype]
+        main = sorted((line for line in of_dtype if line["point"]["text_tokens"] == text_tokens), key=_tokens)
+        for line in main:
+            print(f"{dtype}, {_px(line)}px: {line['measured_bytes'] / _tokens(line) / MIB:.4f} MiB per attended token")
+        if len(main) >= 2:
+            lo, hi = main[0], main[-1]
+            slope = (hi["measured_bytes"] - lo["measured_bytes"]) / (_tokens(hi) - _tokens(lo))
+            base = lo["measured_bytes"] - slope * _tokens(lo)
+            print(f"{dtype}, {_px(lo)}-{_px(hi)}px: {slope / MIB:.4f} MiB per token, intercept {base / GIB:.3f} GiB")
+        for short in (line for line in of_dtype if line["point"]["text_tokens"] != text_tokens):
+            long = next((line for line in main if _px(line) == _px(short)), None)
+            if long is not None and _tokens(long) != _tokens(short):
+                slope = (long["measured_bytes"] - short["measured_bytes"]) / (_tokens(long) - _tokens(short))
+                print(
+                    f"{dtype}, {_px(short)}px, caption of {short['point']['text_tokens']} -> {text_tokens} tokens: "
+                    f"{slope / MIB:.4f} MiB per caption token"
+                )
+    for line in (line for line in measured if line["point"]["kind"] == "blocks"):
+        same = ("px", "text_tokens", "dtype")
+        base = next((ref for ref in grid if all(ref["point"][key] == line["point"][key] for key in same)), None)
+        if base is not None:
+            extra = line["measured_bytes"] - base["measured_bytes"]
+            print(
+                f"{line['point']['blocks']} against {base['point']['blocks']} main blocks, {line['point']['dtype']}, "
+                f"{_px(line)}px: {extra / MIB:+.0f} MiB ({line['measured_bytes'] / base['measured_bytes']:.3f}x)"
+            )
+
+
+def _summarize_checks(lines: Sequence[Mapping[str, Any]]) -> None:
+    from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+    from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_ATTENTION_HEADS, Z_IMAGE_HIDDEN_SIZE
+
+    measured = [line for line in lines if line["status"] == "point"]
+    for line in (line for line in measured if line["point"]["kind"] in ("math", "control")):
+        point = line["point"]
+        reference = next(
+            (
+                ref
+                for ref in measured
+                if ref["point"]["kind"] == "reference" and ref["point"]["dtype"] == point["dtype"]
+            ),
+            None,
         )
-    if control_peak is not None and reference is not None:
-        extra = control_peak - reference
-        hint_bytes = tokens * Z_IMAGE_HIDDEN_SIZE * dtype.itemsize
-        print(
-            f"control, {control_blocks} blocks, {SIZES[0]}px: {extra / GIB:.3f} GiB over no control, "
-            f"{extra / hint_bytes:.2f} hint-sized tensors; the estimate charges n + 4 = {control_blocks + 4}"
-        )
+        if reference is None:
+            print(f"{point['kind']}, {point['dtype']}: no default-kernel forward to compare with")
+            continue
+        extra = line["measured_bytes"] - reference["measured_bytes"]
+        charged = line["raw"]["reservation_bytes"] - reference["raw"]["reservation_bytes"]
+        tokens = _tokens(line)
+        if point["kind"] == "math":
+            elements = Z_IMAGE_ATTENTION_HEADS * tokens * tokens
+            print(
+                f"math kernel, {point['dtype']}, {point['px']}px: {extra / GIB:.3f} GiB over the default kernel, "
+                f"{extra / elements:.2f} bytes per score element; the estimate adds {charged / GIB:.3f} GiB "
+                f"({SDPA_MATH_BYTES_PER_SCORE_ELEMENT} bytes per element, one chunk where the ROCm guard chunks)"
+            )
+        else:
+            hint_bytes = tokens * Z_IMAGE_HIDDEN_SIZE * (4 if point["dtype"] == "float32" else 2)
+            blocks = line["features"]["control_blocks"]
+            print(
+                f"control {point['control_variant']}, {blocks} blocks, {point['dtype']}, {point['px']}px: "
+                f"{extra / GIB:.3f} GiB over no control, {extra / hint_bytes:.2f} hint-sized tensors; the estimate "
+                f"adds {charged / GIB:.3f} GiB ({blocks} + 4 hints)"
+            )
+
+
+def _print_plan(points: Sequence[Point]) -> None:
+    from invokeai.backend.z_image.denoise_working_memory import padded_tokens
+
+    print(_COLUMNS)
+    for point in points:
+        tokens = padded_tokens(image_tokens(point.px)) + padded_tokens(point.text_tokens)
+        print(f"{_grid(dataclasses.asdict(point))} {tokens:>7}{'  forced math' if point.force_math else ''}")
+    print(f"{len(points)} forwards, one process each")
+
+
+def _sizes(text: str) -> list[int]:
+    try:
+        sizes = [int(part) for part in text.split(",") if part.strip()]
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a comma-separated list of sizes: {text!r}")
+    multiple = LATENT_SCALE_FACTOR * PATCH_SIZE
+    if any(px <= 0 or px % multiple for px in sizes):
+        raise argparse.ArgumentTypeError(f"sizes must be positive multiples of {multiple} px, got {text!r}")
+    return sizes
+
+
+def _dtypes(text: str) -> list[str]:
+    names = [part.strip() for part in text.split(",") if part.strip()]
+    if not names or not set(names) <= set(DTYPES):
+        raise argparse.ArgumentTypeError(f"dtypes must be among {', '.join(DTYPES)}, got {text!r}")
+    return names
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--dtype", choices=list(DTYPES), default="bfloat16")
+    parser.add_argument("--mode", choices=("fit", "math", "control"), default="fit", help="Default: fit.")
+    parser.add_argument("--out", type=Path, help="The JSON-lines file the lines are appended to. Required to measure.")
+    parser.add_argument("--sizes", type=_sizes, default="512,768,1024,1440,2048", help="The fit grid's sizes, px.")
+    parser.add_argument("--dtypes", type=_dtypes, default=",".join(DTYPES), help="Default: all three.")
+    parser.add_argument("--text-tokens", type=int, default=512, help="The caption at every size. Default 512.")
+    parser.add_argument("--short-text-tokens", type=int, default=77, help="The text-slope caption. Default 77.")
+    parser.add_argument(
+        "--short-text-sizes", type=_sizes, default="1024,1440", help="Fit sizes that also run the text-slope caption."
+    )
     parser.add_argument("--blocks", type=int, default=2, help="Main transformer blocks. Default 2.")
-    parser.add_argument("--extra-blocks", type=int, default=None, help="Measure a second block count as well.")
-    parser.add_argument("--control-blocks", type=int, default=15, help="ControlNet blocks; 0 skips. Default 15.")
-    parser.add_argument("--max-px", type=int, default=SIZES[-1], help="Largest fused-kernel size to measure.")
+    parser.add_argument("--extra-blocks", type=int, default=0, help="Fit mode: this block count at 1024px as well.")
+    parser.add_argument(
+        "--control-variant",
+        choices=list(CONTROL_VARIANTS),
+        default="2.1",
+        help="The control check's layout. Default 2.1.",
+    )
+    parser.add_argument(
+        "--alloc-conf",
+        default="",
+        help="The allocator configuration, as the server's pytorch_cuda_alloc_conf. Empty: the platform's default.",
+    )
     parser.add_argument("--force", action="store_true", help="Run points predicted not to fit free device memory.")
-    parser.add_argument("--single", nargs="*", default=None, help=argparse.SUPPRESS)
+    parser.add_argument("--dry-run", action="store_true", help="Print the planned points without touching a device.")
+    parser.add_argument("--single", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    if not torch.cuda.is_available():
-        raise SystemExit("No CUDA/HIP device available.")
-    if args.single:
-        px, text_tokens, blocks, dtype_name, force_math, control_blocks = args.single
-        row = measure(
-            int(px), int(text_tokens), int(blocks), DTYPES[dtype_name], force_math == "1", int(control_blocks)
-        )
-        print(json.dumps(row))
-        return
-    print(
-        f"torch {torch.__version__} | device {torch.cuda.get_device_name(0)} | hip={torch.version.hip} | {args.dtype}"
+    if args.single is not None:
+        fresh_points.measure_in_this_process(args.single, point_type=Point, measure=_measure, logger_name=LOGGER_NAME)
+    points = plan(
+        args.mode,
+        sizes=args.sizes,
+        dtypes=args.dtypes,
+        text_tokens=args.text_tokens,
+        short_text_tokens=args.short_text_tokens,
+        short_text_sizes=args.short_text_sizes,
+        blocks=args.blocks,
+        extra_blocks=args.extra_blocks,
+        control_variant=args.control_variant,
     )
-    report(args.dtype, args.blocks, args.extra_blocks, args.control_blocks, args.max_px, args.force)
+    if args.dry_run:
+        _print_plan(points)
+        return
+    if args.out is None:
+        parser.error("--out is required to measure")
+    fresh_points.check_alloc_conf(parser, args.alloc_conf)
+    lines = fresh_points.measure_points(
+        points,
+        script=Path(__file__).resolve(),
+        out=args.out,
+        alloc_conf=args.alloc_conf,
+        force=args.force,
+        logger_name=LOGGER_NAME,
+        columns=_COLUMNS,
+        head=_head,
+    )
+
+    print()
+    if args.mode == "fit":
+        _summarize_fit(lines, args.text_tokens)
+    else:
+        _summarize_checks(lines)
+    fresh_points.print_counts(lines, args.out)
 
 
 if __name__ == "__main__":

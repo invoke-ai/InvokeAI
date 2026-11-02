@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "coefficients": [
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "values": {
+        "k_token": 220000
+      },
+      "provenance": "Peak device bytes per attended token (image tokens at 1/16 of each side plus the prompt's) of one MOSS-Image transformer forward. Measured on the moss_image.denoise points: RTX 4090 (CUDA, Ada), bf16, fully resident, device_peak. Implied 0.164-0.198 MiB per token, the most for long prompts (1024x1024: 0.184/0.192/0.198 at 64/1024/4096 text tokens; 1536x1024, 1536x1536, 2048x2048 at 256: 0.167/0.165/0.164), with no constant term. 220000 (0.21 MiB) is the band between the worst point and 1.3x the best: 1.06-1.28x the measured peaks, which also covers the few MB of float32 latents the node keeps. Not measured off CUDA; the entry is unkeyed because the term is GEMM and fused-attention activations rather than convolution workspaces, and the analytic score-matrix term prices a backend without a fused kernel."
+    }
+  ],
+  "points": [
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 1024,
+        "width": 1024,
+        "text_tokens": 64,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 803209216,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    },
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 1024,
+        "width": 1024,
+        "text_tokens": 1024,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 1029701632,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    },
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 1024,
+        "width": 1024,
+        "text_tokens": 4096,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 1696595968,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    },
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 1024,
+        "width": 1536,
+        "text_tokens": 256,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 1121976320,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    },
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 1536,
+        "width": 1536,
+        "text_tokens": 256,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 1639972864,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    },
+    {
+      "estimator": "moss_image.denoise",
+      "version": 1,
+      "platform": {},
+      "features": {
+        "height": 2048,
+        "width": 2048,
+        "text_tokens": 256,
+        "score_matrix_bytes": 0,
+        "dequant_bytes": 0
+      },
+      "measured_bytes": 2862612480,
+      "method": "device_peak",
+      "device": "RTX 4090",
+      "provenance": "RTX 4090, bf16, the real MOSS-Image-Base transformer fully resident, one sample per forward as moss_image_denoise runs it, fused SDPA (score matrix not materialized); peak drop in torch.cuda.mem_get_info polled during the forward, below the pre-forward baseline, over two forwards per shape. Recorded in MiB."
+    }
+  ]
+}

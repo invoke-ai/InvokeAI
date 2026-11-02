@@ -215,6 +215,54 @@ describe('loadCanvasState', () => {
     expect(badLayer?.type === 'raster' ? badLayer.inpaint : null).toBeUndefined();
   });
 
+  it("round-trips a region's layout role, keeps its absence, and drops a structurally broken one", () => {
+    const region = (id: string, extra: Record<string, unknown> = {}) => ({
+      ...createRegionalGuidanceLayer(id, 0, id),
+      ...extra,
+    });
+    const loaded = load(
+      withNodes(
+        [
+          region('sign', { layout: { kind: 'text', text: '营业中 OPEN' } }),
+          region('hero', { layout: { kind: 'character' } }),
+          region('plain'),
+          region('not-an-object', { layout: 'text' }),
+          region('bad-kind-type', { layout: { kind: 3 } }),
+          region('bad-text', { layout: { kind: 'text', text: 7 } }),
+        ],
+        'regional_guidance'
+      )
+    );
+    const layouts = Object.fromEntries(
+      loaded.document.stacks.regional_guidance.map((layer) => [
+        layer.id,
+        layer.type === 'regional_guidance' ? layer.layout : null,
+      ])
+    );
+
+    expect(layouts).toEqual({
+      'bad-kind-type': undefined,
+      'bad-text': undefined,
+      hero: { kind: 'character' },
+      'not-an-object': undefined,
+      plain: undefined,
+      sign: { kind: 'text', text: '营业中 OPEN' },
+    });
+    const plain = loaded.document.stacks.regional_guidance.find((layer) => layer.id === 'plain');
+    expect(plain && Object.hasOwn(plain, 'layout')).toBe(false);
+  });
+
+  it('refuses a region whose layout role this build does not know, naming the layer', () => {
+    const future = { ...createRegionalGuidanceLayer('Banner', 1, 'banner'), layout: { kind: 'banner' } };
+
+    const refused = refusal(withNodes([createRegionalGuidanceLayer('Kept', 0, 'kept'), future], 'regional_guidance'));
+
+    expect(refused.status).toBe('invalid');
+    expect(refused.status === 'invalid' ? refused.diagnostics : []).toEqual([
+      expect.objectContaining({ path: 'document.stacks.regional_guidance[1]' }),
+    ]);
+  });
+
   it('round-trips triangle and star shape sources', () => {
     const shape = (kind: string) => ({
       ...createEmptyPaintLayer(kind, kind),
@@ -520,6 +568,36 @@ describe('loadCanvasState', () => {
       const raw = { ...base, snapshots: [valid, malformed] };
       expect(refusal(raw)).toMatchObject({ raw, scope: 'snapshot', status: 'invalid' });
     }
+  });
+
+  it('keeps a restore point’s kind and staged results, and reads an unknown kind as a plain restore point', () => {
+    const state = createEmptyCanvasState();
+    const staged = {
+      height: 8,
+      imageName: 'staged.png',
+      imageUrl: '',
+      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: '',
+      width: 8,
+    };
+    const point = { createdAt: 'now', document: state.document, id: 'p', name: 'Point' };
+    const base = withNodes([createEmptyPaintLayer('Live', 'live')]);
+    const loaded = load({
+      ...base,
+      snapshots: [
+        { ...point, kind: 'discard-results', stagedImages: [staged] },
+        { ...point, id: 'q', kind: 'archived', stagedImages: 'none', stray: true },
+        // Entries that could never be staged again (no image name, size or source batch) are dropped.
+        { ...point, id: 'r', stagedImages: [staged, { imageName: '' }, { ...staged, width: 'wide' }, null] },
+      ],
+    });
+    expect(loaded.snapshots).toEqual([
+      { ...point, kind: 'discard-results', stagedImages: [staged] },
+      { ...point, id: 'q' },
+      { ...point, id: 'r', stagedImages: [staged] },
+    ]);
   });
 
   it.each([
@@ -1146,14 +1224,14 @@ describe('createEmptyCanvasState', () => {
 });
 
 describe('createNewCanvasState', () => {
-  it('seeds exactly one empty inpaint mask, selected, matching the layers-panel factory', () => {
+  it('seeds exactly one empty inpaint mask, left unselected so a first stroke paints a new layer', () => {
     const state = createNewCanvasState();
     const mask = state.document.stacks.inpaint_mask[0];
 
     expect(state.document.stacks.inpaint_mask).toHaveLength(1);
     expect(state.document.stacks.raster).toEqual([]);
     expect(mask).toEqual(createInpaintMaskLayer(nextInpaintMaskName([]), mask?.id ?? ''));
-    expect(state.document.selectedLayerId).toBe(mask?.id);
+    expect(state.document.selectedLayerId).toBeNull();
   });
 
   it('honors a custom document size while staying otherwise identical to an empty canvas', () => {

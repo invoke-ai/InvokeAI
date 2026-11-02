@@ -365,6 +365,25 @@ class TestServiceReads:
         assert [summary.item_id for summary in summaries] == [child, *reversed(item_ids)]
         assert (summaries[0].parent_item_id, summaries[0].user_email) == (item_ids[0], "alice@example.com")
 
+    def test_unfinished_origins_are_those_of_the_live_items_with_the_prefix(
+        self, database: Database, service: SessionQueue
+    ) -> None:
+        for status in ("pending", "in_progress", "waiting", "completed", "failed", "canceled"):
+            _item(database, status=status, origin=f"tool_run:{status}")
+        # The prefix matches ignoring case, its `_` only itself, and only in this queue.
+        _item(database, origin="TOOL_RUN:upper")
+        _item(database, origin="toolXrun:lookalike")
+        _item(database, origin="tool_run:other-queue", queue_id="other")
+        _item(database, origin="canvas")
+        _item(database)
+
+        assert service.get_unfinished_origins(QUEUE, "tool_run:") == {
+            "tool_run:pending",
+            "tool_run:in_progress",
+            "tool_run:waiting",
+            "TOOL_RUN:upper",
+        }
+
     def test_batch_status_and_destination_counts(self, database: Database, service: SessionQueue) -> None:
         _item(database, batch_id="b", status="pending", origin="canvas", destination="gallery")
         _item(database, batch_id="b", status="completed", origin="canvas", destination="gallery")

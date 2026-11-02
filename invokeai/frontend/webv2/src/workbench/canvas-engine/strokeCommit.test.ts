@@ -146,7 +146,7 @@ describe('stroke edits', () => {
     h.deps.applyImagePatch.mockRejectedValueOnce(new Error('not ready'));
 
     expect((await h.history.undo()).status).toBe('failed');
-    expect(h.history.entries()).toEqual({ future: [], past: ['Brush stroke'] });
+    expect(h.history.entries()).toEqual({ evicted: 0, future: [], past: ['Brush stroke'] });
   });
 });
 

@@ -1,4 +1,4 @@
-"""The Wan, Krea-2, Ideogram 4 and ERNIE-Image text encoders are idle_gpu_offloadable: each may run
+"""The Wan, Krea-2, Ideogram 4, ERNIE-Image and MOSS-Image text encoders are idle_gpu_offloadable: each may run
 on a borrowed idle GPU whose device-pool lock is released the moment the node returns. Like the
 other offloadable encoders (see test_flux2_klein_output_device.py, test_flux_redux_output_device.py),
 their saved conditioning must be detached and moved to the CPU — otherwise the embeddings stay
@@ -141,6 +141,25 @@ def test_ernie_image_conditioning_is_saved_on_cpu(monkeypatch):
     cpu_embeds = MagicMock(spec=torch.Tensor)
     gpu_embeds = _gpu_tensor_yielding(cpu_embeds)
     monkeypatch.setattr(invocation, "_encode_prompt", lambda context, prompt: gpu_embeds)
+
+    context = MagicMock()
+    context.conditioning.save.return_value = "cond-name"
+
+    invocation.invoke(context)
+
+    gpu_embeds.detach.return_value.to.assert_called_once_with("cpu")
+    info = context.conditioning.save.call_args.args[0].conditionings[0]
+    assert info.prompt_embeds is cpu_embeds
+
+
+def test_moss_image_conditioning_is_saved_on_cpu(monkeypatch):
+    from invokeai.app.invocations.text_encoder.moss_image_text_encoder import MossImageTextEncoderInvocation
+
+    invocation = MossImageTextEncoderInvocation.model_construct(prompt="a prompt", qwen3_5_encoder=MagicMock())
+
+    cpu_embeds = MagicMock(spec=torch.Tensor)
+    gpu_embeds = _gpu_tensor_yielding(cpu_embeds)
+    monkeypatch.setattr(invocation, "_encode", lambda context: gpu_embeds)
 
     context = MagicMock()
     context.conditioning.save.return_value = "cond-name"

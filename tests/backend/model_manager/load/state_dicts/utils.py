@@ -33,7 +33,7 @@ def token_extents(shape: list[int]) -> list[int]:
     return [min(extent, 4) for extent in shape]
 
 
-_SAFETENSORS_DTYPE_BYTES = {"F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I8": 1, "U8": 1}
+_SAFETENSORS_DTYPE_BYTES = {"F32": 4, "F16": 2, "BF16": 2, "F8_E4M3": 1, "F8_E5M2": 1, "I64": 8, "I8": 1, "U8": 1}
 
 
 def write_header_only_safetensors(path: Path, keys: dict[str, tuple[list[int], str]]) -> Path:

@@ -44,7 +44,7 @@ const testProject = {
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
   useOptionalWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
-    selector({ activeProject: testProject } as never),
+    selector({ activeProject: testProject, scopedDefaults: {} } as never),
   useActiveProjectId: () => 'settings-test-project',
   useWorkbenchQueries: () => ({
     isActiveProject: (projectId: string) => projectId === 'settings-test-project',
@@ -137,8 +137,8 @@ describe('settings dialog', () => {
     await act(() => search().fill('numeric attention'));
     await expect.element(page.getByText('Prefer numeric attention style', { exact: true })).toBeVisible();
     await expect.element(search()).toHaveFocus();
-    const modifiedIndicator = page.getByRole('img', {
-      name: 'Prefer numeric attention style: changed from default',
+    const modifiedIndicator = page.getByRole('button', {
+      name: i18n.t('settingsDialog.layer.changedNamed', { setting: 'Prefer numeric attention style' }),
       exact: true,
     });
     await expect.element(modifiedIndicator).not.toBeInTheDocument();
@@ -160,19 +160,56 @@ describe('settings dialog', () => {
     await expect.element(modifiedIndicator).not.toBeInTheDocument();
   });
 
-  it('lists project settings, and widget settings only for widgets in the open project', async () => {
+  it('keeps a setting menu open and focused inside the modal dialog while the pointer crosses its body', async () => {
+    await patchWorkbenchPreferences({ preferNumericAttentionStyle: true });
+    await render();
+    await open();
+    await act(() => search().fill('numeric attention'));
+    const dot = page.getByRole('button', {
+      name: i18n.t('settingsDialog.layer.changedNamed', { setting: 'Prefer numeric attention style' }),
+      exact: true,
+    });
+    await expect.element(dot).toBeVisible();
+    await userEvent.click(dot);
+    const menu = page.getByRole('menu');
+    await expect.element(menu).toBeVisible();
+    // The dialog's focus scope must not pull focus back out of the menu (to Close) and dismiss it.
+    await expect.poll(() => menu.element().contains(document.activeElement)).toBe(true);
+    for (const target of [
+      page.getByText('Prefer numeric attention style', { exact: true }),
+      search(),
+      page.getByRole('heading', { name: new RegExp(i18n.t('settingsDialog.results')) }),
+      closeButton(),
+    ]) {
+      await userEvent.hover(target);
+      await expect.element(menu).toBeVisible();
+    }
+    expect(menu.element().contains(document.activeElement)).toBe(true);
+    await userEvent.keyboard('{Escape}');
+    await expect.element(menu).not.toBeInTheDocument();
+    await expect.element(dialogContent()!).toBeVisible();
+  });
+
+  it('lists every per-project section, editing defaults only for widgets the open project lacks', async () => {
     await render();
     await open();
     const nav = page.getByRole('navigation', { name: i18n.t('settings.title'), exact: true });
-    await expect.element(nav.getByRole('button', { name: 'Project', exact: true })).toBeVisible();
-    await expect.element(nav.getByRole('button', { name: 'Queue', exact: true })).toBeVisible();
-    // Canvas settings are all per widget and this project has no canvas; Preview keeps its project setting.
-    await expect.element(nav.getByRole('button', { name: 'Canvas', exact: true })).not.toBeInTheDocument();
+    await expect.element(nav.getByText(i18n.t('settingsDialog.groups.application'), { exact: true })).toBeVisible();
+    expect(nav.element().textContent).not.toContain('Project');
+    for (const name of ['Generate', 'Canvas', 'Gallery', 'Image Map', 'Preview', 'Queue']) {
+      await expect.element(nav.getByRole('button', { name, exact: true })).toBeVisible();
+    }
+    const note = page.getByText(i18n.t('settingsDialog.defaultsNote'), { exact: true });
+    // The open project has no Canvas: its settings edit the user's defaults, and say so.
+    await act(() => nav.getByRole('button', { name: 'Canvas', exact: true }).click());
+    await expect.element(page.getByRole('checkbox', { name: i18n.t('widgets.canvas.settings.grid') })).toBeEnabled();
+    await expect.element(note).toBeVisible();
+    // The generation flags are the project's own settings: they pin even though this project has no Generate widget.
+    await act(() => nav.getByRole('button', { name: 'Generate', exact: true }).click());
+    await expect.element(page.getByText('NSFW checker', { exact: true })).toBeVisible();
+    await expect.element(note).not.toBeInTheDocument();
     await act(() => nav.getByRole('button', { name: 'Preview', exact: true }).click());
     await expect.element(page.getByText('Antialias progress images', { exact: true })).toBeVisible();
-    await expect
-      .element(page.getByText(i18n.t('settingsDialog.instanceUnavailable'), { exact: true }))
-      .not.toBeInTheDocument();
   });
 
   it('switches prepared sections without loading placeholders or mounting unselected custom editors', async () => {

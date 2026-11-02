@@ -51,6 +51,9 @@ _FP8_PROBE_FAILURE_REPORTED: set[str] = set()
 # quality, which fp8 rounding degrades. Its tokenizer is listed for symmetry (it is not an nn.Module,
 # so casting is a no-op today only by accident).
 #
+# The vision tower follows the text encoder it attaches to. It also could not take the cast as it stands:
+# `Qwen3VLModel` casts the pixels to `visual.dtype`, which a cast tower reports as float8.
+#
 # Unlike the model-kind rules in `fp8_capability.py`, these are about which *component* of a model is
 # being loaded, which no client can see and nothing outside this file asks about.
 _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
@@ -58,6 +61,7 @@ _FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
         SubModelType.TextEncoder,
         SubModelType.TextEncoder2,
         SubModelType.TextEncoder3,
+        SubModelType.VisionEncoder,
         SubModelType.Tokenizer,
         SubModelType.Tokenizer2,
         SubModelType.Tokenizer3,
@@ -315,17 +319,8 @@ class ModelLoader(ModelLoaderBase):
         return (model_base / config.path).resolve()
 
     def _torch_dtype_avoiding_float16(self) -> torch.dtype:
-        """The configured dtype, except float16: bfloat16 where the device has it, float32 otherwise.
-
-        For the FLUX autoencoders, which are broken in float16 -- the dtype `precision: auto` picks on
-        CUDA and MPS. A float32 or bfloat16 request is kept as it is.
-        """
-        if self._torch_dtype != torch.float16:
-            return self._torch_dtype
-        try:
-            return torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
-        except TypeError:
-            return torch.float32
+        """The configured dtype on this loader's device, except float16 (`TorchDevice.dtype_avoiding_float16`)."""
+        return TorchDevice.dtype_avoiding_float16(self._torch_dtype, self._torch_device)
 
     def _get_execution_device(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
@@ -341,8 +336,14 @@ class ModelLoader(ModelLoaderBase):
         # Check if this is a text encoder submodel of a main model with cpu_only setting
         if hasattr(config, "default_settings") and config.default_settings is not None:
             if hasattr(config.default_settings, "cpu_only") and config.default_settings.cpu_only is True:
-                # Only apply CPU execution to text encoder submodels
-                if submodel_type in [SubModelType.TextEncoder, SubModelType.TextEncoder2, SubModelType.TextEncoder3]:
+                # Only apply CPU execution to text encoder submodels. The vision encoder is the text encoder's own
+                # tower, run inside its forward, so it has to execute on the same device.
+                if submodel_type in [
+                    SubModelType.TextEncoder,
+                    SubModelType.TextEncoder2,
+                    SubModelType.TextEncoder3,
+                    SubModelType.VisionEncoder,
+                ]:
                     return torch.device("cpu")
 
         # Check if this is a standalone text encoder config with cpu_only field (T5Encoder, Qwen3Encoder, etc.)

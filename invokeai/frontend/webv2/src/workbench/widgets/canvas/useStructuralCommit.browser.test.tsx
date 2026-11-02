@@ -263,6 +263,8 @@ describe('CanvasEditRefusalNotices', () => {
   it.each<[CanvasEditRefusal, string]>([
     ['over-budget', 'widgets.canvas.structural.overBudget'],
     ['busy', 'widgets.canvas.structural.busy'],
+    // A pending transform whose stroke failed to save ends with this refusal.
+    ['not-ready', 'widgets.canvas.structural.notReady'],
   ])('explains a %s refusal of an edit nobody else reports', (refusal, message) => {
     const { emit, engine } = createRefusalEngine();
     render(<CanvasEditRefusalNotices engine={engine} />);

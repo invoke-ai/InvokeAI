@@ -19,18 +19,9 @@ from unittest.mock import MagicMock
 import pytest
 import torch
 
+from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
-from invokeai.backend.model_manager.configs.lora import (
-    LoRA_LyCORIS_Anima_Config,
-    LoRA_LyCORIS_Flux2_Config,
-    LoRA_LyCORIS_FLUX_Config,
-    LoRA_LyCORIS_Krea2_Config,
-    LoRA_LyCORIS_LTX2_Config,
-    LoRA_LyCORIS_MiniMaxH3_Config,
-    LoRA_LyCORIS_QwenImage_Config,
-    LoRA_LyCORIS_Wan_Config,
-    LoRA_LyCORIS_ZImage_Config,
-)
+from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_LTX2_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 
@@ -158,27 +149,15 @@ def test_an_ltx2_lora_identifies_as_ltx2(prefix: str) -> None:
     assert result.base is BaseModelType.LTX2
 
 
-@pytest.mark.parametrize(
-    "other",
-    [
-        LoRA_LyCORIS_Wan_Config,
-        LoRA_LyCORIS_MiniMaxH3_Config,
-        LoRA_LyCORIS_Anima_Config,
-        LoRA_LyCORIS_Krea2_Config,
-        # These four also precede the LTX-2 entry in the union, so they are the ones whose order
-        # actually decides which config claims a file. Omitting them left the exclusivity this
-        # file's docstring promises resting on the four that happen to come after.
-        LoRA_LyCORIS_FLUX_Config,
-        LoRA_LyCORIS_Flux2_Config,
-        LoRA_LyCORIS_QwenImage_Config,
-        LoRA_LyCORIS_ZImage_Config,
-    ],
-    ids=lambda cls: cls.__name__,
-)
-def test_an_ltx2_lora_is_rejected_by_every_other_probe(other) -> None:
-    matched, _ = _probe(other, _ltx2_distilled_keys())
+@pytest.mark.parametrize("prefix", ["", "diffusion_model.", "transformer.", "base_model.model.transformer."])
+def test_an_ltx2_lora_is_claimed_by_the_ltx2_probe_alone(prefix: str) -> None:
+    """Every LoRA probe, whatever the prefix. Unprefixed or under ``transformer.`` its keys start
+    with ``transformer_blocks.`` as Qwen Image's do; as wide as Qwen-Image-2.1 (4096), it names
+    ``transformer_blocks.N.attn1``. Only the audio and cross-modal towers set it apart."""
+    sd = _ltx2_distilled_keys(prefix)
+    probes = [cls for cls in Config_Base.CONFIG_CLASSES if cls.__name__.startswith("LoRA_")]
 
-    assert not matched
+    assert [cls.__name__ for cls in probes if _probe(cls, sd)[0]] == [LoRA_LyCORIS_LTX2_Config.__name__]
 
 
 @pytest.mark.parametrize(

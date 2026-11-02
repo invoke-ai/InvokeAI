@@ -1,9 +1,10 @@
 """Recovers the ``invokeai_metadata`` / ``invokeai_workflow`` / ``invokeai_graph`` strings a media
 file carries, so an uploaded PNG or MP4 is recallable without the database that produced it.
 
-PNGs hold the three keys as text chunks; MP4s hold them as QuickTime keyed metadata (see
-``invokeai.app.util.mp4_metadata``). Both are stringified JSON written by this application,
-so the validation is the same for either source and lives in ``extract_metadata``.
+PNGs hold the shared keys and optional ``invokeai_resolved_inputs`` as text chunks; MP4s hold
+the three shared keys as QuickTime keyed metadata (see ``invokeai.app.util.mp4_metadata``).
+Both sources use the shared validation in ``extract_metadata``. The image entry point also
+reads resolved inputs using the same Graph JSON envelope validation as the source graph.
 """
 
 import json
@@ -29,6 +30,24 @@ class ExtractedMetadata:
     invokeai_metadata: str | None
     invokeai_workflow: str | None
     invokeai_graph: str | None
+    invokeai_resolved_inputs: str | None = None
+
+
+def _extract_graph(raw: object, logger: logging.Logger) -> str | None:
+    # Validate only the envelope: connected fields may be unset and community node types may be unavailable.
+    if isinstance(raw, str):
+        try:
+            parsed = json.loads(raw)
+            if not isinstance(parsed, dict):
+                raise ValueError("Not a dict")
+            if not isinstance(parsed.get("nodes"), dict):
+                raise ValueError("'nodes' is not a dict")
+            if not isinstance(parsed.get("edges"), list):
+                raise ValueError("'edges' is not a list")
+            return raw
+        except Exception as e:
+            logger.debug(f"Failed to parse graph for uploaded media, {e}")
+    return None
 
 
 def extract_metadata(
@@ -88,35 +107,7 @@ def extract_metadata(
     # We expect the graph, if embedded, to be a JSON-stringified Graph. We will store it as a string.
     graph_raw = invokeai_graph_override if invokeai_graph_override is not None else embedded.get(GRAPH_KEY)
 
-    # The fallback value for graph is None.
-    stringified_graph: str | None = None
-
-    if isinstance(graph_raw, str):
-        try:
-            # TODO(psyche): Due to pydantic's handling of None values, it is possible for the graph to fail validation,
-            # even if it is a direct dump of a valid graph. Node fields in the graph are allowed to have be unset if
-            # they have incoming connections, but something about the ser/de process cannot adequately handle this.
-            #
-            # In lieu of fixing the graph validation, we will just do a simple check here to see if the graph is dict
-            # with the correct keys. This is not a perfect solution, but it should be good enough for now.
-
-            # FIX ME: Validate the graph JSON before storing it
-            # Graph.model_validate_json(graph_raw)
-
-            # Crappy workaround to validate JSON
-            graph_parsed = json.loads(graph_raw)
-            if not isinstance(graph_parsed, dict):
-                raise ValueError("Not a dict")
-            if not isinstance(graph_parsed.get("nodes", None), dict):
-                raise ValueError("'nodes' is not a dict")
-            if not isinstance(graph_parsed.get("edges", None), list):
-                raise ValueError("'edges' is not a list")
-
-            # Looks good, overwrite the fallback value
-            stringified_graph = graph_raw
-        except Exception as e:
-            logger.debug(f"Failed to parse graph for uploaded media, {e}")
-            pass
+    stringified_graph = _extract_graph(graph_raw, logger)
 
     return ExtractedMetadata(
         invokeai_metadata=stringified_metadata, invokeai_workflow=stringified_workflow, invokeai_graph=stringified_graph
@@ -130,14 +121,16 @@ def extract_metadata_from_image(
     invokeai_graph_override: str | None,
     logger: logging.Logger,
 ) -> ExtractedMetadata:
-    """Extracts and validates the metadata, workflow and graph embedded in a PIL Image's text chunks."""
-    return extract_metadata(
+    """Extracts the three shared channels and optional resolved-input Graph JSON from an image's text chunks."""
+    extracted = extract_metadata(
         pil_image.info,
         invokeai_metadata_override,
         invokeai_workflow_override,
         invokeai_graph_override,
         logger,
     )
+    extracted.invokeai_resolved_inputs = _extract_graph(pil_image.info.get("invokeai_resolved_inputs"), logger)
+    return extracted
 
 
 def extract_metadata_from_video(
