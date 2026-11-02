@@ -235,14 +235,19 @@ describe('getRegionalGuidanceSupport', () => {
       negativePrompt: false,
       referenceImages: 'flux_redux',
     });
-    for (const base of ['flux2', 'krea-2', 'z-image', 'anima']) {
+    for (const base of ['krea-2', 'z-image', 'anima']) {
       expect(getRegionalGuidanceSupport(base), base).toMatchObject({
-        autoNegative: false,
+        autoNegative: true,
         mode: 'masks',
-        negativePrompt: false,
+        negativePrompt: true,
         referenceImages: null,
       });
     }
+    expect(getRegionalGuidanceSupport('flux2')).toMatchObject({
+      autoNegative: false,
+      negativePrompt: false,
+      referenceImages: null,
+    });
     expect(getRegionalGuidanceSupport('sd-3')).toBeNull();
     expect(getRegionalGuidanceSupport(null)).toBeNull();
   });
@@ -281,7 +286,7 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
   it.each([
     ['z-image', 'z_image_text_encoder'],
     ['anima', 'anima_text_encoder'],
-  ] as const)('%s wires a masked positive prompt through its Qwen3 encoder, positive only', (base, encoderType) => {
+  ] as const)('%s wires masked prompts through its Qwen3 encoder', (base, encoderType) => {
     const g = run(qwen3BaseGraph(encoderType), {
       base,
       regions: [region({ autoNegative: true, negativePrompt: 'blurry' })],
@@ -291,10 +296,13 @@ describe('addRegionalGuidance — Z-Image / Anima', () => {
     expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_pos_cond_r1', 'qwen3_encoder')).toBe(true);
     expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_pos_cond_r1', 'mask')).toBe(true);
     expect(hasEdge(g, 'rg_pos_cond_r1', 'conditioning', 'pos_cond_collect', 'item')).toBe(true);
-    // These backends discard negative masks even when a negative collector exists.
-    expect(g.nodes.rg_neg_cond_r1).toBeUndefined();
-    expect(g.nodes.rg_pos_cond_inverted_r1).toBeUndefined();
-    expect(g.edges.some((e) => e.destination.node_id === 'neg_cond_collect')).toBe(false);
+    expect(g.nodes.rg_neg_cond_r1).toMatchObject({ prompt: 'blurry', type: encoderType });
+    expect(hasEdge(g, 'model_loader', 'qwen3_encoder', 'rg_neg_cond_r1', 'qwen3_encoder')).toBe(true);
+    expect(hasEdge(g, 'rg_mask_to_tensor_r1', 'mask', 'rg_neg_cond_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_neg_cond_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
+    expect(g.nodes.rg_pos_cond_inverted_r1).toMatchObject({ prompt: 'a cat', type: encoderType });
+    expect(hasEdge(g, 'rg_invert_mask_r1', 'mask', 'rg_pos_cond_inverted_r1', 'mask')).toBe(true);
+    expect(hasEdge(g, 'rg_pos_cond_inverted_r1', 'conditioning', 'neg_cond_collect', 'item')).toBe(true);
   });
 });
 
@@ -567,9 +575,6 @@ describe('getRegionalGuidanceRejectionReason', () => {
   it.each([
     ['flux', 'FLUX', 0],
     ['flux2', 'FLUX.2', 1],
-    ['krea-2', 'Krea-2', 1],
-    ['z-image', 'Z-Image', 1],
-    ['anima', 'Anima', 1],
   ])('rejects a %s region that carries only what the base ignores', (mainBase, label, referenceImageCount) => {
     expect(
       getRegionalGuidanceRejectionReason({
@@ -580,6 +585,15 @@ describe('getRegionalGuidanceRejectionReason', () => {
         referenceImageCount,
       })
     ).toBe(`Regional guidance "Region 1" has no prompt or reference image ${label} can use.`);
+  });
+
+  it.each(['krea-2', 'z-image', 'anima'])('accepts a %s region with only a negative prompt', (mainBase) => {
+    expect(
+      getRegionalGuidanceRejectionReason({ ...params, mainBase, negativePrompt: 'blurry', positivePrompt: null })
+    ).toBeNull();
+    expect(
+      getRegionalGuidanceRejectionReason({ ...params, mainBase, positivePrompt: null, referenceImageCount: 1 })
+    ).toMatch(/no prompt or reference/);
   });
 
   it('keeps a FLUX region that only carries a Redux reference image', () => {

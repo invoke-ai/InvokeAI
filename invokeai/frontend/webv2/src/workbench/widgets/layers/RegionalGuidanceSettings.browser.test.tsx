@@ -63,10 +63,12 @@ const createLayer = (overrides: Partial<CanvasRegionalGuidanceLayerContract> = {
 const render = async (base: string | null, layer: Layer, translations = i18n) => {
   selectedBase = base;
   applyThemeToRoot('classic');
-  host = document.createElement('div');
-  host.style.width = '260px';
-  document.body.append(host);
-  root = createRoot(host);
+  if (!host) {
+    host = document.createElement('div');
+    host.style.width = '260px';
+    document.body.append(host);
+    root = createRoot(host);
+  }
   await act(() => {
     root?.render(
       <I18nextProvider i18n={translations}>
@@ -115,8 +117,30 @@ describe('RegionalGuidanceSettings per model base', () => {
     expect(hasAutoNegativeSwitch()).toBe(true);
   });
 
+  it.each(['krea-2', 'z-image', 'anima'])(
+    'offers %s regional negatives and retains them across model switches',
+    async (base) => {
+      const layer = createLayer({ autoNegative: true, negativePrompt: 'blurry' });
+      await render(base, layer);
+      const negativeInput = () => page.getByRole('textbox', { name: 'widgets.layers.regionalGuidance.negativePrompt' });
+      const autoNegative = () => page.getByRole('checkbox', { name: 'widgets.layers.regionalGuidance.autoNegative' });
+
+      expect(alerts()).toEqual([]);
+      await expect.element(negativeInput()).toHaveValue('blurry');
+      await expect.element(autoNegative()).toBeChecked();
+
+      await render('flux2', layer);
+      expect(hasNegativeField()).toBe(false);
+      expect(hasAutoNegativeSwitch()).toBe(false);
+
+      await render(base, layer);
+      await expect.element(negativeInput()).toHaveValue('blurry');
+      await expect.element(autoNegative()).toBeChecked();
+    }
+  );
+
   it('hides the negative controls on a positive-only base even when the layer still holds a negative', async () => {
-    await render('anima', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
+    await render('flux2', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
     expect(alerts()).toEqual([]);
     expect(hasNegativeField()).toBe(false);
     expect(hasAutoNegativeSwitch()).toBe(false);
@@ -158,7 +182,7 @@ describe('RegionalGuidanceSettings before the capability table arrives', () => {
   });
 
   it('hides the negative controls once the table says the base ignores them', async () => {
-    await render('anima', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
+    await render('flux2', createLayer({ autoNegative: true, negativePrompt: 'blurry' }));
     expect(hasNegativeField()).toBe(true);
 
     await act(() => {
@@ -225,9 +249,6 @@ describe('RegionalGuidanceSettings on a layout base', () => {
     expect(hasNegativeField()).toBe(false);
     expect(hasAutoNegativeSwitch()).toBe(false);
     expect(alerts()).toEqual([]);
-    await act(() => root?.unmount());
-    host?.remove();
-
     await render('sd-1', createLayer());
     expect(kindGroup().query()).toBeNull();
     expect(host!.querySelector('[role="status"]')).toBeNull();

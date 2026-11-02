@@ -20,7 +20,7 @@ from typing import Optional
 import torch
 import torchvision
 
-from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning
+from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
 
@@ -41,15 +41,22 @@ class AnimaRegionalPromptingExtension:
         self.regional_text_conditioning = regional_text_conditioning
         self.cross_attn_mask = cross_attn_mask
 
-    def get_cross_attn_mask(self, block_index: int) -> torch.Tensor | None:
-        """Get the cross-attention mask for a given block index.
-
-        Uses alternating pattern: apply mask on even blocks, no mask on odd blocks.
-        This helps balance regional control with global coherence.
-        """
-        if block_index % 2 == 0:
-            return self.cross_attn_mask
-        return None
+    @staticmethod
+    def estimate_mask_bytes(
+        positive: list[AnimaTextConditioning],
+        negative: list[AnimaTextConditioning],
+        img_seq_len: int,
+        dtype: torch.dtype,
+    ) -> int:
+        """Both resident boolean masks plus the larger construction/SDPA additive-bias transient."""
+        # preprocess_text_embeds pads each context to at least 512 T5 tokens.
+        mask_sizes = [
+            img_seq_len * sum(max(512, tc.t5xxl_ids.numel()) for tc in conditionings)
+            for conditionings in (positive, negative)
+            if any(tc.mask is not None for tc in conditionings)
+        ]
+        scratch_element_size = max(torch.float16.itemsize, dtype.itemsize)
+        return sum(mask_sizes) + max(mask_sizes, default=0) * scratch_element_size
 
     @classmethod
     def from_regional_conditioning(

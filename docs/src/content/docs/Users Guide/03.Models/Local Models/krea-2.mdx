@@ -124,9 +124,11 @@ The **Prompt - Krea-2** node also accepts an optional mask. A masked conditionin
 image region; an unmasked conditioning applies to the background not covered by any regional mask. If
 regional masks cover the full image, an unmasked conditioning falls back to the full image instead of being
 ignored. Krea-2 uses restricted attention on alternating main transformer blocks, leaving the other blocks
-unrestricted to preserve image-wide coherence. Positive regional prompts are available on the canvas. In
+unrestricted to preserve image-wide coherence. Positive and negative regional prompts are available on the
+Canvas. **Auto-Negative** uses the region's positive prompt as a negative outside its mask. Regional negatives
+and auto-negative take effect only when **CFG Scale** is above 1; Turbo's default CFG 1 ignores them. In
 workflows, masked conditioning collections can also be supplied to the negative input when CFG is enabled.
-Canvas regional negative prompts, auto-negative, and regional reference images are not supported.
+Regional reference images are not supported.
 
 :::caution[Regional prompting memory]
 Regional prompting builds a dense boolean attention mask whose memory grows quadratically with the combined
