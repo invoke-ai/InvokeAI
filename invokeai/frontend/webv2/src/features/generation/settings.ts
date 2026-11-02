@@ -105,6 +105,7 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
