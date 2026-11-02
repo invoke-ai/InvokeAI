@@ -279,10 +279,13 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return values
 
     @model_validator(mode="after")
-    def validate_hidiffusion_ratio_order(self, info: ValidationInfo | None = None):
+    def validate_hidiffusion_ratio_order_on_construction(self, info: ValidationInfo):
         # Connected inputs arrive one at a time; validate their final pair at invoke entry.
-        if info is not None and info.field_name is not None:
+        if info.field_name is not None:
             return self
+        return self.validate_hidiffusion_ratio_order()
+
+    def validate_hidiffusion_ratio_order(self):
         if (
             self.hidiffusion
             and self.hidiffusion_raunet
