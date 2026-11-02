@@ -719,6 +719,50 @@ describe('LayersTree selection, surfaces and structure', () => {
     expect(thumbnailLeft('inner') - thumbnailLeft('top')).toBe(LAYER_TREE_INDENT_PX);
   });
 
+  it('fills a group’s leading box with its preview pile, whatever the number of cards', async () => {
+    await renderTree([
+      paint('plain', 'Plain'),
+      groupContract('solo', [paint('only', 'Only')], { name: 'Solo' }),
+      groupContract('wrapper', [groupContract('inside', [paint('lone', 'Lone')], { name: 'Inside' })], {
+        name: 'Wrapper',
+      }),
+      groupContract('pair', [paint('p1', 'P1'), paint('p2', 'P2')], { name: 'Pair' }),
+      groupContract('crowd', [paint('c1', 'C1'), paint('c2', 'C2'), paint('c3', 'C3'), paint('c4', 'C4')], {
+        name: 'Crowd',
+      }),
+    ]);
+    const leadingBox = (name: string) =>
+      treeitem(name).querySelector('[data-layer-row-surface]')!.firstElementChild!.getBoundingClientRect();
+    const cards = (name: string) =>
+      [...treeitem(name).querySelectorAll('[data-testid="thumbnail"]')].map((thumbnail) =>
+        thumbnail.parentElement!.getBoundingClientRect()
+      );
+    const edges = (rect: DOMRect) => [rect.left, rect.top, rect.right, rect.bottom];
+
+    // Groups keep a plain layer's leading box, so nothing beside it shifts.
+    const plain = leadingBox('Plain');
+    for (const name of ['Solo', 'Wrapper', 'Pair', 'Crowd']) {
+      expect([leadingBox(name).width, leadingBox(name).height]).toEqual([plain.width, plain.height]);
+    }
+    // One card, directly or through a nested group, covers the whole box like a plain thumbnail.
+    for (const name of ['Solo', 'Wrapper']) {
+      const [card, ...rest] = cards(name);
+      expect(rest).toEqual([]);
+      expect(edges(card!)).toEqual(edges(leadingBox(name)));
+    }
+    // A pile steps from the box's top-left corner to its bottom-right one; it shows at most three cards.
+    expect(cards('Crowd')).toHaveLength(3);
+    for (const name of ['Pair', 'Crowd']) {
+      const box = leadingBox(name);
+      const pile = cards(name);
+      const front = pile.at(-1)!;
+      const back = pile[0]!;
+      expect([front.left, front.top]).toEqual([box.left, box.top]);
+      expect([back.right, back.bottom]).toEqual([box.right, box.bottom]);
+      expect(front.width).toBeLessThan(box.width);
+    }
+  });
+
   it('joins tree guides from beneath each parent’s leading box into its children, beside their selection fill', async () => {
     await renderTree([
       groupContract(

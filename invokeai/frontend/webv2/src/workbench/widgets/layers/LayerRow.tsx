@@ -37,7 +37,6 @@ const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 
 const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
-const GROUP_PILE_CARD_PX = 24;
 
 /** How a row takes part in the current drag. */
 export type LayerRowDragState = 'source' | 'travelling' | null;
@@ -548,14 +547,14 @@ const GroupPreview = ({
   thumbnails: boolean;
 }) => {
   const leaves = useMemo(() => (thumbnails ? groupLeafPreviews(node) : []), [node, thumbnails]);
-  const cardStyles = useMemo(
-    () =>
-      leaves.map((_, index): CSSProperties => {
-        const offset = index * GROUP_PILE_OFFSET_PX;
-        return { height: GROUP_PILE_CARD_PX, left: offset, top: offset, width: GROUP_PILE_CARD_PX };
-      }),
-    [leaves]
-  );
+  // Cards shrink by one offset per extra card so the pile always spans the whole leading box; one card fills it.
+  const cardStyles = useMemo(() => {
+    const card = LAYER_LEADING_BOX_PX - (leaves.length - 1) * GROUP_PILE_OFFSET_PX;
+    return leaves.map((_, index): CSSProperties => {
+      const offset = index * GROUP_PILE_OFFSET_PX;
+      return { height: card, left: offset, top: offset, width: card };
+    });
+  }, [leaves]);
   if (leaves.length === 0) {
     return (
       <Box
