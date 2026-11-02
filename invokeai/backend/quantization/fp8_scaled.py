@@ -651,7 +651,7 @@ def dequantize_fp8_scaled(
         weight = sd.get(key)
         if weight is None:
             continue
-        sd[key] = _fold_scale(weight, expand_weight_scale(weight, layer.weight_scale, path), dtype)
+        sd[key] = _fold_scale(weight, layer.weight_scale, dtype, path)
     return sd
 
 
@@ -661,21 +661,40 @@ def dequantize_fp8_scaled(
 _FOLD_SLAB_ELEMENTS = 1 << 24
 
 
-def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype) -> torch.Tensor:
-    """``(weight.float() * scale).to(dtype)``, element for element, a slab of rows at a time.
+def _fold_scale(weight: torch.Tensor, scale: torch.Tensor, dtype: torch.dtype, path: str) -> torch.Tensor:
+    """``(weight.float() * expand_weight_scale(weight, scale)).to(dtype)``, element for element, a slab of rows
+    at a time.
 
-    ``scale`` is already expanded against ``weight``: a 0-d scalar, or a tensor whose leading axis runs over
-    the weight's rows. Each slab rounds exactly as the whole would, since every element is computed alone.
+    ``scale`` is the compact one :func:`extract_fp8_scaled_layers` keeps, and it is expanded a slab at a time as
+    well: a block-wise or MXFP8 scale widened whole is itself a float32 copy of the weight, 2.3 GiB for that
+    token table, before the first slab is folded. So beyond the result, nothing the size of the weight is ever
+    held in float32, whatever the layout. Each slab rounds exactly as the whole would, since every element is
+    computed alone.
     """
+    rows = weight.shape[0] if weight.dim() else 1
+    block_wise = scale.numel() > 1 and scale.dim() > 1
+    if block_wise and rows % scale.shape[0]:
+        # Expanded, such a scale never lines up with the rows; the multiply would refuse it without naming the layer.
+        raise ValueError(
+            f"{path}: a {tuple(scale.shape)} block-wise weight_scale does not tile the {rows} rows of its "
+            f"{tuple(weight.shape)} weight; the checkpoint's quantization metadata appears to be malformed."
+        )
     if weight.numel() <= _FOLD_SLAB_ELEMENTS:
-        return (weight.float() * scale).to(dtype)
-    rows = weight.shape[0]
+        return (weight.float() * expand_weight_scale(weight, scale, path)).to(dtype)
     step = max(1, _FOLD_SLAB_ELEMENTS // (weight.numel() // rows))
-    per_row = scale.dim() > 0 and scale.shape[0] == rows
+    # A scalar or one entry per row: expanding it is a view, sliced per slab below.
+    expanded = None if block_wise else expand_weight_scale(weight, scale, path)
+    rows_per_scale_row = rows // scale.shape[0] if block_wise else 1
     out = torch.empty(weight.shape, dtype=dtype, device=weight.device)
     for start in range(0, rows, step):
         slab = slice(start, start + step)
-        out[slab] = weight[slab].float() * (scale[slab] if per_row else scale)
+        if expanded is None:
+            # The scale rows this slab's rows read, one per weight row, widened along the other axes.
+            index = torch.arange(start, min(start + step, rows), device=scale.device) // rows_per_scale_row
+            slab_scale = expand_weight_scale(weight[slab], scale.index_select(0, index), path)
+        else:
+            slab_scale = expanded[slab] if expanded.dim() else expanded
+        out[slab] = weight[slab].float() * slab_scale
     return out
 
 

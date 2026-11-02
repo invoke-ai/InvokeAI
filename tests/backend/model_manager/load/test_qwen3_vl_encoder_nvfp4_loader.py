@@ -11,6 +11,7 @@ before. The compute dtype is bf16, as in production: the packed global scale mus
 """
 
 import json
+from pathlib import Path
 
 import pytest
 import safetensors.torch
@@ -59,8 +60,6 @@ SEAM = Seam(
     loader=Qwen3VLEncoderCheckpointLoader,
     module=krea2,
     entry="_load_text_encoder",
-    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-    load_file_host=safetensors.torch,
     compute_dtype=COMPUTE_DTYPE,
     patches_device=True,
     sets_torch_dtype=False,
@@ -150,22 +149,23 @@ def _checkpoint(naming: str) -> tuple[dict[str, torch.Tensor], dict[str, str] | 
     return state_dict, metadata, expected
 
 
-def _prepare(monkeypatch: pytest.MonkeyPatch, state_dict, metadata, *, matmul: bool = False, storage: bool = False):
-    run = prepare(
-        SEAM,
-        monkeypatch,
-        state_dict=state_dict,
-        metadata=metadata,
-        observe=("dequantize_fp8_scaled", "split_fp8_scaled_layers"),
-    )
+def _prepare(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    state_dict,
+    metadata,
+    *,
+    matmul: bool = False,
+    storage: bool = False,
+):
+    """The loader over a real file holding `state_dict` and `metadata`, so the header it reads is the file's own."""
+    path = tmp_path / "qwen3vl_8b_nvfp4.safetensors"
+    safetensors.torch.save_file({key: value.contiguous() for key, value in state_dict.items()}, path, metadata)
+    run = prepare(SEAM, monkeypatch, observe=("dequantize_fp8_scaled", "split_fp8_scaled_layers"))
     run.loader._load_te_config = lambda _config: _te_config()
     monkeypatch.setattr(krea2, "should_keep_fp8_weights", lambda _device: matmul)
     monkeypatch.setattr(krea2, "_device_supports_fp8_storage", lambda *_args: storage)
-    return run
-
-
-def _config() -> Qwen3VLEncoder_Checkpoint_Config:
-    return Qwen3VLEncoder_Checkpoint_Config.model_construct(path="qwen3vl_8b_nvfp4.safetensors", name="encoder")
+    return run, Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(path), name="encoder")
 
 
 def _logged(run) -> list[str]:
@@ -186,12 +186,14 @@ def _assert_packed(model: torch.nn.Module, path: str, weight: torch.Tensor) -> N
 @pytest.mark.parametrize("mode", ["fold", "fp8_compute", "fp8_storage"])
 @pytest.mark.parametrize("naming", ["marker", "header"])
 def test_named_nvfp4_layers_stay_packed_beside_a_folded_embedding(
-    monkeypatch: pytest.MonkeyPatch, naming: str, mode: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, naming: str, mode: str
 ) -> None:
     state_dict, metadata, expected = _checkpoint(naming)
-    run = _prepare(monkeypatch, state_dict, metadata, matmul=mode == "fp8_compute", storage=mode == "fp8_storage")
+    run, config = _prepare(
+        monkeypatch, tmp_path, state_dict, metadata, matmul=mode == "fp8_compute", storage=mode == "fp8_storage"
+    )
 
-    model = run.load(_config())
+    model = run.load(config)
 
     for path in PROJECTIONS:
         _assert_packed(model, path, expected[_transformers_path(path)])
@@ -212,9 +214,51 @@ def test_named_nvfp4_layers_stay_packed_beside_a_folded_embedding(
     assert run.order and all(reserved == 1 for _step, reserved in run.order), run.order
 
 
+@pytest.mark.parametrize("marker", [{}, {"full_precision_matrix_mult": False}], ids=["empty", "format_less"])
+def test_a_header_named_layer_stays_packed_beside_a_marker_naming_no_format(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, marker: dict
+) -> None:
+    """A marker without a format says nothing about the layer, so the header's entry still names it nvfp4."""
+    state_dict, metadata, expected = _checkpoint("header")
+    layer = "model.layers.0.self_attn.q_proj"
+    state_dict[f"{layer}.comfy_quant"] = comfy_quant_marker(marker)
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, metadata)
+
+    model = run.load(config)
+
+    for path in PROJECTIONS:
+        _assert_packed(model, path, expected[_transformers_path(path)])
+
+
+@pytest.mark.parametrize("head", ["scaled_fp8", "nvfp4"])
+def test_a_head_spelled_under_the_model_prefix_is_never_read(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, head: str
+) -> None:
+    """`model.lm_head` is remapped to `language_model.lm_head` like a bare `lm_head`, a module this model lacks.
+
+    Read, an nvfp4 head failed the install for naming no module, and a scaled fp8 one was folded and reserved for,
+    then discarded. The head is 128 rows here, the smallest an nvfp4 layer can be: never read, its shape is moot.
+    """
+    state_dict, metadata, _ = _checkpoint("marker")
+    for key in [key for key in state_dict if key.startswith("lm_head.")]:
+        payload = state_dict.pop(key)
+        if head == "scaled_fp8":
+            state_dict[f"model.{key}"] = payload
+    if head == "nvfp4":
+        tensors, _ = nvfp4_signed_tensors("model.lm_head", torch.ones(128, HIDDEN, dtype=torch.bool))
+        state_dict.update(tensors)
+        state_dict["model.lm_head.comfy_quant"] = comfy_quant_marker({"format": "nvfp4"})
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, metadata)
+
+    run.load(config)
+
+    packed = sum(_packed_bytes(rows, columns) for rows, columns in PROJECTIONS.values())
+    assert run.reserved == [packed + DENSE_ELEMENTS * COMPUTE_DTYPE.itemsize + 4]
+
+
 @pytest.mark.parametrize("naming", ["marker", "header"])
 def test_an_int8_neighbour_leaves_the_nvfp4_layers_packed_and_reserved(
-    monkeypatch: pytest.MonkeyPatch, naming: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, naming: str
 ) -> None:
     """The int8 branch strips every marker it leaves, nvfp4's included, so the packed layers must be out first; and
     its reservation is the only one, so it has to count them."""
@@ -235,9 +279,9 @@ def test_an_int8_neighbour_leaves_the_nvfp4_layers_packed_and_reserved(
     state_dict[f"{int8}.weight"] = codes
     state_dict[f"{int8}.weight_scale"] = scale
     state_dict[f"{int8}.comfy_quant"] = comfy_quant_marker({"format": "int8_tensorwise", "convrot": False})
-    run = _prepare(monkeypatch, state_dict, metadata)
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, metadata)
 
-    model = run.load(_config())
+    model = run.load(config)
 
     for path in PROJECTIONS:
         if path != int8:
@@ -253,7 +297,9 @@ def test_an_int8_neighbour_leaves_the_nvfp4_layers_packed_and_reserved(
     assert run.reserved == [packed + held_int8 + DENSE_ELEMENTS * COMPUTE_DTYPE.itemsize]
 
 
-def test_an_mxfp8_build_keeps_its_language_model_in_fp8_storage(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_mxfp8_build_keeps_its_language_model_in_fp8_storage(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """Every MXFP8 Linear is folded -- `_scaled_mm` cannot apply a block-wise scale -- so its scaled layers reach the
     storage-only pass, which must still hold them in fp8: only a folded *embedding* stays wide there. Kept at the
     compute dtype instead, the language model would be resident at twice the size it had before."""
@@ -266,9 +312,9 @@ def test_an_mxfp8_build_keeps_its_language_model_in_fp8_storage(monkeypatch: pyt
         state_dict.update(tensors)
         state_dict[f"{path}.comfy_quant"] = comfy_quant_marker(mxfp8_marker())
         expected[_transformers_path(path)] = block_scales.repeat_interleave(MX_BLOCK_SIZE, dim=1)
-    run = _prepare(monkeypatch, state_dict, None, storage=True)
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, None, storage=True)
 
-    model = run.load(_config())
+    model = run.load(config)
 
     for path, weight in expected.items():
         stored = model.get_submodule(path).weight
@@ -298,13 +344,13 @@ def test_an_mxfp8_build_keeps_its_language_model_in_fp8_storage(monkeypatch: pyt
     ],
 )
 def test_a_layer_the_decode_would_misread_is_refused_before_the_loader_reserves_room(
-    monkeypatch: pytest.MonkeyPatch, mutate, message: str
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mutate, message: str
 ) -> None:
     state_dict, metadata, _ = _checkpoint("marker")
     mutate(state_dict)
-    run = _prepare(monkeypatch, state_dict, metadata)
+    run, config = _prepare(monkeypatch, tmp_path, state_dict, metadata)
 
     with pytest.raises(ValueError, match=message):
-        run.load(_config())
+        run.load(config)
 
     assert run.reserved == []

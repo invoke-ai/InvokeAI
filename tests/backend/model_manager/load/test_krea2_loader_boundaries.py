@@ -438,7 +438,7 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     fp8_calls: list = []
@@ -450,7 +450,6 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
     loader._apply_fp8_to_nn_module = lambda *a, **k: fp8_calls.append(a)
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -714,7 +713,7 @@ def test_the_encoder_names_itself_when_refusing_an_unmarked_int8_weight(monkeypa
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
@@ -724,7 +723,6 @@ def test_the_encoder_names_itself_when_refusing_an_unmarked_int8_weight(monkeypa
     loader._load_te_config = lambda _config: SimpleNamespace()
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -788,7 +786,7 @@ def test_a_merged_encoder_checkpoint_is_not_mistaken_for_a_mixed_format_one(
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
@@ -799,7 +797,6 @@ def test_a_merged_encoder_checkpoint_is_not_mistaken_for_a_mixed_format_one(
     loader._apply_fp8_to_nn_module = lambda *a, **k: None
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),

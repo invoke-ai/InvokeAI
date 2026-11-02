@@ -193,7 +193,12 @@ class NVFP4Payload:
         return sum(t.nelement() * t.element_size() for t in (self.weight, self.weight_scale, self.weight_scale_2))
 
 
-def find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | None) -> list[str]:
+def find_nvfp4_layers(
+    sd: Mapping[str, Any],
+    header_layers: Mapping[str, Any] | None,
+    *,
+    markers: Mapping[str, Mapping[str, Any]] | None = None,
+) -> list[str]:
     """Every nvfp4 layer in ``sd``, after refusing what this module would read wrong. Mutates nothing.
 
     Detection is structural -- a ``weight_scale_2`` beside the weight -- and decided per layer, never per
@@ -203,8 +208,9 @@ def find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | 
     space) names as nvfp4.
 
     Reads dtypes and shapes only, so identification can run it over meta tensors and refuse at install time
-    what a load would refuse. A meta marker has no bytes to parse, so there the markers' entries have to come
-    in through ``header_layers`` (see ``read_comfy_quant_markers``).
+    what a load would refuse. A meta marker has no bytes to parse, so there pass the markers as ``markers``,
+    keyed by layer path as ``read_comfy_quant_markers`` reads them; each ``.comfy_quant`` key in ``sd`` then
+    takes its entry from there instead of from its tensor, and a marker of a layer not in ``sd`` is ignored.
     """
     layers = sorted(
         k[: -len(WEIGHT_SCALE_2_SUFFIX)] for k in sd if isinstance(k, str) and k.endswith(WEIGHT_SCALE_2_SUFFIX)
@@ -222,7 +228,8 @@ def find_nvfp4_layers(sd: Mapping[str, Any], header_layers: Mapping[str, Any] | 
     marked: dict[str, Any] = {}
     for key in [k for k in sd if isinstance(k, str) and k.endswith(COMFY_QUANT_SUFFIX)]:
         path = key[: -len(COMFY_QUANT_SUFFIX)]
-        marked[path] = parse_comfy_quant_marker(sd[key]).get("format")
+        marker = parse_comfy_quant_marker(sd[key]) if markers is None else markers.get(path, {})
+        marked[path] = marker.get("format")
         if marked[path] == NVFP4_FORMAT and path not in claimed:
             raise ValueError(f"nvfp4 layer '{path}' has no weight_scale_2, so it cannot be decoded.")
         if path in claimed and marked[path] not in (None, NVFP4_FORMAT):

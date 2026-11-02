@@ -181,6 +181,12 @@ class TestQwen3VLEncoderCheckpointConfig:
 _PACKED = "model.layers.0.self_attn.q_proj"
 
 
+def _replace_packed_layer(state_dict: dict, **tensors: torch.Tensor) -> None:
+    for key in [key for key in state_dict if key.startswith(f"{_PACKED}.")]:
+        del state_dict[key]
+    state_dict.update({f"{_PACKED}.{suffix}": tensor for suffix, tensor in tensors.items()})
+
+
 class TestQwen3VLEncoderQuantizedCheckpoints:
     """What the loader would refuse of a quantized single file is refused at install time; the rest installs.
 
@@ -213,17 +219,12 @@ class TestQwen3VLEncoderQuantizedCheckpoints:
     def test_a_comfy_nvfp4_build_installs(self, tmp_path: Path, naming: str) -> None:
         assert self._identify(tmp_path, naming=naming).variant is Qwen3VLVariantType.Qwen3VL_4B
 
-    def _replace_packed_layer(self, state_dict: dict, **tensors: torch.Tensor) -> None:
-        for key in [key for key in state_dict if key.startswith(f"{_PACKED}.")]:
-            del state_dict[key]
-        state_dict.update({f"{_PACKED}.{suffix}": tensor for suffix, tensor in tensors.items()})
-
     def test_scaled_fp8_and_int8_builds_still_install(self, tmp_path: Path) -> None:
         # Both pair a weight with a `weight_scale` too, and neither is 4-bit.
         fp8 = quantize_scaled_fp8(torch.randn(128, 64))
         assert (
             self._identify(
-                tmp_path, lambda sd: self._replace_packed_layer(sd, weight=fp8.codes, weight_scale=fp8.scale)
+                tmp_path, lambda sd: _replace_packed_layer(sd, weight=fp8.codes, weight_scale=fp8.scale)
             ).variant
             is Qwen3VLVariantType.Qwen3VL_4B
         )
@@ -233,7 +234,7 @@ class TestQwen3VLEncoderQuantizedCheckpoints:
             "comfy_quant": comfy_quant_marker({"format": "int8_tensorwise"}),
         }
         assert (
-            self._identify(tmp_path, lambda sd: self._replace_packed_layer(sd, **int8)).variant
+            self._identify(tmp_path, lambda sd: _replace_packed_layer(sd, **int8)).variant
             is Qwen3VLVariantType.Qwen3VL_4B
         )
 
@@ -245,11 +246,33 @@ class TestQwen3VLEncoderQuantizedCheckpoints:
             # A custom RTN repack published for this encoder: packed codes and a block scale only.
             pytest.param(lambda sd: sd.pop(f"{_PACKED}.weight_scale_2"), "no weight_scale_2", id="no-global-scale"),
             pytest.param(lambda sd: sd.update({f"{_PACKED}.pre_quant_scale": torch.ones(64)}), "AWQ", id="awq"),
+            # A marker that names no format names nothing; only the header could, and here it does not.
+            *(
+                pytest.param(
+                    lambda sd, marker=marker: sd.update({f"{_PACKED}.comfy_quant": comfy_quant_marker(marker)}),
+                    "no ComfyUI `comfy_quant` marker",
+                    id=f"unnamed-{name}-marker",
+                )
+                for name, marker in (("empty", {}), ("format-less", {"full_precision_matrix_mult": False}))
+            ),
+            # Marked nvfp4 over a dense weight: no `weight_scale_2` anywhere in the file, and no packed half-state for
+            # the structural check to catch, so only the marker's own bytes say what the loader will refuse.
+            pytest.param(
+                lambda sd: _replace_packed_layer(
+                    sd,
+                    weight=torch.zeros(128, 128, dtype=torch.bfloat16),
+                    comfy_quant=comfy_quant_marker({"format": "nvfp4"}),
+                ),
+                "has no weight_scale_2, so it cannot be decoded",
+                id="nvfp4-marker-on-a-dense-weight",
+            ),
         ],
     )
     def test_a_layer_the_loader_would_refuse_is_refused_at_install(self, tmp_path: Path, mutate, message: str) -> None:
         with pytest.raises(InvalidMatchError, match=message):
             self._identify(tmp_path, mutate)
+        with pytest.raises(ValueError, match=message):
+            self._loader_finds_nvfp4_layers(tmp_path / "qwen3vl_4b.safetensors")
 
     def test_a_repack_packing_its_embedding_too_is_refused_rather_than_unknown(self, tmp_path: Path) -> None:
         # The variant is read off the embedding's width, which a packed table halves. Checked after that, such a
@@ -270,6 +293,37 @@ class TestQwen3VLEncoderQuantizedCheckpoints:
                 state_dict[f"{path}.weight_scale"] = torch.zeros(128, 4).to(torch.float8_e4m3fn)
 
         assert self._identify(tmp_path, unread_half_state_layers).variant is Qwen3VLVariantType.Qwen3VL_4B
+
+    @staticmethod
+    def _loader_finds_nvfp4_layers(path: Path) -> list[str]:
+        """The loader's own check, over the real tensors and header of the file `_identify` wrote."""
+        from safetensors.torch import load_file
+
+        from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
+        from invokeai.backend.quantization.fp8_scaled import parse_quantization_metadata, read_safetensors_metadata
+        from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
+
+        state_dict = drop_qwen3vl_unloaded_keys(load_file(str(path)))
+        return find_nvfp4_layers(state_dict, parse_quantization_metadata(read_safetensors_metadata(path)))
+
+    @pytest.mark.parametrize("marker", [{}, {"full_precision_matrix_mult": False}], ids=["empty", "format_less"])
+    def test_a_header_named_layer_installs_beside_a_marker_naming_no_format(self, tmp_path: Path, marker) -> None:
+        # The loader names a layer nvfp4 when its marker or its header entry says so. Laid over the header, a marker
+        # without a format erased the header's entry, and a file the loader takes was refused at install.
+        def add_marker(state_dict: dict) -> None:
+            state_dict[f"{_PACKED}.comfy_quant"] = comfy_quant_marker(marker)
+
+        assert self._identify(tmp_path, add_marker, naming="header").variant is Qwen3VLVariantType.Qwen3VL_4B
+        assert self._loader_finds_nvfp4_layers(tmp_path / "qwen3vl_4b.safetensors") == [_PACKED]
+
+    def test_a_marker_contradicting_a_header_named_layer_is_refused_at_install_as_at_load(self, tmp_path: Path) -> None:
+        def add_marker(state_dict: dict) -> None:
+            state_dict[f"{_PACKED}.comfy_quant"] = comfy_quant_marker({"format": "float8_e4m3fn"})
+
+        with pytest.raises(InvalidMatchError, match="contradicts its tensors"):
+            self._identify(tmp_path, add_marker, naming="header")
+        with pytest.raises(ValueError, match="contradicts its tensors"):
+            self._loader_finds_nvfp4_layers(tmp_path / "qwen3vl_4b.safetensors")
 
 
 class TestQwen3VLEncoderDirectoryConfig:

@@ -214,8 +214,17 @@ def drop_qwen3vl_unloaded_keys(sd: dict[str, Any]) -> dict[str, Any]:
     Identification judges a file's quantization by the same view, so it refuses nothing the loader would
     never read.
     """
-    return {
-        k: v
-        for k, v in drop_qwen3vl_visual_tower_keys(sd).items()
-        if not (isinstance(k, str) and k.startswith("lm_head."))
-    }
+    return {k: v for k, v in sd.items() if not _is_qwen3vl_unloaded_key(k)}
+
+
+def _is_qwen3vl_unloaded_key(key: Any) -> bool:
+    """Whether a checkpoint key belongs to the visual tower or the LM head, sidecars included.
+
+    The head is matched where the remap sends it, like the tower: a top-level ``lm_head.*`` and a ``model.lm_head.*``
+    both land on ``language_model.lm_head``, which names no module. Left in, an nvfp4 head fails the install that
+    way, and a scaled fp8 one is folded and reserved for, then discarded.
+    """
+    if not isinstance(key, str):
+        return False
+    target = qwen3vl_target_key(key)
+    return target.startswith("visual.") or target.startswith("language_model.lm_head.")

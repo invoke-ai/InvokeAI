@@ -17,9 +17,9 @@ from invokeai.backend.model_manager.configs.qwen3_5_encoder import has_qwen3_5_l
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
 from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
-from invokeai.backend.quantization.fp8_scaled import parse_quantization_metadata
+from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
 from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
-from invokeai.backend.quantization.nvfp4 import WEIGHT_SCALE_2_SUFFIX, find_nvfp4_layers
+from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -106,14 +106,16 @@ def _raise_for_undecodable_nvfp4_layers(mod: ModelOnDisk, state_dict: dict[str |
     get a file refused. It turns away AWQ builds, packed weights without nvfp4's per-tensor global scale,
     malformed layers, and layers neither a ComfyUI ``.comfy_quant`` marker nor the safetensors header names as
     nvfp4 (ModelOpt-style exports among them). Identification holds meta tensors, whose markers have no bytes to
-    parse, so those are read from the file -- and only from a file that has an nvfp4 layer to name.
+    parse, so those are read from the file -- whenever a kept key is a marker, which is when the check consults
+    them -- and passed beside the header rather than over it: as at load, either one naming a layer nvfp4 is
+    enough.
     """
     consumed = drop_qwen3vl_unloaded_keys(state_dict)
-    names = parse_quantization_metadata(mod.metadata())
-    if any(isinstance(key, str) and key.endswith(WEIGHT_SCALE_2_SUFFIX) for key in consumed):
-        names = {**names, **read_comfy_quant_markers(mod.path)}
+    markers = None
+    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in consumed):
+        markers = read_comfy_quant_markers(mod.path)
     try:
-        find_nvfp4_layers(consumed, header_layers=names)
+        find_nvfp4_layers(consumed, header_layers=parse_quantization_metadata(mod.metadata()), markers=markers)
     except ValueError as e:
         raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {e}") from e
 
