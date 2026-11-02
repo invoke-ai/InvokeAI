@@ -1,7 +1,7 @@
 ---
 title: Crafting images with the Canvas
 description: An introduction to the Canvas — layers and masks, sending generations to the Canvas, inpainting, outpainting, regional prompts, control layers, drawing and adding gallery images.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-02
 ---
 
 import { Image } from 'astro:assets';
@@ -78,7 +78,7 @@ Inpainting regenerates part of an image and leaves the rest untouched: remove an
 
 1. **Add an inpaint mask**, or select the empty one a new canvas starts with, in the **Inpaint Masks** stack. (A new canvas opens with nothing selected and the Brush active, so a stroke there paints a new raster layer.)
 
-2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, or draw it with the **Shape** tool (**R**). The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
+2. **Paint the mask.** Choose the **Brush** (**B**) and paint over the area to regenerate, draw it with the **Shape** tool (**U**), or click it with the **Paint bucket**, which shares the Gradient's button and **G** key, to mask an area of similar color in one go. The mask shows as a tinted overlay. The **Eraser** (**E**) removes mask, and **[** and **]** change the brush size.
 
 3. **Describe the result** in the Generate panel's prompt: describe the whole picture as it should look, or just what should appear in the masked area.
 
@@ -169,7 +169,7 @@ You can paint directly on the canvas, for example to sketch a composition for im
 2. **Pick a color** in the color picker at the top of the Layers panel. Its two chips are the foreground color, used by the brush, and the background color. **X** swaps them and **D** resets them to black and white. Hold **Alt** to pick a color from the canvas.
 3. **Choose the Brush** (**B**) and paint. Its **Size**, **Opacity** and **Hardness** are in the Properties pane; **[** and **]** change the size. The **Eraser** (**E**) erases.
 
-The tool strip also has shape, gradient and text tools, which are described in the [Canvas guide](/users-guide/canvas/canvas-guide/).
+The tool strip also has shape, gradient, paint bucket and text tools, which are described in the [Canvas guide](/users-guide/canvas/canvas-guide/).
 
 ## Adding a gallery image to a layer
 
