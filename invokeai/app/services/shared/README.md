@@ -665,7 +665,10 @@ materialization.
   enclosing iterator paths. This lets a shape such as
   `outer_iter -> inner_collection -> inner_iter -> collect -> consumer` produce one collected result per outer
   iteration instead of mixing all inner items into one global collection. Incoming `collection` inputs are treated as
-  ancestor groups and are copied into each matching descendant item group.
+  ancestor groups and are copied into each matching descendant item group. Root `item` inputs are also broadcast into
+  every deeper item group; when deeper groups exist, they do not create an extra root-only result. Empty enclosing
+  groups remain at their original frame path, even when a deeper nested stream has no items; no deeper child frame is
+  fabricated to hold an empty group.
 
 - Otherwise: compute all combinations of prepared iterator ancestors. For each combination, choose the prepared parent
   for each upstream by matching iterator ancestry, then create **one** exec node. If a node no longer has visible
@@ -841,12 +844,14 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     both branches carry the same deeper axes. Each `Collect.item` closes its innermost axis and keeps the outer axes;
     this identity is followed through chained `Collect`s and ordinary passthrough nodes. Separate branch Collect chains
     may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
-    not establish alignment. An asymmetric or distinct-axis Collect chain, including the cases covered by seeds 157
-    and 795, is rejected before invocation. A downstream
+    not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. Unrelated
+    sibling `Iterate` streams that reach one `Collect` directly or through literal `If` nodes close into their own
+    sibling group, with values kept in stream order; they are not paired by numeric iteration index. A downstream
     `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
     nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
     own axis. When a wired Boolean condition resolves per parent frame to select a `For.output_collection`, its `If`
-    output retains those parent-frame groups through `Collect`, including through an outer literal-`True` `If`.
+    output retains those parent-frame groups through `Collect`, including through an outer literal-`True` `If`. Root
+    `Collect.item` inputs broadcast into each such selected-For parent group; they do not add a separate root result.
   - A root-frame condition choosing between branches with different deeper axes. When both branches retain the same
     nested axes, a root-frame condition runs the `If` once per available frame of the innermost axis. Selecting a root
     value over an axis reached only through an unselected `For` final output is the root-frame exception described

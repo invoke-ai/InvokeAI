@@ -5015,6 +5015,31 @@ def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_
     assert collect_results == [[100, 0, 1], [100, 10, 11]]
 
 
+def test_graph_collector_broadcasts_root_item_into_each_nested_iterator_group():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(AddInvocation(id="root_item", a=100, b=0))
+    graph.add_node(CollectInvocation(id="collect"))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "collect", "item"))
+    graph.add_edge(create_edge("root_item", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    collect_ids = state.source_prepared_mapping["collect"]
+    assert len(collect_ids) == 2
+    assert sorted(state.results[node_id].collection for node_id in collect_ids) == [[100, 0, 1], [100, 10, 11]]
+
+
 def test_graph_collector_nested_under_three_iterators_preserves_outer_iteration_paths():
     graph = Graph()
 

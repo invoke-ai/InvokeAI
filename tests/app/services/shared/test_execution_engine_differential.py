@@ -14770,7 +14770,7 @@ def test_selected_for_final_does_not_duplicate_unrelated_sibling_items(
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
-def test_literal_if_collect_preserves_selected_for_and_root_sibling_groups(
+def test_root_item_broadcasts_into_selected_for_groups_and_keeps_sibling_group(
     force_compatibility_scheduler: bool,
 ) -> None:
     graph = _for_final_if_with_unrelated_sibling_graph([["a"], ["b", "c"]])
@@ -14790,7 +14790,165 @@ def test_literal_if_collect_preserves_selected_for_and_root_sibling_groups(
     assert not state.has_error(), state.errors
     outputs = _source_values(state, "out")
     assert set(outputs) == {(), (0,), (1,)}
-    assert outputs[(0,)] == [["Fa"]]
-    assert outputs[(1,)] == [["Fb", "Fc"]]
-    assert sorted(outputs[()]) == ["ROOT", "s0", "s1", "s2"]
+    assert len(outputs[(0,)]) == 2
+    assert "ROOT" in outputs[(0,)] and ["Fa"] in outputs[(0,)]
+    assert len(outputs[(1,)]) == 2
+    assert "ROOT" in outputs[(1,)] and ["Fb", "Fc"] in outputs[(1,)]
+    assert outputs[()] == ["s0", "s1", "s2"]
     assert [value for value in outputs[()] if value in {"s0", "s1", "s2"}] == ["s0", "s1", "s2"]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_root_item_broadcast_into_nested_literal_if_for_groups_has_no_empty_root_group(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _for_final_if_with_iteration_condition_graph(pass_condition=False)
+    graph.delete_edge(next(edge for edge in graph._get_input_edges("if", "condition")))
+    graph.update_node("if", IfInvocation(id="if", condition=True))
+    graph.delete_edge(next(edge for edge in graph._get_input_edges("out", "item")))
+    graph.add_node(IfInvocation(id="outer", condition=True))
+    graph.add_node(AnyTypeTestInvocation(id="root", value="ROOT"))
+    graph.add_edge(create_edge("if", "value", "outer", "true_input"))
+    graph.add_edge(create_edge("outer", "value", "out", "item"))
+    graph.add_edge(create_edge("root", "value", "out", "item"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    outputs = _source_values(state, "out")
+    assert set(outputs) == {(0,), (1,)}
+    assert len(outputs[(0,)]) == 2
+    assert "ROOT" in outputs[(0,)] and ["Fa"] in outputs[(0,)]
+    assert len(outputs[(1,)]) == 2
+    assert "ROOT" in outputs[(1,)] and ["Fb", "Fc"] in outputs[(1,)]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_root_collect_collection_broadcasts_to_sibling_and_selected_for_groups(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _for_final_if_with_unrelated_sibling_graph([["a"], ["b", "c"]])
+    graph.add_node(CollectionConcatInvocation(id="root_collection", first=["ROOT"]))
+    graph.add_edge(create_edge("root_collection", "collection", "out", "collection"))
+
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph),
+        force_compatibility_scheduler=force_compatibility_scheduler,
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    outputs = _source_values(state, "out")
+    assert set(outputs) == {(), (0,), (1,)}
+    assert len(outputs[()]) == 4
+    assert outputs[()].count("ROOT") == 1
+    assert [value for value in outputs[()] if value in {"s0", "s1", "s2"}] == ["s0", "s1", "s2"]
+    assert len(outputs[(0,)]) == 2
+    assert "ROOT" in outputs[(0,)] and ["Fa"] in outputs[(0,)]
+    assert len(outputs[(1,)]) == 2
+    assert "ROOT" in outputs[(1,)] and ["Fb", "Fc"] in outputs[(1,)]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_root_collect_item_broadcasts_into_nested_iterator_groups(force_compatibility_scheduler: bool) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="source", first=[0, 10]),
+            IterateInvocation(id="outer"),
+            RangeOfSizeInvocation(id="inner_source", size=2),
+            IterateInvocation(id="inner"),
+            AnyTypeTestInvocation(id="inner_item"),
+            AnyTypeTestInvocation(id="root_item", value=100),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("source", "collection", "outer", "collection"),
+            ("outer", "item", "inner_source", "start"),
+            ("inner_source", "collection", "inner", "collection"),
+            ("inner", "item", "inner_item", "value"),
+            ("inner_item", "value", "collect", "item"),
+            ("root_item", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    assert _source_values(state, "collect") == {(0,): [100, 0, 1], (1,): [100, 10, 11]}
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize(
+    ("collection", "expected"),
+    [
+        pytest.param([["a"]], {(0,): ["a"]}, id="single-nested"),
+        pytest.param([[], [["s"]]], {(0,): [], (1,): [["s"]]}, id="empty-before-nonempty"),
+        pytest.param([[], []], {(0,): [], (1,): []}, id="all-empty"),
+        pytest.param([[["a"]], [], [["b"]]], {(0,): [["a"]], (1,): [], (2,): [["b"]]}, id="ragged-empty-middle"),
+    ],
+)
+def test_collect_preserves_empty_and_ragged_nested_iterator_paths(
+    force_compatibility_scheduler: bool,
+    collection: list[Any],
+    expected: dict[tuple[int, ...], Any],
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="source", first=collection),
+            IterateInvocation(id="outer"),
+            CollectionConcatInvocation(id="inner_source"),
+            IterateInvocation(id="inner"),
+            AnyTypeTestInvocation(id="item"),
+            CollectInvocation(id="collect"),
+        ],
+        [
+            ("source", "collection", "outer", "collection"),
+            ("outer", "item", "inner_source", "first"),
+            ("inner_source", "collection", "inner", "collection"),
+            ("inner", "item", "item", "value"),
+            ("item", "value", "collect", "item"),
+        ],
+    )
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    assert _source_values(state, "collect") == expected
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_two_literal_if_sibling_wrappers_share_one_group_with_selected_for(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _for_final_if_with_unrelated_sibling_graph([["a"], ["b"]])
+    graph.delete_edge(next(edge for edge in graph._get_input_edges("out", "item") if edge.source.node_id == "if"))
+    graph.delete_edge(next(edge for edge in graph._get_input_edges("out", "item") if edge.source.node_id == "sibling"))
+    graph.add_node(IfInvocation(id="selected_if_outer", condition=True))
+    graph.add_edge(create_edge("if", "value", "selected_if_outer", "true_input"))
+    graph.add_edge(create_edge("selected_if_outer", "value", "out", "item"))
+    graph.add_node(IfInvocation(id="sibling_if", condition=True))
+    graph.add_node(IfInvocation(id="sibling_if_outer", condition=True))
+    graph.add_edge(create_edge("sibling", "item", "sibling_if", "true_input"))
+    graph.add_edge(create_edge("sibling_if", "value", "sibling_if_outer", "true_input"))
+    graph.add_edge(create_edge("sibling_if_outer", "value", "out", "item"))
+    trace, state = _run_graph(
+        GraphExecutionState(graph=graph), force_compatibility_scheduler=force_compatibility_scheduler
+    )
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    outputs = _source_values(state, "out")
+    assert set(outputs) == {(), (0,), (1,)}
+    assert outputs[(0,)] == [["Fa"]]
+    assert outputs[(1,)] == [["Fb"]]
+    root_values = outputs[()]
+    assert len(root_values) == 3
+    assert root_values == ["s0", "s1", "s2"]
