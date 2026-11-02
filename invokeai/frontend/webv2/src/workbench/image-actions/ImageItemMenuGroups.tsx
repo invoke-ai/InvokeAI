@@ -408,6 +408,8 @@ const ReuseMenuItem = ({
 
 interface VideoReuseItem {
   capability: keyof VideoRecallCapabilities;
+  /** The viewer command that recalls the same from the selected video, for its keycaps. */
+  commandId: string;
   icon: LucideIcon;
   kind: VideoRecallKind;
   label: string;
@@ -418,6 +420,7 @@ interface VideoReuseItem {
 const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   {
     capability: 'remix',
+    commandId: 'viewer.remix',
     icon: ShuffleIcon,
     kind: 'remix',
     label: 'widgets.gallery.itemMenu.remixVideo',
@@ -425,6 +428,7 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   },
   {
     capability: 'all',
+    commandId: 'viewer.recallAll',
     icon: AsteriskIcon,
     kind: 'all',
     label: 'widgets.gallery.itemMenu.allSettings',
@@ -432,6 +436,7 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   },
   {
     capability: 'prompts',
+    commandId: 'viewer.recallPrompts',
     icon: QuoteIcon,
     kind: 'prompts',
     label: 'widgets.gallery.itemActions.recall.verbs.prompts',
@@ -439,6 +444,7 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   },
   {
     capability: 'seed',
+    commandId: 'viewer.recallSeed',
     icon: SproutIcon,
     kind: 'seed',
     label: 'widgets.gallery.itemActions.recall.verbs.seed',
@@ -446,6 +452,7 @@ const VIDEO_REUSE_ITEMS: readonly VideoReuseItem[] = [
   },
   {
     capability: 'size',
+    commandId: 'viewer.useSize',
     icon: RulerIcon,
     kind: 'size',
     label: 'widgets.gallery.itemActions.recall.verbs.dimensions',
@@ -480,6 +487,7 @@ export const VideoUseGroups = ({
       key={reuseItem.kind}
       actions={actions}
       disabled={metadataQuery.isPending || !capabilities[reuseItem.capability]}
+      guided={presentation === 'guided'}
       item={item}
       reuseItem={reuseItem}
     />
@@ -553,11 +561,13 @@ const ConditioningClipMenuItem = ({
 const VideoReuseMenuItem = ({
   actions,
   disabled,
+  guided,
   item,
   reuseItem,
 }: {
   actions: ImageActions;
   disabled: boolean;
+  guided: boolean;
   item: GalleryVideoItem;
   reuseItem: VideoReuseItem;
 }) => {
@@ -566,12 +576,17 @@ const VideoReuseMenuItem = ({
     () => void actions.recallVideoData(item, reuseItem.kind),
     [actions, item, reuseItem.kind]
   );
+  const shortcut = useMemo(
+    () => (guided ? <CommandKeycaps commandId={reuseItem.commandId} /> : undefined),
+    [guided, reuseItem.commandId]
+  );
 
   return (
     <MenuActionItem
       disabled={disabled}
       icon={reuseItem.icon}
       label={t(reuseItem.label)}
+      shortcut={shortcut}
       value={reuseItem.value}
       onSelect={handleSelect}
     />

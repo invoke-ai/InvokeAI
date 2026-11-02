@@ -231,7 +231,8 @@ describe('executeVideoRecall', () => {
       getVideoValues: () => videoValues as unknown as Record<string, unknown>,
       item,
       kind: 'prompts',
-      models: [],
+      // The panel's Wan main is not installed; only H3 is.
+      models: [h3Model],
     });
 
     expect(didRecall).toBe(true);
@@ -241,6 +242,29 @@ describe('executeVideoRecall', () => {
       { negativePrompt: 'blurry', negativePromptEnabled: true, positivePrompt: 'a fox running' },
       undefined
     );
+  });
+
+  it('writes nothing while the model catalog is empty, which would drop the panel model, LoRAs and components', async () => {
+    videoMetadata.mockResolvedValue(metadata);
+    const { commands, patchValues } = createCommands();
+
+    const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+      item,
+      kind: 'all',
+      models: [],
+    });
+
+    expect(didRecall).toBe(false);
+    expect(patchValues).not.toHaveBeenCalled();
+    expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall',
+      title: 'widgets.gallery.itemActions.recall.cannotRecallVideo',
+    });
   });
 
   it('writes the whole values object when the recall carries more than prompts', async () => {

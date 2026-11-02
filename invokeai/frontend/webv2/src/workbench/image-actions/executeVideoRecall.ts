@@ -216,6 +216,17 @@ export const executeVideoRecall = async ({
     return false;
   }
 
+  // Values are synced against the catalog: an empty one (not loaded yet, or failed) would drop the panel's model,
+  // LoRAs and components on commit.
+  if (models.length === 0) {
+    commands.notifications.add({
+      kind: 'info',
+      message: t('widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall'),
+      title: t('widgets.gallery.itemActions.recall.cannotRecallVideo'),
+    });
+    return false;
+  }
+
   let metadata: unknown;
 
   try {

@@ -719,6 +719,11 @@ describe('preview header Edit and Use', () => {
         'Use size (disabled)',
       ])
     );
+    // The viewer keys recall the same from the selected video.
+    const keycaps = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].map(
+      (row) => [...row.querySelectorAll('kbd')].map((key) => key.textContent).join('+') || null
+    );
+    expect(keycaps.slice(3)).toEqual(['r', 'a', 'p', 's', 'd']);
 
     const seed = page.getByRole('menuitem', { name: /^Use seed/ });
     await seed.hover();
