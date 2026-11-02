@@ -1,4 +1,4 @@
-import type { QueueItem } from '@features/queue/core/historyTypes';
+import type { QueueItem, QueueSubmissionRetry } from '@features/queue/core/historyTypes';
 import type {
   QueueBackendPort,
   QueueEnqueueGenerateRequest,
@@ -96,6 +96,8 @@ export interface QueueHistoryCommands {
     projectId: string;
     queueItemId: string;
   }): void;
+  /** Record the latest failed submission of a run the backend has not accepted; acceptance or an ending clears it. */
+  recordSubmissionRetry(payload: { projectId: string; queueItemId: string; retry: QueueSubmissionRetry }): void;
   setCancellationPending(payload: { pending: boolean; projectId: string; queueItemId: string }): void;
   setLocalRecoveryState(payload: {
     projectId: string;
@@ -419,22 +421,80 @@ const getJournalSignature = (item: QueueItem): string =>
     item.backendItemIds,
     item.completedBackendItemIds,
     item.cancelledBackendItemIds,
+    // The failure budget and the wait before the next attempt survive a reload, so every failed attempt writes the run
+    // once more; the retry pace bounds those writes.
+    item.submissionRetry,
   ]);
 
 /**
  * A 5xx answer to an enqueue is usually caused by the request itself (e.g. a graph that
  * crashes server-side validation), so retrying the same submission forever never succeeds.
- * Gateway and availability errors (502/503/504) stay transient and keep retrying.
- * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS 500s spread over at least
+ * Gateway and availability errors (502/503/504, and 408/429) stay transient and keep retrying.
+ * A run only gives up after at least MAX_SERVER_ERROR_SUBMISSIONS consecutive 500s spread over at least
  * MIN_SERVER_ERROR_WINDOW_MS, so a short-lived internal error can still recover.
  * After the last allowed 500 the run is reconciled once more, and only fails if the
- * backend queue really has nothing for it.
+ * backend queue really has nothing for it. The count lives on the run (`submissionRetry`), so a reload continues it.
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
-const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
-const isDeterministicServerError = (error: unknown): boolean =>
-  error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
+const UNAVAILABLE_STATUSES = [408, 429, 502, 503, 504];
+/**
+ * A run waits before each resubmission, 1 s after its first failed submission and doubling up to 15 s, whatever the
+ * reason; its 500 budget is then spent after five attempts over about 15 s. The wait runs from the recorded failure,
+ * so a reload keeps it, and a reconnect lifts it for the runs waiting then, as the server is likely back.
+ */
+const SUBMISSION_RETRY_BASE_MS = 1_000;
+const SUBMISSION_RETRY_MAX_MS = 15_000;
+const getSubmissionRetryDelayMs = (failureCount: number): number =>
+  Math.min(SUBMISSION_RETRY_BASE_MS * 2 ** Math.max(failureCount - 1, 0), SUBMISSION_RETRY_MAX_MS);
+/** Never longer than the delay itself, so a failure recorded ahead of the clock (set back since) cannot stall a run. */
+const getSubmissionWaitMs = (retry: QueueSubmissionRetry, now: number): number => {
+  const delayMs = getSubmissionRetryDelayMs(retry.failureCount);
+  return Math.min(Math.max(retry.failedAt + delayMs - now, 0), delayMs);
+};
+const isDeterministicServerError = (error: unknown): error is ApiError =>
+  error instanceof ApiError && error.status >= 500 && !UNAVAILABLE_STATUSES.includes(error.status);
+
+/**
+ * The retry a failed submission leaves, continuing the run's consecutive server errors. When the clock now reads
+ * before the first of them (it was set back), the window restarts at now and the count stays, so the run neither
+ * waits for the clock to catch up nor fails at once. A clock set forward can only shorten the window; the run still
+ * takes MAX_SERVER_ERROR_SUBMISSIONS server errors to fail.
+ */
+const getSubmissionRetry = (
+  error: unknown,
+  previous: QueueSubmissionRetry | undefined,
+  now: number
+): QueueSubmissionRetry => {
+  const base = {
+    failedAt: now,
+    failureCount: (previous?.failureCount ?? 0) + 1,
+    message: toErrorMessage(error),
+    status: error instanceof ApiError ? error.status : null,
+  };
+  if (!isDeterministicServerError(error)) {
+    return {
+      ...base,
+      reason: error instanceof ApiError && UNAVAILABLE_STATUSES.includes(error.status) ? 'unavailable' : 'unreachable',
+      serverErrorCount: 0,
+      serverErrorSince: null,
+    };
+  }
+  const since = previous?.reason === 'server-error' ? previous.serverErrorSince : null;
+  return {
+    ...base,
+    reason: 'server-error',
+    serverErrorCount: (previous?.reason === 'server-error' ? previous.serverErrorCount : 0) + 1,
+    serverErrorSince: since !== null && since <= now ? since : now,
+  };
+};
+
+/** Judged from the recorded times alone, so a reload or a later clock change cannot alter the verdict. */
+const isSubmissionRetryExhausted = (retry: QueueSubmissionRetry): boolean =>
+  retry.reason === 'server-error' &&
+  retry.serverErrorSince !== null &&
+  retry.serverErrorCount >= MAX_SERVER_ERROR_SUBMISSIONS &&
+  retry.failedAt - retry.serverErrorSince >= MIN_SERVER_ERROR_WINDOW_MS;
 
 const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
 
@@ -515,9 +575,20 @@ export const createQueueRuntime = ({
   const submissionOperations = new Map<string, Promise<unknown>>();
   const cancelRequestedRunKeys = new Set<string>();
   let reconcileRetryDelayMs = 100;
-  const serverErrorCounts = new Map<string, { count: number; firstAt: number }>();
-  const exhaustedServerErrors = new Map<string, string>();
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Wakes the runtime when the earliest waiting run may submit again. */
+  let submissionTimer: { dueAt: number; timer: ReturnType<typeof setTimeout> } | undefined;
+  /**
+   * When each waiting run may submit again, fixed when its failure is first seen, so a clock that reads before the
+   * failure delays the run once by at most its delay instead of moving the time along with it.
+   */
+  const submissionDueTimes = new Map<string, { dueAt: number; failedAt: number }>();
+  /**
+   * Runs that were waiting when the connection came back, by the failure they waited on: they submit without waiting,
+   * and a later failure waits again. Keyed by failure rather than by time, so a clock change cannot widen the lift.
+   */
+  const liftedSubmissionWaits = new Map<string, number>();
+  let sawDisconnect = false;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
   let hasInitialized = false;
   let isInitializing = false;
@@ -826,8 +897,8 @@ export const createQueueRuntime = ({
     reconcileRetryRunKeys.delete(key);
     cancelRequestedRunKeys.delete(key);
     reportedCancelFailures.delete(key);
-    serverErrorCounts.delete(key);
-    exhaustedServerErrors.delete(key);
+    submissionDueTimes.delete(key);
+    liftedSubmissionWaits.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -1887,7 +1958,6 @@ export const createQueueRuntime = ({
 
     await request
       .then(async ({ batchId, enqueued, itemIds, requested }) => {
-        serverErrorCounts.delete(runKey);
         if (!isAttemptCurrent(attempt)) {
           return;
         }
@@ -1957,21 +2027,18 @@ export const createQueueRuntime = ({
           });
           return;
         }
-        if (isDeterministicServerError(error)) {
-          const now = Date.now();
-          const previous = serverErrorCounts.get(runKey);
-          const failures = (previous?.count ?? 0) + 1;
-          const firstAt = previous?.firstAt ?? now;
-          if (failures >= MAX_SERVER_ERROR_SUBMISSIONS && now - firstAt >= MIN_SERVER_ERROR_WINDOW_MS) {
-            // The server may have accepted the batch before answering 500, so reconcile before failing the run.
-            serverErrorCounts.delete(runKey);
-            exhaustedServerErrors.set(runKey, toErrorMessage(error));
-          } else {
-            serverErrorCounts.set(runKey, { count: failures, firstAt });
-          }
-        } else {
-          serverErrorCounts.delete(runKey);
-        }
+        // Even a run past its server-error budget is reconciled first: the server may have accepted the batch before
+        // answering 500.
+        const failedTarget = getRouteTarget(history, currentQueueItem.id);
+        commands.recordSubmissionRetry({
+          projectId: project.id,
+          queueItemId: currentQueueItem.id,
+          retry: getSubmissionRetry(
+            error,
+            failedTarget?.project.id === project.id ? failedTarget.queueItem?.submissionRetry : undefined,
+            Date.now()
+          ),
+        });
         startedRunKeys.delete(runKey);
         reconcileRetryRunKeys.add(runKey);
         scheduleRetry();
@@ -2031,8 +2098,8 @@ export const createQueueRuntime = ({
           pendingReconcileRunKeys.delete(key);
           reconcileRetryRunKeys.delete(key);
           reportedCancelFailures.delete(key);
-          serverErrorCounts.delete(key);
-          exhaustedServerErrors.delete(key);
+          submissionDueTimes.delete(key);
+          liftedSubmissionWaits.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }
@@ -2111,28 +2178,74 @@ export const createQueueRuntime = ({
     });
   };
 
+  const getRemainingSubmissionWaitMs = (key: string, retry: QueueSubmissionRetry, now: number): number => {
+    let due = submissionDueTimes.get(key);
+    if (!due || due.failedAt !== retry.failedAt || due.dueAt - now > getSubmissionRetryDelayMs(retry.failureCount)) {
+      due = { dueAt: now + getSubmissionWaitMs(retry, now), failedAt: retry.failedAt };
+      submissionDueTimes.set(key, due);
+    }
+    return Math.max(due.dueAt - now, 0);
+  };
+
+  const scheduleSubmissionWake = (waitMs: number): void => {
+    const dueAt = Date.now() + waitMs;
+    if (submissionTimer && submissionTimer.dueAt <= dueAt) {
+      return;
+    }
+    if (submissionTimer) {
+      clearTimeout(submissionTimer.timer);
+    }
+    submissionTimer = {
+      dueAt,
+      timer: setTimeout(() => {
+        submissionTimer = undefined;
+        if (isActive()) {
+          synchronize();
+        }
+      }, waitMs),
+    };
+  };
+
   const processQueueItems = (): void => {
     if (!hasInitialized || !isActive() || history.getSnapshot().connectionStatus !== 'connected' || isReconciling) {
       return;
     }
 
+    const now = Date.now();
+    let nextWaitMs: number | undefined;
     for (const project of history.getSnapshot().projects) {
       if (!loadedProjectIds.has(project.id)) {
         continue;
       }
       for (const queueItem of project.queue.items) {
         const runKey = getRunKey(project.id, queueItem.id);
+        // A run waiting out its retry backoff is reconciled before it is submitted again, whatever else changes.
         if (
           shouldSubmitPendingQueueItem(queueItem) &&
           trackedRuns.has(runKey) &&
           !preparingRunKeys.has(runKey) &&
           !pendingReconcileRunKeys.has(runKey) &&
+          !reconcileRetryRunKeys.has(runKey) &&
           !startedRunKeys.has(runKey)
         ) {
+          const retry = queueItem.submissionRetry;
+          const waitMs =
+            retry && liftedSubmissionWaits.get(runKey) !== retry.failedAt
+              ? getRemainingSubmissionWaitMs(runKey, retry, now)
+              : 0;
+          if (waitMs > 0) {
+            nextWaitMs = Math.min(nextWaitMs ?? waitMs, waitMs);
+            continue;
+          }
+          submissionDueTimes.delete(runKey);
+          liftedSubmissionWaits.delete(runKey);
           startedRunKeys.add(runKey);
           void submitQueueItem(project, queueItem, beginAttempt(project.id, queueItem.id));
         }
       }
+    }
+    if (nextWaitMs !== undefined) {
+      scheduleSubmissionWake(nextWaitMs);
     }
   };
 
@@ -2260,8 +2373,6 @@ export const createQueueRuntime = ({
           const cancelRequested = cancelRequestedRunKeys.has(runKey);
           reconcileRetryRunKeys.delete(runKey);
           const outcome = outcomes.get(queueItem.id);
-          const exhaustedServerError = exhaustedServerErrors.get(runKey);
-          exhaustedServerErrors.delete(runKey);
 
           if ((outcome?.kind === 'adopted' || outcome?.kind === 'resumed') && outcome.missingBackendItemIds?.length) {
             commands.recordError({
@@ -2287,9 +2398,9 @@ export const createQueueRuntime = ({
 
           switch (outcome?.kind) {
             case 'enqueue':
-              if (exhaustedServerError !== undefined) {
+              if (currentQueueItem.submissionRetry && isSubmissionRetryExhausted(currentQueueItem.submissionRetry)) {
                 commands.setStatus({
-                  error: exhaustedServerError,
+                  error: currentQueueItem.submissionRetry.message,
                   projectId: project.id,
                   queueItemId: currentQueueItem.id,
                   status: 'failed',
@@ -2535,6 +2646,21 @@ export const createQueueRuntime = ({
         }
 
         commands.setConnectionStatus({ error, status });
+        if (status === 'disconnected') {
+          sawDisconnect = true;
+        } else if (status === 'connected' && sawDisconnect) {
+          // The server is likely back: the runs waiting now may submit at once.
+          sawDisconnect = false;
+          for (const project of history.getSnapshot().projects) {
+            for (const item of project.queue.items) {
+              if (item.status === 'pending' && item.submissionRetry) {
+                const key = getRunKey(project.id, item.id);
+                submissionDueTimes.delete(key);
+                liftedSubmissionWaits.set(key, item.submissionRetry.failedAt);
+              }
+            }
+          }
+        }
         if (status === 'connected') {
           for (const runKey of reconcileRetryRunKeys) {
             reconcileRetryRunKeys.delete(runKey);
@@ -2557,6 +2683,10 @@ export const createQueueRuntime = ({
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;
+    }
+    if (submissionTimer) {
+      clearTimeout(submissionTimer.timer);
+      submissionTimer = undefined;
     }
 
     for (const detach of detachers.splice(0)) {
@@ -2602,8 +2732,8 @@ export const createQueueRuntime = ({
     fallbackAckOperations.clear();
     reconcileRetryRunKeys.clear();
     pendingReconcileRunKeys.clear();
-    serverErrorCounts.clear();
-    exhaustedServerErrors.clear();
+    submissionDueTimes.clear();
+    liftedSubmissionWaits.clear();
     trackedRuns.clear();
     activeAttempts.clear();
     ownershipEpochs.clear();

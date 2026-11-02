@@ -285,6 +285,55 @@ describe('IndexedDB queue run journal', () => {
     expect(restoredMalformed).not.toHaveProperty('retriedBackendItemIds');
   });
 
+  it('keeps the failed submission of a run not yet accepted, and drops a malformed or stale one without losing the run', async () => {
+    const { journal } = await createJournal();
+    const store = createWorkbenchStore();
+    const projectId = store.getState().activeProjectId;
+    const retry = {
+      failedAt: 12_000,
+      failureCount: 3,
+      message: 'graph validation crashed',
+      reason: 'server-error' as const,
+      serverErrorCount: 2,
+      serverErrorSince: 1_000,
+      status: 500,
+    };
+    const retrying = createItem({ submissionRetry: retry });
+    // A server error must be counted, and its window cannot start after the failure it ends with.
+    const miscounted = createItem({ id: 'queue-item-2', submissionRetry: { ...retry, serverErrorCount: 0 } });
+    const backwards = createItem({ id: 'queue-item-3', submissionRetry: { ...retry, serverErrorSince: 13_000 } });
+    // Every server error is a failed submission.
+    const undercounted = createItem({ id: 'queue-item-5', submissionRetry: { ...retry, failureCount: 1 } });
+    // A run the backend accepted has no submission left to retry.
+    const accepted = createItem({
+      backendItemIds: [11],
+      id: 'queue-item-4',
+      status: 'running',
+      submissionRetry: retry,
+    });
+    for (const item of [retrying, miscounted, backwards, undercounted, accepted]) {
+      await journal.record(projectId, item);
+    }
+
+    const loaded = await journal.listForProject(projectId);
+    expect(loaded.kind).toBe('available');
+    store.commands.queue.restoreFromJournal({
+      items: loaded.kind === 'available' ? loaded.entries.map((entry) => entry.item) : [],
+      projectId,
+    });
+
+    const restored = store.getState().projects[0]?.queue.items ?? [];
+    expect(restored.find((item) => item.id === retrying.id)).toMatchObject({
+      status: 'pending',
+      submissionRetry: retry,
+    });
+    for (const item of [miscounted, backwards, undercounted, accepted]) {
+      const restoredItem = restored.find((candidate) => candidate.id === item.id);
+      expect(restoredItem).toMatchObject({ status: item.status });
+      expect(restoredItem).not.toHaveProperty('submissionRetry');
+    }
+  });
+
   it('restores newest-first submission order without moving a run when its status changes', async () => {
     const { journal } = await createJournal();
     await journal.record('project-1', createItem({ id: 'queue-item-1' }));
