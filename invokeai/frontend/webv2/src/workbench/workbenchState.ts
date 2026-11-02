@@ -226,7 +226,9 @@ import {
 import { getSourceIdForWidgetTypeId } from './graphWidgets';
 import {
   defaultInvocationRoute,
+  getDynamicPromptsExpansionSource,
   isInvocationRouteValid,
+  isSameDynamicPromptsExpansionSource,
   isInvocationSourceAvailable,
   isResultDestinationAvailable,
   resolveInvocationRoute,
@@ -5451,6 +5453,27 @@ const reduceWorkbenchAction = (
             projectId: target.id,
             title: 'Workflow not queued',
             titleKey: 'widgets.workflow.submitRemovedTitle',
+          })
+        );
+      }
+
+      // The prompt or its expansion settings changed while the prompt was being expanded. The reducer compiles the
+      // project as it is now, so neither the stale expansion nor the new prompt as typed may run in its place.
+      if (
+        target &&
+        !isSameDynamicPromptsExpansionSource(
+          action.expandedFrom ?? null,
+          getDynamicPromptsExpansionSource(target, action.route.sourceId)
+        )
+      ) {
+        return addNotification(
+          state,
+          createNotification({
+            category: 'enqueue',
+            kind: 'error',
+            projectId: target.id,
+            title: 'The prompt changed while it was being expanded, so nothing was queued. Invoke again.',
+            titleKey: 'topbar.invoke.expansionStale',
           })
         );
       }

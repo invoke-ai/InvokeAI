@@ -470,6 +470,7 @@
       "serverDisconnected": "The server is disconnected.",
       "batchNotReady": "The batch is not ready",
       "expansionFailed": "The prompt could not be expanded",
+      "expansionStale": "The prompt changed while it was being expanded, so nothing was queued. Invoke again.",
       "expansionUnreachable": "The server could not be reached to expand the prompt. Check the connection and try again, or turn dynamic prompts off to use the prompt as typed.",
       "generatorFailed": "The batch generator could not be resolved"
     },

@@ -11,7 +11,7 @@ import type {
   CanvasStagingCandidateContract,
 } from '@workbench/canvas-engine/contracts';
 import type { GraphContract } from '@workbench/graphContracts';
-import type { ExpandedPositivePrompts } from '@workbench/invocationContracts';
+import type { ExpandedPositivePrompts, InvocationSourceId } from '@workbench/invocationContracts';
 import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
@@ -39,6 +39,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 import { createEmptyCanvasDocument } from './canvasMigration';
 import { MAX_CANVAS_SNAPSHOTS } from './canvasProjectMutations';
 import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './canvasStagingView';
+import { getDynamicPromptsExpansionSource } from './invocation';
 import { getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 import {
   createLayoutPresetSnapshot,
@@ -65,6 +66,15 @@ import {
 
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
+
+/** What the caller would have expanded the project's prompt from, as it hands that to the resolved submission. */
+const preparedExpansionSource = (state: WorkbenchState, sourceId: InvocationSourceId) => {
+  const source = getDynamicPromptsExpansionSource(getActiveProject(state), sourceId);
+
+  return source
+    ? { combinatorial: source.combinatorial, maxPrompts: source.maxPrompts, positivePrompt: source.positivePrompt }
+    : undefined;
+};
 
 const generationDeviceMock = vi.hoisted(() => ({
   options: [] as { device: string; name: string }[],
@@ -4366,6 +4376,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const submitResolvedTo = (primed: WorkbenchState, positivePrompts?: string[]) =>
       workbenchReducer(primed, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(primed, 'generate'),
         positivePrompts,
         projectId: primed.activeProjectId,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -4453,6 +4464,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       return workbenchReducer(state, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'video'),
         models: [wanModel],
         positivePrompts,
         positivePromptsSampleSeed,
@@ -5094,6 +5106,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     ) =>
       workbenchReducer(state, {
         backendSupportsCancellation: true,
+        expandedFrom: preparedExpansionSource(state, 'generate'),
         positivePrompts,
         positivePromptsSampleSeed,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
@@ -5391,7 +5404,11 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             positivePrompt: 'a {red|green} cat',
           });
           // Canvas is told the sample its expansion drew, as Generate is.
-          const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+          const drawn = {
+            expandedFrom: { combinatorial: false, maxPrompts: 100, positivePrompt: 'a {red|green} cat' },
+            positivePrompts: ['a green cat'],
+            positivePromptsSampleSeed: 7,
+          };
           const first = submitCanvas(primeGenerate(undefined, compiled), compiled, drawn);
           const rotated = Math.floor(0.5 * SEED_MAX);
 

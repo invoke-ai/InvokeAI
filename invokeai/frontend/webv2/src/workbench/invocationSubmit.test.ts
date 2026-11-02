@@ -37,6 +37,17 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ensureGalleryBoardDestinations: galleryQueriesMock.ensureGalleryBoardDestinations,
 }));
 
+// Holds an expansion open so a test can edit the project while it is pending; otherwise the real resolver runs.
+const expansionMock = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
+vi.mock('@features/generation/prompts', async (importOriginal) => {
+  const original = await importOriginal<{ resolveDynamicPrompts: (...args: unknown[]) => Promise<unknown> }>();
+
+  return {
+    ...original,
+    resolveDynamicPrompts: (...args: unknown[]) => expansionMock.pending ?? original.resolveDynamicPrompts(...args),
+  };
+});
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getInvocationTemplatesSnapshot: () => templatesMock.snapshot,
@@ -393,7 +404,11 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
   // Seed capabilities to match app boot; submission fails closed without them.
   seedArchitectureCapabilities();
 
-  const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+  const drawn = {
+    expandedFrom: { combinatorial: false, maxPrompts: 4, positivePrompt: 'a {red|green} cat' },
+    positivePrompts: ['a green cat'],
+    positivePromptsSampleSeed: 7,
+  };
 
   const submitDrawn = async (sourceId: 'canvas' | 'generate', prepend?: boolean) => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
@@ -632,6 +647,113 @@ describe('submitResolvedInvocation for Video', () => {
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+});
+
+describe('submitResolvedInvocation when the prompt changes while it expands', () => {
+  seedArchitectureCapabilities();
+
+  const wanModel = {
+    base: 'wan',
+    file_size: 1,
+    format: 'diffusers',
+    hash: 'wan-t2v-hash',
+    key: 'wan-t2v_a14b-diffusers',
+    name: 'Wan 2.2 t2v_a14b',
+    path: 'wan-t2v_a14b-diffusers',
+    source: 'wan-t2v_a14b-diffusers',
+    source_type: 'path',
+    type: 'main',
+    variant: 't2v_a14b',
+  } as const;
+  const sdModel: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+
+  const primeVideo = () => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+
+    return workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { model: wanModel, positivePrompt: 'a {red|green} fox' },
+      widgetId: 'video',
+    });
+  };
+  const primeGenerate = () =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      type: 'setGenerateSettings',
+      values: {
+        ...getDefaultGenerateSettings(sdModel),
+        model: sdModel,
+        modelKey: sdModel.key,
+        positivePrompt: 'a {red|green} fox',
+      },
+    });
+
+  /** Invokes, makes `edit` while the expansion is still out, then lets the expansion answer. */
+  const submitWithEditDuringExpansion = async (
+    sourceId: 'generate' | 'video',
+    edit?: (store: ReturnType<typeof createWorkbenchStore>) => void
+  ) => {
+    const store = createWorkbenchStore(sourceId === 'video' ? primeVideo() : primeGenerate());
+    const project = store.getSnapshot().activeProject;
+    const models = sourceId === 'video' ? [wanModel] : undefined;
+    let answer: (response: unknown) => void = () => undefined;
+    expansionMock.pending = new Promise((resolve) => {
+      answer = resolve;
+    });
+
+    try {
+      const submission = submitResolvedInvocation({
+        commands: store.commands,
+        formatControlLayerError,
+        formatUpscaleMetadataFailure,
+        scopedDefaults: {},
+        models,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        route: resolveInvocationRoute(
+          project,
+          'global',
+          { destination: 'gallery', destinationLocked: false, sourceId, sourceLocked: false },
+          models
+        ),
+      });
+
+      edit?.(store);
+      answer({ error: null, prompts: ['a red fox', 'a green fox'] });
+      await submission;
+    } finally {
+      expansionMock.pending = null;
+    }
+
+    const snapshot = store.getSnapshot();
+
+    return {
+      notices: snapshot.notifications.map((notification) => notification.titleKey),
+      queue: snapshot.activeProject.queue.items,
+    };
+  };
+
+  it.each(['generate', 'video'] as const)('queues nothing from %s and says so', async (sourceId) => {
+    const { notices, queue } = await submitWithEditDuringExpansion(sourceId, (store) =>
+      sourceId === 'video'
+        ? store.commands.widgets.patchValues('video', { positivePrompt: 'a {blue|yellow} bird' })
+        : store.commands.widgets.patchValues('generate', { positivePrompt: 'a {blue|yellow} bird' })
+    );
+
+    expect(queue).toEqual([]);
+    expect(notices).toContain('topbar.invoke.expansionStale');
+  });
+
+  it.each(['generate', 'video'] as const)('queues %s as expanded when the prompt held still', async (sourceId) => {
+    const { notices, queue } = await submitWithEditDuringExpansion(sourceId);
+
+    expect(notices).not.toContain('topbar.invoke.expansionStale');
+    expect(queue[0]?.snapshot.backendSubmission).toMatchObject({ positivePrompts: ['a red fox', 'a green fox'] });
   });
 });
 
