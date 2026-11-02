@@ -1,4 +1,5 @@
 import type {
+  VideoAspectRatioId,
   VideoConditioningClip,
   VideoReferenceItem,
   VideoSourceClip,
@@ -6,10 +7,11 @@ import type {
 } from '@features/video/core/types';
 
 import { createListCollection, HStack, Stack, Switch, Text } from '@chakra-ui/react';
-import { GenerationSettingsSection, SeedField } from '@features/generation/components';
+import { AspectRatioPreview, GenerationSettingsSection, SeedField } from '@features/generation/components';
 import { sanitizeBatchCount } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import {
+  getVideoAspectRatioParts,
   getVideoDurationSeconds,
   invertVideoAspectRatioId,
   LTX2_EXTEND_CONTEXT_FRAMES,
@@ -66,9 +68,21 @@ import { useVideoUi, useVideoUiActions } from './VideoUiContext';
 
 const SWITCH_CHECKED_PROPS = { bg: 'accent.solid' };
 
+const getAspectRatio = (id: VideoAspectRatioId): number => {
+  const { width, height } = getVideoAspectRatioParts(id);
+  return width / height;
+};
+
 const ASPECT_RATIO_COLLECTION = createListCollection({
-  items: VIDEO_ASPECT_RATIO_IDS.map((id) => ({ label: id, value: id })),
+  items: VIDEO_ASPECT_RATIO_IDS.map((id) => ({ label: id, ratio: getAspectRatio(id), value: id })),
 });
+
+const renderAspectRatioItem = (item: { label: string; ratio: number }) => (
+  <HStack as="span" gap="2">
+    <AspectRatioPreview boxSize="6" ratio={item.ratio} />
+    <Text as="span">{item.label}</Text>
+  </HStack>
+);
 
 const toTargetResolution = (value: string | undefined): VideoWidgetValues['targetResolution'] | null =>
   isVideoTargetResolution(value) ? value : null;
@@ -463,14 +477,22 @@ export const VideoWidgetView = () => {
   // Media determines output proportions. Show its ratio source while disabled, preserving the saved preset for
   // when media is removed.
   const dimensionSource = dimensions?.source;
-  const derivedSourceValueText = useMemo(
+  const aspectRatioId = values.aspectRatioId;
+  const aspectRatioValueText = useMemo(
     () =>
       dimensionSource && dimensionSource !== 'aspect-ratio' ? (
         <Text as="span" fontSize="md" truncate>
           {t(`widgets.video.dimensionSourceValue.${dimensionSource}`)}
         </Text>
-      ) : undefined,
-    [dimensionSource, t]
+      ) : (
+        <HStack as="span" gap="2" minW="0">
+          <AspectRatioPreview boxSize="5" ratio={getAspectRatio(aspectRatioId)} />
+          <Text as="span" truncate>
+            {aspectRatioId}
+          </Text>
+        </HStack>
+      ),
+    [aspectRatioId, dimensionSource, t]
   );
   const derivedSizeText = dimensions
     ? `${t('widgets.video.derivedSize', { height: dimensions.height, width: dimensions.width })}${
@@ -665,8 +687,9 @@ export const VideoWidgetView = () => {
                 collection={ASPECT_RATIO_COLLECTION}
                 disabled={hasConditioningMedia}
                 flex="1"
+                renderItem={renderAspectRatioItem}
                 value={aspectRatioValue}
-                valueText={derivedSourceValueText}
+                valueText={aspectRatioValueText}
                 onValueChange={set.aspectRatio}
               />
               <IconButton
