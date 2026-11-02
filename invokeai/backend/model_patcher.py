@@ -150,8 +150,8 @@ class ModelPatcher:
         # transformers >=5.6 flattened CLIPTextModel (no `text_model` wrapper); CLIPTextModelWithProjection still wraps.
         clip_model = getattr(text_encoder, "text_model", text_encoder)
         if clip_skip > 0:
-            # Capture hooks must see the complete encoder before layers are temporarily removed. Otherwise a fresh
-            # model's first skipped forward leaves restored layers unrecorded in all later hidden-state outputs.
+            # Transformers installs output-capture hooks lazily on the first hidden-state request. Install them on the
+            # complete encoder first, or a request while layers are popped leaves the restored layers unhooked.
             maybe_install_capturing_hooks(clip_model)
         layers = clip_model.encoder.layers
         skipped_layers = []
