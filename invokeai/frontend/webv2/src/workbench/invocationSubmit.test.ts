@@ -562,6 +562,79 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
   });
 });
 
+describe('submitResolvedInvocation for Video', () => {
+  const wanModel = {
+    base: 'wan',
+    file_size: 1,
+    format: 'diffusers',
+    hash: 'wan-t2v-hash',
+    key: 'wan-t2v_a14b-diffusers',
+    name: 'Wan 2.2 t2v_a14b',
+    path: 'wan-t2v_a14b-diffusers',
+    source: 'wan-t2v_a14b-diffusers',
+    source_type: 'path',
+    type: 'main',
+    variant: 't2v_a14b',
+  } as const;
+
+  const submitVideo = async (dynamicPromptsEnabled: boolean) => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { dynamicPromptsEnabled, model: wanModel, positivePrompt: 'a {red|green} fox' },
+      widgetId: 'video',
+    });
+    const project = getActiveProject(state);
+    // Infinite staleTime makes the cached expansion authoritative, so no request leaves the test.
+    queryClient.setQueryData(
+      dynamicPromptsKeys.expansion({ combinatorial: true, max_prompts: 10, prompt: 'a {red|green} fox', seed: null }),
+      { error: null, prompts: ['a red fox', 'a green fox'] }
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {},
+      models: [wanModel],
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(
+        project,
+        'global',
+        { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+        [wanModel]
+      ),
+    });
+
+    return submitResolved;
+  };
+
+  it('expands a dynamic prompt into one video per prompt', async () => {
+    const submitResolved = await submitVideo(true);
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      positivePrompts: ['a red fox', 'a green fox'],
+      positivePromptsSampleSeed: null,
+    });
+  });
+
+  it('dispatches the prompt as typed with dynamic prompts off', async () => {
+    const submitResolved = await submitVideo(false);
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+});
+
 describe("submitResolvedInvocation reads the user's defaults", () => {
   seedArchitectureCapabilities();
 

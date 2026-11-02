@@ -156,6 +156,7 @@ import {
   removePromptHistoryItem,
   restorePromptHistoryItems,
   sanitizeBatchCount,
+  sanitizeSampleSeed,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
@@ -3934,16 +3935,13 @@ const enqueueCompiledSnapshot = (
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
-  // Upscale and Video have no dynamic prompts switch: their prompts always run as typed.
-  const nonExpandingSettings = upscaleSettings ?? videoSettings;
+  // Upscale has no dynamic prompts switch: its prompt always runs as typed.
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : nonExpandingSettings
-          ? { ...nonExpandingSettings, dynamicPromptsEnabled: false }
-          : null;
+        : (videoSettings ?? (upscaleSettings ? { ...upscaleSettings, dynamicPromptsEnabled: false } : null));
   // Resolve template-merged prompts and seeds here, where Generate, Canvas, Upscale and Video submissions converge; the
   // planner decides whether the expansion counts.
   const submissionPlan = sourceGenerateSettings
@@ -4009,15 +4007,11 @@ const enqueueCompiledSnapshot = (
       : route.sourceId === 'generate'
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
+  const recalledSampleSeed = expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed };
   const recall = generateRecallValues
-    ? {
-        generateValues: {
-          ...cloneGenerateWidgetValues(generateRecallValues),
-          ...(expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed }),
-        },
-      }
+    ? { generateValues: { ...cloneGenerateWidgetValues(generateRecallValues), ...recalledSampleSeed } }
     : videoSettings
-      ? { videoValues: cloneVideoWidgetValues(videoSettings) }
+      ? { videoValues: { ...cloneVideoWidgetValues(videoSettings), ...recalledSampleSeed } }
       : undefined;
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
@@ -4076,7 +4070,7 @@ const enqueueCompiledSnapshot = (
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
   // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
-  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings;
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings;
   // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
   const resampledProject =
     expansionSampleSeed !== null &&
@@ -4087,7 +4081,9 @@ const enqueueCompiledSnapshot = (
           advancedProject,
           route.sourceId === 'canvas' ? 'generate' : route.sourceId,
           (values) =>
-            values.dynamicPromptsSampleSeed === expansionSampleSeed && values.dynamicPromptsCombinatorial === false
+            // Sanitized as the expansion read it: a record saved without the field drew sample seed 0.
+            sanitizeSampleSeed(values.dynamicPromptsSampleSeed) === expansionSampleSeed &&
+            values.dynamicPromptsCombinatorial === false
               ? { ...values, dynamicPromptsSampleSeed: createDynamicPromptsSampleSeed() }
               : values
         )

@@ -3,7 +3,7 @@
  * sources through reducer submission. Inject Canvas preparation to keep this decision independent of the engine.
  */
 
-import type { GenerateSettings } from '@features/generation/contracts';
+import type { DynamicPromptsSettings } from '@features/generation/contracts';
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
@@ -26,6 +26,7 @@ import {
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { normalizeUpscaleWidgetValues } from '@features/upscale';
+import { normalizeVideoWidgetValues } from '@features/video';
 import { getWorkflowBatchCapReason } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { planWorkflowBatch } from '@features/workflow/utility';
@@ -112,13 +113,21 @@ export interface SubmitResolvedInvocationDeps {
   formatUpscaleMetadataFailure: (imageName: string) => string;
 }
 
+type ExpandableSettings = DynamicPromptsSettings & { positivePrompt: string };
+
 /**
- * Return merged Generate prompts only for routes that expand them: dynamic prompts on and dynamic syntax present.
- * Templates may introduce syntax and must consume their own placeholders before expansion.
+ * Return the prompt and its expansion settings only for routes that expand them: dynamic prompts on and dynamic syntax
+ * present. Generate templates may introduce syntax and must consume their own placeholders before expansion.
  */
-const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
-  if (route.sourceId === 'upscale' || route.sourceId === 'video' || route.sourceId === 'workflow') {
+const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): ExpandableSettings | null => {
+  if (route.sourceId === 'upscale' || route.sourceId === 'workflow') {
     return null;
+  }
+
+  if (route.sourceId === 'video') {
+    const values = normalizeVideoWidgetValues(getProjectWidgetValues(project, 'video'));
+
+    return values && expandsDynamicPrompts(values.positivePrompt, values.dynamicPromptsEnabled) ? values : null;
   }
 
   const settings = normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
@@ -139,7 +148,7 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
  * prompts are present.
  */
 const resolveExpandedPrompts = async (
-  settings: GenerateSettings,
+  settings: ExpandableSettings,
   sampleSeed: number | null
 ): Promise<ParseDynamicPromptsResponse | null> => {
   try {

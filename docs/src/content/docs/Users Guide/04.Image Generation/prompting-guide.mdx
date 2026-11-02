@@ -214,7 +214,9 @@ An image's metadata records the prompt that was actually used, with the template
 
 Dynamic prompts expand a single prompt into many variations. Write the parts you want to vary as a list of alternatives, and one press of **Invoke** generates an image for each variation. They are useful for brainstorming, exploring styles and subjects, and testing a model without rewriting the same prompt by hand.
 
-Dynamic prompts work in the **Generate** panel and on the Canvas. Only the positive prompt is expanded; the negative prompt is used as written for every variation.
+Dynamic prompts work in the **Generate** panel, on the Canvas and in the [**Video** panel](/users-guide/video-generation/introduction/#prompt). Only the positive prompt is expanded; the negative prompt is used as written for every variation.
+
+In the **Video** panel each variation queues a full video, so **Max prompts** starts at 10 there instead of 100. Projects saved before Video supported dynamic prompts open with them off, so their prompts keep running as typed; switch on **Use dynamic prompts** to expand them.
 
 ### Basic syntax
 
@@ -277,7 +279,7 @@ The number of prompts can be set from 1 to 10,000 and is 100 by default. Combina
 
 By default, every variation within one iteration shares the same seed. Because only the prompt changes between the images, this makes it easy to see what each option does.
 
-Turn on **New seed for every image** to give each image its own seed instead, for the widest variety. When the panel's **Seed mode** is **Fixed**, every image uses the same seed and this switch is unavailable.
+Turn on **New seed for every generation** to give each image its own seed instead, for the widest variety. When the panel's **Seed mode** is **Fixed**, every image uses the same seed and this switch is unavailable.
 
 ### Dynamic prompts and other features
 

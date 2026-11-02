@@ -4421,6 +4421,104 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
+  describe('expanded Video prompts on the compiled submission', () => {
+    const wanModel: ModelConfig = {
+      base: 'wan',
+      file_size: 1,
+      format: 'diffusers',
+      hash: 'wan-t2v-hash',
+      key: 'wan-t2v_a14b-diffusers',
+      name: 'Wan 2.2 t2v_a14b',
+      path: 'wan-t2v_a14b-diffusers',
+      source: 'wan-t2v_a14b-diffusers',
+      source_type: 'path',
+      type: 'main',
+      variant: 't2v_a14b',
+    };
+    const submitVideo = (
+      values: Record<string, unknown>,
+      positivePrompts?: string[],
+      positivePromptsSampleSeed: number | null = null
+    ) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), {
+        region: 'left',
+        type: 'toggleRegionWidget',
+        widgetId: 'video',
+      });
+      state = workbenchReducer(state, {
+        type: 'patchWidgetValues',
+        values: { model: wanModel, positivePrompt: 'a {red|green} fox', ...values },
+        widgetId: 'video',
+      });
+
+      return workbenchReducer(state, {
+        backendSupportsCancellation: true,
+        models: [wanModel],
+        positivePrompts,
+        positivePromptsSampleSeed,
+        projectId: state.activeProjectId,
+        route: { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+        type: 'submitResolvedInvocationSnapshot',
+      });
+    };
+
+    it('queues one video per expanded prompt', () => {
+      const queueItem = getActiveProject(submitVideo({}, ['a red fox', 'a green fox'])).queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({
+        kind: 'generate',
+        positivePrompts: ['a red fox', 'a green fox'],
+      });
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(2);
+    });
+
+    it('drops an expansion and queues the prompt as typed with dynamic prompts off', () => {
+      const queueItem = getActiveProject(submitVideo({ dynamicPromptsEnabled: false }, ['a red fox', 'a green fox']))
+        .queue.items[0];
+
+      expect(queueItem?.snapshot.backendSubmission).toMatchObject({ positivePrompt: 'a {red|green} fox' });
+      expect(queueItem?.snapshot.backendSubmission).not.toHaveProperty('positivePrompts');
+      expect(queueItem?.snapshot.presentation.batchCount).toBe(1);
+    });
+
+    it('recalls the random sample the expansion drew and rotates the widget to a new one', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: 7 },
+          ['a green fox'],
+          7
+        );
+        const project = getActiveProject(state);
+
+        expect(project.queue.items[0]?.snapshot.recall?.videoValues?.dynamicPromptsSampleSeed).toBe(7);
+        expect(getProjectWidgetValues(project, 'video').dynamicPromptsSampleSeed).toBe(Math.floor(0.5 * 4_294_967_295));
+      } finally {
+        random.mockRestore();
+      }
+    });
+
+    // A project saved before Video stored a sample seed draws with 0, the seed it normalizes to.
+    it('rotates a sample seed the stored values never held', () => {
+      const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+      try {
+        const state = submitVideo(
+          { dynamicPromptsCombinatorial: false, dynamicPromptsSampleSeed: undefined },
+          ['a green fox'],
+          0
+        );
+
+        expect(getProjectWidgetValues(getActiveProject(state), 'video').dynamicPromptsSampleSeed).toBe(
+          Math.floor(0.5 * 4_294_967_295)
+        );
+      } finally {
+        random.mockRestore();
+      }
+    });
+  });
+
   describe('workflow seed modes on the compiled submission', () => {
     const SEED_MAX = 4_294_967_295;
     const seedTemplate = {
