@@ -2,7 +2,6 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type {
   PreviewStateController,
   SamPreviewState,
-  StagedPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
@@ -49,6 +48,11 @@ export interface CreateCompositeFrameDeps {
   readonly getControlView: () => CompositeOptions['controlView'];
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
+  /**
+   * Whether a pointer gesture in progress edits a mask or a region. Its stacks and the regenerate tint then draw
+   * above a shown preview, so the user never paints a mask blind; the frame after the gesture hides them again.
+   */
+  readonly isEditingStagingHiddenStack: () => boolean;
 }
 
 /**
@@ -57,20 +61,14 @@ export interface CreateCompositeFrameDeps {
  */
 const STAGING_OVERLAY_STACKS = { control: true, inpaint_mask: false, regional_guidance: false } as const;
 
-/** Whether the selection sits in a stack the staging view hides: the user is editing a mask or a region. */
-export const isEditingStagingHiddenStack = (doc: CanvasDocumentContractV3): boolean => {
+/**
+ * Whether the selection sits in a stack the staging view hides: a mask or a region, or a group in those stacks. A
+ * gesture that edits it shows those stacks again ({@link CreateCompositeFrameDeps.isEditingStagingHiddenStack}).
+ */
+export const isStagingHiddenStackSelected = (doc: CanvasDocumentContractV3): boolean => {
   const stack = doc.selectedLayerId ? getDocumentIndex(doc).byId.get(doc.selectedLayerId)?.stack : undefined;
   return stack !== undefined && isOverlayStack(stack) && !STAGING_OVERLAY_STACKS[stack];
 };
-
-/**
- * Whether the screen hides masks, regions and the regenerate tint for a shown preview. Selecting a mask or a region
- * shows them again, drawn above the preview, so what the user edits is never painted blind.
- */
-export const hidesOverlayStacksForStaging = (
-  doc: CanvasDocumentContractV3,
-  stagedPreview: StagedPreviewState | null
-): boolean => stagedPreview !== null && !isEditingStagingHiddenStack(doc);
 
 export interface CompositeFrame {
   /** Composites the document onto the screen surface and enforces the surface budget. */
@@ -212,7 +210,8 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPreview = previews.getStaged();
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
-      const staging = hidesOverlayStacksForStaging(doc, stagedPreview);
+      // A shown preview hides masks, regions and the regenerate tint, unless a gesture is editing one of them.
+      const staging = stagedPreview !== null && !deps.isEditingStagingHiddenStack();
       const showOverlayStacks = staging ? STAGING_OVERLAY_STACKS : undefined;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides, showOverlayStacks);
       // Snapshot filter previews only when active, avoiding an empty map allocation every frame.

@@ -13,7 +13,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 
-import { createCompositeFrame, type CreateCompositeFrameDeps } from './compositeFrame';
+import { createCompositeFrame, type CreateCompositeFrameDeps, isStagingHiddenStackSelected } from './compositeFrame';
 
 const VIEW = [1, 0, 0, 1, 0, 0] as unknown as Mat2d;
 
@@ -54,6 +54,8 @@ interface Harness {
   rasterizeLayer: ReturnType<typeof vi.fn>;
   beginFrame: ReturnType<typeof vi.fn>;
   enforce: ReturnType<typeof vi.fn>;
+  /** What the engine reports for a gesture editing a mask or region. */
+  editingHiddenStack: boolean;
 }
 
 let harness: Harness;
@@ -83,6 +85,7 @@ const makeHarness = (): Harness => {
       getCheckerboardTile: () => surface(8, 8),
       getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
+      isEditingStagingHiddenStack: () => harness.editingHiddenStack,
       layerCache: {
         byteSize: () => 0,
         get: (id: string) => entries.get(id),
@@ -101,6 +104,7 @@ const makeHarness = (): Harness => {
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
       } as unknown as CreateCompositeFrameDeps['viewport'],
     },
+    editingHiddenStack: false,
     enforce,
     entries,
     overrides,
@@ -382,15 +386,33 @@ describe('masks while a result is staged', () => {
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
   });
 
-  it.each(['m', 'r'])('shows them over the preview while %s, a mask or region, is selected for editing', (id) => {
+  it('shows them over the preview only while a gesture edits a mask or region, whatever is selected', () => {
+    const frame = createCompositeFrame(harness.deps);
     publishPreview();
-    draw({ ...doc, selectedLayerId: id });
+    // Selecting a mask alone keeps the result unmasked.
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
+    expect(drawnIds()).toEqual(['a', 'c']);
+
+    harness.editingHiddenStack = true;
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(lastCompositeOptions().regionOverlays).toBe(true);
     expect(lastCompositeOptions().stagedPreview).not.toBeNull();
 
-    // Selecting raster or control work hides them again.
-    draw({ ...doc, selectedLayerId: 'c' });
+    harness.editingHiddenStack = false;
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(drawnIds()).toEqual(['a', 'c']);
+    expect(lastCompositeOptions().regionOverlays).toBe(false);
+  });
+
+  it.each([
+    ['m', true],
+    ['r', true],
+    ['c', false],
+    ['a', false],
+    [null, false],
+  ])('counts selecting %s as selecting a stack the staged view hides: %s', (id, hidden) => {
+    expect(isStagingHiddenStackSelected({ ...doc, selectedLayerId: id })).toBe(hidden);
   });
 });

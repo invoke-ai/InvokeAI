@@ -237,4 +237,11 @@ export interface Tool {
    * pointer pipeline must not turn an alt-hold into the temporary color picker.
    */
   readonly usesAltKey?: boolean;
+  /**
+   * Whether a primary gesture starting now edits the selected layer in place, writing its pixels or its placement:
+   * false when the press would be refused up front or would add a new layer instead. Asked once as each gesture
+   * starts; absent means never. While such a gesture targets a mask or a region, the screen shows their stacks above
+   * a staged preview that otherwise hides them.
+   */
+  editsSelectedLayer?(ctx: ToolContext): boolean;
 }

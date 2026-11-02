@@ -8,7 +8,9 @@
  * bake. Cancel restores the drag start; clicks/zero movement do nothing.
  */
 
+import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput, Vec2 } from '@workbench/canvas-engine/types';
 
@@ -26,6 +28,45 @@ const PRIMARY_BUTTON = 1;
 
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const MOVE_DRAG_THRESHOLD_PX = 3;
+
+/**
+ * What a press drags from the panel selection: every selected leaf, and every leaf beneath a selected group, with
+ * the primary one under the document selection; refused, naming the first leaf in the way, when any is locked or
+ * hidden. Pure, so a press can ask before it reports.
+ */
+type SelectedLayerDrag =
+  | { kind: 'drag'; layers: readonly CanvasLayerContract[]; primary: CanvasLayerContract }
+  | { kind: 'refused'; leaf: SemanticLeaf; status: CanvasLayerEditRefusal['status'] }
+  | { kind: 'none' };
+
+/** Target comes solely from document selection, regardless of press location. */
+const planSelectedLayerDrag = (ctx: ToolContext): SelectedLayerDrag => {
+  const doc = ctx.getDocument();
+  const selectedId = doc?.selectedLayerId;
+  if (!doc || !selectedId) {
+    return { kind: 'none' };
+  }
+  const requested = new Set(ctx.getSelectedLayerIds?.() ?? [selectedId]);
+  requested.add(selectedId);
+  const index = getDocumentIndex(doc);
+  if ([...requested].some((id) => !index.byId.has(id))) {
+    return { kind: 'none' };
+  }
+  // A selected group drags every leaf beneath it; a locked node anywhere in the set refuses the drag.
+  const leaves = compileDocumentLeaves(doc).filter(
+    (leaf) => requested.has(leaf.id) || leaf.parentIds.some((ancestor) => requested.has(ancestor))
+  );
+  for (const leaf of leaves) {
+    const status = leafEditRefusal(leaf);
+    if (status) {
+      return { kind: 'refused', leaf, status };
+    }
+  }
+  const primary = leaves.find((leaf) => leaf.id === selectedId || leaf.parentIds.includes(selectedId));
+  return primary
+    ? { kind: 'drag', layers: leaves.map((leaf) => leaf.layer), primary: primary.layer }
+    : { kind: 'none' };
+};
 
 /** Applies the shift-to-dominant-axis constraint to a document-space delta. */
 export const constrainDelta = (dx: number, dy: number, shift: boolean): Vec2 => {
@@ -70,40 +111,6 @@ export const createMoveTool = (): Tool => {
     state = null;
   };
 
-  /** Target comes solely from document selection, regardless of press location. */
-  const selectedDraggableLayers = (
-    ctx: ToolContext
-  ): { layers: readonly CanvasLayerContract[]; primaryId: string | null } => {
-    const doc = ctx.getDocument();
-    const selectedId = doc?.selectedLayerId;
-    if (!doc || !selectedId) {
-      return { layers: [], primaryId: null };
-    }
-    const requested = new Set(ctx.getSelectedLayerIds?.() ?? [selectedId]);
-    requested.add(selectedId);
-    const index = getDocumentIndex(doc);
-    if ([...requested].some((id) => !index.byId.has(id))) {
-      return { layers: [], primaryId: null };
-    }
-    // A selected group drags every leaf beneath it; a locked node anywhere in the set refuses the drag.
-    const leaves = compileDocumentLeaves(doc).filter(
-      (leaf) => requested.has(leaf.id) || leaf.parentIds.some((ancestor) => requested.has(ancestor))
-    );
-    for (const leaf of leaves) {
-      const status = leafEditRefusal(leaf);
-      if (status) {
-        // Said once per press, naming the first layer in the way; nothing moves.
-        ctx.reportEditRefusal?.({ layerId: leaf.id, layerName: leaf.layer.name, status });
-        return { layers: [], primaryId: null };
-      }
-    }
-    if (leaves.length === 0) {
-      return { layers: [], primaryId: null };
-    }
-    const primary = leaves.find((leaf) => leaf.id === selectedId || leaf.parentIds.includes(selectedId));
-    return { layers: leaves.map((leaf) => leaf.layer), primaryId: primary?.id ?? null };
-  };
-
   /**
    * Resolves what a press at `point` drags. Pixels win over the layer when a
    * float is already in flight, or when a live selection contains the press.
@@ -113,11 +120,15 @@ export const createMoveTool = (): Tool => {
     if (existing) {
       return { kind: 'float', layerId: existing.layerId, origin: { ...existing.transform } };
     }
-    const { layers, primaryId } = selectedDraggableLayers(ctx);
-    const primary = layers.find((layer) => layer.id === primaryId);
-    if (!primary) {
+    const plan = planSelectedLayerDrag(ctx);
+    if (plan.kind === 'refused') {
+      // Said once per press, naming the first layer in the way; nothing moves.
+      ctx.reportEditRefusal?.({ layerId: plan.leaf.id, layerName: plan.leaf.layer.name, status: plan.status });
+    }
+    if (plan.kind !== 'drag') {
       return { kind: 'none' };
     }
+    const { layers, primary } = plan;
     const layerDrag: LayerDrag = {
       kind: 'layer',
       targets: layers.map((layer) => ({
@@ -194,6 +205,8 @@ export const createMoveTool = (): Tool => {
       const leaf = doc?.selectedLayerId && !state ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
       return leaf && leafEditRefusal(leaf) ? 'not-allowed' : 'move';
     },
+    // Moves the selected layer (with the rest of the panel selection) unless a locked or hidden one refuses the drag.
+    editsSelectedLayer: (ctx) => planSelectedLayerDrag(ctx).kind === 'drag',
     id: 'move',
     // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
     usesAltKey: true,

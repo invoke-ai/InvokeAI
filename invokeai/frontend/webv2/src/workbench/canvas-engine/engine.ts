@@ -213,7 +213,7 @@ import { createLayerExportGuards, isSupportedExportSource, layerUnreadable } fro
 import { createLayerRasterizer } from './layerRasterizer';
 import { createPreviewPublisher } from './previewPublisher';
 import { createRasterSnapshotCapture } from './rasterSnapshotCapture';
-import { createCompositeFrame, isEditingStagingHiddenStack } from './render/compositeFrame';
+import { createCompositeFrame, isStagingHiddenStackSelected } from './render/compositeFrame';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
@@ -1523,6 +1523,27 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const scheduler: RenderScheduler = renderController.scheduler;
 
+  /** Whether the pointer gesture in progress edits a mask or a region, which a shown staged preview otherwise hides. */
+  let gestureEditsStagingHiddenStack = false;
+  /**
+   * Decided once as a gesture starts, so its pointer moves read a flag. While a preview is shown, the start and the
+   * end of such a gesture each repaint in full: the stacks show above the preview, then hide again.
+   */
+  const onGestureChange = (active: boolean): void => {
+    const document = active ? mirror.getDocument() : null;
+    const edits =
+      !!document &&
+      (activeTool()?.editsSelectedLayer?.(toolContext) ?? false) &&
+      isStagingHiddenStackSelected(document);
+    if (edits === gestureEditsStagingHiddenStack) {
+      return;
+    }
+    gestureEditsStagingHiddenStack = edits;
+    if (renderController.previews.getStaged()) {
+      scheduler.invalidate({ all: true });
+    }
+  };
+
   const compositeFrame = createCompositeFrame({
     backend,
     derivedSurfaceCache,
@@ -1534,6 +1555,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getCheckerboardTile,
     getMaskPatternTile,
     getControlView: () => controlView.get(),
+    isEditingStagingHiddenStack: () => gestureEditsStagingHiddenStack,
     layerCache,
     previews: renderController.previews,
     raster: rasterController,
@@ -1610,23 +1632,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /** Actual last non-null selection, retained across deselect/reselect and updated by engine selections too. */
   let lastSelectedLayerId: string | null = null;
-  /** Whether the selection is a mask or region, which a shown staged preview otherwise hides on the screen. */
-  let selectionEditsHiddenStack = false;
   let toolsReady = false;
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
     onDocumentChanged: () => {
       editingController.transform.onDocumentChanged();
       stores.documentEpoch.set(stores.documentEpoch.get() + 1);
-      // Selecting into or out of a mask or region, or converting the selected layer between them and raster or
-      // control work (same id), shows or hides those stacks across the screen while a preview is shown.
-      const document = mirror.getDocument();
-      const editsHiddenStack = !!document && isEditingStagingHiddenStack(document);
-      if (editsHiddenStack !== selectionEditsHiddenStack) {
-        selectionEditsHiddenStack = editsHiddenStack;
-        if (renderController.previews.getStaged()) {
-          scheduler.invalidate({ all: true });
-        }
-      }
       // A tool's cursor reads the selected layer (not-allowed over a locked or hidden one), which this may change.
       // Skipped until the interaction controller exists, which the cursor reads.
       if (toolsReady) {
@@ -1808,8 +1818,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   // The mirror seeds silently from the current state, so the memory starts from that selection too.
   lastSelectedLayerId = mirror.getDocument()?.selectedLayerId ?? null;
-  const seededDocument = mirror.getDocument();
-  selectionEditsHiddenStack = !!seededDocument && isEditingStagingHiddenStack(seededDocument);
 
   let fontSourceStacks: CanvasDocumentContractV3['stacks'] | null = null;
   let documentFontSources: CanvasTextSource[] = [];
@@ -2012,6 +2020,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     // A primary-button pointerdown while a text-edit session is open commits it
     // (engine reads the live portal content). The pipeline swallows that press.
     maybeCommitModalSession: () => commitOpenTextSession(),
+    onGestureChange,
     setTool: (id, opts) => setTool(id, opts),
     updateCursor,
     viewport,
