@@ -297,16 +297,24 @@ def test_missing_tae_renders_linear_suggests_the_starter_and_logs_info_once_per_
     assert len(_messages(caplog, logging.DEBUG)) == 1
 
 
+@pytest.mark.parametrize(
+    ("base", "channels"),
+    [
+        (BaseModelType.CogView4, 16),
+        # Wan TI2V-5B: TAEW2.1 serves Wan's 16-channel space, not this one, so the message names the width.
+        (BaseModelType.Wan, 48),
+    ],
+)
 def test_family_without_any_tae_is_told_so_rather_than_sent_to_the_starters(
-    caplog: pytest.LogCaptureFixture,
+    caplog: pytest.LogCaptureFixture, base: BaseModelType, channels: int
 ) -> None:
     previews = _previews(_services(_Store([_tae_config()]), _load()))
-    wan_sample = torch.randn(1, 16, 8, 8, generator=torch.Generator().manual_seed(0))
+    sample = torch.randn(1, channels, 8, 8, generator=torch.Generator().manual_seed(0))
 
-    previews.render(BaseModelType.Wan, wan_sample)
+    previews.render(base, sample)
 
     [info] = _messages(caplog, logging.INFO)
-    assert "has no Tiny AutoEncoder" in info and "starter" not in info
+    assert f"{base.value} ({channels}-channel latents) has no Tiny AutoEncoder" in info and "starter" not in info
 
 
 def test_tae_whose_file_is_gone_warns_once_per_process_without_a_traceback(

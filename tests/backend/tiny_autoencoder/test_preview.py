@@ -15,6 +15,7 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_SD1_Config,
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
     is_tiny_autoencoder_supported,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -24,6 +25,7 @@ from invokeai.backend.tiny_autoencoder.preview import (
     decode_working_memory_bytes,
     select_tiny_autoencoder,
 )
+from invokeai.backend.tiny_autoencoder.taehv import ImageDecoder
 from invokeai.backend.tiny_autoencoder.taesd import Decoder, F16Decoder, TaesdDecoder
 
 
@@ -153,6 +155,18 @@ def test_the_cap_is_applied_at_the_decoders_own_compression(taeqi: TaesdDecoder,
     assert image.size == (48, 96)
 
 
+def test_a_taehv_decoder_renders_one_latent_frame_as_an_8x_rgb_image_within_the_cap(monkeypatch) -> None:
+    """Every family in the Wan 2.1 space hands the preview a 4D sample, a video's frame axis already squeezed."""
+    torch.manual_seed(0)
+    decoder = ImageDecoder(16).eval()
+
+    assert decode_preview(decoder, _latent(1, 16, 3, 5)).size == (40, 24)
+
+    monkeypatch.setattr(preview, "MAX_PREVIEW_EDGE", 48)
+    image = decode_preview(decoder, _latent(1, 16, 8, 12))
+    assert (image.mode, image.size) == ("RGB", (48, 32))
+
+
 def test_the_decode_runs_on_the_device_passed_not_where_the_weights_sit(taesd: TaesdDecoder) -> None:
     """A partially loaded decoder's first parameter can be off the compute device the cache names."""
 
@@ -221,7 +235,8 @@ SDXL_TAE = _record(TinyAutoencoder_Checkpoint_SDXL_Config, 4, "taesdxl")
 SD3_TAE = _record(TinyAutoencoder_Checkpoint_SD3_Config, 16, "taesd3")
 FLUX_TAE = _record(TinyAutoencoder_Checkpoint_FLUX_Config, 16, "taef1")
 FLUX2_TAE = _record(TinyAutoencoder_Checkpoint_Flux2_Config, 32, "taef2")
-INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE]
+WAN_TAE = _record(TinyAutoencoder_Checkpoint_Wan_Config, 16, "taew2_1")
+INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE, WAN_TAE]
 
 
 @pytest.mark.parametrize(
@@ -232,8 +247,12 @@ INSTALLED = [SD1_TAE, SDXL_TAE, SD3_TAE, FLUX_TAE, FLUX2_TAE]
         (BaseModelType.ZImage, 16, FLUX_TAE),
         (BaseModelType.StableDiffusion3, 16, SD3_TAE),
         (BaseModelType.ErnieImage, 32, FLUX2_TAE),
+        (BaseModelType.Wan, 16, WAN_TAE),
+        (BaseModelType.Anima, 16, WAN_TAE),
+        (BaseModelType.QwenImage, 16, WAN_TAE),
+        (BaseModelType.Krea2, 16, WAN_TAE),
+        (BaseModelType.Wan, 48, None),
         (BaseModelType.CogView4, 16, None),
-        (BaseModelType.QwenImage, 16, None),
     ],
 )
 def test_a_tae_serves_every_architecture_sharing_its_latent_space(
@@ -259,8 +278,9 @@ def test_the_choice_among_fitting_taes_is_by_name_then_key_whatever_the_order() 
         (BaseModelType.ZImage, 16, True),
         (BaseModelType.Ideogram4, 32, True),
         (BaseModelType.QwenImage21, 64, True),
+        (BaseModelType.QwenImage, 16, True),
+        (BaseModelType.Wan, 48, False),
         (BaseModelType.CogView4, 16, False),
-        (BaseModelType.QwenImage, 16, False),
         (BaseModelType.LTX2, 128, False),
     ],
 )

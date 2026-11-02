@@ -236,7 +236,9 @@ class TinyAutoencoderPreviews:
                 "Install the matching Tiny AutoEncoder starter model."
             )
         else:
-            message = f"{base_model.value} has no Tiny AutoEncoder; using linear previews."
+            message = (
+                f"{base_model.value} ({space.channels}-channel latents) has no Tiny AutoEncoder; using linear previews."
+            )
         self._log_once(("space", id(space)), logging.INFO, message)
 
     def _report_unloadable(self, config: AnyModelConfig, error: FileNotFoundError) -> None:

@@ -202,6 +202,7 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_SD1_Config,
     TinyAutoencoder_Checkpoint_SD3_Config,
     TinyAutoencoder_Checkpoint_SDXL_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
@@ -528,6 +529,7 @@ AnyModelConfig = Annotated[
         Annotated[
             TinyAutoencoder_Checkpoint_QwenImage21_Config, TinyAutoencoder_Checkpoint_QwenImage21_Config.get_tag()
         ],
+        Annotated[TinyAutoencoder_Checkpoint_Wan_Config, TinyAutoencoder_Checkpoint_Wan_Config.get_tag()],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],

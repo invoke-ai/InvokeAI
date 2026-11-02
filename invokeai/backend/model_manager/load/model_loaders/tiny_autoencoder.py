@@ -43,8 +43,9 @@ def _read_checkpoint(path: Path) -> dict[str, Any]:
 @ModelLoaderRegistry.register(
     base=BaseModelType.QwenImage21, type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint
 )
+@ModelLoaderRegistry.register(base=BaseModelType.Wan, type=ModelType.TinyAutoencoder, format=ModelFormat.Checkpoint)
 class TinyAutoencoderLoader(ModelLoader):
-    """Builds the TAESD decoder a checkpoint holds and loads it strictly, in either published layout."""
+    """Builds the TAESD decoder a checkpoint holds and loads it strictly, in any published layout."""
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if submodel_type is not None:

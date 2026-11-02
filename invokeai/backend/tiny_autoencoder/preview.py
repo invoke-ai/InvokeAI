@@ -27,17 +27,22 @@ _LAST_STAGE_CHANNELS: Final = 64
 _LIVE_ACTIVATIONS: Final = 3
 """Full-resolution activations a TAESD decode holds at once, read off the vendored decoder.
 
-The peak is in the last `Block`, the only one at full resolution. Its input stays referenced while its conv branch
+For the TAESD decoders the peak is in the last `Block`, the only one at full resolution. Its input stays referenced while its conv branch
 runs, and `nn.ReLU` is not in place, so each layer of the branch has its own input and output live next to the block's
 input: three tensors. Adding the branch's output to the input (the skip is an identity) and fusing the sum holds three
 again. Every earlier stage runs at half resolution or less. TAEQI2.1's last stage runs at half resolution and holds a
-quarter of this; the bound reserves it the same.
+quarter of this; the bound reserves it the same. TAEHV's ReLUs are in place, and its peak is the half-resolution
+MemBlock stage, which runs on two frames: about 3.25 activations measured on CPU, still within the bound.
 """
 
 _CONV_WORKSPACE_ACTIVATIONS: Final = 2
 """The convolutions' workspace on top, in activation-sized buffers. Measured, and it depends on the algorithm the
 backend picks: on an RTX 4090 in fp16, `max_memory_allocated` grew by 640 MiB over a 1024x1024 decode, five
 activations, two more than the structure holds.
+
+The five-activation bound was calibrated on the TAESD decoders on CUDA. On ROCm (W7900, fp16, 1024x1024) the peak is
+1286 MiB for TAESD and 1446 MiB for TAEHV against this 640 MiB estimate; the cache's default 3 GB working-memory floor
+covers both.
 """
 
 

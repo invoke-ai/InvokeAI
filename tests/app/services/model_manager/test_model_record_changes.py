@@ -47,7 +47,16 @@ from tests.backend.model_manager.load.state_dicts import clip_g_comfy_keys, clip
 from tests.backend.model_manager.load.state_dicts.utils import write_header_only_safetensors
 from tests.fixtures.spandrel_models import write_compact_upscaler
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
-from tests.fixtures.tiny_autoencoders import TAEF2, TAEQI2_1, TAESD, TAESD3, diffusers_weights, native_weights
+from tests.fixtures.tiny_autoencoders import (
+    TAEF2,
+    TAEQI2_1,
+    TAESD,
+    TAESD3,
+    TAEW2_1,
+    diffusers_weights,
+    native_weights,
+    taehv_weights,
+)
 
 KEY = "model-key"
 MODEL_PATH = "sd-1/main/model.safetensors"
@@ -442,8 +451,11 @@ def test_reidentify_keeps_a_backbone_only_the_install_source_names(harness: _Har
 
 
 def _write_tae(path: Path, layout: TaesdLayout, combined: bool) -> None:
-    native = native_weights(layout, dtype=torch.float16)
     path.parent.mkdir(parents=True, exist_ok=True)
+    if layout.arch == "taehv":
+        save_file(taehv_weights(layout.latent_channels, dtype=torch.float16), path)
+        return
+    native = native_weights(layout, dtype=torch.float16)
     save_file(diffusers_weights(native) if combined else native, path)
 
 
@@ -487,6 +499,7 @@ def test_reidentify_keeps_the_base_of_a_tiny_autoencoder_starter(harness: _Harne
         BaseModelType.Flux: (TAESD3, True),
         BaseModelType.Flux2: (TAEF2, True),
         BaseModelType.QwenImage21: (TAEQI2_1, True),
+        BaseModelType.Wan: (TAEW2_1, True),
     }
     path = harness.models_path / KEY / starter.source.rsplit("/", 1)[-1]
     _write_tae(path, *layouts[starter.base])
