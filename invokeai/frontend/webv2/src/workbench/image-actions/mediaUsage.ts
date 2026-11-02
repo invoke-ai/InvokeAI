@@ -4,24 +4,15 @@
  */
 
 import type { GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageSurface } from '@features/gallery/mediaUsage';
 import type { Project } from '@workbench/projectContracts';
 
 import { collectMediaNames, MAX_HELD_NAME_LENGTH, type MediaNameRefs } from '@workbench/mediaReferences';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
-export type MediaUsageSurface =
-  | 'generateReferenceImages'
-  | 'canvasRaster'
-  | 'canvasControl'
-  | 'canvasRegionalGuidance'
-  | 'canvasInpaintMask'
-  | 'upscale'
-  | 'video'
-  | 'workflow';
-
 export interface MediaUsage {
-  surface: MediaUsageSurface;
-  /** The workflow's name, for the `workflow` surface. */
+  surface: GalleryMediaUsageSurface;
+  /** The workflow's or snapshot's name, for the `workflow` and `canvasSnapshot` surfaces. */
   label?: string;
   /** Selected names this surface uses, in selection order. */
   names: string[];
@@ -35,8 +26,9 @@ const selectedNamesIn = (refs: MediaNameRefs, selected: readonly GalleryItemRef[
   selected.filter((ref) => (ref.kind === 'image' ? refs.images : refs.videos).has(ref.name)).map((ref) => ref.name);
 
 /**
- * The project's live surfaces that use any of `selected`, in panel order. History (undo, snapshots, queue) does
- * not count: deleting what only history could restore is a loss, not a hole in current work.
+ * The project's saved surfaces that use any of `selected`, in panel order: live work, staged canvas results and canvas
+ * snapshots, which the user can still accept or restore. Undo history (never saved) does not count, and neither do the
+ * Gallery's selection, recents or compare image, nor a workflow's last run: they show media, they are not work on it.
  */
 export const collectMediaUsage = (project: UsageProject, selected: readonly GalleryItemRef[]): MediaUsage[] => {
   if (selected.length === 0) {
@@ -44,7 +36,7 @@ export const collectMediaUsage = (project: UsageProject, selected: readonly Gall
   }
 
   const usage: MediaUsage[] = [];
-  const add = (surface: MediaUsageSurface, roots: readonly unknown[], label?: string): void => {
+  const add = (surface: GalleryMediaUsageSurface, roots: readonly unknown[], label?: string): void => {
     const names = selectedNamesIn(scan(roots), selected);
 
     if (names.length > 0) {
@@ -59,6 +51,11 @@ export const collectMediaUsage = (project: UsageProject, selected: readonly Gall
   add('canvasControl', [stacks.control]);
   add('canvasRegionalGuidance', [stacks.regional_guidance]);
   add('canvasInpaintMask', [stacks.inpaint_mask]);
+  add('canvasStaging', [project.canvas.stagingArea.pendingImages]);
+
+  for (const snapshot of project.canvas.snapshots) {
+    add('canvasSnapshot', [snapshot.document, snapshot.stagedImages], snapshot.name);
+  }
 
   add('upscale', [getProjectWidgetValues(project, 'upscale').inputImage]);
   add('video', [getProjectWidgetValues(project, 'video')]);

@@ -125,6 +125,15 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       },
       galleryValues,
       generateValues,
+      // Loaded on first use, beside the item actions it shares with the item deletion dialog.
+      getBoardMediaUsage: (boardId, signal) =>
+        import('@workbench/image-actions/mediaUsageReport').then(({ resolveMediaUsage }) =>
+          resolveMediaUsage(
+            { boardId, kind: 'board' },
+            { getLoadedProjects: () => queries.getSnapshot().projects, openProjectId: projectId },
+            { signal }
+          )
+        ),
       getItemLabel,
       noteBoardBrowsed: (boardId) => {
         const values = getGalleryValues(queries.getProject(projectId), queries.getSnapshot().scopedDefaults);

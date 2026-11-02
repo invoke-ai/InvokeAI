@@ -1,4 +1,5 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryMediaUsageReport } from '@features/gallery/mediaUsage';
 import type * as projectsApi from '@workbench/projects/api';
 import type { Ref } from 'react';
 
@@ -27,6 +28,7 @@ vi.mock('react-i18next', () => ({
       const count = Number(values?.count ?? 0);
       const messages: Record<string, string> = {
         'common.cancel': 'Cancel',
+        'common.retry': 'Retry',
         'widgets.gallery.deleteConfirmLabel': 'Delete',
         'widgets.gallery.deleteConfirmSkip': "Don't ask me again",
         'widgets.gallery.deleteConfirmSkipHint': 'You can turn this confirmation back on in Settings.',
@@ -36,11 +38,30 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteItemsConfirmBody':
           count === 1 ? 'Permanently delete the item.' : 'Permanently delete these items.',
         'widgets.gallery.deleteItemsConfirmTitle': count === 1 ? 'Delete item?' : `Delete ${count} items?`,
-        'widgets.gallery.deleteInUse.heading': 'Still used in this project:',
+        'widgets.gallery.deleteInUse.checking': 'Checking where this media is used…',
+        'widgets.gallery.deleteInUse.failed': 'Couldn’t check where this media is used.',
+        'widgets.gallery.deleteInUse.group.openProject': 'This project',
+        'widgets.gallery.deleteInUse.group.project': `Project “${String(values?.name)}”`,
+        'widgets.gallery.deleteInUse.group.projectUnnamed': 'Untitled project',
+        'widgets.gallery.deleteInUse.group.queue':
+          count === 1 ? '1 queued or running job' : `${count} queued or running jobs`,
+        'widgets.gallery.deleteInUse.group.workflow': `Library workflow “${String(values?.name)}”`,
+        'widgets.gallery.deleteInUse.listLabel': 'Where the media is used',
+        'widgets.gallery.deleteInUse.none': 'Nothing uses this media.',
+        'widgets.gallery.deleteInUse.projectUncheckedHint': 'Couldn’t open it to see where.',
+        'widgets.gallery.deleteInUse.queueWarning':
+          count === 1 ? 'Jobs that use it will fail.' : 'Jobs that use them will fail.',
+        'widgets.gallery.deleteInUse.summary': `${count} of these ${String(values?.media)} are still in use:`,
+        'widgets.gallery.deleteInUse.summaryAll': `All ${String(values?.media)} are still in use:`,
+        'widgets.gallery.deleteInUse.summaryOne': 'Still in use:',
         'widgets.gallery.deleteInUse.surface.canvasRaster': 'Canvas raster layers',
         'widgets.gallery.deleteInUse.surface.workflow': `Workflow “${String(values?.name)}”`,
-        'widgets.gallery.deleteInUse.usedCount': count === 1 ? '1 selected item' : `${count} selected items`,
-        'widgets.gallery.deleteInUse.warning': 'The affected work keeps pointing at media that will no longer exist.',
+        'widgets.gallery.deleteInUse.unchecked': 'Other projects couldn’t be checked.',
+        'widgets.gallery.deleteInUse.itemCount': count === 1 ? '1 item' : `${count} items`,
+        'widgets.gallery.deleteInUse.warning':
+          count === 1
+            ? 'Work that uses it will point at missing media.'
+            : 'Work that uses them will point at missing media.',
         'widgets.gallery.deleteTargetImage': `Image ${String(values?.index)}`,
         'widgets.gallery.deleteTargetVideo': `Video ${String(values?.index)}`,
         'widgets.gallery.deleteTargetsMore': `+${count}`,
@@ -56,6 +77,9 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+/** The report's code loads lazily on the first settled check; a cold transform under a busy run can take a while. */
+const REPORT_WAIT = { timeout: 5000 };
+
 type ConfirmationHandle = { requestDeletionConfirmation: RequestDeletionConfirmation };
 
 const Probe = ({ ref }: { ref: Ref<ConfirmationHandle> }) => {
@@ -67,6 +91,15 @@ const Probe = ({ ref }: { ref: Ref<ConfirmationHandle> }) => {
 };
 
 const imageRefs: GalleryItemRef[] = [{ kind: 'image', name: 'image.png' }];
+const usageReport = (overrides: Partial<GalleryMediaUsageReport>): GalleryMediaUsageReport => ({
+  checkedCount: 1,
+  groups: [],
+  inUseCount: 0,
+  onlyImages: true,
+  scope: 'items',
+  serverCheck: 'complete',
+  ...overrides,
+});
 const mixedRefs: GalleryItemRef[] = [
   { kind: 'image', name: 'image.png' },
   { kind: 'video', name: 'video.mp4' },
@@ -155,42 +188,309 @@ describe('useDeletionConfirmation', () => {
     expect(getWorkbenchPreferences().confirmImageDeletion).toBe(true);
   });
 
-  it('lists where the project still uses the items, with the count each surface loses', async () => {
+  it('opens at once while it checks where the items are used, then lists each place grouped by owner', async () => {
     const executeDeletion = vi.fn(async () => {});
     const consoleError = vi.spyOn(console, 'error');
+    let settleCheck: (report: GalleryMediaUsageReport) => void = () => {};
+    const checkUsage = vi.fn(
+      () =>
+        new Promise<GalleryMediaUsageReport>((resolve) => {
+          settleCheck = resolve;
+        })
+    );
 
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, executeDeletion, {
         canSkipFutureConfirmations: true,
-        usage: [
-          { names: ['image.png'], surface: 'canvasRaster' },
-          { label: 'Upscale pass', names: ['image.png', 'video.mp4'], surface: 'workflow' },
-          // Workflow names are not unique.
-          { label: 'Upscale pass', names: ['video.mp4'], surface: 'workflow' },
-        ],
+        checkUsage,
       });
     });
 
+    expect(openDialog()?.textContent).toContain('Checking where this media is used…');
+    // Deleting anyway does not wait for the check.
+    expect(buttonNamed('Delete')?.disabled).toBe(false);
+
+    await act(() =>
+      settleCheck(
+        usageReport({
+          checkedCount: 2,
+          groups: [
+            {
+              count: 2,
+              kind: 'openProject',
+              surfaces: [
+                { count: 1, surface: 'canvasRaster' },
+                { count: 2, label: 'Upscale pass', surface: 'workflow' },
+                // Workflow names are not unique.
+                { count: 1, label: 'Upscale pass', surface: 'workflow' },
+              ],
+            },
+            { count: 1, kind: 'projectUnchecked', name: 'Harbor Tower' },
+            { count: 1, kind: 'workflow', name: 'Portraits' },
+            { count: 1, jobCount: 2, kind: 'queue' },
+          ],
+          inUseCount: 2,
+          onlyImages: false,
+        })
+      )
+    );
+
+    // The section loads with the first check a dialog shows.
+    await vi.waitFor(() => expect(openDialog()?.querySelector('[role="group"]')).not.toBeNull(), REPORT_WAIT);
     const dialog = openDialog();
     const group = dialog?.querySelector('[role="group"]');
-    expect(group?.getAttribute('aria-labelledby')).toBeTruthy();
     expect(dialog?.querySelector(`#${group?.getAttribute('aria-labelledby')}`)?.textContent).toBe(
-      'Still used in this project:'
+      'All 2 items are still in use:'
     );
-    const rows = Array.from(group?.querySelectorAll('li') ?? []).map((row) => row.textContent);
+    const rows = Array.from(group?.querySelectorAll('li') ?? []).map((row) =>
+      Array.from(row.querySelectorAll(':scope > div > p'))
+        .map((cell) => cell.textContent)
+        .join(' · ')
+    );
     expect(rows).toEqual([
-      'Canvas raster layers · 1 selected item',
-      'Workflow “Upscale pass” · 2 selected items',
-      'Workflow “Upscale pass” · 1 selected item',
+      'This project · 2 items',
+      'Canvas raster layers · 1 item',
+      'Workflow “Upscale pass” · 2 items',
+      'Workflow “Upscale pass” · 1 item',
+      'Project “Harbor Tower” · 1 item',
+      'Library workflow “Portraits” · 1 item',
+      '2 queued or running jobs · 1 item',
     ]);
+    expect(dialog?.textContent).toContain('Couldn’t open it to see where.');
+    expect(dialog?.textContent).toContain(
+      // Two items in use: the warnings speak of them, not it.
+      'Work that uses them will point at missing media. Jobs that use them will fail.'
+    );
     expect(consoleError).not.toHaveBeenCalledWith(expect.stringContaining('same key'), expect.anything());
-    expect(dialog?.textContent).toContain('The affected work keeps pointing at media that will no longer exist.');
     // With routine confirmations on, the opt-out still means something for later deletions.
     expect(skipCheckbox()).not.toBeNull();
 
     await clickButton('Delete');
     expect(executeDeletion).toHaveBeenCalledOnce();
     consoleError.mockRestore();
+  });
+
+  it('warns when the check failed, offers Retry, and still offers the deletion', async () => {
+    let settleRetry: (report: GalleryMediaUsageReport) => void = () => {};
+    const checkUsage = vi
+      .fn<(signal: AbortSignal) => Promise<GalleryMediaUsageReport>>()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            settleRetry = resolve;
+          })
+      );
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        { checkUsage }
+      );
+    });
+    await vi.waitFor(
+      () => expect(openDialog()?.textContent).toContain('Couldn’t check where this media is used.'),
+      REPORT_WAIT
+    );
+    expect(buttonNamed('Delete')?.disabled).toBe(false);
+
+    // From the keyboard: Retry holds focus as Enter runs it. The dialog first settles its own opening focus on Cancel,
+    // which would otherwise take focus back from Retry and receive the Enter.
+    await vi.waitFor(() => expect(document.activeElement).toBe(buttonNamed('Cancel')));
+    buttonNamed('Retry')!.focus();
+    expect(document.activeElement).toBe(buttonNamed('Retry'));
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    // Retry gives way to the checking state; focus stays in the dialog, on the panel that reads the outcome, and shows
+    // the ring keyboard focus does.
+    const panel = openDialog()?.querySelector<HTMLElement>('[aria-live="polite"]');
+    expect(openDialog()?.textContent).toContain('Checking where this media is used…');
+    expect(document.activeElement).toBe(panel);
+    expect(panel?.matches(':focus-visible')).toBe(true);
+    expect(getComputedStyle(panel!).outlineStyle).not.toBe('none');
+
+    await act(() => settleRetry(usageReport({ inUseCount: 0 })));
+
+    await vi.waitFor(() => expect(openDialog()?.textContent).toContain('Nothing uses this media.'), REPORT_WAIT);
+    expect(document.activeElement).toBe(panel);
+    expect(openDialog()?.contains(document.activeElement)).toBe(true);
+    expect(checkUsage).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps what it already knows on screen while a retry runs, checking where the warning and Retry were', async () => {
+    let settleRetry: (report: GalleryMediaUsageReport) => void = () => {};
+    const known = usageReport({
+      groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
+      inUseCount: 1,
+      serverCheck: 'unavailable',
+    });
+    const checkUsage = vi.fn<(signal: AbortSignal) => Promise<GalleryMediaUsageReport>>().mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          settleRetry = resolve;
+        })
+    );
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        {
+          checkUsage,
+          usage: known,
+        }
+      );
+    });
+    await vi.waitFor(
+      () => expect(openDialog()?.textContent).toContain('Other projects couldn’t be checked.'),
+      REPORT_WAIT
+    );
+
+    await act(() => userEvent.click(buttonNamed('Retry')!));
+
+    const panel = openDialog()?.querySelector<HTMLElement>('[aria-live="polite"]');
+    expect(panel?.getAttribute('aria-busy')).toBe('true');
+    expect(panel?.textContent).toContain('This project');
+    expect(panel?.textContent).toContain('Checking where this media is used…');
+    expect(panel?.textContent).not.toContain('Other projects couldn’t be checked.');
+    expect(buttonNamed('Retry')).toBeNull();
+    expect(document.activeElement).toBe(panel);
+
+    await act(() => settleRetry({ ...known, serverCheck: 'complete' }));
+
+    await vi.waitFor(() => expect(panel?.textContent).not.toContain('Checking'), REPORT_WAIT);
+    expect(panel?.textContent).toContain('This project');
+    expect(panel?.getAttribute('aria-busy')).toBe('false');
+    expect(document.activeElement).toBe(panel);
+  });
+
+  it('shows a known report at once, without a checking state, and says what went unchecked', async () => {
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        {
+          checkUsage: () => new Promise(() => {}),
+          usage: usageReport({
+            groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
+            inUseCount: 1,
+            serverCheck: 'unavailable',
+          }),
+        }
+      );
+    });
+
+    expect(openDialog()?.textContent).not.toContain('Checking');
+    await vi.waitFor(() => expect(openDialog()?.textContent).toContain('Still in use:'), REPORT_WAIT);
+    expect(openDialog()?.textContent).toContain('Other projects couldn’t be checked.');
+    // Deleting one item, every row would say "1 item": the rows name places only.
+    expect(Array.from(openDialog()?.querySelectorAll('[role="group"] li') ?? []).map((row) => row.textContent)).toEqual(
+      ['This projectCanvas raster layers', 'Canvas raster layers']
+    );
+  });
+
+  it('announces the outcome in a region present from the moment the dialog opens, beside its description', async () => {
+    let settle: (report: GalleryMediaUsageReport) => void = () => {};
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        {
+          checkUsage: () =>
+            new Promise((resolve) => {
+              settle = resolve;
+            }),
+        }
+      );
+    });
+
+    const region = openDialog()?.querySelector('[aria-live="polite"]');
+    expect(region?.getAttribute('aria-busy')).toBe('true');
+    expect(region?.textContent).toBe('Checking where this media is used…');
+    const describedBy = openDialog()?.getAttribute('aria-describedby');
+    expect(describedBy && document.getElementById(describedBy)?.textContent).toBe('Permanently delete the image.');
+
+    await act(() => settle(usageReport({ inUseCount: 0 })));
+
+    // The same element, so assistive technology reads the change in it.
+    await vi.waitFor(() => expect(region?.textContent).toBe('Nothing uses this media.'), REPORT_WAIT);
+    expect(region?.isConnected).toBe(true);
+    expect(region?.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it("keeps an earlier request's late answer out of a later dialog", async () => {
+    const settles: Array<(report: GalleryMediaUsageReport) => void> = [];
+    const checkUsage = () =>
+      new Promise<GalleryMediaUsageReport>((resolve) => {
+        settles.push(resolve);
+      });
+    const inUse = usageReport({
+      groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
+      inUseCount: 1,
+    });
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        { checkUsage }
+      );
+    });
+    await clickButton('Cancel');
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        { checkUsage }
+      );
+    });
+
+    await act(() => settles[0]?.(inUse));
+    expect(openDialog()?.textContent).toContain('Checking where this media is used…');
+    expect(openDialog()?.textContent).not.toContain('still in use');
+
+    await act(() => settles[1]?.(usageReport({ inUseCount: 0 })));
+    await vi.waitFor(() => expect(openDialog()?.textContent).toContain('Nothing uses this media.'), REPORT_WAIT);
+  });
+
+  it('deletes at once when confirmed while the check runs, and stops the check', async () => {
+    const executeDeletion = vi.fn(async () => {});
+    const captured: { signal?: AbortSignal } = {};
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
+        checkUsage: (signal) => {
+          captured.signal = signal;
+          return new Promise(() => {});
+        },
+      });
+    });
+    await clickButton('Delete');
+
+    expect(executeDeletion).toHaveBeenCalledOnce();
+    expect(captured.signal?.aborted).toBe(true);
+  });
+
+  it('stops the check when the dialog is cancelled', async () => {
+    const captured: { signal?: AbortSignal } = {};
+
+    await act(() => {
+      void confirmationRef.current!.requestDeletionConfirmation(
+        imageRefs,
+        vi.fn(async () => {}),
+        {
+          checkUsage: (signal) => {
+            captured.signal = signal;
+            return new Promise(() => {});
+          },
+        }
+      );
+    });
+    await clickButton('Cancel');
+
+    expect(captured.signal?.aborted).toBe(true);
   });
 
   it('offers no opt-out when routine confirmations are already off and the media is in use', async () => {
@@ -200,11 +500,17 @@ describe('useDeletionConfirmation', () => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,
         vi.fn(async () => {}),
-        { canSkipFutureConfirmations: true, usage: [{ names: ['image.png'], surface: 'canvasRaster' }] }
+        {
+          canSkipFutureConfirmations: true,
+          usage: usageReport({
+            groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
+            inUseCount: 1,
+          }),
+        }
       );
     });
 
-    expect(openDialog()?.textContent).toContain('Still used in this project:');
+    await vi.waitFor(() => expect(openDialog()?.textContent).toContain('Still in use:'), REPORT_WAIT);
     expect(skipCheckbox()).toBeNull();
     expect(openDialog()?.textContent).not.toContain('You can turn this confirmation back on in Settings.');
   });
@@ -245,7 +551,7 @@ describe('useDeletionConfirmation', () => {
     expect(targets?.lastElementChild?.textContent).toBe('+3');
   });
 
-  it('shows no usage section for a deletion nothing depends on', async () => {
+  it('shows no usage section when the request asks for no check', async () => {
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(
         imageRefs,

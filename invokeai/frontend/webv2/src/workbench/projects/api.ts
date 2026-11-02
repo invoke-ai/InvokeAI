@@ -118,12 +118,35 @@ export interface ProjectWorkspaceSaveRequest {
 export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
   apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
 
+const getProjectPath = (projectId: string): string =>
+  `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+  `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`;
+
 export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
-  apiFetchJson<ProjectWithWorkspaceDTO>(
-    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
-      `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
-    { signal }
-  );
+  apiFetchJson<ProjectWithWorkspaceDTO>(getProjectPath(projectId), { signal });
+
+/**
+ * A project record no larger than `maxBytes`, else null without parsing it: for reads that inspect a closed project in
+ * passing and must not spend the main thread on a large document. A declared `Content-Length` over the bound skips
+ * the body; without one the text is read and measured (in UTF-16 code units, close to bytes for JSON) before parsing.
+ */
+export const getProjectWithinSize = async (
+  projectId: string,
+  maxBytes: number,
+  signal?: AbortSignal
+): Promise<ProjectWithWorkspaceDTO | null> => {
+  const response = await apiFetch(getProjectPath(projectId), { signal });
+  const declared = Number(response.headers.get('Content-Length'));
+
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    await response.body?.cancel();
+    return null;
+  }
+
+  const text = await response.text();
+
+  return text.length > maxBytes ? null : (JSON.parse(text) as ProjectWithWorkspaceDTO);
+};
 
 const isProjectWriteBusyError = (error: unknown): error is ApiError => {
   if (!(error instanceof ApiError) || error.status !== 429) {

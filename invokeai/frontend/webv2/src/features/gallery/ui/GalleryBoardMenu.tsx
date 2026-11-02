@@ -1,14 +1,22 @@
+import type {
+  GalleryMediaUsageCheck,
+  GalleryMediaUsageReport,
+  GalleryMediaUsageSettledCheck,
+} from '@features/gallery/core/mediaUsage';
 import type { GalleryBoard, GalleryBoardAction, GalleryGeneralAccess } from '@features/gallery/core/types';
 
 import { chakra, Checkbox, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { canOnBoard, isOwnGalleryBoard } from '@features/gallery/core/boardAccess';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
+import { galleryBoardMediaUsageQueryOptions } from '@features/gallery/data/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button } from '@platform/ui/Button';
 import { Dialog } from '@platform/ui/Dialog';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ScrollableMenuContent } from '@platform/ui/ScrollableMenuContent';
+import { useQuery } from '@tanstack/react-query';
 import {
   ArchiveIcon,
   ChevronRightIcon,
@@ -25,6 +33,7 @@ import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { isManagedGalleryBoard, isMovableGalleryBoard } from './galleryBoardGroups';
+import { GalleryMediaUsagePanel } from './GalleryMediaUsagePanel';
 import { getBoardCounts, getGalleryIntendedDestinationId } from './galleryStateView';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
@@ -238,6 +247,7 @@ export const GalleryBoardMenu = ({
       </Dialog.Root>
       <BoardDeleteDialog
         board={deleteTarget}
+        getMediaUsage={actions.getBoardMediaUsage}
         onCancel={handleCancelDelete}
         onDelete={handleDelete}
         onOpenChange={handleDeleteDialogOpenChange}
@@ -255,11 +265,14 @@ export const BOARD_DELETE_TYPED_CONFIRMATION_MIN_ITEMS = 50;
  */
 const BoardDeleteDialog = ({
   board,
+  getMediaUsage,
   onCancel,
   onDelete,
   onOpenChange,
 }: {
   board: GalleryBoard | null;
+  /** Where the board's media is still used, checked once deleting it is ticked. */
+  getMediaUsage: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
   onCancel: () => void;
   onDelete: (includeMedia: boolean) => void;
   onOpenChange: (event: { open: boolean }) => void;
@@ -270,6 +283,8 @@ const BoardDeleteDialog = ({
   const [shownBoard, setShownBoard] = useState(board);
   const [openedBoardId, setOpenedBoardId] = useState(board?.id ?? null);
   const [choices, setChoices] = useState({ includeMedia: false, typedName: '' });
+  // Each opening asks where the media is used afresh; ticking and unticking within one opening does not.
+  const [opening, setOpening] = useState(0);
   if (board !== null && board !== shownBoard) {
     setShownBoard(board);
   }
@@ -277,9 +292,37 @@ const BoardDeleteDialog = ({
     setOpenedBoardId(board?.id ?? null);
     if (board !== null) {
       setChoices({ includeMedia: false, typedName: '' });
+      setOpening((current) => current + 1);
     }
   }
   const { includeMedia, typedName } = choices;
+  const checksUsage = includeMedia && shownBoard !== null;
+  const usageQuery = useQuery({
+    ...galleryBoardMediaUsageQueryOptions({
+      boardId: shownBoard?.id ?? '',
+      load: getMediaUsage,
+      opening,
+      owner: captureAccountScope(),
+    }),
+    enabled: board !== null && checksUsage,
+  });
+  const { data: usageReport, isFetching: isCheckingUsage, refetch: refetchUsage, status: usageStatus } = usageQuery;
+  const usageCheck = useMemo<GalleryMediaUsageCheck | null>(() => {
+    if (!checksUsage) {
+      return null;
+    }
+
+    const settled: GalleryMediaUsageSettledCheck | undefined =
+      usageStatus === 'success' && usageReport
+        ? { report: usageReport, status: 'ready' }
+        : usageStatus === 'error'
+          ? { status: 'failed' }
+          : undefined;
+
+    // A retry keeps the last answer on screen while it runs.
+    return isCheckingUsage || !settled ? { previous: settled, status: 'checking' } : settled;
+  }, [checksUsage, isCheckingUsage, usageReport, usageStatus]);
+  const handleRetryUsage = useCallback(() => void refetchUsage(), [refetchUsage]);
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const mediaHintId = useId();
   const nameInputId = useId();
@@ -308,7 +351,14 @@ const BoardDeleteDialog = ({
 
   return (
     // Cancel takes focus, not the checkbox that would delete the media.
-    <Dialog.Root initialFocusEl={getInitialFocus} open={board !== null} role="alertdialog" onOpenChange={onOpenChange}>
+    // Top-anchored: the usage report arrives after the dialog opens, and grows it downward instead of moving it.
+    <Dialog.Root
+      initialFocusEl={getInitialFocus}
+      open={board !== null}
+      placement="top"
+      role="alertdialog"
+      onOpenChange={onOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
@@ -318,11 +368,16 @@ const BoardDeleteDialog = ({
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="3">
-                <Text fontSize="md">
+                <Dialog.Description color="fg" fontSize="md" lineHeight="inherit">
                   {itemCount === 0
                     ? t('widgets.gallery.deleteBoardEmptyDescription')
-                    : t('widgets.gallery.deleteBoardDescription', { count: itemCount, media })}
-                </Text>
+                    : t(
+                        includeMedia
+                          ? 'widgets.gallery.deleteBoardWithMediaDescription'
+                          : 'widgets.gallery.deleteBoardDescription',
+                        { count: itemCount, media }
+                      )}
+                </Dialog.Description>
                 {itemCount > 0 ? (
                   <Stack gap="1">
                     <Checkbox.Root
@@ -343,6 +398,9 @@ const BoardDeleteDialog = ({
                       {t('widgets.gallery.deleteBoardIncludeMediaHint')}
                     </Text>
                   </Stack>
+                ) : null}
+                {itemCount > 0 && usageCheck ? (
+                  <GalleryMediaUsagePanel check={usageCheck} onRetry={handleRetryUsage} />
                 ) : null}
                 {needsTypedName ? (
                   <Stack gap="1">

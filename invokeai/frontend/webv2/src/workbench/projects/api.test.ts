@@ -24,6 +24,7 @@ import {
   getProjectDocumentSchemaRefusal,
   getProjectWriteSizeRefusal,
   getProject,
+  getProjectWithinSize,
   isProjectCanvasSchemaUnsupportedError,
   ProjectCreateAbsentError,
   saveProjectWorkspace,
@@ -34,6 +35,37 @@ beforeEach(() => {
   transport.apiFetch.mockReset();
   transport.apiFetchJson.mockReset();
   accountLifecycle.activate('project-api-test-user');
+});
+
+describe('getProjectWithinSize', () => {
+  it('parses a record within the bound and skips one past it, declared or measured, without parsing it', async () => {
+    const record = { name: 'Small', project_id: 'p-1' };
+    const body = JSON.stringify(record);
+    const cancel = vi.fn(() => Promise.resolve());
+    const text = vi.fn(() => Promise.resolve(body));
+
+    transport.apiFetch.mockResolvedValueOnce(
+      new Response(body, { headers: { 'Content-Length': String(body.length) } })
+    );
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toEqual(record);
+    expect(transport.apiFetch).toHaveBeenCalledWith(
+      '/api/v1/projects/p-1?max_canvas_schema_version=6&max_document_schema_version=4',
+      { signal: undefined }
+    );
+
+    transport.apiFetch.mockResolvedValueOnce({
+      body: { cancel },
+      headers: new Headers({ 'Content-Length': '5000' }),
+      text,
+    });
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(text).not.toHaveBeenCalled();
+
+    // Without a declared length (a compressed or chunked answer) the text is measured before it is parsed.
+    transport.apiFetch.mockResolvedValueOnce(new Response(`{"padding":"${'x'.repeat(2000)}"}`));
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+  });
 });
 
 /** Cleanup requires proven project absence after an ambiguous create. */

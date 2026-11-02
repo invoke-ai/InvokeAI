@@ -23,11 +23,15 @@ const rasterLayer = (id: string, imageName: string) =>
   }) as unknown as CanvasNodeContract;
 
 const project = ({
+  snapshots = [],
   stacks = {},
+  staged = [],
   widgets = {},
   workflowNodes = [],
 }: {
+  snapshots?: unknown[];
   stacks?: Partial<Record<'raster' | 'control' | 'regional_guidance' | 'inpaint_mask', CanvasNodeContract[]>>;
+  staged?: unknown[];
   widgets?: Record<string, Record<string, unknown>>;
   workflowNodes?: unknown[];
 } = {}) =>
@@ -36,8 +40,8 @@ const project = ({
       document: {
         stacks: { control: [], inpaint_mask: [], raster: [], regional_guidance: [], ...stacks },
       },
-      // Snapshots are history: a deleted name here must not count as in use.
-      snapshots: [{ document: { stacks: { raster: [rasterLayer('old', 'snapshot-only.png')] } } }],
+      snapshots,
+      stagingArea: { pendingImages: staged },
     },
     widgetInstances: Object.fromEntries(
       Object.entries(widgets).map(([typeId, values]) => [typeId, widget(typeId, values)])
@@ -121,9 +125,37 @@ describe('collectMediaUsage', () => {
     ]);
   });
 
-  it('ignores canvas snapshots and media the gallery merely selects', () => {
-    const doc = project({ widgets: { gallery: { selectedImageName: 'snapshot-only.png' } } });
+  it('counts staged results and each canvas snapshot, the live document and its staged results alike', () => {
+    const doc = project({
+      snapshots: [
+        { document: { stacks: { raster: [rasterLayer('old', 'cleared.png')] } }, name: 'Before clear' },
+        {
+          document: { stacks: { raster: [] } },
+          name: 'Discarded results',
+          stagedImages: [{ imageName: 'discarded.png', placement: {} }],
+        },
+      ],
+      staged: [{ imageName: 'staged.png', placement: {} }],
+    });
 
-    expect(collectMediaUsage(doc, [image('snapshot-only.png')])).toEqual([]);
+    expect(collectMediaUsage(doc, [image('cleared.png'), image('discarded.png'), image('staged.png')])).toEqual([
+      { names: ['staged.png'], surface: 'canvasStaging' },
+      { label: 'Before clear', names: ['cleared.png'], surface: 'canvasSnapshot' },
+      { label: 'Discarded results', names: ['discarded.png'], surface: 'canvasSnapshot' },
+    ]);
+  });
+
+  it('ignores what the gallery merely shows: its selection, recents and compare image', () => {
+    const doc = project({
+      widgets: {
+        gallery: {
+          compareImageName: 'shown.png',
+          recentImages: [{ imageName: 'shown.png' }],
+          selectedImageName: 'shown.png',
+        },
+      },
+    });
+
+    expect(collectMediaUsage(doc, [image('shown.png')])).toEqual([]);
   });
 });
