@@ -296,6 +296,20 @@ class TestTilingIsWired:
         assert state[0]["use_tiling"] is True
         assert state[0]["tile_sample_min_size"] == DEFAULT_TILE_SAMPLE_MIN_SIZE
 
+    def test_a_batch_of_latents_decodes_and_is_priced_as_its_first_sample(self, flux_shaped_vae):
+        """The node returns the first image only, so the VAE and the estimate see one sample, not the whole batch."""
+        path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"
+        vae = flux_shaped_vae()
+        batch = torch.cat([torch.zeros(1, 16, 64, 64), torch.ones(1, 16, 64, 64)])
+        _, context, _ = _build_decode_mocks(vae, batch, torch.zeros(1, 3, 512, 512))
+        with patch(path, wraps=estimate_vae_working_memory_flux) as estimate:
+            _build_invocation(tiled=True).invoke(context)
+
+        assert estimate.call_args.kwargs["image_tensor"].shape[0] == 1
+        decoded_input = vae.decode.call_args.args[0]
+        assert decoded_input.shape[0] == 1
+        assert torch.allclose(decoded_input, (batch[:1] / vae.config.scaling_factor) + (vae.config.shift_factor or 0.0))
+
     def test_force_tiled_decode_reaches_the_tiled_path(self, flux_shaped_vae):
         """The config switch a small-VRAM user actually has; the node field is not the only way in."""
         vae = flux_shaped_vae()

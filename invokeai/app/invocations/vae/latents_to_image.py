@@ -53,7 +53,9 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        latents = context.tensors.load(self.latents.latents_name)
+        # The node returns the first image only, so decode only the first sample: the VAE and its working-memory
+        # estimate see a batch of one however many samples the latents carry.
+        latents = context.tensors.load(self.latents.latents_name)[:1]
 
         use_tiling = self.tiled or context.config.get().force_tiled_decode
 

@@ -495,10 +495,14 @@ def _peak_of_two_phases(
 
 
 def _sd_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
+    # Recorded points that predate the batch carry none: a single sample.
+    batch_size = cast(int, features.get("batch_size", 1))
     if features["tile"] is not None:
-        terms = _tiled_convolutions(features, values, _SD_TILED_VAE)
+        terms = _tiled_convolutions(features, values, _SD_TILED_VAE, samples=batch_size)
     else:
-        terms = _convolutions(features, values, cast(int, features["height"]) * cast(int, features["width"]))
+        terms = _convolutions(
+            features, values, cast(int, features["height"]) * cast(int, features["width"]), samples=batch_size
+        )
 
     # The tiny autoencoder has no mid-block attention, so it is priced without a score matrix.
     if features["vae_class"] == "AutoencoderKL":
@@ -578,9 +582,14 @@ def estimate_vae_working_memory_sd15_sdxl(
     single pass the VAE runs then (`AutoencoderKL` tiles only when a side is strictly larger than the tile; for the tiny
     autoencoder, which tiles anyway, see below). A tiled `AutoencoderKL` operation at an overlap other than
     `TILE_OVERLAP_FACTOR` is refused.
+
+    The batch the tensor carries multiplies through, as for `estimate_vae_working_memory_flux2`: the convolution terms
+    per sample (`_tiled_convolutions` for the tiled floors) and the score matrix over batch times heads.
+    `vae.decode` takes the whole batch, so a node that keeps one sample passes only that one.
     """
     device = device if device is not None else TorchDevice.choose_torch_device()
     run_dtype = sd_vae_run_dtype(operation, fp32, device)
+    batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
     height = latent_scale_factor_for_operation * image_tensor.shape[-2]
     width = latent_scale_factor_for_operation * image_tensor.shape[-1]
@@ -607,13 +616,16 @@ def estimate_vae_working_memory_sd15_sdxl(
         "height": height,
         "width": width,
         "tile": tile_size,
+        "batch_size": batch_size,
         "dtype": dtype_name(run_dtype),
         "vae_class": "AutoencoderKL" if isinstance(vae, AutoencoderKL) else "AutoencoderTiny",
         "upcast_weight_bytes": _upcast_weight_bytes(vae, run_dtype),
     }
     if isinstance(vae, AutoencoderKL):
         score_h, score_w = (min(tile_size, height), min(tile_size, width)) if tile_size is not None else (height, width)
-        features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(score_h, score_w, run_dtype, device=device)
+        features["score_matrix_bytes"] = _vae_mid_block_score_matrix_bytes(
+            score_h, score_w, run_dtype, batch_size=batch_size, device=device
+        )
 
     return _estimate(VAE_SD_SPEC, features, device)
 
@@ -685,10 +697,15 @@ def estimate_vae_working_memory_cogview4(
 
 
 def _flux_terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
+    # Recorded points that predate the batch carry none: a single sample.
+    batch_size = cast(int, features.get("batch_size", 1))
     if features["tile"] is not None:
-        convolutions = _tiled_convolutions(features, values, _FLUX_TILED_VAE)
-        return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
-    return _single_pass_terms(features, values)
+        convolutions = _tiled_convolutions(features, values, _FLUX_TILED_VAE, samples=batch_size)
+    else:
+        convolutions = _convolutions(
+            features, values, cast(int, features["height"]) * cast(int, features["width"]), samples=batch_size
+        )
+    return _peak_of_two_phases(convolutions, cast(int, features["score_matrix_bytes"]))
 
 
 # The FLUX.1 loaders avoid fp16, which this autoencoder is broken in, except one: an SDNQ VAE folder loads through the
@@ -726,12 +743,16 @@ def estimate_vae_working_memory_flux(
     priced is the one `scoped_vae_tiling` runs for the field (`scoped_vae_tile`), which can be
     smaller than the field. Both operations tile, each with its own tiled line.
 
+    The batch the tensor carries multiplies through, as for `estimate_vae_working_memory_flux2`: the convolution
+    terms per sample and the score matrix over batch times heads. A node that keeps one sample passes only that one.
+
     `device` is where the VAE will run (a `cpu_only` VAE runs on the CPU); it picks the convolution
     backend's coefficients. Defaults to the session device.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
     dtype = _compute_dtype(vae)
     device = device if device is not None else TorchDevice.choose_torch_device()
+    batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
     out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
     out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
@@ -758,7 +779,10 @@ def estimate_vae_working_memory_flux(
         "width": out_w,
         "dtype": dtype_name(dtype),
         "tile": tile,
-        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(score_h, score_w, dtype, device=device),
+        "batch_size": batch_size,
+        "score_matrix_bytes": _vae_mid_block_score_matrix_bytes(
+            score_h, score_w, dtype, batch_size=batch_size, device=device
+        ),
     }
     return _estimate(VAE_FLUX_SPEC, features, device)
 
@@ -1455,10 +1479,10 @@ def estimate_untiled_vae_decode(
     if estimator == VAE_SD3_SPEC.id:
         return _estimate(VAE_SD3_SPEC, features, device)
     if estimator == VAE_FLUX_SPEC.id:
-        return _estimate(VAE_FLUX_SPEC, features | {"tile": None}, device)
+        return _estimate(VAE_FLUX_SPEC, features | {"tile": None, "batch_size": 1}, device)
     if estimator == VAE_FLUX2_SPEC.id:
         return _estimate(VAE_FLUX2_SPEC, features | {"tile": None, "batch_size": 1}, device)
     if estimator == VAE_SD_SPEC.id:
-        sd_features = features | {"tile": None, "vae_class": "AutoencoderKL", "upcast_weight_bytes": 0}
+        sd_features = features | {"tile": None, "batch_size": 1, "vae_class": "AutoencoderKL", "upcast_weight_bytes": 0}
         return _estimate(VAE_SD_SPEC, sd_features, device)
     raise ValueError(f"No untiled decode is priced by working-memory estimator '{estimator}'.")

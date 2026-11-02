@@ -1334,3 +1334,95 @@ def test_a_planned_untiled_decode_is_priced_as_its_decode_node_prices_it(spec, e
 
     assert dict(planned.features) == dict(node.features)
     assert planned.reservation_bytes == node.reservation_bytes
+
+
+def _batch(operation: str, side: int, channels: int, samples: int) -> torch.Tensor:
+    shape = (samples, channels, side // 8, side // 8) if operation == "decode" else (samples, 3, side, side)
+    return torch.zeros(1, 1, 1, 1).expand(shape)
+
+
+@pytest.mark.parametrize("tile", [None, 512], ids=["untiled", "tiled"])
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+@pytest.mark.parametrize("spec, estimate, cls, channels, dtype, growth", TILED)
+def test_a_batch_reserves_its_samples_on_the_shipped_lines_and_a_single_sample_is_unchanged(
+    on, spec, estimate, cls, channels, dtype, growth, operation, tile
+) -> None:
+    """The convolutions scale with the samples as FLUX.2's do: both phases of a tiled decode per sample, an assembly
+    line's base taken once where it is negative (``k * P + max(b, n * b)``), neither below the floor of every sample."""
+    platform, side, samples = Platform("cudnn", "native", "linux"), 2048, 2
+    vae = _vae(cls, torch.float16 if spec is VAE_SD_SPEC else torch.bfloat16, numel=1000)
+    values = shipped_coefficients(spec, platform).values
+    pixels = side * side
+
+    def expected(n: int) -> int:
+        if tile is None:
+            return int(n * _line(spec, platform, operation, dtype, pixels) + growth)
+        tile_phase = n * _tiled(spec, platform, operation, dtype, tile * tile, pixels)
+        phase = tile_phase
+        if operation == "decode":
+            base = values[f"b_assembled_decode_{dtype}"]
+            assembly = values[f"k_assembled_decode_{dtype}"] * pixels * n + max(base, n * base)
+            phase = max(tile_phase, assembly)
+        floor = _floor(spec, platform, operation, side, side, tile, dtype, n) if tile else 0
+        return int(max(phase, floor) + growth)
+
+    single = estimate(operation, _batch(operation, side, channels, 1), vae, tile, on(platform))
+    batch = estimate(operation, _batch(operation, side, channels, samples), vae, tile, on(platform))
+
+    assert single.reservation_bytes == expected(1)
+    assert batch.features["batch_size"] == samples
+    assert batch.reservation_bytes == pytest.approx(expected(samples), abs=samples)
+    assert batch.reservation_bytes > single.reservation_bytes
+
+
+@pytest.mark.parametrize("tile", [None, 512], ids=["untiled", "tiled"])
+@pytest.mark.parametrize(
+    "estimate, cls",
+    [
+        (
+            lambda image, vae, tile, device: estimate_vae_working_memory_sd15_sdxl(
+                "decode", image, vae, tile, False, device
+            ),
+            AutoencoderKL,
+        ),
+        (
+            lambda image, vae, tile, device: estimate_vae_working_memory_flux("decode", image, vae, tile, device),
+            AutoencoderKL,
+        ),
+    ],
+    ids=["sd", "flux"],
+)
+def test_the_score_matrix_of_a_batch_is_that_many_single_samples(estimate, cls, tile) -> None:
+    """The mid-block score matrix is (batch, heads, S, S): the estimate prices it over batch times heads, on the tile
+    where one runs."""
+    vae = _vae(cls, torch.float16, numel=1000)
+    with patch(
+        "invokeai.backend.util.vae_working_memory.sdpa_score_matrix_bytes",
+        side_effect=lambda **kwargs: kwargs["num_heads"] * kwargs["seq_len"] ** 2 * 3,
+    ):
+        device = torch.device("cuda", 0)
+        single, batch = (
+            estimate(_batch("decode", 2048, 4 if cls is AutoencoderKL else 16, n), vae, tile, device) for n in (1, 2)
+        )
+
+    assert batch.features["score_matrix_bytes"] == 2 * single.features["score_matrix_bytes"]
+
+
+def test_the_sd_decode_node_decodes_and_prices_only_the_first_sample_of_a_batch(cached_vae) -> None:
+    """`l2i` returns the first image only, so the VAE and the estimate see a batch of one."""
+    vae, seen = _sd_shaped_vae(), []
+    real = vae.decode
+
+    def record(latents, *args, **kwargs):
+        seen.append(latents.clone())
+        return real(latents, *args, **kwargs)
+
+    vae.decode = MagicMock(side_effect=record)
+    batch = torch.stack([torch.zeros(4, 32, 544), torch.ones(4, 32, 544)])
+
+    (batch_estimate,) = _run_sd_node(cached_vae, "decode", vae, 256, batch)
+    (single_estimate,) = _run_sd_node(cached_vae, "decode", vae, 256, batch[:1])
+
+    assert [latents.shape[0] for latents in seen] == [1, 1]
+    assert torch.equal(seen[0], seen[1])
+    assert batch_estimate == single_estimate
