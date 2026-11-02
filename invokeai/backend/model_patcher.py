@@ -11,6 +11,7 @@ from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
 from transformers import CLIPTextModel, CLIPTextModelWithProjection, CLIPTokenizer
 
 from invokeai.app.shared.models import FreeUConfig
+from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.textual_inversion import TextualInversionManager, TextualInversionModelRaw
 from invokeai.backend.util.devices import TorchDevice
@@ -61,6 +62,13 @@ class ModelPatcher:
         # For references to the current discussion please see https://github.com/invoke-ai/InvokeAI/pull/4817
         pad_to_multiple_of = 8
 
+        def _resize_embeddings(new_num_tokens: int | None) -> torch.nn.Embedding:
+            # Accelerate patches register_parameter to put new parameters on meta; skip-init also saves/restores
+            # global reset_parameters functions. Exclude concurrent construction before installing skip-init.
+            # Resizing copies retained rows. New TI rows are overwritten below; padding rows have no token.
+            with MODEL_LOAD_LOCK.write_lock(), skip_torch_weight_init():
+                return text_encoder.resize_token_embeddings(new_num_tokens, pad_to_multiple_of, mean_resizing=False)
+
         try:
             # HACK: The CLIPTokenizer API does not include a way to remove tokens after calling add_tokens(...). As a
             # workaround, we create a full copy of `tokenizer` so that its original behavior can be restored after
@@ -70,7 +78,7 @@ class ModelPatcher:
             # but a pickle roundtrip was found to be much faster (1 sec vs. 0.05 secs).
             ti_tokenizer = pickle.loads(pickle.dumps(tokenizer))
             ti_manager = TextualInversionManager(ti_tokenizer)
-            init_tokens_count = text_encoder.resize_token_embeddings(None, pad_to_multiple_of).num_embeddings
+            init_tokens_count = _resize_embeddings(None).num_embeddings
 
             def _get_trigger(ti_name: str, index: int) -> str:
                 trigger = ti_name
@@ -98,11 +106,7 @@ class ModelPatcher:
                     new_tokens_added += ti_tokenizer.add_tokens(_get_trigger(ti_name, i))
 
             # Modify text_encoder.
-            # resize_token_embeddings(...) constructs a new torch.nn.Embedding internally. Initializing the weights of
-            # this embedding is slow and unnecessary, so we wrap this step in skip_torch_weight_init() to save some
-            # time.
-            with skip_torch_weight_init():
-                text_encoder.resize_token_embeddings(init_tokens_count + new_tokens_added, pad_to_multiple_of)
+            _resize_embeddings(init_tokens_count + new_tokens_added)
             model_embeddings = text_encoder.get_input_embeddings()
 
             for ti_name, ti in ti_list:
@@ -137,7 +141,7 @@ class ModelPatcher:
 
         finally:
             if init_tokens_count and new_tokens_added:
-                text_encoder.resize_token_embeddings(init_tokens_count, pad_to_multiple_of)
+                _resize_embeddings(init_tokens_count)
 
     @classmethod
     @contextmanager
