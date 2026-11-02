@@ -187,6 +187,8 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
   // The canvas dims sync reads the render-size keys at boot; the lazy canvas slots and compiler share them.
   '/workbench/widgets/canvas/invoke/canvasScaling.ts',
+  // API recall (editor boot) and the lazy Canvas controls share strength defaults; avoid a standalone boot request.
+  '/workbench/widgets/canvas/invoke/canvasStrength.ts',
   // The canvas dims sync and the lazy Canvas widget and Frame tool share the model grid and the centred resize.
   '/workbench/widgets/canvas/bboxGrid.ts',
   // The Preview (open at boot) and the Canvas staging bar share the Auto-switch menu; alone it costs a boot request.

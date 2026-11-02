@@ -2760,3 +2760,67 @@ describe('legacy records', () => {
     });
   });
 });
+
+describe('legacy family metadata parity', () => {
+  it('restores recorded Ideogram sampler overrides and explicit preset defaults', () => {
+    const model: MainModelConfig = {
+      base: 'ideogram-4',
+      key: 'ideogram',
+      name: 'Ideogram',
+      type: 'main',
+      format: 'diffusers',
+    };
+    const recall = (metadata: unknown) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model, modelKey: model.key, ideogram4Steps: 70, ideogram4Mu: 3 }),
+        image,
+        kind: 'all',
+        metadata,
+        models: [model],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+    const metadata = {
+      model,
+      ideogram4_sampler_preset: 'V4_TURBO_12',
+      ideogram4_steps: 26,
+      ideogram4_guidance_scale: 4.5,
+      ideogram4_mu: -1.5,
+      ideogram4_color_palette: ['green', 'gold'],
+    };
+    expect(recall(metadata)?.values).toMatchObject({
+      ideogram4SamplerPreset: 'V4_TURBO_12',
+      ideogram4Steps: 26,
+      ideogram4GuidanceScale: 4.5,
+      ideogram4Mu: -1.5,
+      ideogram4ColorPalette: ['green', 'gold'],
+    });
+    expect(
+      recall({ model, ideogram4_steps: null, ideogram4_guidance_scale: null, ideogram4_mu: null })?.values
+    ).toMatchObject({ ideogram4Steps: null, ideogram4GuidanceScale: null, ideogram4Mu: null });
+    expect(recall({ model, generation_mode: 'ideogram4_txt2img' })?.values).toMatchObject({
+      ideogram4Steps: null,
+      ideogram4GuidanceScale: null,
+      ideogram4Mu: null,
+    });
+    expect(recall({ model, ideogram4_steps: 2.5, ideogram4_mu: 100 })?.values).toMatchObject({
+      ideogram4Steps: 70,
+      ideogram4Mu: 3,
+    });
+  });
+
+  it('restores legacy Wan VAE and low-noise guidance without applying them to another family', () => {
+    const model: MainModelConfig = { base: 'wan', key: 'wan', name: 'Wan', type: 'main', format: 'diffusers' };
+    const vae: VaeModelConfig = { base: 'wan', key: 'wan-vae', name: 'Wan VAE', type: 'vae', latent_channels: 16 };
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model, modelKey: model.key }),
+      image,
+      kind: 'remix',
+      metadata: { model, wan_vae_model: vae, wan_guidance_scale_low_noise: 23.5 },
+      models: [model, vae],
+      supportedModels: [model],
+      vaeModels: [vae],
+    });
+    expect(result?.values).toMatchObject({ vae, wanGuidanceScaleLowNoise: 23.5 });
+  });
+});

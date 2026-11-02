@@ -1,9 +1,10 @@
-import type { GenerateWidgetValues } from '@features/generation/contracts';
+import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type * as ModelsModule from '@features/models';
 import type { QueueGenerationMeta } from '@features/queue/contracts';
 import type { ImageRecallKind } from '@workbench/image-actions';
 import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
+import { galleryImages } from '@features/gallery';
 import {
   resetArchitectureCapabilities,
   setArchitectureCapabilities,
@@ -12,7 +13,13 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { createDefaultVideoWidgetValues } from '@features/video';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { recordCanvasMetadata } from '@workbench/canvas-operations/saveCanvasToGallery';
+import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
+import { getResolvedProjectWidgetValues } from '@workbench/widgetState';
+import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -27,22 +34,30 @@ const mocks = vi.hoisted(() => ({
   openWidget: vi.fn(),
   patchValues: vi.fn(),
   setSettings: vi.fn(),
+  models: [] as ModelsModule.ModelConfig[],
+  store: null as ReturnType<typeof createWorkbenchStore> | null,
   snapshot: undefined as LocalRecallSnapshot | null | undefined,
 }));
 
 vi.mock('./useLocalRecallSnapshot', () => ({ useLocalRecallSnapshot: () => mocks.snapshot }));
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContextModule>()),
-  useWidgetValuesSelector: () => ({}),
-  useWorkbenchCommands: () => ({
-    generation: { setSettings: mocks.setSettings },
-    widgets: { patchValues: mocks.patchValues },
-  }),
+  useWorkbenchQueries: () =>
+    mocks.store?.queries ?? {
+      getSnapshot: () => ({ activeProject: { id: 'active-project' }, scopedDefaults: {} }),
+      getProject: () => ({ id: 'active-project', widgetInstances: {} }),
+      isActiveProject: () => true,
+    },
+  useWorkbenchCommands: () =>
+    mocks.store?.commands ?? {
+      generation: { setSettings: mocks.setSettings },
+      widgets: { patchValues: mocks.patchValues },
+    },
 }));
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<typeof ModelsModule>()),
   ensureModelsLoaded: () => Promise.resolve(),
-  useModelsSelector: () => [],
+  useModelsSelector: () => mocks.models,
 }));
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ error: vi.fn(), info: mocks.notifyInfo, success: mocks.notifySuccess }),
@@ -61,6 +76,24 @@ const generateSnapshot = {
   seed: 7,
   seedMode: 'fixed',
 } as GenerateWidgetValues;
+
+const makeCanvasMetadata = () => {
+  const document = createEmptyCanvasDocument();
+  document.stacks.raster = [
+    {
+      id: 'recorded-image',
+      name: 'Recorded image',
+      type: 'raster',
+      isEnabled: true,
+      isLocked: false,
+      opacity: 1,
+      blendMode: 'normal',
+      transform: { x: 0, y: 0, rotation: 0, scaleX: 1, scaleY: 1 },
+      source: { type: 'image', image: { imageName: 'recorded.png', width: 640, height: 480 } },
+    },
+  ];
+  return { canvas_v3_metadata: recordCanvasMetadata(document, { models: [] }) };
+};
 
 type Handle = ReturnType<typeof useQueueItemRecall>;
 const handle = createRef<Handle>();
@@ -83,12 +116,17 @@ const render = async (snapshot: LocalRecallSnapshot | null | undefined, meta: Qu
 };
 const recall = (kind: ImageRecallKind) => act(() => handle.current!.recall(kind));
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.store = null;
+  mocks.models = [];
+});
 afterEach(async () => {
   await act(() => root?.unmount());
   host?.remove();
   host = null;
   root = null;
+  vi.restoreAllMocks();
 });
 
 describe('useQueueItemRecall', () => {
@@ -106,7 +144,7 @@ describe('useQueueItemRecall', () => {
 
     await recall('all');
 
-    expect(mocks.setSettings).toHaveBeenCalledWith(generateSnapshot);
+    expect(mocks.setSettings).toHaveBeenCalledWith(generateSnapshot, 'active-project');
     expect(mocks.openWidget).toHaveBeenCalledWith('generate', { preferredRegions: ['left'] });
     expect(mocks.notifySuccess).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.settingsRecalledDescription');
   });
@@ -147,3 +185,206 @@ describe('useQueueItemRecall', () => {
     expect(mocks.notifyInfo).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.recallUnavailableCapabilities');
   });
 });
+
+it('recalls a canvas queue snapshot through the real document owner and keeps its authored controls', async () => {
+  accountLifecycle.activate('queue-canvas-recall');
+  setArchitectureCapabilities(architectureCapabilitiesFixture);
+  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
+    ModelsModule.ModelConfig;
+  const controlModel = {
+    base: 'sdxl',
+    key: 'queue-control',
+    name: 'Edges',
+    type: 'controlnet',
+  } as ModelsModule.ModelConfig;
+  mocks.models = [main, controlModel];
+  mocks.store = createWorkbenchStore();
+  const document = createEmptyCanvasDocument();
+  document.stacks.control = [
+    {
+      id: 'submitted-control',
+      name: 'Recorded edges',
+      type: 'control',
+      isEnabled: true,
+      isLocked: false,
+      opacity: 1,
+      blendMode: 'normal',
+      transform: { x: -20, y: 40, rotation: 0, scaleX: 1, scaleY: 1 },
+      source: { type: 'image', image: { imageName: 'edges.png', width: 640, height: 480 } },
+      withTransparencyEffect: false,
+      adapter: {
+        kind: 'controlnet',
+        model: controlModel.key,
+        weight: 0.65,
+        beginEndStepPct: [0.1, 0.9],
+        controlMode: 'balanced',
+      },
+    },
+  ];
+  vi.spyOn(galleryImages, 'resolveMany').mockResolvedValue([{ imageName: 'edges.png' }] as Awaited<
+    ReturnType<typeof galleryImages.resolveMany>
+  >);
+  await render({
+    sourceId: 'canvas',
+    generateValues: { ...getDefaultGenerateSettings(main), model: main, modelKey: main.key },
+    canvasMetadata: {
+      canvas_v3_metadata: recordCanvasMetadata(document, { models: [controlModel], settings: { strength: 0.4 } }),
+    },
+  });
+  await recall('all');
+  expect(mocks.store.queries.getSnapshot().activeProject.canvas.document.stacks.control[0]).toMatchObject({
+    name: 'Recorded edges',
+    transform: { x: -20, y: 40 },
+    adapter: { model: 'queue-control', weight: 0.65 },
+  });
+  expect(mocks.store.queries.getSnapshot().activeProject.canvas.snapshots).toHaveLength(1);
+});
+
+it('retains prompt tool edits made while canvas assets load and recalls the snapshot model', async () => {
+  accountLifecycle.activate('queue-canvas-concurrent-recall');
+  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
+    ModelsModule.ModelConfig;
+  const other = { base: 'sd-1', key: 'other-main', name: 'Other', type: 'main' } as MainModelConfig &
+    ModelsModule.ModelConfig;
+  mocks.models = [main, other];
+  const store = (mocks.store = createWorkbenchStore());
+  const projectId = store.queries.getSnapshot().activeProject.id;
+  store.commands.generation.setSettings(
+    { ...getDefaultGenerateSettings(main), model: main, modelKey: main.key },
+    projectId
+  );
+  let resolveAssets!: (images: Awaited<ReturnType<typeof galleryImages.resolveMany>>) => void;
+  const assets = new Promise<Awaited<ReturnType<typeof galleryImages.resolveMany>>>((resolve) => {
+    resolveAssets = resolve;
+  });
+  const resolveMany = vi.spyOn(galleryImages, 'resolveMany').mockReturnValue(assets);
+  await render({
+    sourceId: 'canvas',
+    generateValues: {
+      ...getDefaultGenerateSettings(main),
+      model: main,
+      modelKey: main.key,
+      positivePrompt: 'Recalled',
+    },
+    canvasMetadata: makeCanvasMetadata(),
+  });
+  let pending!: Promise<void>;
+  await act(() => {
+    pending = Promise.resolve(handle.current!.recall('remix'));
+  });
+  await vi.waitFor(() => expect(resolveMany).toHaveBeenCalled());
+  store.commands.generation.patchSettings(
+    {
+      expandPromptModelKey: 'new-prompt-tool',
+      imageToPromptModelKey: 'new-vision-tool',
+      model: other,
+      modelKey: other.key,
+    },
+    projectId
+  );
+  await act(async () => {
+    resolveAssets([{ imageName: 'recorded.png' }] as Awaited<ReturnType<typeof galleryImages.resolveMany>>);
+    await pending;
+  });
+  const snapshot = store.queries.getSnapshot();
+  expect(getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults)).toMatchObject({
+    expandPromptModelKey: 'new-prompt-tool',
+    imageToPromptModelKey: 'new-vision-tool',
+    modelKey: main.key,
+    positivePrompt: 'Recalled',
+    seedMode: 'random',
+  });
+  expect(snapshot.activeProject.canvas.document.stacks.raster[0]).toMatchObject({ name: 'Recorded image' });
+});
+
+it('recalls Generate settings and reports a partial result when canvas assets cannot load', async () => {
+  accountLifecycle.activate('queue-canvas-failed-recall');
+  const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
+    ModelsModule.ModelConfig;
+  mocks.models = [main];
+  const store = (mocks.store = createWorkbenchStore());
+  const original = store.queries.getSnapshot().activeProject.canvas.document;
+  vi.spyOn(galleryImages, 'resolveMany').mockRejectedValue(new Error('Asset lookup unavailable'));
+  await render({
+    sourceId: 'canvas',
+    generateValues: {
+      ...getDefaultGenerateSettings(main),
+      model: main,
+      modelKey: main.key,
+      positivePrompt: 'Recalled',
+    },
+    canvasMetadata: makeCanvasMetadata(),
+  });
+  await recall('all');
+  const snapshot = store.queries.getSnapshot();
+  expect(
+    getResolvedProjectWidgetValues(snapshot.activeProject, 'generate', snapshot.scopedDefaults).positivePrompt
+  ).toBe('Recalled');
+  expect(snapshot.activeProject.canvas.document).toBe(original);
+  expect(mocks.notifyInfo).toHaveBeenCalledWith(expect.any(String), 'widgets.gallery.itemActions.recall.canvasPartial');
+  expect(mocks.notifySuccess).toHaveBeenCalledWith(expect.any(String), 'widgets.queue.settingsRecalledDescription');
+});
+
+it.each(['account', 'project', 'canvas'] as const)(
+  'fences a canvas queue recall after its %s changes during asset lookup',
+  async (change) => {
+    accountLifecycle.activate('queue-canvas-fenced-recall');
+    const main = { base: 'sdxl', key: 'queue-main', name: 'SDXL', type: 'main' } as MainModelConfig &
+      ModelsModule.ModelConfig;
+    mocks.models = [main];
+    const store = (mocks.store = createWorkbenchStore());
+    const projectId = store.queries.getSnapshot().activeProject.id;
+    let resolveAssets!: (images: Awaited<ReturnType<typeof galleryImages.resolveMany>>) => void;
+    const assets = new Promise<Awaited<ReturnType<typeof galleryImages.resolveMany>>>((resolve) => {
+      resolveAssets = resolve;
+    });
+    const resolveMany = vi.spyOn(galleryImages, 'resolveMany').mockReturnValue(assets);
+    await render({
+      sourceId: 'canvas',
+      generateValues: {
+        ...getDefaultGenerateSettings(main),
+        model: main,
+        modelKey: main.key,
+        positivePrompt: 'Recalled',
+      },
+      canvasMetadata: makeCanvasMetadata(),
+    });
+    let pending!: Promise<void>;
+    await act(() => {
+      pending = Promise.resolve(handle.current!.recall('all'));
+    });
+    await vi.waitFor(() => expect(resolveMany).toHaveBeenCalled());
+    if (change === 'account') {
+      accountLifecycle.activate('next-account');
+    } else if (change === 'project') {
+      store.commands.projects.create();
+    } else {
+      store.commands.canvas.apply(projectId, {
+        type: 'setCanvasBbox',
+        bbox: { x: 100, y: 200, width: 512, height: 512 },
+      });
+    }
+    const original = store.queries.getProject(projectId)!;
+    await act(async () => {
+      resolveAssets([{ imageName: 'recorded.png' }] as Awaited<ReturnType<typeof galleryImages.resolveMany>>);
+      await pending;
+    });
+    const project = store.queries.getProject(projectId)!;
+    expect(project.canvas.document).toBe(original.canvas.document);
+    expect(project.canvas.snapshots).toHaveLength(0);
+    if (change === 'canvas') {
+      expect(
+        getResolvedProjectWidgetValues(project, 'generate', store.queries.getSnapshot().scopedDefaults).positivePrompt
+      ).toBe('Recalled');
+      expect(mocks.notifyInfo).toHaveBeenCalledWith(
+        expect.any(String),
+        'widgets.gallery.itemActions.recall.canvasPartial'
+      );
+    } else {
+      expect(project).toBe(original);
+      expect(mocks.notifyInfo).not.toHaveBeenCalled();
+      expect(mocks.notifySuccess).not.toHaveBeenCalled();
+      expect(mocks.openWidget).not.toHaveBeenCalled();
+    }
+  }
+);

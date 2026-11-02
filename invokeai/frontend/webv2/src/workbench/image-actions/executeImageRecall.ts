@@ -34,6 +34,8 @@ import {
   type AccountScope,
 } from '@platform/state/accountLifecycle';
 
+import type { CanvasRecallTarget } from './canvasRecall';
+
 import {
   buildImageRecallSettings,
   getImageRecallMessage,
@@ -272,6 +274,7 @@ export const getCurrentGenerateValues = ({
 
 export const executeImageRecall = async ({
   commands,
+  canvasTarget,
   getGenerateValues,
   image,
   isCanvasFrame,
@@ -283,6 +286,7 @@ export const executeImageRecall = async ({
   t,
 }: {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  canvasTarget?: CanvasRecallTarget;
   /** Re-read after every await: the commit writes the whole Generate record, so a snapshot would revert newer edits. */
   getGenerateValues: () => Record<string, unknown>;
   image: GalleryImage;
@@ -298,6 +302,10 @@ export const executeImageRecall = async ({
   t: TFunction;
 }): Promise<boolean> => {
   const owner = callerOwner ?? captureAccountScope();
+  const originalProject = canvasTarget?.getProject();
+  if (canvasTarget && !originalProject) {
+    return false;
+  }
   if (!isAccountScopeCurrent(owner)) {
     return false;
   }
@@ -334,12 +342,55 @@ export const executeImageRecall = async ({
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
     // Only all/remix recall references. Checked against the record, not the built list, so the check happens before
     // the snapshot below.
-    const availableReferenceNames =
-      kind === 'all' || kind === 'remix'
-        ? await resolveAvailableReferenceImageNames(getMetadataReferenceImages(metadata) ?? [], owner.signal)
-        : new Set<string>();
+    const recordedReferences = kind === 'all' || kind === 'remix' ? getMetadataReferenceImages(metadata) : null;
+    const availableReferenceNames = await resolveAvailableReferenceImageNames(recordedReferences ?? [], owner.signal);
 
     assertAccountScopeCurrent(owner);
+    if (canvasTarget && !canvasTarget.getProject()) {
+      return false;
+    }
+    const canvasRecall =
+      (kind === 'all' || kind === 'remix') &&
+      canvasTarget &&
+      originalProject &&
+      metadata &&
+      ('canvas_v3_metadata' in metadata ||
+        'canvas_v2_metadata' in metadata ||
+        'control_layers' in metadata ||
+        'strength' in metadata ||
+        'denoise_strength' in metadata)
+        ? await import('./canvasRecall')
+        : null;
+    const initialValues = canvasRecall ? readGenerateValues() : null;
+    const initialResult = initialValues
+      ? buildImageRecallSettings({
+          currentValues: initialValues,
+          image,
+          isCanvasFrame,
+          kind,
+          metadata,
+          models,
+          supportedModels,
+          vaeModels,
+        })
+      : null;
+    const canvasPlan =
+      canvasRecall && initialResult
+        ? await canvasRecall.prepareCanvasRecall({
+            metadata,
+            model: initialResult.values.model,
+            models,
+            owner,
+            isCurrent: () => canvasTarget?.getProject()?.canvas.document === originalProject?.canvas.document,
+          })
+        : null;
+    if (canvasPlan && canvasRecall && canvasTarget) {
+      await canvasRecall.settleCanvasRecall(canvasPlan, canvasTarget, owner);
+    }
+    assertAccountScopeCurrent(owner);
+    if (canvasTarget && !canvasTarget.getProject()) {
+      return false;
+    }
     // Every read is above: nothing yields between this snapshot and the commit, so an edit made while the record
     // or its references loaded stays in the values the recall writes.
     const currentGenerateValues = readGenerateValues();
@@ -388,9 +439,33 @@ export const executeImageRecall = async ({
       }
     }
 
+    let canvasApplied = false;
+    if (canvasPlan && canvasRecall && canvasTarget && originalProject) {
+      if (initialResult?.values.model.key !== result.values.model.key) {
+        canvasPlan.problems.push('model-changed');
+      } else {
+        canvasApplied = canvasRecall.commitCanvasRecall({
+          plan: canvasPlan,
+          target: canvasTarget,
+          expectedDocument: originalProject.canvas.document,
+          restorePointName: t('widgets.gallery.itemActions.recall.beforeCanvasRecall'),
+        });
+      }
+    }
     const skippedConcepts = result.skipped.filter((skipped) => skipped.subject === 'concept');
     const skippedRefiner = result.skipped.find((skipped) => skipped.subject === 'refiner');
     const skipMessages = [
+      recordedReferences?.some((reference) => {
+        const name = getReferenceImageName(reference);
+        return name === null || !availableReferenceNames.has(name);
+      })
+        ? t('widgets.gallery.itemActions.recall.referenceImagesPartial')
+        : null,
+      canvasPlan && canvasPlan.problems.length > 0
+        ? t('widgets.gallery.itemActions.recall.canvasPartial', {
+            items: canvasRecall!.getCanvasRecallProblemsMessage(canvasPlan.problems, t),
+          })
+        : null,
       skippedConcepts.length > 0
         ? t('widgets.gallery.itemActions.recall.conceptsNotRestored', {
             concepts: skippedConcepts.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
@@ -400,7 +475,7 @@ export const executeImageRecall = async ({
     ].filter((message) => message !== null);
     const skipMessage = skipMessages.length > 0 ? skipMessages.join(' ') : null;
 
-    if (result.fields.length === 0) {
+    if (result.fields.length === 0 && !canvasApplied) {
       commands.notifications.add({
         kind: 'info',
         message: skipMessage ?? t('widgets.gallery.itemActions.recall.imageMetadataUnsupported'),
@@ -409,10 +484,14 @@ export const executeImageRecall = async ({
       return false;
     }
 
-    commands.generation.setSettings(result.values, projectId);
+    if (result.fields.length > 0) {
+      commands.generation.setSettings(result.values, projectId);
+    }
     commands.notifications.add({
       kind: 'success',
-      message: getImageRecallMessage(result.fields, t),
+      message: canvasApplied
+        ? t('widgets.gallery.itemActions.recall.canvasRecalled')
+        : getImageRecallMessage(result.fields, t),
       title: getImageRecallTitle(kind, t),
     });
     if (skipMessage) {

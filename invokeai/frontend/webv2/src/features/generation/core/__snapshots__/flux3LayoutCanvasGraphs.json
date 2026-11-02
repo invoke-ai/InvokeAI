@@ -306,6 +306,29 @@
             "id": "beach",
             "isEnabled": true
           }
+        ],
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              63,
+              250,
+              313,
+              750
+            ],
+            "desc": "a red kite reading \"Éole\""
+          },
+          {
+            "bbox": [
+              625,
+              667,
+              1000,
+              1000
+            ],
+            "desc": "a dog digging in the sand"
+          }
         ]
       }
     }
@@ -627,7 +650,30 @@
         "type": "core_metadata",
         "width": 768,
         "clip_skip": 0,
-        "strength": 0.6
+        "strength": 0.6,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              63,
+              250,
+              313,
+              750
+            ],
+            "desc": "a red kite reading \"Éole\""
+          },
+          {
+            "bbox": [
+              625,
+              667,
+              1000,
+              1000
+            ],
+            "desc": "a dog digging in the sand"
+          }
+        ]
       },
       "canvas_i2l": {
         "is_intermediate": true,
@@ -930,7 +976,30 @@
         "steps": 16,
         "type": "core_metadata",
         "width": 768,
-        "clip_skip": 0
+        "clip_skip": 0,
+        "control_layers": [],
+        "controlnets": [],
+        "t2iAdapters": [],
+        "regions": [
+          {
+            "bbox": [
+              63,
+              250,
+              313,
+              750
+            ],
+            "desc": "a red kite reading \"Éole\""
+          },
+          {
+            "bbox": [
+              625,
+              667,
+              1000,
+              1000
+            ],
+            "desc": "a dog digging in the sand"
+          }
+        ]
       }
     }
   }

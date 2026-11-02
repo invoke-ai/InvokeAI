@@ -10,6 +10,7 @@ import { galleryKeys } from '@features/gallery/queries';
 import { getDefaultGenerateSettings } from '@features/generation/settings';
 import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
+import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { getProjectWidgetInstance } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -55,6 +56,13 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
     negativePrompt: 'avoid blur',
     positivePrompt: 'a canvas prompt',
     seed: 123,
+    steps: 23,
+    cfgScale: 6,
+    cfgRescaleMultiplier: 0.1,
+    scheduler: 'euler',
+    clipSkip: 1,
+    seamlessXAxis: false,
+    seamlessYAxis: true,
     ...generateOverrides,
   };
   // Following the selected board, so the board under test is where saves go.
@@ -63,7 +71,7 @@ const createProject = (boardId = 'board-1', generateOverrides: Partial<GenerateW
   return project;
 };
 
-const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ bbox }) as unknown as CanvasDocumentContractV3;
+const createDocument = (bbox: Rect): CanvasDocumentContractV3 => ({ ...createEmptyCanvasDocument(), bbox });
 
 const createHarness = (
   options: {
@@ -161,7 +169,7 @@ describe('saveCanvasToGallery', () => {
       })
     ).resolves.toEqual({ boardId: 'board-1', imageName: 'saved.png', status: 'saved' });
 
-    expect(harness.order).toEqual(['flush', 'document', 'export', 'upload']);
+    expect(harness.order).toEqual(['flush', 'document', 'export', 'document', 'upload']);
     expect(harness.exportRasterComposite).toHaveBeenCalledWith({ bounds: 'content' });
     expect(harness.uploadImage).toHaveBeenCalledWith(defaultBlob, {
       boardId: 'board-1',
@@ -169,11 +177,22 @@ describe('saveCanvasToGallery', () => {
       imageCategory: 'general',
       isIntermediate: false,
       metadata: {
+        metadata_source: 'canvas_save',
+        vae: null,
+        steps: 23,
+        cfg_scale: 6,
+        cfg_rescale_multiplier: 0.1,
+        scheduler: 'euler',
+        clip_skip: 1,
+        seamless_x: false,
+        seamless_y: true,
+        loras: [],
+        ref_images: [],
         height: 456,
         model: { base: 'sd-1', hash: 'model-hash', key: 'model-key', name: 'Test Model', type: 'main' },
         negative_prompt: 'avoid blur',
         positive_prompt: 'a canvas prompt',
-        seed: 123,
+        canvas_v3_metadata: expect.objectContaining({ version: 1, document: createDocument(defaultRect) }),
         width: 123,
       },
       signal: expect.any(AbortSignal),
@@ -267,9 +286,11 @@ describe('saveCanvasToGallery', () => {
     });
 
     const metadata = harness.uploadImage.mock.calls[0]?.[1]?.metadata;
+    expect(metadata).not.toHaveProperty('seed');
+    expect(metadata).not.toHaveProperty('generation_mode');
     expect(metadata).not.toHaveProperty('model');
     expect(metadata).not.toHaveProperty('negative_prompt');
-    expect(metadata).toMatchObject({ height: 456, positive_prompt: 'a canvas prompt', seed: 123, width: 123 });
+    expect(metadata).toMatchObject({ height: 456, positive_prompt: 'a canvas prompt', width: 123 });
   });
 
   it.each(['empty', 'stale', 'not-ready'] as const)('returns %s without uploading', async (status) => {

@@ -16,6 +16,7 @@ export {
   hasModelDefaultVae,
   isAspectRatioLocked,
   isFluxDypePreset,
+  isIdeogram4SamplerPreset,
   isGenerateModelConfig,
   isLoraCompatibleWithModel,
   isLoraModelConfig,

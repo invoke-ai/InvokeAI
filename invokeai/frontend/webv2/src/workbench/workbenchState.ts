@@ -4009,8 +4009,15 @@ const enqueueCompiledSnapshot = (
       : route.sourceId === 'generate'
         ? normalizeGenerateWidgetValues(widgetStates.generate?.values)
         : null;
+  const recordedCanvas =
+    route.sourceId === 'canvas'
+      ? Object.values(backendGraph?.nodes ?? {}).find((node) => node.type === 'core_metadata')?.canvas_v3_metadata
+      : undefined;
   const recall = generateRecallValues
     ? {
+        ...(recordedCanvas && typeof recordedCanvas === 'object' && !Array.isArray(recordedCanvas)
+          ? { canvasMetadata: { canvas_v3_metadata: structuredClone(recordedCanvas) } }
+          : {}),
         generateValues: {
           ...cloneGenerateWidgetValues(generateRecallValues),
           ...(expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed }),

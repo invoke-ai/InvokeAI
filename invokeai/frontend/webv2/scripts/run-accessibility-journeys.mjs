@@ -614,7 +614,11 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    await page.getByRole('button', { exact: true, name: '0 images remaining. Open queue' }).waitFor();
+    // Queue hydration changes the count and connection wording while the action stays available.
+    await page
+      .locator('header')
+      .getByRole('button', { name: /\. Open queue$/u })
+      .waitFor();
 
     for (const width of [1_024, 900]) {
       await page.setViewportSize({ height: 900, width });

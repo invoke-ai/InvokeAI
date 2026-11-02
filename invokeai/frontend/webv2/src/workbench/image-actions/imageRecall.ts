@@ -14,6 +14,7 @@ import {
   clampAnimaInpaintAdapterWeight,
   clampDimension,
   cloneGenerateWidgetValues,
+  isIdeogram4SamplerPreset,
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
@@ -64,6 +65,13 @@ import {
 import { SEED_MAX } from '@platform/core/seed';
 
 import { resolveRecordedModel, toRecordedModelRef, type RecordedModelPolicy } from './recordedModel';
+
+const hasCanvasRecall = (metadata: unknown): boolean =>
+  isRecord(metadata) &&
+  ('canvas_v3_metadata' in metadata ||
+    'canvas_v2_metadata' in metadata ||
+    'control_layers' in metadata ||
+    typeof (metadata.strength ?? metadata.denoise_strength) === 'number');
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
 
@@ -379,6 +387,13 @@ const getMetadataVae = (
   model: GenerateModelConfig,
   vaeModels: VaeModelConfig[]
 ): VaeModelConfig | null | undefined => {
+  if (!isRecord(metadata)) {
+    return undefined;
+  }
+  const legacyKey = ({ 'qwen-image': 'qwen_image_vae', wan: 'wan_vae_model' } as Record<string, string>)[model.base];
+  if (!('vae' in metadata) && legacyKey && legacyKey in metadata) {
+    metadata = { ...metadata, vae: metadata[legacyKey] };
+  }
   if (!isRecord(metadata) || !('vae' in metadata)) {
     return undefined;
   }
@@ -598,6 +613,46 @@ const getMetadataModelTuning = (
     return {
       ...(shift === undefined ? {} : { qwenImageShift: shift }),
       ...(quantization === undefined ? {} : { qwenImageEncoderQuantization: quantization }),
+    };
+  }
+
+  if (model.base === 'wan') {
+    const raw = metadata.wan_guidance_scale_low_noise;
+    const parsed = raw === null || (typeof raw === 'number' && Number.isFinite(raw) && raw >= 1) ? raw : undefined;
+    const guidance = recordedOrDefault('wan_guidance_scale_low_noise', parsed, null);
+    return guidance === undefined ? {} : { wanGuidanceScaleLowNoise: guidance };
+  }
+  if (model.base === 'ideogram-4') {
+    const preset = isIdeogram4SamplerPreset(metadata.ideogram4_sampler_preset)
+      ? metadata.ideogram4_sampler_preset
+      : undefined;
+    const steps = getBoundedNumber(metadata, 'ideogram4_steps', 2, 100);
+    const overrides = {
+      ideogram4Steps: recordedOrDefault(
+        'ideogram4_steps',
+        metadata.ideogram4_steps === null ? null : steps !== null && Number.isInteger(steps) ? steps : undefined,
+        null
+      ),
+      ideogram4GuidanceScale: recordedOrDefault(
+        'ideogram4_guidance_scale',
+        metadata.ideogram4_guidance_scale === null
+          ? null
+          : (getBoundedNumber(metadata, 'ideogram4_guidance_scale', 1, 20) ?? undefined),
+        null
+      ),
+      ideogram4Mu: recordedOrDefault(
+        'ideogram4_mu',
+        metadata.ideogram4_mu === null ? null : (getBoundedNumber(metadata, 'ideogram4_mu', -4, 4) ?? undefined),
+        null
+      ),
+    };
+    const palette = metadata.ideogram4_color_palette;
+    return {
+      ...(preset === undefined ? {} : { ideogram4SamplerPreset: preset }),
+      ...Object.fromEntries(Object.entries(overrides).filter(([, value]) => value !== undefined)),
+      ...(Array.isArray(palette) && palette.length <= 256 && palette.every((term) => typeof term === 'string')
+        ? { ideogram4ColorPalette: palette }
+        : {}),
     };
   }
 
@@ -1040,7 +1095,12 @@ const getMetadataConcepts = (
       skipped.push({ name: installed.name, reason: 'duplicate', subject: 'concept' });
     } else {
       // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
-      loras.push({ isEnabled: true, model: installed, weight });
+      loras.push({
+        isEnabled:
+          getString(metadata, 'metadata_source') === 'canvas_save' ? (getBoolean(entry, 'isEnabled') ?? true) : true,
+        model: installed,
+        weight,
+      });
     }
   }
 
@@ -1198,7 +1258,8 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings;
+    hasAdapterSettings ||
+    hasCanvasRecall(metadata);
   const hasNonSeedMetadata =
     hasModel ||
     hasVae ||
@@ -1215,7 +1276,8 @@ export const getImageRecallCapabilities = ({
     hasRefiner ||
     hasSkipLayers ||
     hasTuning ||
-    hasAdapterSettings;
+    hasAdapterSettings ||
+    hasCanvasRecall(metadata);
 
   return {
     all: hasAnyMetadata && isImageRecallKindAvailable('all'),
@@ -1488,7 +1550,9 @@ export const buildImageRecallSettings = ({
     }
   }
 
-  return fields.length > 0 || skipped.length > 0 ? { fields, skipped, values } : null;
+  return fields.length > 0 || skipped.length > 0 || ((kind === 'all' || kind === 'remix') && hasCanvasRecall(metadata))
+    ? { fields, skipped, values }
+    : null;
 };
 
 export const getImageRecallTitle = (kind: ImageRecallKind, t: TFunction): string =>
