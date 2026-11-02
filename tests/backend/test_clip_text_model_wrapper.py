@@ -35,17 +35,43 @@ def _config() -> CLIPTextConfig:
 
 
 @pytest.mark.parametrize("model_class", [CLIPTextModel, CLIPTextModelWithProjection])
+@torch.no_grad()
 def test_clip_skip_drops_and_restores_the_last_layers(model_class: type[torch.nn.Module]) -> None:
     model = model_class(_config()).eval()
+    reference = model_class(_config()).eval()
+    reference.load_state_dict(model.state_dict())
     ids = torch.tensor([[0, 5, 6, 2]])
-    # transformers records hidden states with hooks installed on the layers present at the first forward, so a first
-    # forward under clip skip would leave the restored layers unrecorded (#9722, also on 5.5). Warm up unskipped.
-    assert len(model(ids, output_hidden_states=True).hidden_states) == NUM_LAYERS + 1
+    expected = reference(ids, output_hidden_states=True)
 
     with ModelPatcher.apply_clip_skip(model, 2):
-        assert len(model(ids, output_hidden_states=True).hidden_states) == NUM_LAYERS - 2 + 1
+        skipped = model(ids, output_hidden_states=True)
+        assert len(skipped.hidden_states) == NUM_LAYERS - 2 + 1
+        torch.testing.assert_close(skipped.hidden_states, expected.hidden_states[:-2])
+        torch.testing.assert_close(
+            skipped.last_hidden_state,
+            getattr(reference, "text_model", reference).final_layer_norm(expected.hidden_states[-3]),
+        )
 
-    assert len(model(ids, output_hidden_states=True).hidden_states) == NUM_LAYERS + 1
+    restored = model(ids, output_hidden_states=True)
+    assert len(restored.hidden_states) == NUM_LAYERS + 1
+    torch.testing.assert_close(restored.hidden_states, expected.hidden_states)
+    torch.testing.assert_close(restored.last_hidden_state, expected.last_hidden_state)
+
+
+@torch.no_grad()
+def test_clip_skip_does_not_duplicate_hidden_states_on_a_warmed_projection_model() -> None:
+    model = CLIPTextModelWithProjection(_config()).eval()
+    ids = torch.tensor([[0, 5, 6, 2]])
+    expected = model(ids, output_hidden_states=True)
+
+    with ModelPatcher.apply_clip_skip(model, 1):
+        skipped = model(ids, output_hidden_states=True)
+        assert len(skipped.hidden_states) == NUM_LAYERS
+        torch.testing.assert_close(skipped.hidden_states, expected.hidden_states[:-1])
+
+    restored = model(ids, output_hidden_states=True)
+    assert len(restored.hidden_states) == NUM_LAYERS + 1
+    torch.testing.assert_close(restored.hidden_states, expected.hidden_states)
 
 
 @pytest.mark.parametrize(
