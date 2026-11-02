@@ -122,8 +122,8 @@ def test_regional_guidance_and_its_negative_subset() -> None:
     `sdxl_compel_prompt` path masks both prompt polarities. The FLUX / FLUX.2 / Krea-2 / Z-Image /
     Anima denoisers mask positive conditioning only -- Z-Image and Anima accept a negative list but
     discard its masks, so a "regional" negative there would act globally and webv2 rejects it.
-    MOSS-Image and Ideogram 4 mask nothing: their regions become boxes in a JSON layout prompt or
-    structured caption, which has no negative counterpart.
+    MOSS-Image, Ideogram 4 and FLUX.3 mask nothing: their regions become boxes in a JSON layout
+    prompt, structured caption or box table, which has no negative counterpart.
     """
     regional = {
         b.value for b in generative_bases() if (f := get(b, FeaturesFacet)) is not None and f.supports_regional_guidance
@@ -140,6 +140,7 @@ def test_regional_guidance_and_its_negative_subset() -> None:
         "anima",
         "moss-image",
         "ideogram-4",
+        "flux3",
     }
     assert negative == {"sd-1", "sd-2", "sdxl"}
     assert negative < regional, "a regional negative prompt without regional guidance is meaningless"
