@@ -276,7 +276,7 @@ const isPlainRecord = (value: unknown): value is Readonly<Record<string, unknown
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
 /** The tools `canvasToolMemory` may hold; canvas normalizes each one's fields on read. */
-const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text'] as const;
+const CANVAS_TOOL_MEMORY_KEYS = ['brush', 'eraser', 'shape', 'text', 'paintBucket'] as const;
 
 /**
  * Keeps only the known tools' plain records, so the synced blob cannot grow with stray keys. An already-valid record

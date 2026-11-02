@@ -88,6 +88,7 @@ import type { LayerCacheReadiness } from '@workbench/canvas-engine/controllers/e
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
+import type { FloodFillExecutor } from '@workbench/canvas-engine/render/fill/floodFillService';
 import type { CanvasFontRuntime, CanvasTextSource, FontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
@@ -191,6 +192,7 @@ import { createLassoTool } from '@workbench/canvas-engine/tools/lassoTool';
 import { createMarqueeTool } from '@workbench/canvas-engine/tools/marqueeTool';
 import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 import { createMoveTool } from '@workbench/canvas-engine/tools/moveTool';
+import { createPaintBucketTool } from '@workbench/canvas-engine/tools/paintBucketTool';
 import { stepBrushSize } from '@workbench/canvas-engine/tools/paintConstants';
 import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
@@ -202,7 +204,7 @@ import { createViewport, type Viewport } from '@workbench/canvas-engine/viewport
 import type { ImagePatchApply } from './history/imagePatch';
 import type { LayerUnreadable } from './layerExportGuards';
 import type { CanvasProjectMutation } from './mutationContracts';
-import type { StrokeCommittedEvent, Tool, ToolContext } from './tools/tool';
+import type { StrokeCommittedEvent, Tool, ToolContext, ToolFloodFill } from './tools/tool';
 
 import { createBitmapStore, type BitmapStore } from './document/bitmapStore';
 import { createDocumentMirror, type DocumentMirror } from './document/documentMirror';
@@ -307,6 +309,8 @@ export interface CanvasEngineOptions {
   enableDiagnostics?: boolean;
   /** Spatial adjustment executor factory; defaults to a module worker. Node tests pass an inline one. */
   createSpatialExecutor?: () => SpatialAdjustmentExecutor;
+  /** Flood fill executor factory for the paint bucket; defaults to a module worker. Node tests pass an inline one. */
+  createFloodFillExecutor?: () => FloodFillExecutor;
 }
 
 export interface CanvasEngineSelectionCapability extends CanvasSelectionCapability {}
@@ -378,6 +382,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onGroupSurfaceSettled: (groupId) => onGroupSurfaceSettled(groupId),
     onVersionChange: (layerId) => editingController?.invalidateLayer(layerId),
     createSpatialExecutor: opts.createSpatialExecutor,
+    createFloodFillExecutor: opts.createFloodFillExecutor,
   });
   const layerCache = rasterController.layers;
   const stores = createEngineStores();
@@ -410,6 +415,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     marqueeOptions: stores.marqueeOptions,
     layerPixelEpoch: stores.layerPixelEpoch,
     documentEpoch: stores.documentEpoch,
+    paintBucketOptions: stores.paintBucketOptions,
+    paintBucketScrub: stores.paintBucketScrub,
     ruleOfThirds: stores.ruleOfThirds,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
@@ -448,9 +455,48 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ['marquee', createMarqueeTool()],
     ['shape', createShapeTool()],
     ['gradient', createGradientTool()],
+    ['paintBucket', createPaintBucketTool()],
     ['text', createTextTool()],
     ['sam', createSamTool()],
   ]);
+
+  /**
+   * Paint bucket presses open in the flood fill worker. A released press still settles (it commits once its last
+   * region arrives), so an open press counts as part of its gesture: other edits, replays and cache trims wait for it.
+   * Only the tool ends a press (`end`), after it has put its pixels back or recorded them, so this count and the
+   * layer's state never disagree.
+   */
+  const openFillPresses = new Set<number>();
+  const isGestureActive = (): boolean => pipeline.isGestureActive() || openFillPresses.size > 0;
+  const toolFloodFill: ToolFloodFill = {
+    begin: (pressId, sample, seed, options, sampleLease) => {
+      const answer = rasterController.floodFill.begin(pressId, sample, seed, options, sampleLease);
+      openFillPresses.add(pressId);
+      return answer;
+    },
+    end: (pressId) => {
+      openFillPresses.delete(pressId);
+      rasterController.floodFill.end(pressId);
+    },
+    region: (pressId, params) => rasterController.floodFill.region(pressId, params),
+    reserveSample: (bytes) => {
+      const reservation = rasterController.memory.reserveOperation(bytes, { purpose: 'fill-sample' });
+      return reservation.status === 'ok' ? reservation.lease : null;
+    },
+  };
+  /**
+   * Cancels the pointer gesture and any work a tool still settles after it (a released fill), synchronously, so nothing
+   * that follows (a flush, a document swap) sees a preview that will never be recorded. Every tool is asked, not only
+   * the active one: a temporary hold (Alt's picker, Space's pan) may have taken over while a fill settles.
+   */
+  const cancelActiveGesture = (): void => {
+    const cleanup = createCleanupAccumulator();
+    cleanup.run(() => pipeline.cancelActiveGesture());
+    for (const tool of tools.values()) {
+      cleanup.run(() => tool.cancelSettling?.(toolContext));
+    }
+    cleanup.throwIfFailed();
+  };
 
   // Render-time transform previews leave the mirror untouched; move overrides position, transform overrides the
   // full matrix.
@@ -606,7 +652,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   /** Defer trim while a gesture, session or rasterization depends on the cache bounds. */
   const isLayerBusyForTrim = (layerId: string): boolean => {
-    if (pipeline.isGestureActive() || isLayerHeldBySession(layerId)) {
+    if (isGestureActive() || isLayerHeldBySession(layerId)) {
       return true;
     }
     const layer = getDocumentLayer(mirror.getDocument(), layerId);
@@ -680,7 +726,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     canEdit: () => canEditDocument(),
     canRedoStore: stores.canRedo,
     canUndoStore: stores.canUndo,
-    isGestureActive: () => pipeline.isGestureActive(),
+    isGestureActive,
     reportFailure: (label, error) =>
       opts.reportError({
         area: 'canvas-engine',
@@ -919,7 +965,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getReducerDocument: () => mutationPort.getCanvasState()?.document ?? null,
     history,
     installPrepared: (prepared, persist) => installGeneratedPaintCache(prepared, persist),
-    isGestureActive: () => pipeline.isGestureActive(),
+    isGestureActive,
     endStructuralPreview: () => structuralController.endPreview(),
     isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
     preparePixels: (layerId, rect, pixels) => prepareGeneratedPaintCache(layerId, rect, pixels),
@@ -994,7 +1040,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getFillColor: () => stores.brushOptions.get().color,
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
       isRasterCacheReady: (layer, document) => isLayerCacheReadyForOp(layer, document),
-      isGestureActive: () => pipeline.isGestureActive(),
+      isGestureActive,
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
@@ -1014,7 +1060,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       createLayerId,
       getDocument: () => mirror.getDocument(),
       invalidate: (payload) => scheduler.invalidate(payload),
-      isGestureActive: () => pipeline.isGestureActive(),
+      isGestureActive,
       colors: stores.colorPair,
       options: stores.textOptions,
       session: stores.textEditSession,
@@ -1030,7 +1076,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getUserToolId: () => pipeline.heldRestoreToolId() ?? interactionController.getActiveToolId(),
       hasFloatingSelection: () => floatingSelection.has(),
       invalidate: (payload) => scheduler.invalidate(payload),
-      isGestureActive: () => pipeline.isGestureActive(),
+      isGestureActive,
       peekCacheRect: (layerId) => layerCache.peek(layerId)?.rect,
       pending: stores.pendingTransformLayerId,
       reportRefusal: reportEditRefusal,
@@ -1169,7 +1215,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     openTextCreate: (docPoint) => openTextCreate(docPoint),
     openTextEdit: (layerId) => openTextEdit(layerId),
     paintLineEnds,
+    floodFill: toolFloodFill,
     sampleProviders: colorSampleProviders,
+    transformOverrides,
     resolveColorSample: (hex, phase) => colorSamples.route(hex, phase),
     setLayerTransformOverride: (layerId, override) => {
       if (override) {
@@ -1639,7 +1687,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       const cleanup = createCleanupAccumulator();
       cleanup.run(() => groupSurfaces.clear());
       cleanup.run(() => editingController.invalidateDocument());
-      cleanup.run(() => pipeline.cancelActiveGesture());
+      cleanup.run(cancelActiveGesture);
       cleanup.run(cancelOpenPixelEdit);
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
@@ -1712,7 +1760,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         cleanup.run(() => floatingSelection.cancel());
       }
       if (pixelEditController?.isOpenFor(ids)) {
-        cleanup.run(() => pipeline.cancelActiveGesture());
+        cleanup.run(cancelActiveGesture);
         cleanup.run(cancelOpenPixelEdit);
       }
       const doc = mirror.getDocument();
@@ -1862,7 +1910,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     if (projectWasPresent && !projectIsPresent) {
       const cleanup = createCleanupAccumulator();
       cleanup.run(() => editingController.invalidateProject());
-      cleanup.run(() => pipeline.cancelActiveGesture());
+      cleanup.run(cancelActiveGesture);
       cleanup.run(cancelOpenPixelEdit);
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
@@ -1925,6 +1973,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const unsubscribeShowBbox = stores.showBbox.subscribe(() => scheduler.invalidate({ overlay: true }));
   const unsubscribeBboxOverlay = stores.bboxOverlay.subscribe(() => scheduler.invalidate({ overlay: true }));
   const unsubscribeRuleOfThirds = stores.ruleOfThirds.subscribe(() => scheduler.invalidate({ overlay: true }));
+  // The bucket's cursor depends on its mode (erase refuses where fill would make a layer).
+  const unsubscribePaintBucketOptions = stores.paintBucketOptions.subscribe(() => {
+    if (interactionController.getActiveToolId() === 'paintBucket') {
+      updateCursor();
+    }
+  });
 
   /** Steps the active brush/eraser diameter by one notch (ctrl+wheel or the `[`/`]` hotkeys). */
   const stepActiveBrushSize = (direction: 1 | -1): void => {
@@ -2106,6 +2160,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     detach();
     cancelAllLayerRasterizations();
     rasterController.cancelSpatialAdjustments();
+    // Before the flush: a settling fill's preview must not be encoded as the layer's pixels.
+    cancelActiveGesture();
     cooldownPromise = persistenceController.flush().then(
       () => {
         if (disposed || lifecycleState !== 'cooling' || lifecycleGeneration !== generation) {
@@ -2621,7 +2677,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lifecycleGeneration += 1;
     lifecycleState = 'disposed';
     const cleanup = createCleanupAccumulator();
-    cleanup.run(() => pipeline.cancelActiveGesture());
+    cleanup.run(cancelActiveGesture);
     cleanup.run(cancelOpenPixelEdit);
     cleanup.run(() => pixelEditController?.dispose());
     cleanup.run(() => filterResultController.dispose());
@@ -2653,6 +2709,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(unsubscribeShowBbox);
     cleanup.run(unsubscribeBboxOverlay);
     cleanup.run(unsubscribeRuleOfThirds);
+    cleanup.run(unsubscribePaintBucketOptions);
     cleanup.run(unsubscribeProjectPreviewLifecycle);
     cleanup.run(unsubscribeTextFontSources);
     cleanup.run(unsubscribeTextDefaultsFontSources);
@@ -2728,7 +2785,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
    * editing, when right-click belongs to the interaction.
    */
   const canTargetLayerFromContextMenu = (): boolean =>
-    !pipeline.isGestureActive() &&
+    !isGestureActive() &&
     !stores.transformSession.get() &&
     !stores.textEditSession.get() &&
     mirror.getDocument() !== null;

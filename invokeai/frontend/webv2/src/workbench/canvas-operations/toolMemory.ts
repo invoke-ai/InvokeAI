@@ -1,9 +1,9 @@
 /**
- * Tool options a person tunes once and expects to find again: brush, eraser, shape and text settings. They belong to
- * the account (its preferences), not to one engine, so a canvas whose engine was disposed after its project went out
- * of view, or another project's canvas, starts with them. Brush color is not here: it follows the project's color
- * pair. Stored values are normalized against the engine defaults on every read, so an older or hand-edited record
- * never reaches a store.
+ * Tool options a person tunes once and expects to find again: brush, eraser, shape, text and paint bucket settings.
+ * They belong to the account (its preferences), not to one engine, so a canvas whose engine was disposed after its
+ * project went out of view, or another project's canvas, starts with them. Brush color is not here: it follows the
+ * project's color pair. Stored values are normalized against the engine defaults on every read, so an older or
+ * hand-edited record never reaches a store.
  */
 
 import type {
@@ -11,6 +11,7 @@ import type {
   CanvasTextFontRef,
   CanvasTextFontStyle,
   EraserOptions,
+  PaintBucketOptions,
   ShapeToolKind,
   ShapeToolOptions,
   TextToolOptions,
@@ -19,9 +20,14 @@ import type {
 import {
   DEFAULT_BRUSH_OPTIONS,
   DEFAULT_ERASER_OPTIONS,
+  DEFAULT_PAINT_BUCKET_OPTIONS,
   DEFAULT_SHAPE_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   MAX_BRUSH_SIZE,
+  MAX_FILL_CLOSE_GAPS,
+  MAX_FILL_EXPAND,
+  MAX_FILL_OPACITY,
+  MAX_FILL_TOLERANCE,
   MAX_SHAPE_STROKE_WIDTH,
   MAX_TEXT_FONT_SIZE,
   MIN_BRUSH_SIZE,
@@ -33,6 +39,7 @@ export type CanvasToolMemory = {
   eraser: EraserOptions;
   shape: ShapeToolOptions;
   text: TextToolOptions;
+  paintBucket: PaintBucketOptions;
 };
 
 /** Where the account keeps the memory; the composition root injects the preferences store. */
@@ -88,6 +95,7 @@ export const normalizeCanvasToolMemory = (raw: unknown): CanvasToolMemory => {
   const eraser = isRecord(stored.eraser) ? stored.eraser : {};
   const shape = isRecord(stored.shape) ? stored.shape : {};
   const text = isRecord(stored.text) ? stored.text : {};
+  const bucket = isRecord(stored.paintBucket) ? stored.paintBucket : {};
   const ref = fontRef(text.fontRef);
   return {
     brush: {
@@ -127,6 +135,21 @@ export const normalizeCanvasToolMemory = (raw: unknown): CanvasToolMemory => {
       lineHeight: number(text.lineHeight, DEFAULT_TEXT_OPTIONS.lineHeight, LINE_HEIGHTS.min, LINE_HEIGHTS.max),
       ...(ref ? { fontRef: ref } : {}),
     },
+    paintBucket: {
+      antiAlias: boolean(bucket.antiAlias, DEFAULT_PAINT_BUCKET_OPTIONS.antiAlias),
+      closeGaps: Math.round(number(bucket.closeGaps, DEFAULT_PAINT_BUCKET_OPTIONS.closeGaps, 0, MAX_FILL_CLOSE_GAPS)),
+      contiguous: boolean(bucket.contiguous, DEFAULT_PAINT_BUCKET_OPTIONS.contiguous),
+      expandMask: Math.round(
+        number(bucket.expandMask, DEFAULT_PAINT_BUCKET_OPTIONS.expandMask, -MAX_FILL_EXPAND, MAX_FILL_EXPAND)
+      ),
+      expandRaster: Math.round(
+        number(bucket.expandRaster, DEFAULT_PAINT_BUCKET_OPTIONS.expandRaster, -MAX_FILL_EXPAND, MAX_FILL_EXPAND)
+      ),
+      mode: oneOf(bucket.mode, ['fill', 'erase'] as const, DEFAULT_PAINT_BUCKET_OPTIONS.mode),
+      opacity: Math.round(number(bucket.opacity, DEFAULT_PAINT_BUCKET_OPTIONS.opacity, 0, MAX_FILL_OPACITY)),
+      sample: oneOf(bucket.sample, ['all', 'layer'] as const, DEFAULT_PAINT_BUCKET_OPTIONS.sample),
+      tolerance: Math.round(number(bucket.tolerance, DEFAULT_PAINT_BUCKET_OPTIONS.tolerance, 0, MAX_FILL_TOLERANCE)),
+    },
   };
 };
 
@@ -142,18 +165,19 @@ export interface ToolMemoryStores {
   eraserOptions: OptionStore<EraserOptions>;
   shapeOptions: OptionStore<ShapeToolOptions>;
   textOptions: OptionStore<TextToolOptions>;
+  paintBucketOptions: OptionStore<PaintBucketOptions>;
 }
 
 type ToolKey = keyof CanvasToolMemory;
 
-const TOOL_KEYS: readonly ToolKey[] = ['brush', 'eraser', 'shape', 'text'];
+const TOOL_KEYS: readonly ToolKey[] = ['brush', 'eraser', 'shape', 'text', 'paintBucket'];
 
 const capture = <Key extends ToolKey>(stores: ToolMemoryStores, key: Key): CanvasToolMemory[Key] => {
   if (key === 'brush') {
     const { color: _color, ...brush } = stores.brushOptions.get();
     return brush as CanvasToolMemory[Key];
   }
-  return stores[`${key}Options` as 'eraserOptions' | 'shapeOptions' | 'textOptions'].get() as CanvasToolMemory[Key];
+  return stores[`${key}Options` as Exclude<keyof ToolMemoryStores, 'brushOptions'>].get() as CanvasToolMemory[Key];
 };
 
 const sameValue = (a: unknown, b: unknown): boolean => {
@@ -247,6 +271,7 @@ export const bindCanvasToolMemory = (
     stores.eraserOptions.subscribe(onChange('eraser')),
     stores.shapeOptions.subscribe(onChange('shape')),
     stores.textOptions.subscribe(onChange('text')),
+    stores.paintBucketOptions.subscribe(onChange('paintBucket')),
     port.subscribe?.(seed) ?? (() => undefined),
   ];
   let disposed = false;

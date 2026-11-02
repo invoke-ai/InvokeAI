@@ -51,6 +51,15 @@ export const isMergeableRasterLeaf = (leaf: SemanticLeaf | null | undefined): le
   isLeafEditable(leaf) && leaf.layer.type === 'raster' && isPixelBackedLayer(leaf.layer);
 
 /**
+ * Whether a press that paints or erases lands on the leaf itself (paint or image raster, control layer, mask) rather
+ * than on a new paint layer above it. Shared by the brush, eraser and paint bucket, and by the options form.
+ */
+export const paintsInPlace = ({ layer }: SemanticLeaf): boolean =>
+  layer.type === 'raster'
+    ? layer.source.type === 'paint' || layer.source.type === 'image'
+    : layer.type === 'control' || layer.type === 'inpaint_mask' || layer.type === 'regional_guidance';
+
+/**
  * Why a tool cannot edit `leaf`, folding its ancestors: hidden (disabled) before locked, since a layer the user cannot
  * see is the first thing to fix. Null when it can be edited.
  */

@@ -64,8 +64,10 @@ const COLOR_LOUPE_DIAMETER_PX = 120;
 /** Each magnified pixel spans at least this many CSS pixels, and twice the canvas zoom. */
 const COLOR_LOUPE_MIN_CELL_PX = 8;
 const COLOR_LOUPE_RING = '#d4d4d4';
-const COLOR_LOUPE_LABEL_FONT = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
-const COLOR_LOUPE_LABEL_FILL = 'rgba(0, 0, 0, 0.72)';
+/** Readouts beside the pointer (the loupe's RGB, the bucket's tolerance) share one pill style. */
+const LABEL_PILL_FONT = '600 11px ui-monospace, SFMono-Regular, Menlo, monospace';
+const LABEL_PILL_FILL = 'rgba(0, 0, 0, 0.72)';
+const LABEL_PILL_HEIGHT_PX = 18;
 
 /** Document pixels across the loupe at `zoom`: odd, so the sampled one sits at the center, and at least three. */
 export const colorLoupePixels = (zoom: number): number => {
@@ -122,6 +124,8 @@ export interface OverlayState {
   cursor?: OverlayCursor | null;
   /** The color picker's loupe, or `null`/absent to hide it. */
   colorLoupe?: ColorLoupeOverlay | null;
+  /** The tolerance a paint bucket drag is scrubbing, shown beside the pointer (CSS pixels); null/absent hides it. */
+  toleranceReadout?: { readonly tolerance: number; readonly screenPoint: Vec2 } | null;
   /** Move outline uses four document-space content corners projected through view; null/absence hides it. */
   layerOutline?: readonly Vec2[] | null;
   /**
@@ -305,23 +309,58 @@ const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
   strokeOutlined(ctx, COLOR_LOUPE_RING, 2);
 
   if (loupe.color) {
-    const label = `${loupe.color.r} ${loupe.color.g} ${loupe.color.b}`;
-    ctx.font = COLOR_LOUPE_LABEL_FONT;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const width = ctx.measureText(label).width + 12;
-    const height = 18;
-    const labelY = center.y + cell / 2 + 12 + height / 2;
-    const end = height / 2;
-    ctx.beginPath();
-    ctx.arc(center.x - width / 2 + end, labelY, end, Math.PI / 2, (Math.PI * 3) / 2);
-    ctx.arc(center.x + width / 2 - end, labelY, end, -Math.PI / 2, Math.PI / 2);
-    ctx.closePath();
-    ctx.fillStyle = COLOR_LOUPE_LABEL_FILL;
-    ctx.fill();
-    ctx.fillStyle = CURSOR_LIGHT;
-    ctx.fillText(label, center.x, labelY);
+    drawLabelPill(
+      ctx,
+      `${loupe.color.r} ${loupe.color.g} ${loupe.color.b}`,
+      center.x,
+      center.y + cell / 2 + 12,
+      'below'
+    );
   }
+  ctx.restore();
+};
+
+/**
+ * Draws `label` in a rounded pill whose top edge centers on `(x, y)` (`below`) or whose left edge middles on it
+ * (`right`), in CSS pixels.
+ */
+const drawLabelPill = (ctx: Ctx, label: string, x: number, y: number, anchor: 'below' | 'right'): void => {
+  ctx.font = LABEL_PILL_FONT;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const width = ctx.measureText(label).width + 12;
+  const height = LABEL_PILL_HEIGHT_PX;
+  const centerX = anchor === 'below' ? x : x + width / 2;
+  const centerY = anchor === 'below' ? y + height / 2 : y;
+  const end = height / 2;
+  ctx.beginPath();
+  ctx.arc(centerX - width / 2 + end, centerY, end, Math.PI / 2, (Math.PI * 3) / 2);
+  ctx.arc(centerX + width / 2 - end, centerY, end, -Math.PI / 2, Math.PI / 2);
+  ctx.closePath();
+  ctx.fillStyle = LABEL_PILL_FILL;
+  ctx.fill();
+  ctx.fillStyle = CURSOR_LIGHT;
+  ctx.fillText(label, centerX, centerY);
+};
+
+/** Pointer-to-readout offset in CSS pixels: right of and below the hotspot, clear of the crosshair. */
+const TOLERANCE_READOUT_OFFSET = { x: 14, y: 18 } as const;
+
+/** Draws the paint bucket's scrubbed tolerance beside the pointer, in the loupe readout's style. */
+const drawToleranceReadout = (ctx: Ctx, state: OverlayState): void => {
+  const readout = state.toleranceReadout;
+  if (!readout) {
+    return;
+  }
+  ctx.save();
+  ctx.setLineDash([]);
+  drawLabelPill(
+    ctx,
+    `${readout.tolerance}%`,
+    readout.screenPoint.x + TOLERANCE_READOUT_OFFSET.x,
+    readout.screenPoint.y + TOLERANCE_READOUT_OFFSET.y,
+    'right'
+  );
   ctx.restore();
 };
 
@@ -704,6 +743,7 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
   drawGradientPreview(ctx, state);
   drawCursor(ctx, state);
   drawColorLoupe(ctx, state);
+  drawToleranceReadout(ctx, state);
 
   ctx.restore();
 };

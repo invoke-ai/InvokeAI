@@ -178,6 +178,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         // the bbox tool is active so its handles have a frame to attach to.
         showBbox: stores.showBbox.get() || activeTool === 'bbox',
         showGrid: stores.showGrid.get(),
+        toleranceReadout: stores.paintBucketScrub.get(),
         transformFrame: transformFrame(doc),
         ...screen,
       };

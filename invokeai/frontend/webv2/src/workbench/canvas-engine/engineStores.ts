@@ -139,6 +139,53 @@ export interface GradientToolOptions {
   stops: GradientStop[];
 }
 
+/** Fill paints the region with the foreground color; erase clears it. */
+export type PaintBucketMode = 'fill' | 'erase';
+
+/** What the fill compares colors on: everything visible in the raster and control stacks, or the target alone. */
+export type PaintBucketSample = 'all' | 'layer';
+
+/**
+ * Paint bucket options. Tolerance and opacity are percentages; close gaps and expand are document pixels. Expand is
+ * kept per target kind because a mask wants a small bleed past the sampled edge and a raster fill does not. Masks
+ * ignore `antiAlias` and `opacity`: their coverage is always hard and opaque.
+ */
+export interface PaintBucketOptions {
+  mode: PaintBucketMode;
+  tolerance: number;
+  contiguous: boolean;
+  sample: PaintBucketSample;
+  closeGaps: number;
+  expandRaster: number;
+  expandMask: number;
+  antiAlias: boolean;
+  opacity: number;
+}
+
+export const MAX_FILL_TOLERANCE = 100;
+export const MAX_FILL_CLOSE_GAPS = 32;
+/** Expand runs from `-MAX_FILL_EXPAND` (shrink) to `MAX_FILL_EXPAND`. */
+export const MAX_FILL_EXPAND = 16;
+export const MAX_FILL_OPACITY = 100;
+
+export const DEFAULT_PAINT_BUCKET_OPTIONS: Readonly<PaintBucketOptions> = {
+  antiAlias: true,
+  closeGaps: 0,
+  contiguous: true,
+  expandMask: 2,
+  expandRaster: 0,
+  mode: 'fill',
+  opacity: 100,
+  sample: 'all',
+  tolerance: 20,
+};
+
+/** The tolerance a paint bucket drag is scrubbing and where the pointer is (CSS pixels), for the overlay readout. */
+export interface PaintBucketScrub {
+  tolerance: number;
+  screenPoint: Vec2;
+}
+
 /** The lasso tool's in-flight outline: a freehand drag, or a polygon being placed vertex by vertex. */
 export type LassoPreview =
   | { kind: 'freehand'; points: readonly Vec2[] }
@@ -486,6 +533,10 @@ export interface EngineStores {
   gradientOptions: ScalarStore<GradientToolOptions>;
   /** Text tool options (font family / size / weight / line-height / align). */
   textOptions: ScalarStore<TextToolOptions>;
+  /** Paint bucket options; a tolerance drag writes the tolerance it lands on. */
+  paintBucketOptions: ScalarStore<PaintBucketOptions>;
+  /** The tolerance a paint bucket drag is scrubbing, drawn as a readout by the pointer; null when not scrubbing. */
+  paintBucketScrub: ScalarStore<PaintBucketScrub | null>;
   /**
    * Text session drives the portal, live style controls and composite suppression. Commit, cancel, real tool
    * switch, deletion or replacement clears it.
@@ -579,6 +630,22 @@ const shapeOptionsEqual = (a: ShapeToolOptions, b: ShapeToolOptions): boolean =>
   a.fillEnabled === b.fillEnabled &&
   a.strokeEnabled === b.strokeEnabled &&
   a.strokeWidth === b.strokeWidth;
+
+const paintBucketOptionsEqual = (a: PaintBucketOptions, b: PaintBucketOptions): boolean =>
+  a.mode === b.mode &&
+  a.tolerance === b.tolerance &&
+  a.contiguous === b.contiguous &&
+  a.sample === b.sample &&
+  a.closeGaps === b.closeGaps &&
+  a.expandRaster === b.expandRaster &&
+  a.expandMask === b.expandMask &&
+  a.antiAlias === b.antiAlias &&
+  a.opacity === b.opacity;
+
+const paintBucketScrubEqual = (a: PaintBucketScrub | null, b: PaintBucketScrub | null): boolean =>
+  a === null || b === null
+    ? a === b
+    : a.tolerance === b.tolerance && a.screenPoint.x === b.screenPoint.x && a.screenPoint.y === b.screenPoint.y;
 
 const colorPairEqual = (a: ActiveColorPairState, b: ActiveColorPairState): boolean =>
   a.foreground === b.foreground && a.background === b.background;
@@ -730,6 +797,11 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
   marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   layerPixelEpoch: createScalarStore<number>(0),
+  paintBucketOptions: createScalarStore<PaintBucketOptions>(
+    { ...DEFAULT_PAINT_BUCKET_OPTIONS },
+    paintBucketOptionsEqual
+  ),
+  paintBucketScrub: createScalarStore<PaintBucketScrub | null>(null, paintBucketScrubEqual),
   documentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
