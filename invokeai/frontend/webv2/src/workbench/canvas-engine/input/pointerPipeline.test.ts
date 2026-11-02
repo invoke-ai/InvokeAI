@@ -302,6 +302,83 @@ describe('pointer pipeline: middle-mouse pan', () => {
   });
 });
 
+describe('pointer pipeline: physical Control key', () => {
+  const control = (ctrlKey: boolean) => makeKeyEvent({ code: 'ControlLeft', ctrlKey, key: 'Control' });
+
+  it('is unknown until a key or pointer event shows it, then follows presses and releases', () => {
+    const h = createHarness();
+    expect(h.pipeline.controlKeyState()).toBe('unknown');
+    h.pipeline.onKeyDown(control(true));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    // Another key while Control stays down keeps it down.
+    h.pipeline.onKeyUp(makeKeyEvent({ code: 'KeyZ', ctrlKey: true, key: 'z' }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    // Browsers may still report ctrlKey on the Control key's own release.
+    h.pipeline.onKeyUp(control(true));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+  });
+
+  it('takes the real modifier state from pointer events, so a press missed while unfocused still counts', () => {
+    const h = createHarness();
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, ctrlKey: true }));
+    expect(h.pipeline.controlKeyState()).toBe('down');
+    h.pipeline.onPointerMove(makePointerEvent({ buttons: 0 }));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+  });
+
+  it('becomes unknown again on reset (window blur, hidden page, detach)', () => {
+    const h = createHarness();
+    h.pipeline.onKeyUp(control(false));
+    expect(h.pipeline.controlKeyState()).toBe('up');
+    h.pipeline.reset();
+    expect(h.pipeline.controlKeyState()).toBe('unknown');
+  });
+});
+
+describe('pointer pipeline: hover refresh after a view change', () => {
+  it('re-delivers the still pointer as a hover move at its new document point', () => {
+    const h = createHarness();
+    h.pipeline.onPointerEnter();
+    h.pipeline.onPointerMove(
+      makePointerEvent({ buttons: 0, clientX: 40, clientY: 30, ctrlKey: true, pointerType: 'pen' })
+    );
+    h.deps.viewport.panBy({ x: 10, y: -20 });
+    h.pipeline.refreshHover();
+
+    const last = h.tool.moves.at(-1)!;
+    expect(h.tool.moves).toHaveLength(2);
+    expect(last.input.screenPoint).toEqual({ x: 40, y: 30 });
+    expect(last.input.documentPoint).toEqual({ x: 30, y: 50 });
+    expect(last.input.buttons).toBe(0);
+    expect(last.input.modifiers.ctrl).toBe(true);
+    expect(last.input.pointerType).toBe('pen');
+    expect(last.batch).toEqual([last.input]);
+  });
+
+  it('delivers nothing off the canvas, during a gesture, or during a middle-button pan', () => {
+    const left = createHarness();
+    left.pipeline.onPointerEnter();
+    left.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 5 }));
+    left.pipeline.onPointerLeave();
+    left.pipeline.refreshHover();
+    expect(left.tool.moves).toHaveLength(1);
+
+    const painting = createHarness();
+    painting.pipeline.onPointerDown(makePointerEvent({ clientX: 5 }));
+    painting.pipeline.onPointerMove(makePointerEvent({ clientX: 6 }));
+    painting.pipeline.refreshHover();
+    expect(painting.tool.moves).toHaveLength(1);
+
+    const middle = createHarness();
+    middle.pipeline.onPointerEnter();
+    middle.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 5 }));
+    middle.pipeline.onPointerDown(makePointerEvent({ button: 1, buttons: 4, clientX: 5 }));
+    middle.pipeline.onPointerMove(makePointerEvent({ buttons: 4, clientX: 25 }));
+    middle.pipeline.refreshHover();
+    expect(middle.tool.moves).toHaveLength(1);
+  });
+});
+
 describe('pointer pipeline: multi-pointer isolation during an active gesture', () => {
   it('ignores move events from a second pointer while the first pointer is gesturing', () => {
     const h = createHarness();

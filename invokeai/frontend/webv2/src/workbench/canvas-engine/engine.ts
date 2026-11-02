@@ -417,6 +417,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     snapToGrid: stores.snapToGrid,
     textEditSession: stores.textEditSession,
     textOptions: stores.textOptions,
+    trackpadNavigation: stores.trackpadNavigation,
     transformSession: stores.transformSession,
     pendingTransformLayerId: stores.pendingTransformLayerId,
     viewportReady: stores.viewportReady,
@@ -936,6 +937,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     subscribeReducer: (listener) => mutationPort.subscribe(listener),
   });
   const editRefusalListeners = new Set<(refusal: CanvasEditRefusal) => void>();
+  const trackpadPinchListeners = new Set<() => void>();
+  const reportTrackpadPinch = (): void => {
+    for (const listener of trackpadPinchListeners) {
+      try {
+        listener();
+      } catch {
+        // A faulty listener must not stop the wheel event from being routed.
+      }
+    }
+  };
   const reportEditRefusal = (refusal: CanvasEditRefusal): void => {
     for (const listener of editRefusalListeners) {
       try {
@@ -2017,12 +2028,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     viewport,
   });
 
+  // A view change under a still pointer moves the document beneath it; hover-derived tool state must follow.
+  const unsubscribeHoverRefresh = viewport.subscribe(() => pipeline.refreshHover());
+
   const onWheel = createWheelHandler({
     getActiveTool: activeTool,
+    getControlKeyState: () => pipeline.controlKeyState(),
     getInputElement: () => renderController.getInputElement(),
     getInvertBrushSizeScroll: () => stores.invertBrushSizeScroll.get(),
-    getToolContext: () => toolContext,
+    getTrackpadNavigation: () => stores.trackpadNavigation.get(),
     invalidate: (payload) => scheduler.invalidate(payload),
+    isPinchDetectionArmed: () => trackpadPinchListeners.size > 0,
+    reportTrackpadPinch,
     stepActiveBrushSize,
     viewport,
   });
@@ -2041,6 +2058,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const onVisibilityChange = (): void => {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
       kickPendingFlush();
+      // Key releases while hidden never arrive; held keys (Space, Alt, Control) must not outlive the page.
+      onWindowBlur();
     }
   };
   const onWindowBlur = (): void => {
@@ -2643,6 +2662,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => colorSamples.dispose());
     cleanup.run(() => activeTool()?.onDeactivate?.(toolContext));
     cleanup.run(unsubscribeViewport);
+    cleanup.run(unsubscribeHoverRefresh);
     cleanup.run(unsubscribeBrushOptions);
     cleanup.run(unsubscribeEraserOptions);
     cleanup.run(unsubscribeCheckerboard);
@@ -2669,6 +2689,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => stores.thumbnailStatus.clear());
     cleanup.run(() => strokeListeners.clear());
     cleanup.run(() => editRefusalListeners.clear());
+    cleanup.run(() => trackpadPinchListeners.clear());
     cleanup.run(() => toolChangeListeners.clear());
     cleanup.run(() => {
       samInputHandler = null;
@@ -2680,6 +2701,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     strokeListeners.add(listener);
     return () => {
       strokeListeners.delete(listener);
+    };
+  };
+
+  const onTrackpadPinch = (listener: () => void): (() => void) => {
+    trackpadPinchListeners.add(listener);
+    return () => {
+      trackpadPinchListeners.delete(listener);
     };
   };
 
@@ -2977,6 +3005,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     handleEscapePriority,
     onEditRefused,
     onStrokeCommitted,
+    onTrackpadPinch,
     requestColorSample: () => colorSamples.requestSample(),
     setColorSampleRouter: (router) => colorSamples.setRouter(router),
   };

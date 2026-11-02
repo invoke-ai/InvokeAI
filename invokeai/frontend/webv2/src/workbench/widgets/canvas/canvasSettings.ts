@@ -15,7 +15,8 @@ export type CanvasSettingStore =
   | 'bboxOverlay'
   | 'ruleOfThirds'
   | 'snapToGrid'
-  | 'clipToBbox';
+  | 'clipToBbox'
+  | 'trackpadNavigation';
 
 /** The popover section a setting is grouped under. */
 export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
@@ -24,6 +25,7 @@ export type CanvasSettingSection = 'behavior' | 'display' | 'grid';
 export const CANVAS_CHECKERBOARD_KEY = 'showCheckerboard';
 export const CANVAS_SHOW_GRID_KEY = 'showGrid';
 export const CANVAS_INVERT_BRUSH_SCROLL_KEY = 'invertBrushSizeScroll';
+export const CANVAS_TRACKPAD_NAVIGATION_KEY = 'trackpadNavigation';
 export const CANVAS_SHOW_BBOX_KEY = 'showBbox';
 export const CANVAS_BBOX_OVERLAY_KEY = 'bboxOverlay';
 export const CANVAS_RULE_OF_THIRDS_KEY = 'ruleOfThirds';
@@ -57,6 +59,14 @@ export interface CanvasBooleanSetting {
 /** Derive popover order, persistence, and engine feeds from these sectioned entries. */
 export const CANVAS_SETTINGS: readonly CanvasBooleanSetting[] = [
   // ── Behavior ──────────────────────────────────────────────────────────────
+  {
+    // Browsers cannot reliably tell a trackpad from a mouse, so this is opt-in rather than detected.
+    defaultValue: false,
+    key: CANVAS_TRACKPAD_NAVIGATION_KEY,
+    labelKey: 'widgets.canvas.settings.trackpadNavigation',
+    section: 'behavior',
+    store: 'trackpadNavigation',
+  },
   {
     defaultValue: false,
     key: CANVAS_INVERT_BRUSH_SCROLL_KEY,
