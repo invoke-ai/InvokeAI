@@ -12,9 +12,11 @@ which have no `tile_overlap_factor` at all, and `stable_diffusion.vae_tiling.pat
 for SD's, which leaves `use_tiling` to the caller.
 
 `diffusers_latent_tile` and `diffusers_vae_downsample` state constraints of the diffusers VAE
-classes rather than of this module, which is why they are public: the SD sibling derived the tile
-geometry independently and produced wrong-sized images for it, and it now calls these instead. A
-third copy of that arithmetic is the failure mode this module exists to stop.
+classes rather than of this module. The SD sibling once derived the tile geometry itself and
+produced wrong-sized images for it; `diffusers_tile` turns the two into the geometry a VAE is given,
+and both siblings set it from there. The working-memory estimators price the tile from there too
+(`scoped_vae_tile` for this module's), so an estimate prices the tile that runs rather than the one
+a field asked for. A third copy of that arithmetic is the failure mode this module exists to stop.
 """
 
 from contextlib import contextmanager
@@ -82,16 +84,31 @@ def scoped_vae_tiling(vae: Any, tile_size: int | None) -> Iterator[None]:
             # assumes it did. Setting the two attributes afterwards is how the rest of this codebase
             # sizes a diffusers VAE's tiles; see `flux2/ref_image_extension.py`, which forces 512
             # for the same reason. Both are in `_TILING_ATTRS`, so the finally block puts them back.
-            downsample = diffusers_vae_downsample(vae)
-            latent_tile = diffusers_latent_tile(resolve_tile_size(tile_size), downsample, vae.tile_overlap_factor)
+            sample_tile, latent_tile = scoped_vae_tile(vae, tile_size)
             vae.enable_tiling()
             vae.tile_latent_min_size = latent_tile
-            vae.tile_sample_min_size = latent_tile * downsample
+            vae.tile_sample_min_size = sample_tile
         yield
     finally:
         for name, value in original.items():
             if value is not _MISSING:
                 setattr(vae, name, value)
+
+
+def scoped_vae_tile(vae: Any, tile_size: int) -> tuple[int, int]:
+    """The `(tile_sample_min_size, tile_latent_min_size)` `scoped_vae_tiling` sets for a node's tile field:
+    `diffusers_tile` of the resolved field (`resolve_tile_size`) at the overlap the VAE carries. The FLUX.1 and FLUX.2
+    estimators price its sample size, so they price the tile that runs."""
+    return diffusers_tile(vae, resolve_tile_size(tile_size), vae.tile_overlap_factor)
+
+
+def diffusers_tile(vae: Any, requested_sample_size: int, overlap_factor: float) -> tuple[int, int]:
+    """The `(tile_sample_min_size, tile_latent_min_size)` a diffusers VAE runs for a request in output pixels at
+    `overlap_factor`: the latent tile `diffusers_latent_tile` picks at the VAE's own downsample, and the sample size
+    derived from it. At the stock 0.25 factor and an 8x VAE, a 24 px request runs 32 px and a 200 px one 192 px."""
+    downsample = diffusers_vae_downsample(vae)
+    latent_tile = diffusers_latent_tile(requested_sample_size, downsample, overlap_factor)
+    return latent_tile * downsample, latent_tile
 
 
 def diffusers_vae_downsample(vae: Any) -> int:

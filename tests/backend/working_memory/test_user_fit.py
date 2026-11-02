@@ -122,17 +122,40 @@ def test_above_its_measured_sizes_the_larger_of_the_user_and_the_shipped_estimat
     assert VAE_SD_SPEC.estimate(_features(1024), DEVICE).reservation_bytes == 2 * 1024**2 + 2 * MIB
 
 
-def test_a_tiled_decode_is_placed_by_its_image_and_priced_on_its_tile(provide) -> None:
+@pytest.mark.parametrize("side", [1024, 2048, 8192], ids=["within", "above", "assembled"])
+def test_a_tiled_operation_keeps_the_shipped_tile_over_a_lower_user_line(provide, side) -> None:
+    """A tiled operation prices its tile on the larger of the user and the shipped untiled line, within the measured
+    sizes and above them: its tiled and assembly lines are fitted over the untiled demand measured where the shipped
+    line was, and a lower user line beneath them would take away what that demand was. The untiled decode of the same
+    image takes the user line. At 8192px the assembly phase is the larger, which no user line moves."""
     provide(_fit(_points(900, 400 * MIB)))
-    # 2048px is above the measured 1024px, so the larger estimate wins; both price the 512px tile, 1.25x.
-    tiled = _features(2048, tile=512)
-    user = 945 * 512 * 512 * 1.25 + 420 * MIB
-    assert VAE_SD_SPEC.estimate(tiled, DEVICE).reservation_bytes == max(int(user), _shipped(VAE_SD_SPEC, tiled))
+    tiled = VAE_SD_SPEC.estimate(_features(side, tile=512), DEVICE)
+    assert tiled.reservation_bytes == _shipped(VAE_SD_SPEC, _features(side, tile=512))
+    assert tiled.source.startswith("shipped:") and "over user:dc:env decode_fp16 at the tile" in tiled.source
+    assembled = any(term.included and term.name == "assembled" for term in tiled.terms)
+    assert assembled == (side == 8192)
+    assert "user:dc:env" in VAE_SD_SPEC.estimate(_features(side), DEVICE).source
+
+
+@pytest.mark.parametrize("side", [1024, 2048], ids=["within", "above"])
+def test_a_tiled_operation_prices_its_tile_on_a_higher_user_line(provide, side) -> None:
+    """A card whose untiled decode needs more than the shipped line says needs it for each tile too; what tiling adds
+    on top stays the shipped lines'."""
+    provide(_fit(_points(20000, 400 * MIB)))
+    values = shipped_coefficients(VAE_SD_SPEC, PLATFORM).values
+    tile_phase = 21000 * 512 * 512 + 420 * MIB + values["k_tiled_decode_fp16"] * side**2 + values["b_tiled_decode_fp16"]
+    assembly = values["k_assembled_decode_fp16"] * side**2 + values["b_assembled_decode_fp16"]
+
+    tiled = VAE_SD_SPEC.estimate(_features(side, tile=512), DEVICE)
+
+    assert tiled.reservation_bytes == int(max(tile_phase, assembly)) > _shipped(VAE_SD_SPEC, _features(side, tile=512))
+    assert tiled.source.startswith("user:dc:env (decode_fp16 at the tile, over shipped) + shipped:")
 
 
 def test_a_line_carried_for_several_estimators_moves_all_of_them(provide) -> None:
     """vae.sd and vae.flux borrow one entry's values, so an SD fp16 decode calibrates FLUX.1's fp16 decode too."""
-    assert user_fit.carrier_key("vae.sd", 2, PLATFORM) == user_fit.carrier_key("vae.flux", 2, PLATFORM)
+    sd = user_fit.carrier_key("vae.sd", VAE_SD_SPEC.version, PLATFORM)
+    assert sd is not None and sd == user_fit.carrier_key("vae.flux", VAE_FLUX_SPEC.version, PLATFORM)
     provide(_fit(_points(900, 400 * MIB)))
     flux = {
         "operation": "decode",
@@ -163,20 +186,43 @@ def test_the_margin_covers_the_fitted_line_only_and_analytic_terms_stay_as_they_
 
 def test_only_untiled_single_sample_autoencoder_kl_windows_with_demand_and_a_known_version_fit_a_line() -> None:
     good = _points(900, 400 * MIB, sides=(512, 1024))
+    version = VAE_SD_SPEC.version
     ignored = [
-        UserPoint("vae.sd", 2, _features(2048, tile=512), 10**12),
-        UserPoint("vae.sd", 2, _features(2048, upcast_weight_bytes=160 * MIB), 10**12),
-        UserPoint("vae.sd", 2, _features(2048, vae_class="AutoencoderTiny"), 10**12),
-        UserPoint("vae.sd", 2, _features(2048, batch_size=2), 10**12),
-        UserPoint("vae.sd", 2, _features(2048), 0),
-        UserPoint("vae.sd", 1, _features(2048), 10**12),
-        UserPoint("vae.unknown", 2, _features(2048), 10**12),
+        # A tiled window: its line sits on the untiled one and is the shipped fit's alone.
+        UserPoint("vae.sd", version, _features(2048, tile=512), 10**12),
+        UserPoint("vae.sd", version, _features(2048, upcast_weight_bytes=160 * MIB), 10**12),
+        UserPoint("vae.sd", version, _features(2048, vae_class="AutoencoderTiny"), 10**12),
+        UserPoint("vae.sd", version, _features(2048, batch_size=2), 10**12),
+        UserPoint("vae.sd", version, _features(2048), 0),
+        UserPoint("vae.sd", version - 1, _features(2048), 10**12),
+        UserPoint("vae.unknown", version, _features(2048), 10**12),
     ]
 
     lines, _ = fit_user_lines(good + ignored, PLATFORM, SPECS)
 
     [line] = lines.values()
     assert (line.k, line.b, line.x_min, line.x_max, line.points) == (945, 420 * MIB, 512**2, 1024**2, 2)
+
+
+def test_tiled_windows_fit_no_user_line_even_where_their_estimators_entry_carries_the_tiled_line() -> None:
+    """FLUX.2 on MIOpen with expandable segments carries its untiled and its tiled lines in one entry, the one a user
+    line keys on. Its tiled windows still fit nothing: their line sits on the untiled one."""
+    platform = Platform("miopen", "expandable", "windows")
+    flux2 = SPECS["vae.flux2"]
+
+    def window(side: int, tile: int | None) -> UserPoint:
+        features = {"operation": "decode", "height": side, "width": side, "tile": tile, "batch_size": 1,
+                    "dtype": "bf16", "score_matrix_bytes": 0}  # fmt: skip
+        return UserPoint(flux2.id, flux2.version, features, 900 * side**2 + 400 * MIB)
+
+    carrier = user_fit.carrier_key(flux2.id, flux2.version, platform)
+    assert carrier is not None and carrier[0] == flux2.id
+
+    lines, _ = fit_user_lines(
+        [window(512, None), window(1024, None), window(2048, 512), window(4096, 512)], platform, SPECS
+    )
+
+    assert set(lines) == {(carrier, "decode_bf16")}
 
 
 def test_a_line_measured_at_sizes_too_close_together_fits_nothing_and_says_why() -> None:
@@ -230,3 +276,34 @@ def test_the_z_image_denoise_is_moved_by_no_user_line(provide) -> None:
     features = _denoise_features(4096)
     shipped = Z_IMAGE_DENOISE_SPEC.evaluate(features, shipped_coefficients(Z_IMAGE_DENOISE_SPEC, PLATFORM))
     assert Z_IMAGE_DENOISE_SPEC.estimate(features, DEVICE) == shipped
+
+
+@pytest.mark.parametrize("delta", [512 * MIB, -64 * MIB], ids=["higher", "lower"])
+def test_a_tiled_decode_the_floor_decides_follows_a_higher_user_base_and_keeps_the_shipped_one_over_a_lower(
+    delta: int,
+) -> None:
+    """A 24576 px FLUX.1 bf16 decode at a 512 px tile on Windows ROCm with expandable segments: its floor decides, and
+    it carries the base of the untiled line. A tiled operation takes the larger of the user and the shipped estimate
+    (`user_fit.resolve`), so a user base above the shipped one raises the floor by it and its margin, and one below
+    leaves the shipped estimate standing."""
+    platform = Platform("miopen", "expandable", "windows")
+    features = {"operation": "decode", "height": 24576, "width": 24576, "dtype": "bf16", "tile": 512}
+    features["score_matrix_bytes"] = 0
+    shipped_values = shipped_coefficients(VAE_FLUX_SPEC, platform)
+    shipped = VAE_FLUX_SPEC.evaluate(features, shipped_values)
+    assert any(term.included and term.name == "assembly_buffers" for term in shipped.terms), "the floor decides"
+    carrier = user_fit.carrier_key(VAE_FLUX_SPEC.id, VAE_FLUX_SPEC.version, platform)
+    assert carrier is not None
+    k, b = shipped_values.values["k_decode_bf16"], shipped_values.values["b_decode_bf16"]
+    line = UserLine(k=int(k), b=int(b + delta), x_min=512**2, x_max=1024**2, points=3)
+    fit = UserFit(label="user:dc:env", platform=platform, lines={(carrier, "decode_bf16"): line})
+
+    resolved = user_fit.resolve(VAE_FLUX_SPEC, features, shipped_values, fit)
+
+    [base] = [term for term in resolved.terms if term.name == "floor_base"]
+    if delta > 0:
+        assert base.bytes == b + delta
+        assert resolved.reservation_bytes == pytest.approx(shipped.reservation_bytes + 1.05 * delta, abs=2)
+    else:
+        assert base.bytes == b
+        assert resolved.reservation_bytes == shipped.reservation_bytes
