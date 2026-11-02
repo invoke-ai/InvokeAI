@@ -852,7 +852,8 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    - `ModelTaxonomyType` in `types.ts`, and its label in the type list at the top of `taxonomy.ts`
    - `NULL_BASE_ALLOWANCES` and `SINGLETON_LINK_TYPES` in `relationships.ts`
    - the type label in `modelRequirements.ts`
-   - `CPU_ONLY_TYPES` in `src/features/models/ui/detail/CpuOnlySetting.tsx` if the config has `cpu_only`
+
+   The model detail's **Run on CPU** switch needs no entry: it appears for every config that carries `cpu_only`, so adding the field to the backend config is enough.
 
 8. **Per-family UI (only for controls unique to the architecture)**
 
