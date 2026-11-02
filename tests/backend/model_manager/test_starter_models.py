@@ -131,3 +131,26 @@ def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> Non
             (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
         }, model.name
         assert all(dep.source in starter_sources for dep in dependencies), model.name
+
+
+def test_preview_decoders_list_the_bases_sharing_their_latent_space() -> None:
+    """A TAE is filed under one base but decodes for every base denoising in the same latents, so the starter-model
+    base filter can show it there too. A base with a different latent space must not be listed."""
+    taes = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
+    taesd = next(m for m in taes if m.base is BaseModelType.StableDiffusion1)
+    taef1 = next(m for m in taes if m.base is BaseModelType.Flux)
+    taef2 = next(m for m in taes if m.base is BaseModelType.Flux2)
+
+    assert BaseModelType.StableDiffusion2 in taesd.compatible_bases
+    assert BaseModelType.StableDiffusionXL not in taesd.compatible_bases
+    assert BaseModelType.ZImage in taef1.compatible_bases
+    assert BaseModelType.Flux2 not in taef1.compatible_bases
+    assert {BaseModelType.Flux3, BaseModelType.ErnieImage, BaseModelType.Ideogram4} <= set(taef2.compatible_bases)
+    assert BaseModelType.Flux not in taef2.compatible_bases
+    for model in taes:
+        assert model.base not in model.compatible_bases, model.name
+
+
+def test_only_preview_decoders_list_compatible_bases() -> None:
+    others = [m for m in STARTER_MODELS if m.type is not ModelType.TinyAutoencoder]
+    assert others and all(m.compatible_bases == [] for m in others)
