@@ -1,7 +1,7 @@
 ---
 title: FLUX.2
 description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing and the FLUX.2 [dev] Fun-ControlNet-Union.
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-02
 sidebar:
   order: 5
 ---
@@ -58,8 +58,11 @@ quantization](/configuration/optimization/sdnq-quantization/).
 
 ## Installing
 
-The **FLUX.2 Klein** bundle in the Model Manager is the quickest start. It installs *FLUX.2 Klein 4B (GGUF
-Q4)* together with the FLUX.2 VAE and the Qwen3 4B encoder.
+The **FLUX.2** bundle in the Model Manager is the quickest start. It installs *FLUX.2 Klein 4B (GGUF Q4)*
+together with the FLUX.2 VAE and the Qwen3 4B encoder, about 11 GB. All three are Apache 2.0 and ungated, so
+the bundle needs no HuggingFace token. Klein 9B and FLUX.2 [dev] (non-commercial, gated on Black Forest
+Labs' repositories; see [License](#license)) and the [PiD decoders](#pid-super-resolution-decode)
+(non-commercial / research weights) are separate starter models.
 
 A FLUX.2 model needs three components:
 
