@@ -1,18 +1,28 @@
 import type { GenerationModelCatalogItem, MainModelConfig } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
-import { createDefaultVideoWidgetValues } from '@features/video';
+import {
+  compileVideoGraph,
+  createDefaultVideoWidgetValues,
+  getDefaultVideoSettings,
+  type VideoSettings,
+} from '@features/video';
 import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
-import { describe, expect, it } from 'vitest';
+import i18n from 'i18next';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 import {
   buildVideoRecallSettings,
   deriveAcceleratorRecallState,
   EMPTY_VIDEO_RECALL_CAPABILITIES,
-  getRecallableMediaNames,
   getVideoRecallCapabilities,
+  getVideoRecallMessage,
   getVideoSizeRecall,
-  isVideoGenerationMetadata,
+  parseVideoRecallRecord,
 } from './videoRecall';
+
+const isVideoGenerationMetadata = (metadata: unknown): boolean =>
+  parseVideoRecallRecord(metadata)?.isVideoGeneration ?? false;
 
 const wanModel = (variant: string, format = 'diffusers', key = `wan-${variant}-${format}`): MainModelConfig => ({
   base: 'wan',
@@ -60,8 +70,8 @@ const wanMetadata = (extra: Record<string, unknown> = {}): Record<string, unknow
   ...extra,
 });
 
-describe('isVideoGenerationMetadata', () => {
-  it('accepts only the video generation modes', () => {
+describe('parseVideoRecallRecord', () => {
+  it('marks only the video generation modes as video generation', () => {
     expect(isVideoGenerationMetadata(wanMetadata())).toBe(true);
     expect(isVideoGenerationMetadata({ generation_mode: 'minimax_h3_flf2v' })).toBe(true);
     // Image metadata — including Wan still-image modes — is not video metadata.
@@ -88,24 +98,87 @@ describe('getVideoRecallCapabilities', () => {
       seed: true,
     });
   });
+
+  // Each record names one thing recall writes; the verbs it offers must be the ones that do something.
+  it.each([
+    ['fps', WAN_T2V, { fps: 16, generation_mode: 'wan_t2v' }, ['fps']],
+    ['size', WAN_T2V, { generation_mode: 'wan_t2v', height: 720, width: 1280 }, ['size']],
+    ['a switched-off negative prompt', WAN_T2V, { generation_mode: 'wan_t2v', negative_prompt: null }, ['prompts']],
+    [
+      'references',
+      h3Model(),
+      { generation_mode: 'minimax_h3_ref2v', minimax_h3_references: [{ image_name: 'ref.png', kind: 'image' }] },
+      ['media'],
+    ],
+    [
+      'a conditioning clip',
+      ltx2Model('ltx2_dev'),
+      {
+        generation_mode: 'ltx2_a2v',
+        ltx2_conditioning_role: 'audio',
+        ltx2_conditioning_video: { video_name: 'song.mp4' },
+      },
+      ['media'],
+    ],
+  ])('offers what recall applies for a record naming only %s', (_, model, metadata, fields) => {
+    const capabilities = getVideoRecallCapabilities(metadata);
+    const recall = (kind: 'prompts' | 'remix') =>
+      buildVideoRecallSettings({
+        currentValues: createDefaultVideoWidgetValues([model]),
+        kind,
+        metadata,
+        models: [model],
+      });
+
+    expect(capabilities.remix).toBe(true);
+    expect(capabilities.all).toBe(true);
+    expect(recall('remix')?.fields).toEqual(fields);
+    expect(capabilities.prompts).toBe(recall('prompts') !== null);
+  });
 });
 
-describe('getRecallableMediaNames', () => {
+describe('parseVideoRecallRecord media', () => {
   it('suppresses the extracted first frame in extend mode', () => {
-    const names = getRecallableMediaNames({
+    const record = parseVideoRecallRecord({
       first_frame_image: { image_name: 'extracted.png' },
       generation_mode: 'wan_extend_video',
       last_frame_image: { image_name: 'destination.png' },
       source_video: { video_name: 'clip.mp4' },
     });
 
-    expect(names).toEqual({ firstFrameName: null, lastFrameName: 'destination.png', sourceVideoName: 'clip.mp4' });
+    expect(record?.media).toEqual({
+      firstFrameName: null,
+      lastFrameName: 'destination.png',
+      sourceVideoName: 'clip.mp4',
+    });
   });
 
   it('keeps user keyframes when no source video was recorded', () => {
     expect(
-      getRecallableMediaNames({ first_frame_image: { image_name: 'first.png' }, generation_mode: 'wan_i2v' })
+      parseVideoRecallRecord({ first_frame_image: { image_name: 'first.png' }, generation_mode: 'wan_i2v' })?.media
     ).toEqual({ firstFrameName: 'first.png', lastFrameName: null, sourceVideoName: null });
+  });
+});
+
+describe('getVideoRecallMessage', () => {
+  const englishCatalog = Object.values(
+    import.meta.glob('../../../public/locales/en.json', { eager: true, import: 'default' })
+  )[0] as Record<string, unknown>;
+  const instance = i18n.createInstance();
+  const t = ((key: string, values?: Record<string, unknown>) => instance.t(key, values)) as TFunction;
+
+  beforeAll(async () => {
+    await instance.init({
+      initAsync: false,
+      interpolation: { escapeValue: false },
+      lng: 'en',
+      resources: { en: { translation: englishCatalog } },
+    });
+  });
+
+  it('names the applied fields as one locale-joined list', () => {
+    expect(getVideoRecallMessage(['model', 'cfg', 'media'], t)).toBe('Applied model, CFG, and conditioning media.');
+    expect(getVideoRecallMessage(['seed'], t)).toBe('Applied seed.');
   });
 });
 
@@ -983,6 +1056,44 @@ describe('portable records (metadata_version 1.0.0)', () => {
     expect(aliased?.values.wanLowNoiseModel).toEqual(lowExpert);
   });
 
+  it('takes the first installed model when a portable identifier matches several', () => {
+    const twin = { ...WAN_T2V, key: 'wan-twin' };
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({ model: { base: 'wan', key: 'foreign-key', name: WAN_T2V.name, type: 'main' } }),
+      models: [WAN_T2V, twin, h3Model()],
+    });
+
+    expect(result?.fields).toContain('model');
+    expect(result?.values.model?.key).toBe(WAN_T2V.key);
+  });
+
+  it('reads a pre-identifier model record, which may omit the type', () => {
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind: 'all',
+      metadata: wanMetadata({ model: { base_model: 'wan', model_name: WAN_T2V.name } }),
+      models: catalog,
+    });
+
+    expect(result?.values.model?.key).toBe(WAN_T2V.key);
+  });
+
+  it('fills a component slot only with a model of the type it holds', () => {
+    const vae = { base: 'wan', key: 'wan-vae', name: 'Wan 2.1 VAE', type: 'vae' };
+    const result = buildVideoRecallSettings({
+      currentValues: { ...createDefaultVideoWidgetValues([WAN_T2V]), vae: null },
+      kind: 'all',
+      // A typeless record whose name and base match the main model first.
+      metadata: wanMetadata({ vae: { base: 'wan', name: WAN_T2V.name } }),
+      models: [WAN_T2V, vae],
+    });
+
+    expect(result?.values.vae).toBeNull();
+    expect(result?.fields).not.toContain('components');
+  });
+
   it('does not advertise a recall for a model reference nothing can resolve', () => {
     expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', model: { name: 'only a name' } })).toEqual(
       EMPTY_VIDEO_RECALL_CAPABILITIES
@@ -1262,5 +1373,160 @@ describe('LTX-2 recall', () => {
     expect(result?.values.audioCfgScale).toBeNull();
     expect(result?.values.stgScale).toBeNull();
     expect(result?.values.modalityScale).toBeNull();
+  });
+});
+
+/**
+ * The record a compiled graph stores: the metadata node's literal fields plus the values its edges carry, which the
+ * queue fills from the batch (prompts and seed) when it runs.
+ */
+const recordedMetadata = (settings: VideoSettings, model: MainModelConfig): Record<string, unknown> => {
+  const compiled = compileVideoGraph(settings, model);
+  const { backendGraph } = compiled;
+  const batch: Record<string, unknown> = {
+    [compiled.negativePromptNodeId]: settings.negativePrompt,
+    [compiled.positivePromptNodeId]: settings.positivePrompt,
+    [compiled.seedNodeId]: settings.seed,
+  };
+  const record: Record<string, unknown> = { ...backendGraph.nodes.core_metadata };
+
+  for (const edge of backendGraph.edges) {
+    if (edge.destination.node_id === 'core_metadata') {
+      expect(batch, `metadata field ${edge.destination.field} comes from the batch`).toHaveProperty(
+        edge.source.node_id
+      );
+      record[edge.destination.field] = batch[edge.source.node_id];
+    }
+  }
+
+  return record;
+};
+
+describe('recall of what the video graphs record', () => {
+  it('Wan: restores prompts with the wired negative, seed, sampling, fps and size', () => {
+    const model = wanModel('t2v_a14b');
+    const settings: VideoSettings = {
+      ...getDefaultVideoSettings(model),
+      aspectRatioId: '16:9',
+      cfgScale: 4,
+      fps: 24,
+      negativePrompt: 'blurry, low quality',
+      negativePromptEnabled: true,
+      numFrames: 81,
+      positivePrompt: 'a red fox in the snow',
+      seed: 4242,
+      steps: 20,
+      targetResolution: '720p',
+    };
+    const metadata = recordedMetadata(settings, model);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues([model]),
+      kind: 'all',
+      metadata,
+      models: [model],
+    });
+
+    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(result?.fields).toEqual(['prompts', 'seed', 'model', 'frames', 'steps', 'cfg', 'fps', 'size']);
+    expect(result?.values).toMatchObject({
+      aspectRatioId: '16:9',
+      cfgScale: 4,
+      fps: 24,
+      negativePrompt: 'blurry, low quality',
+      negativePromptEnabled: true,
+      numFrames: 81,
+      positivePrompt: 'a red fox in the snow',
+      seed: 4242,
+      steps: 20,
+      targetResolution: '720p',
+    });
+  });
+
+  it('MiniMax H3: restores the ordered references with their trim and conditioning', () => {
+    const componentSource = h3Model();
+    const model: MainModelConfig = {
+      base: 'minimax-h3',
+      format: 'checkpoint',
+      key: 'h3-ref2va-ckpt',
+      name: 'MiniMax H3 Ref2VA Transformer',
+      type: 'main',
+      variant: 'ref2va',
+    };
+    const settings: VideoSettings = {
+      ...getDefaultVideoSettings(model),
+      componentSourceModel: componentSource,
+      positivePrompt: 'a dancer',
+      references: [
+        {
+          clip: { endFrame: 47, fps: 24, height: 480, numFrames: 48, startFrame: 2, video_name: 'ref.mp4', width: 832 },
+          conditioning: 'video_audio',
+          kind: 'video',
+        },
+        { detail: 'match', image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' },
+      ],
+      seed: 77,
+    };
+    const metadata = recordedMetadata(settings, model);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues([componentSource]),
+      kind: 'all',
+      metadata,
+      models: [componentSource, model],
+    });
+
+    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'components', 'media']));
+    expect(result?.values).toMatchObject({
+      componentSourceModel: componentSource,
+      model,
+      positivePrompt: 'a dancer',
+      seed: 77,
+    });
+    expect(result?.mediaNames.references).toEqual([
+      { conditioning: 'video_audio', kind: 'video', name: 'ref.mp4', trim: { endFrame: 47, startFrame: 2 } },
+      { detail: 'match', kind: 'image', name: 'ref.png' },
+    ]);
+  });
+
+  it('LTX-2 audio-to-video: restores the soundtrack in its role, the components and the fps', () => {
+    const model = ltx2Model('ltx2_dev');
+    const encoder: GenerationModelCatalogItem = {
+      base: 'ltx-2',
+      key: 'gemma4',
+      name: 'LTX-2.5 Text Encoder',
+      type: 'gemma4_encoder',
+    };
+    const componentSource = ltx2Model('ltx2_dev', 'diffusers', 'ltx2-components');
+    const settings: VideoSettings = {
+      ...getDefaultVideoSettings(model),
+      componentSourceModel: componentSource,
+      conditioningClip: {
+        clip: { fps: 24, height: 704, numFrames: 96, video_name: 'song.mp4', width: 1248 },
+        fpsKnown: true,
+        role: 'audio',
+      },
+      fps: 25,
+      ltx2TextEncoderModel: encoder,
+      positivePrompt: 'a singer on stage',
+      seed: 99,
+    };
+    const metadata = recordedMetadata(settings, model);
+    const result = buildVideoRecallSettings({
+      currentValues: createDefaultVideoWidgetValues([model]),
+      kind: 'all',
+      metadata,
+      models: [model, componentSource, encoder],
+    });
+
+    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'fps', 'components', 'media']));
+    expect(result?.values).toMatchObject({
+      componentSourceModel: componentSource,
+      fps: 25,
+      ltx2TextEncoderModel: encoder,
+      positivePrompt: 'a singer on stage',
+      seed: 99,
+    });
+    expect(result?.mediaNames.conditioningClip).toEqual({ name: 'song.mp4', role: 'audio' });
   });
 });

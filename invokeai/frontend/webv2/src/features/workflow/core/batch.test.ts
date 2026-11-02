@@ -25,6 +25,7 @@ import {
   type WorkflowGeneratorValue,
 } from './batch';
 import { createProjectGraph } from './document';
+import { formatWorkflowReadinessReason } from './readinessIssues';
 
 const items = (value: WorkflowGeneratorValue, random?: () => number) => {
   const resolution = resolveWorkflowGeneratorValue(value, random);
@@ -426,7 +427,9 @@ describe('planWorkflowBatch', () => {
     const plan = planWorkflowBatch(graph, templates);
 
     // 'cfg' is fed twice: once from the ungrouped node and once from the group.
-    expect(plan.reasons).toEqual(['"cfg" on "sink" receives values from more than one batch node.']);
+    expect(plan.reasons.map(formatWorkflowReadinessReason)).toEqual([
+      '"cfg" on "sink" receives values from more than one batch node.',
+    ]);
     expect(plan.batchSize).toBe(6);
     expect(plan.groups).toEqual([
       [
@@ -503,7 +506,9 @@ describe('planWorkflowBatch', () => {
 
     const empty = planWorkflowBatch(graph, templates, { generators: { g: { items: [], key } } });
 
-    expect(empty.reasons).toEqual(['Batch node "image_batch" has an empty collection.']);
+    expect(empty.reasons.map(formatWorkflowReadinessReason)).toEqual([
+      'Batch node "image_batch" has an empty collection.',
+    ]);
 
     // Without a board there is nothing to list; the fix is on the generator, so the reason names it.
     const boardless = doc(
@@ -515,7 +520,7 @@ describe('planWorkflowBatch', () => {
       [edge('g', 'images', 'b', 'images'), edge('b', 'image', 's', 'image')]
     );
 
-    expect(planWorkflowBatch(boardless, templates).reasons).toEqual([
+    expect(planWorkflowBatch(boardless, templates).reasons.map(formatWorkflowReadinessReason)).toEqual([
       'Image generator "image_generator" has no board selected.',
     ]);
   });
@@ -542,7 +547,7 @@ describe('planWorkflowBatch', () => {
     );
     const plan = planWorkflowBatch(graph, templates);
 
-    expect(plan.reasons).toEqual([
+    expect(plan.reasons.map(formatWorkflowReadinessReason)).toEqual([
       'Batch node "Lonely" is not connected to any node.',
       'Batch node "Empty" has an empty collection.',
       'Batch node "Fed" can only receive its collection from a generator.',
@@ -565,7 +570,7 @@ describe('planWorkflowBatch', () => {
       [edge('g', 'floats', 'b', 'floats'), edge('b', 'value', 's', 'cfg')]
     );
 
-    expect(planWorkflowBatch(graph, templates).reasons).toEqual([
+    expect(planWorkflowBatch(graph, templates).reasons.map(formatWorkflowReadinessReason)).toEqual([
       'Batch node "float_batch" has more than 10,000 items.',
     ]);
   });
@@ -579,7 +584,7 @@ describe('planWorkflowBatch', () => {
       [edge('big', 'value', 's', 'cfg')]
     );
 
-    expect(planWorkflowBatch(graph, templates).reasons).toEqual([
+    expect(planWorkflowBatch(graph, templates).reasons.map(formatWorkflowReadinessReason)).toEqual([
       'Batch node "float_batch" has more than 10,000 items.',
     ]);
   });

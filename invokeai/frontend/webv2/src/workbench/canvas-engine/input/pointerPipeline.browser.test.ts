@@ -59,7 +59,6 @@ const createInputHarness = () => {
     getToolContext: () => ctx,
     initialToolId: 'brush',
     invalidateOverlay: () => undefined,
-    isLocked: () => false,
     publishActiveTool: () => undefined,
     stepBrushSize: () => undefined,
     updateCursor: () => undefined,

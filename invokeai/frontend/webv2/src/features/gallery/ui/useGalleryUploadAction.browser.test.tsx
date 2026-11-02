@@ -42,19 +42,19 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => {
       const messages: Record<string, string> = {
-        'widgets.gallery.imageCount': `${String(values?.count)} images`,
+        'widgets.gallery.imageCount': `${String(values?.count)} ${values?.count === 1 ? 'image' : 'images'}`,
+        'widgets.gallery.mediaCountsTwo': `${String(values?.first)} and ${String(values?.second)}`,
         'widgets.gallery.uploadDateBoardUnavailable': 'Uploads are unavailable for date boards.',
         'widgets.gallery.uploadFailed': `No files uploaded. ${String(values?.failed)} failed.`,
         'widgets.gallery.uploadPartialTitle': `Uploaded ${String(values?.succeeded)} of ${String(values?.total)} files`,
+        'widgets.gallery.uploadFailedCount': `${String(values?.count)} failed.`,
         'widgets.gallery.uploadSplit': 'Images and videos appear in Uploads.',
-        'widgets.gallery.uploadSummary': `${String(values?.images)} and ${String(values?.videos)} uploaded to ${String(
-          values?.board
-        )}. ${String(values?.failed)} failed.`,
+        'widgets.gallery.uploadSummary': `${String(values?.media)} uploaded to ${String(values?.board)}.`,
         'widgets.gallery.uploadSuccessTitle': `Uploaded ${String(values?.count)} files`,
         'widgets.gallery.uploadUnsupported':
           'No supported media files to upload (PNG, JPEG, or WebP images; video files; or audio files).',
         'widgets.gallery.uncategorized': 'Uncategorized',
-        'widgets.gallery.videoCount': `${String(values?.count)} videos`,
+        'widgets.gallery.videoCount': `${String(values?.count)} ${values?.count === 1 ? 'video' : 'videos'}`,
       };
 
       return messages[key] ?? key;
@@ -66,6 +66,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 const uploadFilesRef = createRef<GalleryActions['uploadFiles']>();
 const selectItem = vi.fn();
+const setView = vi.fn();
 const noop = vi.fn();
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -92,7 +93,7 @@ const adapter: GalleryUiAdapter = {
     setSemanticSearchText: noop,
     commitSemanticSearch: noop,
     clearSearch: noop,
-    setView: noop,
+    setView,
     toggleItemSelection: noop,
     updateSettings: noop,
   },
@@ -117,10 +118,12 @@ const adapter: GalleryUiAdapter = {
 const Probe = ({
   galleryView,
   ref,
+  revealInReceivingTab,
   selectedBoardId,
 }: {
   galleryView: 'images' | 'assets';
   ref: Ref<GalleryActions['uploadFiles']>;
+  revealInReceivingTab: boolean;
   selectedBoardId: string;
 }) => {
   const currentGalleryLocationRef = useRef({ galleryView, selectedBoardId });
@@ -156,6 +159,7 @@ const Probe = ({
       },
     ],
     getCurrentGalleryLocation,
+    revealInReceivingTab,
     selectedBoardId,
   });
 
@@ -165,13 +169,19 @@ const Probe = ({
 
 let selectedBoardId = 'board-1';
 let galleryView: 'images' | 'assets' = 'images';
+let revealInReceivingTab = true;
 
 const renderProbe = async () => {
   await act(() => {
     root?.render(
       <QueryClientProvider client={new QueryClient()}>
         <GalleryUiProvider adapter={adapter}>
-          <Probe galleryView={galleryView} ref={uploadFilesRef} selectedBoardId={selectedBoardId} />
+          <Probe
+            galleryView={galleryView}
+            ref={uploadFilesRef}
+            revealInReceivingTab={revealInReceivingTab}
+            selectedBoardId={selectedBoardId}
+          />
         </GalleryUiProvider>
       </QueryClientProvider>
     );
@@ -183,6 +193,7 @@ beforeEach(async () => {
   accountLifecycle.activate('user-a');
   selectedBoardId = 'board-1';
   galleryView = 'images';
+  revealInReceivingTab = true;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -298,6 +309,8 @@ describe('focused gallery upload action', () => {
       title: 'Uploaded 4 of 5 files',
     });
     expect(selectItem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'video', name: 'third.mp4' }));
+    // Some of a mixed upload landed on the tab showing, so the tab stays.
+    expect(setView).not.toHaveBeenCalled();
     await expect(upload).resolves.toEqual([
       expect.objectContaining({ kind: 'image', name: 'one.png' }),
       expect.objectContaining({ kind: 'image', name: 'two.webp' }),
@@ -362,7 +375,7 @@ describe('focused gallery upload action', () => {
     await expect(upload).resolves.toEqual([]);
   });
 
-  it('uses the localized Uncategorized label in a successful upload notification', async () => {
+  it('names only what was uploaded, under the localized Uncategorized label, with no failure clause', async () => {
     selectedBoardId = 'none';
     await renderProbe();
     mocks.uploadGalleryImage.mockResolvedValue(imageUpload('photo.png', '2026-07-30T12:00:04.000Z', 'none'));
@@ -372,8 +385,52 @@ describe('focused gallery upload action', () => {
     });
 
     expect(mocks.notificationsAdd).toHaveBeenCalledWith(
-      expect.objectContaining({ message: '1 images and 0 videos uploaded to Uncategorized. 0 failed.' })
+      expect.objectContaining({ message: '1 image uploaded to Uncategorized.' })
     );
+  });
+
+  it('switches to the tab that received the upload when none of it landed on the one showing', async () => {
+    galleryView = 'images';
+    await renderProbe();
+    mocks.uploadGalleryImage
+      .mockResolvedValueOnce(imageUpload('older.png', '2026-07-30T12:00:01.000Z'))
+      .mockResolvedValueOnce(imageUpload('newer.png', '2026-07-30T12:00:02.000Z'));
+
+    await act(async () => {
+      await uploadFilesRef.current?.([
+        new File(['image'], 'older.png', { type: 'image/png' }),
+        new File(['image'], 'newer.png', { type: 'image/png' }),
+      ]);
+    });
+
+    // Uploaded images are listed under Uploads, not Media.
+    expect(setView).toHaveBeenCalledExactlyOnceWith('assets');
+    expect(selectItem).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'image', name: 'newer.png' }));
+    expect(setView.mock.invocationCallOrder[0]).toBeLessThan(selectItem.mock.invocationCallOrder[0] ?? 0);
+  });
+
+  it('leaves the tab alone for an upload made outside the Gallery, such as a paste', async () => {
+    revealInReceivingTab = false;
+    await renderProbe();
+    mocks.uploadGalleryImage.mockResolvedValue(imageUpload('pasted.png', '2026-07-30T12:00:04.000Z'));
+
+    await act(async () => {
+      await uploadFilesRef.current?.([new File(['image'], 'pasted.png', { type: 'image/png' })]);
+    });
+
+    expect(setView).not.toHaveBeenCalled();
+    expect(selectItem).not.toHaveBeenCalled();
+  });
+
+  it('leaves the tab and selection alone for an upload that landed on a board the gallery left', async () => {
+    mocks.uploadGalleryImage.mockResolvedValue(imageUpload('photo.png', '2026-07-30T12:00:04.000Z', 'board-9'));
+
+    await act(async () => {
+      await uploadFilesRef.current?.([new File(['image'], 'photo.png', { type: 'image/png' })]);
+    });
+
+    expect(setView).not.toHaveBeenCalled();
+    expect(selectItem).not.toHaveBeenCalled();
   });
 
   it('surfaces the first actionable API detail when every upload fails', async () => {

@@ -18,7 +18,11 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const CARD_HOVER = { bg: 'bg.muted', borderColor: 'border.emphasized' } as const;
-const LINK_STYLE = { cursor: 'default', inset: 0, position: 'absolute' } as const;
+// The card clips its overlay link's own outline, so the card draws the keyboard focus ring around itself.
+const LINK_STYLE = { cursor: 'default', inset: 0, outline: 'none', position: 'absolute' } as const;
+const CARD_FOCUS_RING = {
+  '&:has(> a:focus-visible)': { outline: '2px solid', outlineColor: 'accent.solid', outlineOffset: '2px' },
+} as const;
 const CARD_TRANSITION =
   'border-color var(--wb-motion-duration-medium) ease, background var(--wb-motion-duration-medium) ease';
 const COVER_WIDTH = { base: '32', sm: '40' } as const;
@@ -47,6 +51,7 @@ export const ResumeCard = ({
   return (
     <Flex
       align="stretch"
+      css={CARD_FOCUS_RING}
       bg="bg.subtle"
       borderColor="border.subtle"
       borderWidth="1px"
@@ -54,9 +59,10 @@ export const ResumeCard = ({
       position="relative"
       rounded="lg"
       transition={CARD_TRANSITION}
-      _hover={CARD_HOVER}
+      _hover={isCompatible ? CARD_HOVER : undefined}
       onContextMenu={handleContextMenu}
     >
+      {/* A project this build cannot open has no link and no tab stop; its compatibility badge says why. */}
       {isCompatible ? (
         <Link
           aria-label={t('projects.openProjectLabel', { name: summary.name })}
@@ -64,16 +70,7 @@ export const ResumeCard = ({
           style={LINK_STYLE}
           to="/app"
         />
-      ) : (
-        <Box
-          aria-disabled="true"
-          aria-label={`${t('projects.openProjectLabel', { name: summary.name })}. ${t('projects.file.updateClient')}`}
-          role="link"
-          style={LINK_STYLE}
-          tabIndex={0}
-          title={t('projects.file.updateClient')}
-        />
-      )}
+      ) : null}
       <Flex align="center" flexShrink={0} p="1.5" pointerEvents="none" w={COVER_WIDTH}>
         <Box overflow="hidden" rounded="md" w="full">
           <ProjectCover coverUrl={summary.coverUrl} />
@@ -99,7 +96,7 @@ export const ResumeCard = ({
               </Link>
             </Button>
           ) : (
-            <Button disabled title={t('projects.file.updateClient')} variant="solid">
+            <Button unavailableReason={t('projects.file.updateClient')} variant="solid">
               {t('launchpad.home.resumeAction')}
               <ArrowRightIcon />
             </Button>

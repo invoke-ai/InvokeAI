@@ -933,17 +933,29 @@ const addMossImageLayoutRegions = (graph: BackendGraphContract, options: AddLayo
   );
 };
 
-/** One element of the `ideogram4_caption_builder` node's `regions` input; `bbox` is `[y_min, x_min, y_max, x_max]`. */
+/** A box `[y_min, x_min, y_max, x_max]` on the grid Ideogram 4 and FLUX.3 share. */
+type GridBox = [number, number, number, number];
+
+/** Grid boxes are whole numbers from 0 to 1000 across the image, origin top-left. */
+const GRID_COORD_MAX = 1000;
+
+const toGridCoord = (pixels: number, extent: number): number =>
+  clamp(Math.round((pixels / extent) * GRID_COORD_MAX), GRID_COORD_MAX);
+
+/** A mask's bounds on the grid over the bbox, or null when the mask misses the bbox or rounds to a line. */
+const toGridBox = (bounds: Rect, bbox: Pick<Rect, 'width' | 'height'>): GridBox | null => {
+  const yMin = toGridCoord(bounds.y, bbox.height);
+  const xMin = toGridCoord(bounds.x, bbox.width);
+  const yMax = toGridCoord(bounds.y + bounds.height, bbox.height);
+  const xMax = toGridCoord(bounds.x + bounds.width, bbox.width);
+  return yMax > yMin && xMax > xMin ? [yMin, xMin, yMax, xMax] : null;
+};
+
+/** One element of the `ideogram4_caption_builder` node's `regions` input. */
 interface Ideogram4RegionElement {
   prompt: string;
-  bbox: [number, number, number, number];
+  bbox: GridBox;
 }
-
-/** Ideogram 4 boxes are whole numbers from 0 to 1000 across the image, origin top-left. */
-const IDEOGRAM4_COORD_MAX = 1000;
-
-const toIdeogram4Coord = (pixels: number, extent: number): number =>
-  clamp(Math.round((pixels / extent) * IDEOGRAM4_COORD_MAX), IDEOGRAM4_COORD_MAX);
 
 const toIdeogram4Region = (
   region: RegionalGuidanceInput,
@@ -953,17 +965,8 @@ const toIdeogram4Region = (
   if (prompt === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
     return null;
   }
-  const { maskBounds: bounds } = region;
-  const { height, width } = options.bbox;
-  const yMin = toIdeogram4Coord(bounds.y, height);
-  const xMin = toIdeogram4Coord(bounds.x, width);
-  const yMax = toIdeogram4Coord(bounds.y + bounds.height, height);
-  const xMax = toIdeogram4Coord(bounds.x + bounds.width, width);
-  // A mask that misses the bbox, or rounds to a line, has no box to place.
-  if (yMax <= yMin || xMax <= xMin) {
-    return null;
-  }
-  return { bbox: [yMin, xMin, yMax, xMax], prompt };
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  return bbox ? { bbox, prompt } : null;
 };
 
 /**
@@ -984,11 +987,50 @@ const addIdeogram4Regions = (graph: BackendGraphContract, options: AddLayoutRegi
   }
 };
 
+/** One element of the `flux3_layout_prompt` node's `regions` input. */
+interface Flux3RegionElement {
+  desc: string;
+  bbox: GridBox;
+}
+
+const toFlux3Region = (region: RegionalGuidanceInput, options: AddLayoutRegionsOptions): Flux3RegionElement | null => {
+  const desc = region.positivePrompt;
+  if (desc === null || getLayoutRegionIssue(region, options.layoutKinds) !== null) {
+    return null;
+  }
+  const bbox = toGridBox(region.maskBounds, options.bbox);
+  // FLUX.3 reads a box with no coordinate above 1 as 0–1 fractions, so the node refuses [0, 0, 1, 1].
+  return bbox && Math.max(...bbox) > 1 ? { bbox, desc } : null;
+};
+
+/**
+ * FLUX.3 regions: each becomes a row of the box table that ends the caption, boxed around its mask and normalized to
+ * the bbox like Ideogram 4's. The base graph's `layout_prompt` appends them at run time, as object rows or, when the
+ * builder wired reference images, as edit rows for the output; core metadata then records the caption encoded. Regions
+ * the table cannot place are left out, and without any the graph stays untouched.
+ */
+const addFlux3LayoutRegions = (graph: BackendGraphContract, options: AddLayoutRegionsOptions): void => {
+  const layoutPrompt = graph.nodes.layout_prompt;
+  if (!layoutPrompt) {
+    throw new Error('addFlux3LayoutRegions: base graph is missing the layout prompt node.');
+  }
+  const regions = options.regions.flatMap((region) => toFlux3Region(region, options) ?? []);
+  if (regions.length === 0) {
+    return;
+  }
+  layoutPrompt.regions = regions;
+  const metadata = findMetadataNode(graph);
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'flux3_caption');
+  }
+};
+
 /** Each layout base places its regions through its own prompt node. */
 const LAYOUT_REGION_GRAFTS: Record<
   LayoutRegionalGuidanceBase,
   (graph: BackendGraphContract, options: AddLayoutRegionsOptions) => void
 > = {
+  flux3: addFlux3LayoutRegions,
   'ideogram-4': addIdeogram4Regions,
   'moss-image': addMossImageLayoutRegions,
 };

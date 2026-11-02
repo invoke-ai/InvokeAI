@@ -1732,6 +1732,9 @@ const buildFlux3Graph = (
         'transformer',
       ])
     : modelLoader;
+  // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
+  // flows through `positive_prompt`. Without regions the prompt passes through unchanged.
+  const layoutPrompt: BackendInvocationContract = addNode(graph, { id: 'layout_prompt', type: 'flux3_layout_prompt' });
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1761,7 +1764,8 @@ const buildFlux3Graph = (
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
-  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1772,6 +1776,14 @@ const buildFlux3Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  // With reference images FLUX.3 edits them, and its boxes mark where new content goes in the output.
+  if (
+    graph.edges.some(
+      (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'kontext_conditioning'
+    )
+  ) {
+    layoutPrompt.edit_targets = true;
+  }
   addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
     // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
     scheduler: 'euler',

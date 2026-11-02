@@ -2,7 +2,8 @@ import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { ALL_READABLE_BOARDS_ID, toGalleryItemKey } from '@features/gallery/core/items';
-import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings } from '@features/gallery/core/settings';
+import { formatGalleryMediaCounts } from '@features/gallery/core/mediaCounts';
+import { getGallerySettings } from '@features/gallery/core/settings';
 import {
   createGalleryBoard,
   deleteGalleryBoard,
@@ -17,13 +18,14 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { ApiError, getApiErrorCode, getApiErrorMessage } from '@platform/transport/http';
+import { toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryActions } from './GalleryWidgetContext';
 
-import { getGallerySearchScope } from './galleryStateView';
+import { getGalleryRawSelectedBoardId, getGallerySearchScope } from './galleryStateView';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryUploadAction } from './useGalleryUploadAction';
 
@@ -41,20 +43,34 @@ export const useGalleryActions = ({
 }: {
   boards: GalleryBoard[];
   /** The latest rendered gallery, for settling an action the user may have moved on from while it ran. */
-  getCurrentGalleryLocation: () => { autoAddBoardId: string; galleryView: GalleryView; selectedBoardId: string };
+  getCurrentGalleryLocation: () => { autoAddBoardId: string | null; galleryView: GalleryView; selectedBoardId: string };
   loadMore: () => void;
   selectedBoardId: string;
 }): GalleryActions => {
-  const { ensureProjectOnServer, exportProject, gallery, galleryValues, notifications, projectId, widgets } =
-    useGalleryUi();
+  const {
+    ensureProjectOnServer,
+    exportProject,
+    gallery,
+    galleryValues,
+    getProjectGalleryValues,
+    notifications,
+    projectId,
+    widgets,
+  } = useGalleryUi();
   const { autoAddBoardId, showOtherProjectBoards } = getGallerySettings(galleryValues);
   const isSearchingAllBoards = getGallerySearchScope(galleryValues) === 'all';
   const queryClient = useQueryClient();
   const { t } = useTranslation();
+  // The project on screen now, for an Undo that can only select a board in the open project.
+  const openProjectIdRef = useRef(projectId);
+
+  // eslint-disable-next-line react/refs
+  openProjectIdRef.current = projectId;
   // A search of every board has no board to upload to; the upload action refuses it.
   const uploadFiles = useGalleryUploadAction({
     boards,
     getCurrentGalleryLocation,
+    revealInReceivingTab: true,
     selectedBoardId: isSearchingAllBoards ? ALL_READABLE_BOARDS_ID : selectedBoardId,
   });
 
@@ -98,53 +114,93 @@ export const useGalleryActions = ({
 
       return board ? getGalleryBoardLabel(board, t) : t('widgets.gallery.uncategorized');
     };
-    const formatImageCount = (count: number) => t('widgets.gallery.imageCount', { count });
-    const formatVideoCount = (count: number) => t('widgets.gallery.videoCount', { count });
+
+    /** Resolves whether the server took the change, for an Undo to restore only what it can stand behind. */
+    const setBoardArchived = async (boardId: string, archived: boolean): Promise<boolean> => {
+      const owner = captureAccountScope();
+      const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
+      const movedSelectionAway = archived && boardId === selectedBoardId;
+      // An archived board is out of the way, as a deleted one is: results stop going to it rather than to a board
+      // nothing on screen shows.
+      const stoppedAutoAdding = archived && autoAddBoardId === boardId;
+
+      if (movedSelectionAway) {
+        gallery.selectBoard('none');
+      }
+      if (stoppedAutoAdding) {
+        gallery.updateSettings({ autoAddBoardId: null });
+      }
+
+      try {
+        await updateGalleryBoard(boardId, { archived }, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        const title = t(archived ? 'widgets.gallery.boardArchived' : 'widgets.gallery.boardUnarchived', {
+          name: getBoardName(boardId),
+        });
+
+        const undoArchive = async () => {
+          if (!(await setBoardArchived(boardId, false))) {
+            return;
+          }
+          // Back to what the archive changed, in the project it changed them in (the toast outlives a project
+          // switch), and each only while that project still has what the archive left: no destination, and
+          // Uncategorized on screen.
+          const values = movedSelectionAway || stoppedAutoAdding ? getProjectGalleryValues?.(projectId) : null;
+
+          if (!values) {
+            return;
+          }
+          if (stoppedAutoAdding && getGallerySettings(values).autoAddBoardId === null) {
+            gallery.updateSettings({ autoAddBoardId: boardId }, projectId);
+          }
+          // Selecting acts on the open project only.
+          if (
+            movedSelectionAway &&
+            openProjectIdRef.current === projectId &&
+            getGalleryRawSelectedBoardId(values) === 'none'
+          ) {
+            gallery.selectBoard(boardId);
+          }
+        };
+
+        if (archived && notifications.undoable) {
+          notifications.undoable(title, {
+            onUndo: () => void undoArchive(),
+            // Archiving the board again (after an unarchive) withdraws this Undo: the newer one now speaks for it.
+            supersedes: `gallery-board-archive:${boardId}`,
+          });
+        } else {
+          recordSuccess(title);
+        }
+        refresh();
+
+        return true;
+      } catch (error: unknown) {
+        if (!isAccountScopeCurrent(owner)) {
+          return false;
+        }
+
+        rollback();
+
+        // Each only while the user has not chosen again since.
+        const current = getCurrentGalleryLocation();
+        if (movedSelectionAway && current.selectedBoardId === 'none') {
+          gallery.selectBoard(boardId);
+        }
+        if (stoppedAutoAdding && current.autoAddBoardId === null) {
+          gallery.updateSettings({ autoAddBoardId: boardId });
+        }
+
+        recordBoardError(boardId, error);
+
+        return false;
+      }
+    };
 
     return {
       archiveBoard: async (boardId, archived) => {
-        const owner = captureAccountScope();
-        const rollback = patchGalleryBoardCaches(queryClient, boardId, { archived });
-        const movedSelectionAway = archived && boardId === selectedBoardId;
-        // An archived board is out of the way, as a deleted one is: results stop going to it rather than to a board
-        // nothing on screen shows.
-        const stoppedAutoAdding = archived && autoAddBoardId === boardId;
-
-        if (movedSelectionAway) {
-          gallery.selectBoard('none');
-        }
-        if (stoppedAutoAdding) {
-          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
-        }
-
-        try {
-          await updateGalleryBoard(boardId, { archived }, owner.signal);
-
-          assertAccountScopeCurrent(owner);
-          recordSuccess(
-            t(archived ? 'widgets.gallery.boardArchived' : 'widgets.gallery.boardUnarchived', {
-              name: getBoardName(boardId),
-            })
-          );
-          refresh();
-        } catch (error: unknown) {
-          if (!isAccountScopeCurrent(owner)) {
-            return;
-          }
-
-          rollback();
-
-          // Each only while the user has not chosen again since.
-          const current = getCurrentGalleryLocation();
-          if (movedSelectionAway && current.selectedBoardId === 'none') {
-            gallery.selectBoard(boardId);
-          }
-          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
-            gallery.updateSettings({ autoAddBoardId: boardId });
-          }
-
-          recordBoardError(boardId, error);
-        }
+        await setBoardArchived(boardId, archived);
       },
       createBoard: async (boardName, projectId) => {
         const owner = captureAccountScope();
@@ -175,10 +231,19 @@ export const useGalleryActions = ({
       },
       deleteBoard: async (boardId, includeImages) => {
         const owner = captureAccountScope();
+        const boardName = getBoardName(boardId);
+
+        // Deleting media can take a while and the dialog has closed: a progress toast says it is under way until the
+        // outcome replaces it. Only the outcome is recorded in the notification center.
+        const progressToastId = includeImages
+          ? toaster.create({
+              duration: Number.POSITIVE_INFINITY,
+              title: t('widgets.gallery.deleteBoardInProgress', { name: boardName }),
+              type: 'loading',
+            })
+          : null;
 
         try {
-          const boardName = getBoardName(boardId);
-
           const outcome = await deleteGalleryBoard(boardId, includeImages, owner.signal);
 
           assertAccountScopeCurrent(owner);
@@ -187,18 +252,23 @@ export const useGalleryActions = ({
             failedCount > 0 ? 'widgets.gallery.deleteBoardPartialTitle' : 'widgets.gallery.deleteBoardSuccessTitle',
             { name: boardName }
           );
-          const message = includeImages
-            ? t('widgets.gallery.deleteBoardMediaOutcome', {
-                failedImages: formatImageCount(outcome.failedImageNames.length),
-                failedVideos: formatVideoCount(outcome.failedVideoNames.length),
-                images: formatImageCount(outcome.deletedImageNames.length),
-                videos: formatVideoCount(outcome.deletedVideoNames.length),
-              })
-            : t('widgets.gallery.deleteBoardMoveOutcome', {
-                images: formatImageCount(outcome.deletedBoardImageNames.length),
-                videos: formatVideoCount(outcome.deletedBoardVideoNames.length),
-              });
-          recordSuccess(title, message);
+          const formatMedia = (images: readonly string[], videos: readonly string[]) =>
+            formatGalleryMediaCounts(t, { images: images.length, videos: videos.length });
+          const deleted = formatMedia(outcome.deletedImageNames, outcome.deletedVideoNames);
+          const failed = formatMedia(outcome.failedImageNames, outcome.failedVideoNames);
+          const moved = formatMedia(outcome.deletedBoardImageNames, outcome.deletedBoardVideoNames);
+          // Only what happened: nothing about media that was not there, and no failure clause without a failure.
+          const message = (
+            includeImages
+              ? [
+                  deleted ? t('widgets.gallery.deleteBoardMediaDeleted', { media: deleted }) : '',
+                  failed ? t('widgets.gallery.deleteBoardMediaFailed', { media: failed }) : '',
+                ]
+              : [moved ? t('widgets.gallery.deleteBoardMoveOutcome', { media: moved }) : '']
+          )
+            .filter(Boolean)
+            .join(' ');
+          recordSuccess(title, message || undefined);
 
           gallery.reconcileDeletedBoardOutcome(outcome);
           refresh();
@@ -208,6 +278,10 @@ export const useGalleryActions = ({
           }
 
           recordBoardError(boardId, error);
+        } finally {
+          if (progressToastId !== null) {
+            toaster.dismiss(progressToastId);
+          }
         }
       },
       downloadBoard: async (boardId) => {
@@ -255,7 +329,7 @@ export const useGalleryActions = ({
           gallery.selectBoard('none');
         }
         if (stoppedAutoAdding) {
-          gallery.updateSettings({ autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW });
+          gallery.updateSettings({ autoAddBoardId: null });
         }
 
         try {
@@ -283,13 +357,14 @@ export const useGalleryActions = ({
           if (movedSelectionAway && current.selectedBoardId === 'none') {
             gallery.selectBoard(boardId);
           }
-          if (stoppedAutoAdding && current.autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW) {
+          if (stoppedAutoAdding && current.autoAddBoardId === null) {
             gallery.updateSettings({ autoAddBoardId: boardId });
           }
 
           recordBoardError(boardId, error, { missingIsBoard: false });
         }
       },
+      clearSelection: gallery.clearSelection,
       refresh,
       renameBoard: async (boardId, boardName) => {
         const owner = captureAccountScope();
@@ -371,6 +446,7 @@ export const useGalleryActions = ({
     exportProject,
     gallery,
     getCurrentGalleryLocation,
+    getProjectGalleryValues,
     loadMore,
     notifications,
     projectId,

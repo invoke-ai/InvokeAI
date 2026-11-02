@@ -41,6 +41,8 @@ export type IconButtonProps = Omit<ChakraIconButtonProps, 'aria-label' | 'aria-l
   UnavailableProps & {
     /** The platform tooltip an icon-only control carries; while unavailable it adds the reason. */
     tooltip?: ReactNode;
+    /** Where that tooltip opens; a toolbar along an edge opens it away from the edge. */
+    tooltipPlacement?: ComponentProps<typeof Tooltip>['placement'];
   };
 
 /**
@@ -107,6 +109,7 @@ export const IconButton = ({
   colorPalette,
   disabled,
   tooltip,
+  tooltipPlacement,
   unavailableReason,
   ...props
 }: IconButtonProps) => {
@@ -135,7 +138,13 @@ export const IconButton = ({
     </ChakraIconButton>
   );
 
-  return content ? <Tooltip content={content}>{button}</Tooltip> : button;
+  return content ? (
+    <Tooltip content={content} placement={tooltipPlacement}>
+      {button}
+    </Tooltip>
+  ) : (
+    button
+  );
 };
 
 /** Dismissal chrome is muted. */
