@@ -1,7 +1,7 @@
 ---
 title: MOSS-Image
-description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts and layouts from canvas regions.
-lastUpdated: 2026-10-18
+description: Generate and edit images with OpenMOSS's MOSS-Image Base and SFT, from the Diffusers pipelines or a single-file transformer, including JSON layout prompts, layouts from canvas regions and a prompt enhancer.
+lastUpdated: 2026-10-28
 sidebar:
   order: 8
 ---
@@ -191,11 +191,69 @@ with *MOSS-Image needs a prompt to place regional guidance in its layout. Enter 
 regional guidance layers.* Regional negative prompts, auto-negative and regional reference images are not used
 with MOSS-Image; the layer hides its negative prompt and auto-negative controls.
 
-Without regions the prompt is sent unchanged. If the prompt already is a JSON layout in the format above, the
+Without regions the prompt is sent unchanged. If the prompt is a [layout draft](#prompt-enhancer), it is
+compiled and the regions follow its items. If it already is a JSON layout in the format above, the
 regions are added to its `items`; a layout with another `bbox_coord_space` or `bbox_format` makes the
 generation fail with a message. Any other prompt, including JSON that is not a layout, becomes the caption.
-The layout is built when the generation runs, so dynamic prompts and batches vary the caption inside it. The
-encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
+The layout is built when the generation runs, so for a plain-text prompt dynamic prompts and batches vary the
+caption inside it. A prompt that already is a JSON layout or draft is sent as written, without expanding
+dynamic prompts or wildcards and without a prompt template's positive text.
+
+The prompt the model encodes, in the Generate tab and on the Canvas, is saved in the image's metadata as
+`moss_image_layout_prompt`: the compiled layout when there is one, otherwise the prompt as sent.
+
+### Prompt enhancer
+
+MOSS-Image follows long, specific prompts best. **Expand Prompt** in the prompt toolbar can write them for
+you with the **MOSS-Image Prompt Enhancer** system prompt, derived from OpenMOSS's prompt-enhancer skill. See
+[Prompt Tools](/users-guide/image-generation/prompt-tools/#expand-prompt) for the tool itself.
+
+1. Select a MOSS-Image model and type a short idea, such as `a jazz festival poster titled "BLUE NOTES"`.
+2. Open **Expand prompt** in the Generate panel's prompt toolbar; Canvas generations use the same prompt.
+   With MOSS-Image selected it preselects the **MOSS-Image Prompt Enhancer** system prompt. The model saved for
+   the project stays selected; without one, **Gemma 4 E4B (Prompt Enhancer)** is preselected when installed.
+   When Gemma is installed but another model is selected, the popover shows **Recommended for this model** with
+   a **Use it** button; when it is not installed, the popover points you to that starter model. A model or
+   system prompt you pick in the open popover overrides the suggestion.
+3. Click **Expand**, check the result in the prompt box and press Invoke.
+
+The language model decides between two kinds of output:
+
+- **A caption**: one detailed paragraph, for photos, scenes and most images without precise placement.
+  It is sent as written.
+- **A layout draft**: JSON for posters, covers, infographics and other images where text or elements must sit
+  in particular places. It holds a `summary` with the scene caption, a list of `items` with a label, a caption,
+  the text to render for text items and a box, plus the `width` and `height` the boxes refer to. Boxes are
+  `[x1, y1, x2, y2]` pixel edges from the top-left corner (`"bbox_coord_space": "abs"`,
+  `"bbox_format": "xyxy"`).
+
+You can edit a draft in the prompt box like any other text. It is compiled into the model's
+[JSON layout](#json-layouts) when the generation runs:
+
+- **Size**: Expand Prompt never changes the image size. The draft's `width` and `height` only set its
+  coordinate frame, and its boxes are scaled to the width and height you generate at, so you can change the
+  size after expanding.
+- **Tolerance**: a Markdown code fence around the JSON (with or without a language tag such as `json`), unknown fields and unknown labels are accepted, boxes
+  that leave the image are clamped to it, and items whose box has no area are dropped. A draft without a scene
+  caption, without any usable item, or with a text item that has no text fails with a message naming the item.
+- **Canvas regions**: on the Canvas, enabled [regional guidance](#layout-with-canvas-regions) layers are
+  appended after the draft's items.
+
+A JSON object with `"bbox_coord_space": "abs"` is treated as a draft. When it lacks a summary caption, items,
+or a numeric width and height, or its `bbox_format` is not `xyxy`, Invoke is disabled with a message saying
+so. A compiled layout (`abs_centralized`, `yxyx`) is never blocked. Run Expand Prompt
+again or fix the JSON.
+
+#### Recommended language model
+
+Install **Gemma 4 E4B (Prompt Enhancer)** from the starter models (`google/gemma-4-E4B-it`, ~16 GB). It is
+optional and not part of the MOSS-Image bundle. In InvokeAI's tests on an RTX 4090 in bf16, it chose
+between caption and layout correctly for all 10 test requests and every draft it wrote was valid. A request
+took 8 to 26 s and peaked at about 15 GiB of VRAM.
+
+Small language models of about 1.5 to 1.7B parameters, such as **Qwen2.5 1.5B Instruct** or SmolLM-class
+models, are not recommended for this system prompt: they write layouts for nearly every request, and their
+drafts are often invalid.
 
 ## Limitations
 
@@ -210,7 +268,7 @@ encoded layout is saved in the image's metadata as `moss_image_layout_prompt`.
 | Node                              | Purpose                                                                    |
 | --------------------------------- | -------------------------------------------------------------------------- |
 | **Main Model - MOSS-Image**       | Loads the transformer, and the Qwen3.5 9B encoder and VAE from the pipeline or from the standalone models selected |
-| **Layout Prompt - MOSS-Image**    | Builds a JSON layout from a prompt and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. The Canvas feeds it for regional guidance; its regions input has no editor widget |
+| **Layout Prompt - MOSS-Image**    | Builds the prompt the model encodes from a prompt, the image size and a list of regions, each with a type, a caption, visible text for text regions, and a pixel box `[x1, y1, x2, y2]` from the image's top-left. Compiles a layout draft at the given size. Every MOSS-Image graph from the Generate tab and the Canvas uses it; its regions input has no editor widget |
 | **Prompt - MOSS-Image**           | Encodes a prompt with the Qwen3.5 9B encoder                               |
 | **Denoise - MOSS-Image**          | Runs sampling; accepts image-to-image latents and an inpainting mask, and takes the skip layers as **Uncond Skip Layers** |
 | **Image to Latents - FLUX2**      | VAE encode, for image-to-image and inpainting                              |

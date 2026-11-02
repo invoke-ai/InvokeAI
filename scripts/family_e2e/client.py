@@ -11,7 +11,7 @@ import mimetypes
 import threading
 import time
 from collections import defaultdict, deque
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -248,11 +248,12 @@ def build_timing(
     t_enqueue: float,
     t_done: float,
     item: dict[str, Any],
-    expected_steps: int | None = None,
+    step_counts: Mapping[str, int] | None = None,
 ) -> Timing:
     """Run timing from the recorded events; every `t_*` is relative to the enqueue instant.
 
-    `expected_steps` is the denoise step count when the run covers the whole schedule (not img2img).
+    `step_counts` maps a graph node id to the denoise step count the node runs over its whole schedule
+    (`graphs.denoise_step_counts`); the time per step trusts the count of the node that sent the preview frames.
     """
     # The socket client runs every handler on its own thread, so the list order can differ from the arrival order.
     events = sorted(events, key=lambda e: e.t)
@@ -298,7 +299,13 @@ def build_timing(
             loads[pending[key].popleft()]["t_end"] = event.t - t_enqueue
 
     # The denoise node is the one with the most preview frames.
-    denoise = max(progress.values(), key=len, default=[])
+    denoise: list[tuple[float, float]] = []
+    expected_steps = None
+    if progress:
+        denoise_id = max(progress, key=lambda prepared_id: len(progress[prepared_id]))
+        denoise = progress[denoise_id]
+        if denoise_id in starts:
+            expected_steps = (step_counts or {}).get(starts[denoise_id][0])
     return Timing(
         total_s=t_done - t_enqueue,
         nodes=nodes,

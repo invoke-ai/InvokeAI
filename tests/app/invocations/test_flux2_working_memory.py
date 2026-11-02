@@ -6,11 +6,13 @@ with the model. Reference images make that fatal rather than merely tight: their
 concatenated onto the image stream, so three 1024x1024 references quadruple the attended sequence of
 a 1024x1024 generation. See https://github.com/invoke-ai/InvokeAI/issues/9500.
 
-The `MEASURED_*` tables below are peak *reserved* memory measured on CUDA in bf16 (the conservative
-quantity, including allocator overhead). Every estimate must stay an upper bound on them. The VAE's
-measured points ship with its coefficients in `invokeai/backend/working_memory/data/vae.json`, where
-`tests/backend/working_memory/test_shipped_coefficients.py` holds the estimate to at least each point
-and, where a fitted coefficient decides it, at most 1.3x (or the point's `max_ratio`).
+The denoise estimate (`denoise.flux2`) and the VAE's ship their coefficients and measured points in
+`invokeai/backend/working_memory/data/`, where `tests/backend/working_memory/test_shipped_coefficients.py`
+holds every estimate to at least each point and, where a fitted coefficient decides it, at most 1.3x (or
+the point's `max_ratio`). `tests/app/invocations/test_flux2_denoise_working_memory.py` holds the denoise
+estimate to the formula it replaced where the legacy constants still price, and to the checks the shipped
+points leave out. The tests here pin how the estimates are composed and what the nodes hand them, reading
+each line's slope from the shipped data.
 """
 
 from contextlib import contextmanager
@@ -21,13 +23,13 @@ import torch
 import torch.nn.functional as F
 from diffusers.models.autoencoders.autoencoder_kl_flux2 import AutoencoderKLFlux2
 
-from invokeai.app.invocations.flux2.flux2_denoise import (
+from invokeai.app.invocations.flux2.flux2_denoise import FLUX2_MAX_HIDDEN_SIZE, Flux2DenoiseInvocation
+from invokeai.backend.flux2.denoise_working_memory import (
     FLUX2_ATTENTION_HEAD_DIM,
-    FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH,
-    FLUX2_MAX_HIDDEN_SIZE,
-    FLUX2_REFERENCE_HIDDEN_SIZE,
-    Flux2DenoiseInvocation,
+    FLUX2_DENOISE_SPEC,
+    estimate_flux2_denoise_working_memory,
 )
+from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.util.attention import (
     SDPA_MATH_BYTES_PER_SCORE_ELEMENT,
@@ -37,6 +39,7 @@ from invokeai.backend.util.attention import (
     sdpa_score_matrix_bytes,
 )
 from invokeai.backend.util.vae_working_memory import VAE_FLUX2_SPEC, estimate_vae_working_memory_flux2
+from invokeai.backend.working_memory import spec as spec_module
 from invokeai.backend.working_memory.coefficients import shipped_coefficients
 from invokeai.backend.working_memory.platform import Platform
 
@@ -50,20 +53,28 @@ def _vae_line(conv_backend, operation, pixels, allocator="native", os="linux"):
     return int(values[f"k_{operation}_bf16"] * pixels + values[f"b_{operation}_bf16"])
 
 
-# The estimator's default width, and the head count that follows from it. The suite's pinned
-# `MEASURED_DENOISE` table was taken on Klein 9B, which is that default, so those rows are unmoved
-# by the width scaling.
-KLEIN_9B_HEADS = FLUX2_REFERENCE_HIDDEN_SIZE // FLUX2_ATTENTION_HEAD_DIM
-PER_TOKEN = FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH
+# The width the denoise tests price at unless they say otherwise, and the head count that follows from it.
+KLEIN_9B = 4096
+KLEIN_9B_HEADS = KLEIN_9B // FLUX2_ATTENTION_HEAD_DIM
 
 
-def _per_token(hidden):
-    """The estimator's per-token cost at a given width, as it computes it."""
-    return int(FLUX2_BYTES_PER_TOKEN_AT_REFERENCE_WIDTH * hidden / FLUX2_REFERENCE_HIDDEN_SIZE)
+DENOISE_PLATFORM = Platform("cudnn", "native", "linux")
+"""The platform every denoise estimate here is priced on, the RTX 4090's measured lines, whatever device answers the
+attention questions: the CPU stands in for a fused kernel and an unprobed CUDA device for a materializing one, and either
+would otherwise select coefficients of its own."""
 
 
-# The measured tables in this module were all taken on CUDA, where SDPA runs a fused kernel and no
-# score matrix is materialized. torch reports its CPU flash kernel as eligible for every shape used
+def _priced_on_denoise_platform():
+    return patch.object(spec_module, "platform_for", return_value=DENOISE_PLATFORM)
+
+
+def _per_token(hidden=KLEIN_9B):
+    """What the shipped denoise line of a width charges per attended token and sample."""
+    return shipped_coefficients(FLUX2_DENOISE_SPEC, DENOISE_PLATFORM).values[f"k_denoise_bf16_h{hidden}"]
+
+
+# The lines were measured where SDPA runs a fused kernel and no score matrix is materialized.
+# torch reports its CPU flash kernel as eligible for every shape used
 # here, so passing a CPU device reproduces that regime without needing a GPU on the test runner. The
 # materializing regime gets its own class below.
 FUSED = torch.device("cpu")
@@ -75,125 +86,49 @@ def _estimate(
     text_seq_len=512,
     num_loras=0,
     batch_size=1,
-    hidden_size=FLUX2_REFERENCE_HIDDEN_SIZE,
-    regional_bias=0,
-    has_regional_mask=False,
+    hidden_size=KLEIN_9B,
+    regional=False,
     device=FUSED,
 ):
-    return Flux2DenoiseInvocation._estimate_working_memory(
-        MagicMock(spec=Flux2DenoiseInvocation),
-        image_seq_len=image_seq_len,
-        ref_image_seq_len=ref_image_seq_len,
-        text_seq_len=text_seq_len,
-        num_loras=num_loras,
-        batch_size=batch_size,
-        hidden_size=hidden_size,
-        regional_attention_bias_bytes=regional_bias,
-        has_regional_attention_mask=has_regional_mask,
-        device=device,
-    )
-
-
-class TestFlux2DenoiseWorkingMemoryEstimate:
-    # (image tokens, reference tokens, measured peak reserved MB) on the Klein 9B geometry.
-    # Token grids are pixels/16, so a 1024px square is 4096 tokens.
-    MEASURED_DENOISE = [
-        (1024, 0, 448),  # 512px
-        (4096, 0, 1702),  # 1024px
-        (4096, 4096, 3324),  # 1024px + one 1024px reference
-        (4096, 8192, 4840),  # + two references
-        (4096, 12288, 6538),  # + three references (the tiled-refiner case from #9500)
-        (6889, 12288, 7528),  # 1328px tile + three 1024px references
-        (6889, 20667, 10954),  # 1328px tile + three 1328px references
-        (16384, 0, 6538),  # 2048px, no references
-    ]
-
-    @pytest.mark.parametrize("image_seq_len, ref_image_seq_len, measured_mb", MEASURED_DENOISE)
-    def test_estimate_is_an_upper_bound_on_measured_peak(self, image_seq_len, ref_image_seq_len, measured_mb):
-        """The cache treats the estimate as the amount it must keep free, so under-estimating OOMs."""
-        assert _estimate(image_seq_len, ref_image_seq_len) >= measured_mb * MB
-
-    @pytest.mark.parametrize("image_seq_len, ref_image_seq_len, measured_mb", MEASURED_DENOISE)
-    def test_estimate_does_not_wildly_over_reserve(self, image_seq_len, ref_image_seq_len, measured_mb):
-        """Over-estimating is not free: the cache offloads the transformer to RAM to honor the
-        reservation, and a model running over PCIe is indistinguishable from a hang."""
-        assert _estimate(image_seq_len, ref_image_seq_len) <= measured_mb * MB + 2 * GB
-
-    def test_reference_image_tokens_are_counted(self):
-        """The regression this whole module exists for: reference tokens are attended like image
-        tokens and cost the same per token, so they must enter the estimate."""
-        without_refs = _estimate(image_seq_len=4096)
-        with_refs = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
-        assert with_refs - without_refs == 12288 * PER_TOKEN
-
-    def test_estimate_is_linear_in_total_sequence(self):
-        """Attention runs through SDPA, so there is no O(seq^2) term to model -- image, reference and
-        text tokens are interchangeable at the same per-token cost."""
-        assert _estimate(image_seq_len=8192) == _estimate(image_seq_len=4096, ref_image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, text_seq_len=1024) - _estimate(image_seq_len=4096, text_seq_len=512) == (
-            512 * PER_TOKEN
-        )
-
-    def test_lora_margin_is_added_per_lora(self):
-        """Sidecar-patched LoRAs add an activation branch per patched layer."""
-        base = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, num_loras=1) - base == int(0.5 * GB)
-        assert _estimate(image_seq_len=4096, num_loras=3) - base == int(1.5 * GB)
-
-    def test_regional_attention_bias_is_added(self):
-        base = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, regional_bias=123 * MB) - base == 123 * MB
+    """The denoise reservation of a dense transformer. `regional` passes a regional mask over the image and caption
+    tokens, as the node builds it."""
+    side = image_seq_len + text_seq_len
+    with _priced_on_denoise_platform():
+        return estimate_flux2_denoise_working_memory(
+            torch.nn.Module(),
+            hidden_size=hidden_size,
+            image_seq_len=image_seq_len,
+            ref_image_seq_len=ref_image_seq_len,
+            text_seq_len=text_seq_len,
+            batch_size=batch_size,
+            lora_count=num_loras,
+            regional_attn_mask=torch.empty((side, side), device="meta") if regional else None,
+            device=device,
+            dtype=torch.bfloat16,
+        ).reservation_bytes
 
 
 class TestTransformerWidthIsBudgeted:
-    """Per-token activation cost is linear in the transformer's hidden width, not only in the token
-    count. Measured slope between 4608 and 9216 tokens on CUDA/bf16, block count and everything else
-    held fixed, each point in a fresh process:
+    """Per-token activation cost follows the transformer's hidden width, not only the token count: each width has a
+    line of its own in the shipped data, fitted on its own points.
 
-        3072 (Klein 4B) 0.2912 MB/tok    4096 (Klein 9B) 0.3859    6144 ([dev]) 0.5547
-
-    which is 0.755 / 1.000 / 1.438 of the Klein 9B slope against width ratios of 0.75 / 1.00 / 1.50.
-    Linear, and sub-linear at the top, so scaling the constant by width stays an upper bound.
-
-    The same holds on ROCm/gfx1201, measured independently: 0.3147 / 0.4067 / 0.5890, i.e. ratios of
-    0.774 / 1.000 / 1.448. The absolute constant is per-build (which is why it is 0.42, not CUDA's
-    0.386); the width ratio is architectural and is the same on both.
-
-    Calibrating on Klein 9B alone -- which this did -- silently under-reserved FLUX.2 [dev] by a
-    third, and [dev] reaches the denoise node as a first-class path with its own loader and starter
-    models. The head count follows the same width, so the score-matrix term gets the variant's real
-    count rather than the widest.
+    Calibrating on Klein 9B alone silently under-reserved FLUX.2 [dev] by a third, and [dev] reaches
+    the denoise node as a first-class path with its own loader and starter models. So each width has a
+    line of its own, and the head count follows the same width, so the score-matrix term gets the
+    variant's real count rather than the widest.
     """
-
-    # (platform, hidden size, measured MB per token). Reproduce with
-    # `scripts/calibrate_flux2_working_memory.py --only denoise`.
-    MEASURED_WIDTH_SLOPE = [
-        ("cuda-4090", 3072, 0.2912),
-        ("cuda-4090", 4096, 0.3859),
-        ("cuda-4090", 6144, 0.5547),
-        ("rocm-gfx1201", 3072, 0.3147),
-        ("rocm-gfx1201", 4096, 0.4067),
-        ("rocm-gfx1201", 6144, 0.5890),
-    ]
 
     def _slope_per_token(self, hidden):
         short = _estimate(image_seq_len=4096, text_seq_len=512, hidden_size=hidden)
         long = _estimate(image_seq_len=8704, text_seq_len=512, hidden_size=hidden)
         return (long - short) / (9216 - 4608)
 
-    @pytest.mark.parametrize("platform, hidden, measured_mb", MEASURED_WIDTH_SLOPE)
-    def test_the_estimate_upper_bounds_the_measured_slope(self, platform, hidden, measured_mb):
-        """The constant has to bound the worst build measured, not the one it was written on. It was
-        0.4, which is under the 0.4067 gfx1201 costs at the reference width; it is 0.42. The upper
-        guard keeps that from drifting into over-reservation, since this is the dominant term."""
-        slope = self._slope_per_token(hidden)
-        assert slope >= measured_mb * MB
-        assert slope <= 1.25 * measured_mb * MB
+    def test_each_width_is_priced_on_its_own_line(self):
+        widths = (3072, 4096, 6144)
+        slopes = [self._slope_per_token(hidden) for hidden in widths]
 
-    def test_the_slope_is_linear_in_width(self):
-        klein_9b = self._slope_per_token(4096)
-        assert self._slope_per_token(3072) == pytest.approx(0.75 * klein_9b, rel=0.01)
-        assert self._slope_per_token(6144) == pytest.approx(1.50 * klein_9b, rel=0.01)
+        assert slopes == [_per_token(hidden) for hidden in widths]
+        assert slopes[0] < slopes[1] < slopes[2]
 
     @pytest.mark.parametrize("hidden, heads", [(3072, 24), (4096, 32), (6144, 48)])
     def test_the_score_matrix_uses_the_variants_real_head_count(self, hidden, heads):
@@ -201,81 +136,10 @@ class TestTransformerWidthIsBudgeted:
         too much on Klein 9B and double on Klein 4B -- and on MPS, where the probe always takes the
         materializing branch, that term lands on every single estimate."""
         seq_len = 4096 + 512
-        fused = _estimate(image_seq_len=4096, has_regional_mask=True, hidden_size=hidden)
+        fused = _estimate(image_seq_len=4096, regional=True, hidden_size=hidden)
         with _materializing():
-            materializing = _estimate(
-                image_seq_len=4096, has_regional_mask=True, hidden_size=hidden, device=MATERIALIZING
-            )
+            materializing = _estimate(image_seq_len=4096, regional=True, hidden_size=hidden, device=MATERIALIZING)
         assert materializing - fused == heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-
-
-class TestFlux2DenoiseBatchIsBudgeted:
-    """A batch of B is B independent sequences, so it enters the linear term exactly as extra
-    sequence does. Measured on the Klein geometry (48 heads x 128, mlp 3.0) with a reduced block
-    count -- the constant is block-count independent -- peak reserved, each point in a fresh process:
-
-        B=1, 4608 tokens ->  2570MB      B=2, 4608 each (9216 total) ->  5126MB
-        B=1, 9728 tokens ->  5584MB      B=2, 9728 each (19456 total) -> 11120MB
-        B=1, 14336 tokens -> 8284MB      B=3, 4608 each (13824 total) ->  7656MB
-
-    Per *total* token that is 0.554-0.578MB across every row: batch and sequence are interchangeable.
-    (The absolute figure is not comparable to the Klein table elsewhere in this module -- a 3-block
-    stand-in amortizes per-forward overhead differently. Only the equivalence is being tested.)
-
-    Batched latents reach this node through the API and custom graphs, not the stock UI.
-    """
-
-    def test_batch_and_sequence_are_interchangeable(self):
-        """Two samples of 4608 tokens must cost what one sample of 9216 costs -- the measurement
-        above says 5126MB against 5584MB, equal to within the allocator's noise."""
-        assert _estimate(image_seq_len=4096, text_seq_len=512, batch_size=2) == _estimate(
-            image_seq_len=8704, text_seq_len=512, batch_size=1
-        )
-
-    @pytest.mark.parametrize("batch", [2, 3, 4])
-    def test_each_extra_sample_adds_exactly_its_own_tokens(self, batch):
-        single = _estimate(image_seq_len=4096)
-        assert _estimate(image_seq_len=4096, batch_size=batch) - single == (batch - 1) * (4096 + 512) * PER_TOKEN
-
-    def test_reference_tokens_scale_with_the_batch(self):
-        """`ensure_batch_size` repeats the reference latents across the batch."""
-        single = _estimate(image_seq_len=4096, ref_image_seq_len=12288)
-        assert _estimate(image_seq_len=4096, ref_image_seq_len=12288, batch_size=2) - single == (
-            (4096 + 12288 + 512) * PER_TOKEN
-        )
-
-    def test_the_fixed_base_does_not_scale_with_the_batch(self):
-        """It covers transient weight casts and allocator slack -- properties of the weights, not of
-        how many samples run through them. Scaling it would add a GB per sample for nothing."""
-        deltas = {
-            _estimate(image_seq_len=4096, batch_size=b + 1) - _estimate(image_seq_len=4096, batch_size=b)
-            for b in (1, 2, 3)
-        }
-        assert deltas == {(4096 + 512) * PER_TOKEN}
-
-    def test_the_regional_bias_does_not_scale_with_the_batch(self):
-        """`get_joint_attention_kwargs` builds it as (1, 1, S, S) and lets SDPA broadcast it, so
-        there is exactly one of them however many samples are in flight."""
-        bias = (4096 + 512) ** 2 * 2
-        single = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True)
-        double = _estimate(image_seq_len=4096, regional_bias=bias, has_regional_mask=True, batch_size=2)
-        assert double - single == (4096 + 512) * PER_TOKEN
-
-    def test_the_score_matrix_scales_with_the_batch(self):
-        """Where it is materialized at all it is shaped (batch, heads, S, S)."""
-        seq_len = 4096 + 512
-        with _materializing():
-            single = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
-            double = _estimate(image_seq_len=4096, has_regional_mask=True, batch_size=2, device=MATERIALIZING)
-        assert double - single == (
-            seq_len * PER_TOKEN + KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
-        )
-
-    def test_the_lora_margin_scales_with_the_batch(self):
-        """A sidecar patch adds an activation branch, and activations are per sample."""
-        assert _estimate(image_seq_len=4096, num_loras=2, batch_size=3) - _estimate(
-            image_seq_len=4096, num_loras=0, batch_size=3
-        ) == 3 * int(1.0 * GB)
 
 
 class TestFlux2VaeWorkingMemoryEstimate:
@@ -508,12 +372,16 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         variant="klein_9b",
         transformer: torch.nn.Module | None = None,
         on_device=None,
+        negative_tokens: int | None = None,
+        regional_mask: torch.Tensor | None = None,
     ):
-        """Drive `_run_diffusion` up to the transformer load and return the requested working memory.
+        """Drive `_run_diffusion` up to the transformer load and return the reservation of the estimate it hands
+        `model_on_device()`.
 
         `transformer` replaces the mocked model the node reads before locking. It has to be a real
         module for anything that walks the module tree: a `MagicMock` iterates empty, so an int8
-        build looks exactly like a dense one.
+        build looks exactly like a dense one. `negative_tokens` adds a negative caption of that length;
+        `regional_mask` stands in for the mask regional prompting builds from masked positive captions.
         """
         from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
         from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
@@ -536,9 +404,16 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             format=ModelFormat.Checkpoint,
             variant=Flux2VariantType(variant) if variant is not None else None,
         )
-        context.conditioning.load.return_value = ConditioningFieldData(
-            conditionings=[FLUXConditioningInfo(clip_embeds=torch.zeros(1, 768), t5_embeds=torch.zeros(1, 512, 12288))]
-        )
+
+        def conditioning(name: str) -> ConditioningFieldData:
+            tokens = negative_tokens if name == "neg" else 512
+            return ConditioningFieldData(
+                conditionings=[
+                    FLUXConditioningInfo(clip_embeds=torch.zeros(1, 768), t5_embeds=torch.zeros(1, tokens, 12288))
+                ]
+            )
+
+        context.conditioning.load.side_effect = conditioning
 
         ref_extension = MagicMock()
         ref_extension.ref_image_latents = torch.zeros(1, num_ref_tokens, 128)
@@ -556,7 +431,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             add_noise=True,
             transformer=MagicMock(transformer=MagicMock(), loras=[]),
             positive_text_conditioning=MagicMock(conditioning_name="pos", mask=None),
-            negative_text_conditioning=None,
+            negative_text_conditioning=MagicMock(conditioning_name="neg") if negative_tokens is not None else None,
             guidance=4.0,
             cfg_scale=1.0,
             width=1024,
@@ -575,12 +450,16 @@ class TestFlux2DenoiseRequestsWorkingMemory:
             patch.object(
                 Flux2DenoiseInvocation, "_prepare_noise_tensor", return_value=torch.zeros(batch, 32, 128, 128)
             ),
+            _priced_on_denoise_platform(),
             pytest.raises(_StopBeforeLoad),
+            patch.object(Flux2RegionalPromptingExtension, "_prepare_restricted_attn_mask", return_value=regional_mask),
         ):
             invocation._run_diffusion(context)
 
         transformer_info.model_on_device.assert_called_once()
-        return transformer_info.model_on_device.call_args.kwargs["working_mem_bytes"]
+        requested = transformer_info.model_on_device.call_args.kwargs
+        assert "working_mem_bytes" not in requested
+        return requested["working_memory"].reservation_bytes
 
     # `on_device` lets a caller get past the load instead of stopping at it, for the wires that sit
     # further down the node.
@@ -593,7 +472,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
         """Three 1024x1024 references add 12288 tokens to a 1024x1024 generation's 4096."""
         without_refs = self._run(num_ref_tokens=0)
         with_refs = self._run(num_ref_tokens=12288)
-        assert with_refs - without_refs == 12288 * PER_TOKEN
+        assert with_refs - without_refs == 12288 * _per_token()
 
     def test_the_real_batch_reaches_the_reservation(self):
         """A batched latent tensor is reachable through the API and custom graphs. The node has `b`
@@ -603,7 +482,7 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
     def test_a_batched_run_reserves_more_than_a_single_one(self):
         single = self._run(num_ref_tokens=0, batch=1)
-        assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * PER_TOKEN
+        assert self._run(num_ref_tokens=0, batch=2) - single == (64 * 64 + 512) * _per_token()
 
     @pytest.mark.parametrize(
         "variant, hidden",
@@ -643,14 +522,27 @@ class TestFlux2DenoiseRequestsWorkingMemory:
 
     def test_the_blended_batch_is_read_after_the_broadcast(self):
         single = self._run(num_ref_tokens=0, init_batch=1)
-        assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * PER_TOKEN
+        assert self._run(num_ref_tokens=0, init_batch=3) - single == 2 * (64 * 64 + 512) * _per_token()
+
+    def test_a_regional_mask_reaches_the_reservation_without_reference_images(self):
+        """The mask becomes an additive bias the forward attends with, so its bytes are reserved."""
+        side = 64 * 64 + 512
+        mask = torch.ones(side, side, dtype=torch.bool)
+
+        assert self._run(num_ref_tokens=0, regional_mask=mask) == _estimate(image_seq_len=64 * 64, regional=True)
+        assert self._run(num_ref_tokens=0, regional_mask=mask) > self._run(num_ref_tokens=0)
+
+    def test_a_negative_caption_longer_than_the_positive_one_sets_the_text_tokens(self):
+        """The CFG passes run one after the other, so the longer caption of the pair is what a forward attends."""
+        assert self._run(num_ref_tokens=0, negative_tokens=700) == _estimate(image_seq_len=64 * 64, text_seq_len=700)
+        assert self._run(num_ref_tokens=0, negative_tokens=77) == _estimate(image_seq_len=64 * 64, text_seq_len=512)
 
     def test_repeated_reference_latents_are_counted_per_sample(self):
         """`ensure_batch_size` repeats the reference latents across the batch, so their tokens scale
         with it as well -- the worst case in #9500, doubled."""
         single = self._run(num_ref_tokens=12288, batch=1)
         double = self._run(num_ref_tokens=12288, batch=2)
-        assert double - single == (64 * 64 + 12288 + 512) * PER_TOKEN
+        assert double - single == (64 * 64 + 12288 + 512) * _per_token()
 
 
 def _materializing_probe(device_type, device_index, dtype, head_dim, has_attn_mask):
@@ -854,17 +746,9 @@ class TestVaeTermsDoNotAdd:
         orders of magnitude larger."""
         seq_len = 4096 + 512
         bias_bytes = seq_len * seq_len * 2
-        fused = _estimate(
-            image_seq_len=4096, text_seq_len=512, regional_bias=bias_bytes, has_regional_mask=True, device=FUSED
-        )
+        fused = _estimate(image_seq_len=4096, text_seq_len=512, regional=True, device=FUSED)
         with _materializing():
-            materializing = _estimate(
-                image_seq_len=4096,
-                text_seq_len=512,
-                regional_bias=bias_bytes,
-                has_regional_mask=True,
-                device=MATERIALIZING,
-            )
+            materializing = _estimate(image_seq_len=4096, text_seq_len=512, regional=True, device=MATERIALIZING)
         assert materializing - fused == (KLEIN_9B_HEADS * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT)
         assert materializing - fused > 50 * bias_bytes
 
@@ -1131,8 +1015,8 @@ class TestDiffusersAttentionDispatchIsConsulted:
         """`flash`, `sage`, `xformers` and friends exist precisely to avoid the score matrix; they
         must not be taxed for it, on any device."""
         with _diffusers_backend("flash"), _materializing():
-            forced_flash = _estimate(image_seq_len=4096, has_regional_mask=True, device=MATERIALIZING)
-        assert forced_flash == _estimate(image_seq_len=4096, has_regional_mask=True, device=FUSED)
+            forced_flash = _estimate(image_seq_len=4096, regional=True, device=MATERIALIZING)
+        assert forced_flash == _estimate(image_seq_len=4096, regional=True, device=FUSED)
 
     def test_the_vae_estimate_ignores_the_diffusers_backend(self):
         """`AttnProcessor2_0` bypasses the dispatcher, so the VAE's answer comes from torch alone."""
@@ -1199,8 +1083,8 @@ class TestTheInt8DequantTransientReachesTheReservation:
     """A helper existing is not the same as it being called.
 
     An `int8_tensorwise` build materializes each linear's dequantized weight inside `forward`, and
-    that peak is not part of the model's resident size. Deleting `+ int8_dequant_bytes` from the
-    node leaves every other test in this file green, because they drive it with a `MagicMock` whose
+    that peak is not part of the model's resident size. Pricing another module than the one about to
+    be locked leaves every other test in this file green, because they drive it with a `MagicMock` whose
     module tree is empty -- so this is the only place the wire is pinned. For Klein 9B the term is
     576 MiB, against a card this build exists to fit into.
     """
@@ -1225,16 +1109,18 @@ class TestTheInt8DequantTransientReachesTheReservation:
         dense = harness._run(num_ref_tokens=0)
         with_int8 = harness._run(num_ref_tokens=0, transformer=model)
 
-        # Two weight-sized tensors in the compute dtype, over the largest quantized layer.
-        assert with_int8 - dense == 2 * 128 * 64 * torch.bfloat16.itemsize
+        # Two weight-sized tensors in the compute dtype, over the largest quantized layer, plus that layer's stored
+        # int8 weight and float32 scale, which partial loading would stream.
+        assert with_int8 - dense == 2 * 128 * 64 * torch.bfloat16.itemsize + 128 * 64 + 4
 
     def test_a_dense_build_adds_nothing(self):
         # The other half: a bf16 or fp8 checkpoint must not be charged for a dequantization it
-        # never performs.
+        # never performs, only for its largest layer as stored, which partial loading would stream.
         harness = TestFlux2DenoiseRequestsWorkingMemory()
         dense_model = torch.nn.Linear(64, 64).to(torch.bfloat16)
 
-        assert harness._run(num_ref_tokens=0, transformer=dense_model) == harness._run(num_ref_tokens=0)
+        added = harness._run(num_ref_tokens=0, transformer=dense_model) - harness._run(num_ref_tokens=0)
+        assert added == (64 * 64 + 64) * torch.bfloat16.itemsize
 
 
 class TestTheSidecarDecisionReachesThePatcher:

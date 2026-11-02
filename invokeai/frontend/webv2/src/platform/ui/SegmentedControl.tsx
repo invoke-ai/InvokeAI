@@ -3,9 +3,6 @@ import type { ReactNode } from 'react';
 import { SegmentGroup } from '@chakra-ui/react';
 import { useCallback } from 'react';
 
-// Paint the checked item's background too; axe cannot infer the indicator sibling behind it.
-const CHECKED_ITEM_STYLES = { bg: 'accent.solid', color: 'accent.contrast' } as const;
-
 export interface SegmentedControlOption {
   disabled?: boolean;
   label: ReactNode;
@@ -59,7 +56,6 @@ export const SegmentedControl = ({
           justifyContent={isFullWidth ? 'center' : undefined}
           minW={isFullWidth ? '0' : undefined}
           value={option.value}
-          _checked={CHECKED_ITEM_STYLES}
         >
           <SegmentGroup.ItemHiddenInput />
           <SegmentGroup.ItemText fontSize="xs">{option.label}</SegmentGroup.ItemText>

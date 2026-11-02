@@ -530,7 +530,7 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         Qwen3 8B. A Qwen-VL language tower has no visual tower to probe for either (llama.cpp keeps that in a
         separate ``mmproj-*.gguf``), so it matches a text-only Qwen3 in full. Only the metadata separates them.
         """
-        # `mod.metadata()` caches GGUF string fields across the whole identification sweep and
+        # `mod.metadata()` caches a GGUF's scalar fields across the whole identification sweep and
         # yields {} for anything it cannot read, so a non-GGUF simply finds no architecture here and
         # is left to `_validate_looks_like_gguf_quantized`.
         architecture = mod.metadata().get("general.architecture")

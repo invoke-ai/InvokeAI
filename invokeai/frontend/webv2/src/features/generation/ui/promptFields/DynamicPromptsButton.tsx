@@ -1,8 +1,10 @@
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
+import type { PromptEditor } from '@features/generation/ui/promptFields/promptEditor';
+import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
 import { Popover, Portal, Stack, Text } from '@chakra-ui/react';
 import { DynamicPromptsPanel } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
-import { useDynamicPrompts } from '@features/generation/ui/useDynamicPrompts';
+import { useFocusAfterPromptWrite } from '@features/generation/ui/promptFields/promptEditor';
 import { useWildcards } from '@features/generation/ui/useWildcards';
 import { IconButton } from '@platform/ui/Button';
 import { PopoverContent } from '@platform/ui/Popover';
@@ -22,7 +24,10 @@ const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 interface DynamicPromptsButtonProps {
   config: DynamicPromptsFieldConfig;
   batchCount: number;
-  positivePrompt: string;
+  /** The expansion of the prompt as it generates (inside its template). */
+  expansion: DynamicPromptsExpansion;
+  /** Where focus returns after a pick lands in the prompt. */
+  promptEditor: Pick<PromptEditor, 'element'>;
   showSyntaxHighlighting: boolean;
   /** Expanded prompts keep only attention syntax, so they follow the model rather than the authoring preference. */
   highlightExpandedPrompts: boolean;
@@ -33,10 +38,11 @@ interface DynamicPromptsButtonProps {
 export const DynamicPromptsButton = ({
   batchCount,
   config,
+  expansion,
   highlightExpandedPrompts,
   onInsertText,
   onUsePrompt,
-  positivePrompt,
+  promptEditor,
   showSyntaxHighlighting,
 }: DynamicPromptsButtonProps) => {
   const { t } = useTranslation();
@@ -44,9 +50,9 @@ export const DynamicPromptsButton = ({
   const tabsIdBase = useId();
   const [isOpen, setIsOpen] = useState(false);
   const [tab, setTab] = useState<'preview' | 'wildcards'>('preview');
-  const expansion = useDynamicPrompts(positivePrompt, config);
   const catalog = useWildcards();
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const { finalFocusEl, keepFocusAfterWrite } = useFocusAfterPromptWrite(promptEditor);
 
   const handleOpenChange = useCallback((event: { open: boolean }) => {
     if (event.open) {
@@ -59,9 +65,10 @@ export const DynamicPromptsButton = ({
   const closeWith = useCallback(
     (apply: (value: string) => void) => (value: string) => {
       apply(value);
+      keepFocusAfterWrite();
       setIsOpen(false);
     },
-    []
+    [keepFocusAfterWrite]
   );
   const handleUsePrompt = useMemo(() => closeWith(onUsePrompt), [closeWith, onUsePrompt]);
   const handleInsert = useMemo(() => closeWith(onInsertText), [closeWith, onInsertText]);
@@ -74,13 +81,22 @@ export const DynamicPromptsButton = ({
     [t]
   );
 
-  const tooltip = expansion.isDynamic
-    ? t('widgets.generate.dynamicPrompts.showPrompts')
-    : t('widgets.generate.dynamicPrompts.noDynamicSyntax');
-  const countLabel = !expansion.isDynamic ? null : expansion.isLoading ? '—' : String(expansion.count);
+  const tooltip = !config.enabled
+    ? t('widgets.generate.dynamicPrompts.offTooltip')
+    : expansion.isDynamic
+      ? t('widgets.generate.dynamicPrompts.showPrompts')
+      : t('widgets.generate.dynamicPrompts.noDynamicSyntax');
+  const countLabel = !config.enabled
+    ? t('widgets.generate.dynamicPrompts.off')
+    : !expansion.isDynamic
+      ? null
+      : expansion.isLoading
+        ? '—'
+        : String(expansion.count);
 
   return (
     <Popover.Root
+      finalFocusEl={finalFocusEl}
       ids={popoverIds}
       lazyMount
       open={isOpen}
@@ -91,7 +107,11 @@ export const DynamicPromptsButton = ({
       <Tooltip content={tooltip} ids={popoverIds}>
         <Popover.Trigger asChild>
           <IconButton
-            aria-label={t('widgets.generate.dynamicPrompts.showPrompts')}
+            aria-label={
+              config.enabled
+                ? t('widgets.generate.dynamicPrompts.showPrompts')
+                : t('widgets.generate.dynamicPrompts.offLabel')
+            }
             color={expansion.isError ? 'fg.error' : undefined}
             opacity={expansion.isDynamic ? undefined : 0.5}
             px="1"

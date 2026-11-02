@@ -37,6 +37,14 @@ const flux2DevModel: MainModelConfig = {
   name: 'FLUX.2 [dev]',
   variant: 'dev',
 };
+const flux3Model: MainModelConfig = {
+  base: 'flux3',
+  format: 'diffusers',
+  key: 'flux3-model',
+  name: 'FLUX.3 Klein',
+  type: 'main',
+  variant: 'flux3_klein',
+};
 const cogView4Model: MainModelConfig = { base: 'cogview4', key: 'cog-model', name: 'CogView4', type: 'main' };
 const qwenImageModel: MainModelConfig = {
   base: 'qwen-image',
@@ -72,6 +80,13 @@ const mossImageModel: MainModelConfig = {
   format: 'diffusers',
   key: 'moss-image-model',
   name: 'MOSS-Image',
+  type: 'main',
+};
+const ideogram4Model: MainModelConfig = {
+  base: 'ideogram-4',
+  format: 'diffusers',
+  key: 'ideogram4-model',
+  name: 'Ideogram 4',
   type: 'main',
 };
 const externalModel: GenerateModelConfig = {
@@ -250,6 +265,15 @@ const BASE_CASES: BaseCase[] = [
     denoiseType: 'flux2_denoise',
     txt2imgMode: 'flux2_txt2img',
     img2imgMode: 'flux2_img2img',
+    optimizedDenoising: true,
+  },
+  {
+    model: flux3Model,
+    encodeType: 'flux2_vae_encode',
+    outputType: 'flux2_vae_decode',
+    denoiseType: 'flux3_denoise',
+    txt2imgMode: 'flux3_txt2img',
+    img2imgMode: 'flux3_img2img',
     optimizedDenoising: true,
   },
   {
@@ -1894,7 +1918,7 @@ describe('compileCanvasGraph — PiD decode', () => {
         .filter((edge) => edge.destination.node_id === targetNodeId)
         .map((edge) => [edge.destination.field, [graph.nodes[edge.source.node_id]?.type, edge.source.field]])
     );
-  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, qwenImageModel, zImageModel];
+  const PID_BASES = [sdxlModel, sd3Model, fluxModel, flux2Model, flux3Model, qwenImageModel, zImageModel];
   const sdxlVae: VaeModelConfig = { base: 'sdxl', key: 'sdxl-vae', name: 'SDXL VAE', type: 'vae' };
 
   it('lays MOSS-Image regions out at the PiD generation size, which is smaller than the canvas', () => {
@@ -2264,13 +2288,12 @@ describe('compileCanvasGraph — regional guidance', () => {
     ]);
   });
 
-  it('adds no layout node, even on a blank prompt, when no region can be placed', () => {
+  it('places no region, even on a blank prompt, when no region can be placed', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img', {
       regionalGuidance: [region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } })],
     });
 
-    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual([]);
   });
 
   it('blocks MOSS-Image regions on a blank prompt unless a prompt template supplies one', () => {
@@ -2366,11 +2389,230 @@ describe('compileCanvasGraph — regional guidance', () => {
     );
   });
 
-  it('keeps a MOSS-Image canvas graph without regions on the plain prompt', () => {
+  it('routes a MOSS-Image canvas prompt without regions through the layout node at the denoise size', () => {
     const { backendGraph } = compile(mossImageModel, 'txt2img');
 
-    expect(backendGraph.nodes.layout_prompt).toBeUndefined();
-    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(backendGraph.nodes.layout_prompt).toMatchObject({ height: 1024, regions: [], width: 768 });
+    expect(getEdge(backendGraph, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(backendGraph, 'pos_cond', 'prompt')?.source.node_id).toBe('layout_prompt');
+  });
+
+  it('places Ideogram 4 regions on the caption builder as boxes normalized to the 768×1024 bbox', () => {
+    const { backendGraph } = compile(ideogram4Model, 'txt2img', {
+      regionalGuidance: [
+        // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+        region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+        // Starts above the bbox and ends past its right edge.
+        region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+        // Ideogram has no text elements: the stored role stays on the layer, the region is placed as an object.
+        region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+        region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+        region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+        region('no-prompt', { positivePrompt: null }),
+        region('blank-prompt', { positivePrompt: ' ' }),
+      ],
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.caption_builder?.regions).toEqual([
+      { bbox: [10, 130, 498, 521], prompt: 'a red kite' },
+      { bbox: [0, 911, 78, 1000], prompt: 'a cat' },
+      { bbox: [125, 83, 375, 333], prompt: 'a shop sign' },
+    ]);
+    // The global prompt still reaches the caption through the batchable prompt node; no mask is encoded.
+    expect(getEdge(backendGraph, 'caption_builder', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'ideogram4_caption')?.source.node_id).toBe('caption_builder');
+  });
+
+  it('leaves the Ideogram 4 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(ideogram4Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(ideogram4Model, 'txt2img', {
+        regionalGuidance: [region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } })],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.caption_builder).not.toHaveProperty('regions');
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('blocks Ideogram 4 regions on a blank prompt', () => {
+    expect(() =>
+      compile(ideogram4Model, 'txt2img', { regionalGuidance: [region('r1')], settings: { positivePrompt: '' } })
+    ).toThrow(
+      'Ideogram 4 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional guidance layers.'
+    );
+  });
+
+  it('writes the Ideogram 4 regional canvas graph the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...ideogram4Model, hash: 'blake3:ideogram4' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges.
+    const regions = [
+      region('kite', { maskBounds: { height: 256, width: 384, x: 192, y: 64 }, positivePrompt: 'a red kite' }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    let txt2img: BackendGraphContract;
+    try {
+      txt2img = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { positivePrompt: 'a beach at noon' },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the Ideogram 4 regional graph tests.',
+      txt2img: { ...txt2img, id: 'ideogram4_regional_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/ideogram4RegionalCanvasGraphs.json'
+    );
+  });
+
+  /** FLUX.3 regions on the 768×1024 bbox; `FLUX3_ROWS` are the rows the first three become. */
+  const flux3Regions = () => [
+    // 0..1000 of each side, [y_min, x_min, y_max, x_max]: x 100..400 of 768, y 10..510 of 1024.
+    region('rounded', { maskBounds: { height: 500, width: 300, x: 100, y: 10 }, positivePrompt: 'a red kite' }),
+    // Starts above the bbox and ends past its right edge.
+    region('edge', { maskBounds: { height: 100, width: 200, x: 700, y: -20 } }),
+    // FLUX.3 places objects only: the stored role stays on the layer, the region is placed as an object.
+    region('stale-text', { layout: { kind: 'text' }, positivePrompt: 'a shop sign' }),
+    // One pixel in the corner rounds to [0, 0, 1, 1], which FLUX.3 reads as 0–1 fractions.
+    region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+    region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+    region('empty', { maskBounds: { height: 0, width: 0, x: 0, y: 0 } }),
+    region('no-prompt', { positivePrompt: null }),
+    region('blank-prompt', { positivePrompt: ' ' }),
+  ];
+  const FLUX3_ROWS = [
+    { bbox: [10, 130, 498, 521], desc: 'a red kite' },
+    { bbox: [0, 911, 78, 1000], desc: 'a cat' },
+    { bbox: [125, 83, 375, 333], desc: 'a shop sign' },
+  ];
+
+  it('fills the FLUX.3 layout prompt with boxes normalized to the 768×1024 bbox and records the caption', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+    // Without reference images FLUX.3 does not edit, so the boxes stay object rows; no mask is encoded.
+    expect(backendGraph.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(getNodeByType(backendGraph, 'alpha_mask_to_tensor')).toBeUndefined();
+    const metadata = getNodeByType(backendGraph, 'core_metadata')!;
+    expect(getEdge(backendGraph, metadata.id, 'flux3_caption')?.source).toEqual({
+      field: 'value',
+      node_id: 'layout_prompt',
+    });
+    // Recall restores the prompt the user typed.
+    expect(getEdge(backendGraph, metadata.id, 'positive_prompt')?.source.node_id).toBe('positive_prompt');
+  });
+
+  it('places FLUX.3 boxes on the bbox when the canvas generates at a scaled size', () => {
+    const { backendGraph } = compile(flux3Model, 'txt2img', {
+      regionalGuidance: flux3Regions(),
+      scaling: { height: 768, method: 'manual', width: 576 },
+      settings: { positivePrompt: 'a beach at noon' },
+    });
+
+    expect(backendGraph.nodes.denoise_latents).toMatchObject({ height: 768, width: 576 });
+    expect(backendGraph.nodes.layout_prompt?.regions).toEqual(FLUX3_ROWS);
+  });
+
+  it('leaves the FLUX.3 graph unchanged when no region can be placed', () => {
+    // Pin the minted ids so the two graphs compare whole.
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      const plain = compile(flux3Model, 'txt2img', { settings }).backendGraph;
+      const unplaceable = compile(flux3Model, 'txt2img', {
+        regionalGuidance: [
+          region('outside', { maskBounds: { height: 50, width: 50, x: 900, y: 10 } }),
+          region('corner', { maskBounds: { height: 1, width: 1, x: 0, y: 0 } }),
+        ],
+        settings,
+      }).backendGraph;
+
+      expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+      expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+      expect(unplaceable).toEqual(plain);
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+  });
+
+  it('writes the FLUX.3 layout canvas graphs the backend validates', async () => {
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(0);
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    // Installed models always carry a hash, which the backend's model identifier requires.
+    const model = { ...flux3Model, hash: 'blake3:flux3' };
+    // One box inside the 768×1024 frame and one that ends on its right and bottom edges; quotes and non-ASCII text
+    // travel inside the JSON the node writes.
+    const regions = [
+      region('kite', {
+        maskBounds: { height: 256, width: 384, x: 192, y: 64 },
+        positivePrompt: 'a red kite reading "Éole"',
+      }),
+      region('dog', {
+        maskBounds: { height: 384, width: 256, x: 512, y: 640 },
+        positivePrompt: 'a dog digging in the sand',
+      }),
+    ];
+    // With a reference image FLUX.3 edits, and the boxes say where new content goes in the output.
+    const reference = {
+      config: {
+        image: { original: { image: { height: 768, image_name: 'beach.png', width: 512 } } },
+        type: 'flux2_reference_image' as const,
+      },
+      id: 'beach',
+      isEnabled: true,
+    };
+    let txt2img: BackendGraphContract;
+    let inpaint: BackendGraphContract;
+    let edit: BackendGraphContract;
+    try {
+      const settings = { positivePrompt: 'a beach at noon' };
+      txt2img = compile(model, 'txt2img', { regionalGuidance: regions, settings }).backendGraph;
+      inpaint = compile(model, 'inpaint', { regionalGuidance: regions, settings }).backendGraph;
+      edit = compile(model, 'txt2img', {
+        regionalGuidance: regions,
+        settings: { ...settings, referenceImages: [reference] },
+      }).backendGraph;
+    } finally {
+      clock.mockRestore();
+      random.mockRestore();
+    }
+    const fixture = {
+      _comment:
+        'Generated by compileCanvasGraph.test.ts; regenerate with `vitest -u`. Validated against the backend invocations by the FLUX.3 layout graph tests.',
+      edit: { ...edit, id: 'flux3_layout_canvas_edit' },
+      inpaint: { ...inpaint, id: 'flux3_layout_canvas_inpaint' },
+      txt2img: { ...txt2img, id: 'flux3_layout_canvas_txt2img' },
+    };
+    await expect(`${JSON.stringify(fixture, null, 2)}\n`).toMatchFileSnapshot(
+      '../__snapshots__/flux3LayoutCanvasGraphs.json'
+    );
   });
 });
 

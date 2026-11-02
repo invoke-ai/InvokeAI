@@ -15,7 +15,6 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
-from invokeai.backend.quantization.gguf.loaders import WrappedGGUFReader
 
 _RECOGNIZED_TEXT_ENCODER_CLASSES = {
     "Qwen2_5_VLForConditionalGeneration",
@@ -211,23 +210,8 @@ def _raise_if_qwen_vl_mmproj(mod: ModelOnDisk) -> None:
     )
 
 
-def _gguf_context_length(path: Path) -> int | None:
-    """The file's `qwen2vl.context_length`, or None when it has none or cannot be read.
-
-    Read with a reader of its own because `ModelOnDisk.metadata()` keeps only string fields. That costs one more
-    header parse, paid only by files whose architecture already matched.
-    """
-    try:
-        with WrappedGGUFReader(path) as reader:
-            field = reader.fields.get(f"{_QWEN_VL_GGUF_ARCHITECTURE}.context_length")
-            value = field.contents() if field is not None else None
-    except Exception:
-        return None
-    return value if isinstance(value, int) else None
-
-
 def _raise_if_qwen2_vl(mod: ModelOnDisk) -> None:
-    if _gguf_context_length(mod.path) != _QWEN2_VL_CONTEXT_LENGTH:
+    if mod.metadata().get(f"{_QWEN_VL_GGUF_ARCHITECTURE}.context_length") != _QWEN2_VL_CONTEXT_LENGTH:
         return
     raise InvalidMatchError(
         f"this GGUF is Qwen2-VL, not Qwen2.5-VL, which Qwen-Image uses: its context length is "

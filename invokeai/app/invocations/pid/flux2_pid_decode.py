@@ -37,7 +37,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux2.sampling_utils import get_flux2_bn_stats
+from invokeai.backend.flux2.latent_norm import read_vae_bn_stats
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
@@ -110,7 +110,7 @@ class Flux2PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         # 1) Patchify and BN-normalize the stored latent into the form PiD's FLUX.2 backbone was trained on.
         with context.models.load(self.vae.vae).model_on_device() as (_, vae):
-            bn_stats = get_flux2_bn_stats(vae)
+            bn_stats = read_vae_bn_stats(vae)
         if bn_stats is None:
             raise ValueError(
                 "FLUX.2 PiD decode needs the FLUX.2 VAE's BatchNorm statistics to normalize the latent, "

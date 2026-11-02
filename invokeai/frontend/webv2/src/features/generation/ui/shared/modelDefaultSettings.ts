@@ -28,14 +28,17 @@ export const getModelDefaultSettings = (
   return hasModelDefaultVae(model) ? { ...nextSettings, vae: getModelDefaultVae(model, vaeModels) } : nextSettings;
 };
 
-/** Patch limited to the model-governed keys, so prompts and other fields stay untouched. */
+/**
+ * Patch limited to the model-governed keys, so prompts and other fields stay untouched. Concepts are left as they are:
+ * the model already skips the ones it cannot load, and keeping them lets a compatible model run them again.
+ */
 export const getModelDefaultsPatch = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
   vaeModels: VaeModelConfig[]
 ): Partial<GenerateSettings> => {
   const defaults = getModelDefaultSettings(settings, model, vaeModels);
-  const patch: Partial<GenerateSettings> = { loras: defaults.loras, vae: defaults.vae };
+  const patch: Partial<GenerateSettings> = { vae: defaults.vae };
 
   for (const key of MODEL_DEFAULT_VALUE_KEYS) {
     (patch as Record<string, unknown>)[key] = defaults[key];
@@ -54,7 +57,7 @@ const MODEL_DEFAULT_DECISION_GROUPS: readonly (readonly (typeof MODEL_DEFAULT_VA
   ['vaePrecision'],
 ];
 
-/** Count each VAE or LoRA set once. */
+/** Count a VAE override once. */
 export const countModelDefaultOverrides = (
   settings: GenerateSettings,
   modelDefaultSettings: GenerateSettings
@@ -64,14 +67,6 @@ export const countModelDefaultOverrides = (
   ).length;
 
   if (settings.vae?.key !== modelDefaultSettings.vae?.key) {
-    count += 1;
-  }
-
-  const lorasMatch =
-    settings.loras.length === modelDefaultSettings.loras.length &&
-    settings.loras.every((lora, index) => lora.isEnabled === modelDefaultSettings.loras[index]?.isEnabled);
-
-  if (!lorasMatch) {
     count += 1;
   }
 

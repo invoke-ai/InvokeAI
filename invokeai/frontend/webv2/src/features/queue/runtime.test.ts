@@ -4130,3 +4130,161 @@ describe('queue runtime retries', () => {
     await runtime.dispose();
   });
 });
+
+describe('run outcomes', () => {
+  const statusEvent = (itemId: number, origin: string, status: 'canceled' | 'failed', errorMessage?: string) => ({
+    batch_id: 'webv2:local-queue-item',
+    completed_at: null,
+    created_at: '2026-07-17T00:00:00.000Z',
+    destination: 'canvas',
+    error_message: errorMessage ?? null,
+    error_traceback: null,
+    error_type: null,
+    item_id: itemId,
+    origin,
+    queue_id: 'default',
+    session_id: `session-${itemId}`,
+    started_at: null,
+    status,
+    status_sequence: null,
+    timestamp: 0,
+    updated_at: '2026-07-17T00:00:00.000Z',
+    user_id: 'user',
+  });
+
+  const submitRun = async ({
+    cancelRequested = false,
+    getItem,
+  }: { cancelRequested?: boolean; getItem?: QueueBackendPort['getItem'] } = {}) => {
+    const queueItem = createPendingQueueItem();
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const handlers = new Map<string, Set<(payload: never) => void>>();
+    const connectionListeners = new Set<(status: BackendConnectionStatus) => void>();
+    const origin = buildQueueItemOrigin(queueItem.id, project.id);
+    const listeners = new Set<() => void>();
+    // The history records what the backend accepted, as the workbench does.
+    const commands = createTestCommands({
+      markBackendSubmitted: ({ backendBatchId, backendItemIds }) => {
+        Object.assign(queueItem, { backendBatchId, backendItemIds, status: 'running' });
+        listeners.forEach((listener) => listener());
+      },
+    });
+    const enqueueGenerate = vi
+      .fn()
+      .mockResolvedValue({ batchId: 'webv2:local-queue-item', enqueued: 1, itemIds: [41], requested: 1 });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      cancelRequests: { wasRequestedHere: () => cancelRequested },
+      backend: createTestBackend({
+        enqueueGenerate,
+        ...(getItem ? { getItem } : {}),
+        onConnectionChange: vi.fn((listener: (status: BackendConnectionStatus) => void) => {
+          connectionListeners.add(listener);
+          listener('connected');
+          return () => connectionListeners.delete(listener);
+        }) as QueueBackendPort['onConnectionChange'],
+        // A reconcile of the running item finds it still running on the backend.
+        listItems: vi
+          .fn()
+          .mockResolvedValue([{ batchId: 'webv2:local-queue-item', id: 41, origin, status: 'in_progress' }]),
+        on: vi.fn((event: string, handler: (payload: never) => void) => {
+          const eventHandlers = handlers.get(event) ?? new Set();
+          eventHandlers.add(handler);
+          handlers.set(event, eventHandlers);
+          return () => eventHandlers.delete(handler);
+        }) as QueueBackendPort['on'],
+      }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      journal: createTestJournal(),
+    });
+    const emit = (event: string, payload: unknown) =>
+      handlers.get(event)?.forEach((handler) => handler(payload as never));
+
+    runtime.start();
+    await vi.waitFor(() => expect(queueItem.backendItemIds).toEqual([41]));
+
+    // A reconnect makes the coordinator read every tracked item again.
+    const reconnect = () => connectionListeners.forEach((listener) => listener('connected'));
+
+    return { commands, emit, origin, project, queueItem, reconnect, runtime };
+  };
+
+  it('treats a run that vanished in a clear this tab asked for as canceled, without a notice', async () => {
+    const { commands, reconnect, runtime } = await submitRun({
+      cancelRequested: true,
+      getItem: vi.fn().mockRejectedValue(new ApiError('not found', 404)),
+    });
+
+    reconnect();
+
+    await vi.waitFor(() =>
+      expect(commands.setStatus).toHaveBeenCalledWith(expect.objectContaining({ notify: false, status: 'cancelled' }))
+    );
+    await runtime.dispose();
+  });
+
+  it('reports a run that vanished otherwise as failed, with nothing left to show or retry', async () => {
+    const { commands, reconnect, runtime } = await submitRun({
+      getItem: vi.fn().mockRejectedValue(new ApiError('not found', 404)),
+    });
+
+    reconnect();
+
+    await vi.waitFor(() =>
+      expect(commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ errorCode: 'removed', status: 'failed' })
+      )
+    );
+    expect(commands.setStatus).not.toHaveBeenCalledWith(
+      expect.objectContaining({ failedBackendItemIds: expect.anything() })
+    );
+    await runtime.dispose();
+  });
+
+  it('names the backend item whose failure ended the run', async () => {
+    const { commands, emit, origin, queueItem, runtime } = await submitRun();
+
+    emit('queue_item_status_changed', statusEvent(41, origin, 'failed', 'CUDA out of memory'));
+
+    await vi.waitFor(() =>
+      expect(commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({
+          error: 'CUDA out of memory',
+          failedBackendItemIds: [41],
+          queueItemId: queueItem.id,
+          status: 'failed',
+        })
+      )
+    );
+    await runtime.dispose();
+  });
+
+  it('reports a cancellation only when this tab did not already announce asking for it', async () => {
+    const quiet = await submitRun({ cancelRequested: true });
+    quiet.emit('queue_item_status_changed', statusEvent(41, quiet.origin, 'canceled'));
+
+    await vi.waitFor(() =>
+      expect(quiet.commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ notify: false, status: 'cancelled' })
+      )
+    );
+    await quiet.runtime.dispose();
+
+    const reported = await submitRun();
+    reported.emit('queue_item_status_changed', statusEvent(41, reported.origin, 'canceled'));
+
+    await vi.waitFor(() =>
+      expect(reported.commands.setStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ notify: true, status: 'cancelled' })
+      )
+    );
+    await reported.runtime.dispose();
+  });
+});

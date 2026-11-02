@@ -529,6 +529,18 @@ export interface DurableSyncedWorkbenchPersistence {
    * before an asynchronous save can stage it. The next load reconciles the journal under the draft store's rules.
    */
   journalBeforeUnload(state: WorkbenchState): UnloadJournalOutcome;
+  /**
+   * True when unloading now would lose an unsaved document: one the last `journalBeforeUnload` could not write (over
+   * its budget, or the journal unavailable) that no stage has put in local recovery since, or one it journaled while
+   * that project's local recovery is failing (storage full or unavailable). Synchronous and cheap, for `beforeunload`.
+   */
+  hasChangesUnloadWouldLose(): boolean;
+  /**
+   * True while an unload could lose an edit, before any journal of it: what `hasChangesUnloadWouldLose` reports, or
+   * open documents that together exceed the journal budget (as last serialized or loaded), local recovery failing for
+   * an open project, or the journal unavailable. Synchronous and cheap, for keeping the unload prompt registered.
+   */
+  isUnloadAtRisk(state: WorkbenchState): boolean;
   hasPendingChanges(): boolean;
   hydrateProjectFromServer(projectId: string, projectName?: string): Promise<ProjectLoadResult>;
   loadWorkbench(options?: { createNew?: boolean; openProjectId?: string }): Promise<DurableHydratedWorkbenchSnapshot>;
@@ -692,6 +704,15 @@ export const createDurableSyncedWorkbenchPersistence = (
   /** Documents this writer journaled and has not yet seen acknowledged, by resolved project id. */
   const journaledDocuments = new Map<string, ProjectUnloadJournalEntry>();
   /**
+   * Unsaved documents the last unload journal could not write, by resolved project id, with the generation a stage must
+   * exceed to hold that document (or a newer one) in local recovery.
+   */
+  const unjournaledDocuments = new Map<string, number>();
+  /** Each project's document size as a save or the journal last serialized it, by resolved project id. */
+  const serializedDocumentBytes = new Map<string, number>();
+  /** The journal could not be reconciled at load, or its last write could not start. */
+  let isJournalUnavailable = false;
+  /**
    * Projects whose journal record no longer stands for a stored entry, so its document is journaled again: retired at
    * a hidden event (the record stays, so the next save writes the settled mark), or being settled right now.
    */
@@ -723,6 +744,21 @@ export const createDurableSyncedWorkbenchPersistence = (
   };
 
   const assertOwner = (): void => assertAccountScopeCurrent(owner);
+  /** Nothing of a closed session, a cleared workbench, or an ended account lifetime may be written at unload. */
+  const isJournalWritable = (): boolean =>
+    !isClosed && !isTerminallyCleared && !isSessionClosed && owner.accountId !== null && isAccountScopeCurrent(owner);
+  /**
+   * An unsaved document the last journal could not write that no stage has held since, or one it journaled while its
+   * project's local recovery is failing. Deletion owns a deleted project's recovery, as it does in the journal.
+   */
+  const hasJournalLoss = (): boolean =>
+    [...unjournaledDocuments.keys()].some((projectId) => !deletedProjectIds.has(projectId)) ||
+    [...journaledDocuments.keys()].some(
+      (projectId) =>
+        !retiredJournalProjectIds.has(projectId) &&
+        !deletedProjectIds.has(projectId) &&
+        localDraftFailures.has(projectDraftFailureKey(projectId))
+    );
   const assertNotCleared = (): void => {
     if (isTerminallyCleared) {
       throw new Error('Workbench persistence was cleared and must be reloaded.');
@@ -1048,6 +1084,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   const createProjectSavePlan = (inputProject: Project) => {
     const project = resolveInputProject(inputProject);
     const serialized = serializeProjectDocumentV3Json(project);
+    serializedDocumentBytes.set(project.id, serialized.byteSize);
     const entry = syncEntries.get(project.id);
     const existingDraft = volatileDrafts.get(project.id);
     // A conflicted or refused project pushes nothing until resolved, so its upgrade waits too.
@@ -1151,6 +1188,9 @@ export const createDurableSyncedWorkbenchPersistence = (
       markLocalDraftFailure(projectDraftFailureKey(project.id));
     } else {
       clearLocalDraftFailure(projectDraftFailureKey(project.id));
+      if (generation > (unjournaledDocuments.get(project.id) ?? Infinity)) {
+        unjournaledDocuments.delete(project.id);
+      }
       // The lineage now holds this generation, which supersedes the writer's journal through it.
       const journaled = journaledDocuments.get(project.id);
       if (journaled && journaled.generation <= generation && journaled.editorSessionId === draftInput.editorSessionId) {
@@ -2573,22 +2613,41 @@ export const createDurableSyncedWorkbenchPersistence = (
     },
     hasClosedSession: () => isSessionClosed,
     hasPendingChanges: () => hasPending,
+    hasChangesUnloadWouldLose: () => isJournalWritable() && hasJournalLoss(),
+    isUnloadAtRisk: (state) => {
+      if (!isJournalWritable()) {
+        return false;
+      }
+      if (isJournalUnavailable || hasJournalLoss()) {
+        return true;
+      }
+      let openBytes = 0;
+      for (const inputProject of state.projects) {
+        const projectId = resolveProjectId(inputProject.id);
+        if (deletedProjectIds.has(projectId)) {
+          continue;
+        }
+        if (localDraftFailures.has(projectDraftFailureKey(projectId))) {
+          return true;
+        }
+        // Until a save serializes it, a loaded document's length: never more than its UTF-8 size.
+        openBytes +=
+          serializedDocumentBytes.get(projectId) ??
+          volatileDrafts.get(projectId)?.documentByteSize ??
+          syncEntries.get(projectId)?.pushedDoc.length ??
+          0;
+      }
+      return openBytes > PROJECT_UNLOAD_JOURNAL_MAX_BYTES;
+    },
     journalBeforeUnload: (state) => {
       const target = unloadJournalTarget;
-      // Nothing of a closed session, a cleared workbench, or an ended account lifetime may be written.
-      if (
-        !target ||
-        isClosed ||
-        isTerminallyCleared ||
-        isSessionClosed ||
-        owner.accountId === null ||
-        !isAccountScopeCurrent(owner)
-      ) {
+      if (!target || !isJournalWritable() || owner.accountId === null) {
         return { kind: 'nothing-to-journal' };
       }
       const entries: ProjectUnloadJournalEntry[] = [];
       const retired: ProjectUnloadJournalKey[] = [];
       const skippedOversizedProjectIds: string[] = [];
+      unjournaledDocuments.clear();
       const journaledAt = Date.parse(now());
       let remainingBytes = PROJECT_UNLOAD_JOURNAL_MAX_BYTES;
       for (const inputProject of applyProjectResolutionFences(state).projects) {
@@ -2598,6 +2657,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           continue;
         }
         const serialized = serializeProjectDocumentV3Json(project);
+        serializedDocumentBytes.set(project.id, serialized.byteSize);
         const journaled = journaledDocuments.get(project.id);
         const isJournalStored = !retiredJournalProjectIds.has(project.id) && !settlingJournalProjectIds.has(project.id);
         if (serialized.documentJson === journaled?.documentJson && isJournalStored) {
@@ -2611,14 +2671,17 @@ export const createDurableSyncedWorkbenchPersistence = (
           }
           continue;
         }
-        if (serialized.byteSize > remainingBytes) {
-          skippedOversizedProjectIds.push(project.id);
-          continue;
-        }
-        remainingBytes -= serialized.byteSize;
         // A stage of this very document that is still in flight shares its generation: whichever lands first, the
         // lineage ends with one copy, and the acknowledgement of that stage also settles the journal.
         const staging = stagingDocuments.get(project.id);
+        const generation =
+          staging?.documentJson === serialized.documentJson ? staging.generation : nextGeneration(project.id);
+        if (serialized.byteSize > remainingBytes) {
+          skippedOversizedProjectIds.push(project.id);
+          unjournaledDocuments.set(project.id, generation - 1);
+          continue;
+        }
+        remainingBytes -= serialized.byteSize;
         const entry = syncEntries.get(project.id);
         entries.push({
           accountId: owner.accountId,
@@ -2630,8 +2693,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           documentJson: serialized.documentJson,
           documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
           editorSessionId: getDraftEditorSessionId(project.id, target.editorSessionId),
-          generation:
-            staging?.documentJson === serialized.documentJson ? staging.generation : nextGeneration(project.id),
+          generation,
           journaledAt,
           // The lineage above may be named after another tab's session; this page is the one that must still run.
           ownerEditorSessionId: target.editorSessionId,
@@ -2647,7 +2709,11 @@ export const createDurableSyncedWorkbenchPersistence = (
           : { kind: 'nothing-to-journal' };
       }
       const write = target.store.journalBeforeUnload({ entries, retired });
+      isJournalUnavailable = write.kind !== 'started';
       if (write.kind !== 'started') {
+        for (const entry of entries) {
+          unjournaledDocuments.set(entry.projectId, entry.generation - 1);
+        }
         return { kind: 'unavailable' };
       }
       // Remembered at once, so becoming hidden right after `pagehide` does not write it again; an aborted write puts
@@ -2769,6 +2835,9 @@ export const createDurableSyncedWorkbenchPersistence = (
         projectResolutionFences.clear();
         draftEditorSessionIds.clear();
         journaledDocuments.clear();
+        unjournaledDocuments.clear();
+        serializedDocumentBytes.clear();
+        isJournalUnavailable = reconciledJournal.kind === 'unavailable';
         retiredJournalProjectIds.clear();
         settlingJournalProjectIds.clear();
         localDraftFailures.clear();
