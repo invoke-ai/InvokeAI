@@ -16,7 +16,7 @@ from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSingle
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import field_validator, model_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
@@ -277,13 +277,6 @@ class DenoiseLatentsInvocation(BaseInvocation):
             if name in values and values[name] is None:
                 values[name] = 0
         return values
-
-    @model_validator(mode="after")
-    def validate_hidiffusion_ratio_order_on_construction(self, info: ValidationInfo):
-        # Connected inputs arrive one at a time; validate their final pair at invoke entry.
-        if info.field_name is not None:
-            return self
-        return self.validate_hidiffusion_ratio_order()
 
     def validate_hidiffusion_ratio_order(self):
         if (

@@ -705,23 +705,40 @@ def test_hidiffusion_rejects_t2_above_the_resolved_t1(t1_override: float | None)
 
 
 @pytest.mark.parametrize(
-    ("enabled", "raunet_enabled", "rejects"),
-    [(True, True, True), (False, True, False), (True, False, False)],
+    "assignments",
+    [
+        (("hidiffusion_t1_ratio", 0.8), ("hidiffusion_t2_ratio", 0.6)),
+        (("hidiffusion_t2_ratio", 0.6), ("hidiffusion_t1_ratio", 0.8)),
+    ],
 )
-def test_denoise_invocation_validates_ratio_order_only_for_active_raunet(enabled, raunet_enabled, rejects):
-    fields = {
-        "hidiffusion": enabled,
-        "hidiffusion_raunet": raunet_enabled,
-        "hidiffusion_t1_ratio": 0.4,
-        "hidiffusion_t2_ratio": 0.5,
-    }
-    if rejects:
-        with pytest.raises(ValueError, match="T2 ratio must be less than or equal to the T1 ratio"):
-            DenoiseLatentsInvocation(**fields)
-    else:
-        invocation = DenoiseLatentsInvocation(**fields)
-        assert invocation.hidiffusion_t1_ratio == 0.4
-        assert invocation.hidiffusion_t2_ratio == 0.5
+def test_denoise_ratio_assignments_allow_either_order(assignments):
+    invocation = DenoiseLatentsInvocation(hidiffusion=True, hidiffusion_auto_ratios=False)
+
+    for field_name, value in assignments:
+        setattr(invocation, field_name, value)
+
+    assert invocation.hidiffusion_t1_ratio == 0.8
+    assert invocation.hidiffusion_t2_ratio == 0.6
+
+
+@pytest.mark.parametrize(
+    ("enabled", "raunet_enabled", "automatic"),
+    [
+        (False, True, False),
+        (True, False, False),
+        (True, True, True),
+    ],
+)
+def test_denoise_ratio_order_validation_bypasses_inactive_manual_raunet(enabled, raunet_enabled, automatic):
+    invocation = DenoiseLatentsInvocation(
+        hidiffusion=enabled,
+        hidiffusion_raunet=raunet_enabled,
+        hidiffusion_auto_ratios=automatic,
+        hidiffusion_t1_ratio=0.4,
+        hidiffusion_t2_ratio=0.5,
+    )
+
+    assert invocation.validate_hidiffusion_ratio_order() is invocation
 
 
 def test_logical_step_prevents_sequential_guidance_from_advancing_t2_twice():
@@ -941,19 +958,13 @@ def test_denoise_explicit_ratio_mode_preserves_legacy_manual_values(fields, auto
     assert (invocation.hidiffusion_t1_ratio, invocation.hidiffusion_t2_ratio) == ratios
 
 
-def test_denoise_rejects_invalid_resolved_ratios_before_loading_models():
-    invocation = DenoiseLatentsInvocation(hidiffusion=True, hidiffusion_auto_ratios=False)
-    # Graph copies and external callers may bypass assignment validation.
-    invocation = invocation.model_copy(update={"hidiffusion_t1_ratio": 0.1, "hidiffusion_t2_ratio": 0.2})
-    with pytest.raises(ValueError, match="T2 ratio must be less than or equal to the T1 ratio"):
-        invocation.invoke(None)
+def test_denoise_rejects_invalid_resolved_ratios_before_context_access():
+    invocation = DenoiseLatentsInvocation(
+        hidiffusion=True,
+        hidiffusion_auto_ratios=False,
+        hidiffusion_t1_ratio=0.1,
+        hidiffusion_t2_ratio=0.2,
+    )
 
-
-def test_denoise_connected_ratios_validate_the_resolved_pair_instead_of_assignment_order():
-    invocation = DenoiseLatentsInvocation(hidiffusion=True, hidiffusion_auto_ratios=False)
-    invocation.hidiffusion_t2_ratio = 0.6
-    invocation.hidiffusion_t1_ratio = 0.8
-    assert invocation.validate_hidiffusion_ratio_order() is invocation
-    invocation.hidiffusion_t1_ratio = 0.2
     with pytest.raises(ValueError, match="T2 ratio must be less than or equal to the T1 ratio"):
         invocation.invoke(None)
