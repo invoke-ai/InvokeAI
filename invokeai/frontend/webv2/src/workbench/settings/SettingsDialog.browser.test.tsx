@@ -160,7 +160,7 @@ describe('settings dialog', () => {
     await expect.element(modifiedIndicator).not.toBeInTheDocument();
   });
 
-  it('keeps a setting menu open and focused inside the modal dialog while the pointer crosses its body', async () => {
+  it('resets a changed preference directly from its dot without closing the dialog', async () => {
     await patchWorkbenchPreferences({ preferNumericAttentionStyle: true });
     await render();
     await open();
@@ -171,22 +171,12 @@ describe('settings dialog', () => {
     });
     await expect.element(dot).toBeVisible();
     await userEvent.click(dot);
-    const menu = page.getByRole('menu');
-    await expect.element(menu).toBeVisible();
-    // The dialog's focus scope must not pull focus back out of the menu (to Close) and dismiss it.
-    await expect.poll(() => menu.element().contains(document.activeElement)).toBe(true);
-    for (const target of [
-      page.getByText('Prefer numeric attention style', { exact: true }),
-      search(),
-      page.getByRole('heading', { name: new RegExp(i18n.t('settingsDialog.results')) }),
-      closeButton(),
-    ]) {
-      await userEvent.hover(target);
-      await expect.element(menu).toBeVisible();
-    }
-    expect(menu.element().contains(document.activeElement)).toBe(true);
-    await userEvent.keyboard('{Escape}');
-    await expect.element(menu).not.toBeInTheDocument();
+    await expect.poll(() => getWorkbenchPreferences().preferNumericAttentionStyle).toBe(false);
+    const toggle = page.getByRole('checkbox', { name: 'Prefer numeric attention style', exact: true });
+    await expect.element(toggle).not.toBeChecked();
+    await expect.element(dot).not.toBeInTheDocument();
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
+    await expect.poll(() => document.activeElement).toBe(toggle.element());
     await expect.element(dialogContent()!).toBeVisible();
   });
 

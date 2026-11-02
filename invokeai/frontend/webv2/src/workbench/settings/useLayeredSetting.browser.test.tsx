@@ -517,12 +517,9 @@ describe('layered settings in the Launchpad', () => {
     await userEvent.keyboard('{Tab}');
     await expect.poll(() => document.activeElement).toBe(dot.element());
     await userEvent.keyboard('{Enter}');
-    const reset = page.getByRole('menuitem', { name: i18n.t('settingsDialog.layer.resetToBuiltIn') });
-    await expect.element(reset).toBeVisible();
-    await userEvent.keyboard('{ArrowDown}{Enter}');
     await expect.element(toggle).not.toBeChecked();
     expect(getWorkbenchPreferences().scopedDefaults).toEqual({});
-    await expect.element(reset).not.toBeInTheDocument();
+    await expect.element(page.getByRole('menu')).not.toBeInTheDocument();
     await expect.element(dot).not.toBeInTheDocument();
     await expect.poll(() => document.activeElement).toBe(toggle.element());
   });

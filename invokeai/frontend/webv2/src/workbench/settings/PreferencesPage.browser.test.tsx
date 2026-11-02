@@ -208,7 +208,6 @@ describe('Launchpad preferences page', () => {
         })
         .click()
     );
-    await act(() => page.getByRole('menuitem', { name: i18n.t('settingsDialog.layer.resetToBuiltIn') }).click());
     await expect.poll(() => getWorkbenchPreferences().scopedDefaults).toEqual({});
     await expect.element(toggle).not.toBeChecked();
   });
