@@ -268,6 +268,62 @@ describe('executeVideoRecall', () => {
     });
   });
 
+  it('recalls only the size onto the panel model, reading none of the media the record names', async () => {
+    videoMetadata.mockResolvedValue({
+      ...metadata,
+      first_frame_image: { image_name: 'frame.png' },
+      height: 1280,
+      model: { base: 'minimax-h3', key: 'h3-main', name: 'MiniMax H3', type: 'main' },
+      width: 720,
+    });
+    const { commands, patchValues } = createCommands();
+    const videoValues = createDefaultVideoWidgetValues([wanModel]);
+
+    const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues: () => videoValues as unknown as Record<string, unknown>,
+      item,
+      kind: 'size',
+      models: [wanModel, h3Model],
+    });
+
+    expect(didRecall).toBe(true);
+    expect(galleryApi.galleryImages.resolveMany).not.toHaveBeenCalled();
+    expect(patchValues).toHaveBeenCalledWith(
+      'video',
+      { ...videoValues, aspectRatioId: '9:16', targetResolution: '720p' },
+      undefined
+    );
+    expect(commands.notifications.add).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'success', title: 'widgets.gallery.itemActions.recall.videoTitles.size' })
+    );
+  });
+
+  it('says the recorded size has no preset on the panel model, not that the metadata is missing', async () => {
+    videoMetadata.mockResolvedValue({ ...metadata, height: 464, width: 848 });
+    const { commands, patchValues } = createCommands();
+
+    const didRecall = await executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+      item,
+      kind: 'size',
+      models: [wanModel],
+    });
+
+    expect(didRecall).toBe(false);
+    expect(patchValues).not.toHaveBeenCalled();
+    expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.recall.videoSizeUnavailable',
+      title: 'widgets.gallery.itemActions.recall.nothingRecalledVideoSize',
+    });
+  });
+
   it('recalls from the metadata the menu already read, without reading it again', async () => {
     videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();

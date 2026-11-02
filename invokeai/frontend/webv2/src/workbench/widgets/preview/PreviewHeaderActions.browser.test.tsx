@@ -58,11 +58,17 @@ void i18n.use(initReactI18next).init({
               continueWorking: 'Continue working',
               editOnCanvasHint: 'Adds an image layer and opens Canvas',
               remixHint: 'Same settings, new seed',
+              extendInVideo: 'Extend in Video',
+              remixVideo: 'Remix video',
               reuseFromImage: 'Reuse from image',
+              reuseFromVideo: 'Reuse from video',
               sendToVideo: 'Send to Video',
               useAsPromptTemplate: 'Use as prompt template',
               useAsReferenceImage: 'Use as reference image',
+              useAsConditioningClip: 'Use as conditioning clip',
+              useAsReferenceVideo: 'Use as reference video',
               useImageAs: 'Use image as',
+              useVideoAs: 'Use video as',
             },
           },
           preview: {
@@ -72,8 +78,10 @@ void i18n.use(initReactI18next).init({
             imageActions: 'Image actions',
             selectForCompare: 'Select for Compare',
             starImage: 'Star image',
+            starVideo: 'Star video',
             use: 'Use',
             useInGenerate: 'Use this image in Generate',
+            useThisVideo: 'Use this video',
             zoom: 'Zoom',
             zoomFit: 'Fit to view',
             zoomLevel: 'Zoom {{percent}}%',
@@ -100,9 +108,12 @@ const state = vi.hoisted(() => ({
 const patchValues = vi.hoisted(() => vi.fn());
 const openItemMenu = vi.hoisted(() => vi.fn());
 const itemActions = vi.hoisted(() => ({
+  canUseAsConditioningClip: { audio: true, video: true },
   canUseAsReferenceImage: false,
+  canUseAsReferenceVideo: true,
   deriveImageRecallCapabilities: vi.fn(),
   recallImageData: vi.fn(() => Promise.resolve()),
+  recallVideoData: vi.fn(() => Promise.resolve()),
   selectForCompare: vi.fn(),
   sendImageAsControl: vi.fn(() => Promise.resolve()),
   sendToCanvas: vi.fn(() => Promise.resolve()),
@@ -111,12 +122,14 @@ const itemActions = vi.hoisted(() => ({
 const updateProjectPreferences = vi.hoisted(() => vi.fn());
 const showAll = vi.hoisted(() => vi.fn());
 const imageMetadata = vi.hoisted(() => vi.fn());
+const videoMetadata = vi.hoisted(() => vi.fn());
 vi.mock('@features/queue/react', () => ({ useProgressImage: () => null }));
 // The transport, under both the gallery's shared metadata query and its public image port.
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   ...(await importOriginal<typeof GalleryBackendModule>()),
   getGalleryImageByName: () => Promise.resolve({ hasWorkflow: false }),
   getGalleryImageMetadata: imageMetadata,
+  getGalleryVideoMetadata: videoMetadata,
 }));
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<typeof IdentityModule>()),
@@ -232,6 +245,8 @@ beforeEach(() => {
   itemActions.canUseAsReferenceImage = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   imageMetadata.mockReset().mockResolvedValue({ seed: 1 });
+  videoMetadata.mockReset().mockResolvedValue({ generation_mode: 'wan_t2v', positive_prompt: 'a fox', seed: 7 });
+  itemActions.recallVideoData.mockClear();
   itemActions.deriveImageRecallCapabilities.mockReset();
   itemActions.deriveImageRecallCapabilities.mockReturnValue({
     all: true,
@@ -626,13 +641,91 @@ describe('preview header Edit and Use', () => {
     );
   });
 
-  it('keeps a video to star and the full ⋮ menu', async () => {
-    state.actionItem = VIDEO;
+  it('keeps an open Use menu, and its name, on the image when a video takes the selection', async () => {
+    state.actionItem = STILL_IMAGE;
     await render();
+    await settle(() => button('Use this image in Generate').click());
+    const menu = page.getByRole('menu').element();
+    await vi.waitFor(() => expect(menuRows(menu)[0]).toBe('# Use image as'));
 
-    expect(button('Edit')).toBeNull();
-    expect(button('Use this image in Generate')).toBeNull();
+    state.actionItem = VIDEO;
+    await settle(() => {
+      root?.render(
+        <QueryClientProvider client={queryClient}>
+          <I18nextProvider i18n={i18n}>
+            <ChakraProvider value={system}>
+              <PreviewHeaderActions {...({ region: 'center', runtime: {} } as unknown as WidgetViewProps)} />
+            </ChakraProvider>
+          </I18nextProvider>
+        </QueryClientProvider>
+      );
+    });
+
+    expect(button('Use this image in Generate')?.getAttribute('aria-expanded')).toBe('true');
+    expect(button('Use this video')).toBeNull();
+    expect(menuRows(page.getByRole('menu').element())).toContain('# Reuse from image');
+    expect(videoMetadata).not.toHaveBeenCalled();
+  });
+
+  it('gives a video the Use menu and a housekeeping ⋮ down to compact, and minimal star and the full ⋮', async () => {
+    const strip = () =>
+      [...host!.querySelectorAll<HTMLButtonElement>('button')]
+        .map((entry) => entry.getAttribute('aria-label'))
+        .filter((label) => label !== null && !label.startsWith('Auto-switch') && label !== 'Details');
+    state.actionItem = VIDEO;
+
+    await render();
+    expect(strip()).toEqual(['Use this video', 'Star video', 'Image actions']);
+    expect(button('Use this video').textContent).toContain('Use');
+    await settle(() => button('Image actions').click());
+    expect(openItemMenu).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number), 'housekeeping');
+
+    state.density = 'compact';
+    await render();
+    expect(strip()).toEqual(['Use this video', 'Star video', 'Image actions']);
+    expect(button('Use this video').textContent).toBe('');
+    expect(button('Use this video').getAttribute('aria-haspopup')).toBe('menu');
+    await settle(() => button('Image actions').click());
+    expect(openItemMenu).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number), 'housekeeping');
+
+    state.density = 'minimal';
+    await render();
+    expect(strip()).toEqual(['Star video', 'Image actions']);
     await settle(() => button('Image actions').click());
     expect(openItemMenu).toHaveBeenLastCalledWith(expect.any(Number), expect.any(Number), 'full');
+  });
+
+  it('loads what the video can lend only when Use opens, then lists both groups', async () => {
+    state.actionItem = VIDEO;
+    await render();
+    expect(videoMetadata).not.toHaveBeenCalled();
+
+    await settle(() => button('Use this video').click());
+    const menu = page.getByRole('menu').element();
+
+    expect(videoMetadata).toHaveBeenCalledExactlyOnceWith('clip.mp4', expect.any(AbortSignal));
+    await vi.waitFor(() =>
+      expect(menuRows(menu)).toEqual([
+        '# Use video as',
+        'Extend in Video',
+        'Use as reference video',
+        'Use as conditioning clip',
+        '# Reuse from video',
+        'Remix video',
+        'All settings',
+        'Use prompt',
+        'Use seed',
+        // The record names no size.
+        'Use size (disabled)',
+      ])
+    );
+
+    const seed = page.getByRole('menuitem', { name: /^Use seed/ });
+    await seed.hover();
+    await seed.click();
+    expect(itemActions.recallVideoData).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ name: 'clip.mp4' }),
+      'seed'
+    );
   });
 });

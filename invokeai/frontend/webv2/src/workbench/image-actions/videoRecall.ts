@@ -76,13 +76,14 @@ const VIDEO_GENERATION_MODE_IDS: ReadonlySet<string> = new Set([
   'ltx2_extend_video',
 ]);
 
-export type VideoRecallKind = 'all' | 'remix' | 'prompts' | 'seed';
+export type VideoRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'size';
 
 export interface VideoRecallCapabilities {
   all: boolean;
   remix: boolean;
   prompts: boolean;
   seed: boolean;
+  size: boolean;
 }
 
 export const EMPTY_VIDEO_RECALL_CAPABILITIES: VideoRecallCapabilities = {
@@ -90,6 +91,7 @@ export const EMPTY_VIDEO_RECALL_CAPABILITIES: VideoRecallCapabilities = {
   prompts: false,
   remix: false,
   seed: false,
+  size: false,
 };
 
 export type VideoRecalledField =
@@ -475,6 +477,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
   // A recorded null negative prompt is applied too: it switches the negative prompt off.
   const prompts = record.positivePrompt !== null || record.negativePrompt !== undefined;
   const seed = record.seed !== null;
+  const size = record.width !== null && record.height !== null;
   const { media } = record;
   const remix =
     prompts ||
@@ -486,7 +489,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
     record.stgScale !== null ||
     record.modalityScale !== null ||
     record.fps !== null ||
-    (record.width !== null && record.height !== null) ||
+    size ||
     record.components.length > 0 ||
     record.loras.length > 0 ||
     record.hybridStartBlock !== null ||
@@ -497,7 +500,7 @@ export const getVideoRecallCapabilities = (metadata: unknown): VideoRecallCapabi
     record.conditioningClip !== null ||
     record.references.length > 0;
 
-  return { all: remix || seed, prompts, remix, seed };
+  return { all: remix || seed, prompts, remix, seed, size };
 };
 
 const createEmptyMediaNames = (): VideoRecallMediaNames => ({
@@ -611,6 +614,13 @@ export const buildVideoRecallSettings = ({
 
   if (kind === 'seed') {
     return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
+  }
+
+  if (kind === 'size') {
+    // Fitted to the panel's own model: a size recall leaves the model alone.
+    const sizeRecall = values.model ? getVideoSizeRecall(values.model, record.width, record.height) : null;
+
+    return sizeRecall ? { fields: ['size'], mediaNames, values: { ...values, ...sizeRecall } } : null;
   }
 
   // all / remix from here on.

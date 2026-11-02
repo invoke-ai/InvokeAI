@@ -45,6 +45,7 @@ import {
   buildVideoRecallSettings,
   getVideoRecallMessage,
   getVideoRecallTitle,
+  parseVideoRecallRecord,
   type VideoRecallKind,
   type VideoRecallMediaNames,
 } from './videoRecall';
@@ -223,12 +224,25 @@ export const executeVideoRecall = async ({
     return reportVideoRecallError(commands, owner, error, projectId);
   }
 
+  // A recorded size the panel's model has no preset for is not missing metadata: say which size and why.
+  const record = kind === 'size' ? parseVideoRecallRecord(metadata) : null;
+  const emptyNotice =
+    record?.width && record.height
+      ? {
+          message: t('widgets.gallery.itemActions.recall.videoSizeUnavailable', {
+            height: record.height,
+            width: record.width,
+          }),
+          title: t('widgets.gallery.itemActions.recall.nothingRecalledVideoSize'),
+        }
+      : {
+          message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
+          title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
+        };
+
   return applyVideoRecallMetadata({
     commands,
-    emptyNotice: {
-      message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
-      title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
-    },
+    emptyNotice,
     getVideoValues,
     kind,
     metadata,

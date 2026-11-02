@@ -90,13 +90,23 @@ describe('getVideoRecallCapabilities', () => {
   });
 
   it('derives per-verb availability from what the metadata contains', () => {
-    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(wanMetadata())).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', seed: 7 })).toEqual({
       all: true,
       prompts: false,
       remix: false,
       seed: true,
+      size: false,
     });
+    // A dimension alone, or a non-positive one, is no size to recall.
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', width: 1280 }).size).toBe(false);
+    expect(getVideoRecallCapabilities({ generation_mode: 'wan_t2v', height: 720, width: 0 }).size).toBe(false);
   });
 
   // Each record names one thing recall writes; the verbs it offers must be the ones that do something.
@@ -275,6 +285,30 @@ describe('buildVideoRecallSettings', () => {
 
     expect(result?.fields).toEqual(['seed']);
     expect(result?.values).toMatchObject({ seed: 1234, seedMode: 'fixed' });
+  });
+
+  it('recalls only the size for the size verb, fitted to the panel model', () => {
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+    const metadata = wanMetadata({ height: 1280, model: { key: h3Model().key }, width: 720 });
+    const result = buildVideoRecallSettings({ currentValues: wanValues, kind: 'size', metadata, models: catalog });
+
+    expect(result?.fields).toEqual(['size']);
+    // The recorded model, prompts and seed stay out; only the preset pair changes.
+    expect(result?.values).toEqual({ ...wanValues, aspectRatioId: '9:16', targetResolution: '720p' });
+  });
+
+  it('recalls no size the panel model cannot reproduce, or without a model', () => {
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+    const recall = (values: typeof wanValues, width: number, height: number) =>
+      buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height, width }),
+        models: catalog,
+      });
+
+    expect(recall(wanValues, 848, 464)).toBeNull();
+    expect(recall({ ...wanValues, model: null }, 1280, 720)).toBeNull();
   });
 
   it('remix recalls everything except the seed', () => {
@@ -1262,6 +1296,7 @@ describe('LTX-2 recall', () => {
         prompts: true,
         remix: true,
         seed: true,
+        size: true,
       });
     }
   });
@@ -1426,7 +1461,13 @@ describe('recall of what the video graphs record', () => {
       models: [model],
     });
 
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(metadata)).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(result?.fields).toEqual(['prompts', 'seed', 'model', 'frames', 'steps', 'cfg', 'fps', 'size']);
     expect(result?.values).toMatchObject({
       aspectRatioId: '16:9',
@@ -1474,7 +1515,13 @@ describe('recall of what the video graphs record', () => {
       models: [componentSource, model],
     });
 
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(metadata)).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'components', 'media']));
     expect(result?.values).toMatchObject({
       componentSourceModel: componentSource,
@@ -1518,7 +1565,13 @@ describe('recall of what the video graphs record', () => {
       models: [model, componentSource, encoder],
     });
 
-    expect(getVideoRecallCapabilities(metadata)).toEqual({ all: true, prompts: true, remix: true, seed: true });
+    expect(getVideoRecallCapabilities(metadata)).toEqual({
+      all: true,
+      prompts: true,
+      remix: true,
+      seed: true,
+      size: true,
+    });
     expect(result?.fields).toEqual(expect.arrayContaining(['prompts', 'seed', 'model', 'fps', 'components', 'media']));
     expect(result?.values).toMatchObject({
       componentSourceModel: componentSource,

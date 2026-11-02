@@ -3790,6 +3790,7 @@
       "unstarVideo": "Unstar video",
       "use": "Use",
       "useInGenerate": "Use this image in Generate",
+      "useThisVideo": "Use this video",
       "showGallery": "Show Gallery"
     },
     "queue": {
@@ -5749,10 +5750,12 @@
           "imageMetadataUnsupported": "This image does not include supported Generate metadata.",
           "nothingRecalled": "No recallable image data",
           "nothingRecalledVideo": "No recallable video data",
+          "nothingRecalledVideoSize": "Size not recalled",
           "partiallyRecalled": "Some image data was not recalled",
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
           "videoMetadataUnsupported": "This video does not include supported Video metadata.",
+          "videoSizeUnavailable": "This video's size ({{width}}×{{height}}) isn't available for the current Video model, or no model is selected.",
           "fields": {
             "cfg": "CFG",
             "components": "components",
@@ -5773,7 +5776,8 @@
             "dimensions": "Recalled image size",
             "prompts": "Recalled prompts",
             "remix": "Recalled remix settings",
-            "seed": "Recalled seed"
+            "seed": "Recalled seed",
+            "size": "Recalled size"
           },
           "parameters": {
             "applied": "Recalled parameters",
@@ -6068,7 +6072,8 @@
         "useAsReferenceImage": "Use as reference image",
         "useAsReferenceImageHint": "Adds it to Generate's references",
         "useAsReferenceVideo": "Use as reference video",
-        "useImageAs": "Use image as"
+        "useImageAs": "Use image as",
+        "useVideoAs": "Use video as"
       },
       "mediaCountsTwo": "{{first}} and {{second}}",
       "mediaCountsThree": "{{first}}, {{second}}, and {{third}}",

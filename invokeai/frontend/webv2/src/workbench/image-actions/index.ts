@@ -4,7 +4,12 @@ export {
   type ImageContextMenuTarget,
   type ImageContextMenuVariant,
 } from './ImageContextMenu';
-export { GALLERY_CANVAS_IMPORT_DESTINATIONS, ImageContinueGroup, ImageUseGroups } from './ImageItemMenuGroups';
+export {
+  GALLERY_CANVAS_IMPORT_DESTINATIONS,
+  ImageContinueGroup,
+  ImageUseGroups,
+  VideoUseGroups,
+} from './ImageItemMenuGroups';
 export { useImageRecallCapabilities } from './useImageRecallCapabilities';
 export {
   buildImageRecallSettings,
