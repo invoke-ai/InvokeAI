@@ -204,3 +204,27 @@ def attach_qwen3vl_visual_tower(model: torch.nn.Module, tower: torch.nn.Module) 
     finally:
         model.visual = existing
         model.rope_deltas = prior_rope_deltas
+
+
+def drop_qwen3vl_unloaded_keys(sd: dict[str, Any]) -> dict[str, Any]:
+    """Keep only what the single-file encoder loader reads: drop the visual tower and the LM head.
+
+    ``Qwen3VLModel`` has no LM head, so a non-strict load would discard it anyway -- but only after the
+    side-channel handling had folded and reserved for it: on the 8B fp8 builds a 151936x4096 bf16 copy.
+    Identification judges a file's quantization by the same view, so it refuses nothing the loader would
+    never read.
+    """
+    return {k: v for k, v in sd.items() if not _is_qwen3vl_unloaded_key(k)}
+
+
+def _is_qwen3vl_unloaded_key(key: Any) -> bool:
+    """Whether a checkpoint key belongs to the visual tower or the LM head, sidecars included.
+
+    The head is matched where the remap sends it, like the tower: a top-level ``lm_head.*`` and a ``model.lm_head.*``
+    both land on ``language_model.lm_head``, which names no module. Left in, an nvfp4 head fails the install that
+    way, and a scaled fp8 one is folded and reserved for, then discarded.
+    """
+    if not isinstance(key, str):
+        return False
+    target = qwen3vl_target_key(key)
+    return target.startswith("visual.") or target.startswith("language_model.lm_head.")

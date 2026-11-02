@@ -1,7 +1,7 @@
 ---
 title: Z-Image
-description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4 and SDNQ builds, ControlNets and regional prompting.
-lastUpdated: 2026-09-30
+description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4, int8 and SDNQ builds, ControlNets and regional prompting.
+lastUpdated: 2026-11-01
 sidebar:
   order: 13
 ---
@@ -59,12 +59,16 @@ The starter models:
 | Z-Image Turbo (quantized)          | GGUF Q4_K                   | ~4 GB   | Qwen3 encoder (GGUF Q6_K, ~3.3 GB) + FLUX VAE  |
 | Z-Image Turbo (Q8)                 | GGUF Q8_0                   | ~6.6 GB | Qwen3 encoder (GGUF Q6_K) + FLUX VAE           |
 | Z-Image Turbo (NVFP4)              | Comfy-Org nvfp4 single file | ~4.5 GB | Qwen3 encoder (FP4 mixed, ~3.5 GB) + FLUX VAE  |
+| Z-Image Turbo (int8)               | Comfy-Org int8 single file  | ~6.2 GB | Qwen3 encoder (FP4 mixed, ~3.5 GB) + FLUX VAE  |
 | Z-Image Turbo (SDNQ uint4 + SVD)   | SDNQ Diffusers pipeline     | ~5 GB   | nothing, everything is bundled                 |
 
-A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) is also available as a separate starter.
+A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) and its community **int8** build (~4.4 GB download,
+about 4.4 GB once loaded) are also available as separate starters.
 
 The NVFP4 build keeps its quantized layers packed in memory and decodes them on the fly, so it needs about
-a third of the full-precision transformer's memory.
+a third of the full-precision transformer's memory. The int8 build keeps its int8 layers as well, about 6.2 GB
+once loaded on every supported GPU, and [int8 Compute](/configuration/optimization/int8-compute/) can run
+them on NVIDIA int8 tensor cores.
 
 ### Choosing components
 
