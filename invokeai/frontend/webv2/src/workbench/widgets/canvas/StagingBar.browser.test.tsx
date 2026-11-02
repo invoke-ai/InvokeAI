@@ -1,14 +1,16 @@
+import '@fontsource/inter/index.css';
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { QueueItemProgress } from '@features/queue/contracts';
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
@@ -16,10 +18,28 @@ import { StagingBar } from './StagingBar';
 const contextMenu = vi.hoisted(() => ({
   targets: [] as { slotId: string; x: number; y: number }[],
 }));
+const queueProgress = vi.hoisted(() => ({ current: null as QueueItemProgress | null }));
+vi.mock('@features/queue/react', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useQueueItemProgress: () => queueProgress.current,
+}));
 vi.mock('./StagingItemContextMenu', () => ({
-  StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
+  StagingItemContextMenu: ({
+    onClose,
+    target,
+  }: {
+    onClose: () => void;
+    target: { slot: { id: string }; x: number; y: number };
+  }) => {
     contextMenu.targets.push({ slotId: target.slot.id, x: target.x, y: target.y });
-    return <div data-testid="staging-context-menu" />;
+    // Stands in for the menu's dismissal: the menu holds focus, then unmounts and drops it.
+    return (
+      <div data-testid="staging-context-menu">
+        <button type="button" onClick={onClose}>
+          Close menu
+        </button>
+      </div>
+    );
   },
 }));
 
@@ -57,6 +77,8 @@ const makePlaceholder = (index: number): CanvasStagingSlot => ({
   kind: 'placeholder',
   queueItemId: 'queue-item',
   width: 512,
+  x: 0,
+  y: 0,
 });
 
 let host: HTMLDivElement | null = null;
@@ -83,12 +105,16 @@ const renderStagingBar = async (
     isGenerating = false,
     isSavingToGallery = false,
     onAccept = noop,
+    onCycle = noop,
+    onDiscardSelected = noop,
     onSaveToGallery = () => Promise.resolve(),
   }: {
     canvasWidth?: number;
     isGenerating?: boolean;
     isSavingToGallery?: boolean;
     onAccept?: () => void;
+    onCycle?: (direction: -1 | 1) => void;
+    onDiscardSelected?: () => void;
     onSaveToGallery?: (imageName: string) => Promise<void>;
   } = {}
 ) => {
@@ -123,9 +149,9 @@ const renderStagingBar = async (
                   slots={slots}
                   onAccept={onAccept}
                   onCancelQueueItem={noop}
-                  onCycle={noop}
+                  onCycle={onCycle}
                   onDiscardAll={noop}
-                  onDiscardSelected={noop}
+                  onDiscardSelected={onDiscardSelected}
                   onPreloadCandidate={onPreloadCandidate}
                   onSelectImage={onSelectImage}
                   onSaveToGallery={onSaveToGallery}
@@ -141,6 +167,8 @@ const renderStagingBar = async (
       </I18nextProvider>
     );
   });
+
+  await document.fonts.ready;
 
   const viewport = host.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
   const overlay = host.firstElementChild!.firstElementChild as HTMLElement;
@@ -244,6 +272,35 @@ describe('StagingBar thumbnail strip', () => {
     expect(document.querySelector('[data-testid="staging-context-menu"]')).not.toBeNull();
   });
 
+  it('shows the spinner on the executing placeholder until its progress is known', async () => {
+    const indicators = () => [...host!.querySelectorAll('[role="progressbar"]')];
+    const remount = async () => {
+      await interact(() => root?.unmount());
+      host?.remove();
+      host = null;
+      await renderStagingBar(3, 0, noop, noop, noop, makePlaceholder);
+    };
+
+    try {
+      // Zero reads as not started yet, as on every other progress surface.
+      for (const percentage of [null, 0]) {
+        queueProgress.current = { activeItemIndex: 1, message: 'Loading model', percentage };
+        await remount();
+        expect(indicators()).toHaveLength(1);
+        expect(indicators()[0]!.classList.contains('chakra-spinner')).toBe(true);
+        expect(indicators()[0]!.getAttribute('aria-label')).toBe('Generation progress');
+      }
+
+      queueProgress.current = { activeItemIndex: 1, message: 'Denoising', percentage: 0.42 };
+      await remount();
+      expect(indicators()).toHaveLength(1);
+      expect(indicators()[0]!.classList.contains('chakra-spinner')).toBe(false);
+      expect(indicators()[0]!.getAttribute('aria-valuenow')).toBe('42');
+    } finally {
+      queueProgress.current = null;
+    }
+  });
+
   it('leaves the native menu alone on an in-progress placeholder', async () => {
     const { thumbnails } = await renderStagingBar(3, 0, noop, noop, noop, makePlaceholder);
     const before = contextMenu.targets.length;
@@ -286,7 +343,7 @@ describe('StagingBar thumbnail strip', () => {
     await interact(() => trigger!.click());
 
     const menuItem = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find((item) =>
-      item.textContent?.includes('Keep as Hidden Layer')
+      item.textContent?.includes('Keep as hidden layer')
     );
     expect(menuItem).toBeDefined();
     await interact(() => menuItem!.click());
@@ -297,13 +354,13 @@ describe('StagingBar thumbnail strip', () => {
     const onAccept = vi.fn();
     const onSaveToLayerAndContinue = vi.fn();
     await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { onAccept });
-    const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' });
+    const accept = page.getByRole('button', { exact: true, name: 'Accept to layer' });
     await expect.element(accept).toBeVisible();
     await accept.click();
     expect(onAccept).toHaveBeenCalledOnce();
 
     await page.getByRole('button', { name: 'More accept options' }).click();
-    const keepHidden = page.getByRole('menuitem', { name: 'Keep as Hidden Layer' });
+    const keepHidden = page.getByRole('menuitem', { name: 'Keep as hidden layer' });
     await expect.element(keepHidden).toBeVisible();
     await keepHidden.click();
     expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
@@ -323,7 +380,7 @@ describe('StagingBar thumbnail strip', () => {
         { canvasWidth, isGenerating: true }
       );
       const trigger = page.getByRole('button', { name: 'More accept options' }).element();
-      const accept = page.getByRole('button', { exact: true, name: 'Accept to Layer' }).element();
+      const accept = page.getByRole('button', { exact: true, name: 'Accept to layer' }).element();
       const bounds = overlay.getBoundingClientRect();
       expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
       expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
@@ -341,10 +398,33 @@ describe('StagingBar thumbnail strip', () => {
         }
       }
       // The accept action keeps its full name, and Tooltip, however narrow the bar.
-      expect(accept.getAttribute('aria-label')).toBe('Accept to Layer');
+      expect(accept.getAttribute('aria-label')).toBe('Accept to layer');
+      // Labelled or collapsed to its icon, the auto-switch trigger keeps the height of the bar's other controls.
+      expect(
+        page
+          .getByRole('button', { name: /^Auto-switch:/ })
+          .element()
+          .getBoundingClientRect().height
+      ).toBe(page.getByRole('button', { exact: true, name: 'Discard' }).element().getBoundingClientRect().height);
       // Collapsed or not, Discard All and the generating status keep their names.
-      await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
-      expect(page.getByRole('status').element().textContent).toBe('Generating…');
+      await expect.element(page.getByRole('button', { name: 'Discard all' })).toBeVisible();
+      expect(page.getByRole('status').element().textContent).toBe('Generating, 3 results pending');
+    }
+  );
+
+  // The bar's floor is a 360px canvas (see the compact breakpoints); the pending pill adds nothing to it.
+  it.each([false, true])(
+    'keeps Accept inside the narrowest canvas (generating: %s), the pending count read but not shown',
+    async (isGenerating) => {
+      const { overlay } = await renderStagingBar(2, 0, noop, noop, noop, makeSlot, { canvasWidth: 360, isGenerating });
+      const bounds = overlay.getBoundingClientRect();
+      const trigger = page.getByRole('button', { name: 'More accept options' }).element();
+      expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
+      const status = page.getByRole('status').element();
+      expect(status.textContent).toBe(isGenerating ? 'Generating, 2 results pending' : '2 results pending');
+      // No bare count duplicating "1 of 2" beside the counter.
+      const hidden = [...overlay.querySelectorAll('[aria-hidden="true"]')].map((node) => node.textContent?.trim());
+      expect(hidden).not.toContain('2');
     }
   );
 
@@ -401,4 +481,200 @@ describe('StagingBar thumbnail strip', () => {
       );
     }
   );
+});
+
+describe('StagingBar focus', () => {
+  const nextFrame = () =>
+    act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+  /** A canvas region whose surface outlives the bar, which unmounts with its last result as the canvas's does. */
+  const CanvasWithStaging = ({ slots }: { slots: CanvasStagingSlot[] }) => {
+    const [remaining, setRemaining] = useState(slots);
+    const selected = remaining[0];
+    const discardSelected = () => setRemaining((current) => current.slice(1));
+
+    return (
+      <Box h="400px" position="relative" role="region" w={`${CANVAS_WIDTH}px`}>
+        <Box data-canvas-surface="" data-testid="surface" h="full" tabIndex={-1} />
+        <CanvasBottomOverlay.Root>
+          {remaining.length > 0 ? (
+            <CanvasBottomOverlay.Staging>
+              <StagingBar
+                antialiasProgressImages={false}
+                areThumbnailsVisible
+                autoSwitchMode="off"
+                canAccept
+                hasMultipleSlots={remaining.length > 1}
+                isGenerating={false}
+                isSavingToGallery={false}
+                isVisible
+                selectedCandidate={selected?.kind === 'candidate' ? selected.candidate : undefined}
+                selectedImageIndex={0}
+                selectedSlot={selected}
+                slots={remaining}
+                onAccept={noop}
+                onCancelQueueItem={noop}
+                onCycle={noop}
+                onDiscardAll={() => setRemaining([])}
+                onDiscardSelected={discardSelected}
+                onPreloadCandidate={noop}
+                onSelectImage={noop}
+                onSaveToGallery={() => Promise.resolve()}
+                onSaveToLayerAndContinue={noop}
+                onSetAutoSwitch={noop}
+                onToggleThumbnails={noop}
+                onToggleVisibility={noop}
+              />
+            </CanvasBottomOverlay.Staging>
+          ) : null}
+        </CanvasBottomOverlay.Root>
+      </Box>
+    );
+  };
+
+  const renderCanvas = async (slotCount: number) => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() =>
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <CanvasWithStaging slots={Array.from({ length: slotCount }, (_, index) => makeSlot(index))} />
+          </ChakraProvider>
+        </I18nextProvider>
+      )
+    );
+    const thumbnails = () =>
+      Array.from(host!.querySelectorAll<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"] button'));
+    return { surface: host.querySelector<HTMLElement>('[data-testid="surface"]')!, thumbnails };
+  };
+
+  it('hands focus to the canvas surface when discarding the last result removes the bar', async () => {
+    const { surface, thumbnails } = await renderCanvas(1);
+
+    await act(() => thumbnails()[0]!.focus());
+    await act(() => userEvent.keyboard('{Delete}'));
+    await nextFrame();
+
+    expect(host!.querySelector('[data-testid="staging-context-menu"]')).toBeNull();
+    expect(document.activeElement).toBe(surface);
+  });
+
+  it('hands focus to the canvas surface after Discard all', async () => {
+    const { surface } = await renderCanvas(3);
+
+    await userEvent.click(page.getByRole('button', { exact: true, name: 'Discard all' }).first());
+    await nextFrame();
+
+    expect(document.activeElement).toBe(surface);
+  });
+
+  it('returns focus to the thumbnail a dismissed menu opened from', async () => {
+    const { thumbnails } = await renderCanvas(3);
+
+    await act(() => thumbnails()[0]!.focus());
+    await act(() => {
+      thumbnails()[0]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    const close = page.getByRole('button', { name: 'Close menu' });
+    await act(() => (close.element() as HTMLElement).focus());
+    await act(() => (close.element() as HTMLElement).click());
+    await nextFrame();
+
+    expect(document.activeElement).toBe(thumbnails()[0]);
+  });
+});
+
+describe('StagingBar keys', () => {
+  /** Records the keydowns that reach the window, where the workbench hotkeys listen. */
+  const watchWindow = () => {
+    const reached: string[] = [];
+    const listener = (event: KeyboardEvent) => reached.push(event.key);
+    window.addEventListener('keydown', listener);
+    return { reached, stop: () => window.removeEventListener('keydown', listener) };
+  };
+
+  it('selects the thumbnail the keyboard is on and steps focus between thumbnails, keeping keys from the canvas', async () => {
+    const onCycle = vi.fn();
+    const onSelectImage = vi.fn();
+    const { thumbnails } = await renderStagingBar(3, 0, noop, noop, onSelectImage, makeSlot, { onCycle });
+    const window = watchWindow();
+    try {
+      await act(() => thumbnails[1]!.focus());
+      expect(onSelectImage).toHaveBeenLastCalledWith(1);
+      await act(() => userEvent.keyboard('{ArrowRight}'));
+      expect(document.activeElement).toBe(thumbnails[2]);
+      expect(onSelectImage).toHaveBeenLastCalledWith(2);
+      // Wrapping, as the step buttons do.
+      await act(() => userEvent.keyboard('{ArrowRight}'));
+      expect(document.activeElement).toBe(thumbnails[0]);
+      await act(() => userEvent.keyboard('{ArrowLeft}{ArrowUp}'));
+      expect(document.activeElement).toBe(thumbnails[2]);
+    } finally {
+      window.stop();
+    }
+
+    expect(onCycle).not.toHaveBeenCalled();
+    expect(window.reached).toEqual([]);
+  });
+
+  it('steps the selection from the bar buttons, and Delete discards the selected result', async () => {
+    const onCycle = vi.fn();
+    const onDiscardSelected = vi.fn();
+    await renderStagingBar(3, 0, noop, noop, noop, makeSlot, { onCycle, onDiscardSelected });
+    const window = watchWindow();
+    try {
+      await act(() =>
+        (page.getByRole('button', { exact: true, name: 'Discard all' }).element() as HTMLElement).focus()
+      );
+      await act(() => userEvent.keyboard('{ArrowRight}{ArrowLeft}{Delete}{Backspace}'));
+    } finally {
+      window.stop();
+    }
+
+    expect(onCycle.mock.calls).toEqual([[1], [-1]]);
+    expect(onDiscardSelected).toHaveBeenCalledTimes(2);
+    expect(window.reached).toEqual([]);
+  });
+
+  it('leaves keys alone inside its menus: the accept options and a thumbnail menu neither discard nor step', async () => {
+    const onCycle = vi.fn();
+    const onDiscardSelected = vi.fn();
+    const { thumbnails } = await renderStagingBar(3, 0, noop, noop, noop, makeSlot, { onCycle, onDiscardSelected });
+
+    await page.getByRole('button', { name: 'More accept options' }).click();
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
+    await act(() => userEvent.keyboard('{Escape}'));
+
+    await act(() => {
+      thumbnails[0]!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await expect.element(page.getByRole('menu')).toBeVisible();
+    await act(() => userEvent.keyboard('{Delete}{ArrowRight}{Backspace}{ArrowLeft}'));
+
+    expect(onDiscardSelected).not.toHaveBeenCalled();
+    expect(onCycle).not.toHaveBeenCalled();
+  });
+
+  it('lets modified presses and other keys through to the workbench', async () => {
+    const onCycle = vi.fn();
+    const { thumbnails } = await renderStagingBar(3, 0, noop, noop, noop, makeSlot, { onCycle });
+    const window = watchWindow();
+    try {
+      await act(() => thumbnails[0]!.focus());
+      await act(() => userEvent.keyboard('{Alt>}{ArrowRight}{/Alt}b'));
+    } finally {
+      window.stop();
+    }
+
+    expect(onCycle).not.toHaveBeenCalled();
+    expect(window.reached).toEqual(['Alt', 'ArrowRight', 'b']);
+  });
 });

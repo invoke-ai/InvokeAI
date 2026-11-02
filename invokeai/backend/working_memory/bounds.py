@@ -51,10 +51,14 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "denoise.flux3-cudnn,cudaMallocAsync-denoise-bf16-h3072-4096+560tok-b2-RTX4090-demand_peak": 1.31,
         "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-8100+80tok-RTX4090-demand_peak": 1.31,
         "denoise.flux3-cudnn,cudaMallocAsync-denoise-fp32-h3072-1024+560tok-RTX4090-demand_peak": 1.32,
+        "denoise.krea2-cudnn,native-denoise-bf16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
+        "denoise.krea2-cudnn,native-denoise-fp16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
+        "denoise.krea2-cudnn,cudaMallocAsync-denoise-bf16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
+        "denoise.krea2-cudnn,cudaMallocAsync-denoise-fp16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to
-instead. All but the FLUX.3 ones are the native allocator, never expandable segments or `cudaMallocAsync`:
+instead. All but the FLUX.3 and Krea-2 `cudaMallocAsync` points are the native allocator, none expandable segments:
 
 - The VAE points are MIOpen on Windows, where the demand is concave in the size: first-run driver spikes at small sizes
   and a second run reserving up to 1.6x the first at large ones, so a line that covers every point cannot stay within
@@ -69,7 +73,18 @@ instead. All but the FLUX.3 ones are the native allocator, never expandable segm
   the line has to cover the reference forwards. Under the native allocator
   the 1440px forward with an 80-token caption (8180 tokens, 2060 MiB, against 2516 MiB for the 560-token caption at 8660
   tokens) in bf16 and fp16, under `cudaMallocAsync` a batch of two at 1024px in bf16 and, in fp32, the 512px forward
-  and the 1440px one with an 80-token caption."""
+  and the 1440px one with an 80-token caption.
+- The Krea-2 denoise points are a 77-token caption on the RTX 4090, bf16 and fp16 alike. A caption token reserves more
+  than an image token. Allocated memory grows 0.14 to 0.15 MiB per token for caption and image tokens alike, reserved
+  memory 0.30 MiB per image token and 0.73 to 0.95 MiB per caption token under the native allocator (1404 against
+  1086 MiB at 4096 image tokens with 512 and 77 caption tokens, 2916 against 2502 MiB at 9216): the excess is
+  allocator reserve, not live tensors, consistent with the text fusion, which runs each caption token as 12 tapped
+  encoder layers of 2560 before the blocks, leaving segments the blocks' larger tensors do not reuse. One slope prices
+  both, and the line has to cover the 512-token captions, so the
+  77-token forward at 4096 image tokens sits 1.35x below it. Under `cudaMallocAsync` a caption token reserves about
+  twice an image token (1856 against 1680 MiB at 9216 image tokens), and the line is held up by a forward whose warm
+  run read 18% above its cold one (one 1024px joint reference at 1024px: 1984 against 1680 MiB), which puts the
+  77-token forward at 9216 image tokens 1.32x below it."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:

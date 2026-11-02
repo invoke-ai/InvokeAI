@@ -583,7 +583,7 @@ describe('compileGenerateGraph', () => {
   });
 
   it('rejects dimensions that are not on the selected model family grid', () => {
-    expect(() => compile(flux2Model, { height: 888 })).toThrow('Generate height must be a multiple of 16.');
+    expect(() => compile(flux2Model, { height: 888 })).toThrow('Height must be a multiple of 16.');
   });
 
   it('builds an Anima graph with required components', () => {
@@ -719,7 +719,7 @@ describe('compileGenerateGraph', () => {
           referenceImages: [animaReference()],
           vae: qwenImageVae,
         })
-      ).toThrow('Reference Image #1 is not supported by anima model.');
+      ).toThrow('cannot use reference image 1');
     });
   });
 
@@ -1525,6 +1525,25 @@ describe('FLUX.3 graphs', () => {
     expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
+
+  it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
+    const plain = compile(kleinModel);
+    const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
+    const withDisabledReference = compile(kleinModel, { referenceImages: [reference('off', false)] });
+
+    expect(getEdge(plain, 'layout_prompt', 'prompt')?.source.node_id).toBe('positive_prompt');
+    expect(getEdge(plain, 'pos_cond', 'prompt')?.source).toEqual({ field: 'value', node_id: 'layout_prompt' });
+    // Canvas regions fill the node; without them it passes the prompt through, and core metadata keeps only the
+    // prompt as typed.
+    expect(plain.nodes.layout_prompt).toMatchObject({ type: 'flux3_layout_prompt' });
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('regions');
+    expect(getEdge(plain, getNodeByType(plain, 'core_metadata')!.id, 'flux3_caption')).toBeUndefined();
+    expect(plain.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+    expect(withReference.nodes.layout_prompt?.edit_targets).toBe(true);
+    // A disabled reference wires nothing into the denoiser, so FLUX.3 does not edit.
+    expect(getEdge(withDisabledReference, 'denoise_latents', 'kontext_conditioning')).toBeUndefined();
+    expect(withDisabledReference.nodes.layout_prompt).not.toHaveProperty('edit_targets');
+  });
 });
 
 describe('ERNIE-Image graphs', () => {
@@ -1887,7 +1906,7 @@ describe('PiD decode', () => {
 
   it('refuses to compile PiD on an unsupported base rather than silently ignoring it', () => {
     // Reject unsupported PiD rather than silently use ordinary decode.
-    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/PiD is not supported/);
+    expect(() => compile(cogView4Model, { pidMode: 'fit' })).toThrow(/does not support PiD/);
   });
 
   it('requires both PiD models before compiling', () => {

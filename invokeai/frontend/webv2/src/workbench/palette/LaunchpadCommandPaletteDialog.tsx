@@ -2,16 +2,19 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
 import { useCapabilities } from '@features/identity';
 import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useProjectLibrary } from '@workbench/projects/library';
+import { useOpenProjectsSelector } from '@workbench/projects/openProjects';
 import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { PaletteEntry, SettingsEntryDeps } from './entries';
+import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
 import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
+import { createProjectsProvider } from './projectsProvider';
 
-/** Launchpad-only palette adapter: navigation and settings, no editor providers. */
+/** Launchpad-only palette adapter: navigation, settings and projects; no editor providers. */
 const LaunchpadCommandPaletteDialog = ({
   isOpen,
   modifierKeyLabel,
@@ -32,6 +35,8 @@ const LaunchpadCommandPaletteDialog = ({
   const search = useSearch({ strict: false }) as { project?: string };
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
   const settingsSections = useAvailableSettings();
+  const projectLibrary = useProjectLibrary();
+  const openProjectIds = useOpenProjectsSelector((snapshot) => snapshot.ids);
   // Launchpad settings are a page, not the editor's dialog.
   const launchpadSettingsDeps = useMemo<SettingsEntryDeps>(
     () => ({
@@ -86,11 +91,30 @@ const LaunchpadCommandPaletteDialog = ({
     t,
   ]);
 
+  const providers = useMemo<PaletteSearchProvider[]>(() => {
+    // The session names open projects by id only; the library supplies their names.
+    const openIds = new Set(openProjectIds);
+    const openProjects = projectLibrary.summaries
+      .filter((summary) => openIds.has(summary.id))
+      .map(({ id, name }) => ({ id, name }));
+
+    return [
+      createProjectsProvider({
+        library: projectLibrary,
+        // The same route the Launchpad's project cards and rows link to.
+        openProject: (id) => void navigate({ search: { project: id }, to: '/app' }),
+        openProjects,
+        t,
+      }),
+    ];
+  }, [navigate, openProjectIds, projectLibrary, t]);
+
   return (
     <CommandPaletteDialog
       entries={entries}
       isOpen={isOpen}
       modifierKeyLabel={modifierKeyLabel}
+      providers={providers}
       onClose={onClose}
       onExitComplete={onExitComplete}
     />

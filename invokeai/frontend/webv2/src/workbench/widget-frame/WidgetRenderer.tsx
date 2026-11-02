@@ -21,6 +21,7 @@ import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@wor
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { memo, Suspense, use, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
@@ -463,15 +464,19 @@ export const MissingWidgetFrame = ({
   region: Exclude<WidgetRegion, 'center'>;
   /** Unknown when the instance itself is gone. */
   typeId: WidgetTypeId | undefined;
-}) => (
-  <WidgetPanelFrame instanceId={instanceId} region={region} typeId={typeId}>
-    <Box p="3">
-      <Text fontSize="md" fontWeight="700">
-        {label}
-      </Text>
-      <Text color="fg.subtle" fontSize="xs">
-        Widget view unavailable.
-      </Text>
-    </Box>
-  </WidgetPanelFrame>
-);
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <WidgetPanelFrame instanceId={instanceId} region={region} typeId={typeId}>
+      <Box p="3">
+        <Text fontSize="md" fontWeight="700">
+          {label}
+        </Text>
+        <Text color="fg.subtle" fontSize="xs">
+          {t('common.widgetViewUnavailable')}
+        </Text>
+      </Box>
+    </WidgetPanelFrame>
+  );
+};

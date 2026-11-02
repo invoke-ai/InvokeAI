@@ -10,6 +10,7 @@ import type {
   IPAdapterMethod,
   VaeModelConfig,
 } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import {
   cloneGenerateWidgetValues,
@@ -644,19 +645,17 @@ export const buildRecallParametersSettings = ({
   return { fields: [...fields], retainedReferenceImages, skipped, values };
 };
 
-const SKIP_REASON_LABELS: Record<RecallParameterSkipReason, string> = {
-  incompatible: 'incompatible with the current model',
-  invalid: 'invalid value',
-  limit: 'over the reference image limit',
-  unresolved: 'not found',
-  unsupported: 'not supported by the Generate panel',
-};
-
 /** One line naming every parameter that was not applied and why, for the notice. */
-export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[]): string =>
+export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[], t: TFunction): string =>
   skipped
-    .map(({ detail, key, reason }) => `${key}: ${SKIP_REASON_LABELS[reason]}${detail ? ` (${detail})` : ''}`)
+    .map(({ detail, key, reason: skipReason }) => {
+      const reason = t(`widgets.gallery.itemActions.recall.parameters.skipReasons.${skipReason}`);
+
+      return detail
+        ? t('widgets.gallery.itemActions.recall.parameters.skippedWithDetail', { detail, key, reason })
+        : t('widgets.gallery.itemActions.recall.parameters.skipped', { key, reason });
+    })
     .join('; ');
 
-export const getRecallParametersMessage = (fields: readonly RecallParameterField[]): string =>
-  `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
+export const getRecallParametersMessage = (fields: readonly RecallParameterField[], t: TFunction): string =>
+  t('widgets.gallery.itemActions.recall.fieldsApplied', { count: fields.length });

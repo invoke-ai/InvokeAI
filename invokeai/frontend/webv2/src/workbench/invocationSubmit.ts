@@ -15,12 +15,13 @@ import type {
   UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
+import type { ScopedDefaults } from '@workbench/settings/contracts';
 
 import { ensureGalleryBoardDestinations } from '@features/gallery/queries';
 import { resolveDynamicPrompts } from '@features/generation/prompts';
 import {
+  expandsDynamicPrompts,
   getEffectivePrompts,
-  hasDynamicPromptSyntax,
   normalizeGenerateSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
@@ -36,14 +37,23 @@ import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepar
 import type { WorkbenchCommands } from './workbenchStore';
 
 import { getActiveProjectWorkflow } from './projectWorkflows';
+import { getEffectiveProjectSettings, PROJECT_SETTINGS_OWNER } from './settings/projectSettings';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
-import { getProjectWidgetValues } from './widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from './widgetState';
 
-/** Plain English, like the shell's other notices — this module has no i18n context. */
-const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
-const GENERATOR_FAILED_TITLE = 'The batch generator could not be resolved';
-const BATCH_NOT_READY_TITLE = 'The batch is not ready';
+/** Locale keys with their English, which notices keep for a language without them (`resolveNotificationText`). */
+const EXPANSION_FAILED_TITLE = { title: 'The prompt could not be expanded', titleKey: 'topbar.invoke.expansionFailed' };
+const EXPANSION_UNREACHABLE_MESSAGE = {
+  message:
+    'The server could not be reached to expand the prompt. Check the connection and try again, or turn dynamic prompts off to use the prompt as typed.',
+  messageKey: 'topbar.invoke.expansionUnreachable',
+};
+const GENERATOR_FAILED_TITLE = {
+  title: 'The batch generator could not be resolved',
+  titleKey: 'topbar.invoke.generatorFailed',
+};
+const BATCH_NOT_READY_TITLE = { title: 'The batch is not ready', titleKey: 'topbar.invoke.batchNotReady' };
 
 /** Settled, never rejected: it may fail while the board listing is still awaited, before anything awaits it. */
 type UpscaleSourceMetadataRead = UpscaleSourceMetadata | { error: unknown; imageName: string };
@@ -77,6 +87,8 @@ export interface SubmitResolvedInvocationDeps {
   route: ResolvedInvocationRoute;
   /** The project the canvas pipeline reads its generate/canvas widget values from. */
   project: Project;
+  /** The user's defaults captured with `project`; settings and widget values resolve against them. */
+  scopedDefaults: ScopedDefaults;
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
   /**
@@ -101,8 +113,8 @@ export interface SubmitResolvedInvocationDeps {
 }
 
 /**
- * Return merged Generate prompts only for dynamic routes; templates may introduce syntax and must consume their
- * own placeholders before expansion.
+ * Return merged Generate prompts only for routes that expand them: dynamic prompts on and dynamic syntax present.
+ * Templates may introduce syntax and must consume their own placeholders before expansion.
  */
 const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute): GenerateSettings | null => {
   if (route.sourceId === 'upscale' || route.sourceId === 'video' || route.sourceId === 'workflow') {
@@ -117,7 +129,9 @@ const getExpandableSettings = (project: Project, route: ResolvedInvocationRoute)
 
   const effectiveSettings = { ...settings, ...getEffectivePrompts(settings) };
 
-  return hasDynamicPromptSyntax(effectiveSettings.positivePrompt) ? effectiveSettings : null;
+  return expandsDynamicPrompts(effectiveSettings.positivePrompt, effectiveSettings.dynamicPromptsEnabled)
+    ? effectiveSettings
+    : null;
 };
 
 /**
@@ -185,7 +199,7 @@ const resolveWorkflowGeneratorsForRoute = async (
   }
 
   if (errors.length > 0) {
-    commands.notifications.add({ kind: 'error', message: errors[0], title: GENERATOR_FAILED_TITLE });
+    commands.notifications.add({ ...GENERATOR_FAILED_TITLE, kind: 'error', message: errors[0] });
     return null;
   }
 
@@ -203,7 +217,15 @@ const resolveWorkflowGeneratorsForRoute = async (
   const reason = resolvedPlan.reasons[0] ?? capReason;
 
   if (reason) {
-    commands.notifications.add({ kind: 'error', message: reason, title: BATCH_NOT_READY_TITLE });
+    const { message, messageKey, messageValues } = reason.workflowIssue;
+
+    commands.notifications.add({
+      ...BATCH_NOT_READY_TITLE,
+      kind: 'error',
+      message,
+      messageKey,
+      ...(messageValues ? { messageValues } : {}),
+    });
     return null;
   }
 
@@ -220,6 +242,7 @@ export const submitResolvedInvocation = async ({
   prepend,
   project,
   route,
+  scopedDefaults,
   workflowId,
 }: SubmitResolvedInvocationDeps): Promise<void> => {
   if (!isAccountScopeCurrent(owner)) {
@@ -280,10 +303,11 @@ export const submitResolvedInvocation = async ({
     // Reject failed expansions for hotkey and preview callers too, so literal dynamic syntax never reaches
     // generation.
     if (expansion === null || expansion.error) {
+      // A request that never answered has no server reason, so the notice says what failed instead.
       commands.notifications.add({
+        ...EXPANSION_FAILED_TITLE,
+        ...(expansion === null ? EXPANSION_UNREACHABLE_MESSAGE : { message: expansion.error ?? undefined }),
         kind: 'error',
-        message: expansion?.error ?? undefined,
-        title: EXPANSION_FAILED_TITLE,
       });
       return;
     }
@@ -299,6 +323,7 @@ export const submitResolvedInvocation = async ({
         prepend,
         project,
         route,
+        scopedDefaults,
         workflowId,
       },
       expansion.prompts.length > 0
@@ -323,6 +348,7 @@ export const submitResolvedInvocation = async ({
       prepend,
       project,
       route,
+      scopedDefaults,
       workflowId,
     },
     undefined,
@@ -344,6 +370,7 @@ const dispatchResolvedInvocation = async (
     prepend,
     project,
     route,
+    scopedDefaults,
   }: SubmitResolvedInvocationDeps,
   expansion: ExpandedPositivePrompts | undefined,
   workflowGenerators: WorkflowGeneratorResolutions | undefined,
@@ -382,8 +409,9 @@ const dispatchResolvedInvocation = async (
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
     // Canvas can output to Gallery.
+    const canvasValues = getResolvedProjectWidgetValues(project, 'canvas', scopedDefaults);
     await prepareCanvasInvocation({
-      compositing: readCanvasCompositingSettings(getProjectWidgetValues(project, 'canvas')),
+      compositing: readCanvasCompositingSettings(canvasValues),
       destination: route.destination,
       commands,
       formatControlLayerError,
@@ -393,9 +421,9 @@ const dispatchResolvedInvocation = async (
       expansion,
       ...(prepend ? { prepend } : {}),
       projectId: project.id,
-      canvasValues: getProjectWidgetValues(project, 'canvas'),
-      projectSettings: project.settings,
-      strength: readCanvasDenoisingStrength(getProjectWidgetValues(project, 'canvas')),
+      canvasValues,
+      projectSettings: getEffectiveProjectSettings(project.settings, scopedDefaults[PROJECT_SETTINGS_OWNER]),
+      strength: readCanvasDenoisingStrength(canvasValues),
     });
     return;
   }

@@ -30,6 +30,18 @@ anima_base = StarterModel(
     dependencies=[anima_qwen3_encoder, anima_vae],
 )
 
+anima_base_int8 = StarterModel(
+    name="Anima Base 1.0 (int8)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/Bedovyy/Anima-INT8/resolve/d7ba6686f161e9a829373106eb4b881327247ba9/anima-base-v1.0-int8convrot.safetensors",
+    description="Anima Base 1.0 in Bedovyy's int8_convrot build. Its int8 layers stay int8 on every supported GPU, "
+    "about 2.7GB once loaded; int8 Compute can run them on NVIDIA int8 tensor cores. ~2.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
 _DERIVATIVE_LICENSE = (
     "A derivative of Anima under the CircleStone Labs Non-Commercial License: the model may not be used "
     "commercially (generated images may)."
@@ -69,6 +81,19 @@ anima_turbo_gguf_q8_0 = StarterModel(
     f"{_DERIVATIVE_LICENSE} ~2.2GB",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    variant=AnimaVariantType.Qwen3,
+    dependencies=[anima_qwen3_encoder, anima_vae],
+)
+
+anima_turbo_int8 = StarterModel(
+    name="Anima Turbo 1.1 (int8)",
+    base=BaseModelType.Anima,
+    source="https://huggingface.co/Bedovyy/Anima-INT8/resolve/d7ba6686f161e9a829373106eb4b881327247ba9/anima-turbo-v1.1-int8convrot.safetensors",
+    description="Anima Turbo v1.1, the distilled version of Anima for fast generations, in Bedovyy's int8_convrot "
+    "build. Its int8 layers stay int8 on every supported GPU, about 2.7GB once loaded; int8 Compute can run them on "
+    f"NVIDIA int8 tensor cores. Recommended: 8-12 steps, CFG 1. {_DERIVATIVE_LICENSE} ~2.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
     variant=AnimaVariantType.Qwen3,
     dependencies=[anima_qwen3_encoder, anima_vae],
 )

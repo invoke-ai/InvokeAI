@@ -47,7 +47,6 @@ const documentOf = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 =>
 interface Harness {
   deps: CreateCompositeFrameDeps;
   controlView: ReturnType<CreateCompositeFrameDeps['getControlView']>;
-  staging: { candidates: boolean };
   stores: ReturnType<typeof createEngineStores>;
   previews: PreviewStateController;
   overrides: Map<string, { x: number; y: number }>;
@@ -72,13 +71,10 @@ const makeHarness = (): Harness => {
   const rasterizeLayer = vi.fn();
   const beginFrame = vi.fn(() => FRAME_USAGE);
   const enforce = vi.fn(() => ({ evictedBaseLayerIds: [] as string[], overageBytes: 0 }));
-  const staging = { candidates: false };
   const harness: Harness = {
     beginFrame,
     controlView: null,
-    staging,
     deps: {
-      hasStagedCandidates: () => staging.candidates,
       backend: {} as CreateCompositeFrameDeps['backend'],
       derivedSurfaceCache: { byteSize: () => 0 } as CreateCompositeFrameDeps['derivedSurfaceCache'],
       diagnostics: {} as CreateCompositeFrameDeps['diagnostics'],
@@ -242,26 +238,13 @@ describe('filter previews', () => {
 });
 
 describe('the staged candidate', () => {
-  const publishStaged = (placement?: Record<string, number>) => {
+  it('lands at its pinned placement, never at the bbox', () => {
     harness.previews.publishStaged(harness.previews.nextStagedToken(), {
       height: 16,
-      placement,
+      placement: { height: 2, opacity: 0.5, width: 3, x: 20, y: 30 },
       surface: surface(16, 16),
       width: 16,
-    } as never);
-  };
-
-  it('follows the bbox origin when it carries no placement', () => {
-    publishStaged();
-    draw();
-    expect(lastCompositeOptions().stagedPreview).toMatchObject({
-      opacity: 1,
-      rect: { height: 16, width: 16, x: 4, y: 6 },
     });
-  });
-
-  it('uses its own placement when it has one', () => {
-    publishStaged({ height: 2, opacity: 0.5, width: 3, x: 20, y: 30 });
     draw();
     expect(lastCompositeOptions().stagedPreview).toMatchObject({
       opacity: 0.5,
@@ -364,7 +347,15 @@ describe('masks while a result is staged', () => {
     beforeEach(() => harness.entries.set(id, entryFor()));
   }
 
-  it('hides mask and region stacks and the region tint, rebuilding the frame description once per flip', () => {
+  const publishPreview = () =>
+    harness.previews.publishStaged(harness.previews.nextStagedToken(), {
+      height: 8,
+      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+      surface: surface(8, 8),
+      width: 8,
+    });
+
+  it('hides mask and region stacks and the region tint under a shown preview, rebuilding the description per flip', () => {
     const frame = createCompositeFrame(harness.deps);
     const drawFrame = () => frame.draw(surface(), doc, VIEW, null, null);
 
@@ -374,7 +365,7 @@ describe('masks while a result is staged', () => {
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(lastCompositeOptions().regionOverlays).toBe(true);
 
-    harness.staging.candidates = true;
+    publishPreview();
     drawFrame();
     const hidden = description();
     expect(hidden).not.toBe(shown);
@@ -384,19 +375,22 @@ describe('masks while a result is staged', () => {
     drawFrame();
     expect(description()).toBe(hidden);
 
-    harness.staging.candidates = false;
+    // Toggling the preview off (or accepting/discarding) shows them again.
+    harness.previews.clearStaged();
     drawFrame();
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
   });
 
-  it('also hides them while only a staged or progress preview is published', () => {
-    harness.previews.publishStaged(harness.previews.nextStagedToken(), {
-      height: 8,
-      surface: surface(8, 8),
-      width: 8,
-    } as never);
-    draw(doc);
+  it.each(['m', 'r'])('shows them over the preview while %s, a mask or region, is selected for editing', (id) => {
+    publishPreview();
+    draw({ ...doc, selectedLayerId: id });
+    expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(lastCompositeOptions().regionOverlays).toBe(true);
+    expect(lastCompositeOptions().stagedPreview).not.toBeNull();
+
+    // Selecting raster or control work hides them again.
+    draw({ ...doc, selectedLayerId: 'c' });
     expect(drawnIds()).toEqual(['a', 'c']);
   });
 });

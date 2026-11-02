@@ -380,6 +380,17 @@ z_image_qwen3_encoder_fp4 = StarterModel(
     type=ModelType.Qwen3Encoder,
 )
 
+# The same community repack and commit as the FLUX.2 Klein Qwen3 8B int8 encoder, pinned for the same reason.
+z_image_qwen3_encoder_int8 = StarterModel(
+    name="Z-Image Qwen3 Text Encoder (int8)",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/text_encoders/qwen_3_4b_int8_convrot.safetensors",
+    description="Community int8_convrot Qwen3 4B text encoder for Z-Image, from supermind's repack. Its int8 "
+    "projections stay int8, about 4.4GB once loaded rather than the ~8GB of the full-precision encoder; int8 Compute "
+    "can run them on NVIDIA int8 tensor cores. ~4.4GB download",
+    type=ModelType.Qwen3Encoder,
+)
+
 # region Krea-2
 # Standalone Qwen3-VL text encoder used by Krea-2 (distinct from the Qwen2.5-VL encoder above). Pair
 # with single-file / GGUF Krea-2 transformers, which ship only the transformer. The Qwen-Image VAE

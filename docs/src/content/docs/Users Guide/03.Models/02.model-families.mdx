@@ -1,7 +1,7 @@
 ---
 title: Model Formats and Families
 description: An overview of the models InvokeAI supports — checkpoint, Diffusers and quantized formats, the components that make up a model, and the model families with their licenses.
-lastUpdated: 2026-10-18
+lastUpdated: 2026-11-01
 sidebar:
   order: 2
 ---
@@ -34,7 +34,7 @@ Newer models are often distributed in **quantized** forms, which
 store the weights at reduced precision to save disk space and
 VRAM. InvokeAI recognizes several of these, including **GGUF** files
 (named for their quantization level, such as `Q4_K_M` or `Q8_0`),
-**fp8**, **int8** and **nf4** builds. Like other single-file
+**fp8**, **int8**, **int4** and **nf4** builds. Like other single-file
 checkpoints, a quantized file usually carries only the transformer
 and needs separately installed companions. Lower precision trades a
 little image quality for a large saving in memory; each model family's
@@ -44,10 +44,11 @@ page lists the builds it supports.
 
 InvokeAI recognizes the format from the file's contents, so you install them like any other model. Which format loads for which model is listed in [Model Format Support](/users-guide/models/model-format-support/).
 
-- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, FLUX.3, Z-Image, Krea-2, Qwen-Image, Qwen-Image-2.1, Ideogram 4, ERNIE-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` files, which store int8 (`int8_convrot`) layers inside a `.gguf`, load for the Krea-2 transformer; for other models, and for ComfyUI-GGUF's `Q4_CR`, installation is refused with a message saying so.
+- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, FLUX.3, Z-Image, Krea-2, Qwen-Image, Qwen-Image-2.1, Ideogram 4, ERNIE-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders. ComfyUI-GGUF's `Q8_CR` and `Q4_CR` files, which store int8 or int4 convrot layers inside a `.gguf`, load for the Krea-2 transformer; for other models installation is refused with a message saying so.
 - **NF4** (bitsandbytes): 4-bit, CUDA only.
 - **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
-- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Qwen-Image-2.1, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
+- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Anima, Krea-2, Qwen-Image-2.1, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 4B and 8B, Qwen3-VL and LTX-2 Gemma encoders.
+- **int4** (`convrot_w4a4` or `int4_tensorwise`, ComfyUI repackages that usually keep some layers int8): the weights stay packed in memory at half a byte each and are unpacked per layer, on every device. This saves memory, not time: InvokeAI unpacks the weights for every step rather than running 4-bit matrix kernels, and 4-bit weights keep less detail than int8. Supported for the Krea-2 transformer.
 - **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 and Qwen-Image-2.1 nvfp4 files are refused at install.
 - **fp8** (plain or `fp8_scaled`): InvokeAI keeps the weights in fp8 when [FP8 Storage](/configuration/optimization/fp8-storage/) is on, which installation does for you, or when `fp8_compute` is enabled.
 - **MXFP8** (fp8 with one scale per block of 32 weights): loaded by unpacking to BF16. Turn FP8 Storage off for these; see the [FP8 Storage caution](/configuration/optimization/fp8-storage/).

@@ -129,7 +129,7 @@ describe('MaxQueueHistorySettings', () => {
     await render({ maxQueueHistory: undefined });
 
     expect(host.textContent).toContain("Could not read the server's queue history setting.");
-    expect(host.textContent).toContain('Restart InvokeAI for changes to take effect.');
+    expect(host.textContent).toContain('Restart Invoke for changes to take effect.');
   });
 
   it('keeps the limit editable when only the device listing failed', async () => {

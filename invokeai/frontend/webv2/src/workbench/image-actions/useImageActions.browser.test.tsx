@@ -23,6 +23,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ImageActions } from './useImageActions';
 
+import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 import { useImageActions } from './useImageActions';
 
 const mocks = vi.hoisted(() => ({
@@ -61,7 +62,6 @@ const mocks = vi.hoisted(() => ({
   ),
   requestWorkflowDocumentLoad: vi.fn(),
   submitUtilityGraph: vi.fn((..._args: unknown[]): Promise<unknown> => Promise.reject(new Error('not submitted'))),
-  videoMetadata: vi.fn((..._args: unknown[]) => Promise.resolve(null)),
   videoWorkflow: vi.fn((..._args: unknown[]): Promise<{ graph: string | null; workflow: string | null }> =>
     Promise.resolve({ graph: null, workflow: null })
   ),
@@ -72,6 +72,7 @@ const mocks = vi.hoisted(() => ({
   itemMoveToBoard: vi.fn(),
   itemSetStarred: vi.fn(),
   notificationsAdd: vi.fn(),
+  notifyUndoable: vi.fn(),
   onImagesDeleted: vi.fn(),
   openWorkbenchWidget: vi.fn((..._args: unknown[]): { ok: boolean; reason?: string; region?: string } => ({
     ok: true,
@@ -109,7 +110,6 @@ vi.mock('@features/gallery', () => ({
   },
   galleryTransfers: { downloadArchive: (...args: unknown[]) => mocks.downloadArchive(...args) },
   galleryVideos: {
-    metadata: (...args: unknown[]) => mocks.videoMetadata(...args),
     workflow: (...args: unknown[]) => mocks.videoWorkflow(...args),
   },
   legacyGeneratedImageToGalleryItem: (image: { boardId?: string; imageName: string; starred?: boolean }) => ({
@@ -144,6 +144,8 @@ vi.mock('@features/workflow/preview', async () => {
 vi.mock('@features/gallery/queries', () => ({
   canAddToCachedGalleryBoard: (...args: unknown[]) => mocks.canAddToCachedGalleryBoard(...args),
   ensureGalleryBoardDestinations: () => mocks.ensureGalleryBoardDestinations(),
+  fetchGalleryImageMetadata: (_client: unknown, _owner: unknown, imageName: string) => mocks.imageMetadata(imageName),
+  fetchGalleryVideoMetadata: () => Promise.resolve(null),
   getGalleryItemBoardIdsFromCaches: (...args: unknown[]) => mocks.getItemBoardIds(...args),
   getGalleryItemStarredFromCaches: (...args: unknown[]) => mocks.getItemStarred(...args),
   invalidateGallery: (...args: unknown[]) => mocks.invalidateGallery(...args),
@@ -171,6 +173,10 @@ vi.mock('@features/models', () => ({
         { base: 'flux', key: 'flux-model', name: 'FLUX', type: 'main' },
       ],
     }),
+}));
+
+vi.mock('@workbench/useNotify', () => ({
+  useNotify: () => ({ undoable: (...args: unknown[]) => mocks.notifyUndoable(...args) }),
 }));
 
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
@@ -230,7 +236,8 @@ vi.mock('@workbench/WorkbenchContext', () => {
     useWorkbenchCommands: () => commands,
     useWorkbenchQueries: () => ({
       getProject: (...args: unknown[]) => mocks.getProject(...args),
-      getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
+      // Fixtures set no user defaults.
+      getSnapshot: (...args: unknown[]) => ({ scopedDefaults: {}, ...(mocks.getSnapshot(...args) as object) }),
       isActiveProject: (...args: unknown[]) => mocks.isActiveProject(...args),
     }),
     // Only the Video panel's reference capacity is selected; no test here exercises it.
@@ -246,6 +253,9 @@ vi.mock('react-i18next', () => ({
       }
       if (key === 'widgets.gallery.itemActions.move.success') {
         return `Moved to ${String(values?.board)}`;
+      }
+      if (key.startsWith('widgets.gallery.itemActions.undoStale.')) {
+        return `${key}:${JSON.stringify(values)}`;
       }
       if (key.startsWith('widgets.gallery.itemActions.loadWorkflow.loadedLabel')) {
         return `${key}:${String(values?.name)}`;
@@ -587,8 +597,8 @@ describe('reference image availability and the capability table', () => {
   });
 });
 
-describe('image recall capability cancellation', () => {
-  it('re-derives capabilities from the current generate model without another metadata request', async () => {
+describe('image recall capabilities', () => {
+  it('derives capabilities from the current generate model', async () => {
     const image: GalleryImage = {
       boardId: 'none',
       height: 512,
@@ -613,51 +623,30 @@ describe('image recall capability cancellation', () => {
     });
 
     expect(actionsRef.current?.deriveImageRecallCapabilities(image, { clip_skip: 2 }).clipSkip).toBe(false);
-    expect(mocks.imageMetadata).not.toHaveBeenCalled();
   });
 
-  it('combines a caller signal with the account lifecycle signal for metadata transport', async () => {
-    let resolveMetadata!: (value: null) => void;
-    const metadata = new Promise<null>((resolve) => {
-      resolveMetadata = resolve;
-    });
-    mocks.imageMetadata.mockReturnValueOnce(metadata);
-    const controller = new AbortController();
+  it('offers only an embedded workflow while the Generate panel has no values', async () => {
     const image: GalleryImage = {
       boardId: 'none',
+      hasWorkflow: true,
       height: 512,
       imageCategory: 'general',
-      imageName: 'recall.png',
-      imageUrl: '/full/recall.png',
+      imageName: 'workflow.png',
+      imageUrl: '/full/workflow.png',
       queuedAt: '2026-07-30T00:00:00.000Z',
-      sourceQueueItemId: 'queue-recall',
+      sourceQueueItemId: 'queue-workflow',
       starred: false,
-      thumbnailUrl: '/thumb/recall.png',
+      thumbnailUrl: '/thumb/workflow.png',
       width: 512,
     };
-    const getCapabilities = actionsRef.current?.getImageRecallCapabilities as unknown as (
-      image: GalleryImage,
-      signal?: AbortSignal
-    ) => Promise<unknown>;
-    let result!: Promise<unknown>;
 
-    await act(async () => {
-      result = getCapabilities(image, controller.signal);
-      await Promise.resolve();
+    // Without the capability table there are no Generate values to recall into.
+    await act(() => resetArchitectureCapabilities());
+    expect(actionsRef.current?.deriveImageRecallCapabilities(image, { seed: 7 })).toEqual({
+      ...EMPTY_IMAGE_RECALL_CAPABILITIES,
+      workflow: true,
     });
-
-    expect(mocks.imageMetadata).toHaveBeenCalledWith('recall.png', expect.any(AbortSignal));
-    const transportSignal = mocks.imageMetadata.mock.calls[0]?.[1] as AbortSignal;
-    expect(transportSignal).toBeInstanceOf(AbortSignal);
-    expect(transportSignal.aborted).toBe(false);
-
-    controller.abort();
-
-    expect(transportSignal.aborted).toBe(true);
-    resolveMetadata(null);
-    await act(async () => {
-      await result;
-    });
+    await act(() => setArchitectureCapabilities(architectureCapabilitiesFixture));
   });
 });
 
@@ -674,24 +663,6 @@ describe('load workflow from image', () => {
     thumbnailUrl: '/thumb/made-by-workflow.png',
     width: 512,
   };
-
-  it('offers the action only once the image record says a workflow is embedded', async () => {
-    mocks.imageMetadata.mockResolvedValue(null);
-    mocks.imageResolve.mockResolvedValueOnce({ ...image, hasWorkflow: true });
-
-    await expect(actionsRef.current?.getImageRecallCapabilities(image)).resolves.toMatchObject({ workflow: true });
-
-    mocks.imageResolve.mockResolvedValueOnce({ ...image, hasWorkflow: false });
-
-    await expect(actionsRef.current?.getImageRecallCapabilities(image)).resolves.toMatchObject({ workflow: false });
-
-    // An image that came through a record endpoint already knows; no second round trip.
-    mocks.imageResolve.mockClear();
-    await expect(
-      actionsRef.current?.getImageRecallCapabilities({ ...image, hasWorkflow: true })
-    ).resolves.toMatchObject({ workflow: true });
-    expect(mocks.imageResolve).not.toHaveBeenCalled();
-  });
 
   it('reports, instead of queueing a load for a later editor, when the workflow widget cannot open', async () => {
     mocks.imageWorkflow.mockResolvedValueOnce({ graph: null, workflow: JSON.stringify({ nodes: [] }) });
@@ -1143,18 +1114,6 @@ describe('video workflow loading', () => {
     width: 512,
   };
 
-  it('answers from the item when it knows, otherwise from the video record', async () => {
-    await expect(actionsRef.current?.hasVideoWorkflow({ ...video, hasWorkflow: true })).resolves.toBe(true);
-    expect(mocks.resolveItem).not.toHaveBeenCalled();
-
-    mocks.resolveItem.mockResolvedValueOnce({ ...video, hasWorkflow: true });
-    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(true);
-    expect(mocks.resolveItem).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' }, expect.any(AbortSignal));
-
-    mocks.resolveItem.mockRejectedValueOnce(new Error('offline'));
-    await expect(actionsRef.current?.hasVideoWorkflow(video)).resolves.toBe(false);
-  });
-
   it('hands the embedded workflow to the editor and opens it', async () => {
     mocks.videoWorkflow.mockResolvedValueOnce({
       graph: null,
@@ -1291,7 +1250,7 @@ describe('partial image mutation outcomes', () => {
 type ExpectedItemActions = {
   deleteItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
-    options?: { returnFocus?: () => HTMLElement | null }
+    options?: { returnFocus?: () => HTMLElement | null; targetsOffScreen?: boolean }
   ): Promise<void>;
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
@@ -1330,7 +1289,11 @@ describe('mixed item mutation outcomes', () => {
     });
 
     // The dialog learns where focus goes once the deletion has removed the control that asked for it.
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus, []);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: true,
+      returnFocus,
+      usage: [],
+    });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -1349,6 +1312,31 @@ describe('mixed item mutation outcomes', () => {
 
     expect(mocks.requestDeletionConfirmation).not.toHaveBeenCalled();
     expect(mocks.itemDelete).toHaveBeenCalledWith(refs, expect.any(AbortSignal));
+  });
+
+  it.each([
+    [
+      'more than one item',
+      [
+        { kind: 'image' as const, name: 'a.png' },
+        { kind: 'video' as const, name: 'b.mp4' },
+      ],
+      false,
+    ],
+    ['an item off screen', [{ kind: 'image' as const, name: 'a.png' }], true],
+  ])('asks before deleting %s even with routine confirmations off', async (_case, refs, targetsOffScreen) => {
+    mocks.requestDeletionConfirmation.mockImplementation(() => Promise.resolve());
+
+    await act(async () => {
+      await getItemActions().deleteItems(refs, { targetsOffScreen });
+    });
+
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: false,
+      returnFocus: undefined,
+      usage: [],
+    });
+    expect(mocks.itemDelete).not.toHaveBeenCalled();
   });
 
   it('still confirms, naming the surfaces, when the project uses an item and confirmation is off', async () => {
@@ -1370,9 +1358,11 @@ describe('mixed item mutation outcomes', () => {
       await getItemActions().deleteItems(refs);
     });
 
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), undefined, [
-      { names: ['source.png'], surface: 'upscale' },
-    ]);
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), {
+      canSkipFutureConfirmations: false,
+      returnFocus: undefined,
+      usage: [{ names: ['source.png'], surface: 'upscale' }],
+    });
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -1393,6 +1383,164 @@ describe('mixed item mutation outcomes', () => {
       kind: 'success',
       title: 'Moved to Uncategorized',
     });
+  });
+
+  it('reports a move to another board with an Undo that returns each item to the board it came from', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'a.png' },
+      { kind: 'video' as const, name: 'b.mp4' },
+      { kind: 'image' as const, name: 'unknown.png' },
+    ];
+    mocks.getItemBoardIds.mockReturnValue(
+      new Map([
+        ['image:a.png', 'board-1'],
+        ['video:b.mp4', 'none'],
+      ])
+    );
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-2');
+    });
+
+    expect(mocks.notificationsAdd).not.toHaveBeenCalled();
+    // The hook's board list does not name board-2.
+    expect(mocks.notifyUndoable).toHaveBeenCalledExactlyOnceWith('Moved to widgets.gallery.unknownBoard', {
+      onUndo: expect.any(Function),
+      projectId: 'project-1',
+    });
+
+    mocks.getItemBoardIds.mockReturnValue(new Map());
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    // Each back to its own board; one whose board was not known stays where it went.
+    expect(mocks.itemMoveToBoard.mock.calls.slice(1).map(([moved, boardId]) => [moved, boardId])).toEqual([
+      [[refs[0]], 'board-1'],
+      [[refs[1]], 'none'],
+    ]);
+    // Undoing reports plainly: there is no Undo of the Undo.
+    expect(mocks.notifyUndoable).toHaveBeenCalledOnce();
+    // The item whose board was not known is reported, not silently skipped.
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":3,"restored":2}',
+    });
+  });
+
+  it('leaves an item a later move took elsewhere when an earlier move is undone', async () => {
+    const refs = [{ kind: 'image' as const, name: 'moved-twice.png' }];
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-a']]));
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-b');
+    });
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-b']]));
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-c');
+    });
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:moved-twice.png', 'board-c']]));
+
+    const [[, first], [, second]] = mocks.notifyUndoable.mock.calls as [string, { onUndo: () => void }][];
+    await act(async () => {
+      first.onUndo();
+      await Promise.resolve();
+    });
+
+    expect(mocks.itemMoveToBoard).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
+    });
+
+    // The newer move's Undo still applies.
+    await act(async () => {
+      second.onUndo();
+      await Promise.resolve();
+    });
+    expect(mocks.itemMoveToBoard).toHaveBeenLastCalledWith(refs, 'board-b', expect.any(AbortSignal));
+  });
+
+  it('leaves an item a later unstar changed when an earlier star is undone', async () => {
+    const refs = [{ kind: 'image' as const, name: 'toggled.png' }];
+    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', true]]));
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, false);
+    });
+    mocks.getItemStarred.mockReturnValue(new Map([['image:toggled.png', false]]));
+
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
+    expect(mocks.notificationsAdd).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.none:{"count":1}',
+    });
+  });
+
+  it('reports a star with an Undo that gives each item back its own flag', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'was-starred.png' },
+      { kind: 'image' as const, name: 'was-not.png' },
+      { kind: 'image' as const, name: 'unknown.png' },
+    ];
+    mocks.getItemStarred.mockReturnValue(
+      new Map([
+        ['image:was-starred.png', true],
+        ['image:was-not.png', false],
+      ])
+    );
+    mocks.itemSetStarred.mockResolvedValue({ affectedBoardIds: [], failed: [], succeeded: refs });
+
+    await act(async () => {
+      await getItemActions().setItemsStarred(refs, true);
+    });
+
+    mocks.getItemStarred.mockReturnValue(new Map());
+    const [, { onUndo }] = mocks.notifyUndoable.mock.calls[0] as [string, { onUndo: () => void }];
+    await act(async () => {
+      onUndo();
+      await Promise.resolve();
+    });
+
+    // Only the item the star is known to have changed is unstarred again; one whose flag was not known stays.
+    expect(mocks.itemSetStarred).toHaveBeenLastCalledWith([refs[1]], false, expect.any(AbortSignal));
+    expect(mocks.itemSetStarred).toHaveBeenCalledTimes(2);
+    // The item whose flag was not known is reported, not silently skipped.
+    expect(mocks.notificationsAdd).toHaveBeenCalledWith({
+      kind: 'info',
+      title: 'widgets.gallery.itemActions.undoStale.partial:{"count":2,"restored":1}',
+    });
+  });
+
+  it('offers no Undo for a move that partly failed', async () => {
+    const refs = [
+      { kind: 'image' as const, name: 'a.png' },
+      { kind: 'image' as const, name: 'b.png' },
+    ];
+    mocks.getItemBoardIds.mockReturnValue(new Map([['image:a.png', 'board-1']]));
+    mocks.itemMoveToBoard.mockResolvedValue({ affectedBoardIds: [], failed: [refs[1]], succeeded: [refs[0]] });
+
+    await act(async () => {
+      await getItemActions().moveItemsToBoard(refs, 'board-2');
+    });
+
+    expect(mocks.notifyUndoable).not.toHaveBeenCalled();
+    expect(mocks.reportError).toHaveBeenCalledOnce();
   });
 
   it('moves mixed refs optimistically and reverts only the failed qualified key', async () => {

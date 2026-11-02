@@ -11,7 +11,6 @@ describe('RenderController', () => {
       cancelFrame: () => {
         frame = null;
       },
-      clearPreview: vi.fn(),
       getInputHandlers: () =>
         ({
           onKeyDown: vi.fn(),

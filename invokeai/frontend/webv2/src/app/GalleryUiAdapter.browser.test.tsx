@@ -1,5 +1,6 @@
 import type { GalleryUiAdapter } from '@features/gallery/react';
 import type { Project } from '@workbench/projectContracts';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -57,10 +58,13 @@ vi.mock('@workbench/WorkbenchContext', () => ({
       (snapshot) => selector(snapshot.activeProject),
       shallowEqual
     ),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchInternalStore: () => store,
   useWorkbenchPersistenceService: () => ({ ensureProjectOnServer: () => Promise.resolve() }),
   useWorkbenchQueries: () => store.queries,
+  useWorkbenchSelector: (selector: (snapshot: WorkbenchSnapshot) => unknown) =>
+    useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, shallowEqual),
 }));
 
 const renderAdapter = async (absent: string[] = []) => {

@@ -7,7 +7,7 @@ import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchSt
 
 import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { openWidgetPlacement, revealPlacedWidget } from '@workbench/widgetPlacementCommands';
 
 export interface RecallRuntime {
   dispose(): void;
@@ -128,14 +128,11 @@ export interface RecallRevealContext {
   isEditingText: () => boolean;
 }
 
-const PANEL_OPEN_KEYS = { bottom: 'isBottomOpen', left: 'isLeftOpen', right: 'isRightOpen' } as const;
-
 /**
- * Bring the widget a recall just changed to the front of its project, so the caller sees the result: select its
- * tab (expanding its region and opening its panel), raise (and unshade) it when it floats, or open it when the layout
- * has none. A
- * floating window stays floating. Nothing moves while the user is typing, or when the project is no longer the one
- * on screen; the notification reports the change either way.
+ * Bring the widget a recall just changed to the front of its project, so the caller sees the result: reveal it where
+ * the layout has it (see `revealPlacedWidget`), or open it when the layout has none. A floating window stays
+ * floating. Nothing moves while the user is typing, or when the project is no longer the one on screen; the
+ * notification reports the change either way.
  */
 export const bringRecallWidgetToFront = ({
   commands,
@@ -158,29 +155,7 @@ export const bringRecallWidgetToFront = ({
     return;
   }
 
-  const isTarget = (instanceId: string | null | undefined) =>
-    instanceId !== null && instanceId !== undefined && project.widgetInstances[instanceId]?.typeId === typeId;
-  const floating = Object.keys(project.floatingWidgets ?? {}).find(isTarget);
-
-  if (floating) {
-    commands.widgets.revealFloating(floating);
-    return;
-  }
-
-  const placed = (
-    Object.entries(project.widgetRegions) as [WidgetRegion, (typeof project.widgetRegions)[WidgetRegion]][]
-  ).filter(([, region]) => region.instanceIds.some(isTarget));
-  const isShown = ([region, state]: (typeof placed)[number]) =>
-    isTarget(state.activeInstanceId) &&
-    !state.isCollapsed &&
-    (region === 'center' || project.layout.panels[PANEL_OPEN_KEYS[region]]);
-
-  if (placed.some(isShown)) {
-    return;
-  }
-  if (placed.length > 0) {
-    // Opening a type its region already holds activates that instance, expands the region and opens its panel.
-    commands.widgets.open({ projectId, region: placed[0]![0], widgetId: typeId });
+  if (revealPlacedWidget({ project, typeId, widgets: commands.widgets })) {
     return;
   }
 
