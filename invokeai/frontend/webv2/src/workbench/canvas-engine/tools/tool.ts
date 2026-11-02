@@ -24,7 +24,7 @@ import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engi
 import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
-import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { PlacedSurface, PointerInput, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
 /** One completed-stroke event carries before/after images sized to dirtyRect for exact undo/redo and persistence. */
@@ -234,8 +234,6 @@ export interface Tool {
    * separate.
    */
   onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): void;
-  /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
-  onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   /** The CSS cursor to show while this tool is active. */
   cursor?(ctx: ToolContext): string;
   /**

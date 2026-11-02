@@ -4297,7 +4297,8 @@
         },
         "showBbox": "Show generation frame",
         "showProgressOnCanvas": "Show progress on canvas",
-        "snapToGrid": "Snap to grid"
+        "snapToGrid": "Snap to grid",
+        "trackpadNavigation": "Scroll to pan, pinch to zoom"
       },
       "showStagedResultPreview": "Show staged result preview",
       "showStagingThumbnails": "Show staging thumbnails",

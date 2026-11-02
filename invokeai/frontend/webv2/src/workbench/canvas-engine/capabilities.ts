@@ -227,6 +227,7 @@ export interface CanvasInteractionState {
   snapToGrid: boolean;
   textEditSession: TextEditSession | null;
   textOptions: TextToolOptions;
+  trackpadNavigation: boolean;
   transformSession: TransformSession | null;
   /**
    * The layer `layers.beginTransform` is waiting on: its session opens once the layer's fresh pixels are persisted.
@@ -260,6 +261,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'showGrid'
   | 'snapToGrid'
   | 'textOptions'
+  | 'trackpadNavigation'
 >;
 
 export interface CanvasInteractionStateCapability {
@@ -726,6 +728,13 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
   onStrokeCommitted(listener: (event: StrokeCommittedEvent) => void): () => void;
   /** Refusals of edits that have no caller to report to, such as a stroke too large to undo. */
   onEditRefused(listener: (refusal: CanvasEditRefusal) => void): () => void;
+  /**
+   * A trackpad pinch (a quick run of small ctrl+wheel steps with the physical Control key known to be up) while
+   * trackpad navigation is off. Listeners run before that event is routed, so one that sets `trackpadNavigation` on
+   * has it zoom as a pinch. While any listener is subscribed, candidate steps are swallowed instead of sizing the
+   * brush, so subscribe only while a pinch could still change the setting.
+   */
+  onTrackpadPinch(listener: () => void): () => void;
   /**
    * Samples the composite once as `#rrggbb`, or null on Escape, tool change or disposal. Restores the previous
    * tool on either outcome.

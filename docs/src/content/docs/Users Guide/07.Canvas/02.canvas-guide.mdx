@@ -47,7 +47,7 @@ A pick that changes a layer is one undoable step. Gradient stops are not picked 
 
 ### Tool options
 
-* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
+* **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll (unless **Scroll to pan, pinch to zoom** is on). Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases.
 
 The Brush, Eraser, Shape and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
@@ -72,7 +72,7 @@ In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if 
 
 ## Navigating the canvas
 
-* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**.
+* **Zoom** with the mouse wheel, which zooms around the pointer, or choose a level from the zoom menu in the header (25% to 500%). **Ctrl+1**, **Ctrl+2**, **Ctrl+3** and **Ctrl+4** zoom to 100%, 200%, 400% and 800% around the center of the view. Many browsers use these keys to switch tabs and do not pass them to the page; there, choose **Zoom to 100%**, **Zoom to 200%**, **Zoom to 400%** or **Zoom to 800%** from the command palette (**Ctrl+K**), or assign other keys in **Settings → Hotkeys**. On a laptop trackpad, **Scroll to pan, pinch to zoom** in the canvas settings makes two-finger scrolling pan the view and pinching zoom around the pointer. It turns on by itself the first time you pinch on the canvas.
 * **Pan** with the View tool, by holding **Space**, or by dragging with the middle mouse button.
 * **Fit to view**, at the top of the header's zoom menu, fits the generation frame and all layers into the window.
 
@@ -190,6 +190,7 @@ The gear button in the header opens the canvas settings. They are saved with the
 <Image src={canvasSettings} alt="The Canvas settings popover with Behavior, Display and Grid options." width={420} />
 
 * **Behavior**
+  * **Scroll to pan, pinch to zoom** — for trackpads: scrolling pans the view in any direction and pinching (or **Ctrl**+scroll) zooms around the pointer. With it on, **Ctrl**+scroll no longer resizes the brush; use **[** and **]** instead. It turns on automatically the first time you pinch on the canvas, for all your projects; once you turn it off yourself, it stays off.
   * **Invert scroll for brush size** — reverses **Ctrl**+scroll brush sizing.
   * **Clip strokes to frame** — keeps painting inside the generation frame.
   * **Output only generated regions** — when on, an inpainting or outpainting result contains only the regenerated area, with the rest transparent; when off, it includes the whole frame.
