@@ -25,9 +25,6 @@ from invokeai.backend.patches.lora_conversions.krea2_lora_constants import (
     unflatten_kohya_krea2_module_path,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.util.logging import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 
 # Module-name fragments unique to the Krea-2 transformer (text-fusion stage + timestep modulation proj).
 # ``text_fusion`` is the diffusers name; ``txtfusion`` is the native (ComfyUI) name for the same stage.
@@ -242,8 +239,7 @@ def lora_model_from_krea2_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
 def _get_lora_layer_values(
     layer_key: str, layer_dict: dict[str, torch.Tensor], alpha: float | None
 ) -> dict[str, torch.Tensor]:
-    """Convert PEFT (lora_A/lora_B) layer values to internal (lora_down/lora_up) format, and drop a DoRA
-    magnitude from a LoKr layer (see below)."""
+    """Convert PEFT (lora_A/lora_B) layer values to internal (lora_down/lora_up) format."""
     if "lora_A.weight" in layer_dict:
         if "lora_B.weight" not in layer_dict:
             raise ValueError(
@@ -262,18 +258,6 @@ def _get_lora_layer_values(
         if alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         return values
-    # A weight-decomposed LoKr (LyCORIS `dora_wd`) also carries a DoRA magnitude. `any_lora_layer_from_state_dict`
-    # tests for that before the LoKr factors and would build a DoRALayer, which fails on the missing
-    # lora_up/lora_down. There is no DoRA+LoKr layer, so apply the plain LoKr delta instead, as the Anima
-    # converter does.
-    if "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict:
-        magnitude_keys = {"dora_scale", "dora_magnitude"} & layer_dict.keys()
-        if magnitude_keys:
-            logger.warning(
-                f"Krea-2 LoRA layer '{layer_key}' combines LoKr with a DoRA magnitude, which is not supported; "
-                "applying it as plain LoKr."
-            )
-            return {key: value for key, value in layer_dict.items() if key not in magnitude_keys}
     return layer_dict
 
 

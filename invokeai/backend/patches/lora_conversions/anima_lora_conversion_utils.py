@@ -24,9 +24,6 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
-from invokeai.backend.util.logging import InvokeAILogger
-
-logger = InvokeAILogger.get_logger(__name__)
 
 
 def is_state_dict_likely_anima_lora(state_dict: dict[str | int, torch.Tensor]) -> bool:
@@ -149,18 +146,6 @@ def _convert_kohya_te_key(kohya_layer_name: str) -> str:
 
 
 def _make_layer_patch(layer_dict: dict[str, torch.Tensor]) -> BaseLayerPatch:
-    """Create a layer patch from a layer dict, handling DoRA+LoKR edge case.
-
-    Some Anima LoRAs combine DoRA (dora_scale) with LoKR (lokr_w1/lokr_w2) weights.
-    The shared any_lora_layer_from_state_dict checks dora_scale first and expects
-    lora_up/lora_down keys, which don't exist in LoKR layers. We strip dora_scale
-    from LoKR layers so they fall through to the LoKR handler instead.
-    """
-    has_lokr = "lokr_w1" in layer_dict or "lokr_w1_a" in layer_dict
-    has_dora = "dora_scale" in layer_dict
-    if has_lokr and has_dora:
-        layer_dict = {k: v for k, v in layer_dict.items() if k != "dora_scale"}
-        logger.warning("Stripped dora_scale from LoKR layer (DoRA+LoKR combination not supported, using LoKR only)")
     return any_lora_layer_from_state_dict(layer_dict)
 
 
