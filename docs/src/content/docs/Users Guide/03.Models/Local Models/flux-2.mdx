@@ -73,9 +73,14 @@ A FLUX.2 model needs three components:
 | Text encoder | bundled | Klein 4B: Qwen3 4B · Klein 9B: Qwen3 8B · [dev]: Mistral |
 
 Starter models that are not Diffusers pipelines install the VAE and the matching encoder as dependencies.
-Pick them in the **Components** section next to the model. If you have a FLUX.2 Diffusers model of the
-matching variant installed, InvokeAI uses its encoder and VAE automatically, so you don't need standalone
-ones.
+Pick them in the **Components** section next to the model. InvokeAI also takes them from another installed
+FLUX.2 pipeline automatically, so you don't need standalone ones:
+
+- **Klein** uses a Diffusers or self-contained SDNQ pipeline: any one for the VAE, one of the same size (4B or 9B)
+  for the encoder.
+- **[dev]** uses Diffusers pipelines only: any FLUX.2 one for the VAE, a [dev] one for the Mistral encoder. An
+  SDNQ [dev] install is no pipeline of its own: it needs a standalone VAE and Mistral encoder, or a Diffusers
+  pipeline as above.
 
 ### Klein starter models
 
