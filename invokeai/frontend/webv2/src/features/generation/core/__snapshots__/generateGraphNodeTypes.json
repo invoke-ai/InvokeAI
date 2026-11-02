@@ -712,6 +712,10 @@
           false,
           true
         ],
+        "hidiffusion_auto_ratios": [
+          false,
+          true
+        ],
         "hidiffusion_raunet": [
           true
         ],
@@ -881,6 +885,9 @@
         "hidiffusion": [
           false,
           true
+        ],
+        "hidiffusion_auto_ratios": [
+          false
         ],
         "hidiffusion_raunet": [
           true

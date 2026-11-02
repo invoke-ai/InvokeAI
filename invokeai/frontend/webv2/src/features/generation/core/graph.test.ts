@@ -277,8 +277,9 @@ describe('compileGenerateGraph', () => {
   it.each([sd1Model, sdxlModel])('preserves automatic ratios and explicit zero for $base', (model) => {
     const automatic = compile(model, { hiDiffusionEnabled: true, hiDiffusionManualRatios: { t1: 0.7, t2: 0.2 } });
     expect(getNodeByType(automatic, 'denoise_latents')).toMatchObject({
-      hidiffusion_t1_ratio: null,
-      hidiffusion_t2_ratio: null,
+      hidiffusion_auto_ratios: true,
+      hidiffusion_t1_ratio: 0,
+      hidiffusion_t2_ratio: 0,
     });
     expect(getNodeByType(automatic, 'core_metadata')).toMatchObject({
       hidiffusion_t1_ratio: null,

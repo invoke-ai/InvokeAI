@@ -919,3 +919,41 @@ def test_sdxl_automatic_ratios_preserve_extreme_resolution_preset():
 
     assert module.T1_ratio == 0.3
     assert module.T1 == 9
+
+
+@pytest.mark.parametrize(
+    ("fields", "automatic", "ratios"),
+    [
+        ({}, False, (0.4, 0)),
+        ({"hidiffusion_t1_ratio": None, "hidiffusion_t2_ratio": None}, False, (0, 0)),
+        ({"hidiffusion_t1_ratio": 0.4, "hidiffusion_t2_ratio": 0}, False, (0.4, 0)),
+        ({"hidiffusion_t1_ratio": 0, "hidiffusion_t2_ratio": 0}, False, (0, 0)),
+        ({"hidiffusion_t1_ratio": 0.4, "hidiffusion_t2_ratio": None}, False, (0.4, 0)),
+        ({"hidiffusion_auto_ratios": True, "hidiffusion_t1_ratio": 0.1, "hidiffusion_t2_ratio": 0.9}, True, (0.1, 0.9)),
+        ({"hidiffusion_auto_ratios": False, "hidiffusion_t1_ratio": None}, False, (0, 0)),
+        ({"hidiffusion_auto_ratios": False}, False, (0.4, 0)),
+        ({"hidiffusion_t2_ratio": 0.2}, False, (0.4, 0.2)),
+    ],
+)
+def test_denoise_explicit_ratio_mode_preserves_legacy_manual_values(fields, automatic, ratios):
+    invocation = DenoiseLatentsInvocation(hidiffusion=True, **fields)
+    assert invocation.hidiffusion_auto_ratios is automatic
+    assert (invocation.hidiffusion_t1_ratio, invocation.hidiffusion_t2_ratio) == ratios
+
+
+def test_denoise_rejects_invalid_resolved_ratios_before_loading_models():
+    invocation = DenoiseLatentsInvocation(hidiffusion=True, hidiffusion_auto_ratios=False)
+    # Graph copies and external callers may bypass assignment validation.
+    invocation = invocation.model_copy(update={"hidiffusion_t1_ratio": 0.1, "hidiffusion_t2_ratio": 0.2})
+    with pytest.raises(ValueError, match="T2 ratio must be less than or equal to the T1 ratio"):
+        invocation.invoke(None)
+
+
+def test_denoise_connected_ratios_validate_the_resolved_pair_instead_of_assignment_order():
+    invocation = DenoiseLatentsInvocation(hidiffusion=True, hidiffusion_auto_ratios=False)
+    invocation.hidiffusion_t2_ratio = 0.6
+    invocation.hidiffusion_t1_ratio = 0.8
+    assert invocation.validate_hidiffusion_ratio_order() is invocation
+    invocation.hidiffusion_t1_ratio = 0.2
+    with pytest.raises(ValueError, match="T2 ratio must be less than or equal to the T1 ratio"):
+        invocation.invoke(None)

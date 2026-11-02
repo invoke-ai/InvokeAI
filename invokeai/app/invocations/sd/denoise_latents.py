@@ -16,7 +16,7 @@ from diffusers.schedulers.scheduling_dpmsolver_singlestep import DPMSolverSingle
 from diffusers.schedulers.scheduling_tcd import TCDScheduler
 from diffusers.schedulers.scheduling_utils import SchedulerMixin as Scheduler
 from PIL import Image
-from pydantic import field_validator, model_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from torchvision.transforms.functional import resize as tv_resize
 from transformers import CLIPVisionModelWithProjection
 
@@ -146,7 +146,7 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.7.0",
+    version="1.8.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -222,15 +222,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
         description=FieldDescriptions.hidiffusion_window_attn,
         title="HiDiffusion: Window Attention",
     )
-    hidiffusion_t1_ratio: Optional[float] = InputField(
-        default=None,
+    hidiffusion_auto_ratios: bool = InputField(
+        default=False,
+        input=Input.Direct,
+        description=FieldDescriptions.hidiffusion_auto_ratios,
+        title="HiDiffusion: Automatic Ratios",
+    )
+    hidiffusion_t1_ratio: float = InputField(
+        default=0.4,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t1_ratio,
         title="HiDiffusion: T1 Ratio",
     )
-    hidiffusion_t2_ratio: Optional[float] = InputField(
-        default=None,
+    hidiffusion_t2_ratio: float = InputField(
+        default=0,
         ge=0,
         le=1,
         description=FieldDescriptions.hidiffusion_t2_ratio,
@@ -261,13 +267,26 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 raise ValueError("cfg_scale must be greater than 1")
         return v
 
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_legacy_hidiffusion_ratios(cls, values):
+        if not isinstance(values, dict):
+            return values
+        values = dict(values)
+        for name in ("hidiffusion_t1_ratio", "hidiffusion_t2_ratio"):
+            if name in values and values[name] is None:
+                values[name] = 0
+        return values
+
     @model_validator(mode="after")
-    def validate_hidiffusion_ratio_order(self):
+    def validate_hidiffusion_ratio_order(self, info: ValidationInfo | None = None):
+        # Connected inputs arrive one at a time; validate their final pair at invoke entry.
+        if info is not None and info.field_name is not None:
+            return self
         if (
             self.hidiffusion
             and self.hidiffusion_raunet
-            and self.hidiffusion_t1_ratio is not None
-            and self.hidiffusion_t2_ratio is not None
+            and not self.hidiffusion_auto_ratios
             and self.hidiffusion_t2_ratio > self.hidiffusion_t1_ratio
         ):
             raise ValueError("HiDiffusion T2 ratio must be less than or equal to the T1 ratio")
@@ -918,6 +937,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
         return seed, noise, latents
 
     def invoke(self, context: InvocationContext) -> LatentsOutput:
+        self.validate_hidiffusion_ratio_order()
         if os.environ.get("USE_MODULAR_DENOISE", False):
             return self._new_invoke(context)
         else:
@@ -985,8 +1005,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_window_attn=self.hidiffusion_window_attn,
                     has_controlnet=bool(self.control),
                     is_controlnet_text_to_image=bool(self.control) and self.latents is None,
-                    t1_ratio=self.hidiffusion_t1_ratio,
-                    t2_ratio=self.hidiffusion_t2_ratio,
+                    t1_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+                    t2_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
                     is_inpainting_task=self.denoise_mask is not None,
                     full_timestep_count=scheduler_init.full_timestep_count,
@@ -1236,8 +1256,8 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     apply_window_attn=self.hidiffusion_window_attn,
                     has_controlnet=bool(controlnet_data),
                     is_controlnet_text_to_image=bool(controlnet_data) and self.latents is None,
-                    t1_ratio=self.hidiffusion_t1_ratio,
-                    t2_ratio=self.hidiffusion_t2_ratio,
+                    t1_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t1_ratio,
+                    t2_ratio=None if self.hidiffusion_auto_ratios else self.hidiffusion_t2_ratio,
                     generator=torch.Generator(device="cpu").manual_seed(seed),
                     is_inpainting_task=self.denoise_mask is not None,
                     full_timestep_count=scheduler_init.full_timestep_count,

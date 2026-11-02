@@ -152,6 +152,7 @@ class FieldDescriptions:
     hidiffusion = "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising"
     hidiffusion_raunet = "Apply HiDiffusion RAU-Net blocks"
     hidiffusion_window_attn = "Apply HiDiffusion window attention blocks"
+    hidiffusion_auto_ratios = "Use model- and resolution-specific presets for both HiDiffusion ratios"
     hidiffusion_t1_ratio = (
         "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). "
         "At extreme resolutions this is the later of the two RAU-Net cutoffs."

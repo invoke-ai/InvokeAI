@@ -11,6 +11,7 @@ import {
   nodeAcceptsExtraInputs,
 } from './document';
 import { getLayeredPositions } from './graphLayout';
+import { isHiDiffusionNode, normalizeHiDiffusionInputs } from './hidiffusion';
 import { isInvocationNode } from './types';
 
 /** Use a structural preview shape so core does not import UI contracts. */
@@ -97,6 +98,13 @@ export const previewGraphToDocument = (
       }
     }
 
+    if (isHiDiffusionNode(node.data.type) && template.inputs.hidiffusion_auto_ratios) {
+      normalizeHiDiffusionInputs(
+        node.data.inputs,
+        Object.fromEntries(Object.entries(graphNode.inputs).map(([name, value]) => [name, { name, value }])),
+        new Set(graph.edges.filter((edge) => edge.targetNodeId === graphNode.id).map((edge) => edge.targetField))
+      );
+    }
     nodes.push(node);
   }
 

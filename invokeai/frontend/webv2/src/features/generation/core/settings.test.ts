@@ -62,6 +62,15 @@ describe('normalizeGenerateSettings', () => {
     ).toMatchObject({ hiDiffusionT1Ratio: ratio, hiDiffusionT2Ratio: ratio });
   });
 
+  it.each([
+    [null, 0.2, 0, 0.2],
+    [0.4, null, 0.4, 0],
+  ])('normalizes mixed ratios to one manual mode', (t1, t2, expectedT1, expectedT2) => {
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, hiDiffusionT1Ratio: t1, hiDiffusionT2Ratio: t2 })
+    ).toMatchObject({ hiDiffusionT1Ratio: expectedT1, hiDiffusionT2Ratio: expectedT2 });
+  });
+
   it('round-trips remembered manual ratios without changing automatic generation settings', () => {
     const saved = {
       ...legacyStoredValues,

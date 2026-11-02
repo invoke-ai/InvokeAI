@@ -282,16 +282,19 @@ const getHiDiffusionPatch = (
     ...(enabled !== null ? { hiDiffusionEnabled: enabled } : {}),
     ...(rauNetEnabled !== null ? { hiDiffusionRauNetEnabled: rauNetEnabled } : {}),
     ...(windowAttentionEnabled !== null ? { hiDiffusionWindowAttentionEnabled: windowAttentionEnabled } : {}),
-    ...(metadata.hidiffusion_t1_ratio === null || (metadata.hidiffusion_t1_ratio === undefined && enabled !== null)
-      ? { hiDiffusionT1Ratio: null }
-      : {}),
-    ...(metadata.hidiffusion_t2_ratio === null || (metadata.hidiffusion_t2_ratio === undefined && enabled !== null)
-      ? { hiDiffusionT2Ratio: null }
-      : {}),
-    ...(t1Ratio !== null && t1Ratio >= MIN_HIDIFFUSION_T1_RATIO && t1Ratio <= MAX_HIDIFFUSION_RATIO
-      ? { hiDiffusionT1Ratio: t1Ratio }
-      : {}),
-    ...(t2Ratio !== null && t2Ratio >= 0 && t2Ratio <= MAX_HIDIFFUSION_RATIO ? { hiDiffusionT2Ratio: t2Ratio } : {}),
+    ...(getBoolean(metadata, 'hidiffusion_auto_ratios') === true ||
+    (getBoolean(metadata, 'hidiffusion_auto_ratios') === null && t1Ratio === null && t2Ratio === null)
+      ? getBoolean(metadata, 'hidiffusion_auto_ratios') === true ||
+        enabled !== null ||
+        metadata.hidiffusion_t1_ratio === null ||
+        metadata.hidiffusion_t2_ratio === null
+        ? { hiDiffusionT1Ratio: null, hiDiffusionT2Ratio: null }
+        : {}
+      : {
+          hiDiffusionT1Ratio:
+            t1Ratio !== null && t1Ratio >= MIN_HIDIFFUSION_T1_RATIO && t1Ratio <= MAX_HIDIFFUSION_RATIO ? t1Ratio : 0,
+          hiDiffusionT2Ratio: t2Ratio !== null && t2Ratio >= 0 && t2Ratio <= MAX_HIDIFFUSION_RATIO ? t2Ratio : 0,
+        }),
   };
 };
 

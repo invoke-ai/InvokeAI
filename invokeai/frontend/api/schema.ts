@@ -12187,17 +12187,23 @@ export type components = {
              */
             hidiffusion_window_attn?: boolean;
             /**
+             * HiDiffusion: Automatic Ratios
+             * @description Use model- and resolution-specific presets for both HiDiffusion ratios
+             * @default false
+             */
+            hidiffusion_auto_ratios?: boolean;
+            /**
              * HiDiffusion: T1 Ratio
              * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
-             * @default null
+             * @default 0.4
              */
-            hidiffusion_t1_ratio?: number | null;
+            hidiffusion_t1_ratio?: number;
             /**
              * HiDiffusion: T2 Ratio
              * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
-             * @default null
+             * @default 0
              */
-            hidiffusion_t2_ratio?: number | null;
+            hidiffusion_t2_ratio?: number;
             /**
              * @description Latents tensor
              * @default null
@@ -12335,17 +12341,23 @@ export type components = {
              */
             hidiffusion_window_attn?: boolean;
             /**
+             * HiDiffusion: Automatic Ratios
+             * @description Use model- and resolution-specific presets for both HiDiffusion ratios
+             * @default false
+             */
+            hidiffusion_auto_ratios?: boolean;
+            /**
              * HiDiffusion: T1 Ratio
              * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
-             * @default null
+             * @default 0.4
              */
-            hidiffusion_t1_ratio?: number | null;
+            hidiffusion_t1_ratio?: number;
             /**
              * HiDiffusion: T2 Ratio
              * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
-             * @default null
+             * @default 0
              */
-            hidiffusion_t2_ratio?: number | null;
+            hidiffusion_t2_ratio?: number;
             /**
              * @description Latents tensor
              * @default null

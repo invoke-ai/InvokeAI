@@ -855,6 +855,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     return null;
   }
 
+  const manualHiDiffusion =
+    hasFiniteNumber(values, 'hiDiffusionT1Ratio') || hasFiniteNumber(values, 'hiDiffusionT2Ratio');
   const width = values.width as number;
   const height = values.height as number;
 
@@ -901,10 +903,10 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
           },
         }
       : {}),
-    hiDiffusionT1Ratio: !hasFiniteNumber(values, 'hiDiffusionT1Ratio')
+    hiDiffusionT1Ratio: !manualHiDiffusion
       ? null
-      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0.4),
-    hiDiffusionT2Ratio: !hasFiniteNumber(values, 'hiDiffusionT2Ratio')
+      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0),
+    hiDiffusionT2Ratio: !manualHiDiffusion
       ? null
       : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
     dynamicPromptsCombinatorial:
