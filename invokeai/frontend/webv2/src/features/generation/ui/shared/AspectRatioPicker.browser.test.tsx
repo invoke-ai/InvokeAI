@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop */
+import '@fontsource/inter/index.css';
 import type {
   AspectRatioPreset,
   AspectRatioPresetDraft,
@@ -33,6 +34,7 @@ afterEach(async () => {
   host?.remove();
   root = null;
   host = null;
+  await page.viewport(1280, 720);
 });
 
 const cinema: AspectRatioPreset = { height: 1, id: 'cinema', label: 'Cinema', width: 2.39 };
@@ -232,7 +234,8 @@ describe('AspectRatioPicker saved ratios', () => {
     await expect.element(page.getByText('Name a ratio you use often to pick it here at any size.')).toBeVisible();
   });
 
-  it('fits an 18-character name untruncated beside its ratio, size and visible actions', async () => {
+  it.each([1280, 320])('fits an 18-character name with its ratio, size and visible actions at %ipx', async (width) => {
+    await page.viewport(width, 720);
     // Current, so the name is bold: its widest form.
     await render({
       initial: [{ height: 1, id: 'insta', label: 'Instagram portrait', width: 2.39 }],
@@ -248,7 +251,21 @@ describe('AspectRatioPicker saved ratios', () => {
     await expect
       .poll(() => getComputedStyle(page.getByRole('button', { name: /^Delete ratio/ }).element()).opacity)
       .toBe('1');
+    await document.fonts.ready;
     expect(name.scrollWidth).toBeLessThanOrEqual(name.clientWidth);
+    const bounds = dialog()!.getBoundingClientRect();
+    expect(bounds.left).toBeGreaterThanOrEqual(0);
+    expect(bounds.right).toBeLessThanOrEqual(width);
+    for (const text of ['2.39:1', '1536×640']) {
+      const element = row.getByText(text, { exact: true }).element() as HTMLElement;
+      expect(element.scrollWidth).toBeLessThanOrEqual(element.clientWidth);
+      expect(element.getBoundingClientRect().right).toBeLessThanOrEqual(row.element().getBoundingClientRect().right);
+    }
+    for (const action of ['Edit', 'Delete']) {
+      const element = page.getByRole('button', { name: `${action} ratio Instagram portrait (2.39:1)` }).element();
+      expect(element.getBoundingClientRect().left).toBeGreaterThanOrEqual(row.element().getBoundingClientRect().right);
+      expect(element.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
+    }
   });
 
   it('adds a ratio prefilled from the current size, with Enter, and focuses its new row', async () => {

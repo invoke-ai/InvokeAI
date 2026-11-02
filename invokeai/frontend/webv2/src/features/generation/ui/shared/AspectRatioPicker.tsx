@@ -313,7 +313,7 @@ const PresetRow = ({
 
   return (
     <HStack css={PRESET_ROW_CSS} gap="0.5">
-      <Row active={isCurrent ? 'emphasized' : 'none'} asChild flex="1" gap="1.5" h="7" minW="0" px="1.5">
+      <Row active={isCurrent ? 'emphasized' : 'none'} asChild flex="1" gap="1.5" minH="10" minW="0" px="1.5" py="1">
         <button
           ref={registerFocusTarget}
           data-focus-key={`choose:${preset.id}`}
@@ -324,15 +324,19 @@ const PresetRow = ({
           onClick={onChoose}
         >
           <AspectRatioPreview boxSize="5" ratio={getAspectRatioPresetRatio(preset)} />
-          <ClippedText flex="1" fontSize="md" fontWeight={isCurrent ? '600' : undefined}>
-            {preset.label}
-          </ClippedText>
-          <Text as="span" color="fg.muted" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums">
-            {ratioText}
-          </Text>
-          <Text as="span" color="fg.subtle" flexShrink={0} fontSize="sm" fontVariantNumeric="tabular-nums">
-            {sizeText}
-          </Text>
+          <Stack as="span" flex="1" gap="0" minW="0" textAlign="start">
+            <ClippedText fontWeight={isCurrent ? '600' : undefined} textStyle="md">
+              {preset.label}
+            </ClippedText>
+            <HStack as="span" gap="1.5" fontVariantNumeric="tabular-nums" textStyle="sm">
+              <Text as="span" color="fg.muted" flexShrink={0}>
+                {ratioText}
+              </Text>
+              <Text as="span" color="fg.subtle" flexShrink={0}>
+                {sizeText}
+              </Text>
+            </HStack>
+          </Stack>
           <Icon as={CheckIcon} aria-hidden boxSize="3" color="accent.fg" flexShrink={0} opacity={isCurrent ? 1 : 0} />
         </button>
       </Row>
