@@ -22,7 +22,12 @@ import {
 } from './batch';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
 import { createWorkflowId, nodeAcceptsExtraInputs } from './document';
-import { getWorkflowFieldInvalidReason, isDirectInputField, isWorkflowCollectionItemValid } from './fields';
+import {
+  getHiDiffusionRatioOrderIssue,
+  getWorkflowFieldInvalidReason,
+  isDirectInputField,
+  isWorkflowCollectionItemValid,
+} from './fields';
 import {
   createForLoopValidationReason,
   ForLoopGraphValidationError,
@@ -30,7 +35,6 @@ import {
   validateForLoopGraph,
 } from './forLoops';
 import { getFormFieldTemplate } from './formFieldSettings';
-import { getHiDiffusionRatioOrderIssue } from './hidiffusion';
 import { createWorkflowIssue, type WorkflowIssueReason, type WorkflowReadinessReason } from './readinessIssues';
 import { isInvocationNode } from './types';
 import { hasAnyCycle } from './validation';

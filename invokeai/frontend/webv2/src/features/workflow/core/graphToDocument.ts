@@ -10,8 +10,8 @@ import {
   migrateMiniMaxH3NumFramesValue,
   nodeAcceptsExtraInputs,
 } from './document';
+import { isHiDiffusionNode, normalizeHiDiffusionInputs } from './fields';
 import { getLayeredPositions } from './graphLayout';
-import { isHiDiffusionNode, normalizeHiDiffusionInputs } from './hidiffusion';
 import { isInvocationNode } from './types';
 
 /** Use a structural preview shape so core does not import UI contracts. */

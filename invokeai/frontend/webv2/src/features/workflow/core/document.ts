@@ -33,7 +33,7 @@ import {
   type SavedWorkflowDynamicField,
 } from './callSavedWorkflow';
 import { getConnectorDeletionSpliceConnections } from './connectors';
-import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './hidiffusion';
+import { isHiDiffusionNode, isHiDiffusionRatioField, normalizeHiDiffusionInputs } from './fields';
 import { isInvocationNode, isNotesNode } from './types';
 
 const now = (): string => new Date().toISOString();

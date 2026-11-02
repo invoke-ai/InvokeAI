@@ -11,5 +11,3 @@ export * from './core/readinessIssues';
 export * from './core/validation';
 export * from './core/workflowJson';
 export * from './core/callSavedWorkflow';
-
-export * from './core/hidiffusion';
