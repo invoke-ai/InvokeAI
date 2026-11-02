@@ -48,7 +48,7 @@ afterEach(async () => {
 });
 
 it.each([1024, 1280])(
-  'moves the mounted Invoke group before projects using its Behavior setting at %ipx',
+  'positions Invoke using its Behavior setting and keeps presets centered at %ipx',
   async (width) => {
     await page.viewport(width, 300);
     accountLifecycle.activate('invoke-placement-test');
@@ -69,30 +69,38 @@ it.each([1024, 1280])(
         </ChakraProvider>
       );
     });
-    const group = host.querySelector<HTMLElement>('[data-invocation-side]')!;
+    const group = () => host.querySelector<HTMLElement>('[data-invocation-side]')!;
     const project = page.getByRole('button', { name: 'Project', exact: true }).element();
     const menu = page.getByRole('button', { name: 'Menu', exact: true }).element();
     const queue = page.getByRole('button', { name: 'Queue', exact: true }).element();
-    const input = host.querySelector('input[aria-label="Iterations"]')!;
+    const header = host.querySelector('header')!;
+    const presets = page.getByText('Presets', { exact: true }).element();
+    const expectCenteredPresets = () => {
+      const headerBounds = header.getBoundingClientRect();
+      const presetBounds = presets.getBoundingClientRect();
+      expect(presetBounds.left + presetBounds.width / 2).toBeCloseTo(headerBounds.left + headerBounds.width / 2, 1);
+    };
     const setting = page.getByRole('checkbox', { name: 'Show Invoke button on the left', exact: true });
     const settingLabel = page.getByText('Show Invoke button on the left', { exact: true });
     await expect.element(setting).not.toBeChecked();
-    expect(group.dataset.invocationSide).toBe('right');
-    expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
+    expect(group().dataset.invocationSide).toBe('right');
+    expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group().getBoundingClientRect().left);
+    expectCenteredPresets();
 
     await act(() => userEvent.click(settingLabel));
     await expect.element(setting).toBeChecked();
-    expect(group.dataset.invocationSide).toBe('left');
-    expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
-    expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(project.getBoundingClientRect().left);
-    expect(host.querySelector('input[aria-label="Iterations"]')).toBe(input);
-    expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
+    expect(group().dataset.invocationSide).toBe('left');
+    expect(menu.getBoundingClientRect().right).toBeLessThanOrEqual(group().getBoundingClientRect().left);
+    expect(group().getBoundingClientRect().right).toBeLessThanOrEqual(project.getBoundingClientRect().left);
+    expect(group().getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
+    expectCenteredPresets();
 
     await act(() => userEvent.click(settingLabel));
     await expect.element(setting).not.toBeChecked();
-    expect(group.dataset.invocationSide).toBe('right');
-    expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group.getBoundingClientRect().left);
-    expect(group.getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
+    expect(group().dataset.invocationSide).toBe('right');
+    expect(project.getBoundingClientRect().right).toBeLessThanOrEqual(group().getBoundingClientRect().left);
+    expect(group().getBoundingClientRect().right).toBeLessThanOrEqual(queue.getBoundingClientRect().left);
+    expectCenteredPresets();
   }
 );
 import type * as projectsApi from '@workbench/projects/api';

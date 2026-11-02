@@ -14,9 +14,9 @@ import { QueueCluster } from './QueueCluster';
 import { TopbarProgressRail } from './TopbarProgressRail';
 
 /**
- * Left-side Invoke controls precede the project switcher; the menu and queue stay at the outer edges.
+ * Equal side columns keep presets centered independently of Invoke placement and project-name width.
  */
-const TOPBAR_COLUMNS = 'auto auto minmax(0, 1fr) auto minmax(max-content, 1fr) auto';
+const TOPBAR_COLUMNS = 'minmax(0, 1fr) auto minmax(0, 1fr)';
 
 export const TopBar = () => {
   const showInvokeButtonOnLeft = useWorkbenchPreferenceSelector((preferences) => preferences.showInvokeButtonOnLeft);
@@ -38,28 +38,25 @@ export const TopBar = () => {
         px="1.5"
         w="full"
       >
-        <HStack gridColumn="1" gridRow="1">
+        <HStack gap="0.5" minW="0">
           <AppMenu />
-        </HStack>
-        <HStack gap="0.5" minW="0" maxW="min(22rem, 24vw)" gridColumn="3" gridRow="1" justifySelf="start">
+          {showInvokeButtonOnLeft ? (
+            <HStack data-invocation-side="left" flexShrink={0}>
+              <InvocationCluster />
+            </HStack>
+          ) : null}
           <ProjectSwitcher />
           <PaletteButton />
         </HStack>
 
-        <HStack gridColumn="4" gridRow="1" minW="0">
-          <LayoutPresetStrip />
-        </HStack>
+        <LayoutPresetStrip />
 
-        <HStack
-          data-invocation-side={showInvokeButtonOnLeft ? 'left' : 'right'}
-          gridColumn={showInvokeButtonOnLeft ? '2' : '5'}
-          gridRow="1"
-          justifySelf={showInvokeButtonOnLeft ? 'start' : 'end'}
-          minW="max-content"
-        >
-          <InvocationCluster />
-        </HStack>
-        <HStack gridColumn="6" gridRow="1">
+        <HStack gap="2" justify="end" minW="0">
+          {showInvokeButtonOnLeft ? null : (
+            <HStack data-invocation-side="right" flexShrink={0}>
+              <InvocationCluster />
+            </HStack>
+          )}
           <QueueCluster />
         </HStack>
 
