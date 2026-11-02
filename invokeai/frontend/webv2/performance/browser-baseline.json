@@ -3161,6 +3161,7 @@
       "source:src/workbench/widgets/layers/LayerStackMenu.tsx",
       "source:src/workbench/widgets/layers/LayerSurfaceHost.tsx",
       "source:src/workbench/widgets/layers/LayerThumbnail.tsx",
+      "source:src/workbench/widgets/layers/LayerTreeGuides.tsx",
       "source:src/workbench/widgets/layers/LayersHeaderActions.tsx",
       "source:src/workbench/widgets/layers/LayersPanelFooter.tsx",
       "source:src/workbench/widgets/layers/LayersTree.tsx",

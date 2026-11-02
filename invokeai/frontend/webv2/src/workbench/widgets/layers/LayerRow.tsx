@@ -29,13 +29,13 @@ import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
 import { anchorFromPoint } from './layerRowCommands';
 import { layerRowSummary } from './layerRowSummary';
-import { LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
+import { LAYER_LEADING_BOX_PX, LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
 import { LayerThumbnail, type LayerThumbnailEngine } from './LayerThumbnail';
 import { layerTypeIcon } from './layerTypeIcon';
 
 const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 
-const THUMBNAIL_SIZE = '8';
+const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
 const GROUP_PILE_CARD_PX = 24;
 

@@ -45,7 +45,7 @@ import { ADJUSTMENT_SPINNER_DELAY_MS } from './AdjustmentStatusIcon';
 import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSelection';
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
-import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX } from './layerPanelRows';
+import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX, LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { clearLayerPropertiesRequest, requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
@@ -588,19 +588,24 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(output('surface')).toBe('menu:top');
   });
 
-  it('frames the keyboard-focused row surface with its ring, not the gap below it', async () => {
+  it('frames the keyboard-focused row surface with its ring, not the gap below it or the guides beside it', async () => {
     await renderTree(nested());
-    treeitem('Top').focus();
+    await act(() => userEvent.click(treeitem('Group').querySelector('button[aria-label="Expand group"]')!));
+    treeitem('Group').focus();
     await act(() => userEvent.keyboard('{ArrowDown}'));
-    const row = treeitem('Group');
+    const row = treeitem('Inner');
     expect(document.activeElement).toBe(row);
 
-    const ring = getComputedStyle(row, '::after');
+    // The ring is the surface's own inset shadow, so it shares the selection fill's box: clear of the gap below the
+    // row and of the indent where the tree guides run.
+    const surface = row.querySelector<HTMLElement>('[data-layer-row-surface]')!;
+    expect(getComputedStyle(surface).boxShadow).toContain('inset');
+    expect(getComputedStyle(row).outlineStyle).toBe('none');
     const rowRect = row.getBoundingClientRect();
-    const surface = [...row.children].find((child) => child.textContent?.includes('Group'))!.getBoundingClientRect();
-    // The ring and the surface share their box, so the row's content sits centred inside the ring.
-    expect(rowRect.top + Number.parseFloat(ring.top)).toBeCloseTo(surface.top, 0);
-    expect(rowRect.bottom - Number.parseFloat(ring.bottom)).toBeCloseTo(surface.bottom, 0);
+    const surfaceRect = surface.getBoundingClientRect();
+    expect(surfaceRect.bottom).toBeLessThan(rowRect.bottom);
+    expect(surfaceRect.left - rowRect.left).toBe(LAYER_TREE_INDENT_PX);
+    expect(getComputedStyle(treeitem('Top').querySelector('[data-layer-row-surface]')!).boxShadow).toBe('none');
   });
 
   it('keeps the focused row mounted and focused while scrolled far away', async () => {
@@ -710,8 +715,105 @@ describe('LayersTree selection, surfaces and structure', () => {
     // Nesting indents the leading edge only.
     const thumbnailLeft = (id: string) =>
       host!.querySelector(`[data-layer-row-id="${id}"] [data-testid="thumbnail"]`)!.getBoundingClientRect().left;
-    expect(thumbnailLeft('deep') - thumbnailLeft('inner')).toBe(16);
-    expect(thumbnailLeft('inner') - thumbnailLeft('top')).toBe(16);
+    expect(thumbnailLeft('deep') - thumbnailLeft('inner')).toBe(LAYER_TREE_INDENT_PX);
+    expect(thumbnailLeft('inner') - thumbnailLeft('top')).toBe(LAYER_TREE_INDENT_PX);
+  });
+
+  it('joins tree guides from beneath each parent’s leading box into its children, beside their selection fill', async () => {
+    await renderTree([
+      groupContract(
+        'g',
+        [
+          layerContract('inner', 'raster', {
+            adjustments: [
+              { id: 'a1', isEnabled: true, saturation: 0.1, type: 'hsl' },
+              { id: 'a2', isEnabled: true, saturation: 0.2, type: 'hsl' },
+            ],
+            name: 'Inner',
+          }),
+          groupContract('h', [paint('deep', 'Deep')], { name: 'H' }),
+        ],
+        { name: 'G' }
+      ),
+      paint('bottom', 'Bottom'),
+    ]);
+    await act(() => userEvent.click(treeitem('G').querySelector('button[aria-label="Expand group"]')!));
+    await act(() => userEvent.click(treeitem('H').querySelector('button[aria-label="Expand group"]')!));
+    await act(() => userEvent.click(treeitem('Saturation')));
+    await settle();
+
+    const slot = (name: string) => treeitem(name).parentElement!.getBoundingClientRect();
+    const leading = (name: string) =>
+      treeitem(name).querySelector('[data-layer-row-surface]')!.firstElementChild!.getBoundingClientRect();
+    const surface = (name: string) => treeitem(name).querySelector('[data-layer-row-surface]')!.getBoundingClientRect();
+    const guides = (name: string, kind: 'line' | 'branch' | 'stem') =>
+      [...treeitem(name).parentElement!.querySelectorAll(`[data-tree-guide="${kind}"]`)].map((element) =>
+        element.getBoundingClientRect()
+      );
+    const centreX = (rect: DOMRect) => rect.left + rect.width / 2;
+    const centreY = (rect: DOMRect) => rect.top + rect.height / 2;
+
+    // The parent's stem drops from beneath its leading box, on its centre, to the row's end.
+    const [stem] = guides('G', 'stem');
+    expect(stem!.top).toBeGreaterThan(leading('G').bottom);
+    expect(stem!.bottom).toBe(slot('G').bottom);
+    expect(Math.abs(stem!.left - centreX(leading('G')))).toBeLessThanOrEqual(1);
+
+    // A middle child: the parent's line spans its whole row and joins the stem above, and the branch turns at the
+    // parent's centre into the child's own centre line, ending where the child's surface begins.
+    const [line] = guides('Inner', 'line');
+    expect(line!.top).toBe(stem!.bottom);
+    expect(line!.bottom).toBe(slot('Inner').bottom);
+    expect(line!.left).toBe(stem!.left);
+    const [branch] = guides('Inner', 'branch');
+    expect(branch!.left).toBe(line!.left);
+    expect(branch!.top).toBe(slot('Inner').top);
+    expect(Math.abs(branch!.bottom - centreY(leading('Inner')))).toBeLessThanOrEqual(1);
+    expect(branch!.right).toBe(surface('Inner').left);
+    expect(branch!.right).toBeLessThan(leading('Inner').left);
+
+    // Inner's adjustment rows (shorter rows) branch from Inner's own column while G's line passes beside them; the
+    // middle one continues Inner's line and the last one ends it, so nothing runs on into H.
+    const adjustments = [...host!.querySelectorAll<HTMLElement>('[role="treeitem"][aria-label="Saturation"]')];
+    expect(adjustments).toHaveLength(2);
+    const rowGuides = (row: HTMLElement, kind: 'line' | 'branch') =>
+      [...row.parentElement!.querySelectorAll(`[data-tree-guide="${kind}"]`)].map((element) =>
+        element.getBoundingClientRect()
+      );
+    const [middleLines, lastLines] = adjustments.map((row) => rowGuides(row, 'line'));
+    expect(middleLines!.map((rect) => rect.left)).toEqual([line!.left, line!.left + LAYER_TREE_INDENT_PX]);
+    expect(lastLines!.map((rect) => rect.left)).toEqual([line!.left]);
+    for (const [index, row] of adjustments.entries()) {
+      const rowSlot = row.parentElement!.getBoundingClientRect();
+      expect(rowSlot.height).toBeLessThan(slot('Inner').height);
+      for (const rect of rowGuides(row, 'line')) {
+        expect([rect.top, rect.bottom]).toEqual([rowSlot.top, rowSlot.bottom]);
+      }
+      const [rowBranch] = rowGuides(row, 'branch');
+      expect(Math.abs(rowBranch!.left - centreX(leading('Inner')))).toBeLessThanOrEqual(1);
+      expect(
+        Math.abs(
+          rowBranch!.bottom -
+            centreY(row.querySelector('[data-layer-row-surface]')!.firstElementChild!.getBoundingClientRect())
+        )
+      ).toBeLessThanOrEqual(1);
+      // The selected (first) row's fill starts right of its branch, which stays drawn beside it.
+      expect(row).toHaveAttribute('aria-selected', String(index === 0));
+      expect(rowBranch!.right).toBe(row.querySelector('[data-layer-row-surface]')!.getBoundingClientRect().left);
+    }
+
+    // The last child ends its parent's line in an elbow; an ended ancestor leaves its column empty.
+    expect(guides('H', 'line')).toHaveLength(0);
+    expect(guides('H', 'branch')[0]!.left).toBe(line!.left);
+    expect(guides('Deep', 'line')).toHaveLength(0);
+    expect(Math.abs(guides('Deep', 'branch')[0]!.left - centreX(leading('H')))).toBeLessThanOrEqual(1);
+    // Stack headers are headings: top-level rows draw nothing, and a parent's stem needs visible children.
+    expect(treeitem('Bottom').parentElement!.querySelector('[data-tree-guides]')).toBeNull();
+
+    // Purely decorative: hidden from assistive technology and transparent to the pointer.
+    const container = treeitem('Inner').parentElement!.querySelector<HTMLElement>('[data-tree-guides]')!;
+    expect(container).toHaveAttribute('aria-hidden', 'true');
+    expect(document.elementFromPoint(line!.left, centreY(line!))!.closest('[role="treeitem"]')).toBe(treeitem('Inner'));
   });
 
   it('puts the stack headers’ and child rows’ eyes in the layer rows’ eye column', async () => {
