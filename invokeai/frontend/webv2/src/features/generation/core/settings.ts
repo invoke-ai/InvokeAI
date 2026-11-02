@@ -146,21 +146,32 @@ export const DEFAULT_LORA_WEIGHT_CONFIG = {
 export const clampDimension = (value: number, grid = DIMENSION_GRID): number =>
   Math.min(MAX_DIMENSION, Math.max(MIN_DIMENSION, Math.round(value / grid) * grid));
 
-/** Fit a width/height of the given ratio into approximately the given pixel area, snapped to the grid. */
+/**
+ * Fit a width/height of the given ratio into approximately the given pixel area, snapped to the grid. At the dimension
+ * limits both sides scale together (the larger side down to the maximum, else the smaller up to the minimum), so only
+ * grid snapping moves the ratio.
+ */
 export const calculateNewSize = (
   ratio: number,
   area: number,
   grid = DIMENSION_GRID
 ): { width: number; height: number } => {
   const exactWidth = Math.sqrt(area * ratio);
+  const exactHeight = exactWidth / ratio;
+  const larger = Math.max(exactWidth, exactHeight);
+  const smaller = Math.min(exactWidth, exactHeight);
+  const scale = larger > MAX_DIMENSION ? MAX_DIMENSION / larger : smaller < MIN_DIMENSION ? MIN_DIMENSION / smaller : 1;
 
-  return { height: clampDimension(exactWidth / ratio, grid), width: clampDimension(exactWidth, grid) };
+  return { height: clampDimension(exactHeight * scale, grid), width: clampDimension(exactWidth * scale, grid) };
 };
 
 /** A preset ratio implies the lock; Free holds its ratio only while the lock is on. */
 export const isAspectRatioLocked = (
   settings: Pick<GenerateSettings, 'aspectRatioId' | 'aspectRatioIsLocked'>
 ): boolean => settings.aspectRatioId !== 'Free' || settings.aspectRatioIsLocked;
+
+/** How far apart two ratios may be and still count as the same one. */
+export const ASPECT_RATIO_TOLERANCE = 0.0001;
 
 /** Best-matching preset for existing dimensions, falling back to Free. */
 export const deriveAspectRatioId = (width: number, height: number): AspectRatioId => {
@@ -171,7 +182,7 @@ export const deriveAspectRatioId = (width: number, height: number): AspectRatioI
   const ratio = width / height;
 
   for (const [id, entry] of Object.entries(ASPECT_RATIO_MAP)) {
-    if (Math.abs(entry.ratio - ratio) < 0.0001) {
+    if (Math.abs(entry.ratio - ratio) < ASPECT_RATIO_TOLERANCE) {
       return id as AspectRatioId;
     }
   }

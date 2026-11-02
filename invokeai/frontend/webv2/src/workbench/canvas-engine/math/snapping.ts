@@ -38,46 +38,5 @@ export const snapRectToGrid = (rect: Rect, grid: number): Rect => {
   return { x, y, width: right - x, height: bottom - y };
 };
 
-/** The corner or center kept fixed when `constrainAspect` resizes a rect. */
-export type AspectAnchor = 'nw' | 'ne' | 'sw' | 'se' | 'center';
-
-/** Resizes to width/height aspect while keeping the named anchor fixed. */
-export const constrainAspect = (rect: Rect, aspect: number, anchor: AspectAnchor): Rect => {
-  if (aspect <= 0 || rect.width <= 0 || rect.height <= 0) {
-    return rect;
-  }
-
-  const currentAspect = rect.width / rect.height;
-  let width: number;
-  let height: number;
-
-  if (currentAspect > aspect) {
-    // Too wide for the target aspect: keep width, shrink/grow height to match.
-    width = rect.width;
-    height = width / aspect;
-  } else {
-    // Too tall (or exact): keep height, shrink/grow width to match.
-    height = rect.height;
-    width = height * aspect;
-  }
-
-  const left = rect.x;
-  const top = rect.y;
-  const right = rect.x + rect.width;
-  const bottom = rect.y + rect.height;
-  const centerX = rect.x + rect.width / 2;
-  const centerY = rect.y + rect.height / 2;
-
-  switch (anchor) {
-    case 'nw':
-      return { x: left, y: top, width, height };
-    case 'ne':
-      return { x: right - width, y: top, width, height };
-    case 'sw':
-      return { x: left, y: bottom - height, width, height };
-    case 'se':
-      return { x: right - width, y: bottom - height, width, height };
-    case 'center':
-      return { x: centerX - width / 2, y: centerY - height / 2, width, height };
-  }
-};
+/** The corner a corner-handle resize keeps fixed. */
+export type AspectAnchor = 'nw' | 'ne' | 'sw' | 'se';

@@ -2,16 +2,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  clampZoom,
-  constrainAspect,
-  snapMovedPoint,
-  snapRectToGrid,
-  snapToGrid,
-  ZOOM_MAX,
-  ZOOM_MIN,
-  ZOOM_PRESETS,
-} from './snapping';
+import { clampZoom, snapMovedPoint, snapRectToGrid, snapToGrid, ZOOM_MAX, ZOOM_MIN, ZOOM_PRESETS } from './snapping';
 
 describe('ZOOM_PRESETS', () => {
   it('exports the default candidates as a stable list', () => {
@@ -81,50 +72,5 @@ describe('snapRectToGrid', () => {
   it('is a no-op for a rect already aligned to the grid', () => {
     const r: Rect = { x: 16, y: 32, width: 64, height: 16 };
     expect(snapRectToGrid(r, 16)).toEqual(r);
-  });
-});
-
-describe('constrainAspect', () => {
-  const square: Rect = { x: 10, y: 10, width: 20, height: 20 };
-
-  it('keeps the nw corner fixed', () => {
-    const result = constrainAspect(square, 2, 'nw');
-    expect(result).toEqual({ x: 10, y: 10, width: 40, height: 20 });
-  });
-
-  it('keeps the ne corner fixed', () => {
-    const result = constrainAspect(square, 2, 'ne');
-    // right edge (30) stays fixed, width grows to 40, so x = 30 - 40 = -10
-    expect(result).toEqual({ x: -10, y: 10, width: 40, height: 20 });
-  });
-
-  it('keeps the sw corner fixed', () => {
-    const result = constrainAspect(square, 0.5, 'sw');
-    // Keep width 20 and bottom edge 30; aspect 0.5 requires height 40.
-    expect(result).toEqual({ x: 10, y: -10, width: 20, height: 40 });
-  });
-
-  it('keeps the se corner fixed', () => {
-    const result = constrainAspect(square, 2, 'se');
-    expect(result).toEqual({ x: -10, y: 10, width: 40, height: 20 });
-  });
-
-  it('keeps the center fixed', () => {
-    const result = constrainAspect(square, 2, 'center');
-    expect(result).toEqual({ x: 0, y: 10, width: 40, height: 20 });
-  });
-
-  it('is a no-op-ish passthrough for a non-positive aspect or empty rect', () => {
-    expect(constrainAspect(square, 0, 'nw')).toEqual(square);
-    expect(constrainAspect(square, -1, 'nw')).toEqual(square);
-    const empty: Rect = { x: 0, y: 0, width: 0, height: 10 };
-    expect(constrainAspect(empty, 2, 'nw')).toEqual(empty);
-  });
-
-  it('leaves an already-matching aspect rect unchanged in size', () => {
-    const wide: Rect = { x: 0, y: 0, width: 40, height: 20 };
-    const result = constrainAspect(wide, 2, 'center');
-    expect(result.width).toBeCloseTo(40, 8);
-    expect(result.height).toBeCloseTo(20, 8);
   });
 });

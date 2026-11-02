@@ -15,13 +15,16 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import type { CanvasRenderSizeProps } from './GenerationUiContext';
 
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 
-const harness = vi.hoisted(() => ({ invocationSourceId: 'generate' }));
+const harness = vi.hoisted(() => ({
+  aspectRatioPresets: [] as { height: number; id: string; label: string; width: number }[],
+  invocationSourceId: 'generate',
+}));
 
 vi.mock('./GenerationUiContext', () => ({
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
@@ -33,6 +36,13 @@ vi.mock('./GenerationUiContext', () => ({
         controls: <div data-testid="render-size-controls" />,
         size: { height: frame.height * 2, width: frame.width * 2 },
       }),
+    aspectRatioPresets: {
+      isFull: false,
+      presets: harness.aspectRatioPresets,
+      remove: vi.fn(),
+      save: vi.fn(),
+      update: vi.fn(),
+    },
     project: { invocationSourceId: harness.invocationSourceId },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
@@ -50,6 +60,8 @@ void i18n.use(initReactI18next).init({
         widgets: {
           generate: {
             aspectRatio: 'Aspect ratio',
+            aspectRatioFree: 'Free',
+            aspectRatioPresetOption: '{{name}}, {{ratio}}, {{size}}',
             height: 'Height',
             lockAspectRatio: 'Lock aspect ratio',
             megapixelsValue: '{{value}} MP',
@@ -59,6 +71,7 @@ void i18n.use(initReactI18next).init({
             resetSizeOptimalForCurrentRatio: 'Optimal size for current ratio',
             resetSizeOptimalForRatio: 'Optimal size for {{ratio}}',
             resetSizeSquareNative: 'Square at native size',
+            resetToModelDefault: 'Reset to model default',
             size: 'Size',
             sizePreviewHandle: 'Resize',
             swapWidthAndHeight: 'Swap width and height',
@@ -98,15 +111,17 @@ const render = async (settings: Partial<GenerateSettings>, model: GenerateModelC
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  const onCommit = vi.fn();
-  const onResetSize = vi.fn();
+  const draft = createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings });
+  // Commits and resets land in the draft, as the panel's draft would show them.
+  const onCommit = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
+  const onResetSize = vi.fn((patch: Partial<GenerateSettings>) => draft.patchSnapshot(patch));
 
   await settle(() => {
     root?.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <GenerateDimensionFields
-            draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
+            draft={draft}
             projectId="project"
             selectedModel={model}
             onCommit={onCommit}
@@ -125,7 +140,12 @@ const lockButton = () =>
     'button[aria-label="Lock aspect ratio"], button[aria-label="Unlock aspect ratio"]'
   ) ?? null;
 const bracket = () => host?.querySelector('[data-part="bracket"]')?.parentElement ?? null;
-const presetTrigger = () => host?.querySelector<HTMLButtonElement>('[role="combobox"]') ?? null;
+const ratioTrigger = () => page.getByRole('button', { name: /^Aspect ratio/ });
+const chooseRatio = async (name: string) => {
+  await userEvent.click(ratioTrigger());
+  // Built-ins are radios in the ratio grid; saved ratios are rows named "name, ratio, size".
+  await userEvent.click(page.getByRole(name.includes(',') ? 'button' : 'radio', { exact: true, name }));
+};
 
 const unmountAndReset = async () => {
   await settle(() => root?.unmount());
@@ -135,6 +155,7 @@ const unmountAndReset = async () => {
 };
 
 afterEach(async () => {
+  harness.aspectRatioPresets = [];
   harness.invocationSourceId = 'generate';
   await unmountAndReset();
 });
@@ -247,8 +268,7 @@ describe('GenerateDimensionFields aspect ratio', () => {
     expect(lockButton()?.getAttribute('aria-label')).toBe('Lock aspect ratio');
     expect(bracket()?.hasAttribute('data-locked')).toBe(false);
 
-    await settle(() => presetTrigger()?.click());
-    await settle(() => document.querySelector<HTMLElement>('[role="option"][data-value="16:9"]')?.click());
+    await chooseRatio('16:9');
 
     expect(onCommit).toHaveBeenCalledWith({
       aspectRatioId: '16:9',
@@ -269,7 +289,7 @@ describe('GenerateDimensionFields aspect ratio', () => {
       width: 1368,
     });
 
-    expect(presetTrigger()?.textContent).toContain('16:9');
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio 16:9');
     expect(lockButton()?.getAttribute('aria-label')).toBe('Unlock aspect ratio');
     expect(bracket()?.hasAttribute('data-locked')).toBe(true);
 
@@ -331,6 +351,67 @@ describe('GenerateDimensionFields aspect ratio', () => {
       width: 768,
     });
   });
+  it('keeps the pixel count when choosing a saved ratio and stores it as a locked Free ratio', async () => {
+    harness.aspectRatioPresets = [{ height: 1, id: 'cinema', label: 'Cinema', width: 2.39 }];
+    const { onCommit } = await render({ aspectRatioId: 'Free', aspectRatioIsLocked: false, height: 1024, width: 1024 });
+
+    // 1024² at 2.39:1 is 1583.1×662.4, snapped to 1584×664: the same pixel count, never the model's optimum.
+    await chooseRatio('Cinema, 2.39:1, 1584×664');
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 2.39,
+      height: 664,
+      width: 1584,
+    });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio Cinema 2.39:1');
+  });
+
+  it('stores a saved ratio equal to a built-in under the built-in id, still named by the saved ratio', async () => {
+    harness.aspectRatioPresets = [{ height: 9, id: 'wide', label: 'Wide', width: 16 }];
+    const { onCommit } = await render({ aspectRatioId: 'Free', aspectRatioIsLocked: false, height: 1024, width: 1024 });
+
+    await chooseRatio('Wide, 16:9, 1368×768');
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: '16:9',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 16 / 9,
+      height: 768,
+      width: 1368,
+    });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio Wide 16:9');
+  });
+
+  it('keeps a locked extreme ratio at the size limit, scaling both sides', async () => {
+    harness.aspectRatioPresets = [{ height: 1, id: 'banner', label: 'Banner', width: 7 }];
+    const { onCommit } = await render({ aspectRatioId: 'Free', aspectRatioIsLocked: false, height: 2048, width: 2048 });
+
+    // 2048² at 7:1 is 5418.6×774.1; scaled to fit 4096 wide it is 4096×585.1, snapped to 4096×584 (7.01:1).
+    await chooseRatio('Banner, 7:1, 4096×584');
+
+    expect(onCommit).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 7,
+      height: 584,
+      width: 4096,
+    });
+  });
+
+  it('swaps a saved ratio into the saved ratio that is its inverse', async () => {
+    harness.aspectRatioPresets = [
+      { height: 5, id: 'banner', label: 'Banner', width: 12 },
+      { height: 12, id: 'skyscraper', label: 'Skyscraper', width: 5 },
+    ];
+    await render({ aspectRatioId: 'Free', aspectRatioIsLocked: true, aspectRatioValue: 2.4, height: 640, width: 1536 });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio Banner 12:5');
+
+    await settle(() => host?.querySelector<HTMLButtonElement>('button[aria-label="Swap width and height"]')?.click());
+
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio Skyscraper 5:12');
+  });
 });
 
 describe('GenerateDimensionFields Reset size', () => {
@@ -368,9 +449,10 @@ describe('GenerateDimensionFields Reset size', () => {
     await openMenu();
 
     // SD 1.5 is native at 512 on an 8px grid: 512² reshaped to 2:3 is 418×627, snapped to 416×624.
+    // The optimal size for the ratio comes first, as the choice most reached for; this model sets no size of its own.
     expect(menuItems().map((item) => item.textContent)).toEqual([
-      'Square at native size512×512',
       'Optimal size for 2:3416×624',
+      'Square at native size512×512',
     ]);
 
     await choose('Square at native size');
@@ -402,24 +484,39 @@ describe('GenerateDimensionFields Reset size', () => {
     expect(onResetSize).toHaveBeenCalledExactlyOnceWith({ height: 360, width: 728 });
   });
 
-  it('names a locked free ratio in the app locale', async () => {
+  it('names a locked free ratio by small whole terms, else by decimals in the app locale', async () => {
+    await render({ aspectRatioId: 'Free', aspectRatioIsLocked: true, aspectRatioValue: 2.5, height: 400, width: 1000 });
+    await openMenu();
+    // 512² at 5:2 is 809.5×323.8, snapped to 808×320.
+    expect(menuItem('Optimal size for 5:2')?.textContent).toBe('Optimal size for 5:2808×320');
+    await unmountAndReset();
+
     i18n.addResourceBundle('de', 'translation', i18n.getResourceBundle('en', 'translation'));
     await i18n.changeLanguage('de');
     try {
       await render({
         aspectRatioId: 'Free',
         aspectRatioIsLocked: true,
-        aspectRatioValue: 2.5,
+        aspectRatioValue: 2.39,
         height: 400,
-        width: 1000,
+        width: 960,
       });
       await openMenu();
 
-      // 512² at 5:2 is 809.5×323.8, snapped to 808×320.
-      expect(menuItem('Optimal size for 2,5:1')?.textContent).toBe('Optimal size for 2,5:1808×320');
+      // 512² at 2.39:1 is 791.5×331.2, snapped to 792×328.
+      expect(menuItem('Optimal size for 2,39:1')?.textContent).toBe('Optimal size for 2,39:1792×328');
     } finally {
       await i18n.changeLanguage('en');
     }
+  });
+
+  it('names a locked ratio by the saved ratio it matches', async () => {
+    harness.aspectRatioPresets = [{ height: 5, id: 'banner', label: 'Banner', width: 12 }];
+    await render({ aspectRatioId: 'Free', aspectRatioIsLocked: true, aspectRatioValue: 2.4, height: 640, width: 1536 });
+    await openMenu();
+
+    // 512² at 12:5 is 793.3×330.5, snapped to 792×328.
+    expect(menuItem('Optimal size for Banner')?.textContent).toBe('Optimal size for Banner792×328');
   });
 
   it('checks the applied choice, keeps it reachable, and drops an optimal size that is the native square', async () => {
@@ -478,7 +575,94 @@ describe('GenerateDimensionFields Reset size', () => {
 
     await choose('Model defaults');
 
-    expect(onResetSize).toHaveBeenCalledExactlyOnceWith({ height: 768, width: 640 });
+    // An unlocked ratio stays unlocked, at the default size's ratio.
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
+      aspectRatioValue: 640 / 768,
+      height: 768,
+      width: 640,
+    });
+  });
+
+  const squareModel: MainModelConfig = { ...sd1Model, default_settings: { height: 1024, width: 1024 } };
+  const widescreen = {
+    aspectRatioId: '16:9',
+    aspectRatioIsLocked: true,
+    aspectRatioValue: 16 / 9,
+    height: 768,
+    width: 1368,
+  } as const;
+
+  it('locks a square model default at 1:1 when a non-square ratio was locked', async () => {
+    const { onResetSize } = await render(widescreen, squareModel);
+    await openMenu();
+
+    await choose('Model defaults');
+
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: '1:1',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 1,
+      height: 1024,
+      width: 1024,
+    });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio 1:1');
+    expect(lockButton()?.getAttribute('aria-label')).toBe('Unlock aspect ratio');
+    expect(host?.textContent).toContain('1024×1024');
+  });
+
+  it('leaves the ratio unlocked when resetting an unlocked size to a square model default', async () => {
+    const { onResetSize } = await render(
+      { aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: 16 / 9, height: 768, width: 1368 },
+      squareModel
+    );
+    await openMenu();
+
+    await choose('Model defaults');
+
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: false,
+      aspectRatioValue: 1,
+      height: 1024,
+      width: 1024,
+    });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio Free');
+    expect(lockButton()?.getAttribute('aria-label')).toBe('Lock aspect ratio');
+  });
+
+  it('locks the default size ratio from the size field Reset to model default', async () => {
+    const portraitModel: MainModelConfig = { ...sd1Model, default_settings: { height: 768, width: 640 } };
+    const { onResetSize } = await render(widescreen, portraitModel);
+
+    await userEvent.click(page.getByRole('slider', { name: 'Width' }), { button: 'right' });
+    await userEvent.click(page.getByRole('menuitem', { name: 'Reset to model default' }));
+
+    // 640×768 is 5:6, no built-in: a locked Free ratio.
+    expect(onResetSize).toHaveBeenCalledExactlyOnceWith({
+      aspectRatioId: 'Free',
+      aspectRatioIsLocked: true,
+      aspectRatioValue: 640 / 768,
+      height: 768,
+      width: 640,
+    });
+    await expect.element(ratioTrigger()).toHaveAccessibleName('Aspect ratio 5:6');
+  });
+
+  it('orders the optimal size first, then the model defaults, then the native square', async () => {
+    const sizedModel: MainModelConfig = { ...sd1Model, default_settings: { height: 768, width: 640 } };
+    await render(
+      { aspectRatioId: '2:3', aspectRatioIsLocked: true, aspectRatioValue: 2 / 3, height: 768, width: 512 },
+      sizedModel
+    );
+    await openMenu();
+
+    expect(menuItems().map((item) => item.textContent)).toEqual([
+      'Optimal size for 2:3416×624',
+      'Model defaults640×768',
+      'Square at native size512×512',
+    ]);
   });
 
   it('opens from the keyboard and applies the highlighted choice', async () => {
@@ -493,11 +677,23 @@ describe('GenerateDimensionFields Reset size', () => {
     resetSizeButton()?.focus();
     await userEvent.keyboard('{Enter}');
     await vi.waitFor(() => expect(document.activeElement?.getAttribute('role')).toBe('menu'));
-    await userEvent.keyboard('{ArrowDown}');
-    await userEvent.keyboard('{ArrowDown}');
+    // Arrows down to the native square by its name, wherever the menu lists it.
+    const square = menuItem('Square at native size');
+    for (let step = 0; step < menuItems().length && !square?.hasAttribute('data-highlighted'); step += 1) {
+      await userEvent.keyboard('{ArrowDown}');
+    }
+    expect(square?.hasAttribute('data-highlighted')).toBe(true);
     await userEvent.keyboard('{Enter}');
 
-    await vi.waitFor(() => expect(onResetSize).toHaveBeenCalledExactlyOnceWith({ height: 624, width: 416 }));
+    await vi.waitFor(() =>
+      expect(onResetSize).toHaveBeenCalledExactlyOnceWith({
+        aspectRatioId: '1:1',
+        aspectRatioIsLocked: true,
+        aspectRatioValue: 1,
+        height: 512,
+        width: 512,
+      })
+    );
   });
 
   it('has no footer optimal-size button', async () => {
