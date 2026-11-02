@@ -841,7 +841,8 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
     both branches carry the same deeper axes. Each `Collect.item` closes its innermost axis and keeps the outer axes;
     this identity is followed through chained `Collect`s and ordinary passthrough nodes. Separate branch Collect chains
     may retain the same axis identities and frames; sharing a Collect node is not required. Matching lengths alone do
-    not establish alignment. An asymmetric or distinct-axis Collect chain is rejected before invocation. A downstream
+    not establish alignment. An asymmetric or distinct-axis Collect chain, including the cases covered by seeds 157
+    and 795, is rejected before invocation. A downstream
     `Collect` retains empty outer groups. A `For.output_collection` passed through zero or more literal-`True` `If`
     nodes into `Collect.item` keeps the `For`'s parent frame for every chain length; the `For` final closes only its
     own axis. When a wired Boolean condition resolves per parent frame to select a `For.output_collection`, its `If`
@@ -853,9 +854,12 @@ Run `C` -> `D:0` -> enqueue `D`. Run `D` -> done.
   Validation and frame inference use graph topology and statically known conditions only; they do not depend on
   unresolved runtime branch selections.
 - A completed `Collect` on a branch closes its item axis; the `If` does not wait for an `Iterate` that only that
-  `Collect` consumes. When the `Collect` keeps an outer frame open and is selected, the `If` runs once per preserved
-  group; when it is rejected, it never runs and the `If` runs in the frames of its remaining iterators. A `Collect` of a
-  `For` final output groups in the `For`'s parent frame, so it keeps that frame open.
+  `Collect` consumes. Runtime groups after the `If` follow the selected output's frame provenance: a selected `Collect`
+  keeps its preserved outer groups, while a `Collect` or `For` on the unselected branch contributes no groups. Numeric
+  iteration indexes alone do not align unrelated sources. A selected `For` final output keeps its parent frame grouped
+  when the condition establishes that frame, including through `Collect`; selecting the other branch does not retain
+  those parent groups. This runtime behavior is separate from static graph validation and admissibility. A `Collect` of
+  a `For` final output groups in the `For`'s parent frame, so it keeps that frame open.
 - A `For` whose loop body belongs to an `If` branch (its body feeds the `ForReturn`, which reaches the `For` only
   through the loop linkage) is gated with that branch: for a frame that rejects the branch, neither the `For` nor its
   body runs. A gated `For` brings in a `For` nested in its body together with that body. Two `For`s stay ungated. A
@@ -926,8 +930,9 @@ In normal execution, all runtime expansion occurs in `execution_graph` with trac
   private planner closes empty streams for the exact fresh source/Iterate/body/Collect, exact two- or three-stream
   fan-in, and exact two-branch body-mediated fan-in shapes; broader body-mediated fan-in, four or more streams, and
   other fallback shapes retain materializer compatibility ownership.
-- Collectors wait for available direct Iterate streams to close, then aggregate their ledger values in stream order and
-  may also merge incoming `collection` inputs during runtime hydration. A missing ledger remains a legacy snapshot
+- Collectors wait for available direct Iterate streams to close, then aggregate their ledger values in stream order;
+  order across sources is unspecified, and repeated values are preserved. They may also merge incoming `collection`
+  inputs during runtime hydration. A missing ledger remains a legacy snapshot
   fallback; stale legacy Iterate result mirrors do not override durable effects. Collectors nested under iterators
   preserve enclosing iteration paths, so downstream consumers materialize per enclosing iteration instead of receiving
   a mixed collection from unrelated outer iterations.

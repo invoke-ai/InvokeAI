@@ -1,6 +1,7 @@
 """Compatibility materialization for graph execution state."""
 
 import itertools
+from collections import deque
 from typing import TYPE_CHECKING, Any, Iterable, Optional
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation
@@ -1234,36 +1235,116 @@ class _ExecutionNodeBuilder:
                 return
         self._state._enqueue_if_ready(exec_node_id)
 
-    def _get_collect_iteration_group_key(self, edge: Edge, sibling_depth: Optional[int] = None) -> tuple[int, ...]:
-        path = self._state._get_iteration_path(edge.source.node_id)
-        source_node_id = self._state.prepared_source_mapping.get(edge.source.node_id, edge.source.node_id)
-        source_node = self._state.graph.get_node(source_node_id)
+    def _get_collect_group_axes(self, edge: Edge) -> tuple[str, ...]:
+        source_node = self._state.graph.get_node(edge.source.node_id)
+        prepared_ids = self._get_ordered_prepared_nodes_for_edge(edge)
+        if not prepared_ids:
+            return self._get_static_collect_group_axes(edge)
+
+        prepared_id = prepared_ids[0]
+        axes = self._get_prepared_edge_iteration_axes(edge, prepared_id)
+        if edge.destination.field != ITEM_FIELD:
+            return axes
         if (
             isinstance(source_node, ForInvocation)
             and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
         ):
-            return self._state._get_for_parent_iteration_path(edge.source.node_id)
+            return axes
+        if isinstance(source_node, IfInvocation):
+            ancestry = self._get_iterator_ancestry(self.iterator_graph())
+            retained_axes = self._get_selected_for_final_parent_axes(source_node.id, ancestry)
+            if retained_axes and self._collect_has_selected_for_final_input(edge.destination.node_id):
+                prepared_retained_axes = self._get_selected_for_final_parent_axes(source_node.id, ancestry, prepared_id)
+                if prepared_retained_axes:
+                    return prepared_retained_axes
+                return tuple(axis for axis in axes if axis in retained_axes)
+            if not self._state.graph._get_input_edges(source_node.id, "condition"):
+                selected_field = graph_if_runtime._get_static_if_selection(self._state, source_node.id)
+                if selected_field is not None:
+                    branch_axes, _ = graph_if_runtime._get_if_static_frame_analysis(
+                        self._state, ancestry, source_node.id
+                    )
+                    other_field = "false_input" if selected_field == "true_input" else "true_input"
+                    selected_axes = branch_axes[selected_field]
+                    reopened_axes = set().union(
+                        *(
+                            graph_if_runtime._get_reopened_source_axes(
+                                self._state, ancestry, selected_axis, ancestry.frame_axes_cache
+                            )
+                            for selected_axis in selected_axes
+                        )
+                    )
+                    if branch_axes[selected_field] and set(branch_axes[other_field]).intersection(reopened_axes):
+                        return axes
+        return axes[:-1]
+
+    def _get_static_collect_group_axes(self, edge: Edge) -> tuple[str, ...]:
+        iterator_node_ids = self._get_collect_source_iterator_ids(edge.source.node_id)
+        group_depth = len(iterator_node_ids)
+        source_node = self._state.graph.get_node(edge.source.node_id)
         if edge.destination.field == ITEM_FIELD:
+            if (
+                isinstance(source_node, ForInvocation)
+                and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
+            ):
+                return tuple(iterator_node_ids)
             if isinstance(source_node, IfInvocation):
-                selected_field = (
-                    graph_if_runtime._get_static_if_selection(self._state, source_node_id)
-                    if not self._state.graph._get_input_edges(source_node_id, "condition")
-                    else None
-                )
                 ancestry = self._get_iterator_ancestry(self.iterator_graph())
-                if (
-                    selected_field is not None
-                    and graph_if_runtime._get_if_static_frame_analysis(self._state, ancestry, source_node_id)[1][
-                        selected_field
-                    ]
+                retained_axes = self._get_selected_for_final_parent_axes(source_node.id, ancestry)
+                if retained_axes and self._collect_has_selected_for_final_input(edge.destination.node_id):
+                    return retained_axes
+            group_depth = max(group_depth - 1, 0)
+        return tuple(iterator_node_ids[:group_depth])
+
+    def _get_prepared_edge_iteration_axes(self, edge: Edge, prepared_id: str) -> tuple[str, ...]:
+        """Identify frame axes from the prepared node's real execution ancestors."""
+        path = self._get_prepared_edge_iteration_path(edge, prepared_id)
+        if not path:
+            return ()
+
+        execution_graph = self._state._get_execution_graph_flat()
+        pending = deque([(prepared_id, 0)])
+        visited = {prepared_id}
+        candidates: dict[int, list[tuple[int, str]]] = {}
+        while pending:
+            exec_id, distance = pending.popleft()
+            source_id = self._state.prepared_source_mapping.get(exec_id)
+            if source_id is not None:
+                source_node = self._state.graph.get_node(source_id)
+                prepared_node = self._state.execution_graph.get_node(exec_id)
+                if isinstance(source_node, IterateInvocation) or (
+                    isinstance(source_node, ForInvocation)
+                    and isinstance(prepared_node, ForInvocation)
+                    and prepared_node.index >= 0
                 ):
-                    return path
-            if isinstance(source_node, ForInvocation) and source_node.index == -1:
-                return path
-            # Ragged siblings need the deepest path to identify their shared outer group.
-            depth = len(path) if sibling_depth is None else sibling_depth
-            return path[: max(depth - 1, 0)]
-        return path
+                    frame_path = self._state._get_iteration_path(exec_id)
+                    if frame_path and len(frame_path) <= len(path) and path[: len(frame_path)] == frame_path:
+                        candidates.setdefault(len(frame_path) - 1, []).append((distance, source_id))
+            for parent_id in execution_graph.predecessors(exec_id):
+                if parent_id not in visited:
+                    visited.add(parent_id)
+                    pending.append((parent_id, distance + 1))
+
+        static_axes = self._get_collect_source_iterator_ids(edge.source.node_id)
+        axes: list[str] = []
+        for axis_index in range(len(path)):
+            axis_candidates = candidates.get(axis_index, [])
+            preferred_axis = next(
+                (axis_id for axis_id in static_axes if any(candidate == axis_id for _, candidate in axis_candidates)),
+                None,
+            )
+            axis_id = preferred_axis or (min(axis_candidates)[1] if axis_candidates else None)
+            axes.append(
+                axis_id
+                or (static_axes[axis_index] if len(static_axes) >= len(path) else f"{edge.source.node_id}:{axis_index}")
+            )
+        return tuple(axes)
+
+    def _get_collect_iteration_group_key(
+        self, edge: Edge, prepared_id: str, group_axes: tuple[str, ...]
+    ) -> tuple[tuple[str, ...], tuple[int, ...]]:
+        path = self._get_prepared_edge_iteration_path(edge, prepared_id)
+        return group_axes, path[: len(group_axes)]
 
     def _get_collect_source_iterator_ids(
         self, source_node_id: str, iterator_graph: Optional["nx.DiGraph"] = None
@@ -1282,7 +1363,16 @@ class _ExecutionNodeBuilder:
             if branch_axes[0] and branch_axes[0] == branch_axes[1] and set(branch_axes[0]) > condition_axes:
                 return list(branch_axes[0])
 
+        iterator_graph = iterator_graph or self.iterator_graph()
+        iterator_ancestry = self._get_iterator_ancestry(iterator_graph)
         iterator_node_ids = self.get_node_iterators(source_node_id, iterator_graph)
+        parent_frame_axes = [
+            axis_id
+            for iterator_node_id in iterator_node_ids
+            for edge in self._state.graph._get_input_edges(iterator_node_id, COLLECTION_FIELD)
+            for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
+        ]
+        iterator_node_ids = list(dict.fromkeys([*parent_frame_axes, *iterator_node_ids]))
         if isinstance(self._state.graph.get_node(source_node_id), IterateInvocation):
             iterator_node_ids.append(source_node_id)
         return iterator_node_ids
@@ -1358,75 +1448,98 @@ class _ExecutionNodeBuilder:
             for edge in self._state.graph._get_input_edges(collect_id, ITEM_FIELD)
         )
 
-    def _get_selected_for_final_parent_axes(self, if_node_id: str, ancestry: _IteratorAncestry) -> set[str]:
+    def _get_selected_if_fields(self, if_node_id: str, prepared_id: Optional[str] = None) -> tuple[str, ...]:
+        if prepared_id is not None:
+            selected_field = self._state._resolved_if_exec_branches.get(prepared_id)
+            if selected_field is not None:
+                return (selected_field,)
+        selected_field = graph_if_runtime._get_static_if_selection(self._state, if_node_id)
+        if selected_field is not None:
+            return (selected_field,)
+        prepared_ids = self._state.source_prepared_mapping.get(if_node_id, ())
+        selected_fields = {self._state._resolved_if_exec_branches.get(prepared_id) for prepared_id in prepared_ids}
+        selected_fields.discard(None)
+        if not selected_fields or any(
+            prepared_id not in self._state._resolved_if_exec_branches for prepared_id in prepared_ids
+        ):
+            return ("true_input", "false_input")
+        return tuple(field for field in ("true_input", "false_input") if field in selected_fields)
+
+    def _get_selected_for_final_parent_axes(
+        self, if_node_id: str, ancestry: _IteratorAncestry, prepared_id: Optional[str] = None
+    ) -> tuple[str, ...]:
         """Return For-final parent frames retained by this If's selection and condition scope."""
         if not isinstance(self._state.graph.get_node(if_node_id), IfInvocation):
-            return set()
-        root_selection = graph_if_runtime._get_static_if_selection(self._state, if_node_id)
-        selected_fields = (root_selection,) if root_selection is not None else ("true_input", "false_input")
+            return ()
+        root_selection = (
+            graph_if_runtime._get_static_if_selection(self._state, if_node_id)
+            if not self._state.graph._get_input_edges(if_node_id, "condition")
+            else None
+        )
+        selected_fields = self._get_selected_if_fields(if_node_id, prepared_id)
         condition_axes = {
             axis_id
             for edge in self._state.graph._get_input_edges(if_node_id, "condition")
             for axis_id in ancestry.get_frame_axes_for_edge(edge)
         }
         pending_edges = [
-            edge
+            (edge, False)
             for branch_field in selected_fields
             for edge in self._state.graph._get_input_edges(if_node_id, branch_field)
         ]
-        visited: set[str] = set()
-        retained_axes: set[str] = set()
+        visited: set[tuple[str, bool]] = set()
+        retained_axes: list[str] = []
         while pending_edges:
-            edge = pending_edges.pop()
+            edge, nested_condition = pending_edges.pop()
             source_id = edge.source.node_id
             source_node = self._state.graph.get_node(source_id)
             if (
                 isinstance(source_node, ForInvocation)
                 and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
             ):
-                final_parent_axes = set(ancestry.get_frame_axes_for_edge(edge))
-                retained_axes.update(
-                    final_parent_axes if root_selection is not None else final_parent_axes & condition_axes
-                )
+                if prepared_id is not None:
+                    prepared_path = self._state._get_iteration_path(prepared_id)
+                    final_output_paths = {
+                        self._get_prepared_edge_iteration_path(edge, final_id)
+                        for final_id in self._get_ordered_prepared_nodes_for_edge(edge)
+                    }
+                    if prepared_path not in final_output_paths:
+                        continue
+                final_parent_axes = ancestry.get_frame_axes_for_edge(edge)
+                for axis_id in final_parent_axes:
+                    if (
+                        root_selection is not None or nested_condition or axis_id in condition_axes
+                    ) and axis_id not in retained_axes:
+                        retained_axes.append(axis_id)
                 continue
-            if source_id in visited:
+            visit_key = (source_id, nested_condition)
+            if visit_key in visited:
                 continue
-            visited.add(source_id)
+            visited.add(visit_key)
             if isinstance(source_node, IfInvocation):
-                nested_selection = graph_if_runtime._get_static_if_selection(self._state, source_id)
-                nested_fields = (nested_selection,) if nested_selection is not None else ("true_input", "false_input")
+                nested_fields = self._get_selected_if_fields(source_id)
                 pending_edges.extend(
-                    edge
+                    (edge, nested_condition or bool(self._state.graph._get_input_edges(source_id, "condition")))
                     for branch_field in nested_fields
                     for edge in self._state.graph._get_input_edges(source_id, branch_field)
                 )
                 continue
             if isinstance(source_node, (ForInvocation, IterateInvocation, CollectInvocation)):
                 continue
-            pending_edges.extend(self._state.graph._get_input_edges(source_id))
-        return retained_axes
+            pending_edges.extend(
+                (input_edge, nested_condition) for input_edge in self._state.graph._get_input_edges(source_id)
+            )
+        return tuple(retained_axes)
 
-    def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[int, ...]]:
+    def _get_collect_candidate_group_keys(self, edge: Edge) -> set[tuple[tuple[str, ...], tuple[int, ...]]]:
         source_node_id = edge.source.node_id
         iterator_node_ids = self._get_collect_source_iterator_ids(source_node_id)
+        group_axes = self._get_collect_group_axes(edge)
+        group_depth = len(group_axes)
+        if group_depth == 0:
+            return {((), ())}
 
-        group_depth = len(iterator_node_ids)
-        if edge.destination.field == ITEM_FIELD:
-            source_node = self._state.graph.get_node(source_node_id)
-            if isinstance(source_node, IfInvocation):
-                ancestry = self._get_iterator_ancestry(self.iterator_graph())
-                retained_axes = self._get_selected_for_final_parent_axes(source_node.id, ancestry)
-            else:
-                retained_axes = set()
-            if retained_axes and self._collect_has_selected_for_final_input(edge.destination.node_id):
-                group_depth = max(
-                    (index + 1 for index, axis_id in enumerate(iterator_node_ids) if axis_id in retained_axes),
-                    default=0,
-                )
-            else:
-                group_depth = max(group_depth - 1, 0)
-
-        group_keys: set[tuple[int, ...]] = set()
+        group_keys: set[tuple[tuple[str, ...], tuple[int, ...]]] = set()
         # A Collect.item edge groups by the outer `group_depth` axes. Read input paths from the current item axis
         # too: an empty stream still carries its parent groups even when it has no prepared items.
         for axis_index, iterator_node_id in enumerate(iterator_node_ids[: group_depth + 1]):
@@ -1434,75 +1547,78 @@ class _ExecutionNodeBuilder:
             # Only outer group axes contribute prepared paths; the current item axis is collapsed by Collect.
             if axis_index < group_depth and prepared_nodes:
                 group_keys.update(
-                    iteration_path[:group_depth]
+                    (group_axes, iteration_path[:group_depth])
                     for prepared_id in prepared_nodes
                     if len(iteration_path := self._state._get_iteration_path(prepared_id)) >= group_depth
                 )
-            group_keys.update(self._get_iterator_input_iteration_paths(iterator_node_id))
+            group_keys.update(
+                (group_axes, input_path[:group_depth])
+                for input_path in self._get_iterator_input_iteration_paths(iterator_node_id)
+                if len(input_path) >= group_depth
+            )
 
-        if group_keys:
-            return group_keys
-        if group_depth == 0:
-            return {()}
-        return set()
+        return group_keys
 
     def _get_collect_iteration_mapping_groups(
         self, input_edges: list[Edge]
     ) -> list[tuple[tuple[int, ...], list[tuple[str, str]]]]:
-        prepared_inputs: list[tuple[Edge, str, str, tuple[int, ...]]] = []
-        group_keys: set[tuple[int, ...]] = set()
+        prepared_inputs: list[tuple[Edge, str, str, tuple[str, ...], tuple[int, ...]]] = []
+        group_keys: set[tuple[tuple[str, ...], tuple[int, ...]]] = set()
         for edge in input_edges:
+            group_axes = self._get_collect_group_axes(edge)
             group_keys.update(self._get_collect_candidate_group_keys(edge))
-            prepared_nodes = self._get_ordered_prepared_nodes_for_edge(edge)
-            sibling_depth = max(
-                (len(self._get_prepared_edge_iteration_path(edge, prepared_id)) for prepared_id in prepared_nodes),
-                default=0,
-            )
-            for prepared_id in prepared_nodes:
-                prepared_edge = Edge(
-                    source=EdgeConnection(node_id=prepared_id, field=edge.source.field),
-                    destination=edge.destination,
-                )
-                group_key = self._get_collect_iteration_group_key(prepared_edge, sibling_depth)
+            for prepared_id in self._get_ordered_prepared_nodes_for_edge(edge):
+                group_axes, group_path = self._get_collect_iteration_group_key(edge, prepared_id, group_axes)
+                group_key = (group_axes, group_path)
                 group_keys.add(group_key)
-                prepared_inputs.append(
-                    (
-                        prepared_edge,
-                        edge.source.node_id,
-                        prepared_id,
-                        self._get_prepared_edge_iteration_path(edge, prepared_id),
-                    )
-                )
+                prepared_inputs.append((edge, edge.source.node_id, prepared_id, group_axes, group_path))
 
         if not group_keys:
-            group_keys.add(())
+            group_keys.add(((), ()))
 
-        final_group_keys = sorted(
+        final_group_keys = [
             group_key
             for group_key in group_keys
             if not any(
-                group_key != other_group_key and other_group_key[: len(group_key)] == group_key
+                len(group_key[0]) > 0
+                and len(group_key[0]) < len(other_group_key[0])
+                and other_group_key[0][: len(group_key[0])] == group_key[0]
+                and other_group_key[1][: len(group_key[1])] == group_key[1]
                 for other_group_key in group_keys
             )
-        )
+        ]
+        final_group_keys.sort(key=lambda group_key: (group_key[1], group_key[0]))
+
+        def matches_group(
+            edge: Edge,
+            source_axes: tuple[str, ...],
+            source_path: tuple[int, ...],
+            group_axes: tuple[str, ...],
+            group_path: tuple[int, ...],
+        ) -> bool:
+            if group_axes == source_axes:
+                return group_path == source_path
+            if len(group_axes) < len(source_axes) and source_axes[: len(group_axes)] == group_axes:
+                return (
+                    edge.destination.field != ITEM_FIELD
+                    if not group_axes
+                    else group_path == source_path[: len(group_axes)]
+                )
+            if len(source_axes) < len(group_axes) and group_axes[: len(source_axes)] == source_axes:
+                return (
+                    edge.destination.field != ITEM_FIELD
+                    if not source_axes
+                    else source_path == group_path[: len(source_axes)]
+                )
+            return False
 
         return [
             (
-                group_key,
+                group_key[1],
                 [
                     (source_node_id, prepared_id)
-                    for prepared_edge, source_node_id, prepared_id, iteration_path in prepared_inputs
-                    if (
-                        prepared_edge.destination.field == ITEM_FIELD
-                        and (
-                            group_key[: len(iteration_path)] == iteration_path
-                            or iteration_path[: len(group_key)] == group_key
-                        )
-                    )
-                    or (
-                        prepared_edge.destination.field != ITEM_FIELD
-                        and group_key[: len(iteration_path)] == iteration_path
-                    )
+                    for edge, source_node_id, prepared_id, source_axes, source_path in prepared_inputs
+                    if matches_group(edge, source_axes, source_path, group_key[0], group_key[1])
                 ],
             )
             for group_key in final_group_keys
@@ -1578,11 +1694,22 @@ class _ExecutionNodeBuilder:
             return False
         selected_field = "true_input" if node.condition else "false_input"
         selected_edges = self._state.graph._get_input_edges(node_id, selected_field)
-        return bool(selected_edges) and all(
+        if bool(selected_edges) and all(
             isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
             and edge.source.node_id in self._state.executed
             and not self._state.source_prepared_mapping.get(edge.source.node_id)
             for edge in selected_edges
+        ):
+            return True
+
+        # A root If can have no frames when an unselected nested If is itself framed by an empty Iterate.
+        unselected_field = "false_input" if node.condition else "true_input"
+        unselected_edges = self._state.graph._get_input_edges(node_id, unselected_field)
+        return bool(unselected_edges) and all(
+            isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
+            and not self._state.source_prepared_mapping.get(edge.source.node_id)
+            and graph_if_runtime._has_empty_if_frame(self._state, edge.source.node_id)
+            for edge in unselected_edges
         )
 
     def _index_prepared_nodes_by_iteration_path(
@@ -2713,52 +2840,93 @@ class _ExecutionNodeBuilder:
                 for source_id in dict.fromkeys(nested_literal_sources)
                 for prepared_id in self._get_ordered_prepared_nodes_for_source(source_id)
             ]
-            prepared_item_paths: set[tuple[int, ...]] = set()
+            nested_literal_source_ids = set(nested_literal_sources)
+            iterator_ancestry = self._get_iterator_ancestry(self.iterator_graph())
+
+            def get_selected_source_axes(source_id: str) -> tuple[str, ...]:
+                if isinstance(self._state.graph.get_node(source_id), IfInvocation):
+                    selected_axes = self._get_selected_for_final_parent_axes(source_id, iterator_ancestry)
+                    if selected_axes:
+                        return selected_axes
+                return tuple(self._get_collect_source_iterator_ids(source_id))
+
+            prepared_item_groups: set[tuple[tuple[str, ...], tuple[int, ...]]] = set()
             for input_edge in collect_inputs:
                 if input_edge.destination.field != ITEM_FIELD:
                     continue
                 source_id = input_edge.source.node_id
-                source_node = self._state.graph.get_node(source_id)
-                nested_literal_item = (
-                    isinstance(source_node, IfInvocation)
-                    and not self._state.graph._get_input_edges(source_id, "condition")
-                    and any(
-                        isinstance(self._state.graph.get_node(branch_edge.source.node_id), IfInvocation)
-                        for branch in ("true_input", "false_input")
-                        for branch_edge in self._state.graph._get_input_edges(source_id, branch)
-                    )
-                )
-                if nested_literal_item:
-                    prepared_item_paths.update(
-                        self._get_prepared_edge_iteration_path(input_edge, candidate_id)
+                source_axes = get_selected_source_axes(source_id)
+                if source_id in nested_literal_source_ids:
+                    prepared_item_groups.update(
+                        (source_axes[: len(path)], path)
                         for candidate_id in self._get_ordered_prepared_nodes_for_edge(input_edge)
+                        if len(path := self._get_prepared_edge_iteration_path(input_edge, candidate_id))
+                        <= len(source_axes)
                     )
                 else:
-                    prepared_item_paths.update(
-                        iteration_path for iteration_path, _ in self._get_collect_iteration_mapping_groups([input_edge])
+                    group_axes = self._get_collect_group_axes(input_edge)
+                    prepared_item_groups.update(
+                        (group_axes, path) for path, _ in self._get_collect_iteration_mapping_groups([input_edge])
                     )
-            prepared_item_paths = {
-                path
-                for path in prepared_item_paths
+            prepared_item_groups = {
+                group
+                for group in prepared_item_groups
                 if not any(
-                    other != path and len(other) > len(path) and other[: len(path)] == path
-                    for other in prepared_item_paths
+                    # The root group is independent of selected branch frames and must remain available.
+                    len(group[0]) > 0
+                    and len(other[0]) > len(group[0])
+                    and other[0][: len(group[0])] == group[0]
+                    and other[1][: len(group[1])] == group[1]
+                    for other in prepared_item_groups
                 )
             }
             if (
                 self._collect_has_selected_for_final_input(next_node_id)
                 and len(prepared_nested_ids) > 1
-                and len(prepared_item_paths) > 1
+                and len(prepared_item_groups) > 1
             ):
-                for iteration_path in sorted(prepared_item_paths):
+                grouped_item_mappings: list[
+                    Optional[dict[tuple[tuple[str, ...], tuple[int, ...]], list[tuple[str, str]]]]
+                ] = []
+                for input_edge in collect_inputs:
+                    source_id = input_edge.source.node_id
+                    if input_edge.destination.field != ITEM_FIELD or source_id in nested_literal_source_ids:
+                        grouped_item_mappings.append(None)
+                        continue
+                    group_axes = self._get_collect_group_axes(input_edge)
+                    grouped_item_mappings.append(
+                        {
+                            (group_axes, iteration_path): iteration_mappings
+                            for iteration_path, iteration_mappings in self._get_collect_iteration_mapping_groups(
+                                [input_edge]
+                            )
+                        }
+                    )
+                for group_axes, iteration_path in sorted(prepared_item_groups):
                     iteration_mapping: list[tuple[str, str]] = []
-                    for input_edge in collect_inputs:
+                    for input_edge, item_mappings in zip(collect_inputs, grouped_item_mappings, strict=True):
                         source_id = input_edge.source.node_id
-                        prepared_candidates = self._get_ordered_prepared_nodes_for_edge(input_edge)
-                        for candidate_id in prepared_candidates:
+                        if item_mappings is not None:
+                            iteration_mapping.extend(item_mappings.get((group_axes, iteration_path), ()))
+                            continue
+
+                        source_axes = get_selected_source_axes(source_id)
+                        # A selected nested branch stays out of a separate root item group.
+                        if input_edge.destination.field == ITEM_FIELD and not group_axes and source_axes:
+                            continue
+                        for candidate_id in self._get_ordered_prepared_nodes_for_edge(input_edge):
                             candidate_path = self._get_prepared_edge_iteration_path(input_edge, candidate_id)
-                            candidate_is_ancestor = iteration_path[: len(candidate_path)] == candidate_path
-                            candidate_is_descendant = candidate_path[: len(iteration_path)] == iteration_path
+                            candidate_axes = source_axes[: len(candidate_path)]
+                            candidate_is_ancestor = (
+                                len(candidate_axes) <= len(group_axes)
+                                and group_axes[: len(candidate_axes)] == candidate_axes
+                                and iteration_path[: len(candidate_path)] == candidate_path
+                            )
+                            candidate_is_descendant = (
+                                len(candidate_axes) > len(group_axes)
+                                and candidate_axes[: len(group_axes)] == group_axes
+                                and candidate_path[: len(iteration_path)] == iteration_path
+                            )
                             if candidate_is_ancestor or (
                                 input_edge.destination.field == ITEM_FIELD and candidate_is_descendant
                             ):
