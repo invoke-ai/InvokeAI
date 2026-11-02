@@ -840,6 +840,7 @@ def test_every_image_names_body_is_bounded(client: TestClient) -> None:
     assert sorted(checked) == [
         "/api/v1/board_images/batch",
         "/api/v1/board_images/batch/delete",
+        "/api/v1/gallery/usage",
         "/api/v1/images/copy",
         "/api/v1/images/delete",
         "/api/v1/images/download",

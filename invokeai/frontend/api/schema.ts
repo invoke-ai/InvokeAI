@@ -2540,6 +2540,27 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/gallery/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Get Gallery Media Usage
+         * @description Reports what still uses media before it is deleted: the caller's saved documents and active queue work by
+         *     name, other accounts' as counts. Deleting stays a separate request; this only reads.
+         */
+        post: operations["get_gallery_media_usage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/gallery/maintenance/preview": {
         parameters: {
             query?: never;
@@ -18047,6 +18068,167 @@ export type components = {
             backup_path?: string | null;
             /** Errors */
             errors?: string[];
+        };
+        /**
+         * GalleryMediaUsage
+         * @description What still uses media a deletion would remove. Saved documents count conservatively: anything they name,
+         *     history included.
+         */
+        GalleryMediaUsage: {
+            /**
+             * Checked Image Count
+             * @description Images checked: the requested ones the caller may delete, or the images the board's deletion would delete.
+             */
+            checked_image_count: number;
+            /**
+             * Checked Video Count
+             * @description Videos checked: the requested ones the caller may delete, or the videos the board's deletion would delete.
+             */
+            checked_video_count: number;
+            /**
+             * In Use Image Count
+             * @description Distinct checked images that anything below names.
+             */
+            in_use_image_count: number;
+            /**
+             * In Use Video Count
+             * @description Distinct checked videos that anything below names.
+             */
+            in_use_video_count: number;
+            /**
+             * Documents
+             * @description The caller's own documents naming checked media, by kind, then name, then id; at most 100.
+             */
+            documents: components["schemas"]["GalleryMediaUsageDocument"][];
+            /**
+             * Documents Total
+             * @description How many of the caller's documents name checked media.
+             */
+            documents_total: number;
+            /** @description The caller's own active queue work naming checked media. */
+            queue: components["schemas"]["GalleryMediaUsageQueue"];
+            /** @description Other accounts' documents and queue work naming checked media, as counts only. */
+            other_accounts: components["schemas"]["GalleryMediaUsageOthers"];
+        };
+        /**
+         * GalleryMediaUsageDocument
+         * @description One of the caller's saved documents that names checked media.
+         */
+        GalleryMediaUsageDocument: {
+            /**
+             * Kind
+             * @description 'project': a project's content and the caller's own workspace in it. 'workflow': a library workflow. 'legacy_editor': the legacy editor's saved state, all of it as one entry. 'quarantined_project': a project kept for repair.
+             * @enum {string}
+             */
+            kind: "project" | "workflow" | "legacy_editor" | "quarantined_project";
+            /**
+             * Id
+             * @description The project or workflow id; 'legacy_editor' for the legacy editor's state.
+             */
+            id: string;
+            /**
+             * Name
+             * @description The document's name; null for the legacy editor or a missing document.
+             */
+            name: string | null;
+            /**
+             * Image Names
+             * @description The checked images the document names, sorted; at most 1000.
+             */
+            image_names: string[];
+            /**
+             * Video Names
+             * @description The checked videos the document names, sorted; at most 1000.
+             */
+            video_names: string[];
+            /**
+             * Image Count
+             * @description How many checked images the document names, past the list's cap too.
+             */
+            image_count: number;
+            /**
+             * Video Count
+             * @description How many checked videos the document names, past the list's cap too.
+             */
+            video_count: number;
+        };
+        /**
+         * GalleryMediaUsageOthers
+         * @description Other accounts' documents and queue work that name checked media, without identifying them.
+         */
+        GalleryMediaUsageOthers: {
+            /**
+             * Document Count
+             * @description Other accounts' documents naming checked media.
+             */
+            document_count: number;
+            /**
+             * Queue Item Count
+             * @description Other accounts' active queue items naming checked media.
+             */
+            queue_item_count: number;
+            /**
+             * Image Count
+             * @description Distinct checked images other accounts' documents or queue work name.
+             */
+            image_count: number;
+            /**
+             * Video Count
+             * @description Distinct checked videos other accounts' documents or queue work name.
+             */
+            video_count: number;
+        };
+        /**
+         * GalleryMediaUsageQueue
+         * @description The caller's active queue work that names checked media.
+         */
+        GalleryMediaUsageQueue: {
+            /**
+             * Item Count
+             * @description The caller's active queue items (pending, in progress or waiting, and the completed children of an active root) whose sessions name checked media.
+             */
+            item_count: number;
+            /**
+             * Image Names
+             * @description The checked images those items name, sorted; at most 1000.
+             */
+            image_names: string[];
+            /**
+             * Video Names
+             * @description The checked videos those items name, sorted; at most 1000.
+             */
+            video_names: string[];
+            /**
+             * Image Count
+             * @description How many checked images those items name, past the list's cap too.
+             */
+            image_count: number;
+            /**
+             * Video Count
+             * @description How many checked videos those items name, past the list's cap too.
+             */
+            video_count: number;
+        };
+        /**
+         * GalleryMediaUsageRequest
+         * @description The media to check: named images and videos, or every item on one board.
+         */
+        GalleryMediaUsageRequest: {
+            /**
+             * Image Names
+             * @description Images to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /images/delete` skips them.
+             */
+            image_names?: string[];
+            /**
+             * Video Names
+             * @description Videos to check. Those the caller may not delete, and unknown ones, are ignored, as `POST /videos/delete` skips them.
+             */
+            video_names?: string[];
+            /**
+             * Board Id
+             * @description Check the images and videos `DELETE /boards/{board_id}?include_images=true` would delete, under the same access rules. Not combined with names.
+             */
+            board_id?: string | null;
         };
         /**
          * Gemini Image Generation
@@ -62397,6 +62579,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GalleryItemNamesResult"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_gallery_media_usage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GalleryMediaUsageRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GalleryMediaUsage"];
                 };
             };
             /** @description Validation Error */
