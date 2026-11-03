@@ -314,6 +314,7 @@ class ImagesInterface(InvocationContextInterface):
         board_id: Optional[str] = None,
         image_category: ImageCategory = ImageCategory.GENERAL,
         metadata: Optional[MetadataField] = None,
+        display_image: Optional[Image] = None,
     ) -> ImageDTO:
         """Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled
         exactly as in `save`.
@@ -331,6 +332,10 @@ class ImagesInterface(InvocationContextInterface):
             board_id: See `save`.
             image_category: See `save`.
             metadata: See `save`.
+            display_image: The gallery PNG of a precise save, instead of the display quantization of `raster`, for a
+                node that must keep its legacy 8-bit output bit-identical. An 8-bit PIL image of the same size whose
+                mode equals the raster's channels (L/LA/RGB/RGBA); otherwise `RasterConversionError` is raised and
+                nothing is saved. Passing it for a raster the gallery PNG represents exactly is an error.
 
         Returns:
             The saved image DTO.
@@ -338,6 +343,10 @@ class ImagesInterface(InvocationContextInterface):
 
         refusal = pil_refusal(raster)
         if refusal is None:
+            if display_image is not None:
+                raise ValueError(
+                    "display_image applies only to precise saves; this raster is saved as an ordinary gallery PNG"
+                )
             return self._save_image(raster_to_pil(raster), board_id, image_category, metadata)
         if not self.precise_storage_enabled:
             raise RasterConversionError(
@@ -345,7 +354,7 @@ class ImagesInterface(InvocationContextInterface):
                 "storage (`precise_image_storage`) is enabled, so convert explicitly first (for example with "
                 "quantize_unit)"
             )
-        return self._save_image(raster, board_id, image_category, metadata)
+        return self._save_image(raster, board_id, image_category, metadata, display_image)
 
     def _save_image(
         self,
@@ -353,6 +362,7 @@ class ImagesInterface(InvocationContextInterface):
         board_id: Optional[str],
         image_category: ImageCategory,
         metadata: Optional[MetadataField],
+        display_image: Optional[Image] = None,
     ) -> ImageDTO:
         self._util.signal_progress("Saving image")
 
@@ -410,7 +420,7 @@ class ImagesInterface(InvocationContextInterface):
             "project_id": self._data.queue_item.project_id,
         }
         if isinstance(image, RasterImage):
-            return self._services.images.create_from_raster(raster=image, **shared)
+            return self._services.images.create_from_raster(raster=image, display_image=display_image, **shared)
         return self._services.images.create(image=image, **shared)
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
@@ -455,6 +465,18 @@ class ImagesInterface(InvocationContextInterface):
         """
         self._assert_read_access(image_name)
         return self._services.images.get_raster(image_name)
+
+    def has_precise_asset(self, image_name: str) -> bool:
+        """Whether the image was saved with a precise asset, so `get_raster` returns more than its gallery PNG holds.
+
+        A node that must keep its 8-bit behavior for ordinary images can route on this instead of on the raster's
+        dtype: a PNG-backed image never has an asset, whatever its pixel format.
+
+        Args:
+            image_name: The name of the image to check.
+        """
+        self._assert_read_access(image_name)
+        return self._services.images.has_precise_asset(image_name)
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata, if it has any.

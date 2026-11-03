@@ -278,6 +278,7 @@ def test_every_decode_runs_the_dtype_its_estimate_priced_and_prices_the_same_upc
     context.config.get.return_value.force_tiled_decode = False
     context.models.load.return_value = cached_vae(vae, estimates)
     context.images.save.return_value = MagicMock(image_name="x.png", width=8, height=8)
+    context.images.precise_storage_enabled = False
     node = LatentsToImageInvocation.model_construct(
         latents=MagicMock(latents_name="x"), vae=MagicMock(seamless_axes=[]), tiled=False, tile_size=0, fp32=fp32
     )
@@ -528,6 +529,7 @@ def _run_sd_node(
         context.config.get.return_value.force_tiled_decode = False
         context.models.load.return_value = vae_info
         context.images.save.return_value = MagicMock(image_name="x.png", width=8, height=8)
+        context.images.precise_storage_enabled = False
         node = LatentsToImageInvocation.model_construct(
             latents=MagicMock(latents_name="x"),
             vae=MagicMock(seamless_axes=[]),

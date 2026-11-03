@@ -110,6 +110,7 @@ def test_image_save_allows_any_board_in_single_user_mode() -> None:
     [
         ("get_pil", "get_pil_image"),
         ("get_raster", "get_raster"),
+        ("has_precise_asset", "has_precise_asset"),
         ("get_metadata", "get_metadata"),
         ("get_dto", "get_dto"),
         ("get_path", "get_path"),

@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.vae_tiling import patch_vae_tiling_params
@@ -107,14 +108,17 @@ class LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # copied from diffusers pipeline
                 latents = latents / vae.config.scaling_factor
                 image = vae.decode(latents, return_dict=False)[0]
-                image = (image / 2 + 0.5).clamp(0, 1)  # denormalize
+                unit_image = image / 2 + 0.5  # denormalize
                 # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
-                np_image = image.cpu().permute(0, 2, 3, 1).float().numpy()
-
-                image = VaeImageProcessor.numpy_to_pil(np_image)[0]
+                np_image = unit_image.clamp(0, 1).cpu().permute(0, 2, 3, 1).float().numpy()
+                legacy = VaeImageProcessor.numpy_to_pil(np_image)[0]
+                # The unclamped output keeps what the gallery PNG clips (overshoot), at the decode precision.
+                raster = precise_decode_raster(context, unit_image)
+                # Nothing from the decode stays on the device past the model block (the cache empties below).
+                del image, unit_image, latents, np_image
 
         TorchDevice.empty_cache()
 
-        image_dto = context.images.save(image=image)
+        image_dto = save_decoded_image(context, legacy, raster)
 
         return ImageOutput.build(image_dto)

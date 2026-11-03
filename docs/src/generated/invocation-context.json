@@ -92,6 +92,21 @@
           "signature": "(image_name: str) -> RasterImage"
         },
         {
+          "description": "Whether the image was saved with a precise asset, so `get_raster` returns more than its gallery PNG holds.\nA node that must keep its 8-bit behavior for ordinary images can route on this instead of on the raster's\ndtype: a PNG-backed image never has an asset, whatever its pixel format.",
+          "name": "has_precise_asset",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to check.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "bool",
+          "returns": "",
+          "signature": "(image_name: str) -> bool"
+        },
+        {
           "description": "Saves an image, returning its DTO.\nIf the current queue item has a workflow or metadata, it is automatically saved with the image.",
           "name": "save",
           "parameters": [
@@ -151,11 +166,17 @@
               "description": "See `save`.",
               "name": "metadata",
               "type": "Optional[MetadataField]"
+            },
+            {
+              "default": "None",
+              "description": "The gallery PNG of a precise save, instead of the display quantization of `raster`, for a node that must keep its legacy 8-bit output bit-identical. An 8-bit PIL image of the same size whose mode equals the raster's channels (L/LA/RGB/RGBA); otherwise `RasterConversionError` is raised and nothing is saved. Passing it for a raster the gallery PNG represents exactly is an error.",
+              "name": "display_image",
+              "type": "Optional[Image]"
             }
           ],
           "return_type": "ImageDTO",
           "returns": "The saved image DTO.",
-          "signature": "(raster: RasterImage, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
+          "signature": "(raster: RasterImage, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None, display_image: Optional[Image] = None) -> ImageDTO"
         }
       ],
       "name": "ImagesInterface"

@@ -80,6 +80,7 @@ class ImageServiceABC(ABC):
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
         resolved_inputs: Optional[str] = None,
+        display_image: Optional[PILImageType] = None,
     ) -> ImageDTO:
         """Creates an image with a precise asset: the raster's exact pixels, an 8-bit PNG display derivative made
         from it by display quantization, the thumbnail and the association row, as one unit.
@@ -87,6 +88,11 @@ class ImageServiceABC(ABC):
         The raster must be displayable as sRGB (UNIT range, no premultiplied alpha, L/LA/RGB/RGBA, finite) and within
         the precise asset bounds; otherwise RasterConversionError or PreciseAssetError is raised before anything is
         persisted. A failure after that leaves no record, row or file.
+
+        `display_image` replaces the quantized derivative as the gallery PNG, so a family keeps its legacy PNG
+        bit-identical. It must be a PIL image whose mode equals the raster's channels (L/LA/RGB/RGBA) and whose size
+        equals the raster's, and the raster must be finite; otherwise RasterConversionError is raised before anything
+        is persisted.
         """
         pass
 
@@ -122,6 +128,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_raster(self, image_name: str) -> RasterImage:
         """Gets the pixels of an image as an owned raster."""
+        pass
+
+    @abstractmethod
+    def has_precise_asset(self, image_name: str) -> bool:
+        """Whether the image has a precise asset, according to its association row."""
         pass
 
     @abstractmethod

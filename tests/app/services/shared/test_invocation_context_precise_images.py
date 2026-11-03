@@ -167,3 +167,80 @@ def test_precise_storage_is_off_by_default_and_a_float_raster_is_refused_with_no
 
     assert default_stack.files() == []
     assert next(default_stack.names) == 0
+
+
+def _display_image(raster: RasterImage, mode: str = "RGB", size: tuple[int, int] | None = None) -> Image.Image:
+    """A gallery PNG source unlike the quantized derivative (inverted), as a family's legacy decode would differ."""
+    size = size or (raster.width, raster.height)
+    values = np.random.default_rng(9).integers(0, 256, size=(size[1], size[0], len(mode)), dtype=np.uint8)
+    return Image.fromarray(values[:, :, 0] if len(mode) == 1 else values, mode)
+
+
+def test_display_image_is_stored_byte_for_byte_as_the_gallery_png_of_a_precise_save(stack: Stack) -> None:
+    raster = _rasters()["float32-rgb"]
+    display = _display_image(raster)
+    node = stack.node()
+
+    saved = node.save_raster(raster, display_image=display)
+
+    with Image.open(stack.storage.get_path(saved.image_name)) as png:
+        assert png.mode == "RGB"
+        assert png.tobytes() == display.tobytes()
+        assert png.tobytes() != raster_to_pil(quantize_unit(raster, np.uint8)).tobytes()
+    assert node.get_raster(saved.image_name).view().tobytes() == raster.view().tobytes()
+
+
+def test_display_image_of_the_ordinary_derivative_changes_nothing(stack: Stack) -> None:
+    raster = _rasters()["float16-rgba"]
+    node = stack.node()
+
+    explicit = node.save_raster(raster, display_image=raster_to_pil(quantize_unit(raster, np.uint8)))
+    omitted = node.save_raster(raster)
+
+    assert (
+        stack.storage.get_path(explicit.image_name).read_bytes()
+        == stack.storage.get_path(omitted.image_name).read_bytes()
+    )
+
+
+@pytest.mark.parametrize(
+    ("case", "display"),
+    [
+        ("size", lambda raster: _display_image(raster, "RGB", (raster.width + 1, raster.height))),
+        ("mode", lambda raster: _display_image(raster, "RGBA")),
+        ("gray", lambda raster: _display_image(raster, "L")),
+        ("dtype", lambda raster: Image.fromarray(np.zeros((raster.height, raster.width), np.float32), "F")),
+    ],
+)
+def test_a_mismatched_display_image_is_refused_with_nothing_persisted(stack: Stack, case: str, display) -> None:
+    raster = _rasters()["float32-rgb"]
+
+    with pytest.raises(ValueError):
+        stack.node().save_raster(raster, display_image=display(raster))
+
+    assert stack.files() == []
+    assert next(stack.names) == 0
+
+
+def test_a_display_image_with_a_non_finite_raster_is_refused_with_nothing_persisted(stack: Stack) -> None:
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    pixels = np.full((4, 4, 3), 0.5, np.float32)
+    pixels[1, 1, 0] = np.nan
+    raster = RasterImage.from_array(pixels, descriptor)
+
+    with pytest.raises(ValueError, match="non-finite"):
+        stack.node().save_raster(raster, display_image=_display_image(raster))
+
+    assert stack.files() == []
+    assert next(stack.names) == 0
+
+
+def test_a_display_image_for_a_png_representable_raster_is_a_caller_error(stack: Stack) -> None:
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    raster = RasterImage.from_array(np.arange(18, dtype=np.uint8).reshape(2, 3, 3), descriptor)
+
+    with pytest.raises(ValueError, match="display_image"):
+        stack.node().save_raster(raster, display_image=_display_image(raster))
+
+    assert stack.files() == []
+    assert next(stack.names) == 0

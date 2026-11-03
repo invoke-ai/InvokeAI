@@ -147,6 +147,15 @@ def test_old_png_only_records_and_precise_records_coexist(stack: Stack) -> None:
     assert stack.service.get_pil_image("new.png").getpixel((0, 0)) == (1, 2, 3)
 
 
+def test_has_precise_asset_follows_the_association_row(stack: Stack) -> None:
+    stack.add("old.png", png_pixels=(10, 20, 30))
+    stack.add("new.png", png_pixels=(1, 2, 3), precise=_float_rgb())
+
+    assert stack.service.has_precise_asset("new.png") is True
+    assert stack.service.has_precise_asset("old.png") is False
+    assert stack.service.has_precise_asset("missing.png") is False
+
+
 def test_a_record_in_a_subfolder_resolves_the_asset_in_the_same_subfolder(stack: Stack) -> None:
     stack.add("flat.png", precise=_uint16_rgba())
     stack.add("nested.png", subfolder="2026/11", precise=_float_rgb())

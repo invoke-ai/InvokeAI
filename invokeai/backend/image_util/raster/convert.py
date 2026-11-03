@@ -137,6 +137,21 @@ def raster_from_torch(tensor_chw: torch.Tensor, descriptor: RasterDescriptor) ->
     return RasterImage.from_array(hwc, descriptor)
 
 
+def decoded_unit_raster(unit_chw: torch.Tensor) -> RasterImage | None:
+    """Owned sRGB unit-range RGB raster from the first sample of a decoder output in unit space (CHW or NCHW).
+
+    The values are not clamped: overshoot a gallery PNG would clip is kept. float16 and float32 keep their precision,
+    any other dtype (bfloat16) is widened to float32. Returns None when the sample has a non-finite value, which the
+    check finds on the tensor's own device before the host copy.
+    """
+    sample = unit_chw[0] if unit_chw.ndim == 4 else unit_chw
+    if not torch.isfinite(sample).all().item():
+        return None
+    if sample.dtype not in (torch.float16, torch.float32):
+        sample = sample.float()
+    return raster_from_torch(sample, _srgb_descriptor(RasterChannels.RGB, None))
+
+
 def raster_to_torch(raster: RasterImage, device: torch.device | str | None = None) -> torch.Tensor:
     """CHW tensor holding a copy of the pixels, optionally moved to `device`."""
     chw = np.array(raster.view().transpose(2, 0, 1), order="C", copy=True)

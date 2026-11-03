@@ -6,9 +6,11 @@ from dataclasses import dataclass
 from typing import Any, Callable, List, Optional, Union
 
 import einops
+import numpy as np
 import PIL.Image
 import psutil
 import torch
+import torch.nn.functional as F
 import torchvision.transforms as T
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from diffusers.models.unets.unet_2d_condition import UNet2DConditionModel
@@ -20,6 +22,15 @@ from pydantic import Field
 from transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer
 
 from invokeai.app.services.config.config_default import get_config
+from invokeai.backend.image_util.raster.convert import to_unit_float
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterConversionError,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import IPAdapterData, TextConditioningData
 from invokeai.backend.stable_diffusion.diffusion.shared_invokeai_diffusion import InvokeAIDiffuserComponent
 from invokeai.backend.stable_diffusion.diffusion.unet_attention_patcher import UNetAttentionPatcher, UNetIPAdapterData
@@ -84,6 +95,39 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     if normalize:
         tensor = tensor * 2.0 - 1.0
     return tensor
+
+
+def raster_resized_to_grid_as_tensor(raster: RasterImage, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
+    """`image_resized_to_grid_as_tensor` for a precise raster: float32 CHW RGB, never clamped.
+
+    Alpha is dropped and gray replicated, as `PIL.Image.convert("RGB")` does. Sizes that are not a multiple of
+    `multiple_of` are trimmed like the PIL helper and then resized with antialiased bicubic interpolation (PIL's LANCZOS
+    cannot operate on floats); aligned sizes are not resampled. Only sRGB unit-range rasters with straight or no alpha
+    have a meaning here: linear, DATA, unbounded and premultiplied rasters raise RasterConversionError.
+    """
+    descriptor = raster.descriptor
+    if (
+        descriptor.color is not ColorEncoding.SRGB
+        or descriptor.value_range is not ValueRange.UNIT
+        or descriptor.alpha is AlphaMode.PREMULTIPLIED
+        or descriptor.channels is RasterChannels.DATA
+    ):
+        raise RasterConversionError(
+            f"cannot encode a {descriptor.channels.value}/{descriptor.color.value}/{descriptor.value_range.value}/"
+            f"{descriptor.alpha.value} image; only sRGB unit-range images with straight or no alpha are supported"
+        )
+    unit = raster if raster.dtype == np.float32 else to_unit_float(raster, np.float32)
+    pixels = unit.view()
+    if descriptor.channels in (RasterChannels.L, RasterChannels.LA):
+        pixels = np.repeat(pixels[:, :, :1], 3, axis=2)
+    else:
+        pixels = pixels[:, :, :3]
+    tensor = torch.from_numpy(np.ascontiguousarray(pixels.transpose(2, 0, 1)))
+
+    w, h = trim_to_multiple_of(raster.width, raster.height, multiple_of=multiple_of)
+    if (w, h) != (raster.width, raster.height):
+        tensor = F.interpolate(tensor[None], size=(h, w), mode="bicubic", align_corners=False, antialias=True)[0]
+    return tensor * 2.0 - 1.0 if normalize else tensor
 
 
 def is_inpainting_model(unet: UNet2DConditionModel):

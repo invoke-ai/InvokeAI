@@ -88,6 +88,23 @@ def _require_displayable(raster: RasterImage) -> None:
     _require_matching_icc(raster)
 
 
+def _require_display_image(raster: RasterImage, display_image: PILImageType) -> None:
+    """A caller-supplied gallery PNG must be the raster's 8-bit display derivative: same channels and size. The raster
+    must be finite, since the quantization that would have rejected it is skipped."""
+    expected_mode = raster.descriptor.channels.value
+    if display_image.mode != expected_mode:
+        raise RasterConversionError(
+            f"display_image mode {display_image.mode} does not match the {expected_mode} raster; it must be 8-bit "
+            f"{expected_mode}"
+        )
+    if display_image.size != (raster.width, raster.height):
+        raise RasterConversionError(
+            f"display_image size {display_image.size} does not match the {raster.width}x{raster.height} raster"
+        )
+    if raster.dtype.kind == "f" and not numpy.isfinite(raster.view()).all():
+        raise RasterConversionError("cannot store non-finite values")
+
+
 class ImageService(ImageServiceABC):
     __invoker: Invoker
 
@@ -163,11 +180,16 @@ class ImageService(ImageServiceABC):
         user_id: Optional[str] = None,
         project_id: Optional[str] = None,
         resolved_inputs: Optional[str] = None,
+        display_image: Optional[PILImageType] = None,
     ) -> ImageDTO:
         _require_displayable(raster)
-        # Pure CPU, so it runs before the mutation lock is taken. The raster is frozen and outlives the save, which
-        # only reads the derivative, so it can wrap the quantized pixels without a second copy.
-        derivative = raster_to_pil(quantize_unit(raster, numpy.uint8), share_pixels=True)
+        if display_image is None:
+            # Pure CPU, so it runs before the mutation lock is taken. The raster is frozen and outlives the save, which
+            # only reads the derivative, so it can wrap the quantized pixels without a second copy.
+            derivative = raster_to_pil(quantize_unit(raster, numpy.uint8), share_pixels=True)
+        else:
+            _require_display_image(raster, display_image)
+            derivative = display_image
         return self._create(
             derivative,
             raster,
@@ -530,6 +552,9 @@ class ImageService(ImageServiceABC):
         except (ImageFileNotFoundException, PreciseAssetError):
             services.logger.error(f"Failed to read precise asset of {image_name}")
             raise
+
+    def has_precise_asset(self, image_name: str) -> bool:
+        return self.__invoker.services.database.queries.image_precise_assets.get(image_name) is not None
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:
