@@ -6082,6 +6082,8 @@
       "idle": "Queue idle",
       "paused": "Paused · {{count}} waiting",
       "queued": "{{count}} queued",
+      "loadingModel": "Loading {{model}} · {{count}} queued",
+      "loadingModelUnnamed": "Loading model · {{count}} queued",
       "offline": "{{count}} queued · reconnecting…"
     },
     "serverStatus": {
