@@ -436,6 +436,7 @@ def test_flux_and_flux2_denoise_build_metadata() -> None:
     assert flux3_md["height"] == 768
     assert flux3_md["steps"] == 16
     assert flux3_md["cfg_scale"] == 3.5
+    assert flux3_md["scheduler"] == "euler"
     assert flux3_md["denoising_start"] == 0.0
     assert flux3_md["denoising_end"] == 1.0
     assert flux3_md["add_noise"] is True
@@ -1744,3 +1745,111 @@ def test_ref_images_serialization_and_metadata_to_adapters_multi_format() -> Non
     ).invoke(mixed_ctx)
     assert len(out_mixed_t2i.t2i_adapter_list) == 1
     assert out_mixed_t2i.t2i_adapter_list[0].image.image_name == "sd-t2i.png"
+
+
+def test_metadata_item_linked_unwraps_submodel_fields_and_does_not_mutate_input() -> None:
+    from invokeai.app.invocations.metadata import MetadataItemInvocation, unwrap_metadata_value
+    from invokeai.app.invocations.metadata_linked import MetadataItemLinkedInvocation
+    from invokeai.app.invocations.model import CLIPField, Qwen3VLEncoderField
+
+    ctx = SimpleNamespace()
+    tok_id = _make_model_id(
+        key="qwen3-vl-tok",
+        name="Qwen3-VL-Tokenizer",
+        base=BaseModelType.Any,
+        model_type=ModelType.Qwen3Encoder,
+        submodel_type=SubModelType.Tokenizer,
+    )
+    enc_id = _make_model_id(
+        key="qwen3-vl-key",
+        name="Qwen3-VL-4B",
+        base=BaseModelType.Any,
+        model_type=ModelType.Qwen3Encoder,
+        submodel_type=SubModelType.TextEncoder,
+    )
+    vae_id = _make_model_id(
+        key="vae-key",
+        name="FLUX.2-VAE",
+        base=BaseModelType.Flux2,
+        model_type=ModelType.VAE,
+        submodel_type=SubModelType.VAE,
+    )
+    clip_id = _make_model_id(
+        key="clip-key",
+        name="CLIP-L",
+        base=BaseModelType.Any,
+        model_type=ModelType.CLIPEmbed,
+        submodel_type=SubModelType.TextEncoder,
+    )
+
+    # 1. Qwen3VLEncoderField instance & deserialized dict
+    qwen_field = Qwen3VLEncoderField(tokenizer=tok_id, text_encoder=enc_id, loras=[])
+    qwen_dict = qwen_field.model_dump()
+
+    upstream = MetadataField.model_validate({"positive_prompt": "astronaut"})
+    node_from_dict = MetadataItemLinkedInvocation.model_validate(
+        {
+            "id": "meta-qwen-dict",
+            "type": "metadata_item_linked",
+            "metadata": upstream.model_dump(),
+            "label": "qwen3_vl_encoder",
+            "value": qwen_dict,
+        }
+    )
+    out_from_dict = node_from_dict.invoke(ctx)
+    assert out_from_dict.metadata.root["qwen3_vl_encoder"]["key"] == "qwen3-vl-key"
+    assert "tokenizer" not in out_from_dict.metadata.root["qwen3_vl_encoder"]
+
+    # Input MetadataField.root must not be mutated in place
+    original_root = {"positive_prompt": "astronaut"}
+    in_meta = MetadataField.model_validate(dict(original_root))
+    node_from_instance = MetadataItemLinkedInvocation.model_construct(
+        metadata=in_meta,
+        label="qwen3_vl_encoder",
+        custom_label=None,
+        value=qwen_field,
+    )
+    out_from_instance = node_from_instance.invoke(ctx)
+    assert in_meta.root == original_root
+    assert "qwen3_vl_encoder" not in in_meta.root
+    assert out_from_instance.metadata.root["qwen3_vl_encoder"] == enc_id
+
+    # 2. VAEField instance & deserialized dict
+    vae_field = VAEField(vae=vae_id)
+    vae_dict = vae_field.model_dump()
+    out_vae_dict = MetadataItemLinkedInvocation.model_validate(
+        {
+            "id": "meta-vae-dict",
+            "type": "metadata_item_linked",
+            "label": "vae",
+            "value": vae_dict,
+        }
+    ).invoke(ctx)
+    assert out_vae_dict.metadata.root["vae"]["key"] == "vae-key"
+    assert "seamless_axes" not in out_vae_dict.metadata.root["vae"]
+
+    out_vae_inst = MetadataItemLinkedInvocation.model_construct(
+        metadata=None,
+        label="vae",
+        custom_label=None,
+        value=vae_field,
+    ).invoke(ctx)
+    assert out_vae_inst.metadata.root["vae"] == vae_id
+
+    # 3. CLIPField deserialized dict & MetadataItemInvocation unwrapping
+    clip_field = CLIPField(tokenizer=tok_id, text_encoder=clip_id, loras=[], skipped_layers=0)
+    clip_dict = clip_field.model_dump()
+    out_clip_dict = MetadataItemLinkedInvocation.model_validate(
+        {
+            "id": "meta-clip-dict",
+            "type": "metadata_item_linked",
+            "label": "clip_embed_model",
+            "value": clip_dict,
+        }
+    ).invoke(ctx)
+    assert out_clip_dict.metadata.root["clip_embed_model"]["key"] == "clip-key"
+    assert "tokenizer" not in out_clip_dict.metadata.root["clip_embed_model"]
+
+    item_out = MetadataItemInvocation(label="qwen3_vl_encoder", value=qwen_dict).invoke(ctx)
+    assert item_out.item.value["key"] == "qwen3-vl-key"
+    assert unwrap_metadata_value({"image_name": "img.png"}) == {"image_name": "img.png"}

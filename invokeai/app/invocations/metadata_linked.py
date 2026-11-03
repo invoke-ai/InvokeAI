@@ -30,6 +30,7 @@ from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     MetadataOutput,
     build_denoise_metadata,
+    unwrap_metadata_value,
 )
 from invokeai.app.invocations.model import (
     CLIPField,
@@ -480,9 +481,9 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> MetadataOutput:
         k = self.custom_label if self.label == CUSTOM_LABEL else self.label
-        v = self.value.vae if isinstance(self.value, VAEField) else self.value
+        v = unwrap_metadata_value(self.value)
 
-        data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
+        data: Dict[str, Any] = {} if self.metadata is None else dict(self.metadata.root)
         data.update({str(k): v})
         data.update({"app_version": __version__})
 

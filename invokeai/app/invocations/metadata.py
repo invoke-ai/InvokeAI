@@ -90,6 +90,25 @@ class MetadataItemOutput(BaseInvocationOutput):
     item: MetadataItemField = OutputField(description="Metadata Item")
 
 
+_SUBMODEL_WRAPPER_ATTRS: tuple[str, ...] = ("vae", "text_encoder", "unet", "transformer", "decoder")
+
+
+def unwrap_metadata_value(val: Any) -> Any:
+    """Unwrap model loader submodel fields (VAEField, encoder fields, UNetField, TransformerField, PiDDecoderField)
+    into their inner ModelIdentifierField (or ModelIdentifierField-shaped dict) when stored in metadata."""
+    if isinstance(val, BaseModel) and not isinstance(val, ModelIdentifierField):
+        for attr in _SUBMODEL_WRAPPER_ATTRS:
+            inner = getattr(val, attr, None)
+            if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                return inner
+    elif isinstance(val, dict) and "key" not in val and "image_name" not in val and "video_name" not in val:
+        for attr in _SUBMODEL_WRAPPER_ATTRS:
+            inner = val.get(attr)
+            if isinstance(inner, ModelIdentifierField) or (isinstance(inner, dict) and "key" in inner):
+                return inner
+    return val
+
+
 @invocation("metadata_item", title="Metadata Item", tags=["metadata"], category="metadata", version="1.0.1")
 class MetadataItemInvocation(BaseInvocation):
     """Used to create an arbitrary metadata item. Provide "label" and make a connection to "value" to store that data as the value."""
@@ -98,7 +117,7 @@ class MetadataItemInvocation(BaseInvocation):
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
     def invoke(self, context: InvocationContext) -> MetadataItemOutput:
-        return MetadataItemOutput(item=MetadataItemField(label=self.label, value=self.value))
+        return MetadataItemOutput(item=MetadataItemField(label=self.label, value=unwrap_metadata_value(self.value)))
 
 
 @invocation_output("metadata_output")

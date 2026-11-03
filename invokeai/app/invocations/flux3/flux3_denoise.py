@@ -116,6 +116,7 @@ class Flux3DenoiseInvocation(BaseInvocation, WithMetadata):
             "height": self.height,
             "steps": self.steps,
             "cfg_scale": self.cfg_scale,
+            "scheduler": "euler",
             "denoising_start": self.denoising_start,
             "denoising_end": self.denoising_end,
             "add_noise": self.add_noise,
