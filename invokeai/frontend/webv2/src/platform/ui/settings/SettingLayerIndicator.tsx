@@ -40,6 +40,13 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
     },
     []
   );
+  const handleResetClick = useCallback(
+    (event: MouseEvent) => {
+      event.preventDefault();
+      select(layer.onResetToBuiltIn!)();
+    },
+    [layer.onResetToBuiltIn, select]
+  );
   const pinned = layer.state === 'pinned';
   // The tooltip sits beside the label, so it stays short; the accessible name says which setting it belongs to, and
   // `aria-haspopup` announces the menu, so the name does not repeat "options".
@@ -69,10 +76,7 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
           size="xs"
           variant="ghost"
           flexShrink={0}
-          onClick={(event) => {
-            event.preventDefault();
-            select(layer.onResetToBuiltIn!)();
-          }}
+          onClick={handleResetClick}
         >
           <Dot />
         </IconButton>
