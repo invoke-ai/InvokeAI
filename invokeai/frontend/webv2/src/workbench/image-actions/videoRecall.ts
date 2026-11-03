@@ -22,6 +22,7 @@ import {
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   getVideoTargetResolutionOptions,
+  getVideoValidationReasons,
   isConditioningClipExcludingFrames,
   isSupportedVideoModel,
   isValidVideoNumFrames,
@@ -436,6 +437,46 @@ export const getVideoSizeRecall = (
   return null;
 };
 
+export type VideoSizeRecallFit =
+  /** No model, or no preset of it reproduces the size. */
+  | { outcome: 'unavailable' }
+  /** A preset fits, but the panel's media has no usable frame on this model. */
+  | { outcome: 'media-unresolvable' }
+  /** The panel's media owns the frame, and the run would get this size instead. */
+  | { outcome: 'media-conflict'; effective: { height: number; width: number } }
+  /** The preset would leave the panel unable to run, for this reason it did not already have. */
+  | { outcome: 'invalid'; reason: string }
+  | { outcome: 'fits'; sizeRecall: NonNullable<ReturnType<typeof getVideoSizeRecall>> };
+
+/** Whether a recorded size can be applied to the panel as it stands, shared by the recall and its failure notice. */
+export const resolveVideoSizeRecall = (
+  values: VideoWidgetValues,
+  width: number | null,
+  height: number | null
+): VideoSizeRecallFit => {
+  const { model } = values;
+  const sizeRecall = model ? getVideoSizeRecall(model, width, height) : null;
+
+  if (!model || !sizeRecall) {
+    return { outcome: 'unavailable' };
+  }
+
+  const next = { ...values, ...sizeRecall };
+  const effective = getVideoDimensions(model, next);
+
+  if (!effective) {
+    return { outcome: 'media-unresolvable' };
+  }
+  if (effective.width !== width || effective.height !== height) {
+    return { effective, outcome: 'media-conflict' };
+  }
+
+  const existingReasons = new Set(getVideoValidationReasons(model, values));
+  const reason = getVideoValidationReasons(model, next).find((candidate) => !existingReasons.has(candidate));
+
+  return reason ? { outcome: 'invalid', reason } : { outcome: 'fits', sizeRecall };
+};
+
 /**
  * Restore acceleration only when recalled LoRAs form a complete set at its distilled step count; derive from
  * recorded keys, not today's catalog preference.
@@ -617,10 +658,10 @@ export const buildVideoRecallSettings = ({
   }
 
   if (kind === 'size') {
-    // Fitted to the panel's own model: a size recall leaves the model alone.
-    const sizeRecall = values.model ? getVideoSizeRecall(values.model, record.width, record.height) : null;
+    // Fitted to the panel's own model and media: a size recall leaves both alone, so a size they refuse writes nothing.
+    const fit = resolveVideoSizeRecall(values, record.width, record.height);
 
-    return sizeRecall ? { fields: ['size'], mediaNames, values: { ...values, ...sizeRecall } } : null;
+    return fit.outcome === 'fits' ? { fields: ['size'], mediaNames, values: { ...values, ...fit.sizeRecall } } : null;
   }
 
   // all / remix from here on.

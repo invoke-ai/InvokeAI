@@ -42,7 +42,8 @@ const recallFixtures = vi.hoisted(() => ({
 }));
 
 vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation }));
-vi.mock('@workbench/image-actions/selectedImage', () => ({
+vi.mock('@workbench/image-actions/selectedImage', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
   getSelectedGalleryImage: () => recallFixtures.image,
   getSelectedGalleryItem: () => recallFixtures.item,
 }));
@@ -51,7 +52,8 @@ vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
   getGalleryImageMetadata: recallFixtures.metadata,
   getGalleryVideoMetadata: recallFixtures.videoMetadata,
 }));
-vi.mock('@workbench/WorkbenchContext', () => {
+// Partial: the video recall loads through the image-actions entry, whose menus import the rest of this module.
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => {
   const getProject = () => ({
     id: 'project-1',
     invocation: { sourceId: 'generate' },
@@ -61,6 +63,7 @@ vi.mock('@workbench/WorkbenchContext', () => {
   });
 
   return {
+    ...(await importOriginal<Record<string, unknown>>()),
     useWorkbenchCommands: () => workbench.commands,
     useWorkbenchExtensions: () => ({
       commands: {

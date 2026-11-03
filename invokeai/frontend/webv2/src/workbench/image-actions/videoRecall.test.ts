@@ -5,7 +5,10 @@ import {
   compileVideoGraph,
   createDefaultVideoWidgetValues,
   getDefaultVideoSettings,
+  getVideoDimensions,
+  getVideoValidationReasons,
   type VideoSettings,
+  type VideoWidgetValues,
 } from '@features/video';
 import { getVideoPromptPolicy } from '@features/video/core/videoPolicies';
 import i18n from 'i18next';
@@ -19,6 +22,7 @@ import {
   getVideoRecallMessage,
   getVideoSizeRecall,
   parseVideoRecallRecord,
+  resolveVideoSizeRecall,
 } from './videoRecall';
 
 const isVideoGenerationMetadata = (metadata: unknown): boolean =>
@@ -309,6 +313,110 @@ describe('buildVideoRecallSettings', () => {
 
     expect(recall(wanValues, 848, 464)).toBeNull();
     expect(recall({ ...wanValues, model: null }, 1280, 720)).toBeNull();
+  });
+
+  describe('a size recall with media in the panel', () => {
+    const image = (width: number, height: number) => ({ height, image_name: 'held.png', width });
+    const recallSize = (values: VideoWidgetValues, width: number, height: number) =>
+      buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height, width }),
+        models: catalog,
+      });
+    const wanValues = createDefaultVideoWidgetValues([WAN_T2V]);
+
+    it('writes nothing when the media would keep the frame from reaching the recorded size', () => {
+      const values = { ...wanValues, firstFrameImage: image(1280, 720) };
+
+      expect(recallSize(values, 720, 1280)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 720, 1280)).toMatchObject({
+        effective: { height: 720, width: 1280 },
+        outcome: 'media-conflict',
+      });
+    });
+
+    it('applies when the media resolves to the recorded size, keeping the media', () => {
+      const values = { ...wanValues, firstFrameImage: image(1920, 1080), targetResolution: '480p' as const };
+
+      expect(recallSize(values, 1280, 720)?.values).toEqual({
+        ...values,
+        aspectRatioId: '16:9',
+        targetResolution: '720p',
+      });
+    });
+
+    it('lets only a video-role conditioning clip own the frame, not an audio-role one', () => {
+      const ltx2 = ltx2Model('ltx2_dev');
+      const ltx2Values = createDefaultVideoWidgetValues([ltx2]);
+      const { height, width } = getVideoDimensions(ltx2, { ...ltx2Values, aspectRatioId: '16:9' })!;
+      const portrait = { duration: 4, fps: 24, height: 1920, video_name: 'held.mp4', width: 1080 };
+      const withClip = (role: 'audio' | 'video') =>
+        ({ ...ltx2Values, conditioningClip: { clip: portrait, role } }) as unknown as VideoWidgetValues;
+
+      expect(resolveVideoSizeRecall(withClip('audio'), width, height).outcome).toBe('fits');
+      expect(resolveVideoSizeRecall(withClip('video'), width, height).outcome).toBe('media-conflict');
+    });
+  });
+
+  describe('a size recall that would change whether the panel can run', () => {
+    const ltx2 = ltx2Model('ltx2_dev');
+    const ltx2Values = createDefaultVideoWidgetValues([ltx2]);
+    const audioClip = {
+      clip: { duration: 4, fps: 24, height: 1024, video_name: 'song.mp4', width: 1792 },
+      role: 'audio',
+    };
+    const metadata = wanMetadata({ height: 1024, width: 1792 });
+    const recall = (values: VideoWidgetValues) =>
+      buildVideoRecallSettings({ currentValues: values, kind: 'size', metadata, models: [ltx2] });
+
+    it('writes nothing when a two-stage preset would be refused alongside the conditioning clip', () => {
+      const values = {
+        ...ltx2Values,
+        conditioningClip: audioClip,
+        targetResolution: '720p',
+      } as unknown as VideoWidgetValues;
+
+      expect(recall(values)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 1792, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('does not run a two-stage target resolution'),
+      });
+    });
+
+    it('writes nothing when a two-stage preset needs more steps than the panel has', () => {
+      const values = { ...ltx2Values, steps: 1, targetResolution: '720p' } as unknown as VideoWidgetValues;
+
+      expect(recall(values)).toBeNull();
+      expect(resolveVideoSizeRecall(values, 1792, 1024)).toEqual({
+        outcome: 'invalid',
+        reason: expect.stringContaining('two-stage target resolution needs at least'),
+      });
+    });
+
+    it('does not hold a reason the panel already had against the recall', () => {
+      const values = {
+        ...ltx2Values,
+        conditioningClip: audioClip,
+        steps: 0,
+        targetResolution: '1024p',
+      } as unknown as VideoWidgetValues;
+
+      expect(getVideoValidationReasons(ltx2, values)).not.toEqual([]);
+      expect(recall(values)?.fields).toEqual(['size']);
+    });
+  });
+
+  it('tells apart no preset from media with no usable frame on the model', () => {
+    const h3 = h3Model();
+    const h3Values = createDefaultVideoWidgetValues([h3]);
+    const narrowFrame = { height: 500, image_name: 'held.png', width: 100 };
+
+    expect(resolveVideoSizeRecall(h3Values, 1000, 1000).outcome).toBe('unavailable');
+    expect(resolveVideoSizeRecall({ ...h3Values, model: null }, 1344, 768).outcome).toBe('unavailable');
+    expect(resolveVideoSizeRecall({ ...h3Values, firstFrameImage: narrowFrame }, 1344, 768).outcome).toBe(
+      'media-unresolvable'
+    );
   });
 
   it('remix recalls everything except the seed', () => {

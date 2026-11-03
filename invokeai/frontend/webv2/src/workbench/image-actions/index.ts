@@ -25,6 +25,7 @@ export { readRecordedModelRef } from './recordedModel';
 export {
   appendReferenceVideo,
   applyVideoRecallMetadata,
+  executeVideoRecall,
   getCurrentVideoValues,
   placeConditioningClip,
   placeInitialVideo,

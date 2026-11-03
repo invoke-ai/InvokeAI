@@ -46,8 +46,10 @@ import {
   getVideoRecallMessage,
   getVideoRecallTitle,
   parseVideoRecallRecord,
+  resolveVideoSizeRecall,
   type VideoRecallKind,
   type VideoRecallMediaNames,
+  type VideoSizeRecallFit,
 } from './videoRecall';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
@@ -188,6 +190,27 @@ const reportVideoRecallError = (
   return false;
 };
 
+const getSizeRecallFailureMessage = (
+  fit: VideoSizeRecallFit,
+  size: { height: number; width: number },
+  t: TFunction
+): string => {
+  switch (fit.outcome) {
+    case 'invalid':
+      return fit.reason;
+    case 'media-conflict':
+      return t('widgets.gallery.itemActions.recall.videoSizeMediaConflict', {
+        ...size,
+        effectiveHeight: fit.effective.height,
+        effectiveWidth: fit.effective.width,
+      });
+    case 'media-unresolvable':
+      return t('widgets.gallery.itemActions.recall.videoSizeMediaUnresolvable', size);
+    default:
+      return t('widgets.gallery.itemActions.recall.videoSizeUnavailable', size);
+  }
+};
+
 export const executeVideoRecall = async ({
   commands,
   getVideoValues,
@@ -217,8 +240,8 @@ export const executeVideoRecall = async ({
   }
 
   // Values are synced against the catalog: an empty one (not loaded yet, or failed) would drop the panel's model,
-  // LoRAs and components on commit.
-  if (models.length === 0) {
+  // LoRAs and components on commit. A prompts recall commits only the prompt keys, so it needs no catalog.
+  if (models.length === 0 && kind !== 'prompts') {
     commands.notifications.add({
       kind: 'info',
       message: t('widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall'),
@@ -235,21 +258,28 @@ export const executeVideoRecall = async ({
     return reportVideoRecallError(commands, owner, error, projectId);
   }
 
-  // A recorded size the panel's model has no preset for is not missing metadata: say which size and why.
+  // A recorded size the panel cannot take is not missing metadata: say which size and why. A size recall reads no
+  // media, so this sees the snapshot the recall below applies to.
   const record = kind === 'size' ? parseVideoRecallRecord(metadata) : null;
-  const emptyNotice =
-    record?.width && record.height
-      ? {
-          message: t('widgets.gallery.itemActions.recall.videoSizeUnavailable', {
-            height: record.height,
-            width: record.width,
-          }),
-          title: t('widgets.gallery.itemActions.recall.nothingRecalledVideoSize'),
-        }
-      : {
-          message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
-          title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
-        };
+  const size =
+    record?.isVideoGeneration && record.width && record.height ? { height: record.height, width: record.width } : null;
+  const emptyNotice = size
+    ? {
+        message: getSizeRecallFailureMessage(
+          resolveVideoSizeRecall(
+            getCurrentVideoValues({ models, videoValues: getVideoValues() }),
+            size.width,
+            size.height
+          ),
+          size,
+          t
+        ),
+        title: t('widgets.gallery.itemActions.recall.nothingRecalledVideoSize'),
+      }
+    : {
+        message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
+        title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
+      };
 
   return applyVideoRecallMetadata({
     commands,

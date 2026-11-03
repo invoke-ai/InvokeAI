@@ -255,7 +255,9 @@ export const useRegisterFirstPartyCommands = () => {
     owner: AccountScope,
     projectId: string
   ) => {
-    const { executeVideoRecall } = await import('@workbench/image-actions/executeVideoRecall');
+    // Through the entry the gallery's actions already load on every editor route: naming the module itself would split
+    // it out of their chunk, at two more boot requests.
+    const { executeVideoRecall } = await import('@workbench/image-actions');
 
     assertAccountScopeCurrent(owner);
     const didRecall = await executeVideoRecall({

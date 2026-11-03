@@ -5759,6 +5759,8 @@
           "unnamedConcept": "unnamed concept",
           "unnamedRefiner": "unnamed refiner",
           "videoMetadataUnsupported": "This video does not include supported Video metadata.",
+          "videoSizeMediaConflict": "Media in the Video panel sets the output to {{effectiveWidth}}×{{effectiveHeight}}, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
+          "videoSizeMediaUnresolvable": "Media in the Video panel has a shape this model can't use, so this video's {{width}}×{{height}} can't be applied. Remove that media to use this size.",
           "videoSizeUnavailable": "This video's size ({{width}}×{{height}}) isn't available for the current Video model, or no model is selected.",
           "fields": {
             "cfg": "CFG",

@@ -244,7 +244,7 @@ describe('executeVideoRecall', () => {
     );
   });
 
-  it('writes nothing while the model catalog is empty, which would drop the panel model, LoRAs and components', async () => {
+  it('commits only the prompt keys of a prompts recall while the model catalog is empty', async () => {
     videoMetadata.mockResolvedValue(metadata);
     const { commands, patchValues } = createCommands();
 
@@ -254,18 +254,43 @@ describe('executeVideoRecall', () => {
       commands,
       getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
       item,
-      kind: 'all',
+      kind: 'prompts',
       models: [],
     });
 
-    expect(didRecall).toBe(false);
-    expect(patchValues).not.toHaveBeenCalled();
-    expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
-      kind: 'info',
-      message: 'widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall',
-      title: 'widgets.gallery.itemActions.recall.cannotRecallVideo',
-    });
+    expect(didRecall).toBe(true);
+    expect(patchValues).toHaveBeenCalledExactlyOnceWith(
+      'video',
+      { negativePrompt: 'blurry', negativePromptEnabled: true, positivePrompt: 'a fox running' },
+      undefined
+    );
   });
+
+  it.each(['all', 'remix', 'seed', 'size'] as const)(
+    'writes nothing for %s while the model catalog is empty',
+    async (kind) => {
+      videoMetadata.mockResolvedValue(metadata);
+      const { commands, patchValues } = createCommands();
+
+      const didRecall = await executeVideoRecall({
+        queryClient,
+        t,
+        commands,
+        getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+        item,
+        kind,
+        models: [],
+      });
+
+      expect(didRecall).toBe(false);
+      expect(patchValues).not.toHaveBeenCalled();
+      expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
+        kind: 'info',
+        message: 'widgets.gallery.itemActions.recall.modelsUnavailableForVideoRecall',
+        title: 'widgets.gallery.itemActions.recall.cannotRecallVideo',
+      });
+    }
+  );
 
   it('writes the whole values object when the recall carries more than prompts', async () => {
     videoMetadata.mockResolvedValue(metadata);
@@ -344,6 +369,105 @@ describe('executeVideoRecall', () => {
     expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
       kind: 'info',
       message: 'widgets.gallery.itemActions.recall.videoSizeUnavailable',
+      title: 'widgets.gallery.itemActions.recall.nothingRecalledVideoSize',
+    });
+  });
+
+  it('names the panel media when it has no usable frame on the model, and shows a refused run its reason', async () => {
+    const recallSize = async (model: ModelConfig, values: Record<string, unknown>, width: number, height: number) => {
+      videoMetadata.mockResolvedValue({ ...metadata, height, width });
+      queryClient.clear();
+      const { commands, patchValues } = createCommands();
+
+      await executeVideoRecall({
+        queryClient,
+        t,
+        commands,
+        getVideoValues: () => ({ ...createDefaultVideoWidgetValues([model]), ...values }),
+        item,
+        kind: 'size',
+        models: [model],
+      });
+      expect(patchValues).not.toHaveBeenCalled();
+
+      return commands.notifications.add;
+    };
+
+    const narrowFrame = { firstFrameImage: { height: 500, image_name: 'held.png', width: 100 } };
+    const h3Checkpoint = { ...h3Model, format: 'checkpoint' } as ModelConfig;
+    expect(await recallSize(h3Checkpoint, narrowFrame, 1344, 768)).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.recall.videoSizeMediaUnresolvable',
+      title: 'widgets.gallery.itemActions.recall.nothingRecalledVideoSize',
+    });
+
+    const audioClip = {
+      conditioningClip: {
+        clip: { fps: 24, height: 1024, numFrames: 96, video_name: 'song.mp4', width: 1792 },
+        fpsKnown: true,
+        role: 'audio',
+      },
+    };
+    expect(
+      await recallSize(ltx2Model, { ...audioClip, targetResolution: '720p' }, 1792, 1024)
+    ).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: expect.stringContaining('does not run a two-stage target resolution'),
+      title: 'widgets.gallery.itemActions.recall.nothingRecalledVideoSize',
+    });
+  });
+
+  it('keeps the unsupported-metadata notice for a size key on a record that is not video generation', async () => {
+    videoMetadata.mockResolvedValue({ generation_mode: 'sdxl_txt2img', height: 720, width: 1280 });
+    const { commands } = createCommands();
+
+    await executeVideoRecall({
+      queryClient,
+      t,
+      commands,
+      getVideoValues: () => createDefaultVideoWidgetValues([wanModel]) as unknown as Record<string, unknown>,
+      item,
+      kind: 'size',
+      models: [wanModel],
+    });
+
+    expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.recall.videoMetadataUnsupported',
+      title: 'widgets.gallery.itemActions.recall.nothingRecalledVideo',
+    });
+  });
+
+  it('says media in the panel overrules the recorded size, and leaves the panel alone', async () => {
+    videoMetadata.mockResolvedValue({ ...metadata, height: 1280, width: 720 });
+    const { commands, patchValues } = createCommands();
+    const message = vi.fn((key: string) => key);
+    const videoValues = {
+      ...createDefaultVideoWidgetValues([wanModel]),
+      firstFrameImage: { height: 720, image_name: 'held.png', width: 1280 },
+    };
+
+    const didRecall = await executeVideoRecall({
+      queryClient,
+      t: message as unknown as TFunction,
+      commands,
+      getVideoValues: () => videoValues as unknown as Record<string, unknown>,
+      item,
+      kind: 'size',
+      models: [wanModel],
+    });
+
+    expect(didRecall).toBe(false);
+    expect(patchValues).not.toHaveBeenCalled();
+    expect(message).toHaveBeenCalledWith('widgets.gallery.itemActions.recall.videoSizeMediaConflict', {
+      effectiveHeight: 720,
+      effectiveWidth: 1280,
+      height: 1280,
+      width: 720,
+    });
+    expect(commands.notifications.add).toHaveBeenCalledExactlyOnceWith({
+      kind: 'info',
+      message: 'widgets.gallery.itemActions.recall.videoSizeMediaConflict',
       title: 'widgets.gallery.itemActions.recall.nothingRecalledVideoSize',
     });
   });
