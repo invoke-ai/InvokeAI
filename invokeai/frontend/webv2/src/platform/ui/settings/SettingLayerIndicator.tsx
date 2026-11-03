@@ -83,12 +83,7 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
     // up front: a menu mounted on first open let the dialog's focus scope claim focus for a frame before the menu did.
     <Menu.Root ids={ids} positioning={MENU_POSITIONING} onOpenChange={handleOpenChange}>
       {/* Quiet while the menu is open: it opens below the dot, where the tooltip would cover its first item. */}
-      <Tooltip
-        content={t('settingsDialog.layer.pinnedOptions')}
-        disabled={isMenuOpen}
-        ids={ids}
-        keepsRootWhenDisabled
-      >
+      <Tooltip content={t('settingsDialog.layer.pinnedOptions')} disabled={isMenuOpen} ids={ids} keepsRootWhenDisabled>
         <Menu.Trigger asChild>
           <IconButton
             ref={trigger}
