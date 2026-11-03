@@ -78,6 +78,9 @@ dependencies = [
   # `_iter_route_contexts` in tests/app/routers/test_model_manager_authorization.py). Keep the minor-version bound:
   # both of those were silent breakages that only surfaced because something happened to assert on them.
   "fastapi>=0.141.1,<0.142",
+  # Starlette 1.8 forwards `http.response.start` from inside GZipResponder, which our
+  # `_ContentTypeAwareGZipResponder` drops (#10119). FastAPI leaves Starlette unbounded above, so cap it here.
+  "starlette<1.8",
   "huggingface-hub",
   "networkx",
   "pydantic-settings",
