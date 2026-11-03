@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from dynamicprompts.commands import (
@@ -17,59 +17,73 @@ from dynamicprompts.parser.parse import parse
 from dynamicprompts.wildcards import WildcardManager
 from pyparsing import ParseException
 
+# Stands in for an immediate `${c=!...}` value, which the sampler reduces to one literal string.
+_SAMPLED_VALUE = LiteralCommand("")
 
-def _iter_wildcard_names(
-    command: Command,
-    variables: Mapping[str, Command] | None = None,
-    sampling: frozenset[str] = frozenset(),
-) -> Iterator[str]:
-    """Recursively yield the statically-known wildcard names that sampling `command` would evaluate.
+
+def _collect_wildcard_names(command: Command) -> list[str]:
+    """Return the statically-known wildcard names that sampling `command` would evaluate, in order.
 
     Variables are tracked the way `SamplingContext` resolves them, so a wildcard is only reported when
     it can actually run: a lazy assignment's value counts where the variable is read, a variable
-    default counts only while the variable is unset, and an immediate assignment counts where it is
-    assigned.
+    default counts only while the variable is unset, and an immediate assignment's value never
+    counts. `SamplingContext.process_variable_assignment` keeps only the first result of an
+    immediate value, so an unresolvable wildcard there can neither hang nor collapse the prompt.
+
+    A command is walked at most once per variable scope, so an expression that many references
+    share is not walked again for each of them.
     """
-    if variables is None:
-        variables = {}
-    if isinstance(command, WildcardCommand):
-        # The wildcard name may itself be a dynamic Command (e.g. `__${var}__`). Only plain string
-        # names can be validated ahead of time, so the dynamic case is intentionally skipped.
-        if isinstance(command.wildcard, str):
-            yield command.wildcard
-    elif isinstance(command, SequenceCommand):
-        # Mirrors `SamplingContext.process_variable_assignments`: every assignment in the sequence is
-        # applied against the enclosing scope before any other token is sampled, the last one wins.
-        assigned: dict[str, Command] = {}
-        for token in command.tokens:
-            if not isinstance(token, VariableAssignmentCommand):
-                continue
-            if not token.overwrite and token.name in variables:
-                assigned[token.name] = variables[token.name]
-            elif token.immediate:
-                # `${c=!{__nope__|x}}` samples its value right away, whether or not `c` is read.
-                yield from _iter_wildcard_names(token.value, variables, sampling)
-                assigned[token.name] = LiteralCommand("")
-            else:
-                assigned[token.name] = token.value
-        scope = {**variables, **assigned} if assigned else variables
-        for token in command.tokens:
-            if not isinstance(token, VariableAssignmentCommand):
-                yield from _iter_wildcard_names(token, scope, sampling)
-    elif isinstance(command, VariantCommand):
-        for value in command.values:
-            yield from _iter_wildcard_names(value, variables, sampling)
-    elif isinstance(command, WrapCommand):
-        yield from _iter_wildcard_names(command.wrapper, variables, sampling)
-        yield from _iter_wildcard_names(command.inner, variables, sampling)
-    elif isinstance(command, VariableAccessCommand):
-        # `${c}` samples the value bound to `c`, and `${c:{__nope__|x}}` falls back to its default
-        # only when `c` is unset. A recursive reference is left to the sampler's own RecursionError.
-        if command.name not in sampling:
-            target = variables.get(command.name, command.default)
+    names: dict[str, None] = {}
+    visited: set[tuple[int, frozenset[tuple[str, int]]]] = set()
+
+    def visit(command: Command, scope: Mapping[str, Command], scope_key: frozenset[tuple[str, int]]) -> None:
+        key = (id(command), scope_key)
+        if key in visited:
+            # Already walked in this scope (or being walked, for a recursive reference that the
+            # sampler rejects with its own RecursionError), so it cannot add a new name.
+            return
+        visited.add(key)
+        if isinstance(command, WildcardCommand):
+            # The wildcard name may itself be a dynamic Command (e.g. `__${var}__`). Only plain string
+            # names can be validated ahead of time, so the dynamic case is intentionally skipped.
+            if isinstance(command.wildcard, str):
+                names.setdefault(command.wildcard)
+        elif isinstance(command, SequenceCommand):
+            # Mirrors `SamplingContext.process_variable_assignments`: every assignment in the sequence
+            # is applied against the enclosing scope before any other token is sampled, the last one
+            # wins.
+            assigned: dict[str, Command] = {}
+            for token in command.tokens:
+                if not isinstance(token, VariableAssignmentCommand):
+                    continue
+                if not token.overwrite and token.name in scope:
+                    assigned[token.name] = scope[token.name]
+                elif token.immediate:
+                    assigned[token.name] = _SAMPLED_VALUE
+                else:
+                    assigned[token.name] = token.value
+            if assigned:
+                scope = {**scope, **assigned}
+                scope_key = frozenset((name, id(value)) for name, value in scope.items())
+            for token in command.tokens:
+                if not isinstance(token, VariableAssignmentCommand):
+                    visit(token, scope, scope_key)
+        elif isinstance(command, VariantCommand):
+            for value in command.values:
+                visit(value, scope, scope_key)
+        elif isinstance(command, WrapCommand):
+            visit(command.wrapper, scope, scope_key)
+            visit(command.inner, scope, scope_key)
+        elif isinstance(command, VariableAccessCommand):
+            # `${c}` samples the value bound to `c`, and `${c:{__nope__|x}}` falls back to its default
+            # only when `c` is unset.
+            target = scope.get(command.name, command.default)
             if target is not None:
-                yield from _iter_wildcard_names(target, variables, sampling | {command.name})
-    # LiteralCommand references no wildcards.
+                visit(target, scope, scope_key)
+        # LiteralCommand references no wildcards.
+
+    visit(command, {}, frozenset())
+    return list(names)
 
 
 def find_missing_wildcards(prompt: str, wildcard_manager: WildcardManager | None = None) -> list[str]:
@@ -100,11 +114,7 @@ def find_missing_wildcards(prompt: str, wildcard_manager: WildcardManager | None
         # Malformed prompts are surfaced separately by the generators; nothing to validate here.
         return []
 
-    missing: list[str] = []
-    for name in _iter_wildcard_names(tree):
-        if name not in missing and not wildcard_manager.get_values(name):
-            missing.append(name)
-    return missing
+    return [name for name in _collect_wildcard_names(tree) if not wildcard_manager.get_values(name)]
 
 
 @dataclass(frozen=True)

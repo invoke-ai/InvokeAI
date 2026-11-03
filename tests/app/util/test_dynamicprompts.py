@@ -4,7 +4,7 @@ import pytest
 from dynamicprompts.generators import CombinatorialPromptGenerator
 from dynamicprompts.wildcards import WildcardManager
 
-from invokeai.app.util.dynamicprompts import expand_dynamic_prompt, find_missing_wildcards
+from invokeai.app.util.dynamicprompts import ExpandedPrompts, expand_dynamic_prompt, find_missing_wildcards
 
 
 @pytest.fixture
@@ -73,7 +73,6 @@ def test_resolvable_wildcard_in_a_variant_generates_instead_of_hanging(
     "prompt",
     [
         "${c={__nope__|x}} a ${c}",
-        "${c=!{__nope__|x}} a ${c}",
         "${c=__nope__} a ${c}",
         "a ${c:{__nope__|x}}",
     ],
@@ -100,9 +99,29 @@ def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_vari
         "${c={__nope__|x}} a",
         # The lazy value is replaced before `c` is read.
         "${c={__nope__|x}} ${c=red} a ${c}",
+        # An immediate value is sampled once, keeping only its first result.
+        "${c=!{red|__nope__}} a ${c}",
+        "${c=!{__nope__|x}} a {b|d}",
     ],
 )
 def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
     assert find_missing_wildcards(prompt) == []
     result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
     assert result.error is None
+
+
+def test_immediate_assignment_keeps_only_the_first_result() -> None:
+    result = expand_dynamic_prompt("${c=!{red|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[" a red"])
+
+
+@pytest.mark.timeout(5)
+def test_find_missing_wildcards_walks_a_shared_variable_expression_once() -> None:
+    # Every variable reads the previous one twice, so walking each reference separately would take
+    # 2**40 steps.
+    chain = "".join(f"${{v{i}=${{v{i - 1}}} ${{v{i - 1}}}}} " for i in range(1, 41))
+    prompt = "${v0={a|b}} " + chain + "${v40}"
+
+    assert find_missing_wildcards(prompt) == []
+    assert find_missing_wildcards(prompt.replace("{a|b}", "{a|__nope__}")) == ["nope"]
