@@ -126,6 +126,7 @@ export const isVideoPlayerControlsTarget = (target: Element): boolean =>
 // Idle controls fade out, but stay focusable: keyboard focus inside the player, or the pointer resting on the bar,
 // keeps them shown.
 const CONTROLS_SHOWN_ANYWAY = `:has(:focus-visible, [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]:hover)`;
+const CONTROLS_HIDDEN = `[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY})`;
 const PLAYER_CONTAINER = 'video-player';
 
 /**
@@ -155,8 +156,8 @@ const ROOT_CSS = {
   // The full bar drops controls by the player's own width, wherever it is placed.
   containerName: PLAYER_CONTAINER,
   containerType: 'inline-size',
-  [`&[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY})`]: { cursor: 'none' },
-  [`&[data-controls-hidden]:not(${CONTROLS_SHOWN_ANYWAY}) [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]`]: {
+  [`&${CONTROLS_HIDDEN}`]: { cursor: 'none' },
+  [`&${CONTROLS_HIDDEN} [${VIDEO_PLAYER_CONTROLS_ATTRIBUTE}]`]: {
     opacity: 0,
     pointerEvents: 'none',
   },
@@ -694,9 +695,10 @@ const VolumeControls = ({
 /**
  * A video with its own controls: play, loop (on by default), an optional playback window, scrubbing, frame steps with
  * `fps`, speed, volume and fullscreen. `isVideoPlayerControlsTarget` tells the controls' pointer input from the
- * picture's. Shortcuts act only while focus is inside the player. Hiding or unmounting the
- * player pauses it, so audio never outlives its controls. Media errors leave the picture to the caller (`onError` and
- * `overlay`) and remove the controls, since none of them could work.
+ * picture's. Clicking the picture plays and pauses, except that a touch tap while the controls are hidden only brings
+ * them back. Shortcuts act only while focus is inside the player. Hiding or unmounting the player pauses it, so audio
+ * never outlives its controls. Media errors leave the picture to the caller (`onError` and `overlay`) and remove the
+ * controls, since none of them could work.
  */
 export const VideoPlayer = ({
   'aria-label': label,
@@ -742,6 +744,8 @@ export const VideoPlayer = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isVolumeOpen, setIsVolumeOpen] = useState(false);
   const idleTimerRef = useRef<number | null>(null);
+  // Set by a touch press made while the controls were hidden: its tap only brings them back.
+  const revealingTapRef = useRef(false);
   // A mid-playback error can leave metadata in place, but nothing the controls do would work.
   const disabled = !status.ready || status.error;
 
@@ -936,6 +940,15 @@ export const VideoPlayer = ({
     },
     [canFullscreen, disabled, size, stepFrame, store, toggleFullscreen, toggleLoop, toggleMute, wake]
   );
+  // Hidden controls take no pointer input, so a touch lands on the picture; toggling playback there would leave a touch
+  // user no way to reach the controls of a playing clip.
+  const handlePointerDown = useCallback(
+    (event: PointerEvent<HTMLDivElement>) => {
+      revealingTapRef.current = event.pointerType === 'touch' && event.currentTarget.matches(CONTROLS_HIDDEN);
+      wake();
+    },
+    [wake]
+  );
   const handlePointerLeave = useCallback(
     (event: PointerEvent<HTMLDivElement>) => {
       // Touch pointers leave on every lift; only a mouse leaving means nobody is looking at the controls.
@@ -950,8 +963,14 @@ export const VideoPlayer = ({
     (event: MouseEvent<HTMLVideoElement>) => {
       onClick?.(event);
 
+      // Only a click that a press produced (detail > 0): a touch press can end in no click, and an activation without a
+      // press (`click()`, assistive technology) must not be taken for its tap.
+      const isRevealingTap = revealingTapRef.current && event.detail > 0;
+
+      revealingTapRef.current = false;
+
       // A double-click's second click is not a second toggle.
-      if (!event.defaultPrevented && !disabled && event.detail <= 1) {
+      if (!event.defaultPrevented && !disabled && !isRevealingTap && event.detail <= 1) {
         store.togglePlay();
       }
     },
@@ -1037,7 +1056,7 @@ export const VideoPlayer = ({
       tabIndex={-1}
       w="full"
       onKeyDown={handleKeyDown}
-      onPointerDown={wake}
+      onPointerDown={handlePointerDown}
       onPointerLeave={handlePointerLeave}
       onPointerMove={wake}
     >

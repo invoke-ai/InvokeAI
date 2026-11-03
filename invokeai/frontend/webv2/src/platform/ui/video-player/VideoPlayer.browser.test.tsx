@@ -129,6 +129,29 @@ const scrubPointer = async (
   });
 };
 
+/** A press and release on the picture, then its click unless `withClick` is false, from a touch or a mouse. */
+const tapPicture = async (video: HTMLVideoElement, pointerType: 'mouse' | 'touch', withClick = true) => {
+  const rect = video.getBoundingClientRect();
+  const init = {
+    bubbles: true,
+    cancelable: true,
+    clientX: rect.left + rect.width / 2,
+    clientY: rect.top + rect.height / 3,
+    isPrimary: true,
+    pointerId: 2,
+    pointerType,
+  };
+
+  await act(() => {
+    video.dispatchEvent(new PointerEvent('pointerdown', { ...init, button: 0, buttons: 1 }));
+    video.dispatchEvent(new PointerEvent('pointerup', { ...init, button: 0, buttons: 0 }));
+
+    if (withClick) {
+      video.dispatchEvent(new PointerEvent('click', { ...init, button: 0, detail: 1 }));
+    }
+  });
+};
+
 describe('VideoPlayer', () => {
   it('plays and pauses from its button, Space on the player, and K', async () => {
     const { video } = await renderPlayer();
@@ -456,6 +479,39 @@ describe('VideoPlayer', () => {
     await userEvent.keyboard('k');
     await expect.poll(() => video.paused).toBe(true);
     expect(getPlayer().hasAttribute('data-controls-hidden')).toBe(false);
+  });
+
+  it('brings hidden controls back for a touch tap on the picture without pausing; a mouse click still pauses', async () => {
+    const { video } = await renderPlayer();
+    await play(video);
+    await userEvent.unhover(getPlayer());
+    await expect.poll(() => getPlayer().hasAttribute('data-controls-hidden')).toBe(true);
+
+    await tapPicture(video, 'touch');
+    await settle();
+
+    expect(getPlayer().hasAttribute('data-controls-hidden')).toBe(false);
+    expect(video.paused).toBe(false);
+
+    // With the controls showing, a tap plays and pauses as a click does.
+    await tapPicture(video, 'touch');
+    await expect.poll(() => video.paused).toBe(true);
+
+    await play(video);
+    await userEvent.unhover(getPlayer());
+    await expect.poll(() => getPlayer().hasAttribute('data-controls-hidden')).toBe(true);
+
+    await tapPicture(video, 'mouse');
+    await expect.poll(() => video.paused).toBe(true);
+
+    // A touch press that ends in no click (a swipe) leaves a later activation without a press, such as assistive
+    // technology's, to play and pause.
+    await play(video);
+    await userEvent.unhover(getPlayer());
+    await expect.poll(() => getPlayer().hasAttribute('data-controls-hidden')).toBe(true);
+    await tapPicture(video, 'touch', false);
+    await act(() => video.click());
+    await expect.poll(() => video.paused).toBe(true);
   });
 
   it('offers no frame stepping without a frame rate', async () => {
