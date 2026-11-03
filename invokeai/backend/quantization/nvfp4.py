@@ -214,7 +214,7 @@ class NVFP4Payload:
 
 def find_nvfp4_layers(
     sd: Mapping[str, Any],
-    header_layers: Mapping[str, Any] | None = None,
+    header_layers: Mapping[str, Any] | None,
     *,
     markers: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[str]:
@@ -222,13 +222,14 @@ def find_nvfp4_layers(
 
     Detection is structural -- a ``weight_scale_2`` beside the weight -- and decided per layer, never per
     file. Refused, naming the layers: AWQ layers; markers that contradict their tensors; packed weights
-    with a ``weight_scale`` but no ``weight_scale_2``; malformed layers, a grid that is not whole scale
-    tiles among them; and layers that neither a ``.comfy_quant`` marker nor a ``_quantization_metadata``
-    entry (``header_layers``, in ``sd``'s key space) names as nvfp4.
+    with a ``weight_scale`` but no ``weight_scale_2``; malformed layers, a grid that is not whole scale tiles among them; and layers that neither a
+    ``.comfy_quant`` marker nor a ``_quantization_metadata`` entry (``header_layers``, in ``sd``'s key
+    space) names as nvfp4.
 
-    Only names, dtypes and shapes are read, so identification asks this of a header's meta tensors too.
-    It passes the decoded markers by layer as ``markers``, read from the file's bytes, since a meta tensor
-    has none to decode; a loader leaves them to be decoded from ``sd``.
+    Reads dtypes and shapes only, so identification can run it over meta tensors and refuse at install time
+    what a load would refuse. A meta marker has no bytes to parse, so there pass the markers as ``markers``,
+    keyed by layer path as ``read_comfy_quant_markers`` reads them; each ``.comfy_quant`` key in ``sd`` then
+    takes its entry from there instead of from its tensor, and a marker of a layer not in ``sd`` is ignored.
     """
     layers = sorted(
         k[: -len(WEIGHT_SCALE_2_SUFFIX)] for k in sd if isinstance(k, str) and k.endswith(WEIGHT_SCALE_2_SUFFIX)
@@ -250,7 +251,9 @@ def find_nvfp4_layers(
             if isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX)
         }
     marked: dict[str, Any] = {}
-    for path, marker in markers.items():
+    for key in [k for k in sd if isinstance(k, str) and k.endswith(COMFY_QUANT_SUFFIX)]:
+        path = key[: -len(COMFY_QUANT_SUFFIX)]
+        marker = parse_comfy_quant_marker(sd[key]) if markers is None else markers.get(path, {})
         marked[path] = marker.get("format")
         if marked[path] == NVFP4_FORMAT and path not in claimed:
             raise ValueError(f"nvfp4 layer '{path}' has no weight_scale_2, so it cannot be decoded.")

@@ -27,6 +27,7 @@ from invokeai.backend.quantization.nvfp4 import (
     NVFP4Linear,
     NVFP4Payload,
     dequantize_nvfp4_weight,
+    find_nvfp4_layers,
     install_nvfp4_layers,
     pop_nvfp4_layers,
     predict_nvfp4_install_size,
@@ -226,6 +227,31 @@ def test_a_layer_nothing_names_as_nvfp4_is_refused_rather_than_read_by_comfy_con
     with pytest.raises(ValueError, match="laid out like nvfp4 that no ComfyUI"):
         pop_nvfp4_layers(sd, header_layers={"other": {"format": "nvfp4"}})
     assert "layer.weight" in sd
+
+
+@pytest.mark.parametrize("marker", [{}, {"full_precision_matrix_mult": False}], ids=["empty", "format_less"])
+@pytest.mark.parametrize("source", ["tensor", "markers"])
+def test_a_marker_naming_no_format_does_not_name_a_packed_layer(marker: dict, source: str) -> None:
+    """Only a marker or header entry whose format is nvfp4 names a layer; a marker's presence alone says nothing.
+    Identification passes the file's markers as `markers`, its meta marker tensors having no bytes to parse."""
+    sd = _zero_layer("layer")
+    if source == "tensor":
+        sd["layer.comfy_quant"] = comfy_quant_marker(marker)
+        kwargs = {}
+    else:
+        sd["layer.comfy_quant"] = torch.empty(0, dtype=torch.uint8, device="meta")
+        kwargs = {"markers": {"layer": marker}}
+
+    with pytest.raises(ValueError, match="laid out like nvfp4 that no ComfyUI"):
+        find_nvfp4_layers(sd, None, **kwargs)
+    assert find_nvfp4_layers(sd, {"layer": {"format": "nvfp4"}}, **kwargs) == ["layer"]
+
+
+def test_markers_passed_in_stand_for_the_marker_tensors() -> None:
+    sd = _zero_layer("layer")
+    sd["layer.comfy_quant"] = torch.empty(0, dtype=torch.uint8, device="meta")
+
+    assert find_nvfp4_layers(sd, None, markers={"layer": {"format": "nvfp4"}}) == ["layer"]
 
 
 def test_an_awq_checkpoint_is_refused_before_anything_is_taken_out() -> None:
