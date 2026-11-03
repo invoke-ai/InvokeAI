@@ -2,6 +2,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Optional
 
+import numpy
 from PIL.Image import Image as PILImageType
 
 from invokeai.app.invocations.fields import MetadataField
@@ -33,13 +34,58 @@ from invokeai.app.services.shared.intermediate_delete import (
     delete_journaled_intermediates,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
-from invokeai.backend.image_util.raster.convert import raster_from_pil
+from invokeai.backend.image_util.raster.convert import quantize_unit, raster_from_pil, raster_to_pil
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterConversionError,
+    ValueRange,
+)
 from invokeai.backend.image_util.raster.precise_asset import (
     PRECISE_ASSET_FORMAT,
     PRECISE_ASSET_VERSION,
     PreciseAssetError,
+    check_precise_asset_bounds,
 )
 from invokeai.backend.image_util.raster.raster import RasterImage
+
+_DISPLAY_CHANNELS = (RasterChannels.L, RasterChannels.LA, RasterChannels.RGB, RasterChannels.RGBA)
+_ICC_HEADER_BYTES = 128
+
+
+def _require_matching_icc(raster: RasterImage) -> None:
+    """An ICC profile must describe the raster's channels: the color space is at bytes 16-20 of the profile header."""
+    profile = raster.descriptor.icc_profile
+    if profile is None:
+        return
+    expected = b"GRAY" if raster.descriptor.channels in (RasterChannels.L, RasterChannels.LA) else b"RGB "
+    if len(profile) < _ICC_HEADER_BYTES or profile[16:20] != expected:
+        raise RasterConversionError(
+            f"the ICC profile does not describe a {expected.decode().strip()} image "
+            f"({raster.descriptor.channels.value} raster)"
+        )
+
+
+def _require_displayable(raster: RasterImage) -> None:
+    """Refuses, before anything is persisted, a raster the PNG derivative cannot be made from or the asset cannot hold.
+
+    The derivative is a display quantization, which means something only for sRGB values in the unit range (finiteness is checked by the quantization itself).
+    """
+    descriptor = raster.descriptor
+    if (
+        descriptor.color is not ColorEncoding.SRGB
+        or descriptor.value_range is not ValueRange.UNIT
+        or descriptor.alpha is AlphaMode.PREMULTIPLIED
+        or descriptor.channels not in _DISPLAY_CHANNELS
+    ):
+        raise RasterConversionError(
+            f"no display policy for {descriptor.channels.value}/{descriptor.color.value}/"
+            f"{descriptor.value_range.value}/{descriptor.alpha.value} rasters yet; "
+            "only sRGB unit-range L/LA/RGB/RGBA with straight or no alpha can be stored precisely"
+        )
+    check_precise_asset_bounds(raster)
+    _require_matching_icc(raster)
 
 
 class ImageService(ImageServiceABC):
@@ -85,6 +131,79 @@ class ImageService(ImageServiceABC):
         project_id: Optional[str] = None,
         resolved_inputs: Optional[str] = None,
     ) -> ImageDTO:
+        return self._create(
+            image,
+            None,
+            image_origin,
+            image_category,
+            node_id=node_id,
+            session_id=session_id,
+            board_id=board_id,
+            is_intermediate=is_intermediate,
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+            user_id=user_id,
+            project_id=project_id,
+            resolved_inputs=resolved_inputs,
+        )
+
+    def create_from_raster(
+        self,
+        raster: RasterImage,
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        node_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
+        is_intermediate: Optional[bool] = False,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
+    ) -> ImageDTO:
+        _require_displayable(raster)
+        # Pure CPU, so it runs before the mutation lock is taken. The raster is frozen and outlives the save, which
+        # only reads the derivative, so it can wrap the quantized pixels without a second copy.
+        derivative = raster_to_pil(quantize_unit(raster, numpy.uint8), share_pixels=True)
+        return self._create(
+            derivative,
+            raster,
+            image_origin,
+            image_category,
+            node_id=node_id,
+            session_id=session_id,
+            board_id=board_id,
+            is_intermediate=is_intermediate,
+            metadata=metadata,
+            workflow=workflow,
+            graph=graph,
+            user_id=user_id,
+            project_id=project_id,
+            resolved_inputs=resolved_inputs,
+        )
+
+    def _create(
+        self,
+        image: PILImageType,
+        raster: Optional[RasterImage],
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        node_id: Optional[str],
+        session_id: Optional[str],
+        board_id: Optional[str],
+        is_intermediate: Optional[bool],
+        metadata: Optional[str],
+        workflow: Optional[str],
+        graph: Optional[str],
+        user_id: Optional[str],
+        project_id: Optional[str],
+        resolved_inputs: Optional[str],
+    ) -> ImageDTO:
+        """Shared body of `create` and `create_from_raster`: `image` is the gallery PNG source, `raster` (precise saves
+        only) the exact pixels the image was derived from."""
         if image_origin not in ResourceOrigin:
             raise InvalidOriginException
 
@@ -135,6 +254,15 @@ class ImageService(ImageServiceABC):
                         )
                     except Exception as e:
                         self.__invoker.services.logger.warning(f"Failed to add image to board {board_id}: {str(e)}")
+                if raster is not None:
+                    # Staged and published under the lock, with the row inserted before it is released: a
+                    # concurrent maintenance run must never find the asset without its row.
+                    self.__invoker.services.image_files.save_precise(raster, image_name, image_subfolder)
+                    self.__invoker.services.database.queries.image_precise_assets.insert(
+                        image_name=image_name,
+                        asset_format=PRECISE_ASSET_FORMAT,
+                        format_version=PRECISE_ASSET_VERSION,
+                    )
                 self.__invoker.services.image_files.save(
                     image_name=image_name,
                     image=image,
@@ -158,6 +286,10 @@ class ImageService(ImageServiceABC):
             raise
         except Exception as e:
             self.__invoker.services.logger.error(f"Problem saving image record and file: {str(e)}")
+            if raster is not None:
+                # A precise save is one unit: a failure at any later step (row insert, size, DTO, notification)
+                # must not leave the record or its files behind.
+                self.__clean_up_failed_save(image_name, image_subfolder)
             raise e
 
     def _record_file_size(self, image_name: str, image_subfolder: str) -> None:

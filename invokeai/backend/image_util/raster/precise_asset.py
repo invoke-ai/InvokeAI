@@ -68,16 +68,26 @@ def _check_bounds(height: int, width: int, channels: int, itemsize: int, icc_len
         raise PreciseAssetError(f"icc_profile exceeds the limit of {MAX_ICC_BYTES} bytes")
 
 
+def check_precise_asset_bounds(raster: RasterImage) -> None:
+    """Raise PreciseAssetError when `raster` is outside the bounds `write_precise_asset` enforces.
+
+    Lets a caller refuse an oversized raster before it persists anything else.
+    """
+    icc = raster.descriptor.icc_profile
+    _check_bounds(
+        raster.height, raster.width, raster.channel_count, raster.dtype.itemsize, None if icc is None else len(icc)
+    )
+
+
 def write_precise_asset(raster: RasterImage, path: Path) -> None:
     """Write `raster` to `path` (created or overwritten).
 
     Rasters outside the reader's bounds are refused with PreciseAssetError before anything is written.
     I/O failures surface as OSError and MemoryError propagates unchanged; publication policy is the caller's.
     """
+    check_precise_asset_bounds(raster)
     descriptor = raster.descriptor
     icc = descriptor.icc_profile
-    icc_length = None if icc is None else len(icc)
-    _check_bounds(raster.height, raster.width, raster.channel_count, raster.dtype.itemsize, icc_length)
     # safetensors writes raw bytes without checking strides, so the array must be C-contiguous.
     tensors = {_PIXELS: np.ascontiguousarray(raster.view())}
     if icc is not None:

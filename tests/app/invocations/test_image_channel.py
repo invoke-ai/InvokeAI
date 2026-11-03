@@ -44,6 +44,7 @@ def stack(tmp_path: Path):
     invoker.services.configuration.pil_compress_level = 6
     invoker.services.configuration.image_subfolder_strategy = "flat"
     invoker.services.configuration.multiuser = False
+    invoker.services.configuration.precise_image_storage = False
     storage.start(invoker)
     db = init_database(config=config, logger=InvokeAILogger.get_logger(), image_files=storage)
     counter = itertools.count()
@@ -72,7 +73,12 @@ def stack(tmp_path: Path):
     )
     images = ImagesInterface(invoker.services, data, MagicMock())
     return SimpleNamespace(
-        service=service, storage=storage, database=db, images=images, context=SimpleNamespace(images=images)
+        service=service,
+        storage=storage,
+        database=db,
+        images=images,
+        context=SimpleNamespace(images=images),
+        configuration=invoker.services.configuration,
     )
 
 
@@ -195,6 +201,33 @@ def test_channel_of_a_float_image_without_display_meaning_is_refused(color, valu
     images.save_raster.assert_not_called()
 
 
+def test_with_precise_storage_the_channel_of_a_precise_float_image_stays_float(stack) -> None:
+    stack.configuration.precise_image_storage = True
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    red = np.array([[0.5, -0.3, 1.7], [0.3, 1.0, 0.25]], np.float32)
+    pixels = np.stack([red, np.zeros_like(red), np.ones_like(red)], axis=2)
+    name = _store_precise(stack, RasterImage.from_array(pixels, descriptor))
+
+    output = ImageChannelInvocation(id="channel", image={"image_name": name}, channel="R").invoke(stack.context)
+
+    channel = stack.service.get_raster(output.image.image_name)
+    assert channel.dtype == np.float32
+    assert channel.descriptor.channels is RasterChannels.L
+    assert channel.view()[:, :, 0].tobytes() == red.tobytes()
+    with Image.open(stack.storage.get_path(output.image.image_name)) as derivative:
+        assert np.asarray(derivative).tolist() == [[128, 0, 255], [77, 255, 64]]
+
+
+@pytest.mark.parametrize("mode", ["RGB", "RGBA"])
+def test_with_precise_storage_a_png_only_source_gives_the_same_output_as_without(stack, mode: str) -> None:
+    stack.configuration.precise_image_storage = True
+
+    old_name, new_name = _run(stack, mode, "G")
+
+    assert stack.storage.get_path(new_name).read_bytes() == stack.storage.get_path(old_name).read_bytes()
+    assert stack.database.queries.image_precise_assets.get(new_name) is None
+
+
 def test_channel_of_a_precise_uint16_rgba_image_keeps_all_16_bits(stack) -> None:
     descriptor = RasterDescriptor(RasterChannels.RGBA, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.STRAIGHT, 4)
     pixels = np.array([[[0, 1, 2, 65535], [40000, 3, 4, 5]]], np.uint16)
@@ -215,6 +248,7 @@ def _premultiplied(dtype, values) -> RasterImage:
 def _run_with(source: RasterImage, channel: str) -> list[RasterImage]:
     saved: list[RasterImage] = []
     images = SimpleNamespace(
+        precise_storage_enabled=False,
         get_raster=lambda name: source,
         save_raster=lambda raster: saved.append(raster) or SimpleNamespace(image_name="out.png", width=1, height=1),
     )

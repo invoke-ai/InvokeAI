@@ -1456,6 +1456,71 @@ def test_read_precise_of_a_corrupt_file_is_a_precise_asset_error(tmp_path: Path)
         storage.read_precise("img.png")
 
 
+def test_save_precise_stages_beside_the_destination_where_maintenance_recognizes_it(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    seen: list[Path] = []
+    real_write = write_precise_asset
+
+    def observe_staging(raster: RasterImage, path: Path) -> None:
+        seen.extend(storage.iter_precise_staging_paths())
+        assert list(storage.iter_precise_paths()) == []
+        real_write(raster, path)
+
+    with patch("invokeai.app.services.image_files.image_files_disk.write_precise_asset", observe_staging):
+        storage.save_precise(_float_raster(), "img.png", "sub")
+
+    assert [path.parent for path in seen] == [storage.get_precise_path("img.png", "sub").parent]
+    assert list(storage.iter_precise_staging_paths()) == []
+    assert storage.read_precise("img.png", "sub").view().tobytes() == _float_raster().view().tobytes()
+
+
+def test_save_precise_publishes_without_hard_links_by_renaming(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+
+    with patch.object(no_replace.os, "link", _refuse_link):
+        storage.save_precise(_float_raster(), "img.png")
+
+    assert storage.read_precise("img.png").view().tobytes() == _float_raster().view().tobytes()
+    assert list(storage.iter_precise_staging_paths()) == []
+
+
+def test_save_precise_never_replaces_an_existing_asset_and_removes_its_staging_file(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    path = storage.get_precise_path("img.png")
+    path.write_bytes(b"existing")
+
+    with pytest.raises(ImageFileSaveException):
+        storage.save_precise(_float_raster(), "img.png")
+
+    assert path.read_bytes() == b"existing"
+    assert list(storage.iter_precise_staging_paths()) == []
+
+
+def test_save_precise_removes_its_published_asset_when_the_directory_sync_fails(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+
+    def failing_sync(directory: Path, missing_ok: bool = False) -> None:
+        raise OSError(errno.EIO, "injected", str(directory))
+
+    with patch.object(DiskImageFileStorage, "_DiskImageFileStorage__fsync_directory", staticmethod(failing_sync)):
+        with pytest.raises(ImageFileSaveException):
+            storage.save_precise(_float_raster(), "img.png")
+
+    assert not storage.get_precise_path("img.png").exists()
+    assert [p for p in storage.precise_root.rglob("*") if p.is_file()] == []
+
+
+def test_save_precise_of_an_oversized_raster_writes_nothing(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    descriptor = RasterDescriptor(RasterChannels.RGBA, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.STRAIGHT, 4)
+    huge = RasterImage.borrow(np.broadcast_to(np.zeros((1, 1, 4), np.float32), (20000, 20000, 4)), descriptor)
+
+    with pytest.raises(ImageFileSaveException):
+        storage.save_precise(huge, "img.png")
+
+    assert [p for p in storage.precise_root.rglob("*") if p.is_file()] == []
+
+
 def _write_precise(storage: DiskImageFileStorage, image_name: str, subfolder: str = "") -> Path:
     path = storage.get_precise_path(image_name, subfolder)
     path.parent.mkdir(parents=True, exist_ok=True)

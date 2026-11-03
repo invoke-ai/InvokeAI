@@ -884,6 +884,17 @@
     },
     {
       "category": "GENERATION",
+      "default": false,
+      "description": "Opt-in. Nodes that produce 16-bit color or floating-point sRGB images store the exact pixels (including values beyond 0-1) next to the gallery PNG, in `outputs/images/precise/`, so later nodes read them back losslessly; the PNG stays an 8-bit display copy. Linear, unbounded or premultiplied images are refused. Adds width x height x channels x 2 bytes (16-bit, float16) or x 4 bytes (float32) per such image, e.g. 64 MiB for a 2048x2048 RGBA float32 image. Off by default: those nodes then save 8-bit PNGs only. Turning it off stops new precise images and never deletes existing ones.",
+      "env_var": "INVOKEAI_PRECISE_IMAGE_STORAGE",
+      "literal_values": [],
+      "name": "precise_image_storage",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": 10000,
       "description": "Maximum number of items in the session queue.",
       "env_var": "INVOKEAI_MAX_QUEUE_SIZE",

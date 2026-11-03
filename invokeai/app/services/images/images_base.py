@@ -65,6 +65,32 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
+    def create_from_raster(
+        self,
+        raster: RasterImage,
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        node_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
+        is_intermediate: Optional[bool] = False,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
+    ) -> ImageDTO:
+        """Creates an image with a precise asset: the raster's exact pixels, an 8-bit PNG display derivative made
+        from it by display quantization, the thumbnail and the association row, as one unit.
+
+        The raster must be displayable as sRGB (UNIT range, no premultiplied alpha, L/LA/RGB/RGBA, finite) and within
+        the precise asset bounds; otherwise RasterConversionError or PreciseAssetError is raised before anything is
+        persisted. A failure after that leaves no record, row or file.
+        """
+        pass
+
+    @abstractmethod
     def copy(
         self,
         source_image_name: str,

@@ -25,7 +25,7 @@ from invokeai.app.services.image_files.image_files_common import (
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.no_replace import file_signature, publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
-from invokeai.backend.image_util.raster.precise_asset import read_precise_asset
+from invokeai.backend.image_util.raster.precise_asset import read_precise_asset, write_precise_asset
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -347,6 +347,41 @@ class DiskImageFileStorage(ImageFileStorageBase):
                         pass
             self.evict_cache_paths([path for path in (image_path, thumbnail_path) if path is not None])
             raise ImageFileSaveException from e
+
+    def save_precise(self, raster: RasterImage, image_name: str, image_subfolder: str = "") -> None:
+        precise_path: Optional[Path] = None
+        published = False
+        temporary_path: Optional[Path] = None
+        try:
+            self.__validate_storage_folders()
+            precise_path = self.get_precise_path(image_name, image_subfolder)
+            precise_path.parent.mkdir(parents=True, exist_ok=True)
+            # The `.tmp` prefix is what gallery maintenance recognizes as an interrupted write. The suffix keeps the
+            # staging file out of the asset walk (`.safetensors`).
+            descriptor, temporary_name = tempfile.mkstemp(prefix=".tmp-", suffix=".partial", dir=precise_path.parent)
+            os.close(descriptor)
+            temporary_path = Path(temporary_name)
+            write_precise_asset(raster, temporary_path)
+            with open(temporary_path, "rb+") as completed_file:
+                os.fsync(completed_file.fileno())
+            # Never replaces: the name is new, so an existing file is a stray that no row owns.
+            publish_noreplace(temporary_path, precise_path)
+            published = True
+            self.__fsync_directory(precise_path.parent)
+        except Exception as e:
+            # Whatever reached the final name is ours: the caller's name is fresh and publication refuses to replace.
+            if published and precise_path is not None:
+                try:
+                    precise_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            raise ImageFileSaveException from e
+        finally:
+            if temporary_path is not None:
+                try:
+                    temporary_path.unlink(missing_ok=True)
+                except OSError:
+                    pass
 
     def generate_thumbnail_if_missing(
         self, image_name: str, image_subfolder: str = "", thumbnail_size: int = 256

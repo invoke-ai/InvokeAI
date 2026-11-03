@@ -33,7 +33,7 @@ from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callback
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
-from invokeai.backend.image_util.raster.convert import raster_to_pil
+from invokeai.backend.image_util.raster.convert import pil_refusal, raster_to_pil
 from invokeai.backend.image_util.raster.descriptor import RasterConversionError
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.configs.base import Config_Base
@@ -301,6 +301,13 @@ class ImagesInterface(InvocationContextInterface):
 
         return self._save_image(image, board_id, image_category, metadata)
 
+    @property
+    def precise_storage_enabled(self) -> bool:
+        """Whether `save_raster` stores rasters the gallery PNG cannot represent exactly (16-bit RGB/RGBA, float16,
+        float32) as precise images. A node that does not need exactness can check this and quantize explicitly
+        (`quantize_unit`) when it is False."""
+        return self._services.configuration.precise_image_storage
+
     def save_raster(
         self,
         raster: RasterImage,
@@ -311,9 +318,13 @@ class ImagesInterface(InvocationContextInterface):
         """Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled
         exactly as in `save`.
 
-        Only rasters the gallery PNG represents exactly are accepted: uint8 sRGB L/LA/RGB/RGBA with straight alpha
-        and uint16 L. Anything else raises `RasterConversionError`; quantize explicitly first (`quantize_unit`)
-        instead of relying on a silent conversion here. Nothing is saved when the raster is refused.
+        A raster the gallery PNG represents exactly (uint8 sRGB L/LA/RGB/RGBA with straight alpha, uint16 L) is saved
+        as an ordinary image. Any other raster is saved as a precise image when `precise_storage_enabled` and the
+        raster is displayable (sRGB, unit range, L/LA/RGB/RGBA, no premultiplied alpha, finite, within the asset
+        bounds): its exact pixels are stored losslessly and `get_raster` returns them, while the gallery shows an
+        8-bit PNG made from them by display quantization. Otherwise `RasterConversionError` is raised (and
+        `PreciseAssetError` for an oversized raster); quantize explicitly first instead of relying on a silent
+        conversion here. Nothing is saved when the raster is refused.
 
         Args:
             raster: The raster to save.
@@ -325,18 +336,20 @@ class ImagesInterface(InvocationContextInterface):
             The saved image DTO.
         """
 
-        try:
-            image = raster_to_pil(raster)
-        except RasterConversionError as e:
+        refusal = pil_refusal(raster)
+        if refusal is None:
+            return self._save_image(raster_to_pil(raster), board_id, image_category, metadata)
+        if not self.precise_storage_enabled:
             raise RasterConversionError(
-                f"{e}; the gallery stores only 8-bit sRGB L/LA/RGB/RGBA and 16-bit L, "
-                "so convert explicitly first (for example with quantize_unit)"
-            ) from e
-        return self._save_image(image, board_id, image_category, metadata)
+                f"{refusal}; the gallery stores only 8-bit sRGB L/LA/RGB/RGBA and 16-bit L unless precise image "
+                "storage (`precise_image_storage`) is enabled, so convert explicitly first (for example with "
+                "quantize_unit)"
+            )
+        return self._save_image(raster, board_id, image_category, metadata)
 
     def _save_image(
         self,
-        image: Image,
+        image: Image | RasterImage,
         board_id: Optional[str],
         image_category: ImageCategory,
         metadata: Optional[MetadataField],
@@ -382,21 +395,23 @@ class ImagesInterface(InvocationContextInterface):
                 self._data.invocation
             ).model_dump_json()
 
-        return self._services.images.create(
-            image=image,
-            is_intermediate=self._data.invocation.is_intermediate,
-            image_category=image_category,
-            board_id=board_id_,
-            metadata=metadata_,
-            image_origin=ResourceOrigin.INTERNAL,
-            workflow=workflow_,
-            graph=graph_,
-            resolved_inputs=resolved_inputs,
-            session_id=self._data.queue_item.session_id,
-            node_id=self._data.invocation.id,
-            user_id=self._data.queue_item.user_id,
-            project_id=self._data.queue_item.project_id,
-        )
+        shared = {
+            "is_intermediate": self._data.invocation.is_intermediate,
+            "image_category": image_category,
+            "board_id": board_id_,
+            "metadata": metadata_,
+            "image_origin": ResourceOrigin.INTERNAL,
+            "workflow": workflow_,
+            "graph": graph_,
+            "resolved_inputs": resolved_inputs,
+            "session_id": self._data.queue_item.session_id,
+            "node_id": self._data.invocation.id,
+            "user_id": self._data.queue_item.user_id,
+            "project_id": self._data.queue_item.project_id,
+        }
+        if isinstance(image, RasterImage):
+            return self._services.images.create_from_raster(raster=image, **shared)
+        return self._services.images.create(image=image, **shared)
 
     def get_pil(self, image_name: str, mode: IMAGE_MODES | None = None) -> Image:
         """Gets an image as a PIL Image object. This method returns a copy of the image.

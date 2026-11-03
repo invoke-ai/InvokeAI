@@ -35,6 +35,16 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
+    def save_precise(self, raster: "RasterImage", image_name: str, image_subfolder: str = "") -> None:
+        """Writes an image's precise asset: staged in the destination folder, then published without replacing.
+
+        Raises ImageFileSaveException on any failure, leaving no staging file and no asset at the final path. An
+        asset already at the final path is never replaced. The caller holds the image mutation lock, so maintenance
+        cannot sweep the staging file or archive the published asset before its row exists.
+        """
+        pass
+
+    @abstractmethod
     def iter_image_paths(self) -> Iterator[Path]:
         """Yields supported image paths in stable order, excluding reserved trees and symlinks."""
         pass

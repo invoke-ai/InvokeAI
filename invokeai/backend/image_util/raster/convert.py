@@ -101,8 +101,12 @@ def pil_refusal(raster: RasterImage) -> str | None:
     return f"cannot export {raster.dtype} {descriptor.channels.value} to PIL"
 
 
-def raster_to_pil(raster: RasterImage) -> Image.Image:
-    """PIL image from uint8 L/LA/RGB/RGBA or uint16 L sRGB straight-alpha rasters; anything else must be converted first."""
+def raster_to_pil(raster: RasterImage, *, share_pixels: bool = False) -> Image.Image:
+    """PIL image from uint8 L/LA/RGB/RGBA or uint16 L sRGB straight-alpha rasters; anything else must be converted first.
+
+    The image is independent of the raster. `share_pixels=True` skips that copy for a caller that only reads the image
+    and drops the raster with it (a read-only temporary): the image then wraps the raster's read-only pixels.
+    """
     descriptor = raster.descriptor
     refusal = pil_refusal(raster)
     if refusal is not None:
@@ -115,7 +119,9 @@ def raster_to_pil(raster: RasterImage) -> Image.Image:
         mode = None  # Pillow infers "I;16" from a 2-D uint16 array
 
     # fromarray shares the (read-only) buffer; the copy makes the image independent of the raster.
-    image = Image.fromarray(pixels[:, :, 0] if pixels.shape[2] == 1 else pixels, mode).copy()
+    image = Image.fromarray(pixels[:, :, 0] if pixels.shape[2] == 1 else pixels, mode)
+    if not share_pixels:
+        image = image.copy()
     if descriptor.icc_profile is not None:
         image.info["icc_profile"] = descriptor.icc_profile
     return image

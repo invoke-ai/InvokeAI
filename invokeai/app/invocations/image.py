@@ -322,17 +322,21 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
             ),
         )
 
+        keeps_precision = False
         if channel_raster.dtype.kind == "f":
-            # A float (precise) source is stored as an 8-bit PNG by an explicit display quantization, which only
-            # means something for sRGB values in [0, 1].
+            # A float (precise) source is displayed through a display quantization, which only means something for
+            # sRGB values in [0, 1].
             if color is not ColorEncoding.SRGB or descriptor.value_range is not ValueRange.UNIT:
                 raise ValueError(
                     f"Cannot take a displayable channel from a {color.value} image with "
                     f"{descriptor.value_range.value} values"
                 )
-            channel_raster = quantize_unit(channel_raster, numpy.uint8)
+            # With precise storage the channel keeps its precision; otherwise it is stored as an 8-bit PNG.
+            keeps_precision = context.images.precise_storage_enabled
+            if not keeps_precision:
+                channel_raster = quantize_unit(channel_raster, numpy.uint8)
         refusal = pil_refusal(channel_raster)
-        if refusal is not None:
+        if refusal is not None and not keeps_precision:
             raise ValueError(f"Cannot take a displayable channel: {refusal}")
 
         image_dto = context.images.save_raster(channel_raster)

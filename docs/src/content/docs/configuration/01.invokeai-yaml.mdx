@@ -247,6 +247,22 @@ Changing this setting only affects newly-created images. Existing images remain 
 
 If precise files are missing, the gallery and ordinary image reads still use the PNG, but nodes that read an image's exact pixels fail. Once precise files exist, do not roll back to an InvokeAI build without precise-image support: it does not know the folder, so it can destroy the precise pixels of images that still exist and leaves the files of deleted images behind.
 
+#### Precise Image Storage
+
+Gallery images are 8-bit PNGs (or 16-bit grayscale PNGs). Nodes that produce 16-bit color or floating-point images can only keep that precision when precise image storage is on, including sRGB-encoded values beyond 0-1. It is off by default:
+
+```yaml
+precise_image_storage: false # default value
+```
+
+With `precise_image_storage: true`, such a node saves the exact pixels in `outputs/images/precise/` next to the usual PNG and thumbnail. The PNG is an 8-bit display copy made from the exact pixels (values are clipped to 0-1 and rounded); nodes that read the image later get the exact pixels back, bit for bit, even across restarts. The record, board, metadata, workflow and graph are saved exactly as for any other image. Only sRGB images in the nominal 0-1 range (values beyond it are kept, but are clipped in the PNG) with straight or no alpha and a matching ICC profile, if any, are stored this way; any other image (linear light, unbounded or non-color data, premultiplied alpha, non-finite values) is refused by the node instead of being quantized silently. 16-bit grayscale is representable as a PNG, so it is saved as an ordinary 16-bit PNG without a precise file.
+
+With `precise_image_storage: false`, no new precise image is created by a node (copying an existing precise image still copies its `precise/` file). A node that produces such an image either converts it to an 8-bit PNG explicitly (the Extract Image Channel node does) or fails with an error naming this setting; nothing is half-saved.
+
+Each precise image adds width x height x channels x 2 bytes (16-bit and float16) or x 4 bytes (float32) on top of its PNG and thumbnail, for example 64 MiB for a 2048 x 2048 RGBA float32 image and 256 MiB at 4096 x 4096. Saving takes longer than an 8-bit PNG save of the same size: measured on a CPU-only desktop, 0.33 s against 0.27 s at 2048 x 2048 and 1.2 s against 0.95 s at 4096 x 4096 for float32 (uint16: 0.27 s against 0.24 s and 0.9 s against 0.8 s), with about 16 MiB (2048 x 2048) to 64 MiB (4096 x 4096) of extra memory beyond the image itself. The numbers depend on the content and mostly on the disk: the precise file is flushed to disk while the image is saved, which for an image near the 4 GiB limit can take many seconds on a slow disk, and other work that needs the image storage waits meanwhile. The exact pixels are by far the largest file in the set.
+
+Turning the setting off only stops new precise saves. Existing precise images, their files and their readers keep working, and `precise/` must never be deleted while images that own a precise file exist.
+
 #### Response Compression
 
 API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.

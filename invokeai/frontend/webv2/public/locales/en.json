@@ -2455,12 +2455,12 @@
     "galleryMaintenance": {
       "heading": "Gallery maintenance",
       "removeMissing": "Remove records for missing images",
-      "removeMissingDescription": "Remove gallery entries whose original image files are missing. Remaining thumbnails are moved to the archive.",
+      "removeMissingDescription": "Remove gallery entries whose original image files are missing. Their remaining thumbnails and precise pixel files are moved to the archive.",
       "removeMissingTitle": "Remove records for missing images?",
       "removeMissingConfirm": "Remove missing image records",
       "removeMissingConsequence": "This removes the missing images from gallery boards and their related semantic-index entries.",
       "archiveUntracked": "Archive untracked files",
-      "archiveUntrackedDescription": "Move image files that have no gallery record, and orphaned thumbnails, to the archive.",
+      "archiveUntrackedDescription": "Move image files that have no gallery record, orphaned thumbnails, and precise pixel files without a matching image to the archive.",
       "archiveUntrackedTitle": "Archive untracked image files?",
       "archiveUntrackedConfirm": "Archive untracked files",
       "regenerateThumbnails": "Regenerate missing thumbnails",
@@ -2485,7 +2485,7 @@
       "executeFailed": "The gallery maintenance request failed.",
       "refreshFailed": "The gallery changed, but its read models could not be refreshed.",
       "accountChanged": "The account changed. Review a fresh scan before continuing.",
-      "resultSummary": "Examined {{examined}} · Removed records {{recordsRemoved}} · Archived images {{imagesArchived}} · Archived thumbnails {{thumbnailsArchived}} · Regenerated thumbnails {{thumbnailsRegenerated}} · Skipped {{skipped}} · Failed {{failed}}"
+      "resultSummary": "Examined {{examined}} · Removed records {{recordsRemoved}} · Archived images {{imagesArchived}} · Archived precise pixel files {{preciseArchived}} · Archived thumbnails {{thumbnailsArchived}} · Regenerated thumbnails {{thumbnailsRegenerated}} · Skipped {{skipped}} · Failed {{failed}}"
     },
     "generationDevices": {
       "useAll": "Use every available accelerator",

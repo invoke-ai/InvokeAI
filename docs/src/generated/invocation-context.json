@@ -125,7 +125,7 @@
           "signature": "(image: Image, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
         },
         {
-          "description": "Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled\nexactly as in `save`.\nOnly rasters the gallery PNG represents exactly are accepted: uint8 sRGB L/LA/RGB/RGBA with straight alpha\nand uint16 L. Anything else raises `RasterConversionError`; quantize explicitly first (`quantize_unit`)\ninstead of relying on a silent conversion here. Nothing is saved when the raster is refused.",
+          "description": "Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled\nexactly as in `save`.\nA raster the gallery PNG represents exactly (uint8 sRGB L/LA/RGB/RGBA with straight alpha, uint16 L) is saved\nas an ordinary image. Any other raster is saved as a precise image when `precise_storage_enabled` and the\nraster is displayable (sRGB, unit range, L/LA/RGB/RGBA, no premultiplied alpha, finite, within the asset\nbounds): its exact pixels are stored losslessly and `get_raster` returns them, while the gallery shows an\n8-bit PNG made from them by display quantization. Otherwise `RasterConversionError` is raised (and\n`PreciseAssetError` for an oversized raster); quantize explicitly first instead of relying on a silent\nconversion here. Nothing is saved when the raster is refused.",
           "name": "save_raster",
           "parameters": [
             {

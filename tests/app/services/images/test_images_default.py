@@ -680,6 +680,7 @@ def test_save_raster_refuses_what_the_gallery_png_cannot_hold_and_writes_nothing
     service, records, storage = real_image_service
     services = service._ImageService__invoker.services
     services.configuration.multiuser = False
+    services.configuration.precise_image_storage = False
     services.images = service
     images = ImagesInterface(services, _queue_data(), MagicMock())
 
