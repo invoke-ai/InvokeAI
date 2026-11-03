@@ -1,6 +1,6 @@
 import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
+import type { QueueCompiledSubmission, QueueHistoryItemStatus, QueueRunErrorCode } from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { WorkflowSubmissionPlan } from '@features/workflow/graph';
 import type { LogNamespace } from '@platform/logging/contracts';
@@ -470,8 +470,8 @@ type WorkbenchReducerAction =
       error?: string;
       /** The backend items whose failure ended the run; its failure notice offers to show and retry them. */
       failedBackendItemIds?: readonly number[];
-      /** `error` is a stand-in: the backend gave no reason, or the item vanished from its queue. */
-      errorCode?: 'removed' | 'unexplained';
+      /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
+      errorCode?: QueueRunErrorCode;
       notify?: boolean;
     }
   | {
@@ -794,12 +794,56 @@ const withRunLabel = (
   return label ? describe(label) : unlabeled;
 };
 
-/** Why a run failed, in words: the backend's own error verbatim, or a translated stand-in when it gave none. */
+type CodedRunFailure = Exclude<QueueRunErrorCode, 'removed' | 'unexplained'>;
+
+/**
+ * Failures the queue runtime words itself, as translation keys with their English. `key` is the message for a run
+ * with a prompt or workflow name, `${key}Unlabeled` the one without; `reason` is the server's or validator's text.
+ */
+const CODED_RUN_FAILURES: Record<
+  CodedRunFailure,
+  { key: string; labeled: (label: string, reason: string) => string; unlabeled: (reason: string) => string }
+> = {
+  'invalid-submission': {
+    key: 'notifications.runOutcome.invalidSubmissionMessage',
+    labeled: (label, reason) => `“${label}” could not be submitted because its queued request is invalid: ${reason}`,
+    unlabeled: (reason) => `The run could not be submitted because its queued request is invalid: ${reason}`,
+  },
+  'not-accepted': {
+    key: 'notifications.runOutcome.notAcceptedMessage',
+    labeled: (label) => `The server queue did not accept “${label}”. The queue may be full.`,
+    unlabeled: () => 'The server queue did not accept the run. The queue may be full.',
+  },
+  'project-not-saved': {
+    key: 'notifications.runOutcome.projectNotSavedMessage',
+    labeled: (label) => `“${label}” was not submitted because its project cannot be saved.`,
+    unlabeled: () => 'The run was not submitted because its project cannot be saved.',
+  },
+  'server-error': {
+    key: 'notifications.runOutcome.serverErrorMessage',
+    labeled: (label, reason) => `The server kept failing to queue “${label}”: ${reason}`,
+    unlabeled: (reason) => `The server kept failing to queue the run: ${reason}`,
+  },
+};
+
+/**
+ * Why a run failed, in words: a translated message for failures the runtime words itself (quoting the server's or
+ * validator's text where it has one), the backend's own error verbatim, or a translated stand-in when it gave none.
+ */
 const describeRunFailure = (
   queueItem: QueueItem | undefined,
   reason: string,
-  errorCode: 'removed' | 'unexplained' | undefined
+  errorCode: QueueRunErrorCode | undefined
 ): NotificationText => {
+  if (errorCode && errorCode !== 'removed' && errorCode !== 'unexplained') {
+    const { key, labeled, unlabeled } = CODED_RUN_FAILURES[errorCode];
+    return withRunLabel(
+      queueItem,
+      (label) => ({ message: labeled(label, reason), messageKey: key, messageValues: { label, reason } }),
+      { message: unlabeled(reason), messageKey: `${key}Unlabeled`, messageValues: { reason } }
+    );
+  }
+
   if (errorCode === 'removed') {
     return withRunLabel(
       queueItem,
@@ -854,7 +898,7 @@ const createRunOutcomeNotification = (
     status,
   }: {
     error?: string;
-    errorCode?: 'removed' | 'unexplained';
+    errorCode?: QueueRunErrorCode;
     failedBackendItemIds?: readonly number[];
     status: 'cancelled' | 'failed';
   }
