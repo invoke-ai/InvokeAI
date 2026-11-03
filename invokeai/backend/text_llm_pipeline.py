@@ -328,8 +328,11 @@ def load_text_llm_tokenizer_and_processor(
     The model cache hands every request the same instance, but a fast tokenizer's padding and truncation state is
     mutable and its Rust backend rejects concurrent mutation ("Already borrowed"): Gemma-4 image processing enables
     padding while progress counting disables it, and requests on different GPUs overlap. Each request therefore gets
-    its own deep copy. That costs about as much as parsing the vocabulary once (~1 s for a 150k vocabulary, measured),
-    small next to a generation, whereas a lock would serialize generations across GPUs.
+    its own deep copy. The cache is the loader's only access to a model's tokenizer and processor (a single file has no
+    folder to read them from), so a private instance can only be copied, never built. Measured on Qwen3.5 (150k
+    vocabulary): deepcopy 1.2-1.8 s against 0.75-1.1 s to build from scratch, and re-serializing the Rust backend is no
+    cheaper (1.2 s). Both are small next to a generation; a lock would serialize generations across GPUs, and copying
+    only when an instance is busy races the holder's padding changes against the copy's serialization.
 
     Args:
         load: Loads a submodel of the TextLLM, e.g. ``lambda submodel: context.models.load(model, submodel)``.
