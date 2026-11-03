@@ -7,7 +7,7 @@ import { Box, Icon, Skeleton, Stack, Text } from '@chakra-ui/react';
 import { toGalleryItemKey } from '@features/gallery/core/items';
 import { GALLERY_PAGE_SIZE } from '@features/gallery/data/queries';
 import { getGalleryColumnCountForCell } from '@features/gallery/ui/galleryGridLayout';
-import { GalleryTileFrame } from '@features/gallery/ui/GalleryTileFrame';
+import { GalleryTileFrame, GalleryTileMedia } from '@features/gallery/ui/GalleryTileFrame';
 import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon } from 'lucide-react';
@@ -91,19 +91,25 @@ const GalleryPickerTile = memo(function GalleryPickerTile({
       data-item-index={index}
       data-item-key={key}
       id={galleryPickerOptionId(idBase, index)}
-      isSelected={key === currentKey || state === 'added'}
       item={item}
       role="option"
       title={unsupportedLabel}
     >
-      <img
-        alt=""
-        decoding="async"
-        draggable={false}
-        loading="lazy"
-        src={item.thumbnailUrl || item.fullUrl}
-        style={IMG_STYLE}
-      />
+      <GalleryTileMedia
+        fit="square"
+        height={item.height}
+        isSelected={key === currentKey || state === 'added'}
+        width={item.width}
+      >
+        <img
+          alt=""
+          decoding="async"
+          draggable={false}
+          loading="lazy"
+          src={item.thumbnailUrl || item.fullUrl}
+          style={IMG_STYLE}
+        />
+      </GalleryTileMedia>
       {state === 'added' ? (
         <Box
           alignItems="center"
