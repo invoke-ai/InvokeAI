@@ -26,6 +26,7 @@ from invokeai.backend.quantization.fp8_scaled import (
 from invokeai.backend.quantization.int8_convrot import (
     INT8_TENSORWISE_FORMAT,
     check_int8_layer_layout,
+    check_int8_rotation_width,
     reject_unmarked_int8_weights,
 )
 from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers, modelopt_nvfp4_header_layers
@@ -70,8 +71,9 @@ def reject_unloadable_quantization(
     - bitsandbytes 4-bit state, and any packed ``uint8`` weight that is not a named nvfp4 layer;
     - an fp8 weight scale in a spelling the key conversion does not carry, which would be left behind as its weight is
       renamed, and the weight loaded unscaled (AWQ's ``pre_quant_scale`` beside an fp8 weight among them);
-    - int8 weights without an ``int8_tensorwise`` marker, or a layout the int8 linears cannot be built from (:func:`check_int8_layer_layout`: a missing scale, a blockwise
-      scale, a rotation group that is not a power of 4 or does not divide the input width);
+    - int8 weights without an ``int8_tensorwise`` marker, or a layout the int8 linears cannot be built from
+      (:func:`check_int8_layer_layout`, :func:`check_int8_rotation_width`: a missing scale, a blockwise scale, a
+      rotation group that is not a power of 4 or does not divide the input width);
     - what :func:`find_nvfp4_layers` refuses: AWQ, nvfp4 layers no header or marker names, malformed or half-stored
       ones;
     - int8 mixed with nvfp4 or with scaled fp8;
@@ -101,9 +103,9 @@ def reject_unloadable_quantization(
     reject_unmarked_int8_weights(state_dict, int8_markers, "FLUX.3")
     for path, marker in int8_markers.items():
         try:
-            check_int8_layer_layout(
-                path, marker, state_dict.get(f"{path}.weight"), state_dict.get(f"{path}.weight_scale")
-            )
+            weight = state_dict.get(f"{path}.weight")
+            layout = check_int8_layer_layout(path, marker, weight, state_dict.get(f"{path}.weight_scale"))
+            check_int8_rotation_width(path, layout, weight)
         except ValueError as e:
             raise ValueError(f"{e} {_INSTEAD}") from None
 

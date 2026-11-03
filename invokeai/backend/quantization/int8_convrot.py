@@ -994,9 +994,9 @@ def check_int8_layer_layout(
 ) -> ConvrotLayout:
     """Refuse a marked layer the int8/int4 linears cannot be built from, and return its layout.
 
-    The one statement of what a layer must look like to stay quantized: both tensors present, a 2-D weight, a scale
-    granularity the decode implements, a usable rotation group (a power of 4) that divides the decoded input width.
-    The loader builds the layer after this, and an installer can ask it of meta tensors, since only shapes are read.
+    Both tensors present, a 2-D weight, a scale granularity the decode implements, a readable marker. Whether the
+    rotation fits the layer's width is :func:`check_int8_rotation_width`, kept apart so the swap can report a payload
+    that does not match the architecture first. Only shapes are read, so an installer can ask it of meta tensors.
     """
     fmt = marker.get("format")
     if weight is None or scale is None:
@@ -1009,7 +1009,11 @@ def check_int8_layer_layout(
             "Only a Linear weight can be kept quantized; dequantize this one instead."
         )
     check_int8_scale_layout(path, weight, scale)
-    layout = marker_layout(marker)
+    return marker_layout(marker)
+
+
+def check_int8_rotation_width(path: str, layout: ConvrotLayout, weight: torch.Tensor) -> None:
+    """Refuse a rotation group that is not a power of 4 or does not divide the decoded input width."""
     if layout.convrot:
         try:
             check_hadamard_size(layout.group_size)
@@ -1024,7 +1028,6 @@ def check_int8_layer_layout(
                 f"'{path}' is rotated in groups of {layout.group_size}, which do not divide its input width "
                 f"{in_features}."
             )
-    return layout
 
 
 def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: dict[str, dict[str, Any]]) -> None:
@@ -1075,6 +1078,7 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
                 f"'{path}' is marked {fmt} and the {extra}'s Linear has a bias, but the "
                 f"{missing} has none. The checkpoint does not match this architecture."
             )
+        check_int8_rotation_width(path, layout, weight)
         layer: Int4ConvrotLinear | Int8ConvrotLinear
         if layout.packed_int4:
             layer = Int4ConvrotLinear(
