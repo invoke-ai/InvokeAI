@@ -1229,9 +1229,38 @@ def _extract_controlnets_from_metadata(data: dict[str, Any]) -> list[dict[str, A
         normalized["image"] = img
         result.append(normalized)
     if not result:
+        raw_control_layers = data.get("control_layers")
+        if isinstance(raw_control_layers, list):
+            for item in raw_control_layers:
+                if not isinstance(item, dict) or item.get("type") != "controlnet":
+                    continue
+                img = (
+                    item.get("processed_image")
+                    or item.get("image")
+                    or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+                )
+                model = item.get("control_model") or item.get("model")
+                if img is None or not model:
+                    continue
+                result.append(
+                    {
+                        "image": img,
+                        "control_model": model,
+                        "control_weight": item.get("control_weight", item.get("weight", 1.0)),
+                        "begin_step_percent": item.get("begin_step_percent", 0.0),
+                        "end_step_percent": item.get("end_step_percent", 1.0),
+                        "control_mode": item.get("control_mode", "balanced"),
+                        "resize_mode": item.get("resize_mode", "just_resize"),
+                    }
+                )
+    if not result:
         canvas_v2 = data.get("canvas_v2_metadata")
         control_layers = canvas_v2.get("controlLayers") if isinstance(canvas_v2, dict) else None
-        entities = control_layers.get("entities", []) if isinstance(control_layers, dict) else []
+        entities = (
+            control_layers
+            if isinstance(control_layers, list)
+            else (control_layers.get("entities", []) if isinstance(control_layers, dict) else [])
+        )
         for entity in entities:
             if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
                 continue
@@ -1288,7 +1317,11 @@ def _extract_ip_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, A
     if not result:
         canvas_v2 = data.get("canvas_v2_metadata")
         ref_imgs = canvas_v2.get("referenceImages") if isinstance(canvas_v2, dict) else None
-        entities = ref_imgs.get("entities", []) if isinstance(ref_imgs, dict) else []
+        entities = (
+            ref_imgs
+            if isinstance(ref_imgs, list)
+            else (ref_imgs.get("entities", []) if isinstance(ref_imgs, dict) else [])
+        )
         for entity in entities:
             if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
                 continue
@@ -1357,9 +1390,37 @@ def _extract_t2i_adapters_from_metadata(data: dict[str, Any]) -> list[dict[str, 
         normalized["image"] = img
         result.append(normalized)
     if not result:
+        raw_control_layers = data.get("control_layers")
+        if isinstance(raw_control_layers, list):
+            for item in raw_control_layers:
+                if not isinstance(item, dict) or item.get("type") != "t2i_adapter":
+                    continue
+                img = (
+                    item.get("processed_image")
+                    or item.get("image")
+                    or ({"image_name": item["image_name"]} if item.get("image_name") else None)
+                )
+                model = item.get("t2i_adapter_model") or item.get("model")
+                if img is None or not model:
+                    continue
+                result.append(
+                    {
+                        "image": img,
+                        "t2i_adapter_model": model,
+                        "weight": item.get("weight", 1.0),
+                        "begin_step_percent": item.get("begin_step_percent", 0.0),
+                        "end_step_percent": item.get("end_step_percent", 1.0),
+                        "resize_mode": item.get("resize_mode", "just_resize"),
+                    }
+                )
+    if not result:
         canvas_v2 = data.get("canvas_v2_metadata")
         control_layers = canvas_v2.get("controlLayers") if isinstance(canvas_v2, dict) else None
-        entities = control_layers.get("entities", []) if isinstance(control_layers, dict) else []
+        entities = (
+            control_layers
+            if isinstance(control_layers, list)
+            else (control_layers.get("entities", []) if isinstance(control_layers, dict) else [])
+        )
         for entity in entities:
             if not isinstance(entity, dict) or entity.get("isEnabled", True) is False:
                 continue

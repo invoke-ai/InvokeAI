@@ -1530,7 +1530,36 @@ def test_ref_images_serialization_and_metadata_to_adapters_multi_format() -> Non
     assert out_v5.ip_adapter_list[0].method == "composition"
     assert out_v5.ip_adapter_list[0].weight == 0.6
 
-    # MetadataToControlnetsInvocation & MetadataToT2IAdaptersInvocation: safe defaults & v5 fallback
+    # MetadataToIPAdaptersInvocation: Format 2b (v5 canvas_v2_metadata.referenceImages as direct list)
+    v5_list_md = MetadataField.model_validate(
+        {
+            "canvas_v2_metadata": {
+                "referenceImages": [
+                    {
+                        "id": "ref-v5-list",
+                        "isEnabled": True,
+                        "ipAdapter": {
+                            "image": {"original": {"image": {"image_name": "v5-list-ref.png"}}},
+                            "model": {"key": "ipa-key-1"},
+                            "clipVisionModel": "ViT-L",
+                            "method": "style",
+                            "weight": 0.45,
+                            "beginEndStepPct": [0.1, 0.9],
+                        },
+                    }
+                ]
+            }
+        }
+    )
+    out_v5_list = MetadataToIPAdaptersInvocation.model_construct(metadata=v5_list_md, ip_adapter_list=None).invoke(
+        mock_ctx
+    )
+    assert len(out_v5_list.ip_adapter_list) == 1
+    assert out_v5_list.ip_adapter_list[0].image.image_name == "v5-list-ref.png"
+    assert out_v5_list.ip_adapter_list[0].method == "style"
+    assert out_v5_list.ip_adapter_list[0].weight == 0.45
+
+    # MetadataToControlnetsInvocation & MetadataToT2IAdaptersInvocation: safe defaults, control_layers & v5 fallback
     cn_md = MetadataField.model_validate(
         {
             "controlnets": [
@@ -1545,6 +1574,53 @@ def test_ref_images_serialization_and_metadata_to_adapters_multi_format() -> Non
     assert out_cn.control_list[0].control_weight == 0.55
     assert out_cn.control_list[0].control_mode == "balanced"
     assert out_cn.control_list[0].resize_mode == "just_resize"
+
+    # control_layers fallback for both controlnet and t2i_adapter (PR #10127 compatibility)
+    control_layers_md = MetadataField.model_validate(
+        {
+            "control_layers": [
+                {
+                    "type": "controlnet",
+                    "processed_image": {"image_name": "cl-cn-proc.png"},
+                    "control_model": {"key": "ctrl-key-1"},
+                    "weight": 0.65,
+                    "begin_step_percent": 0.05,
+                    "end_step_percent": 0.95,
+                    "control_mode": "more_prompt",
+                    "resize_mode": "crop_resize",
+                },
+                {
+                    "type": "t2i_adapter",
+                    "image": {"image_name": "cl-t2i.png"},
+                    "t2i_adapter_model": {"key": "t2i-key-1"},
+                    "weight": 0.7,
+                    "begin_step_percent": 0.1,
+                    "end_step_percent": 0.8,
+                    "resize_mode": "fill_resize",
+                },
+            ]
+        }
+    )
+    out_cl_cn = MetadataToControlnetsInvocation.model_construct(metadata=control_layers_md, control_list=None).invoke(
+        mock_ctx
+    )
+    assert len(out_cl_cn.control_list) == 1
+    assert out_cl_cn.control_list[0].image.image_name == "cl-cn-proc.png"
+    assert out_cl_cn.control_list[0].control_weight == 0.65
+    assert out_cl_cn.control_list[0].begin_step_percent == 0.05
+    assert out_cl_cn.control_list[0].end_step_percent == 0.95
+    assert out_cl_cn.control_list[0].control_mode == "more_prompt"
+    assert out_cl_cn.control_list[0].resize_mode == "crop_resize"
+
+    out_cl_t2i = MetadataToT2IAdaptersInvocation.model_construct(
+        metadata=control_layers_md, t2i_adapter_list=None
+    ).invoke(mock_ctx)
+    assert len(out_cl_t2i.t2i_adapter_list) == 1
+    assert out_cl_t2i.t2i_adapter_list[0].image.image_name == "cl-t2i.png"
+    assert out_cl_t2i.t2i_adapter_list[0].weight == 0.7
+    assert out_cl_t2i.t2i_adapter_list[0].begin_step_percent == 0.1
+    assert out_cl_t2i.t2i_adapter_list[0].end_step_percent == 0.8
+    assert out_cl_t2i.t2i_adapter_list[0].resize_mode == "fill_resize"
 
     t2i_v5_md = MetadataField.model_validate(
         {
