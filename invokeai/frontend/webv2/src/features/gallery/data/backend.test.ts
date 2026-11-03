@@ -1,8 +1,9 @@
 import { galleryItems } from '@features/gallery';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { AccountScopeExpiredError, accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
+  apiFetch: vi.fn(),
   apiFetchJson: vi.fn(),
   apiFetchRaw: vi.fn(),
   sleep: vi.fn(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   absolutizeApiUrl: (url: string) => `https://api.test${url}`,
-  apiFetch: vi.fn(),
+  apiFetch: mocks.apiFetch,
   apiFetchJson: mocks.apiFetchJson,
   apiFetchRaw: mocks.apiFetchRaw,
   sleep: mocks.sleep,
@@ -27,8 +28,10 @@ import {
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  exportGalleryImage,
   fetchImageIndexAvailability,
   getGalleryImageByName,
+  getGalleryImageExportFormats,
   getGalleryImagesByNames,
   getGalleryItemLocation,
   getGalleryVideoMetadata,
@@ -1173,5 +1176,74 @@ describe('galleryBoardExists', () => {
     await expect(galleryBoardExists('none')).resolves.toBe(true);
     await expect(galleryBoardExists('by_date:2026-07-30')).resolves.toBe(true);
     expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+  });
+});
+
+describe('exportGalleryImage', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('user-a');
+    mocks.apiFetch.mockReset();
+  });
+
+  const pngResponse = (disposition: string | null) =>
+    new Response('png-bytes', { headers: disposition ? { 'Content-Disposition': disposition } : {} });
+
+  it('requests the 16-bit export of the encoded image name and names the file as the server did', async () => {
+    mocks.apiFetch.mockResolvedValue(pngResponse('attachment; filename="sky photo-16bit.png"'));
+
+    const { blob, fileName } = await exportGalleryImage({ format: 'png16', imageName: 'sky photo.png' });
+
+    expect(mocks.apiFetch).toHaveBeenCalledWith('/api/v1/images/i/sky%20photo.png/export?format=png16', {
+      signal: expect.any(AbortSignal),
+    });
+    expect(fileName).toBe('sky photo-16bit.png');
+    expect(await blob.text()).toBe('png-bytes');
+  });
+
+  it.each([
+    ['attachment; filename=plain-16bit.png', 'plain-16bit.png'],
+    ['attachment; filename="../../evil-16bit.png"', 'evil-16bit.png'],
+  ])('reads the filename from %s', async (disposition, expected) => {
+    mocks.apiFetch.mockResolvedValue(pngResponse(disposition));
+
+    expect((await exportGalleryImage({ format: 'png16', imageName: 'a.png' })).fileName).toBe(expected);
+  });
+
+  it('falls back to the image stem plus -16bit when the header is missing', async () => {
+    mocks.apiFetch.mockResolvedValue(pngResponse(null));
+
+    expect((await exportGalleryImage({ format: 'png16', imageName: 'render.v2.png' })).fileName).toBe(
+      'render.v2-16bit.png'
+    );
+  });
+
+  it('rejects with the server error, and with an expired account scope when the account changes before the file arrives', async () => {
+    mocks.apiFetch.mockRejectedValueOnce(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '2' }));
+    await expect(exportGalleryImage({ format: 'png16', imageName: 'a.png' })).rejects.toMatchObject({ status: 503 });
+
+    let release = (_response: Response): void => undefined;
+    mocks.apiFetch.mockReturnValueOnce(
+      new Promise<Response>((resolve) => {
+        release = resolve;
+      })
+    );
+    const pending = expect(exportGalleryImage({ format: 'png16', imageName: 'a.png' })).rejects.toBeInstanceOf(
+      AccountScopeExpiredError
+    );
+
+    accountLifecycle.activate('user-b');
+    release(pngResponse(null));
+    await pending;
+  });
+});
+
+describe('getGalleryImageExportFormats', () => {
+  it('reads the formats the server lists for the image', async () => {
+    mocks.apiFetchJson.mockReset().mockResolvedValue({ formats: ['png16'] });
+
+    await expect(getGalleryImageExportFormats('a b.png')).resolves.toEqual(['png16']);
+    expect(mocks.apiFetchJson).toHaveBeenCalledWith('/api/v1/images/i/a%20b.png/export-formats', {
+      signal: undefined,
+    });
   });
 });

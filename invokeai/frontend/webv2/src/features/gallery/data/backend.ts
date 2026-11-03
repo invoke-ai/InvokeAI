@@ -39,6 +39,7 @@ import {
 import {
   absolutizeApiUrl,
   ApiError,
+  apiFetch,
   apiFetchJson,
   apiFetchRaw,
   HttpRequestIdentityExpiredError,
@@ -1087,6 +1088,73 @@ export const getGalleryImageMetadata = async (
   const body = await apiFetchJson<unknown>(`/api/v1/images/i/${encodeURIComponent(imageName)}/metadata`, { signal });
 
   return body && typeof body === 'object' && !Array.isArray(body) ? (body as GalleryImageMetadata) : null;
+};
+
+/** An export format the server offers for an image; today only the 16-bit PNG of its precise asset. */
+export type GalleryImageExportFormat = components['schemas']['ImageExportFormat'];
+
+/**
+ * The formats an image can be exported in. Empty for an image without an exportable precise asset; a failed read
+ * rejects, so the caller can tell "none" from "unknown".
+ */
+export const getGalleryImageExportFormats = async (
+  imageName: string,
+  signal?: AbortSignal
+): Promise<GalleryImageExportFormat[]> => {
+  const body = await apiFetchJson<components['schemas']['ImageExportFormats']>(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export-formats`,
+    { signal }
+  );
+
+  return Array.isArray(body.formats) ? body.formats : [];
+};
+
+/** The name the server gave the export (`Content-Disposition`), or null when absent or unusable. */
+const readContentDispositionFileName = (header: string | null): string | null => {
+  if (!header) {
+    return null;
+  }
+
+  const name =
+    /filename\s*=\s*"((?:[^"\\]|\\.)*)"/i.exec(header)?.[1]?.replace(/\\(.)/g, '$1') ??
+    /filename\s*=\s*([^;\s]+)/i.exec(header)?.[1];
+
+  // The name goes to the download anchor: never a path.
+  const baseName = name?.split(/[\\/]/).pop()?.trim();
+
+  return baseName ? baseName : null;
+};
+
+/**
+ * Export an image in a precise format and return the file with the name the server chose. Failures are the server's
+ * `ApiError`: 503 while another export runs, 409 with the reason the image cannot be exported.
+ */
+export const exportGalleryImage = async ({
+  format,
+  imageName,
+  signal,
+}: {
+  format: GalleryImageExportFormat;
+  imageName: string;
+  signal?: AbortSignal;
+}): Promise<{ blob: Blob; fileName: string }> => {
+  const owner = captureAccountScope();
+  const requestSignal = signal ? AbortSignal.any([signal, owner.signal]) : owner.signal;
+  const response = await apiFetch(
+    `/api/v1/images/i/${encodeURIComponent(imageName)}/export?${toSearchParams({ format })}`,
+    { signal: requestSignal }
+  );
+  const blob = await response.blob();
+
+  assertAccountScopeCurrent(owner);
+  requestSignal.throwIfAborted();
+
+  return {
+    blob,
+    fileName:
+      readContentDispositionFileName(response.headers.get('Content-Disposition')) ??
+      `${imageName.replace(/\.[^./\\]+$/, '')}-16bit.png`,
+  };
 };
 
 /**

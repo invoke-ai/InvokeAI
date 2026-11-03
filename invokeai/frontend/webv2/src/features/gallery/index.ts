@@ -44,6 +44,7 @@ import {
   deleteGalleryImages,
   deleteGalleryVideoItems,
   downloadGalleryArchive,
+  exportGalleryImage,
   getGalleryImageByName,
   getGalleryImageMetadata,
   getGalleryImagesByNames,
@@ -87,6 +88,7 @@ export const galleryVideos = {
 /** Import/export intents shared by image-producing and image-consuming features. */
 export const galleryTransfers = {
   downloadArchive: downloadGalleryArchive,
+  exportImage: exportGalleryImage,
   upload: uploadGalleryImage,
   uploadVideo: uploadGalleryVideo,
 } as const;

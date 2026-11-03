@@ -5742,6 +5742,16 @@
           "partial": "{{succeeded}} of {{count}} items downloaded; {{failed}} failed or were skipped.",
           "success": "Download ready"
         },
+        "exportPng16": {
+          "busy": "Another export is running — try again in a moment",
+          "forbidden": "You don't have access to export this image.",
+          "failed": "The 16-bit PNG could not be exported. Try again.",
+          "failedTitle": "16-bit PNG export failed",
+          "notFound": "This image no longer exists.",
+          "preparing": "Preparing 16-bit PNG…",
+          "success": "16-bit PNG downloaded",
+          "unavailable": "This image cannot be exported as a 16-bit PNG."
+        },
         "move": {
           "failure_one": "Could not move {{count}} item to {{board}}.",
           "failure_other": "Could not move {{count}} items to {{board}}.",
@@ -6052,6 +6062,7 @@
         "deleteImage": "Delete image",
         "deleteVideo": "Delete video",
         "downloadImage": "Download image",
+        "downloadPng16": "Download 16-bit PNG",
         "downloadVideo": "Download video",
         "editOnCanvasHint": "Adds an image layer and opens Canvas",
         "extendInVideo": "Extend in Video",
