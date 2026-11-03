@@ -1,6 +1,6 @@
 import type { QueueActivity } from '@features/queue/core/queueActivity';
 
-import { Stack } from '@chakra-ui/react';
+import { Box, Stack } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StatusWidgetChip } from '@platform/ui/StatusWidgetChip';
 import { CloudOffIcon, ListOrderedIcon, PauseIcon, type LucideIcon } from 'lucide-react';
@@ -41,14 +41,15 @@ const QueueContent = () => {
     setFilter('all');
   }
 
-  // The counted filters stay put while the item lists scroll on their own.
+  // The counted filters stay put while the item lists scroll on their own. Strip and lists share the gallery rail's
+  // inset, so the selected filter's edge lines up with the rows below.
   return (
-    <Stack gap="3" h="full" minH="0" pt="3">
-      <Stack flexShrink={0} gap="3" px="3">
+    <Stack gap="2" h="full" minH="0" pt="2">
+      <Box flexShrink={0} px="2">
         <QueueFilterTabs value={filter} onChange={setFilter} />
-      </Stack>
+      </Box>
       <Scrollable flex="1" label={t('widgets.queue.items')} minH="0" overflowX="hidden">
-        <Stack gap="3" pb="3" px="3">
+        <Stack gap="3" pb="2" px="2">
           <CurrentBatchSection filter={filter} revealRequest={revealRequest} />
           <RecentSection filter={filter} revealRequest={revealRequest} />
         </Stack>
