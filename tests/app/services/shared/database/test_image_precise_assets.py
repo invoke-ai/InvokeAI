@@ -6,6 +6,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import ForeignKeyViolation, UniqueViolation
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK
 from invokeai.app.services.shared.database.queries.image_precise_assets import PreciseAssetRecord
 
 
@@ -78,3 +79,21 @@ def test_deleting_the_image_record_removes_its_asset_row_only(database: Database
 
     assert database.queries.image_precise_assets.get("a.png") is None
     assert database.queries.image_precise_assets.get("b.png") is not None
+
+
+def test_names_with_assets_picks_the_images_that_have_one_across_chunks(database: Database) -> None:
+    count = IN_CHUNK + 5
+    names = [f"img-{i:04d}.png" for i in range(count)]
+    with_assets = {name for i, name in enumerate(names) if i % 3 == 0 or i >= IN_CHUNK}
+    for name in names:
+        _image(database, name)
+    for name in with_assets:
+        _add(database, name)
+
+    found = database.queries.image_precise_assets.names_with_assets([*names, "unknown.png"])
+
+    assert found == with_assets
+
+
+def test_names_with_assets_of_no_names_is_empty(database: Database) -> None:
+    assert database.queries.image_precise_assets.names_with_assets([]) == set()

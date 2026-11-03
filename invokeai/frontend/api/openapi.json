@@ -44967,6 +44967,12 @@
             "minimum": 0.0,
             "title": "Thumbnails Archived"
           },
+          "precise_archived": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Precise Archived",
+            "default": 0
+          },
           "thumbnails_regenerated": {
             "type": "integer",
             "minimum": 0.0,

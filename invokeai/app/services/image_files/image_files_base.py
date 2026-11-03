@@ -49,6 +49,11 @@ class ImageFileStorageBase(ABC):
         """Yields precise asset paths (`.safetensors`) in stable order, excluding reserved trees and symlinks."""
         pass
 
+    @abstractmethod
+    def iter_precise_staging_paths(self) -> Iterator[Path]:
+        """Yields `.tmp*` files in the precise tree: leftovers of interrupted safetensors writes, never assets."""
+        pass
+
     @property
     @abstractmethod
     def image_root(self) -> Path:

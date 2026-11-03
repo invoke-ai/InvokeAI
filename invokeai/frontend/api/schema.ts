@@ -18039,6 +18039,11 @@ export type components = {
             images_archived: number;
             /** Thumbnails Archived */
             thumbnails_archived: number;
+            /**
+             * Precise Archived
+             * @default 0
+             */
+            precise_archived?: number;
             /** Thumbnails Regenerated */
             thumbnails_regenerated: number;
             /** Archive Path */

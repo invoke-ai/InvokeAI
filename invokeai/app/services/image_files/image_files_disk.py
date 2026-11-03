@@ -149,8 +149,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Walk precise assets; interrupted writes (`.tmp*`) are not assets and are not yielded."""
         yield from self.__iter_supported_paths(self.precise_root, suffixes={".safetensors"})
 
+    def iter_precise_staging_paths(self) -> Iterator[Path]:
+        """Walk `.tmp*` files a crashed safetensors write can leave in the precise tree."""
+        yield from self.__iter_supported_paths(self.precise_root, suffixes=set(), name_prefix=".tmp")
+
     @staticmethod
-    def __iter_supported_paths(root: Path, suffixes: set[str], skip_reserved_roots: bool = False) -> Iterator[Path]:
+    def __iter_supported_paths(
+        root: Path, suffixes: set[str], skip_reserved_roots: bool = False, name_prefix: str | None = None
+    ) -> Iterator[Path]:
         # Inventory and traversal state stay in a temporary SQLite database. A generated gallery
         # can contain enough files that retaining DirEntry objects or directory paths in Python
         # would make maintenance memory usage grow with the output tree.
@@ -190,7 +196,11 @@ class DiskImageFileStorage(ImageFileStorageBase):
                                 continue
                             if entry.is_dir(follow_symlinks=False):
                                 is_directory = 1
-                            elif entry.is_file(follow_symlinks=False) and Path(entry.name).suffix.lower() in suffixes:
+                            elif entry.is_file(follow_symlinks=False) and (
+                                entry.name.startswith(name_prefix)
+                                if name_prefix is not None
+                                else Path(entry.name).suffix.lower() in suffixes
+                            ):
                                 is_directory = 0
                             else:
                                 continue

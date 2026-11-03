@@ -139,10 +139,19 @@ def test_iter_image_and_thumbnail_paths_is_sorted_nested_and_excludes_reserved_t
     (tmp_path / "precise" / "a").mkdir(parents=True)
     (tmp_path / "precise" / "a" / "nested.safetensors").write_bytes(b"p")
     (tmp_path / "precise" / "stray.png").write_bytes(b"s")
+    (tmp_path / "precise" / "a" / ".tmpQ1w2e3").write_bytes(b"staging")
+    (tmp_path / "precise" / ".delete_x").mkdir()
+    (tmp_path / "precise" / ".delete_x" / ".tmpjournal").write_bytes(b"j")
 
     assert [path.relative_to(tmp_path).as_posix() for path in storage.iter_image_paths()] == ["z.png", "a/nested.png"]
     assert [path.relative_to(storage.thumbnail_root).as_posix() for path in storage.iter_thumbnail_paths()] == [
         "a/nested.webp"
+    ]
+    assert [path.relative_to(storage.precise_root).as_posix() for path in storage.iter_precise_paths()] == [
+        "a/nested.safetensors"
+    ]
+    assert [path.relative_to(storage.precise_root).as_posix() for path in storage.iter_precise_staging_paths()] == [
+        "a/.tmpQ1w2e3"
     ]
 
 
