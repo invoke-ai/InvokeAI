@@ -1,3 +1,4 @@
+import copy
 import math
 import queue
 import threading
@@ -324,17 +325,23 @@ def load_text_llm_tokenizer_and_processor(
     vendored ones. A processor carries its own tokenizer, so with an image only the processor is loaded; loading
     both would parse the vocabulary (for Gemma, ~30 MB) twice.
 
+    The model cache hands every request the same instance, but a fast tokenizer's padding and truncation state is
+    mutable and its Rust backend rejects concurrent mutation ("Already borrowed"): Gemma-4 image processing enables
+    padding while progress counting disables it, and requests on different GPUs overlap. Each request therefore gets
+    its own deep copy. That costs about as much as parsing the vocabulary once (~1 s for a 150k vocabulary, measured),
+    small next to a generation, whereas a lock would serialize generations across GPUs.
+
     Args:
         load: Loads a submodel of the TextLLM, e.g. ``lambda submodel: context.models.load(model, submodel)``.
         with_processor: Whether the request conditions on an image, which needs the processor.
     """
     if with_processor:
-        processor = load(SubModelType.Processor).model
+        processor = copy.deepcopy(load(SubModelType.Processor).model)
         tokenizer = getattr(processor, "tokenizer", None)
         if not isinstance(processor, ProcessorMixin) or not isinstance(tokenizer, PreTrainedTokenizerBase):
             raise TypeError(f"Expected a processor with a tokenizer for this TextLLM, got {type(processor).__name__}.")
         return tokenizer, processor
-    tokenizer = load(SubModelType.Tokenizer).model
+    tokenizer = copy.deepcopy(load(SubModelType.Tokenizer).model)
     if not isinstance(tokenizer, PreTrainedTokenizerBase):
         raise TypeError(f"Expected a tokenizer for this TextLLM, got {type(tokenizer).__name__}.")
     return tokenizer, None

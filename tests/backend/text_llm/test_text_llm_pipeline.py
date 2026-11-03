@@ -20,8 +20,14 @@ from transformers import (
 )
 
 from invokeai.backend import text_llm_pipeline
+from invokeai.backend.model_manager.taxonomy import SubModelType
 from invokeai.backend.qwen3_5.qwen3_5_vl import build_qwen3_5_vl_processor
-from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline, _SeededMultinomialMode
+from invokeai.backend.text_llm_pipeline import (
+    DEFAULT_SYSTEM_PROMPT,
+    TextLLMPipeline,
+    _SeededMultinomialMode,
+    load_text_llm_tokenizer_and_processor,
+)
 
 
 def _make_mock_tokenizer(has_chat_template: bool = True) -> MagicMock:
@@ -628,3 +634,43 @@ def test_pipeline_refuses_an_image_without_a_processor():
     pipeline = TextLLMPipeline(_make_mock_model(), _make_mock_tokenizer(has_chat_template=True))
     with pytest.raises(ValueError, match="multimodal model"):
         pipeline.run(prompt="a cat", image=Image.new("RGB", (8, 8)))
+
+
+def test_cached_tokenizer_and_processor_are_isolated_per_request(qwen3_5_processor: ProcessorMixin) -> None:
+    """The model cache serves one processor to every request; concurrent requests must not share its tokenizer.
+
+    Padding is switched on and off on a fast tokenizer's Rust backend, which rejects overlapping use with
+    "Already borrowed" -- as when one request processes an image (padding on) while another counts progress tokens
+    (padding off).
+    """
+    cached = MagicMock(model=qwen3_5_processor)
+    cached_tokenizer = MagicMock(model=qwen3_5_processor.tokenizer)
+
+    def load(submodel: SubModelType) -> MagicMock:
+        return cached if submodel == SubModelType.Processor else cached_tokenizer
+
+    errors: list[Exception] = []
+    handed_out: list[object] = []
+    barrier = threading.Barrier(4)
+
+    def request(padding: bool) -> None:
+        try:
+            tokenizer, processor = load_text_llm_tokenizer_and_processor(load, with_processor=True)
+            handed_out.append(tokenizer)
+            assert processor is not None and processor.tokenizer is tokenizer
+            barrier.wait()
+            for _ in range(300):
+                tokenizer(["a short prompt", "a second, rather longer prompt"], padding=padding)
+        except Exception as e:
+            errors.append(e)
+
+    threads = [threading.Thread(target=request, args=(i % 2 == 0,)) for i in range(4)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert not errors
+    assert len({id(t) for t in handed_out}) == 4
+    assert all(t is not qwen3_5_processor.tokenizer for t in handed_out)
+    assert load_text_llm_tokenizer_and_processor(load, with_processor=False)[0] is not qwen3_5_processor.tokenizer
