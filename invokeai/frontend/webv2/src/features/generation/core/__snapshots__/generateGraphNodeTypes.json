@@ -322,9 +322,11 @@
         "img_nsfw",
         "img_watermark",
         "integer",
+        "lora_selector",
         "qwen_image_2_1_denoise",
         "qwen_image_2_1_i2l",
         "qwen_image_2_1_l2i",
+        "qwen_image_2_1_lora_collection_loader",
         "qwen_image_2_1_model_loader",
         "qwen_image_2_1_text_encoder",
         "string"
@@ -2104,6 +2106,23 @@
       },
       "outputs": [
         "image"
+      ]
+    },
+    "qwen_image_2_1_lora_collection_loader": {
+      "inputs": [
+        "loras",
+        "transformer"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "transformer"
       ]
     },
     "qwen_image_2_1_model_loader": {
