@@ -114,8 +114,8 @@ export const useInvokeIssueActions = (): ((issue: InvocationIssue) => InvokeIssu
         case 'prompt':
           return [
             show(() => {
-              reveal('generate');
-              requestAnimationFrame(() => focusPositivePrompt());
+              reveal(target.widgetId);
+              requestAnimationFrame(() => focusPositivePrompt(target.widgetId));
             }),
           ];
         case 'layer':
