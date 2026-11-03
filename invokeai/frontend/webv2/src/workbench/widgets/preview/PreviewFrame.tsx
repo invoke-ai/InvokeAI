@@ -564,8 +564,8 @@ const PreviewVideo = ({
     return isCurrent() ? { ok: true } : { ok: false, reason: 'stale' };
   }, [isItemCurrent, source.itemKey]);
   const isCopyAvailable = useCallback(() => isVideoFrameCopyAvailable(videoRef.current), []);
-  // The span a request armed, which the player plays as its playback window. Handlers read the ref: a seek's event
-  // can arrive before the render that arms its span.
+  // The span a request armed, which the player plays as its playback window. Handlers read the ref, which is current
+  // before the render that arms the span.
   const [span, setSpan] = useState<VideoSpan | null>(null);
   const spanRef = useRef<VideoSpan | null>(null);
   // Expire spans parked before media readiness so retries or hidden remounts cannot start stale audio later.
@@ -573,6 +573,9 @@ const PreviewVideo = ({
   // Keep request identity through pause/hide while the span stays armed; retire it when the playhead leaves or a
   // newer request arrives.
   const spanTokenRef = useRef<number | null>(null);
+  // Where an armed span's playback starts once the player holds its window; see SpanPlaybackStart.
+  const pendingSpanStartRef = useRef<number | null>(null);
+  const [spanStartRequest, setSpanStartRequest] = useState(0);
   const armSpan = useCallback((next: VideoSpan | null) => {
     spanRef.current = next;
     setSpan(next);
@@ -629,14 +632,27 @@ const PreviewVideo = ({
         spanTokenRef.current = token;
       }
 
-      seekVideo(video, startSeconds);
-      // Autoplay policy can refuse an unmuted play(). That leaves the clip parked on the first selected frame with
-      // the span still armed, so pressing play there plays the selection rather than the whole clip.
-      void video.play().catch(() => {});
-      publishSpanState();
+      pendingSpanStartRef.current = startSeconds;
+      setSpanStartRequest((request) => request + 1);
     },
-    [armSpan, publishSpanState, retireSpanToken]
+    [armSpan, retireSpanToken]
   );
+  const startPendingSpan = useCallback(() => {
+    const startSeconds = pendingSpanStartRef.current;
+    const video = videoRef.current;
+
+    pendingSpanStartRef.current = null;
+
+    if (startSeconds === null || !video) {
+      return;
+    }
+
+    seekVideo(video, startSeconds);
+    // Autoplay policy can refuse an unmuted play(). That leaves the clip parked on the first selected frame with
+    // the span still armed, so pressing play there plays the selection rather than the whole clip.
+    void video.play().catch(() => {});
+    publishSpanState();
+  }, [publishSpanState]);
   // Retire spans only when seeks land outside them; own-seek markers fail for no-op or delayed seeks. In-span scrubs,
   // and the player's own wraps, rests and replays, keep the span. The player never acts on a seek, so the retirement
   // needs no particular timing.
@@ -701,6 +717,8 @@ const PreviewVideo = ({
 
     return () => {
       unsubscribe();
+      // A span hidden before it started stays armed but does not start on its own once shown again.
+      pendingSpanStartRef.current = null;
       // Report nothing stoppable while hidden, but retain span identity for playback after showing.
       const token = spanTokenRef.current;
 
@@ -909,6 +927,7 @@ const PreviewVideo = ({
             onVolumeChange={rememberPreviewVideoAudio}
             onWaiting={publishCopyAvailability}
           />
+          {spanStartRequest > 0 ? <SpanPlaybackStart key={spanStartRequest} onStart={startPendingSpan} /> : null}
         </Suspense>
         {dragItem ? (
           // Keep drag grips unfocusable so KeyboardSensor cannot start invisible Enter/Space drags.
@@ -985,6 +1004,20 @@ const seekVideo = (video: HTMLVideoElement, seconds: number): void => {
   } catch {
     // Some browsers throw while the seekable range is still empty; the element keeps its position.
   }
+};
+
+/**
+ * Starts an armed span's playback, for one request: keyed by it, rendered after the player. The player binds its
+ * playback window in an effect, and React runs a commit's passive effects in tree order, so the window this request
+ * armed is in place before playback starts; started any earlier, the player would judge it against the previous window
+ * (a finished span's rest would replay that span over the new one).
+ */
+const SpanPlaybackStart = ({ onStart }: { onStart: () => void }) => {
+  useMountEffect(() => {
+    onStart();
+  });
+
+  return null;
 };
 
 /** A trimmed window of a clip, in seconds, as the Video panel's play buttons request it. */

@@ -988,6 +988,39 @@ describe('PreviewFrame video span playback through the player', () => {
     await expect.poll(isResting, { timeout: 3000 }).toBe(true);
   });
 
+  it("starts a span only once the player holds its window, so a finished span's rest cannot replay over it", async () => {
+    await renderHarness({ source: fixtureVideoSource, videoLoop: false });
+    const video = await loadedVideo();
+    requestVideoSpanPlayback({ endSeconds: 0.5, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.2 });
+    await expect
+      .poll(() => video.paused && !video.seeking && Math.abs(video.currentTime - 0.45) < 1e-6, { timeout: 3000 })
+      .toBe(true);
+    const finishedWindowStart = getWindowStart();
+    const seeks = recordSeeks(video);
+    // The window the player shows whenever playback is asked for. Its binding to the player's store commits with it.
+    const windowsAtPlay: string[] = [];
+    const nativePlay = video.play.bind(video);
+    vi.spyOn(video, 'play').mockImplementation(() => {
+      windowsAtPlay.push(getWindowStart());
+      return nativePlay();
+    });
+
+    // Frames 5 to 8, which start past the finished span's rest; published outside any React event, as the Video panel
+    // does.
+    const token = requestVideoSpanPlayback({ endSeconds: 0.9, itemKey: fixtureVideoSource.itemKey, startSeconds: 0.5 });
+
+    await expect.poll(() => getWindowStart()).not.toBe(finishedWindowStart);
+    await expect.poll(() => getVideoSpanPlaybackState()).toMatchObject({ isPlaying: true, token });
+    expect(windowsAtPlay).toEqual([getWindowStart()]);
+    // It plays the new span once, from its start, and rests on its last frame.
+    await expect
+      .poll(() => video.paused && !video.seeking && Math.abs(video.currentTime - 0.85) < 1e-6, { timeout: 3000 })
+      .toBe(true);
+    expect(seeks[0]).toBeCloseTo(0.5);
+    expect(seeks.some(isSpanStart)).toBe(false);
+    expect(getVideoSpanPlaybackState()).toMatchObject({ isPlaying: false, token });
+  });
+
   it('hands the loop toggle to the caller', async () => {
     const onVideoLoopChange = vi.fn();
     await renderHarness({ onVideoLoopChange, source: fixtureVideoSource, videoLoop: false });
@@ -1149,6 +1182,9 @@ const getScrubberRoot = (): Element => {
 
   return scrubber;
 };
+
+/** Where the scrubber shades the player's playback window from, as rendered. */
+const getWindowStart = (): string => (getScrubberRoot() as HTMLElement).style.getPropertyValue('--video-window-start');
 
 const getVideo = (): HTMLVideoElement => {
   const video = host?.querySelector<HTMLVideoElement>('video');

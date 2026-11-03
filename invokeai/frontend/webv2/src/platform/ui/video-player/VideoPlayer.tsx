@@ -88,7 +88,9 @@ export interface VideoPlayerProps extends Omit<
    * Plays this window instead of the whole clip. Playback that reaches its end wraps to its start while looping;
    * otherwise it pauses on the window's last frame, and playing from there starts the window over. It is clamped to
    * the media; a collapsed or inverted window is none, so playback covers the whole clip. Seeks never act on it, and
-   * one that leaves it keeps it: retiring it is the caller's call (`onSeeking`).
+   * one that leaves it keeps it: retiring it is the caller's call (`onSeeking`). A new window takes effect in the passive
+   * effects of the commit that renders it; playback started before then (a caller's `play()` in the same task) is
+   * judged against the previous window, so a caller starts it from an effect after the player's in that commit.
    */
   playbackWindow?: PlaybackWindow | null;
   /** `compact` fits a small box: play, loop, scrubber and one readout; volume and fullscreen are left out. */

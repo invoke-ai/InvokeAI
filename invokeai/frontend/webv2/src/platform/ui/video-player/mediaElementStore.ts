@@ -34,8 +34,10 @@ export interface MediaElementStore {
   /**
    * While set, playback that reaches the window's end wraps to its start with `loop`, including at the media end;
    * without it, playback pauses and rests at `restSeconds`. A seek is not playback: one that lands at or past the end
-   * never wraps or pauses, though playback from before the window does once it reaches the end. Playing from the rest, or past it, starts the window over, whatever starts the
-   * playback. Returns the clearing; a later window replaces this one, and clearing a replaced window does nothing.
+   * never wraps or pauses, though playback from before the window does once it reaches the end. Playing from the rest,
+   * or past it, starts the window over, whatever starts the playback (`play`, media keys, a caller's own `play()`).
+   * Playback is judged against the window set when it starts, so a caller playing a new window sets it first. Returns
+   * the clearing; a later window replaces this one, and clearing a replaced window does nothing.
    */
   setPlaybackWindow: (window: PlaybackWindow, options: { loop: boolean; restSeconds: number }) => () => void;
   setMuted: (muted: boolean) => void;
@@ -128,13 +130,13 @@ export const createMediaElementStore = (): MediaElementStore => {
       frame = null;
     }
   };
-  const isAtRest = (video: HTMLVideoElement): boolean =>
-    playbackWindow !== null &&
-    !playbackWindow.loop &&
-    (video.ended || video.currentTime >= playbackWindow.restSeconds - REST_TOLERANCE_SECONDS);
-  // A finished window plays again from its start, as an ended clip does.
-  const rewindFinishedWindow = (video: HTMLVideoElement): void => {
-    if (playbackWindow && isAtRest(video)) {
+  // A finished window plays again from its start, as an ended clip does. An ended element is past the rest too.
+  const replayFinishedWindow = (video: HTMLVideoElement): void => {
+    if (
+      playbackWindow &&
+      !playbackWindow.loop &&
+      video.currentTime >= playbackWindow.restSeconds - REST_TOLERANCE_SECONDS
+    ) {
       seekElement(video, playbackWindow.range.startSeconds);
       sampledTime = null;
     }
@@ -206,7 +208,7 @@ export const createMediaElementStore = (): MediaElementStore => {
       case 'play':
         // Native play (media keys, a caller's own `play()`) replays a finished window as the controls do.
         if (element) {
-          rewindFinishedWindow(element);
+          replayFinishedWindow(element);
         }
 
         sampleWindowEnd();
@@ -229,7 +231,7 @@ export const createMediaElementStore = (): MediaElementStore => {
     }
 
     // Rewound before playing, so not even a frame plays from the rest.
-    rewindFinishedWindow(element);
+    replayFinishedWindow(element);
     void element.play().catch(ignoreRefusal);
   };
 

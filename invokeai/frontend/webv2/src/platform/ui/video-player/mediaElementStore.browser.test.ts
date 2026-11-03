@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createMediaElementStore } from './mediaElementStore';
+import { getPlaybackWindowRest } from './videoTimeline';
 
 // The mock backend's clip: 64×64 H.264, 10 frames at 10 fps, one second long. Vite serves the package root.
 const FIXTURE_VIDEO_URL = '/scripts/mock-assets/fixture-video.mp4';
@@ -148,23 +149,22 @@ describe('createMediaElementStore', () => {
     const store = createMediaElementStore();
     store.attach(video);
     await loadFixture();
-    store.setPlaybackWindow({ endSeconds: 0.5, startSeconds: 0.2 }, { loop: false, restSeconds: 0.45 });
+    // A real clip's rest, a frame's middle at 23.976 fps, which the element reports back only to its own precision.
+    const range = { endSeconds: 0.5, startSeconds: 0.2 };
+    const restSeconds = getPlaybackWindowRest(range, 23.976);
+    const isResting = () => video.paused && !video.seeking && Math.abs(video.currentTime - restSeconds) < 1e-4;
+    store.setPlaybackWindow(range, { loop: false, restSeconds });
     store.seek(0.2);
     store.play();
 
-    await expect
-      .poll(() => video.paused && !video.seeking && Math.abs(video.currentTime - 0.45) < 1e-6, {
-        timeout: 3000,
-      })
-      .toBe(true);
+    await expect.poll(isResting, { timeout: 3000 }).toBe(true);
 
     // Media keys and other callers play the element directly; the window replays all the same.
     const seeks = recordSeeks();
     await video.play();
 
     await expect.poll(() => seeks[0]).toBeCloseTo(0.2);
-    await expect.poll(() => video.paused, { timeout: 3000 }).toBe(true);
-    await expect.poll(() => Math.abs(video.currentTime - 0.45) < 1e-6).toBe(true);
+    await expect.poll(isResting, { timeout: 3000 }).toBe(true);
   });
 
   it('stops wrapping once the window is cleared, and ignores clearing a replaced window', async () => {
