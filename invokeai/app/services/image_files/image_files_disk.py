@@ -43,6 +43,7 @@ class _StagedDelete:
     files: list[tuple[Path, Path]]
     image_name: str
     image_subfolder: str
+    candidates: list[Path]
 
 
 @dataclass
@@ -56,6 +57,8 @@ class _PendingDelete:
 
     directory: Path
     images: list[tuple[str, str]]
+    # Delete candidates per image, parallel to `images`: resolved once at begin and reused by purge and sync.
+    candidates: list[list[Path]]
 
 
 def _get_png_size(image: PILImageType, compress_type: Optional[int] = None) -> int:
@@ -110,6 +113,13 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__precise_folder = self.__output_folder / "precise"
         # Validate required output folders at launch
         self.__validate_storage_folders()
+        # Resolved once: resolving a root walks the filesystem, and every path lookup checks containment in it.
+        # A root re-pointed (symlink or junction target changed) while the server runs needs a restart; lookups then
+        # fail closed on the containment check.
+        self.__resolved_roots = {
+            folder: folder.resolve()
+            for folder in (self.__output_folder, self.__thumbnails_folder, self.__precise_folder)
+        }
 
     def start(self, invoker: Invoker) -> None:
         self.__invoker = invoker
@@ -134,6 +144,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def iter_thumbnail_paths(self) -> Iterator[Path]:
         """Walk WEBP thumbnails without following symlinks or entering reserved journals."""
         yield from self.__iter_supported_paths(self.thumbnail_root, suffixes={".webp"})
+
+    def iter_precise_paths(self) -> Iterator[Path]:
+        """Walk precise assets; interrupted writes (`.tmp*`) are not assets and are not yielded."""
+        yield from self.__iter_supported_paths(self.precise_root, suffixes={".safetensors"})
 
     @staticmethod
     def __iter_supported_paths(root: Path, suffixes: set[str], skip_reserved_roots: bool = False) -> Iterator[Path]:
@@ -386,12 +400,16 @@ class DiskImageFileStorage(ImageFileStorageBase):
         source_subfolder: str = "",
         image_subfolder: str = "",
         thumbnail_size: int = 256,
+        include_precise: bool = False,
     ) -> None:
         """Duplicate an image's files under a new name, without decoding them.
 
         `shutil.copy2` is both cheapest and most faithful: every PNG chunk travels, including ones
         this application does not parse and would drop on a re-encode. Nothing is cached — a copy
         nobody has read yet has no business occupying a slot.
+
+        The precise asset travels only when the caller says the source has one: the record store,
+        not the presence of a file, decides that. A flagged but missing source file fails the copy.
         """
         try:
             self.__validate_storage_folders()
@@ -411,6 +429,11 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 # worth a decode rather than leaving the copy with a broken gallery tile.
                 with Image.open(image_path) as copied:
                     make_thumbnail(copied, thumbnail_size).save(thumbnail_path)
+
+            if include_precise:
+                precise_path = self.get_precise_path(image_name, image_subfolder)
+                precise_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(self.get_precise_path(source_image_name, source_subfolder), precise_path)
         except Exception as e:
             raise ImageFileSaveException from e
 
@@ -440,7 +463,11 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 finally:
                     self.__invalidate_cache_paths_locked(candidates)
             return _StagedDelete(
-                directory=staging_dir, files=staged, image_name=image_name, image_subfolder=image_subfolder
+                directory=staging_dir,
+                files=staged,
+                image_name=image_name,
+                image_subfolder=image_subfolder,
+                candidates=candidates,
             )
         except Exception as e:
             for source, destination in reversed(staged):
@@ -460,8 +487,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """
         # Resolve every path up front. A name that cannot be turned into a path must fail here,
         # while the caller can still abort — not after it has deleted the records.
-        for image_name, image_subfolder in images:
-            self.__delete_candidates(image_name, image_subfolder)
+        candidates = [self.__delete_candidates(image_name, image_subfolder) for image_name, image_subfolder in images]
         journal_dir = Path(tempfile.mkdtemp(prefix=".delete_", dir=self.__output_folder))
         try:
             entries = [
@@ -473,7 +499,9 @@ class DiskImageFileStorage(ImageFileStorageBase):
                 manifest.flush()
                 os.fsync(manifest.fileno())
             self.__persist_journal_directory(journal_dir)
-            return _PendingDelete(directory=journal_dir, images=[(name, subfolder) for name, subfolder in images])
+            return _PendingDelete(
+                directory=journal_dir, images=[(name, subfolder) for name, subfolder in images], candidates=candidates
+            )
         except Exception as e:
             shutil.rmtree(journal_dir, ignore_errors=True)
             raise ImageFileDeleteException from e
@@ -499,8 +527,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # and if that second one is the one whose record deletion succeeds, dropping its empty
             # staging directory alone would strand the files the first deleter restores. Committing
             # has to mean "no file for this image survives", whichever request moved them.
-            self.__purge_files(token.image_name, token.image_subfolder)
-            self.__persist_purges([(token.image_name, token.image_subfolder)])
+            self.__purge_files(token.candidates)
+            self.__persist_purges([token.candidates])
             shutil.rmtree(token.directory)
         except Exception as e:
             raise ImageFileDeleteException from e
@@ -510,14 +538,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
         # still lists every candidate, which is harmless because recovery re-checks each one against
         # the record store and skips any that survived.
         selected = image_names if image_names is None else set(image_names)
-        purged: list[tuple[str, str]] = []
+        purged: list[list[Path]] = []
         failures: list[str] = []
-        for image_name, image_subfolder in token.images:
+        for (image_name, _), candidates in zip(token.images, token.candidates, strict=True):
             if selected is not None and image_name not in selected:
                 continue
             try:
-                self.__purge_files(image_name, image_subfolder)
-                purged.append((image_name, image_subfolder))
+                self.__purge_files(candidates)
+                purged.append(candidates)
             except OSError as e:
                 failures.append(f"{image_name}: {e}")
         if failures:
@@ -545,28 +573,32 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # only *after* its record is committed as gone, so a record still present here cannot
             # have been purged before this restore, and a record already absent means the purge
             # either found nothing or is still to come — either way the files must go.
-            self.__purge_if_record_absent(token.image_name, token.image_subfolder)
-            self.__persist_purges([(token.image_name, token.image_subfolder)])
+            self.__purge_if_record_absent(token.image_name, token.candidates)
+            self.__persist_purges([token.candidates])
             shutil.rmtree(token.directory, ignore_errors=True)
         except Exception as e:
             raise ImageFileDeleteException from e
 
     def __delete_candidates(self, image_name: str, image_subfolder: str) -> list[Path]:
+        # The position is the staged file's name inside a delete journal: append, never reorder.
+        # The precise asset is a candidate whether or not a row names it, because the purge may run
+        # after the row's cascade delete.
         return [
             self.get_path(image_name, image_subfolder=image_subfolder),
             self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
+            self.get_precise_path(image_name, image_subfolder),
         ]
 
-    def __purge_files(self, image_name: str, image_subfolder: str) -> None:
-        """Removes an image's file and thumbnail. Missing files are not an error."""
-        for path in self.__delete_candidates(image_name, image_subfolder):
+    def __purge_files(self, candidates: Iterable[Path]) -> None:
+        """Removes an image's file, thumbnail and precise asset. Missing files are not an error."""
+        for path in candidates:
             with self.__cache_lock:
                 try:
                     path.unlink(missing_ok=True)
                 finally:
                     self.__invalidate_cache_paths_locked([path])
 
-    def __purge_if_record_absent(self, image_name: str, image_subfolder: str) -> None:
+    def __purge_if_record_absent(self, image_name: str, candidates: list[Path]) -> None:
         try:
             record_exists = self.__invoker.services.image_records.exists(image_name)
         except Exception as e:
@@ -576,7 +608,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             return
         if record_exists:
             return
-        self.__purge_files(image_name, image_subfolder)
+        self.__purge_files(candidates)
 
     def __persist_journal_directory(self, journal_dir: Path) -> None:
         """Makes a journal directory and its manifest survive a power loss.
@@ -590,7 +622,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
         self.__fsync_directory(journal_dir)
         self.__fsync_directory(self.__output_folder)
 
-    def __persist_purges(self, images: Iterable[tuple[str, str]]) -> None:
+    def __persist_purges(self, candidate_groups: Iterable[Sequence[Path]]) -> None:
         """Makes the removal (or restoration) of these images' files survive a power loss.
 
         Runs before the journal that names them is dropped. Unlinks and renames live in the parent
@@ -599,8 +631,8 @@ class DiskImageFileStorage(ImageFileStorageBase):
         them by. Raises ``OSError`` when a sync fails, so the caller keeps the journal.
         """
         parents: dict[Path, None] = {}
-        for image_name, image_subfolder in images:
-            for path in self.__delete_candidates(image_name, image_subfolder):
+        for candidates in candidate_groups:
+            for path in candidates:
                 parents[path.parent] = None
         for parent in parents:
             # A parent that no longer exists has no entries to make durable.
@@ -633,10 +665,14 @@ class DiskImageFileStorage(ImageFileStorageBase):
             size = self.get_path(image_name, image_subfolder=image_subfolder).stat().st_size
         except FileNotFoundError:
             return None
-        try:
-            size += self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder).stat().st_size
-        except FileNotFoundError:
-            pass
+        for companion in (
+            self.get_path(image_name, thumbnail=True, image_subfolder=image_subfolder),
+            self.get_precise_path(image_name, image_subfolder),
+        ):
+            try:
+                size += companion.stat().st_size
+            except FileNotFoundError:
+                pass
         return size
 
     def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
@@ -675,7 +711,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
             image_path = base_folder / basename
 
         # Ensure the image path is within the base folder to prevent directory traversal
-        resolved_base = base_folder.resolve()
+        resolved_base = self.__resolved_roots.get(base_folder) or base_folder.resolve()
         resolved_image_path = image_path.resolve()
 
         if not resolved_image_path.is_relative_to(resolved_base):
@@ -758,13 +794,17 @@ class DiskImageFileStorage(ImageFileStorageBase):
                     data = json.load(manifest)
                 records = self.__invoker.services.image_records
                 images = self.__manifest_images(data)
+                recovered: list[list[Path]] = []
                 for image_name, image_subfolder in images:
+                    candidates = self.__delete_candidates(image_name, image_subfolder)
+                    recovered.append(candidates)
                     if records.exists(image_name):
                         # Put back whatever stage_delete() moved aside. Only a single-image journal
-                        # ever holds staged files, at indices 0 and 1; a pending-delete journal
+                        # ever holds staged files, named by candidate index (journals from builds
+                        # without precise assets only have 0 and 1); a pending-delete journal
                         # moves nothing, so these lookups simply find nothing to restore.
                         restored = False
-                        for index, source in enumerate(self.__delete_candidates(image_name, image_subfolder)):
+                        for index, source in enumerate(candidates):
                             staged = journal_dir / str(index)
                             if staged.exists():
                                 source.parent.mkdir(parents=True, exist_ok=True)
@@ -780,10 +820,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
                         # the journal, like every other lookup in this loop.
                         if not restored or records.exists(image_name):
                             continue
-                    self.__purge_files(image_name, image_subfolder)
+                    self.__purge_files(candidates)
                 # Every restore and purge above must be on disk before the journal that could redo
                 # them is gone. A failed sync propagates and keeps the journal for the next startup.
-                self.__persist_purges(images)
+                self.__persist_purges(recovered)
                 shutil.rmtree(journal_dir, ignore_errors=True)
             except Exception as error:
                 # Includes a record-store fault: leave the journal for the next startup rather than

@@ -964,11 +964,13 @@ def wired(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFi
     """ImageService wired to a real record store and a real disk store — no stub decides anything."""
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
-    records = ImageRecordStorage(create_mock_sqlite_database(config, logger))
+    db = create_mock_sqlite_database(config, logger)
+    records = ImageRecordStorage(db)
     storage = DiskImageFileStorage(tmp_path / "outputs")
 
     svc = ImageService()
     invoker = MagicMock()
+    invoker.services.database = db
     invoker.services.configuration.pil_compress_level = 1
     invoker.services.image_records = records
     invoker.services.image_files = storage
@@ -992,6 +994,7 @@ def wired_with_move_service(
 
     svc = ImageService()
     invoker = MagicMock()
+    invoker.services.database = db
     invoker.services.configuration.pil_compress_level = 1
     invoker.services.image_records = records
     invoker.services.image_files = storage

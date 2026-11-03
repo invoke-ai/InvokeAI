@@ -3,14 +3,16 @@
 Fixtures are written directly (`write_precise_asset` + a row through `Database.queries`), never by a production writer.
 """
 
+import itertools
+import shutil
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 from PIL import Image
 
-from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException, ImageFileSaveException
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -43,6 +45,7 @@ class Stack:
         self.database = database
         self.output = output
         self.records = ImageRecordStorage(database)
+        self._names = itertools.count()
         self.storage, self.service = self._build()
 
     def _build(self) -> tuple[DiskImageFileStorage, ImageService]:
@@ -53,6 +56,10 @@ class Stack:
         invoker.services.image_records = self.records
         invoker.services.image_files = storage
         invoker.services.logger = MagicMock()
+        invoker.services.configuration.image_subfolder_strategy = "hash"
+        invoker.services.names.create_image_name.side_effect = lambda: f"new-{next(self._names)}.png"
+        invoker.services.urls.get_image_url.side_effect = lambda name, thumbnail=False: f"/{name}"
+        invoker.services.board_image_records.get_board_for_image.return_value = None
         storage.start(invoker)
         service = ImageService()
         service.start(invoker)
@@ -69,6 +76,7 @@ class Stack:
         subfolder: str = "",
         precise: RasterImage | None = None,
         asset: tuple[str, int] | None = None,
+        is_intermediate: bool = False,
     ) -> None:
         """An image with a PNG derivative; with `precise` also the asset file and its row (or `asset` as the row)."""
         self.records.save(
@@ -78,6 +86,7 @@ class Stack:
             width=2,
             height=1,
             has_workflow=False,
+            is_intermediate=is_intermediate,
             image_subfolder=subfolder,
         )
         if ".." not in subfolder:
@@ -242,3 +251,180 @@ def test_an_os_error_other_than_missing_propagates_and_never_returns_the_png(sta
 
     assert not isinstance(storage_error.value, ImageFileNotFoundException | FileNotFoundError)
     assert not isinstance(service_error.value, ImageFileNotFoundException | FileNotFoundError)
+
+
+# --- Lifecycle: the asset set is deleted, copied and accounted for as one unit -------------------------------------
+
+
+def _files_under(root: Path) -> set[str]:
+    return {path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file()}
+
+
+def _asset_row(stack: Stack, name: str):
+    return stack.database.queries.image_precise_assets.get(name)
+
+
+def _set_paths(stack: Stack, name: str, subfolder: str = "") -> list[Path]:
+    return [
+        stack.storage.get_path(name, image_subfolder=subfolder),
+        stack.storage.get_path(name, thumbnail=True, image_subfolder=subfolder),
+        stack.storage.get_precise_path(name, subfolder),
+    ]
+
+
+@pytest.mark.parametrize("subfolder", ["", "2026/11"])
+def test_delete_removes_png_thumbnail_precise_file_and_row(stack: Stack, subfolder: str) -> None:
+    stack.add("p.png", subfolder=subfolder, precise=_float_rgb())
+    paths = _set_paths(stack, "p.png", subfolder)
+    paths[1].parent.mkdir(parents=True, exist_ok=True)
+    paths[1].write_bytes(b"thumbnail")
+    assert all(path.exists() for path in paths)
+
+    stack.service.delete("p.png")
+
+    assert not any(path.exists() for path in paths)
+    assert _asset_row(stack, "p.png") is None
+    assert not list(stack.output.glob(".delete_*"))
+
+
+def test_delete_purges_a_precise_file_that_has_no_row(stack: Stack) -> None:
+    stack.add("p.png", png_pixels=(1, 2, 3))
+    stray = stack.storage.get_precise_path("p.png")
+    write_precise_asset(_float_rgb(), stray)
+
+    stack.service.delete("p.png")
+
+    assert not stray.exists()
+
+
+def test_bulk_delete_removes_the_precise_files_of_the_selected_images_only(stack: Stack) -> None:
+    stack.add("a.png", precise=_float_rgb())
+    stack.add("b.png", subfolder="x", precise=_uint16_rgba())
+    stack.add("keep.png", precise=_float_rgb())
+
+    deleted, failed = stack.service.delete_images_by_names(["a.png", "b.png"])
+
+    assert (sorted(deleted), failed) == (["a.png", "b.png"], [])
+    assert _files_under(stack.storage.precise_root) == {"keep.safetensors"}
+    assert _asset_row(stack, "keep.png") is not None
+    assert _asset_row(stack, "a.png") is None
+
+
+def test_delete_intermediates_removes_the_precise_file(stack: Stack) -> None:
+    stack.add("mid.png", precise=_float_rgb(), is_intermediate=True)
+    stack.add("final.png", precise=_float_rgb())
+
+    stack.service.delete_intermediates_by_names(["mid.png"])
+
+    assert _files_under(stack.storage.precise_root) == {"final.safetensors"}
+    assert _asset_row(stack, "mid.png") is None
+
+
+def test_a_failed_save_cleanup_removes_a_precise_file_that_landed(stack: Stack) -> None:
+    def save_then_fail(image, image_name, image_subfolder="", **_):
+        path = stack.storage.get_precise_path(image_name, image_subfolder)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        write_precise_asset(_float_rgb(), path)
+        raise ImageFileSaveException
+
+    with Image.new("RGB", (2, 1)) as image:
+        with (
+            patch.object(stack.storage, "save", side_effect=save_then_fail),
+            pytest.raises(ImageFileSaveException),
+        ):
+            stack.service.create(image, ResourceOrigin.INTERNAL, ImageCategory.GENERAL)
+
+    assert _files_under(stack.output) == set()
+    assert not stack.records.exists("new-0.png")
+
+
+class TestCopy:
+    @staticmethod
+    def _snapshot(stack: Stack) -> dict[str, bytes]:
+        return {
+            path.relative_to(stack.output).as_posix(): path.read_bytes()
+            for path in stack.output.rglob("*")
+            if path.is_file()
+        }
+
+    def test_a_source_with_a_row_gets_its_own_asset_file_row_and_size(self, stack: Stack) -> None:
+        stack.add("src.png", subfolder="old", precise=_uint16_rgba())
+
+        dto = stack.service.copy("src.png")
+
+        destination = stack.records.get(dto.image_name)
+        paths = _set_paths(stack, dto.image_name, destination.image_subfolder)
+        assert destination.image_subfolder == dto.image_name[:2]
+        assert paths[2].name == f"{Path(dto.image_name).stem}.safetensors"
+        assert paths[2].read_bytes() == stack.storage.get_precise_path("src.png", "old").read_bytes()
+        assert _asset_row(stack, dto.image_name) == _asset_row(stack, "src.png")._replace(image_name=dto.image_name)
+        assert destination.file_size_bytes == sum(path.stat().st_size for path in paths)
+        assert stack.service.get_raster(dto.image_name).view().tobytes() == _uint16_rgba().view().tobytes()
+
+    def test_a_source_without_a_row_copies_no_asset_even_with_a_stray_file(self, stack: Stack) -> None:
+        stack.add("src.png")
+        write_precise_asset(_float_rgb(), stack.storage.get_precise_path("src.png"))
+
+        dto = stack.service.copy("src.png")
+
+        subfolder = stack.records.get(dto.image_name).image_subfolder
+        assert not stack.storage.get_precise_path(dto.image_name, subfolder).exists()
+        assert _asset_row(stack, dto.image_name) is None
+        assert _files_under(stack.storage.precise_root) == {"src.safetensors"}
+
+    def test_the_destination_row_exists_before_the_copy_is_announced(self, stack: Stack) -> None:
+        stack.add("src.png", precise=_float_rgb())
+        announced_with_row: list[bool] = []
+
+        def on_changed(dto) -> None:
+            announced_with_row.append(_asset_row(stack, dto.image_name) is not None)
+
+        with patch.object(stack.service, "_on_changed", side_effect=on_changed):
+            stack.service.copy("src.png")
+
+        assert announced_with_row == [True]
+
+    @pytest.mark.parametrize("inject", ["row_insert", "dto", "changed_notification"])
+    def test_a_failure_after_the_asset_landed_leaves_no_destination_and_an_untouched_source(
+        self, stack: Stack, inject: str
+    ) -> None:
+        stack.add("src.png", subfolder="old", precise=_float_rgb())
+        before = self._snapshot(stack)
+
+        if inject == "row_insert":
+            failure = patch.object(
+                type(stack.database.queries.image_precise_assets), "insert", side_effect=RuntimeError("insert failed")
+            )
+        elif inject == "dto":
+            failure = patch.object(stack.service, "get_dto", side_effect=RuntimeError("dto failed"))
+        else:
+            failure = patch.object(stack.service, "_on_changed", side_effect=RuntimeError("event failed"))
+        with failure, patch.object(stack.service, "_on_changed", wraps=stack.service._on_changed) as announced:
+            with pytest.raises(RuntimeError):
+                stack.service.copy("src.png")
+        if inject == "row_insert":
+            announced.assert_not_called()
+
+        assert self._snapshot(stack) == before
+        assert not stack.records.exists("new-0.png")
+        assert _asset_row(stack, "new-0.png") is None
+        assert stack.records.get("src.png").image_subfolder == "old"
+
+    def test_a_file_copy_failure_after_the_png_landed_is_unwound(self, stack: Stack) -> None:
+        stack.add("src.png", precise=_float_rgb())
+        before = self._snapshot(stack)
+        real_copy2 = shutil.copy2
+
+        def copy2(src, dst, *args, **kwargs):
+            real_copy2(src, dst, *args, **kwargs)
+            if str(dst).endswith(".safetensors"):
+                raise OSError("disk full")
+
+        with (
+            patch("invokeai.app.services.image_files.image_files_disk.shutil.copy2", copy2),
+            pytest.raises(ImageFileSaveException),
+        ):
+            stack.service.copy("src.png")
+
+        assert self._snapshot(stack) == before
+        assert not stack.records.exists("new-0.png")

@@ -44,6 +44,11 @@ class ImageFileStorageBase(ABC):
         """Yields thumbnail paths in stable order, excluding reserved trees and symlinks."""
         pass
 
+    @abstractmethod
+    def iter_precise_paths(self) -> Iterator[Path]:
+        """Yields precise asset paths (`.safetensors`) in stable order, excluding reserved trees and symlinks."""
+        pass
+
     @property
     @abstractmethod
     def image_root(self) -> Path:
@@ -104,17 +109,20 @@ class ImageFileStorageBase(ABC):
         source_subfolder: str = "",
         image_subfolder: str = "",
         thumbnail_size: int = 256,
+        include_precise: bool = False,
     ) -> None:
-        """Duplicates an existing image's file and thumbnail under a new name.
+        """Duplicates an existing image's file, thumbnail and (when `include_precise`) precise asset.
 
         A byte-level copy, not a re-encode: every PNG chunk travels, including ones this
-        application does not parse, and no pixels are decoded.
+        application does not parse, and no pixels are decoded. The caller decides `include_precise`
+        from the record store; a flagged but missing source asset fails the copy.
         """
         pass
 
     @abstractmethod
     def get_file_size_bytes(self, image_name: str, image_subfolder: str = "") -> Optional[int]:
-        """Bytes the image and its thumbnail occupy; None when the full-size file is missing."""
+        """Bytes the image, its thumbnail and its precise asset (when present) occupy; None when the full-size file is
+        missing."""
         pass
 
     @abstractmethod

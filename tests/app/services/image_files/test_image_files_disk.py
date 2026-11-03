@@ -1,5 +1,6 @@
 import errno
 import hashlib
+import json
 import os
 import platform
 import shutil
@@ -385,8 +386,8 @@ def test_stage_delete_and_commit_prevent_inflight_read_from_caching_deleted_imag
         token = storage.stage_delete(image_name)
         purge = storage._DiskImageFileStorage__purge_files
 
-        def pause_after_purge(name: str, subfolder: str) -> None:
-            purge(name, subfolder)
+        def pause_after_purge(candidates: list[Path]) -> None:
+            purge(candidates)
             purge_finished.set()
             if not allow_commit.wait(timeout=5):
                 raise TimeoutError("test did not release staged deletion")
@@ -471,11 +472,11 @@ def test_pending_delete_purge_prevents_inflight_read_from_caching_deleted_image(
         assert cache_write_started.wait(timeout=5)
         persist = storage._DiskImageFileStorage__persist_purges
 
-        def pause_after_purge(images: list[tuple[str, str]]) -> None:
+        def pause_after_purge(candidate_groups: list[list[Path]]) -> None:
             purge_finished.set()
             if not allow_persist.wait(timeout=5):
                 raise TimeoutError("test did not release pending deletion")
-            persist(images)
+            persist(candidate_groups)
 
         monkeypatch.setattr(storage, "_DiskImageFileStorage__persist_purges", pause_after_purge)
 
@@ -1141,6 +1142,7 @@ class TestPurgeDurability:
         return {
             disk_storage.get_path(image_name, image_subfolder=self.SUBFOLDER).parent.resolve(),
             disk_storage.get_path(image_name, thumbnail=True, image_subfolder=self.SUBFOLDER).parent.resolve(),
+            disk_storage.get_precise_path(image_name, self.SUBFOLDER).parent.resolve(),
         }
 
     def _assert_parents_synced_before_journal_removal(self, disk_storage, monkeypatch, image_name: str):
@@ -1166,6 +1168,7 @@ class TestPurgeDurability:
         self, disk_storage: DiskImageFileStorage, monkeypatch
     ):
         disk_storage.save(image=Image.new("RGB", (32, 32)), image_name="gone.png", image_subfolder=self.SUBFOLDER)
+        _write_precise(disk_storage, "gone.png", self.SUBFOLDER)
         token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
         fsynced = self._assert_parents_synced_before_journal_removal(disk_storage, monkeypatch, "gone.png")
 
@@ -1442,3 +1445,186 @@ def test_read_precise_of_a_corrupt_file_is_a_precise_asset_error(tmp_path: Path)
 
     with pytest.raises(PreciseAssetError):
         storage.read_precise("img.png")
+
+
+def _write_precise(storage: DiskImageFileStorage, image_name: str, subfolder: str = "") -> Path:
+    path = storage.get_precise_path(image_name, subfolder)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_precise_asset(_float_raster(), path)
+    return path
+
+
+def _save_with_precise(storage: DiskImageFileStorage, image_name: str, subfolder: str = "") -> list[Path]:
+    """PNG, thumbnail and precise asset of one image; returns their paths in delete-candidate order."""
+    storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name, image_subfolder=subfolder)
+    return [
+        storage.get_path(image_name, image_subfolder=subfolder),
+        storage.get_path(image_name, thumbnail=True, image_subfolder=subfolder),
+        _write_precise(storage, image_name, subfolder),
+    ]
+
+
+def test_iter_precise_paths_is_sorted_nested_and_skips_journals_and_other_files(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    (tmp_path / "precise" / "b").mkdir()
+    (tmp_path / "precise" / "z.safetensors").write_bytes(b"z")
+    (tmp_path / "precise" / "b" / "nested.safetensors").write_bytes(b"n")
+    (tmp_path / "precise" / "a.tmpX1y2Z3").write_bytes(b"crashed write")
+    (tmp_path / "precise" / "stray.png").write_bytes(b"s")
+    (tmp_path / "precise" / ".delete_x").mkdir()
+    (tmp_path / "precise" / ".delete_x" / "j.safetensors").write_bytes(b"j")
+    (tmp_path / "z.safetensors").write_bytes(b"outside the precise root")
+
+    assert [path.relative_to(storage.precise_root).as_posix() for path in storage.iter_precise_paths()] == [
+        "z.safetensors",
+        "b/nested.safetensors",
+    ]
+
+
+class TestPreciseAssetLifecycle:
+    """The precise asset is the third delete candidate: removed, staged, restored and journaled with the image."""
+
+    SUBFOLDER = "2026/11/03"
+
+    def test_pending_commit_purges_all_three_files(self, disk_storage: DiskImageFileStorage):
+        paths = _save_with_precise(disk_storage, "gone.png", self.SUBFOLDER)
+        token = disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+
+        disk_storage.commit_delete(token)
+
+        assert not any(path.exists() for path in paths)
+
+    def test_staged_rollback_restores_the_precise_file_byte_identically(self, disk_storage: DiskImageFileStorage):
+        paths = _save_with_precise(disk_storage, "back.png", self.SUBFOLDER)
+        original = [path.read_bytes() for path in paths]
+
+        token = disk_storage.stage_delete("back.png", self.SUBFOLDER)
+        assert not any(path.exists() for path in paths)
+        disk_storage.rollback_delete(token)
+
+        assert [path.read_bytes() for path in paths] == original
+
+    def test_rollback_purges_all_three_when_the_record_vanished_while_staged(self, disk_storage: DiskImageFileStorage):
+        paths = _save_with_precise(disk_storage, "raced.png", self.SUBFOLDER)
+        token = disk_storage.stage_delete("raced.png", self.SUBFOLDER)
+        disk_storage._DiskImageFileStorage__invoker.services.image_records.exists.return_value = False
+
+        disk_storage.rollback_delete(token)
+
+        assert not any(path.exists() for path in paths)
+
+    def test_startup_restores_all_three_when_the_record_exists(self, disk_storage: DiskImageFileStorage):
+        paths = _save_with_precise(disk_storage, "back.png", self.SUBFOLDER)
+        original = [path.read_bytes() for path in paths]
+        disk_storage.stage_delete("back.png", self.SUBFOLDER)
+
+        _restart(disk_storage, record_exists=True)
+
+        assert [path.read_bytes() for path in paths] == original
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+    def test_startup_purges_a_pending_journals_precise_file_when_the_record_is_gone(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        paths = _save_with_precise(disk_storage, "gone.png", self.SUBFOLDER)
+        disk_storage.begin_delete([("gone.png", self.SUBFOLDER)])
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not any(path.exists() for path in paths)
+
+    @pytest.mark.parametrize("record_exists", [True, False])
+    def test_a_journal_from_the_two_candidate_layout_still_recovers(
+        self, disk_storage: DiskImageFileStorage, record_exists: bool
+    ):
+        """Older builds staged only the PNG ("0") and the thumbnail ("1")."""
+        png, thumbnail, precise = _save_with_precise(disk_storage, "old.png", self.SUBFOLDER)
+        journal = disk_storage.image_root / ".delete_oldlayout"
+        journal.mkdir()
+        (journal / "manifest.json").write_text(
+            json.dumps({"image_name": "old.png", "image_subfolder": self.SUBFOLDER}), encoding="utf-8"
+        )
+        png_bytes, thumbnail_bytes = png.read_bytes(), thumbnail.read_bytes()
+        png.replace(journal / "0")
+        thumbnail.replace(journal / "1")
+
+        _restart(disk_storage, record_exists=record_exists)
+
+        if record_exists:
+            assert (png.read_bytes(), thumbnail.read_bytes()) == (png_bytes, thumbnail_bytes)
+            assert precise.exists()
+        else:
+            assert not png.exists() and not thumbnail.exists()
+            assert not precise.exists()
+        assert not journal.exists()
+
+    def test_a_precise_purge_failure_keeps_the_journal_and_startup_finishes_it(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        png, thumbnail, precise = _save_with_precise(disk_storage, "bad.png", self.SUBFOLDER)
+        token = disk_storage.begin_delete([("bad.png", self.SUBFOLDER)])
+        real_unlink = Path.unlink
+
+        def unlink(self: Path, missing_ok: bool = False):
+            if self == precise:
+                raise OSError("device busy")
+            return real_unlink(self, missing_ok=missing_ok)
+
+        with patch.object(Path, "unlink", unlink), pytest.raises(ImageFileDeleteException):
+            disk_storage.commit_delete(token)
+
+        assert precise.exists() and not png.exists() and not thumbnail.exists()
+        assert list(disk_storage.image_root.glob(".delete_*"))
+
+        _restart(disk_storage, record_exists=False)
+
+        assert not precise.exists()
+        assert not list(disk_storage.image_root.glob(".delete_*"))
+
+
+class TestFileSizeIncludesPreciseAsset:
+    def test_size_is_png_plus_thumbnail_plus_precise(self, disk_storage: DiskImageFileStorage):
+        paths = _save_with_precise(disk_storage, "p.png", "a")
+
+        assert disk_storage.get_file_size_bytes("p.png", "a") == sum(path.stat().st_size for path in paths)
+
+    def test_a_missing_precise_file_is_ignored(self, disk_storage: DiskImageFileStorage):
+        png, thumbnail, precise = _save_with_precise(disk_storage, "p.png")
+        precise.unlink()
+
+        assert disk_storage.get_file_size_bytes("p.png") == png.stat().st_size + thumbnail.stat().st_size
+
+    def test_a_missing_png_is_none_even_with_a_precise_file(self, disk_storage: DiskImageFileStorage):
+        png, _, _ = _save_with_precise(disk_storage, "p.png")
+        png.unlink()
+
+        assert disk_storage.get_file_size_bytes("p.png") is None
+
+
+class TestCopyPreciseAsset:
+    def test_include_precise_copies_the_asset_byte_identically_into_the_destination_subfolder(
+        self, disk_storage: DiskImageFileStorage
+    ):
+        _, _, source = _save_with_precise(disk_storage, "src.png", "old")
+
+        disk_storage.copy("src.png", "dst.png", source_subfolder="old", image_subfolder="new/sub", include_precise=True)
+
+        destination = disk_storage.get_precise_path("dst.png", "new/sub")
+        assert destination == disk_storage.precise_root / "new" / "sub" / "dst.safetensors"
+        assert destination.read_bytes() == source.read_bytes()
+        assert source.exists()
+
+    def test_without_include_precise_a_stray_source_asset_is_not_copied(self, disk_storage: DiskImageFileStorage):
+        _save_with_precise(disk_storage, "src.png")
+
+        disk_storage.copy("src.png", "dst.png")
+
+        assert disk_storage.get_path("dst.png").exists()
+        assert not disk_storage.get_precise_path("dst.png").exists()
+
+    def test_a_flagged_but_missing_source_asset_fails_the_copy(self, disk_storage: DiskImageFileStorage):
+        _, _, source = _save_with_precise(disk_storage, "src.png")
+        source.unlink()
+
+        with pytest.raises(ImageFileSaveException):
+            disk_storage.copy("src.png", "dst.png", include_precise=True)

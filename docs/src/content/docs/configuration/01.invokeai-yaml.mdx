@@ -241,6 +241,12 @@ Available strategies:
 
 Changing this setting only affects newly-created images. Existing images remain in their current locations unless you run [Image Storage Maintenance](/users-guide/gallery/image-storage-maintenance/).
 
+#### Image Storage Layout
+
+`outputs/images/` also contains the `thumbnails/` and `precise/` folders, which mirror the image subfolders. `outputs/images/precise/<subfolder>/<image name without .png>.safetensors` holds the exact working pixels of an image saved with precision; the PNG next to it is only a display copy. Back up and move `precise/` together with `outputs/images`, and keep it on the same volume as `outputs/images` (no junction or symlink to another drive), because deleting and moving images renames files between the folders.
+
+If precise files are missing, the gallery and ordinary image reads still use the PNG, but nodes that read an image's exact pixels fail. Once precise files exist, do not roll back to an InvokeAI build without precise-image support: it does not know the folder, so it can destroy the precise pixels of images that still exist and leaves the files of deleted images behind.
+
 #### Response Compression
 
 API responses (JSON, HTML, JS, CSS, SVG) are gzipped before being sent. Already-compressed responses — PNG, WebP, JPEG, MP4 — are passed through untouched, since compressing them costs CPU and returns a body no smaller than the original.

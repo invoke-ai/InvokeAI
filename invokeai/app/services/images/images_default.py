@@ -248,7 +248,8 @@ class ImageService(ImageServiceABC):
 
         New identity, same picture: the record is cloned and the file copied byte for byte, so
         embedded metadata, workflow and graph travel as file chunks rather than being re-derived.
-        The copy is never intermediate, and starring is not copied.
+        The copy is never intermediate, and starring is not copied. A source with a precise asset
+        gets its own asset file and row; the size recorded covers all of the copy's files.
 
         Board attachment is checked *before* the file is written, where the video twin writes first
         and withdraws on failure. The orders differ because `create` — which the video path reuses —
@@ -269,6 +270,8 @@ class ImageService(ImageServiceABC):
         try:
             record = self.__invoker.services.image_records.get(source_image_name)
             metadata = self.__invoker.services.image_records.get_metadata(source_image_name)
+            # The row, not a file probe, says whether the source has a precise asset.
+            source_asset = self.__invoker.services.database.queries.image_precise_assets.get(source_image_name)
 
             image_name = self.__invoker.services.names.create_image_name()
             strategy_name = self.__invoker.services.configuration.image_subfolder_strategy
@@ -276,7 +279,7 @@ class ImageService(ImageServiceABC):
             image_subfolder = strategy.get_subfolder(image_name, record.image_category, False)
 
             record_saved = False
-            file_copied = False
+            files_started = False
             try:
                 self.__invoker.services.image_records.save(
                     image_name=image_name,
@@ -301,13 +304,21 @@ class ImageService(ImageServiceABC):
                         board_id=board_id, image_name=image_name
                     )
 
+                # From here on any file under the new name may exist, so the unwind purges them all.
+                files_started = True
                 self.__invoker.services.image_files.copy(
                     source_image_name=source_image_name,
                     image_name=image_name,
                     source_subfolder=record.image_subfolder or "",
                     image_subfolder=image_subfolder,
+                    include_precise=source_asset is not None,
                 )
-                file_copied = True
+                if source_asset is not None:
+                    self.__invoker.services.database.queries.image_precise_assets.insert(
+                        image_name=image_name,
+                        asset_format=source_asset.asset_format,
+                        format_version=source_asset.format_version,
+                    )
                 self._record_file_size(image_name, image_subfolder)
 
                 image_dto = self.get_dto(image_name)
@@ -316,7 +327,7 @@ class ImageService(ImageServiceABC):
             except Exception:
                 # Unwind whatever exists, newest first. The board membership goes with the record
                 # via the FK.
-                if file_copied:
+                if files_started:
                     try:
                         self.__invoker.services.image_files.delete(image_name, image_subfolder=image_subfolder)
                     except Exception as cleanup_error:
