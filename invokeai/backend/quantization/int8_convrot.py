@@ -989,6 +989,44 @@ def _pinned_quantized_keys(quantized: Mapping[str, Any]) -> set[str]:
     return {key for path in quantized for key in (f"{path}.weight", f"{path}.weight_scale")}
 
 
+def check_int8_layer_layout(
+    path: str, marker: Mapping[str, Any], weight: torch.Tensor | None, scale: torch.Tensor | None
+) -> ConvrotLayout:
+    """Refuse a marked layer the int8/int4 linears cannot be built from, and return its layout.
+
+    The one statement of what a layer must look like to stay quantized: both tensors present, a 2-D weight, a scale
+    granularity the decode implements, a usable rotation group (a power of 4) that divides the decoded input width.
+    The loader builds the layer after this, and an installer can ask it of meta tensors, since only shapes are read.
+    """
+    fmt = marker.get("format")
+    if weight is None or scale is None:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
+        )
+    if weight.dim() != 2:
+        raise ValueError(
+            f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
+            "Only a Linear weight can be kept quantized; dequantize this one instead."
+        )
+    check_int8_scale_layout(path, weight, scale)
+    layout = marker_layout(marker)
+    if layout.convrot:
+        try:
+            check_hadamard_size(layout.group_size)
+        except ValueError:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}; a rotation is undone only in groups of a "
+                "power of 4 (256 in every release)."
+            ) from None
+        in_features = weight.shape[1] * (2 if layout.packed_int4 else 1)
+        if in_features % layout.group_size != 0:
+            raise ValueError(
+                f"'{path}' is rotated in groups of {layout.group_size}, which do not divide its input width "
+                f"{in_features}."
+            )
+    return layout
+
+
 def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: dict[str, dict[str, Any]]) -> None:
     """Replace each quantized ``nn.Linear`` with an ``Int8ConvrotLinear`` or, for a packed int4 marker, an
     ``Int4ConvrotLinear``, sized from the state dict.
@@ -1015,17 +1053,8 @@ def swap_in_int8_linears(model: torch.nn.Module, sd: dict[str, Any], quantized: 
     for path, marker in quantized.items():
         fmt = marker.get("format")
         weight, scale = sd.get(f"{path}.weight"), sd.get(f"{path}.weight_scale")
-        if weight is None or scale is None:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but is missing its {'weight' if weight is None else 'weight_scale'}."
-            )
-        if weight.dim() != 2:
-            raise ValueError(
-                f"'{path}' is marked {fmt} but its weight is {tuple(weight.shape)}, not 2-D. "
-                "Only a Linear weight can be kept quantized; dequantize this one instead."
-            )
-        check_int8_scale_layout(path, weight, scale)
-        layout = marker_layout(marker)
+        layout = check_int8_layer_layout(path, marker, weight, scale)
+        assert weight is not None
         parent, attribute, target = _resolve_int8_target(model, path)
         decoded = (weight.shape[0], weight.shape[1] * (2 if layout.packed_int4 else 1))
         if decoded != (target.out_features, target.in_features):

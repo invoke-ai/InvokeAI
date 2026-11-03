@@ -212,6 +212,25 @@ _REFUSED = {
         "no `comfy_quant` marker",
     ),
     "int8-group-size": ({_Q: _INT8}, {_Q: {**_INT8_MARKER, "convrot_groupsize": 512}}, {}, "groups of 512"),
+    "int8-missing-scale": (
+        {_Q: {"weight": ([3072, 3072], "I8"), "comfy_quant": ([72], "U8")}},
+        {_Q: _INT8_MARKER},
+        {},
+        "missing its weight_scale",
+    ),
+    "int8-blockwise-scale": (
+        {_Q: {**_INT8, "weight_scale": ([24, 24], "F32")}},
+        {_Q: _INT8_MARKER},
+        {},
+        "Blockwise scale grids are not implemented",
+    ),
+    # A 256-wide rotation group does not fit a 128-wide input.
+    "int8-group-wider-than-input": (
+        {_Q: {**_INT8, "weight": ([3072, 128], "I8")}},
+        {_Q: _INT8_MARKER},
+        {},
+        "do not divide its input width 128",
+    ),
     "torchao": (
         {_Q: {"_weight_qdata": ([3072, 3072], "F8_E4M3"), "_weight_scale": ([3072, 1], "F32")}},
         {},

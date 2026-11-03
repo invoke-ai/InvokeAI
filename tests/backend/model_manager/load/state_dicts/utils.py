@@ -89,7 +89,8 @@ def write_shrunk_safetensors(
     `safe_open`, which refuses a file whose data a header-only write left out, and a `.comfy_quant` marker is read
     from its bytes: each marker the fixture decoded (`markers`, keyed by layer) is written back as its JSON.
 
-    One layout keeps a size, because identification checks it: a packed nvfp4 weight and its block-scale grid keep
+    Two layouts keep a size, because identification checks it. An int8 weight keeps up to one rotation group of input
+    columns (`_CONVROT_GROUP`), so a rotated layer stays divisible and an undivisible one stays so. A packed nvfp4 weight and its block-scale grid keep
     one whole scale tile of rows and blocks (`_NVFP4_TILE`), so a released layer stays a valid one and a misaligned
     one stays misaligned. Nothing else that reads a size may use this.
     """
@@ -109,8 +110,15 @@ def write_shrunk_safetensors(
 _NVFP4_TILE = {"U8": (128, 32), "F8_E4M3": (128, 4)}
 
 
+# The rotation group of every int8 convrot release, in input columns.
+_CONVROT_GROUP = 256
+
+
 def _shrunk_extents(key: str, shape: list[int], dtype: str) -> list[int]:
-    """`token_extents`, except for an nvfp4 layer's packed weight and grid, which keep at most one scale tile."""
+    """`token_extents`, except for an nvfp4 layer's packed weight and grid, which keep at most one scale tile, and an
+    int8 weight, which keeps at most one rotation group of columns."""
+    if len(shape) == 2 and dtype == "I8" and key.endswith(".weight"):
+        return [min(shape[0], 4), min(shape[1], _CONVROT_GROUP)]
     nvfp4_part = (dtype == "U8" and key.endswith(".weight")) or (dtype == "F8_E4M3" and key.endswith(".weight_scale"))
     if len(shape) == 2 and nvfp4_part:
         return [min(extent, limit) for extent, limit in zip(shape, _NVFP4_TILE[dtype], strict=True)]
