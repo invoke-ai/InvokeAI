@@ -77,6 +77,21 @@
           "signature": "(image_name: str, mode: Optional[Literal['L', 'RGB', 'RGBA', 'CMYK', 'YCbCr', 'LAB', 'HSV', 'I', 'F']] = None) -> Image"
         },
         {
+          "description": "Gets an image's pixels as a raster that the caller owns.\nGallery images arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes\nstraight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`\ncannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first.",
+          "name": "get_raster",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The name of the image to get.",
+              "name": "image_name",
+              "type": "str"
+            }
+          ],
+          "return_type": "RasterImage",
+          "returns": "The image as a RasterImage.",
+          "signature": "(image_name: str) -> RasterImage"
+        },
+        {
           "description": "Saves an image, returning its DTO.\nIf the current queue item has a workflow or metadata, it is automatically saved with the image.",
           "name": "save",
           "parameters": [
@@ -108,6 +123,39 @@
           "return_type": "ImageDTO",
           "returns": "The saved image DTO.",
           "signature": "(image: Image, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
+        },
+        {
+          "description": "Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled\nexactly as in `save`.\nOnly rasters the gallery PNG represents exactly are accepted: uint8 sRGB L/LA/RGB/RGBA with straight alpha\nand uint16 L. Anything else raises `RasterConversionError`; quantize explicitly first (`quantize_unit`)\ninstead of relying on a silent conversion here. Nothing is saved when the raster is refused.",
+          "name": "save_raster",
+          "parameters": [
+            {
+              "default": "",
+              "description": "The raster to save.",
+              "name": "raster",
+              "type": "RasterImage"
+            },
+            {
+              "default": "None",
+              "description": "See `save`.",
+              "name": "board_id",
+              "type": "Optional[str]"
+            },
+            {
+              "default": "ImageCategory.GENERAL",
+              "description": "See `save`.",
+              "name": "image_category",
+              "type": "ImageCategory"
+            },
+            {
+              "default": "None",
+              "description": "See `save`.",
+              "name": "metadata",
+              "type": "Optional[MetadataField]"
+            }
+          ],
+          "return_type": "ImageDTO",
+          "returns": "The saved image DTO.",
+          "signature": "(raster: RasterImage, board_id: Optional[str] = None, image_category: ImageCategory = ImageCategory.GENERAL, metadata: Optional[MetadataField] = None) -> ImageDTO"
         }
       ],
       "name": "ImagesInterface"

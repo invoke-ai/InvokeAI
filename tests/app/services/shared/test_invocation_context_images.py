@@ -3,6 +3,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
 from PIL import Image
 
@@ -33,6 +34,14 @@ from invokeai.app.services.shared.graph import (
 )
 from invokeai.app.services.shared.invocation_context import ImagesInterface
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowWithoutID
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
 from tests.test_nodes import AnyTypeTestInvocation
 
 
@@ -64,6 +73,19 @@ def test_image_save_rejects_a_board_the_user_cannot_add_to() -> None:
     services.images.create.assert_not_called()
 
 
+def test_image_save_raster_rejects_a_board_the_user_cannot_add_to() -> None:
+    images, services = _make_interface(allowed=False)
+    raster = RasterImage.from_array(
+        np.zeros((1, 1, 3), np.uint8),
+        RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3),
+    )
+
+    with pytest.raises(PermissionError, match="not authorized"):
+        images.save_raster(raster, board_id="foreign-board")
+
+    services.images.create.assert_not_called()
+
+
 def test_image_save_allows_a_board_the_user_can_add_to() -> None:
     images, services = _make_interface(allowed=True)
 
@@ -87,6 +109,7 @@ def test_image_save_allows_any_board_in_single_user_mode() -> None:
     ("method_name", "service_method"),
     [
         ("get_pil", "get_pil_image"),
+        ("get_raster", "get_raster"),
         ("get_metadata", "get_metadata"),
         ("get_dto", "get_dto"),
         ("get_path", "get_path"),

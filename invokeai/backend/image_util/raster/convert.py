@@ -49,7 +49,10 @@ def _srgb_descriptor(channels: RasterChannels, icc_profile: bytes | None) -> Ras
 
 
 def raster_from_pil(image: Image.Image) -> RasterImage:
-    """Owned raster from a PIL image: 8-bit L/LA/RGB/RGBA, 16-bit grayscale, `1` and `P`; other modes are rejected."""
+    """Owned raster from a PIL image: 8-bit L/LA/RGB/RGBA, 16-bit grayscale, `1`, `P` and `PA`; other modes are rejected.
+
+    Palettes and tRNS color keys become alpha when the image has transparency.
+    """
     icc_profile = image.info.get("icc_profile")
     if not isinstance(icc_profile, bytes) or not icc_profile:
         icc_profile = None
@@ -57,12 +60,21 @@ def raster_from_pil(image: Image.Image) -> RasterImage:
     mode = image.mode
     if mode in _PIL_16_BIT_MODES:
         pixels = np.asarray(image).astype(np.uint16)[:, :, np.newaxis]
+        key = image.info.get("transparency")
+        if isinstance(key, int):
+            # Pillow has no 16-bit LA: the gray color key becomes a straight uint16 alpha channel.
+            alpha = np.where(pixels == key, 0, 65535).astype(np.uint16)
+            pixels = np.concatenate([pixels, alpha], axis=2)
+            return RasterImage._adopt(pixels, _srgb_descriptor(RasterChannels.LA, icc_profile))
         return RasterImage._adopt(pixels, _srgb_descriptor(RasterChannels.L, icc_profile))
     if mode == "1":
-        image = image.convert("L")
-    elif mode == "P":
+        image = image.convert("LA" if image.has_transparency_data else "L")
+    elif mode in ("P", "PA"):
         # has_transparency_data also covers palettes with an alpha column, which carry no info["transparency"].
         image = image.convert("RGBA" if image.has_transparency_data else "RGB")
+    elif mode in ("L", "RGB") and image.has_transparency_data:
+        # A tRNS color key becomes a straight alpha channel (Pillow maps the keyed color to alpha 0).
+        image = image.convert("LA" if mode == "L" else "RGBA")
     elif mode not in _PIL_MODE_CHANNELS:
         raise RasterConversionError(f"unsupported PIL mode {mode}")
 

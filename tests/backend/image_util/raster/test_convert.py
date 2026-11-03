@@ -126,6 +126,54 @@ def test_pil_palette_imports_as_rgb_or_rgba_depending_on_transparency():
     assert converted.view()[0, :, 3].tolist() == [255, 0]
 
 
+def test_pil_palette_alpha_mode_imports_as_rgba():
+    image = Image.new("PA", (2, 1))
+    image.putpalette([10, 20, 30, 40, 50, 60])
+    image.putpixel((0, 0), (0, 255))
+    image.putpixel((1, 0), (1, 77))
+    converted = raster_from_pil(image)
+    assert converted.descriptor.channels is RasterChannels.RGBA
+    assert converted.view()[0].tolist() == [[10, 20, 30, 255], [40, 50, 60, 77]]
+
+
+@pytest.mark.parametrize(
+    ("mode", "key", "keyed", "other", "expected_channels"),
+    [
+        ("L", 7, (7,), (9,), RasterChannels.LA),
+        ("RGB", (1, 2, 3), (1, 2, 3), (4, 5, 6), RasterChannels.RGBA),
+    ],
+)
+def test_pil_color_key_becomes_straight_alpha(mode, key, keyed, other, expected_channels):
+    image = Image.new(mode, (2, 1))
+    image.putpixel((0, 0), keyed if len(keyed) > 1 else keyed[0])
+    image.putpixel((1, 0), other if len(other) > 1 else other[0])
+    image.info["transparency"] = key
+    converted = raster_from_pil(image)
+    assert converted.descriptor.channels is expected_channels
+    assert converted.descriptor.alpha is AlphaMode.STRAIGHT
+    assert converted.view()[0].tolist() == [[*keyed, 0], [*other, 255]]
+
+
+def test_pil_16_bit_color_key_becomes_uint16_alpha():
+    image = Image.fromarray(np.array([[5, 900, 65535]], np.uint16))
+    image.info["transparency"] = 900
+    converted = raster_from_pil(image)
+    assert converted.dtype == np.uint16 and converted.descriptor.channels is RasterChannels.LA
+    assert converted.descriptor.alpha is AlphaMode.STRAIGHT
+    assert converted.view()[0].tolist() == [[5, 65535], [900, 0], [65535, 65535]]
+
+
+@pytest.mark.parametrize(("key", "expected_alpha"), [(255, [0, 255]), (0, [255, 0])])
+def test_pil_bilevel_color_key_becomes_alpha(key, expected_alpha):
+    image = Image.new("1", (2, 1))
+    image.putpixel((0, 0), 1)
+    image.info["transparency"] = key
+    converted = raster_from_pil(image)
+    assert converted.descriptor.channels is RasterChannels.LA and converted.dtype == np.uint8
+    assert converted.view()[0, :, 0].tolist() == [255, 0]
+    assert converted.view()[0, :, 1].tolist() == expected_alpha
+
+
 @pytest.mark.parametrize("mode", ["CMYK", "I", "F", "YCbCr", "LAB", "HSV", "La", "RGBa"])
 def test_pil_rejects_unsupported_modes(mode):
     with pytest.raises(RasterConversionError):

@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from typing import Literal, Optional
 
@@ -35,6 +36,8 @@ from invokeai.backend.image_util.color_conversion import (
     srgb_from_linear_srgb,
 )
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
+from invokeai.backend.image_util.raster.descriptor import AlphaMode, RasterChannels
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
 
@@ -291,11 +294,20 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
     channel: IMAGE_CHANNELS = InputField(default="A", description="The channel to get")
 
     def invoke(self, context: InvocationContext) -> ImageOutput:
-        image = context.images.get_pil(self.image.image_name)
+        raster = context.images.get_raster(self.image.image_name)
 
-        channel_image = image.getchannel(self.channel)
+        descriptor = raster.descriptor
+        bands = descriptor.channels.value
+        if self.channel not in bands:
+            raise ValueError(f"No such channel {self.channel!r} in an image with channels {bands}")
+        index = bands.index(self.channel)
 
-        image_dto = context.images.save(image=channel_image)
+        channel_raster = RasterImage.from_array(
+            raster.view()[:, :, index : index + 1],
+            replace(descriptor, channels=RasterChannels.L, alpha=AlphaMode.NONE, channel_count=1, icc_profile=None),
+        )
+
+        image_dto = context.images.save_raster(channel_raster)
 
         return ImageOutput.build(image_dto)
 

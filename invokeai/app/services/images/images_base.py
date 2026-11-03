@@ -14,6 +14,7 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
+from invokeai.backend.image_util.raster.raster import RasterImage
 
 
 class ImageServiceABC(ABC):
@@ -90,6 +91,11 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def get_pil_image(self, image_name: str) -> PILImageType:
         """Gets an image as a PIL image."""
+        pass
+
+    @abstractmethod
+    def get_raster(self, image_name: str) -> RasterImage:
+        """Gets the pixels of an image as an owned raster."""
         pass
 
     @abstractmethod

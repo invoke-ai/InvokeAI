@@ -13,13 +13,15 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 from PIL import Image
 
 from invokeai.app.api.extract_metadata import extract_metadata_from_image
 from invokeai.app.invocations.baseinvocation import BaseInvocation
 from invokeai.app.invocations.collections import CollectionConcatInvocation
-from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.fields import BoardField, MetadataField
+from invokeai.app.invocations.image import BlankImageInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
@@ -50,6 +52,16 @@ from invokeai.app.services.shared.graph import (
 )
 from invokeai.app.services.shared.invocation_context import ImagesInterface
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.backend.image_util.raster.convert import raster_from_pil, raster_to_pil
+from invokeai.backend.image_util.raster.descriptor import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterConversionError,
+    RasterDescriptor,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 from tests.test_nodes import AnyTypeTestInvocation
@@ -306,6 +318,375 @@ def test_create_accepts_large_16_bit_image(
         assert storage.get_path("uploaded.png", thumbnail=True).exists()
     finally:
         image.close()
+
+
+# ── Raster access ──
+
+
+def _raster_descriptor(
+    channels: RasterChannels,
+    color: ColorEncoding = ColorEncoding.SRGB,
+    alpha: AlphaMode | None = None,
+) -> RasterDescriptor:
+    count = {RasterChannels.L: 1, RasterChannels.LA: 2, RasterChannels.RGB: 3, RasterChannels.RGBA: 4}[channels]
+    if alpha is None:
+        alpha = AlphaMode.STRAIGHT if channels in (RasterChannels.LA, RasterChannels.RGBA) else AlphaMode.NONE
+    return RasterDescriptor(channels, color, ValueRange.UNIT, alpha, count)
+
+
+def _raster(values: list, dtype=np.uint8, **kwargs) -> RasterImage:
+    array = np.array(values, dtype)
+    channels = {1: RasterChannels.L, 2: RasterChannels.LA, 3: RasterChannels.RGB, 4: RasterChannels.RGBA}[
+        array.shape[2]
+    ]
+    return RasterImage.from_array(array, _raster_descriptor(channels, **kwargs))
+
+
+def _palette_image(transparency: int | bytes | None = None, palette_mode: str = "RGB") -> Image.Image:
+    image = Image.new("P", (2, 1))
+    if palette_mode == "RGBA":
+        image.putpalette([10, 20, 30, 0, 40, 50, 60, 128], "RGBA")
+    else:
+        image.putpalette([10, 20, 30, 40, 50, 60])
+    image.putpixel((1, 0), 1)
+    if transparency is not None:
+        image.info["transparency"] = transparency
+    return image
+
+
+def _bilevel_image() -> Image.Image:
+    image = Image.new("1", (2, 1))
+    image.putpixel((0, 0), 1)
+    return image
+
+
+def _with_pixels(mode: str, pixels: list) -> Image.Image:
+    image = Image.new(mode, (2, 1))
+    for x, value in enumerate(pixels):
+        image.putpixel((x, 0), value)
+    return image
+
+
+def _keyed(mode: str, pixels: list, key) -> Image.Image:
+    image = _with_pixels(mode, pixels)
+    image.info["transparency"] = key
+    return image
+
+
+# The gallery writes these through DiskImageFileStorage.save. That writer drops L/RGB color keys and palette
+# transparency of the in-memory image, so files carrying them (older or imported ones) are written with Pillow.
+_STORED_MODES = [
+    pytest.param(_bilevel_image, "storage", RasterChannels.L, np.uint8, [[[255], [0]]], id="1"),
+    pytest.param(lambda: _with_pixels("L", [7, 200]), "storage", RasterChannels.L, np.uint8, [[[7], [200]]], id="L"),
+    pytest.param(
+        lambda: _with_pixels("LA", [(7, 9), (200, 0)]),
+        "storage",
+        RasterChannels.LA,
+        np.uint8,
+        [[[7, 9], [200, 0]]],
+        id="LA",
+    ),
+    pytest.param(
+        lambda: _with_pixels("I;16", [1, 65535]), "storage", RasterChannels.L, np.uint16, [[[1], [65535]]], id="I;16"
+    ),
+    pytest.param(
+        lambda: _with_pixels("I", [300, 70000]), "storage", RasterChannels.L, np.uint16, [[[300], [65535]]], id="I"
+    ),
+    pytest.param(_palette_image, "storage", RasterChannels.RGB, np.uint8, [[[10, 20, 30], [40, 50, 60]]], id="P"),
+    pytest.param(
+        lambda: _palette_image(palette_mode="RGBA"),
+        "storage",
+        RasterChannels.RGBA,
+        np.uint8,
+        [[[10, 20, 30, 0], [40, 50, 60, 128]]],
+        id="P-palette-alpha",
+    ),
+    pytest.param(
+        lambda: _palette_image(transparency=1),
+        "pillow",
+        RasterChannels.RGBA,
+        np.uint8,
+        [[[10, 20, 30, 255], [40, 50, 60, 0]]],
+        id="P-color-key",
+    ),
+    pytest.param(
+        lambda: _palette_image(transparency=bytes([90, 33])),
+        "pillow",
+        RasterChannels.RGBA,
+        np.uint8,
+        [[[10, 20, 30, 90], [40, 50, 60, 33]]],
+        id="P-trns-table",
+    ),
+    pytest.param(
+        lambda: _with_pixels("RGB", [(1, 2, 3), (250, 0, 9)]),
+        "storage",
+        RasterChannels.RGB,
+        np.uint8,
+        [[[1, 2, 3], [250, 0, 9]]],
+        id="RGB",
+    ),
+    pytest.param(
+        lambda: _with_pixels("RGBA", [(1, 2, 3, 4), (250, 0, 9, 255)]),
+        "storage",
+        RasterChannels.RGBA,
+        np.uint8,
+        [[[1, 2, 3, 4], [250, 0, 9, 255]]],
+        id="RGBA",
+    ),
+    pytest.param(
+        lambda: _keyed("L", [7, 200], 7),
+        "pillow",
+        RasterChannels.LA,
+        np.uint8,
+        [[[7, 0], [200, 255]]],
+        id="L-color-key",
+    ),
+    pytest.param(
+        lambda: _keyed("I;16", [5, 900], 900),
+        "pillow",
+        RasterChannels.LA,
+        np.uint16,
+        [[[5, 65535], [900, 0]]],
+        id="I;16-color-key",
+    ),
+    pytest.param(
+        lambda: _keyed("1", [1, 0], 1),
+        "pillow",
+        RasterChannels.LA,
+        np.uint8,
+        [[[255, 0], [0, 255]]],
+        id="1-color-key",
+    ),
+    pytest.param(
+        lambda: _keyed("RGB", [(1, 2, 3), (250, 0, 9)], (1, 2, 3)),
+        "pillow",
+        RasterChannels.RGBA,
+        np.uint8,
+        [[[1, 2, 3, 0], [250, 0, 9, 255]]],
+        id="RGB-color-key",
+    ),
+]
+
+
+@pytest.fixture
+def raster_image_service(tmp_path: Path) -> tuple[ImageService, DiskImageFileStorage]:
+    """The real image service reading real PNG files; records are irrelevant to pixel access."""
+    storage = DiskImageFileStorage(tmp_path / "images")
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    invoker.services.image_files = storage
+    invoker.services.image_records.get.return_value = _make_record()
+    storage.start(invoker)
+    service = ImageService()
+    service.start(invoker)
+    return service, storage
+
+
+def _store(storage: DiskImageFileStorage, image: Image.Image, how: str, name: str = "stored.png") -> str:
+    if how == "storage":
+        storage.save(image, name)
+    else:
+        path = storage.get_path(name)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        image.save(path, "PNG", transparency=image.info.get("transparency"))
+    storage.evict_cache_paths([storage.get_path(name)])  # read the file, not the writer's in-memory image
+    return name
+
+
+@pytest.mark.parametrize(("build", "how", "channels", "dtype", "expected"), _STORED_MODES)
+def test_get_raster_returns_the_stored_pixels_of_every_gallery_mode(
+    raster_image_service: tuple[ImageService, DiskImageFileStorage], build, how, channels, dtype, expected
+) -> None:
+    service, storage = raster_image_service
+    name = _store(storage, build(), how)
+
+    raster = service.get_raster(name)
+
+    assert raster.is_owned
+    assert raster.dtype == dtype
+    assert raster.descriptor.channels is channels
+    assert raster.descriptor.color is ColorEncoding.SRGB
+    assert raster.descriptor.alpha is (
+        AlphaMode.STRAIGHT if channels in (RasterChannels.LA, RasterChannels.RGBA) else AlphaMode.NONE
+    )
+    np.testing.assert_array_equal(raster.view(), np.array(expected, dtype))
+
+
+def test_get_raster_is_independent_of_other_readers(
+    raster_image_service: tuple[ImageService, DiskImageFileStorage],
+) -> None:
+    service, storage = raster_image_service
+    name = _store(storage, _with_pixels("RGB", [(1, 2, 3), (250, 0, 9)]), "storage")
+    original = np.array([[[1, 2, 3], [250, 0, 9]]], np.uint8)
+
+    first = service.get_raster(name)
+    with pytest.raises(ValueError):
+        first.view()[0, 0, 0] = 99
+    # The cached PIL image is shared with every reader; the raster must not be a view of it.
+    service.get_pil_image(name).putpixel((0, 0), (77, 77, 77))
+
+    np.testing.assert_array_equal(first.view(), original)
+    second = service.get_raster(name)
+    assert second.view()[0, 0].tolist() == [77, 77, 77]
+    assert second.view()[0, 1].tolist() == [250, 0, 9]
+    assert not np.shares_memory(first.view(), second.view())
+
+
+def test_images_interface_raster_and_pil_reads_do_not_affect_each_other(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, _, _ = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    original = [[(1, 2, 3), (250, 0, 9)]]
+    with _with_pixels("RGB", [(1, 2, 3), (250, 0, 9)]) as source:
+        name = service.create(source, ResourceOrigin.EXTERNAL, ImageCategory.GENERAL).image_name
+    images = ImagesInterface(services, MagicMock(), MagicMock())
+
+    raster = images.get_raster(name)
+    pil = images.get_pil(name)
+    pil.putpixel((0, 0), (9, 9, 9))
+    raster_after_pil = images.get_raster(name)
+    pil_after_raster = images.get_pil(name)
+
+    assert [tuple(p) for p in raster_after_pil.view()[0].tolist()] == original[0]
+    assert [pil_after_raster.getpixel((x, 0)) for x in range(2)] == original[0]
+    assert [tuple(p) for p in raster.view()[0].tolist()] == original[0]
+
+
+def _queue_data(invocation: BaseInvocation | None = None) -> SimpleNamespace:
+    graph = Graph()
+    graph.add_node(invocation or AddInvocation(id="add", a=3, b=4))
+    session = GraphExecutionState(graph=graph)
+    node = session.next()
+    assert node is not None
+    return SimpleNamespace(
+        queue_item=SimpleNamespace(
+            user_id="queue-user",
+            project_id="project-1",
+            session_id="session",
+            session=session,
+            workflow=None,
+            root_item_id=None,
+            _workflow_json_loaded=False,
+            _workflow_json_snapshot=None,
+        ),
+        invocation=node,
+    )
+
+
+_SAVED_RASTERS = [
+    pytest.param(np.uint8, [[[7], [200], [0]]], id="L"),
+    pytest.param(np.uint8, [[[7, 9], [200, 0], [255, 255]]], id="LA"),
+    pytest.param(np.uint8, [[[1, 2, 3], [250, 0, 9], [0, 0, 0]]], id="RGB"),
+    pytest.param(np.uint8, [[[1, 2, 3, 4], [250, 0, 9, 255], [0, 0, 0, 0]]], id="RGBA"),
+    pytest.param(np.uint16, [[[1], [255], [256]], [[65535], [0x1234], [0x8001]]], id="L16"),
+]
+
+
+@pytest.mark.parametrize(("dtype", "values"), _SAVED_RASTERS)
+def test_save_raster_stores_the_pixels_exactly_and_matches_save(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage], dtype, values
+) -> None:
+    service, records, storage = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    services.names.create_image_name.side_effect = ["via-save.png", "via-raster.png"]
+    data = _queue_data()
+    images = ImagesInterface(services, data, MagicMock())
+    metadata = MetadataField.model_validate({"seed": 123})
+    raster = _raster(values, dtype)
+
+    with raster_to_pil(raster) as reference:
+        by_save = images.save(reference, metadata=metadata)
+    by_raster = images.save_raster(raster, metadata=metadata)
+
+    variable = {"image_name", "image_url", "thumbnail_url", "created_at", "updated_at"}
+    assert by_raster.model_dump(exclude=variable) == by_save.model_dump(exclude=variable)
+    assert by_raster.node_id == data.invocation.id and by_raster.session_id == "session"
+    assert records.get_user_id("via-raster.png") == "queue-user"
+    assert records.get("via-raster.png").project_id == "project-1"
+    assert records.get_metadata("via-raster.png").model_dump_json() == metadata.model_dump_json()
+
+    reader = DiskImageFileStorage(storage.image_root)
+    with reader.get("via-save.png") as saved, reader.get("via-raster.png") as via_raster:
+        assert via_raster.mode == saved.mode
+        assert via_raster.info == saved.info
+        assert via_raster.info["invokeai_graph"] and via_raster.info["invokeai_resolved_inputs"]
+        np.testing.assert_array_equal(raster_from_pil(via_raster).view(), np.array(values, dtype))
+    assert storage.get_path("via-raster.png").read_bytes() == storage.get_path("via-save.png").read_bytes()
+
+
+def test_save_raster_applies_node_defaults_and_category_like_save(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    services.names.create_image_name.side_effect = ["via-save.png", "via-raster.png"]
+    node = BlankImageInvocation(
+        id="blank",
+        width=1,
+        height=1,
+        metadata=MetadataField.model_validate({"seed": 5}),
+        board=BoardField(board_id="node-board"),
+    )
+    data = _queue_data(node)
+    images = ImagesInterface(services, data, MagicMock())
+    raster = _raster([[[1, 2, 3]]])
+
+    with raster_to_pil(raster) as reference:
+        by_save = images.save(reference, image_category=ImageCategory.MASK)
+    by_raster = images.save_raster(raster, image_category=ImageCategory.MASK)
+
+    variable = {"image_name", "image_url", "thumbnail_url", "created_at", "updated_at"}
+    assert by_raster.model_dump(exclude=variable) == by_save.model_dump(exclude=variable)
+    assert by_raster.image_category is ImageCategory.MASK
+    added = services.board_image_records.add_image_to_board.call_args_list
+    assert [(c.kwargs["board_id"], c.kwargs["image_name"]) for c in added] == [
+        ("node-board", "via-save.png"),
+        ("node-board", "via-raster.png"),
+    ]
+    assert records.get_metadata("via-raster.png").model_dump_json() == '{"seed":5}'
+    assert records.get_metadata("via-save.png").model_dump_json() == '{"seed":5}'
+
+
+def _unrepresentable_rasters() -> list:
+    return [
+        pytest.param(_raster([[[0.25, 0.5, 0.75]]], np.float32), id="float32-rgb"),
+        pytest.param(_raster([[[1000, 2000, 3000]]], np.uint16), id="uint16-rgb"),
+        pytest.param(_raster([[[1000, 2000, 3000, 65535]]], np.uint16), id="uint16-rgba"),
+        pytest.param(_raster([[[1, 2, 3]]], color=ColorEncoding.LINEAR_SRGB), id="linear"),
+        pytest.param(_raster([[[1, 2, 3, 128]]], alpha=AlphaMode.PREMULTIPLIED), id="premultiplied"),
+        pytest.param(
+            RasterImage.from_array(
+                np.zeros((1, 1, 2), np.float32),
+                RasterDescriptor(RasterChannels.DATA, ColorEncoding.NONE, ValueRange.UNBOUNDED, AlphaMode.NONE, 2),
+            ),
+            id="data",
+        ),
+    ]
+
+
+@pytest.mark.parametrize("raster", _unrepresentable_rasters())
+def test_save_raster_refuses_what_the_gallery_png_cannot_hold_and_writes_nothing(
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage], raster: RasterImage
+) -> None:
+    service, records, storage = real_image_service
+    services = service._ImageService__invoker.services
+    services.configuration.multiuser = False
+    services.images = service
+    images = ImagesInterface(services, _queue_data(), MagicMock())
+
+    with pytest.raises(RasterConversionError, match="quantize_unit"):
+        images.save_raster(raster)
+
+    with pytest.raises(ImageRecordNotFoundException):
+        records.get("uploaded.png")
+    assert not list(storage.image_root.rglob("*.png"))
 
 
 # ── Point 2: subfolder forwarding tests ──

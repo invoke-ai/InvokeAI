@@ -33,6 +33,8 @@ from invokeai.app.services.shared.intermediate_delete import (
     delete_journaled_intermediates,
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
+from invokeai.backend.image_util.raster.convert import raster_from_pil
+from invokeai.backend.image_util.raster.raster import RasterImage
 
 
 class ImageService(ImageServiceABC):
@@ -358,6 +360,10 @@ class ImageService(ImageServiceABC):
         except Exception as e:
             self.__invoker.services.logger.error("Problem getting image file")
             raise e
+
+    def get_raster(self, image_name: str) -> RasterImage:
+        # The one place that decides where an image's pixels come from; the gallery file is the only source today.
+        return raster_from_pil(self.get_pil_image(image_name))
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:

@@ -33,6 +33,9 @@ from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
 from invokeai.app.util.step_callback import PreviewRender, diffusion_step_callback
 from invokeai.app.util.tiny_autoencoder_previews import TinyAutoencoderPreviews
+from invokeai.backend.image_util.raster.convert import raster_to_pil
+from invokeai.backend.image_util.raster.descriptor import RasterConversionError
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_base import LoadedModel, LoadedModelWithoutConfig
@@ -296,6 +299,48 @@ class ImagesInterface(InvocationContextInterface):
             The saved image DTO.
         """
 
+        return self._save_image(image, board_id, image_category, metadata)
+
+    def save_raster(
+        self,
+        raster: RasterImage,
+        board_id: Optional[str] = None,
+        image_category: ImageCategory = ImageCategory.GENERAL,
+        metadata: Optional[MetadataField] = None,
+    ) -> ImageDTO:
+        """Saves a raster as a gallery image, returning its DTO. Metadata, board, workflow and graph are handled
+        exactly as in `save`.
+
+        Only rasters the gallery PNG represents exactly are accepted: uint8 sRGB L/LA/RGB/RGBA with straight alpha
+        and uint16 L. Anything else raises `RasterConversionError`; quantize explicitly first (`quantize_unit`)
+        instead of relying on a silent conversion here. Nothing is saved when the raster is refused.
+
+        Args:
+            raster: The raster to save.
+            board_id: See `save`.
+            image_category: See `save`.
+            metadata: See `save`.
+
+        Returns:
+            The saved image DTO.
+        """
+
+        try:
+            image = raster_to_pil(raster)
+        except RasterConversionError as e:
+            raise RasterConversionError(
+                f"{e}; the gallery stores only 8-bit sRGB L/LA/RGB/RGBA and 16-bit L, "
+                "so convert explicitly first (for example with quantize_unit)"
+            ) from e
+        return self._save_image(image, board_id, image_category, metadata)
+
+    def _save_image(
+        self,
+        image: Image,
+        board_id: Optional[str],
+        image_category: ImageCategory,
+        metadata: Optional[MetadataField],
+    ) -> ImageDTO:
         self._util.signal_progress("Saving image")
 
         # If `metadata` is provided directly, use that. Else, use the metadata provided by `WithMetadata`, falling back to None.
@@ -377,6 +422,22 @@ class ImagesInterface(InvocationContextInterface):
             # copy the image to prevent the user from modifying the original
             image = image.copy()
         return image
+
+    def get_raster(self, image_name: str) -> RasterImage:
+        """Gets an image's pixels as a raster that the caller owns.
+
+        Gallery images arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes
+        straight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`
+        cannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first.
+
+        Args:
+            image_name: The name of the image to get.
+
+        Returns:
+            The image as a RasterImage.
+        """
+        self._assert_read_access(image_name)
+        return self._services.images.get_raster(image_name)
 
     def get_metadata(self, image_name: str) -> Optional[MetadataField]:
         """Gets an image's metadata, if it has any.
