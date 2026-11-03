@@ -24,7 +24,11 @@ the point is a `demand_peak`. Where one could not, the point falls back to torch
 
 The transformer has the real geometry (dim 3840, 30 heads of 128, caption features 2560 wide) and random weights in the
 measured dtype, because memory depends on shapes, not on weight values. It has 2 main blocks and one refiner block each:
-a no-grad forward frees each block's intermediates, which `--extra-blocks 4` re-checks at 1024px. A point carries the
+a no-grad forward frees each block's intermediates, which `--extra-blocks 4` re-checks at 1024px. A ControlNet point
+runs the control through the denoise's hooks (`install_fun_control`) with its main-stage hints on consecutive main
+blocks, and with the real transformer's two refiner blocks, on which its refiner chain lands its hints. The hints are all
+computed as the first main block starts and dropped after the last one they land on, so where in between they land does
+not move the peak, and packing them keeps the transformer at one main block per hint. A point carries the
 features of `estimate_z_image_denoise_working_memory`, taken in the measuring process after the runtime setup, so its
 `score_matrix_bytes` reflects the attention kernel this build really runs.
 
@@ -40,7 +44,7 @@ Modes
   1024px, in the first dtype.
 - `math`: SDPA forced onto the math kernel at 1024px, next to the default kernel, per dtype: what a materialized score
   matrix costs per element, against what the estimate charges for it.
-- `control`: a `--control-blocks` ControlNet adapter (15) at 1024px, next to no control, per dtype: how many
+- `control`: a `--control-variant` Fun ControlNet layout (2.1) at 1024px, next to no control, per dtype: how many
   hint-sized tensors it keeps, against the n + 4 the estimate charges.
 
 Only the fit grid's points are fit points (`"fit": true`). The checks' points, the extra-blocks forward included, test
@@ -106,6 +110,7 @@ from invokeai.app.util.torch_cuda_allocator import ALLOCATOR_CONF_ENV_VARS
 if TYPE_CHECKING:
     import torch
 
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControlVariant
     from invokeai.backend.working_memory.measurement import FreshWindow
 
 GIB = 2**30
@@ -113,7 +118,17 @@ MIB = 2**20
 
 CAP_FEAT_DIM = 2560
 PATCH_SIZE = 2
-CONTROL_IN_DIM = 33  # V2.0 adapters; the channel count only sizes the patch embedder
+CONTROL_VARIANTS = {
+    "1.0": "Z_IMAGE_FUN_CONTROL_1_0",
+    "2.0": "Z_IMAGE_FUN_CONTROL_2_0",
+    "2.1": "Z_IMAGE_FUN_CONTROL_2_1",
+    "2.1-lite": "Z_IMAGE_FUN_CONTROL_2_1_LITE",
+}
+"""The control check's layouts by `--control-variant`: the names of their `ZImageFunControlVariant`s in
+`invokeai.backend.fun_controlnet.z_image`, which imports torch."""
+CONTROL_REFINER_BLOCKS = 2
+"""The real transformer's refiner blocks, which a ControlNet point's transformer has: the control's refiner chain adds
+its hints after both."""
 CHECK_PX = 1024
 """The size the checks and the extra-blocks forward run at."""
 
@@ -143,7 +158,8 @@ class Point:
     """A torch dtype name, one of `DTYPES`."""
     blocks: int
     force_math: bool = False
-    control_blocks: int = 0
+    control_variant: str | None = None
+    """A key of `CONTROL_VARIANTS`, for a ControlNet point."""
 
     @property
     def fit(self) -> bool:
@@ -160,7 +176,7 @@ def plan(
     short_text_sizes: Sequence[int],
     blocks: int,
     extra_blocks: int,
-    control_blocks: int,
+    control_variant: str,
 ) -> list[Point]:
     """The forwards a run measures, in order: per dtype, the fit grid or a check's pair of forwards."""
     points: list[Point] = []
@@ -178,7 +194,7 @@ def plan(
                 dtype,
                 blocks,
                 force_math=mode == "math",
-                control_blocks=control_blocks if mode == "control" else 0,
+                control_variant=control_variant if mode == "control" else None,
             )
         )
     if mode == "fit" and extra_blocks:
@@ -189,6 +205,26 @@ def plan(
 def image_tokens(px: int) -> int:
     side = px // LATENT_SCALE_FACTOR // PATCH_SIZE
     return side * side
+
+
+def _control_variant(point: Point) -> "ZImageFunControlVariant | None":
+    """The ControlNet layout of `point`, with its main-stage hints packed onto main blocks 0, 1, 2, ...: the same peak
+    on the fewest blocks. Imports torch."""
+    if point.control_variant is None:
+        return None
+    from invokeai.backend.fun_controlnet import z_image
+
+    variant = getattr(z_image, CONTROL_VARIANTS[point.control_variant])
+    return dataclasses.replace(variant, main_layers=tuple(range(len(variant.main_layers))))
+
+
+def _transformer_blocks(point: Point) -> tuple[int, int]:
+    """The main and refiner blocks of `point`'s transformer: for a ControlNet point, one main block per hint at least
+    and the real refiner blocks. Imports torch for a ControlNet point."""
+    variant = _control_variant(point)
+    if variant is None:
+        return point.blocks, 1
+    return max(point.blocks, len(variant.main_layers)), CONTROL_REFINER_BLOCKS
 
 
 def measured_bytes_and_method(windows: Sequence["FreshWindow"]) -> tuple[int, PointMethod]:
@@ -266,11 +302,17 @@ def provenance(point: Point, facts: Mapping[str, Any], date: str) -> str:
             f"{AOTRITON_EXPERIMENTAL_ENV}={facts['aotriton_experimental'] or 'unset'}",
             f"ROCm SDPA guard {'installed' if facts['rocm_sdpa_guard'] else 'not installed'}",
         ]
-    regime = {"math": ", SDPA forced onto the math kernel", "control": f", a {point.control_blocks}-block ControlNet"}
-    blocks = f"{point.blocks} main block{'' if point.blocks == 1 else 's'}"
+    main_blocks, refiner_blocks = _transformer_blocks(point)
+    regime = {
+        "math": ", SDPA forced onto the math kernel",
+        "control": f", the {point.control_variant} Fun ControlNet through the denoise's hooks, its hints on consecutive "
+        "main blocks",
+    }
+    blocks = f"{main_blocks} main block{'' if main_blocks == 1 else 's'}"
+    refiners = "one refiner block" if refiner_blocks == 1 else f"{refiner_blocks} refiner blocks"
     return (
         f"scripts/calibrate_z_image_working_memory.py ({date}): {', '.join(parts)}. Random-init Z-Image transformer "
-        f"with the real geometry, {blocks} and one refiner block each{regime.get(point.kind, '')}; "
+        f"with the real geometry, {blocks} and {refiners} each{regime.get(point.kind, '')}; "
         "memory does not depend on weight values. A fresh process with the server's runtime, the larger demand of a "
         "cold and a warm forward; no failed allocation, allocator retry or spill."
     )
@@ -320,8 +362,9 @@ def _runtime_facts(device: "torch.device", os_name: str) -> dict[str, Any]:
     }
 
 
-def _transformer(blocks: int) -> "torch.nn.Module":
-    """The Z-Image transformer's geometry with `blocks` main blocks and one refiner block each, on the meta device."""
+def _transformer(blocks: int, refiner_blocks: int) -> "torch.nn.Module":
+    """The Z-Image transformer's geometry with `blocks` main blocks and `refiner_blocks` refiner blocks each, on the
+    meta device."""
     import torch
     from diffusers import ZImageTransformer2DModel
 
@@ -334,7 +377,7 @@ def _transformer(blocks: int) -> "torch.nn.Module":
             in_channels=16,
             dim=Z_IMAGE_HIDDEN_SIZE,
             n_layers=blocks,
-            n_refiner_layers=1,
+            n_refiner_layers=refiner_blocks,
             n_heads=Z_IMAGE_ATTENTION_HEADS,
             n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
             norm_eps=1e-05,
@@ -347,25 +390,19 @@ def _transformer(blocks: int) -> "torch.nn.Module":
         )
 
 
-def _control_adapter(blocks: int) -> "torch.nn.Module":
-    """A ControlNet adapter with `blocks` control blocks at the transformer's width, on the meta device."""
+def _control(variant: "ZImageFunControlVariant") -> "torch.nn.Module":
+    """The Fun ControlNet of `variant` at the transformer's width, on the meta device."""
     import torch
 
+    from invokeai.backend.fun_controlnet.z_image import ZImageFunControl
     from invokeai.backend.z_image.denoise_working_memory import Z_IMAGE_ATTENTION_HEADS, Z_IMAGE_HIDDEN_SIZE
-    from invokeai.backend.z_image.z_image_control_adapter import ZImageControlAdapter
 
     with torch.device("meta"):
-        return ZImageControlAdapter(
-            num_control_blocks=blocks,
-            control_in_dim=CONTROL_IN_DIM,
-            dim=Z_IMAGE_HIDDEN_SIZE,
-            n_heads=Z_IMAGE_ATTENTION_HEADS,
-            n_kv_heads=Z_IMAGE_ATTENTION_HEADS,
-        )
+        return ZImageFunControl(variant, hidden_size=Z_IMAGE_HIDDEN_SIZE, num_attention_heads=Z_IMAGE_ATTENTION_HEADS)
 
 
 def _materialize(module: "torch.nn.Module", device: "torch.device", dtype: "torch.dtype") -> "torch.nn.Module":
-    """A meta-device module allocated directly in `dtype` on `device`, randomly initialized: a 15-block adapter is ~3B
+    """A meta-device module allocated directly in `dtype` on `device`, randomly initialized: a 15-block control is ~3B
     parameters, which would otherwise pass through the host in float32 first."""
     import torch
 
@@ -380,20 +417,18 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
     import torch
     from torch.nn.attention import SDPBackend, sdpa_kernel
 
+    from invokeai.backend.fun_controlnet.hooks import install_fun_control
     from invokeai.backend.util.devices import TorchDevice
     from invokeai.backend.working_memory.measurement import measure
     from invokeai.backend.working_memory.platform import platform_for
     from invokeai.backend.z_image.denoise_working_memory import estimate_z_image_denoise_working_memory
-    from invokeai.backend.z_image.z_image_controlnet_extension import (
-        ZImageControlNetExtension,
-        z_image_forward_with_control,
-    )
 
     # The device the node itself takes.
     device = TorchDevice.choose_torch_device()
     if device.type != "cuda":
         raise SystemExit(f"Needs a CUDA or ROCm device; this process would run on {device}.")
     dtype = getattr(torch, point.dtype)
+    variant = _control_variant(point)
 
     def kernel():
         return sdpa_kernel(SDPBackend.MATH) if point.force_math else nullcontext()
@@ -407,9 +442,10 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
                 image_seq_len=image_tokens(point.px),
                 text_seq_len=point.text_tokens,
                 lora_count=0,
-                control_blocks=point.control_blocks,
-                # The ControlNet forward always builds a padding mask; the plain one passes none at batch size 1.
-                has_attention_mask=point.control_blocks > 0,
+                control_blocks=len(variant.main_layers) if variant is not None else 0,
+                # The forward passes no attention mask at batch size 1, and a ControlNet's blocks take exactly the
+                # arguments the base blocks take.
+                has_attention_mask=False,
                 device=device,
                 dtype=dtype,
             )
@@ -423,9 +459,9 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
             "device": facts["device"],
         }
 
-        transformer = _transformer(point.blocks)
-        adapter = _control_adapter(point.control_blocks) if point.control_blocks else None
-        on_meta = [module for module in (transformer, adapter) if module is not None]
+        transformer = _transformer(*_transformer_blocks(point))
+        control = _control(variant) if variant is not None else None
+        on_meta = [module for module in (transformer, control) if module is not None]
         weight_bytes = sum(param.numel() for module in on_meta for param in module.parameters()) * dtype.itemsize
         free, _ = TorchDevice.cuda_mem_get_info(device)
         raw = {
@@ -443,20 +479,19 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
         x = [torch.randn(16, 1, latent, latent, device=device, dtype=dtype)]
         t = torch.full((1,), 0.5, device=device, dtype=dtype)
         cap_feats = [torch.randn(point.text_tokens, CAP_FEAT_DIM, device=device, dtype=dtype)]
-        extension = None
-        if adapter is not None:
-            extension = ZImageControlNetExtension(
-                control_adapter=_materialize(adapter, device, dtype),
-                control_cond=torch.randn(CONTROL_IN_DIM, 1, latent, latent, device=device, dtype=dtype),
-            )
+        control_context = None
+        if control is not None:
+            control = _materialize(control, device, dtype)
+            control_context = torch.randn(1, image_tokens(point.px), control.control_in_dim, device=device, dtype=dtype)
 
         def forward() -> object:
-            with kernel():
-                if extension is None:
-                    return transformer(x=x, t=t, cap_feats=cap_feats)
-                return z_image_forward_with_control(
-                    transformer=transformer, x=x, t=t, cap_feats=cap_feats, control_extension=extension
-                )
+            hooks = (
+                install_fun_control(transformer, control, control_context, scale=0.75)
+                if control is not None and control_context is not None
+                else nullcontext()
+            )
+            with kernel(), hooks:
+                return transformer(x=x, t=t, cap_feats=cap_feats)
 
         windows = [measure(device, forward)]
         if "oom" not in windows[0].reasons:
@@ -500,12 +535,12 @@ def _run(point: Point, alloc_conf: str, force: bool) -> dict[str, Any]:
     return failed_line(point, f"exit code {done.returncode}: {tail[0]}")
 
 
-_COLUMNS = f"{'kind':>9} {'dtype':>8} {'blocks':>6} {'control':>7} {'px':>5} {'text':>5} {'tokens':>7}"
+_COLUMNS = f"{'kind':>9} {'dtype':>8} {'blocks':>6} {'control':>8} {'px':>5} {'text':>5} {'tokens':>7}"
 
 
 def _grid(point: Mapping[str, Any]) -> str:
     return (
-        f"{point['kind']:>9} {point['dtype']:>8} {point['blocks']:>6} {point['control_blocks']:>7} "
+        f"{point['kind']:>9} {point['dtype']:>8} {point['blocks']:>6} {point['control_variant'] or '':>8} "
         f"{point['px']:>5} {point['text_tokens']:>5}"
     )
 
@@ -615,11 +650,11 @@ def _summarize_checks(lines: Sequence[Mapping[str, Any]]) -> None:
             )
         else:
             hint_bytes = tokens * Z_IMAGE_HIDDEN_SIZE * (4 if point["dtype"] == "float32" else 2)
-            blocks = point["control_blocks"]
+            blocks = line["features"]["control_blocks"]
             print(
-                f"control, {blocks} blocks, {point['dtype']}, {point['px']}px: {extra / GIB:.3f} GiB over no control, "
-                f"{extra / hint_bytes:.2f} hint-sized tensors; the estimate adds {charged / GIB:.3f} GiB "
-                f"({blocks} + 4 hints, and any score matrix the mask brings)"
+                f"control {point['control_variant']}, {blocks} blocks, {point['dtype']}, {point['px']}px: "
+                f"{extra / GIB:.3f} GiB over no control, {extra / hint_bytes:.2f} hint-sized tensors; the estimate "
+                f"adds {charged / GIB:.3f} GiB ({blocks} + 4 hints)"
             )
 
 
@@ -664,7 +699,12 @@ def main() -> None:
     )
     parser.add_argument("--blocks", type=int, default=2, help="Main transformer blocks. Default 2.")
     parser.add_argument("--extra-blocks", type=int, default=0, help="Fit mode: this block count at 1024px as well.")
-    parser.add_argument("--control-blocks", type=int, default=15, help="The control check's adapter. Default 15.")
+    parser.add_argument(
+        "--control-variant",
+        choices=list(CONTROL_VARIANTS),
+        default="2.1",
+        help="The control check's layout. Default 2.1.",
+    )
     parser.add_argument(
         "--alloc-conf",
         default="",
@@ -687,7 +727,7 @@ def main() -> None:
         short_text_sizes=args.short_text_sizes,
         blocks=args.blocks,
         extra_blocks=args.extra_blocks,
-        control_blocks=args.control_blocks,
+        control_variant=args.control_variant,
     )
     if args.dry_run:
         _print_plan(points)

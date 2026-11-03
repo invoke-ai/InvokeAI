@@ -46,13 +46,13 @@ The analytic terms:
   under Windows, whose fused kernels are disabled, a 1024px generation spilled 7.7 GB into shared system memory while
   the node reserved only the default working memory. `sdpa_score_matrix_bytes` prices the term only where it is really
   built. An attention mask narrows which fused kernels a build can use, so the call is told whether one is passed:
-  regional prompting's additive bias, or the padding mask the ControlNet forward always builds. The plain forward
-  passes none at batch size 1.
+  regional prompting's additive bias. The forward passes none at batch size 1 otherwise, and a ControlNet's blocks take
+  exactly the arguments the base blocks take.
 - Regional prompting's attention bias (`_regional_attention_bias_bytes`).
-- A ControlNet adapter first runs its own blocks over a sequence of the same length and keeps one hint per block,
-  alive through the main layers. Measured over the plain forward at 1024px: 3.3, 5.9 and 18.9 hint-sized tensors
-  (sequence x width x element size) for 1, 6 and 15 blocks in the script's first runs, and at 15 blocks 19.5 on the
-  RTX 4090 and 18.4 on the RX 9060 XT since. n + 4 are charged; with the line's margin that covers each of them.
+- A ControlNet first runs its own blocks over a sequence of the same length and keeps one hint per block, alive
+  until the last layer it adds to. Measured on the hooked forward over the plain one at 1024px: 1.8 hint-sized tensors
+  (sequence x width x element size) for the 6-block 1.0 layout, 0.9 for the 3-block 2.1 Lite and 11.6 for the 15-block
+  2.0 and 2.1, so the n + 4 charged bound every layout.
 - Half a GiB per LoRA.
 - The dequantization copy an int8_tensorwise, nvfp4 or GGUF build materializes per quantized linear and forward,
   alive alongside the activations and invisible to them (`peak_dequant_transient_bytes`); zero for every other build.
@@ -65,6 +65,7 @@ from types import MappingProxyType
 from typing import Final, Optional, cast
 
 import torch
+from diffusers.models.transformers.transformer_z_image import SEQ_MULTI_OF
 
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
@@ -73,10 +74,9 @@ from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemory
 from invokeai.backend.working_memory.fit import Line
 from invokeai.backend.working_memory.platform import platform_for
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
-from invokeai.backend.z_image.z_image_patchify_utils import SEQ_MULTI_OF
 
 Z_IMAGE_HIDDEN_SIZE: Final = 3840
-"""The transformer's width, which its ControlNet adapters share."""
+"""The transformer's width, which its ControlNets share."""
 Z_IMAGE_ATTENTION_HEADS: Final = 30
 """Heads of 128."""
 
@@ -173,7 +173,7 @@ def estimate_z_image_denoise_working_memory(
 
     `transformer` is the model about to be locked, read unlocked for its dequantization and fp8 cast transients.
     `image_seq_len` and `text_seq_len` are the unpadded token counts, the longer caption of a CFG pair. `control_blocks`
-    is the ControlNet adapter's block count, `regional_attn_mask` regional prompting's mask, and `has_attention_mask`
+    is the ControlNet's block count, `regional_attn_mask` regional prompting's mask, and `has_attention_mask`
     whether the forward passes an attention mask at all.
     """
     dtype_name = _DTYPE_NAMES.get(dtype)

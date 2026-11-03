@@ -65,6 +65,18 @@ _KOHYA_UNET_KEY_REPLACEMENTS = [
     ("mlp_layer2", "mlp.layer2"),
 ]
 
+# Anima's six trainable linear modules outside the DiT and LLM-adapter blocks. These need exact
+# mappings because their leaf names contain underscores (for example ``linear_1``), so they cannot
+# be recovered safely by splitting every underscore into a period.
+_KOHYA_UNET_NON_BLOCK_KEY_MAP = {
+    "final_layer_linear": "final_layer.linear",
+    "final_layer_adaln_modulation_1": "final_layer.adaln_modulation.1",
+    "final_layer_adaln_modulation_2": "final_layer.adaln_modulation.2",
+    "t_embedder_1_linear_1": "t_embedder.1.linear_1",
+    "t_embedder_1_linear_2": "t_embedder.1.linear_2",
+    "x_embedder_proj_1": "x_embedder.proj.1",
+}
+
 # Mapping for Qwen3 text encoder Kohya keys.
 _KOHYA_TE_KEY_REPLACEMENTS = [
     ("self_attn_k_proj", "self_attn.k_proj"),
@@ -82,10 +94,14 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
 
     Example: lora_unet_blocks_0_cross_attn_k_proj -> blocks.0.cross_attn.k_proj
     Example: lora_unet_llm_adapter_blocks_0_cross_attn_k_proj -> llm_adapter.blocks.0.cross_attn.k_proj
+    Example: lora_unet_final_layer_linear -> final_layer.linear
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
         key = key[len("lora_unet_") :]
+
+    if non_block_key := _KOHYA_UNET_NON_BLOCK_KEY_MAP.get(key):
+        return non_block_key
 
     # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
     llm_adapter_prefix = ""

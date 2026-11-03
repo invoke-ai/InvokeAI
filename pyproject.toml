@@ -48,7 +48,7 @@ dependencies = [
   "tiktoken==0.13.0; sys_platform == 'win32' and platform_machine == 'ARM64'",   # mistral-common dependency; self-built win_arm64 wheel (see invoke-win-arm64-wheels)
   "numpy<2.0.0; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "numpy>=2.3,<2.4; sys_platform == 'win32' and platform_machine == 'ARM64'",   # first win_arm64 wheels are 2.3; <2.4 is mistral-common's cap on 3.12
-  "onnx==1.21.0",
+  "onnx==1.22.0",
   "onnxruntime==1.19.2; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "onnxruntime>=1.24.2; sys_platform == 'win32' and platform_machine == 'ARM64'",   # CPU execution provider only; no GPU build exists for win_arm64
   "opencv-contrib-python; (sys_platform != 'win32' or platform_machine != 'ARM64')",
@@ -124,7 +124,7 @@ dependencies = [
   "fonttools[woff]; (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "fonttools; sys_platform == 'win32' and platform_machine == 'ARM64'",   # [woff] needs brotli, which has no win_arm64 wheel; woff2 fonts are skipped there
   "picklescan",
-  "pillow>=12.3.0",
+  "pillow>=13.0.0",
   "prompt-toolkit",
   "pypatchmatch",
   "PyJWT>=2.15.0",
