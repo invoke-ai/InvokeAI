@@ -32,6 +32,7 @@ import { getDocumentLeaves } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { WIDGET_REGIONS } from '@workbench/layoutContracts';
+import { createInstance } from 'i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CanvasProjectMutation } from './canvasProjectMutations';
@@ -3981,6 +3982,53 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
     expect(state.notifications[0]).not.toHaveProperty('actions');
   });
+
+  it.each([
+    ['invalid-submission', 'Queue item has malformed workflow seed metadata.', 'invalidSubmissionMessage'],
+    ['not-accepted', 'The backend queue did not accept this generation. The queue may be full.', 'notAcceptedMessage'],
+    ['project-not-saved', 'This run was not submitted because its project cannot be saved.', 'projectNotSavedMessage'],
+    ['server-error', 'graph validation crashed', 'serverErrorMessage'],
+  ] as const)(
+    'words a %s failure through a translation key, quoting the error as its reason',
+    (errorCode, error, key) => {
+      const englishCatalog = import.meta.glob('../../public/locales/en.json', { eager: true, import: 'default' });
+      const english = createInstance();
+      void english.init({
+        initAsync: false,
+        interpolation: { escapeValue: false },
+        lng: 'en',
+        resources: { en: { translation: Object.values(englishCatalog)[0] as Record<string, unknown> } },
+      });
+      const messageKey = `notifications.runOutcome.${key}`;
+      let state = submitGenerate(primeGenerate(undefined, { positivePrompt: 'A lighthouse in a storm' }));
+      const project = getActiveProject(state);
+      const failRun = (queueItemId: string) =>
+        workbenchReducer(state, {
+          error,
+          errorCode,
+          projectId: project.id,
+          queueItemId,
+          status: 'failed',
+          type: 'setQueueItemStatus',
+        });
+
+      state = failRun(project.queue.items[0]!.id);
+      const labeled = state.notifications[0]!;
+      expect(labeled).toMatchObject({
+        messageKey,
+        messageValues: { label: 'A lighthouse in a storm', reason: error },
+        titleKey: 'notifications.runOutcome.failed',
+      });
+      // The English stand-in is what the catalog says, so the notice reads the same before and after translation.
+      expect(english.t(messageKey, labeled.messageValues)).toBe(labeled.message);
+
+      // A run that already left the project's queue has no prompt to name.
+      state = failRun('run-no-longer-in-the-queue');
+      const unlabeled = state.notifications[0]!;
+      expect(unlabeled).toMatchObject({ messageKey: `${messageKey}Unlabeled`, messageValues: { reason: error } });
+      expect(english.t(`${messageKey}Unlabeled`, unlabeled.messageValues)).toBe(unlabeled.message);
+    }
+  );
 
   it('reports a failure no backend item explains without follow-ups it cannot offer', () => {
     let state = submitGenerate(primeGenerate());

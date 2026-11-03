@@ -12,6 +12,7 @@ from safetensors.torch import save_file
 
 from invokeai.backend.quantization.int8_convrot import (
     CONVROT_GROUP_SIZE,
+    Int4ConvrotLinear,
     Int8ConvrotLinear,
     cast_unquantized,
     check_int8_scale_layout,
@@ -25,7 +26,12 @@ from invokeai.backend.quantization.int8_convrot import (
     split_int8_convrot_layers,
     swap_in_int8_linears,
 )
-from tests.fixtures.quantized_payloads import comfy_quant_marker
+from tests.fixtures.quantized_payloads import (
+    comfy_quant_marker,
+    convrot_w4a4_marker,
+    int4_tensorwise_marker,
+    quantize_convrot_int4,
+)
 
 MARKER = {"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": CONVROT_GROUP_SIZE}
 
@@ -317,6 +323,19 @@ class TestTheKeysTheOrphanCheckAndTheSidecarDropActOn:
         with pytest.raises(ValueError, match=r"'w'"):
             reject_unmarked_int8_weights(sd, {"": MARKER}, "Krea-2")
 
+    @pytest.mark.parametrize("where", ["per-tensor marker", "header entry"])
+    def test_an_int4_layer_on_a_loader_that_did_not_opt_in_is_named_as_int4(self, where: str) -> None:
+        """Not as an int8 weight with no marker: it has one, the loader just does not decode that format."""
+        sd = {"foo.weight": torch.zeros(4, 4, dtype=torch.int8)}
+        header = {}
+        if where == "per-tensor marker":
+            sd["foo.comfy_quant"] = comfy_quant_marker(convrot_w4a4_marker())
+        else:
+            header = {"foo": convrot_w4a4_marker()}
+
+        with pytest.raises(ValueError, match=r"1 int8 weight\(s\) marked 'convrot_w4a4'.*which Z-Image does not load"):
+            reject_unmarked_int8_weights(sd, extract_int8_convrot_markers(sd), "Z-Image", header_layers=header)
+
     def test_a_claimed_weight_is_not_an_orphan(self) -> None:
         reject_unmarked_int8_weights({"foo.weight": torch.zeros(4, 4, dtype=torch.int8)}, {"foo": MARKER}, "Krea-2")
 
@@ -480,6 +499,50 @@ class TestTheSharedInstall:
         codes = 4 * CONVROT_GROUP_SIZE
         scale = 4 * 4
         assert reserved == [codes + scale + 4096]
+
+    def test_a_mixed_int8_and_int4_file_installs_each_layer_in_its_own_storage(self) -> None:
+        """The published int4 builds are all mixed: some layers int8, the sensitive ones kept wider. Each layer is
+        installed as its marker declares and charged as stored -- half a byte per weight for the packed one."""
+        model = self._model()
+        int4 = quantize_convrot_int4(torch.randn(4, CONVROT_GROUP_SIZE))
+        sd = {**self._int8_layer("keeps"), "widens.weight": int4.packed, "widens.weight_scale": int4.scale}
+        reserved: list[int] = []
+
+        install_int8_convrot_layers(
+            model,
+            sd,
+            {"keeps": MARKER, "widens": convrot_w4a4_marker()},
+            torch.float32,
+            architecture="Krea-2",
+            reserve=reserved.append,
+        )
+
+        assert type(model.keeps) is Int8ConvrotLinear and type(model.widens) is Int4ConvrotLinear
+        int8_layer = 4 * CONVROT_GROUP_SIZE + 4 * 4
+        int4_layer = 4 * CONVROT_GROUP_SIZE // 2 + 4 * 4
+        assert reserved == [int8_layer + int4_layer]
+
+    def test_an_int4_layer_the_split_widens_is_charged_and_decoded_at_its_unpacked_size(self) -> None:
+        """Its payload holds half the elements it decodes to, so a prediction from the stored element count comes
+        up short by exactly half of what the split allocates."""
+        model = self._model()
+        int4 = quantize_convrot_int4(torch.randn(4, CONVROT_GROUP_SIZE))
+        sd = {"widens.weight": int4.packed, "widens.weight_scale": int4.scale}
+        reserved: list[int] = []
+
+        surviving = install_int8_convrot_layers(
+            model,
+            sd,
+            {"widens": int4_tensorwise_marker()},
+            torch.float32,
+            architecture="Krea-2",
+            reserve=reserved.append,
+            skip_patterns=("widens",),
+        )
+
+        assert surviving == {}
+        assert reserved == [4 * CONVROT_GROUP_SIZE * 4]
+        assert torch.allclose(sd["widens.weight"], int4.dequantized, atol=1e-5)
 
 
 def test_read_comfy_quant_markers_reads_a_marker_off_a_file(tmp_path) -> None:
