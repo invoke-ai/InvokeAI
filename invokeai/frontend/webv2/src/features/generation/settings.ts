@@ -11,6 +11,8 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
+  getDynamicPromptsConfig,
+  getDynamicPromptsSettingsPatch,
   getGenerateValuesRevertPatch,
   getModelDefaultVae,
   hasModelDefaultVae,
@@ -38,6 +40,7 @@ export {
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeDynamicPromptsSettings,
   normalizeGenerateSettings,
   normalizeMossImageSkipLayers,
   normalizeGenerateWidgetValues,
@@ -105,6 +108,7 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
@@ -133,6 +137,7 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
   describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,

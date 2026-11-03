@@ -360,6 +360,17 @@ export interface GenerateSettings {
   refinerStart: number;
 }
 
+/** The dynamic prompts fields every surface whose prompt expands persists (Generate, Video). */
+export type DynamicPromptsSettings = Pick<
+  GenerateSettings,
+  | 'dynamicPromptsCombinatorial'
+  | 'dynamicPromptsEnabled'
+  | 'dynamicPromptsMaxPrompts'
+  | 'dynamicPromptsResample'
+  | 'dynamicPromptsSampleSeed'
+  | 'dynamicPromptsSeedBehaviour'
+>;
+
 export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
 export type OpenAIImageBackground = 'auto' | 'transparent' | 'opaque';
 export type OpenAIInputFidelity = 'low' | 'high';
