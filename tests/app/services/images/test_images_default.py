@@ -120,6 +120,7 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage
 
     invoker.services.configuration.image_subfolder_strategy = "flat"
     invoker.services.names.create_image_name.return_value = "uploaded.png"
+    invoker.services.database = db
     invoker.services.image_records = records
     invoker.services.image_files = storage
     invoker.services.board_image_records.get_board_for_image.return_value = None
@@ -476,6 +477,7 @@ def raster_image_service(tmp_path: Path) -> tuple[ImageService, DiskImageFileSto
     invoker.services.configuration.pil_compress_level = 6
     invoker.services.image_files = storage
     invoker.services.image_records.get.return_value = _make_record()
+    invoker.services.database.queries.image_precise_assets.get.return_value = None  # precise reads: test_images_precise
     storage.start(invoker)
     service = ImageService()
     service.start(invoker)

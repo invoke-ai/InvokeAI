@@ -25,6 +25,8 @@ from invokeai.app.services.image_files.image_files_common import (
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.no_replace import file_signature, publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
+from invokeai.backend.image_util.raster.precise_asset import read_precise_asset
+from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.util.logging import InvokeAILogger
 
 _PNG_RLE_MIN_PIXELS = 512 * 512
@@ -105,6 +107,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
         self.__output_folder = output_folder if isinstance(output_folder, Path) else Path(output_folder)
         self.__thumbnails_folder = self.__output_folder / "thumbnails"
+        self.__precise_folder = self.__output_folder / "precise"
         # Validate required output folders at launch
         self.__validate_storage_folders()
 
@@ -120,16 +123,20 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def thumbnail_root(self) -> Path:
         return self.__thumbnails_folder.resolve()
 
+    @property
+    def precise_root(self) -> Path:
+        return self.__precise_folder.resolve()
+
     def iter_image_paths(self) -> Iterator[Path]:
-        """Walk supported image files without following symlinks or entering journals/thumbnails."""
-        yield from self.__iter_supported_paths(self.image_root, suffixes={".png"}, skip_thumbnail_root=True)
+        """Walk supported image files without following symlinks or entering journals/thumbnails/precise assets."""
+        yield from self.__iter_supported_paths(self.image_root, suffixes={".png"}, skip_reserved_roots=True)
 
     def iter_thumbnail_paths(self) -> Iterator[Path]:
         """Walk WEBP thumbnails without following symlinks or entering reserved journals."""
         yield from self.__iter_supported_paths(self.thumbnail_root, suffixes={".webp"})
 
     @staticmethod
-    def __iter_supported_paths(root: Path, suffixes: set[str], skip_thumbnail_root: bool = False) -> Iterator[Path]:
+    def __iter_supported_paths(root: Path, suffixes: set[str], skip_reserved_roots: bool = False) -> Iterator[Path]:
         # Inventory and traversal state stay in a temporary SQLite database. A generated gallery
         # can contain enough files that retaining DirEntry objects or directory paths in Python
         # would make maintenance memory usage grow with the output tree.
@@ -163,7 +170,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
                         for entry in scan:
                             if entry.name.startswith(".delete_"):
                                 continue
-                            if directory == root and skip_thumbnail_root and entry.name == "thumbnails":
+                            if directory == root and skip_reserved_roots and entry.name in ("thumbnails", "precise"):
                                 continue
                             if entry.is_symlink():
                                 continue
@@ -635,7 +642,26 @@ class DiskImageFileStorage(ImageFileStorageBase):
     def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         base_folder = self.__thumbnails_folder if thumbnail else self.__output_folder
         filename = get_thumbnail_name(image_name) if thumbnail else image_name
+        return self.__resolve_path(base_folder, filename, image_subfolder)
 
+    def get_precise_path(self, image_name: str, image_subfolder: str = "") -> Path:
+        """The precise asset of an image: `<image stem>.safetensors` in the image's subfolder of the precise root.
+
+        Whether the image has such an asset is the record store's decision, never a probe of this path.
+        """
+        # Validate the image name first: a stem would hide a separator in the suffix-less part.
+        if Path(image_name).name != image_name:
+            raise ValueError("Invalid image name, potential directory traversal detected")
+        return self.__resolve_path(self.__precise_folder, f"{Path(image_name).stem}.safetensors", image_subfolder)
+
+    def read_precise(self, image_name: str, image_subfolder: str = "") -> RasterImage:
+        """Reads the image's precise asset, uncached. A missing file raises ImageFileNotFoundException."""
+        try:
+            return read_precise_asset(self.get_precise_path(image_name, image_subfolder))
+        except FileNotFoundError as e:
+            raise ImageFileNotFoundException(f"Precise asset of {image_name} not found") from e
+
+    def __resolve_path(self, base_folder: Path, filename: str, image_subfolder: str) -> Path:
         # Validate the filename itself (no path separators allowed in the filename)
         basename = Path(filename).name
         if basename != filename:
@@ -701,7 +727,7 @@ class DiskImageFileStorage(ImageFileStorageBase):
 
     def __validate_storage_folders(self) -> None:
         """Checks if the required output folders exist and create them if they don't"""
-        folders: list[Path] = [self.__output_folder, self.__thumbnails_folder]
+        folders: list[Path] = [self.__output_folder, self.__thumbnails_folder, self.__precise_folder]
         for folder in folders:
             folder.mkdir(parents=True, exist_ok=True)
 

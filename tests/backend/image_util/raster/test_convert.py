@@ -20,6 +20,7 @@ from invokeai.backend.image_util.raster import (
     raster_to_torch,
     to_unit_float,
 )
+from invokeai.backend.image_util.raster.convert import pil_refusal
 
 CHANNELS = {1: RasterChannels.L, 2: RasterChannels.LA, 3: RasterChannels.RGB, 4: RasterChannels.RGBA}
 
@@ -207,6 +208,43 @@ def test_icc_profile_round_trips_through_pil():
 def test_pil_export_rejects_what_it_cannot_represent_exactly(bad):
     with pytest.raises(RasterConversionError):
         raster_to_pil(bad)
+
+
+@pytest.mark.parametrize(
+    ("make", "reason"),
+    [
+        (lambda: raster(pattern(2, 2, 3), color=ColorEncoding.LINEAR_SRGB), "linear_srgb"),
+        (lambda: raster(pattern(2, 2, 4), alpha=AlphaMode.PREMULTIPLIED), "premultiplied"),
+        (
+            lambda: RasterImage.from_array(
+                pattern(2, 2, 3),
+                RasterDescriptor(RasterChannels.DATA, ColorEncoding.NONE, ValueRange.UNIT, AlphaMode.NONE, 3),
+            ),
+            "data",
+        ),
+        (lambda: raster(pattern(2, 2, 3, np.uint16)), "uint16 RGB"),
+        (lambda: raster(pattern(2, 2, 3).astype(np.float32) / 255), "float32 RGB"),
+    ],
+    ids=["linear", "premultiplied", "data", "uint16-color", "float"],
+)
+def test_pil_refusal_names_each_class_raster_to_pil_refuses(make, reason):
+    bad = make()
+
+    refusal = pil_refusal(bad)
+
+    assert refusal is not None and reason in refusal
+    with pytest.raises(RasterConversionError, match=refusal):
+        raster_to_pil(bad)
+
+
+@pytest.mark.parametrize(
+    "good",
+    [raster(pattern(2, 2, 3)), raster(pattern(2, 2, 1, np.uint16)), raster(pattern(2, 2, 2))],
+    ids=["uint8-rgb", "uint16-l", "uint8-la"],
+)
+def test_pil_refusal_is_none_for_what_raster_to_pil_exports(good):
+    assert pil_refusal(good) is None
+    raster_to_pil(good)
 
 
 # --- torch -------------------------------------------------------------------------------------------------------

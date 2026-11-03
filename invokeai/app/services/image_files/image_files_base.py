@@ -1,9 +1,13 @@
 from abc import ABC, abstractmethod
 from collections.abc import Collection, Iterator, Sequence
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from PIL.Image import Image as PILImageType
+
+if TYPE_CHECKING:
+    # Not at runtime: the raster package imports torch, which the database layer (it imports this module) must not load.
+    from invokeai.backend.image_util.raster.raster import RasterImage
 
 
 class ImageFileStorageBase(ABC):
@@ -17,6 +21,17 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def get_path(self, image_name: str, thumbnail: bool = False, image_subfolder: str = "") -> Path:
         """Gets the internal path to an image or thumbnail."""
+        pass
+
+    @abstractmethod
+    def get_precise_path(self, image_name: str, image_subfolder: str = "") -> Path:
+        """Gets the path of an image's precise asset, whether or not the image has one."""
+        pass
+
+    @abstractmethod
+    def read_precise(self, image_name: str, image_subfolder: str = "") -> "RasterImage":
+        """Reads an image's precise asset. Raises ImageFileNotFoundException when the file is missing and
+        PreciseAssetError when it is corrupt or unsupported."""
         pass
 
     @abstractmethod
@@ -39,6 +54,12 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def thumbnail_root(self) -> Path:
         """Gets the root directory for thumbnails."""
+        pass
+
+    @property
+    @abstractmethod
+    def precise_root(self) -> Path:
+        """Gets the root directory for precise assets."""
         pass
 
     @abstractmethod

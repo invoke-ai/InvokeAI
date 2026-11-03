@@ -9,6 +9,7 @@ import zlib
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 from PIL import Image, UnidentifiedImageError
 
@@ -21,6 +22,15 @@ from invokeai.app.services.image_files.image_files_common import (
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
 from invokeai.app.util import no_replace
 from invokeai.app.util.thumbnails import get_thumbnail_name
+from invokeai.backend.image_util.raster import (
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    RasterImage,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.precise_asset import PreciseAssetError, write_precise_asset
 
 
 def _restart(storage: DiskImageFileStorage, record_exists: bool) -> DiskImageFileStorage:
@@ -125,6 +135,9 @@ def test_iter_image_and_thumbnail_paths_is_sorted_nested_and_excludes_reserved_t
     (tmp_path / ".delete_pending").mkdir()
     (tmp_path / ".delete_pending" / "journal.png").write_bytes(b"j")
     (tmp_path / "clip.mp4").write_bytes(b"v")
+    (tmp_path / "precise" / "a").mkdir(parents=True)
+    (tmp_path / "precise" / "a" / "nested.safetensors").write_bytes(b"p")
+    (tmp_path / "precise" / "stray.png").write_bytes(b"s")
 
     assert [path.relative_to(tmp_path).as_posix() for path in storage.iter_image_paths()] == ["z.png", "a/nested.png"]
     assert [path.relative_to(storage.thumbnail_root).as_posix() for path in storage.iter_thumbnail_paths()] == [
@@ -1356,3 +1369,76 @@ class TestProvenanceRoundTrip:
         assert extracted.invokeai_metadata is None
         assert extracted.invokeai_workflow is None
         assert extracted.invokeai_graph is None
+
+
+def _float_raster() -> RasterImage:
+    descriptor = RasterDescriptor(RasterChannels.RGB, ColorEncoding.SRGB, ValueRange.UNIT, AlphaMode.NONE, 3)
+    pixels = np.array([[[2.5, -0.25, 0.5], [0.0, 1.0, 7.0]]], np.float32)
+    return RasterImage.from_array(pixels, descriptor)
+
+
+def test_precise_root_is_created_next_to_the_thumbnails(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path / "images")
+
+    assert storage.precise_root == (tmp_path / "images" / "precise").resolve()
+    assert storage.precise_root.is_dir()
+    assert storage.precise_root.parent == storage.thumbnail_root.parent
+
+
+@pytest.mark.parametrize(
+    ("image_name", "subfolder", "relative"),
+    [
+        ("img.png", "", "img.safetensors"),
+        ("img.png", "2026/11", "2026/11/img.safetensors"),
+        ("abc-1.v2.png", "", "abc-1.v2.safetensors"),
+    ],
+)
+def test_precise_path_is_the_image_stem_in_the_same_subfolder_of_the_precise_root(
+    tmp_path: Path, image_name: str, subfolder: str, relative: str
+):
+    storage = DiskImageFileStorage(tmp_path)
+
+    assert storage.get_precise_path(image_name, subfolder) == storage.precise_root / relative
+
+
+def test_precise_path_rejects_traversal_like_get_path(tmp_path: Path, image_names: list[str]):
+    storage = DiskImageFileStorage(tmp_path)
+
+    for name in [*image_names, "../evil.png"]:
+        with pytest.raises(ValueError, match="Invalid image name"):
+            storage.get_precise_path(name)
+    for subfolder in ("../x", "/abs", "a//b", r"a\b"):
+        with pytest.raises(ValueError):
+            storage.get_precise_path("img.png", subfolder)
+
+
+def test_read_precise_returns_the_stored_raster_bytes_without_caching(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    raster = _float_raster()
+    path = storage.get_precise_path("img.png", "sub")
+    path.parent.mkdir(parents=True)
+    write_precise_asset(raster, path)
+
+    first = storage.read_precise("img.png", "sub")
+    write_precise_asset(
+        RasterImage.from_array(raster.view() * 2, raster.descriptor), path
+    )  # a cache would still answer with the old pixels
+    second = storage.read_precise("img.png", "sub")
+
+    assert first.view().tobytes() == raster.view().tobytes()
+    assert second.view().tolist() == (raster.view() * 2).tolist()
+
+
+def test_read_precise_of_a_missing_file_is_an_image_file_not_found(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+
+    with pytest.raises(ImageFileNotFoundException, match="Precise asset"):
+        storage.read_precise("img.png")
+
+
+def test_read_precise_of_a_corrupt_file_is_a_precise_asset_error(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    storage.get_precise_path("img.png").write_bytes(b"not a safetensors file")
+
+    with pytest.raises(PreciseAssetError):
+        storage.read_precise("img.png")

@@ -84,26 +84,35 @@ def raster_from_pil(image: Image.Image) -> RasterImage:
     return RasterImage._adopt(pixels, _srgb_descriptor(_PIL_MODE_CHANNELS[image.mode], icc_profile))
 
 
-def raster_to_pil(raster: RasterImage) -> Image.Image:
-    """PIL image from uint8 L/LA/RGB/RGBA or uint16 L sRGB straight-alpha rasters; anything else must be converted first."""
+def pil_refusal(raster: RasterImage) -> str | None:
+    """Why `raster_to_pil` refuses this raster, or None when a gallery PNG represents it exactly."""
     descriptor = raster.descriptor
     if (
         descriptor.channels is RasterChannels.DATA
         or descriptor.color is not ColorEncoding.SRGB
         or descriptor.alpha is AlphaMode.PREMULTIPLIED
     ):
-        raise RasterConversionError(
+        return (
             f"cannot export {descriptor.channels.value}/{descriptor.color.value}/{descriptor.alpha.value} "
             "to PIL without an explicit conversion"
         )
+    if raster.dtype == np.uint8 or (raster.dtype == np.uint16 and descriptor.channels is RasterChannels.L):
+        return None
+    return f"cannot export {raster.dtype} {descriptor.channels.value} to PIL"
+
+
+def raster_to_pil(raster: RasterImage) -> Image.Image:
+    """PIL image from uint8 L/LA/RGB/RGBA or uint16 L sRGB straight-alpha rasters; anything else must be converted first."""
+    descriptor = raster.descriptor
+    refusal = pil_refusal(raster)
+    if refusal is not None:
+        raise RasterConversionError(refusal)
     if raster.dtype == np.uint8:
         pixels = raster.view()
         mode = descriptor.channels.value
-    elif raster.dtype == np.uint16 and descriptor.channels is RasterChannels.L:
+    else:
         pixels = raster.view().astype("<u2", copy=False)  # "I;16" is little-endian
         mode = None  # Pillow infers "I;16" from a 2-D uint16 array
-    else:
-        raise RasterConversionError(f"cannot export {raster.dtype} {descriptor.channels.value} to PIL")
 
     # fromarray shares the (read-only) buffer; the copy makes the image independent of the raster.
     image = Image.fromarray(pixels[:, :, 0] if pixels.shape[2] == 1 else pixels, mode).copy()

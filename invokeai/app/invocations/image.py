@@ -36,7 +36,8 @@ from invokeai.backend.image_util.color_conversion import (
     srgb_from_linear_srgb,
 )
 from invokeai.backend.image_util.invisible_watermark import InvisibleWatermark
-from invokeai.backend.image_util.raster.descriptor import AlphaMode, RasterChannels
+from invokeai.backend.image_util.raster.convert import pil_refusal, quantize_unit
+from invokeai.backend.image_util.raster.descriptor import AlphaMode, ColorEncoding, RasterChannels, ValueRange
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.image_util.safety_checker import SafetyChecker
 
@@ -302,10 +303,37 @@ class ImageChannelInvocation(BaseInvocation, WithMetadata, WithBoard):
             raise ValueError(f"No such channel {self.channel!r} in an image with channels {bands}")
         index = bands.index(self.channel)
 
+        if descriptor.alpha is AlphaMode.PREMULTIPLIED and self.channel != "A":
+            raise ValueError(
+                f"Cannot take the {self.channel!r} channel of an image with premultiplied alpha: "
+                "its color values are not the displayed ones"
+            )
+        # Alpha is never transfer-encoded, so the alpha channel is sRGB whatever the image's color encoding.
+        color = ColorEncoding.SRGB if self.channel == "A" else descriptor.color
         channel_raster = RasterImage.from_array(
             raster.view()[:, :, index : index + 1],
-            replace(descriptor, channels=RasterChannels.L, alpha=AlphaMode.NONE, channel_count=1, icc_profile=None),
+            replace(
+                descriptor,
+                channels=RasterChannels.L,
+                color=color,
+                alpha=AlphaMode.NONE,
+                channel_count=1,
+                icc_profile=None,
+            ),
         )
+
+        if channel_raster.dtype.kind == "f":
+            # A float (precise) source is stored as an 8-bit PNG by an explicit display quantization, which only
+            # means something for sRGB values in [0, 1].
+            if color is not ColorEncoding.SRGB or descriptor.value_range is not ValueRange.UNIT:
+                raise ValueError(
+                    f"Cannot take a displayable channel from a {color.value} image with "
+                    f"{descriptor.value_range.value} values"
+                )
+            channel_raster = quantize_unit(channel_raster, numpy.uint8)
+        refusal = pil_refusal(channel_raster)
+        if refusal is not None:
+            raise ValueError(f"Cannot take a displayable channel: {refusal}")
 
         image_dto = context.images.save_raster(channel_raster)
 

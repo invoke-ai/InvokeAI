@@ -34,6 +34,11 @@ from invokeai.app.services.shared.intermediate_delete import (
 )
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.backend.image_util.raster.convert import raster_from_pil
+from invokeai.backend.image_util.raster.precise_asset import (
+    PRECISE_ASSET_FORMAT,
+    PRECISE_ASSET_VERSION,
+    PreciseAssetError,
+)
 from invokeai.backend.image_util.raster.raster import RasterImage
 
 
@@ -362,8 +367,26 @@ class ImageService(ImageServiceABC):
             raise e
 
     def get_raster(self, image_name: str) -> RasterImage:
-        # The one place that decides where an image's pixels come from; the gallery file is the only source today.
-        return raster_from_pil(self.get_pil_image(image_name))
+        """The one place that decides where an image's pixels come from.
+
+        The record store's precise-asset row is the only authority: with a row the precise file is the source and any
+        failure surfaces (never a fallback to the PNG derivative); without one the gallery file is.
+        """
+        services = self.__invoker.services
+        record = self.get_record(image_name)
+        asset = services.database.queries.image_precise_assets.get(image_name)
+        if asset is None:
+            return raster_from_pil(services.image_files.get(image_name, image_subfolder=record.image_subfolder))
+        if (asset.asset_format, asset.format_version) != (PRECISE_ASSET_FORMAT, PRECISE_ASSET_VERSION):
+            raise PreciseAssetError(
+                f"Unsupported precise asset for {image_name}: format {asset.asset_format!r}, "
+                f"version {asset.format_version}"
+            )
+        try:
+            return services.image_files.read_precise(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError):
+            services.logger.error(f"Failed to read precise asset of {image_name}")
+            raise
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:

@@ -426,9 +426,11 @@ class ImagesInterface(InvocationContextInterface):
     def get_raster(self, image_name: str) -> RasterImage:
         """Gets an image's pixels as a raster that the caller owns.
 
-        Gallery images arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes
+        Gallery PNGs arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes
         straight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`
-        cannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first.
+        cannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first. An image with a precise
+        asset arrives with the stored precision and descriptor (e.g. float32, linear or premultiplied), which can
+        be anything the raster package represents.
 
         Args:
             image_name: The name of the image to get.

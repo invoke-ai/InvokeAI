@@ -77,7 +77,7 @@
           "signature": "(image_name: str, mode: Optional[Literal['L', 'RGB', 'RGBA', 'CMYK', 'YCbCr', 'LAB', 'HSV', 'I', 'F']] = None) -> Image"
         },
         {
-          "description": "Gets an image's pixels as a raster that the caller owns.\nGallery images arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes\nstraight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`\ncannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first.",
+          "description": "Gets an image's pixels as a raster that the caller owns.\nGallery PNGs arrive as uint8 sRGB L/LA/RGB/RGBA or uint16 L. Palette and color-key transparency becomes\nstraight alpha; a 16-bit gray image with a color key therefore arrives as uint16 LA, which `save_raster`\ncannot store (the gallery PNG has no 16-bit LA), so quantize it explicitly first. An image with a precise\nasset arrives with the stored precision and descriptor (e.g. float32, linear or premultiplied), which can\nbe anything the raster package represents.",
           "name": "get_raster",
           "parameters": [
             {
