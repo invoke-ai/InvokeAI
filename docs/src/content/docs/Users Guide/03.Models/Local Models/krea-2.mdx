@@ -1,7 +1,7 @@
 ---
 title: Krea-2
 description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers, training-free style reference and edit LoRAs with reference images.
-lastUpdated: 2026-11-01
+lastUpdated: 2026-11-02
 sidebar:
   order: 8
 ---
@@ -55,8 +55,9 @@ The Qwen3-VL encoder and the small VAE come on top of these sizes. The encoder t
 
 ## Installing
 
-The easiest path is the **Krea-2 launchpad bundle** in the Model Manager, which installs the models and
-their dependencies together.
+The easiest path is the **Krea 2** bundle in the Model Manager. It installs Krea-2 Turbo and Raw as
+Diffusers pipelines, the Turbo GGUF Q4_K_M, GGUF Q8_0 and NVFP4 transformers, and the standalone Qwen-Image
+VAE and Qwen3-VL 4B encoder those transformers need.
 
 Krea-2 needs three components:
 
@@ -69,7 +70,7 @@ Krea-2 needs three components:
 - **Diffusers** (e.g. `krea/Krea-2-Turbo`, `krea/Krea-2-Raw`): a single ~26 GB install that bundles the
   VAE and text encoder. Nothing else is required.
 - **GGUF / single-file**: the checkpoint ships **only the transformer**. You must also install a
-  standalone **Qwen-Image VAE** and a **Qwen3-VL encoder** (both included in the launchpad bundle).
+  standalone **Qwen-Image VAE** and a **Qwen3-VL encoder** (both included in the Krea 2 bundle).
   Comfy-Org's fp8 and int8 builds, *Krea-2 Turbo (fp8)* (~13.1 GB) and *Krea-2 Turbo (int8)* (~13.5 GB),
   are individual starter models that install both as dependencies.
 
@@ -81,7 +82,8 @@ the bundled components.
 :::note[Qwen3-VL encoder]
 Single-file Qwen3-VL encoders bundle only the weights. Their tokenizer and architecture config ship
 with InvokeAI, so these encoders load without network access. A single-file fp8 encoder is kept
-resident in fp8 (roughly half the VRAM of the bf16 encoder).
+resident in fp8 (roughly half the VRAM of the bf16 encoder), and an nvfp4 encoder keeps its layers packed
+at 4 bits.
 :::
 
 ### Qwen3-VL GGUF encoders

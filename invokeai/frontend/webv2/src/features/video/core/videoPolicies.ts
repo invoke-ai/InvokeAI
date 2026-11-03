@@ -73,6 +73,7 @@ import {
   MINIMAX_H3_HYBRID_BLOCK_RANGE,
   resolveVideoMode,
   VIDEO_ASPECT_RATIO_IDS,
+  VIDEO_DYNAMIC_PROMPTS_DEFAULTS,
 } from './settings';
 
 // Wan variants differ in conditioning, pixel grid, and experts; key capabilities by base and variant.
@@ -1824,6 +1825,7 @@ export const getDefaultVideoSettings = (
     cfgScale: config.defaults.cfgScale,
     cfgScaleLowNoise: config.defaults.cfgScaleLowNoise,
     conditioningClip: null,
+    ...VIDEO_DYNAMIC_PROMPTS_DEFAULTS,
     audioCfgScale: config.defaults.audioCfgScale,
     // Seed a component source from the catalog so a single-file main starts invokable; reset reuses defaults.
     componentSourceModel:

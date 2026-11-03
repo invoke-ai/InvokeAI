@@ -185,7 +185,7 @@ describe('resolveInvocationRoute', () => {
 
     expect(route.sourceValid).toBe(false);
     expect(route.validationReasons.map(reasonText)).toContain(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
