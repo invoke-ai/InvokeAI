@@ -286,6 +286,10 @@ class DiskImageFileStorage(ImageFileStorageBase):
             # PNG has no 32-bit integer mode, and Pillow 13 no longer clips "I" to 16 bits on save: do it here.
             if image.mode == "I":
                 image = image.convert("I;16")
+            else:
+                # The object cached below must be ours alone: the caller keeps mutating its image, and the info
+                # assignment must not reach it.
+                image = image.copy()
 
             # When saving the image, the image object's info field is not populated. We need to set it
             image.info = info_dict

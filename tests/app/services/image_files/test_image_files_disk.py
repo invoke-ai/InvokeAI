@@ -93,6 +93,19 @@ def disk_storage(tmp_path: Path) -> DiskImageFileStorage:
     return storage
 
 
+def test_saved_image_is_cached_independently_of_the_callers_object(disk_storage: DiskImageFileStorage):
+    """A node that keeps drawing on its canvas after saving must not rewrite what the next read returns."""
+    canvas = Image.new("RGB", (8, 8), (10, 20, 30))
+    canvas.info = {"caller": "kept"}
+    on_disk = canvas.tobytes()
+
+    disk_storage.save(canvas, "frame.png", metadata="{}")
+    canvas.paste((255, 255, 255), (0, 0, 8, 8))
+
+    assert disk_storage.get("frame.png").tobytes() == on_disk
+    assert canvas.info == {"caller": "kept"}
+
+
 def test_directory_traversal_protection(tmp_path: Path, image_names: list[str]):
     """Test that the image file storage prevents directory traversal attacks.
 
