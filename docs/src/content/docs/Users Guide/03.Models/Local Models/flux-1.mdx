@@ -1,7 +1,7 @@
 ---
 title: FLUX.1
 description: Generate and edit images with FLUX.1 dev, schnell, Krea dev and Kontext, plus FLUX Fill, Redux, IP-Adapter, ControlNets and Control LoRAs.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-11-02
 sidebar:
   order: 4
 ---
@@ -23,8 +23,8 @@ and PiD super-resolution decoders.
 | Model | License | Commercial use |
 |---|---|---|
 | FLUX.1 schnell | Apache 2.0 | Allowed |
-| FLUX.1 dev, Kontext dev, Krea dev, Fill and Redux | FLUX.1 [dev] Non-Commercial License | The weights may not be used commercially. Images you generate may be, except to train a competing model. |
-| T5 and CLIP text encoders | Apache 2.0 / MIT | Allowed |
+| FLUX.1 dev, Kontext dev, Krea dev, Fill, Redux and the Canny and Depth Control LoRAs | FLUX.1 [dev] Non-Commercial License | The weights may not be used commercially. Images you generate may be, except to train a competing model. |
+| T5 and CLIP text encoders, SigLIP image encoder | Apache 2.0 / MIT | Allowed |
 
 The starter models download from ungated copies where possible. The FLUX Fill, Redux and Kontext models, and the control LoRAs, come from Black Forest Labs' own gated repositories: accept the license on each model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager.
 
@@ -34,21 +34,26 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 See the [System Requirements](/start-here/system-requirements/) table. FLUX.1 needs about **10 GB of
 VRAM** and **32 GB of system RAM** at 1024×1024. Download totals with dependencies are roughly **12 GB**
-for the NF4 and GGUF Q4 builds, **18 GB** for the int8 build and **33 GB** for bfloat16. The int8
-transformer occupies about 11.5 GB on any supported GPU, so it streams on a 10 GB card.
+for the NF4 and GGUF Q4 builds, **18 GB** for the dev int8 and Krea dev fp8 builds, **20 GB** for the Krea
+dev int8 build and **33 GB** for bfloat16. The dev int8 transformer occupies about 11.5 GB on any supported
+GPU, so it streams on a 10 GB card.
 
 To fit a full-precision checkpoint in less memory, see [FP8 Storage](/configuration/optimization/fp8-storage/)
 and [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
 
 ## Installing
 
-The simplest path is the **FLUX.1 dev** bundle in the Model Manager. It installs:
+The simplest path is the **FLUX.1** bundle in the Model Manager. It installs:
 
 - FLUX.1 schnell (quantized) and FLUX.1 dev (quantized)
 - FLUX.1 Kontext dev (quantized) and FLUX.1 Krea dev (quantized)
 - FLUX Fill and FLUX Redux
 - the FLUX VAE, the int8 T5 encoder and the CLIP-L encoder
 - the InstantX Union ControlNet, the Canny and Depth Control LoRAs, and the XLabs IP-Adapter
+
+Only FLUX.1 schnell, the VAE and the encoders (T5, CLIP, and the SigLIP image encoder FLUX Redux uses) in
+the bundle allow commercial use. Its other models are FLUX.1 [dev] models or add-ons built on it, under
+non-commercial terms. Some download from gated repositories; see [License](#license).
 
 Individual starter models for the main model:
 
@@ -60,6 +65,8 @@ Individual starter models for the main model:
 | FLUX.1 schnell (SDNQ uint4 + SVD) | [SDNQ](/configuration/optimization/sdnq-quantization/) Diffusers pipeline | ~15 GB, self-contained |
 | FLUX.1 Kontext dev (quantized) | GGUF Q4_K_M | ~12 GB with dependencies |
 | FLUX.1 Krea dev / Krea dev (quantized) | single file / GGUF Q4_K_M | ~29 GB / ~12 GB with dependencies |
+| FLUX.1 Krea dev (fp8) | Comfy-Org scaled fp8 single file | ~18 GB with dependencies; FP8 Storage is switched on at install, about 11.9 GB once loaded |
+| FLUX.1 Krea dev (int8) | int8 single file (community repack) | ~20 GB with dependencies; stays int8 on every supported GPU, about 14.1 GB once loaded |
 | FLUX Fill | single file | Inpainting model |
 
 Except for the self-contained SDNQ pipeline, a FLUX.1 main model is only the transformer, and needs three
@@ -141,7 +148,9 @@ recommended.
 
 FLUX.1 LoRAs can be applied from the Generate tab or with the **Apply LoRA - FLUX** and **Apply LoRA
 Collection - FLUX** nodes. They patch the transformer and, where the LoRA includes text-encoder layers, the
-CLIP and T5 encoders.
+CLIP and T5 encoders. Supported layouts include LyCORIS, Diffusers/PEFT, OMI and ComfyUI/OneTrainer PEFT files
+whose module names start with `diffusion_model.`. Per-layer `.alpha` values in these `diffusion_model.` files set
+the LoRA scale.
 
 ## PiD super-resolution decode
 

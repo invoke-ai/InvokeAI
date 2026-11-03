@@ -46,7 +46,7 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => ({
   ...(await importOriginal<typeof LayoutPresetActivationModule>()),
   preloadLayoutPresetWidgets: () => undefined,
 }));
-vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
+vi.mock('@workbench/hotkeys/useShortcutBinding', () => ({ useShortcutLabel: () => null }));
 
 import { LayoutPresetStrip } from './LayoutPresetStrip';
 

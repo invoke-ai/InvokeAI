@@ -55,6 +55,31 @@ const renderScrollable = async (children: ReactNode, orientation: 'horizontal' |
   return host.querySelector<HTMLElement>('[role="region"][aria-label="subject"]')!;
 };
 
+/** Zag commits timer-driven measurements through React state; let each poll close its act scope so they land. */
+const waitForCommitted = async (assertion: () => void, timeoutMs = 2000): Promise<void> => {
+  const startedAt = Date.now();
+
+  for (;;) {
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, 50);
+        })
+    );
+
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      if (Date.now() - startedAt > timeoutMs) {
+        throw error;
+      }
+    }
+  }
+};
+
+const RENAMED_CONTENT_IDS = { content: 'renamed-content' };
+
 describe('Scrollable', () => {
   it('does not let a vertical area scroll sideways, whatever its content asks for', async () => {
     const viewport = await renderScrollable(<div>{UNBREAKABLE}</div>, 'vertical');
@@ -141,5 +166,46 @@ describe('Scrollable', () => {
     await waitFor(() => !scrollbar.hasAttribute('data-overflow-y'));
     expect(scrollbar.hasAttribute('data-overflow-y')).toBe(false);
     expect(getComputedStyle(scrollbar).display).toBe('none');
+  });
+
+  it('remeasures the thumb when content resizes under a viewport held at its cap', async () => {
+    host = document.createElement('div');
+    host.style.cssText = 'width:200px;';
+    document.body.append(host);
+    root = createRoot(host);
+    const renderContent = (heightPx: number) =>
+      act(() => {
+        root?.render(
+          <ChakraProvider value={system}>
+            {/* A renamed content id must keep Zag's content observer bound. */}
+            <Scrollable ids={RENAMED_CONTENT_IDS} label="capped" maxH="100px">
+              <div style={{ height: heightPx }} />
+            </Scrollable>
+          </ChakraProvider>
+        );
+      });
+
+    await renderContent(1000);
+    const viewport = host.querySelector<HTMLElement>('[role="region"][aria-label="capped"]')!;
+    const scrollbar = host.querySelector<HTMLElement>('[data-part="scrollbar"][data-orientation="vertical"]')!;
+    const thumbHeight = () =>
+      scrollbar.querySelector<HTMLElement>('[data-part="thumb"]')!.getBoundingClientRect().height;
+
+    expect(document.getElementById('renamed-content')?.parentElement).toBe(viewport);
+    await waitForCommitted(() => {
+      expect(scrollbar.hasAttribute('data-overflow-y')).toBe(true);
+      // A tenth of the track would be below Zag's 20px minimum thumb.
+      expect(thumbHeight()).toBeCloseTo(20, 0);
+    });
+
+    await renderContent(200);
+    await waitForCommitted(() => {
+      expect(viewport.clientHeight).toBe(100);
+      // Half the content is visible, so the thumb spans half the track.
+      expect(thumbHeight()).toBeCloseTo(scrollbar.clientHeight / 2, 0);
+    });
+
+    await renderContent(60);
+    await waitForCommitted(() => expect(scrollbar.hasAttribute('data-overflow-y')).toBe(false));
   });
 });

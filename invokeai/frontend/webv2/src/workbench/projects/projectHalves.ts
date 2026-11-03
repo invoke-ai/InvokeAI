@@ -31,6 +31,7 @@ export interface ProjectWorkspaceV4 extends Pick<
   | 'presetWorkingLayouts'
   | 'promptHistory'
   | 'settings'
+  | 'settingsLayering'
   | 'widgetGraphs'
   | 'widgetInstances'
   | 'widgetRegions'
@@ -56,6 +57,8 @@ export const PROJECT_DOCUMENT_HALVES = {
   presetWorkingLayouts: 'workspace',
   promptHistory: 'workspace',
   settings: 'workspace',
+  // Says how the workspace's settings and widget values read, so it travels with them.
+  settingsLayering: 'workspace',
   widgetGraphs: 'workspace',
   widgetInstances: 'workspace',
   widgetRegions: 'workspace',
@@ -97,6 +100,7 @@ export const splitProjectDocument = (document: ProjectDocumentV3): ProjectHalves
     ...(document.presetWorkingLayouts ? { presetWorkingLayouts: document.presetWorkingLayouts } : {}),
     promptHistory: document.promptHistory,
     settings: document.settings,
+    ...(document.settingsLayering ? { settingsLayering: document.settingsLayering } : {}),
     widgetGraphs: document.widgetGraphs,
     widgetInstances: document.widgetInstances,
     widgetRegions: document.widgetRegions,

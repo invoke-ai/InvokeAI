@@ -36,6 +36,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => mocks.store.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   useWorkbenchInternalStore: () => mocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => mocks.store.queries,
   useWorkbenchSubscription: () => mocks.store.subscribe,
 }));

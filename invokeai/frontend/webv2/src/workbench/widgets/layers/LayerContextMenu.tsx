@@ -41,7 +41,6 @@ import { ShortcutKeycaps } from '@workbench/hotkeys/keyGlyphs';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
-import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { reportTransformRefusal } from '@workbench/widgets/canvas/canvasToolCommands';
 import {
   useCanvasDocumentEditingLocked,
@@ -244,7 +243,6 @@ const LayerMenu = ({
   const base = useSelectedModelBase();
   const workflowAvailability = useLayerWorkflowAvailability();
   const canvas = useActiveProjectSelector((project) => project.canvas);
-  const queueItems = useActiveProjectSelector((project) => project.queue.items);
   const { document } = canvas;
   const { bbox } = document;
   const documentRect = useMemo(
@@ -253,7 +251,6 @@ const LayerMenu = ({
   );
   const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
-  const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
   const hasLiveContent = useCanvasEngineRead(
     engine,
     () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
@@ -336,7 +333,8 @@ const LayerMenu = ({
       hasEngine: engine !== null,
       hasSupportedContent,
       hasWorkflowBindings: workflowAvailability.hasWorkflowBindings,
-      interactionLocked,
+      // Generation and staged results never lock layer actions; only an operation holding the document does.
+      operationLocked: documentEditingLocked,
       layer,
       mergeMasksEligibility,
       modelBase: base,
@@ -353,7 +351,7 @@ const LayerMenu = ({
       document,
       engine,
       hasSupportedContent,
-      interactionLocked,
+      documentEditingLocked,
       layer,
       mergeMasksEligibility,
       selectedIds,
@@ -542,12 +540,12 @@ const LayerMenu = ({
       const index = getDocumentIndex(document);
       const isEnabled = !targets.every((id) => index.byId.get(id)?.node.isEnabled ?? true);
       commitPrepared(
-        t(isEnabled ? 'widgets.layers.actions.enableSelected' : 'widgets.layers.actions.disableSelected'),
+        t(isEnabled ? 'widgets.layers.actions.showSelected' : 'widgets.layers.actions.hideSelected'),
         (model) => model.prepare({ type: 'set-enabled', updates: targets.map((id) => ({ id, isEnabled })) })
       );
       return;
     }
-    patchBase(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !layer.isEnabled });
+    patchBase(t('widgets.layers.actions.toggleActive'), { isEnabled: !layer.isEnabled });
   }, [commitPrepared, document, layer, patchBase, selectedIds, t]);
 
   const handleToggleHidden = useCallback(() => {
@@ -566,13 +564,15 @@ const LayerMenu = ({
       });
       const isHidden = !nodes.every((node) => isNodeHidden(node));
       commitPrepared(
-        t(isHidden ? 'widgets.layers.actions.hideSelectedLayers' : 'widgets.layers.actions.showSelectedLayers'),
+        t(isHidden ? 'widgets.layers.actions.hideSelectedOnCanvas' : 'widgets.layers.actions.showSelectedOnCanvas'),
         (model) => model.prepare({ type: 'set-hidden', updates: nodes.map((node) => ({ id: node.id, isHidden })) })
       );
       return;
     }
-    commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-      model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden: !isNodeHidden(layer) }] })
+    const isHidden = !isNodeHidden(layer);
+    commitPrepared(
+      t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'),
+      (model) => model.prepare({ type: 'set-hidden', updates: [{ id: layer.id, isHidden }] })
     );
   }, [commitPrepared, document, layer, selectedIds, t]);
 

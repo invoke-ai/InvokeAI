@@ -4,11 +4,11 @@ FLUX.2 [dev] uses a Mistral Small 3 (hidden_size=5120) text encoder. Two variant
 are supported (see ``MistralVariantType``), both read at the same hidden-state
 indices (10, 20, 30):
 
-- **Mistral24B** — the 40-layer encoder BFL ships in the canonical
+- **Mistral24B** — the 40-layer encoder BFL ships in
   ``black-forest-labs/FLUX.2-dev/text_encoder``. This is the default pipeline
   encoder; the loader keeps its final RMSNorm.
-- **Cow** — the 30-layer "cow-mistral3-small" distillation, recommended for best
-  prompt adherence. On a 30-layer model the indices map to (1/3, 2/3, last), and
+- **Cow** — the "cow-mistral3-small" build, the first 30 of those layers: all
+  FLUX.2 [dev] reads. On a 30-layer model the indices map to (1/3, 2/3, last), and
   the loader drops the final RMSNorm to match ComfyUI's reference (``final_norm=False``).
 
 Pipeline, per generation:
@@ -64,7 +64,7 @@ FLUX2_DEV_PROMPT_TEMPLATE = "[SYSTEM_PROMPT]{system}[/SYSTEM_PROMPT][INST]{promp
 
 # Indices into hidden_states[] (hidden_states[0] is the embedding output) that
 # FLUX.2 [dev]'s joint attention was trained to consume. ComfyUI uses these
-# same indices for both the 30-layer cow distillation and the 40-layer Mistral
+# same indices for both the 30-layer cow build and the 40-layer Mistral
 # Small 3; for cow they hit (1/3, 2/3, last), and the loader strips the final
 # RMSNorm so the layer-30 readout is the raw post-layer-29 state.
 DEV_EXTRACTION_LAYERS = (10, 20, 30)
@@ -83,7 +83,7 @@ DEV_MAX_SEQ_LEN = 512
     idle_gpu_offloadable=True,
 )
 class Flux2DevTextEncoderInvocation(BaseInvocation):
-    """Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.1 text encoder."""
+    """Encode a prompt for FLUX.2 [dev] using its Mistral Small 3.2 text encoder."""
 
     prompt: str = InputField(description="Text prompt to encode.", ui_component=UIComponent.Textarea)
     mistral_encoder: MistralEncoderField = InputField(

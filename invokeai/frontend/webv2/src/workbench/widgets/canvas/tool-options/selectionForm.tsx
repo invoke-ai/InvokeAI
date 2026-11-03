@@ -16,13 +16,12 @@ import { useTranslation } from 'react-i18next';
 import { SelectionActions, SelectionOpModeButtons } from './SelectionOptionsRow';
 
 /** Share selection rows across lasso/marquee to preserve DOM identity while active-tool stores supply values. */
-const SelectionModeSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const SelectionModeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const isMarquee = activeTool === 'marquee';
   const lasso = useLassoOptions(engine);
   const marquee = useMarqueeOptions(engine);
-  void isSurfaceInteractionLocked;
 
   const shapeOptions = useMemo(
     () =>

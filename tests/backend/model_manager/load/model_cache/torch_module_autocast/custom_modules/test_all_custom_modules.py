@@ -19,6 +19,7 @@ from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlL
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.layers.merged_layer_patch import MergedLayerPatch, Range
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
 from invokeai.backend.quantization.sdnq.utils import SDNQQuantizationType
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
@@ -390,6 +391,7 @@ def _is_bnb_quantized_linear(layer: torch.nn.Module) -> bool:
         "single_lora",
         "multiple_loras",
         "concatenated_lora",
+        "swapped_halves_lora",
         "flux_control_lora",
         "single_lokr",
         "single_dora",
@@ -452,6 +454,16 @@ def patch_under_test(request: pytest.FixtureRequest) -> PatchUnderTest:
 
         input = torch.randn(1, in_features)
         return ([(merged_layer_patch, 0.7)], input)
+    elif layer_type == "swapped_halves_lora":
+        lora_layer = LoRALayer(
+            up=torch.randn(out_features, rank),
+            mid=None,
+            down=torch.randn(rank, in_features),
+            alpha=1.0,
+            bias=torch.randn(out_features),
+        )
+        input = torch.randn(1, in_features)
+        return ([(SwappedHalvesLayerPatch(lora_layer), 0.7)], input)
     elif layer_type == "flux_control_lora":
         # Create a FluxControlLoRALayer.
         patched_in_features = 40

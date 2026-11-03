@@ -3,7 +3,7 @@
 Qwen Image uses QwenImageTransformer2DModel architecture.
 Supports multiple LoRA formats:
 - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
-- With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight
+- With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight (also diffusion_model./base_model.model.)
 - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight (underscores instead of dots)
 """
 
@@ -85,6 +85,7 @@ def lora_model_from_qwen_image_state_dict(
     Handles three key formats:
     - Diffusers/PEFT: transformer_blocks.0.attn.to_k.lora_down.weight
     - With prefix: transformer.transformer_blocks.0.attn.to_k.lora_down.weight
+      (also diffusion_model., base_model.model.)
     - Kohya: lora_unet_transformer_blocks_0_attn_to_k.lora_down.weight
     """
     is_kohya = is_state_dict_likely_kohya_qwen_image(state_dict)
@@ -125,8 +126,8 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
     """Convert Diffusers/PEFT format state dict."""
     layers: dict[str, BaseLayerPatch] = {}
 
-    # Some LoRAs use a "transformer." prefix on keys
-    strip_prefixes = ["transformer."]
+    # The diffusers (`transformer.`), ComfyUI (`diffusion_model.`) and raw PEFT (`base_model.model.`) key prefixes
+    strip_prefixes = ["transformer.", "diffusion_model.", "base_model.model."]
 
     grouped = _group_by_layer(state_dict)
 

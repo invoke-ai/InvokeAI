@@ -50,7 +50,7 @@ import {
   useModelsSelector,
   useOpenModelInManager,
 } from '@features/models';
-import { ModelSelect } from '@features/models/react';
+import { ModelSelect, useHasModelPickerCandidates } from '@features/models/react';
 import {
   coerceUpscaleScheduler,
   createDefaultUpscaleWidgetValues,
@@ -645,6 +645,13 @@ export const UpscaleWidgetView = () => {
       patch({ tileControlnetModel: isTileControlNetCandidate(model, values.model) ? model : null }),
     [patch, values.model]
   );
+  // A required picker with nothing installed says so, beside its install action, rather than asking for a choice.
+  const hasSpandrelModels = useHasModelPickerCandidates({ modelTypes: SPANDREL_MODEL_TYPES });
+  const hasMainModels = useHasModelPickerCandidates({ filter: isSelectableMainModel, modelTypes: MAIN_MODEL_TYPES });
+  const hasTileControlNets = useHasModelPickerCandidates({
+    filter: tileControlNetFilter,
+    modelTypes: CONTROLNET_MODEL_TYPES,
+  });
   // The served rule, not a base match: Z-Image decodes with a FLUX VAE, Anima with a Qwen-Image one.
   const vaeFilter = useCallback(
     (model: ModelConfig) =>
@@ -704,7 +711,13 @@ export const UpscaleWidgetView = () => {
             upscaleModel={values.upscaleModel}
           />
           <Field
-            error={values.upscaleModel ? undefined : t('widgets.upscale.spandrelModelRequired')}
+            error={
+              values.upscaleModel
+                ? undefined
+                : hasSpandrelModels === false
+                  ? t('widgets.upscale.spandrelModelNotInstalled')
+                  : t('widgets.upscale.spandrelModelRequired')
+            }
             helpText={
               !values.upscaleModel
                 ? undefined
@@ -716,6 +729,7 @@ export const UpscaleWidgetView = () => {
             label={t('widgets.upscale.spandrelModel')}
           >
             <ModelSelect
+              installAction
               invalid={!values.upscaleModel}
               modelTypes={SPANDREL_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectSpandrelModel')}
@@ -818,12 +832,19 @@ export const UpscaleWidgetView = () => {
         <GenerationSettingsSection label={t('widgets.upscale.generation')}>
           <Stack gap="3" p="2">
             <Field
-              error={values.model ? undefined : t('widgets.upscale.mainModelRequired')}
+              error={
+                values.model
+                  ? undefined
+                  : hasMainModels === false
+                    ? t('widgets.upscale.mainModelNotInstalled')
+                    : t('widgets.upscale.mainModelRequired')
+              }
               hint="model"
               label={t('widgets.upscale.mainModel')}
             >
               <ModelSelect
                 filter={isSelectableMainModel}
+                installAction
                 invalid={!values.model}
                 modelTypes={MAIN_MODEL_TYPES}
                 placeholder={t('widgets.upscale.selectMainModel')}
@@ -910,13 +931,20 @@ export const UpscaleWidgetView = () => {
           <Stack gap="3" p="2">
             {tileControlNet?.required && (
               <Field
-                error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
+                error={
+                  values.tileControlnetModel
+                    ? undefined
+                    : hasTileControlNets === false
+                      ? t('widgets.upscale.tileControlNetNotInstalled')
+                      : t('widgets.upscale.tileControlNetRequired')
+                }
                 helpText={values.tileControlnetModel ? t('widgets.upscale.tileControlNetHelp') : undefined}
                 hint="tileControlNet"
                 label={t('widgets.upscale.tileControlNet')}
               >
                 <ModelSelect
                   filter={tileControlNetFilter}
+                  installAction
                   invalid={!values.tileControlnetModel}
                   modelTypes={CONTROLNET_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectTileControlNet')}

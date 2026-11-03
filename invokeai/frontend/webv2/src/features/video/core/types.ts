@@ -1,4 +1,5 @@
 import type {
+  DynamicPromptsSettings,
   GenerateLora,
   ImageWithDims,
   MainModelConfig,
@@ -88,8 +89,8 @@ export type VideoTargetResolution = WanTargetResolution | MiniMaxH3TargetResolut
 /** Derive dimensions from preset ratio/resolution or conditioning media; no free-size fields are offered. */
 export type VideoAspectRatioId = '21:9' | '16:9' | '3:2' | '4:3' | '1:1' | '3:4' | '2:3' | '9:16' | '9:21';
 
-/** Project-persisted settings owned by the Video widget. */
-export interface VideoSettings {
+/** Project-persisted settings owned by the Video widget; the prompt expands like Generate's. */
+export interface VideoSettings extends DynamicPromptsSettings {
   batchCount: number;
   modelKey: string;
   positivePrompt: string;

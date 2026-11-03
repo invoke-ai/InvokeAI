@@ -29,6 +29,8 @@ import { commands, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
+import { PREVIEW_NAV_ATTRIBUTE } from './PreviewNavButtons';
+import { PreviewWidgetLabel } from './PreviewWidgetChrome';
 
 const queueItem: QueueItem = {
   backendItemIds: [1],
@@ -78,6 +80,8 @@ const createVideoItem = (name: string, createdAt: string): GalleryVideoItem => (
   width: 1920,
 });
 
+// What the view last handed its shared image context menu.
+const contextMenuProps = vi.hoisted(() => ({ current: null as null | { target: unknown; variant?: string } }));
 const mocks = vi.hoisted(() => {
   const recentImages = [
     {
@@ -101,9 +105,17 @@ const mocks = vi.hoisted(() => {
   ];
 
   return {
+    openWidget: vi.fn(),
+    revealPlacedWidget: vi.fn((..._args: unknown[]): unknown => null),
     commands: {
       account: { updateProjectPreferences: vi.fn() },
-      gallery: { selectImage: vi.fn(), selectItem: vi.fn(), setCompareImage: vi.fn(), setCompareItem: vi.fn() },
+      gallery: {
+        clearSelection: vi.fn(),
+        selectImage: vi.fn(),
+        selectItem: vi.fn(),
+        setCompareImage: vi.fn(),
+        setCompareItem: vi.fn(),
+      },
       notifications: { reportError: vi.fn() },
       widgets: { patchValues: vi.fn() },
     },
@@ -169,15 +181,36 @@ const mocks = vi.hoisted(() => {
   };
 });
 
+vi.mock('@workbench/widgetPlacementCommands', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  revealPlacedWidget: (...args: unknown[]) => mocks.revealPlacedWidget(...args),
+}));
+
+vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
+  useOpenWorkbenchWidget: () => mocks.openWidget,
+}));
+
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
+  useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
-  useWidgetValuesSelector: () => ({}),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      widgetId === 'gallery' || widgetId === 'preview'
+        ? ((
+            Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === widgetId) as
+              | { state?: { values?: Record<string, unknown> } }
+              | undefined
+          )?.state?.values ?? {})
+        : {}
+    ),
   useWorkbenchCommands: () => mocks.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.
   useWorkbenchInternalStore: () => null,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => ({ getSnapshot: () => ({ activeProject: mocks.project }) }),
   useWorkbenchSubscription: () => () => () => {},
   useWorkbenchSelector: (selector: (snapshot: unknown) => unknown) =>
@@ -399,16 +432,18 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
-  ImageContextMenu: () => null,
+  ImageContextMenu: (props: { target: unknown; variant?: string }) => {
+    contextMenuProps.current = props;
+    return null;
+  },
+  ImageContinueGroup: () => null,
+  ImageUseGroups: () => null,
   RecallActionButtons: () => null,
   buildImageRecallSettings: () => ({}),
   executeImageRecall: () => {},
   getCurrentGenerateValues: () => ({}),
   getImageRecallVerb: () => ({ icon: () => null, label: '' }),
-  getGalleryCanvasImportMenuItems: () => [],
   getImageContextMenuImages: () => [],
-  getImageContextMenuRecallRequestKey: () => null,
-  getImageRecallCapabilities: () => ({}),
   getImageRecallMessage: () => '',
   getImageRecallTitle: () => '',
   getSelectedGalleryImage: () => null,
@@ -444,8 +479,11 @@ await i18n.use(initReactI18next).init({
       translation: {
         common: { countOfTotal: '{{count}} of {{total}}', generating: 'Generating' },
         widgets: {
+          gallery: { commands: { clearSelection: 'Clear gallery selection' } },
           preview: {
             commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
+            noGallerySelection: 'No gallery selection',
+            showGallery: 'Show Gallery',
             framesPerSecond: '{{count}} fps',
             itemCount_one: '{{count}} item',
             itemCount_other: '{{count}} items',
@@ -521,11 +559,13 @@ const FollowProbe = () => {
 };
 
 let headerPosition: PreviewItemPosition | null = null;
+let headerOpenItemMenu: ReturnType<typeof usePreviewHeaderContext>['openItemMenu'] = null;
 const HeaderPositionProbe = () => {
-  const { position } = usePreviewHeaderContext();
+  const { openItemMenu, position } = usePreviewHeaderContext();
   const ref = useCallback(() => {
     headerPosition = position;
-  }, [position]);
+    headerOpenItemMenu = openItemMenu;
+  }, [openItemMenu, position]);
   return <span ref={ref} />;
 };
 
@@ -539,7 +579,13 @@ const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   return <DndContext sensors={sensors}>{children}</DndContext>;
 };
 
-/** The center region as the shell frames it: the focusable region container around the widget's own frame. */
+// Off unless a test renders the center chrome's label beside the view.
+let showsHeaderLabel = false;
+
+/**
+ * The center region as the shell frames it: the focusable region container around the widget's own frame, with the
+ * chrome's label after the frame, outside it.
+ */
 const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
   <section data-testid="center-region" {...useFocusRegionProps('center')} tabIndex={-1}>
     <div
@@ -549,6 +595,11 @@ const CenterRegion = ({ children }: Pick<DndContextProps, 'children'>) => (
     >
       {children}
     </div>
+    {showsHeaderLabel ? (
+      <div data-testid="center-label">
+        <PreviewWidgetLabel region="center" />
+      </div>
+    ) : null}
   </section>
 );
 
@@ -755,6 +806,8 @@ beforeEach(() => {
   mocks.commands.account.updateProjectPreferences.mockClear();
   mocks.commands.gallery.selectImage.mockClear();
   mocks.commands.gallery.selectItem.mockClear();
+  mocks.commands.gallery.clearSelection.mockReset();
+  showsHeaderLabel = false;
   vi.mocked(requestGalleryItemReveal).mockClear();
   mocks.project.queue.items = [];
   mocks.project.settings.viewerAutoSwitch = 'off';
@@ -824,6 +877,40 @@ afterEach(async () => {
 /** The filmstrip's current thumb: the one visible trace of where the navigation cursor sits. */
 const selectedThumb = (): string | null | undefined =>
   host?.querySelector<HTMLButtonElement>('button[aria-current]')?.getAttribute('aria-label');
+
+describe('preview context menu variant', () => {
+  const lastMenu = () => contextMenuProps.current;
+  const rightClick = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
+      );
+      await Promise.resolve();
+    });
+
+  it('opens the header ⋮ as housekeeping, and the stage or a filmstrip thumb as the full menu afterwards', async () => {
+    await render();
+    contextMenuProps.current = null;
+
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'housekeeping');
+      await Promise.resolve();
+    });
+    expect(lastMenu()?.target).not.toBeNull();
+    expect(lastMenu()?.variant).toBe('housekeeping');
+
+    const stageImage = host!.querySelector(`[${PREVIEW_NAV_ATTRIBUTE}]`)!.parentElement!.querySelector('img')!;
+    await rightClick(stageImage);
+    expect(lastMenu()?.variant).toBe('full');
+
+    await act(async () => {
+      headerOpenItemMenu?.(10, 10, 'housekeeping');
+      await Promise.resolve();
+    });
+    await rightClick(host!.querySelector('button[aria-current]')!);
+    expect(lastMenu()?.variant).toBe('full');
+  });
+});
 
 describe('preview arrow buttons', () => {
   const arrow = (name: 'Show next item' | 'Show previous item') =>
@@ -3550,7 +3637,7 @@ describe('preview keyboard navigation boundary', () => {
     expect([...registeredHotkeys.keys()]).not.toContain('viewer.zoomToFit');
   });
 
-  it('binds I to toggling the details popover through the preview widget value', async () => {
+  it('binds I to toggling the details panel through the preview widget value', async () => {
     await render();
 
     expect(registeredHotkeys.get('viewer.toggleMetadata')).toEqual(['i']);
@@ -3818,4 +3905,88 @@ describe('preview image recovery', () => {
       await imageRouteCommands.stopThumbnailRoute();
     }
   }, 20_000);
+});
+
+describe('preview label clear selection', () => {
+  const clearButton = () =>
+    host!.querySelector<HTMLButtonElement>('[data-testid="center-label"] button[aria-label="Clear gallery selection"]');
+  const centerRegion = () => host!.querySelector<HTMLElement>('[data-testid="center-region"]');
+
+  beforeEach(() => {
+    showsHeaderLabel = true;
+    // What the reducer's clearGallerySelection does to these values; recent results stay.
+    mocks.commands.gallery.clearSelection.mockImplementation(() =>
+      setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] })
+    );
+  });
+
+  const expectCleared = async () => {
+    expect(mocks.commands.gallery.clearSelection).toHaveBeenCalledOnce();
+    await rerender();
+
+    expect(clearButton()).toBeNull();
+    expect(host!.querySelector('[data-testid="center-label"]')?.textContent).toBe('');
+    expect(host!.textContent).toContain('No gallery selection');
+    // The button left with the selection; focus moves to the Preview's region rather than the document body.
+    await expect.poll(() => document.activeElement).toBe(centerRegion());
+  };
+
+  it('clears the selection from the image name, leaving the empty state though recent results exist', async () => {
+    await render();
+
+    await expect.poll(() => host!.querySelector('[data-testid="center-label"]')?.textContent).toContain('newest');
+    expect(host!.textContent).not.toContain('No gallery selection');
+
+    await userEvent.click(clearButton()!);
+
+    await expectCleared();
+  });
+
+  it('clears the selection from the keyboard', async () => {
+    await render();
+    await expect.poll(clearButton).not.toBeNull();
+
+    await act(async () => {
+      clearButton()!.focus();
+      await userEvent.keyboard('{Enter}');
+    });
+
+    await expectCleared();
+  });
+
+  it('offers no clear control without a selection', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+
+    await render();
+
+    expect(host!.textContent).toContain('No gallery selection');
+    expect(clearButton()).toBeNull();
+  });
+
+  it('offers the way to a selection from the empty state', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+
+    await render();
+    const showGallery = Array.from(host!.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Show Gallery'
+    );
+    await userEvent.click(showGallery!);
+
+    expect(mocks.openWidget).toHaveBeenCalledExactlyOnceWith('gallery');
+  });
+
+  it('brings a Gallery the layout already has forward rather than opening it again', async () => {
+    setGalleryValues({ selectedImage: null, selectedImageName: null, selectedImageNames: [] });
+    mocks.revealPlacedWidget.mockReturnValueOnce({ kind: 'region', region: 'right' });
+    mocks.openWidget.mockClear();
+
+    await render();
+    const showGallery = Array.from(host!.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Show Gallery'
+    );
+    await userEvent.click(showGallery!);
+
+    expect(mocks.revealPlacedWidget).toHaveBeenCalledWith(expect.objectContaining({ typeId: 'gallery' }));
+    expect(mocks.openWidget).not.toHaveBeenCalled();
+  });
 });

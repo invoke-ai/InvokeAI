@@ -1,5 +1,5 @@
 import type { GalleryImageItem, GalleryItem, GalleryVideoItem } from '@features/gallery/core/items';
-import type { GalleryBoard, GalleryBoardAction, GeneratedImageContract } from '@features/gallery/core/types';
+import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { describe, expect, it } from 'vitest';
@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
   getBoardCounts,
   getGalleryAutoAddBoardId,
-  getGalleryRedirectedDestination,
+  getGalleryIntendedDestinationId,
   getGalleryDestinationBoardId,
   getGalleryListingBoardId,
   getGallerySelectedBoardId,
@@ -18,6 +18,7 @@ import {
   getGalleryReadStatus,
   getGalleryStateView,
   type GalleryQueryFacts,
+  settleGalleryValues,
 } from './galleryStateView';
 
 const boards: GalleryBoard[] = [
@@ -151,12 +152,13 @@ describe('gallery state view', () => {
     expect(gallery.selectedItemKey).toBeNull();
   });
 
-  it('exposes image, video, and asset counts for board labels', () => {
-    expect(getBoardCounts({ ...boards[1], videoCount: 3 })).toEqual({
-      assetCount: 0,
-      assetVideoCount: 0,
-      imageCount: 2,
-      videoCount: 3,
+  it("splits a board's counts as its Media and Uploads tabs list them", () => {
+    expect(getBoardCounts({ ...boards[1], assetCount: 4, assetVideoCount: 1, videoCount: 3 })).toEqual({
+      images: 2,
+      items: 9,
+      media: 4,
+      uploads: 5,
+      videos: 2,
     });
   });
 
@@ -168,7 +170,7 @@ describe('gallery state view', () => {
     );
 
     expect(gallery.settings).toEqual({
-      autoAddBoardId: 'follow',
+      autoAddBoardId: null,
       boardOrderBy: 'board_name',
       boardOrderDir: 'DESC',
       boardPanelCollapsed: false,
@@ -177,6 +179,7 @@ describe('gallery state view', () => {
       collapsedBoardSections: [],
       collapsedProjectGroupIds: [],
       expandedBoardSections: [],
+      followSelectedBoard: false,
       imageDensityPercent: 50,
       imageOrderDir: 'DESC',
       mediaFilter: 'all',
@@ -513,9 +516,28 @@ describe('getGalleryDestinationBoardId', () => {
 describe('getGalleryAutoAddBoardId', () => {
   const anyBoard = () => true;
 
-  it('follows the gallery destination until a board is fixed', () => {
-    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' }, anyBoard)).toBe('picked');
-    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' }, anyBoard)).toBe('project');
+  it('sends results to the project inbox by default, wherever the gallery browses', () => {
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' }, anyBoard)).toBe(
+      'project'
+    );
+    // What earlier builds stored for following the selected board, their default, reads as the default now.
+    expect(
+      getGalleryAutoAddBoardId(
+        { autoAddBoardId: 'follow', projectBoardId: 'project', selectedBoardId: 'picked' },
+        anyBoard
+      )
+    ).toBe('project');
+    // A gallery with no inbox, such as a Library-only one, falls back to Uncategorized.
+    expect(getGalleryAutoAddBoardId({ selectedBoardId: 'picked' }, anyBoard)).toBe('none');
+  });
+
+  it('follows the selected board only when that is turned on, the project board for a date bucket', () => {
+    const following = { followSelectedBoard: true, projectBoardId: 'project' };
+
+    expect(
+      getGalleryAutoAddBoardId({ ...following, autoAddBoardId: 'fixed', selectedBoardId: 'picked' }, anyBoard)
+    ).toBe('picked');
+    expect(getGalleryAutoAddBoardId({ ...following, selectedBoardId: 'by_date:2026-07-15' }, anyBoard)).toBe('project');
   });
 
   it('uses a fixed board, including Uncategorized, whatever the selection', () => {
@@ -526,7 +548,12 @@ describe('getGalleryAutoAddBoardId', () => {
   it('sends results a view-only board refuses to the project inbox, followed or fixed', () => {
     const viewOnly = (boardId: string) => boardId !== 'shared';
 
-    expect(getGalleryAutoAddBoardId({ projectBoardId: 'inbox', selectedBoardId: 'shared' }, viewOnly)).toBe('inbox');
+    expect(
+      getGalleryAutoAddBoardId(
+        { followSelectedBoard: true, projectBoardId: 'inbox', selectedBoardId: 'shared' },
+        viewOnly
+      )
+    ).toBe('inbox');
     expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared', projectBoardId: 'inbox' }, viewOnly)).toBe('inbox');
     expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'shared' }, viewOnly)).toBe('none');
     // Uncategorized is always the caller's own.
@@ -534,41 +561,93 @@ describe('getGalleryAutoAddBoardId', () => {
   });
 });
 
-describe('getGalleryRedirectedDestination', () => {
-  const createBoard = (id: string): GalleryBoard => ({
-    archived: false,
-    assetCount: 0,
-    assetVideoCount: 0,
-    id,
-    imageCount: 0,
-    isInbox: false,
-    kind: 'board',
-    name: id,
-    projectId: null,
-    videoCount: 0,
-  });
-  const access = (actions: GalleryBoardAction[]) => ({
-    access: { actions, adminOverride: false, generalAccess: 'viewer' as const, role: 'viewer' as const },
-  });
-  const boards = [
-    { ...createBoard('shared'), ...access(['read']) },
-    { ...createBoard('moodboard'), ...access(['read', 'add_media']) },
-    createBoard('inbox'),
-  ];
-  const view = (settings: { autoAddBoardId: string }, selectedBoardId: string) => ({
-    boards,
+describe('getGalleryIntendedDestinationId', () => {
+  const view = (settings: Partial<ReturnType<typeof getGallerySettings>>, selectedBoardId: string) => ({
     projectBoardId: 'inbox',
     selectedBoardId,
     settings: { ...getGallerySettings({}), ...settings },
   });
 
-  it('names the board that refused results and where they go instead', () => {
-    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'shared'))).toEqual({
-      boardId: 'inbox',
-      refusedBoard: boards[0],
+  it('names the chosen board, else the inbox, whatever is selected', () => {
+    expect(getGalleryIntendedDestinationId(view({}, 'moodboard'))).toBe('inbox');
+    expect(getGalleryIntendedDestinationId(view({ autoAddBoardId: 'chosen' }, 'moodboard'))).toBe('chosen');
+  });
+
+  it('names the selected board while following it, the inbox for a date bucket', () => {
+    expect(
+      getGalleryIntendedDestinationId(view({ autoAddBoardId: 'chosen', followSelectedBoard: true }, 'moodboard'))
+    ).toBe('moodboard');
+    expect(getGalleryIntendedDestinationId(view({ followSelectedBoard: true }, 'by_date:2026-07-15'))).toBe('inbox');
+  });
+});
+
+describe('settleGalleryValues', () => {
+  const selected = {
+    selectedBoardId: 'dogs',
+    selectedImage: { boardId: 'dogs', kind: 'image', name: 'a.png' },
+    selectedImageName: 'image:a.png',
+    selectedImageNames: ['image:a.png', 'image:b.png'],
+  };
+
+  it.each([
+    ['another board', { selectedBoardId: 'cats' }],
+    ['a search', { searchTerm: 'fox' }],
+    ['the starred filter', { starredOnly: true }],
+    ['the other tab', { galleryView: 'assets' }],
+    ['a media filter', { mediaFilter: 'video' }],
+    ['a semantic query', { semanticImageQuery: { kind: 'text', query: 'fox' }, semanticSearchText: 'fox' }],
+  ])(
+    'drops a selection the listing no longer holds after a switch to %s, keeping the item Preview shows',
+    (_case, patch) => {
+      const next = settleGalleryValues(selected, { ...selected, ...patch });
+
+      expect(next.selectedImageNames).toEqual([]);
+      expect(next.selectedImageName).toBe('image:a.png');
+    }
+  );
+
+  it('keeps the selection through writes that leave the listing as it was', () => {
+    const next = { ...selected, galleryPage: 3, imageDensityPercent: 20, imageOrderDir: 'ASC' };
+
+    expect(settleGalleryValues(selected, next)).toBe(next);
+  });
+
+  it('drops the selection when a search widens to every board, and again when clearing it narrows it back', () => {
+    const searching = { ...selected, searchTerm: 'fox' };
+    const widened = settleGalleryValues(searching, { ...searching, searchScope: 'all' });
+
+    expect(widened.selectedImageNames).toEqual([]);
+    // Clearing the search settles the scope back to the board, a different listing again.
+    const reselected = { ...widened, selectedImageNames: ['image:c.png'] };
+    const cleared = settleGalleryValues(reselected, { ...reselected, searchTerm: '' });
+
+    expect(cleared.searchScope).toBe('board');
+    expect(cleared.selectedImageNames).toEqual([]);
+  });
+
+  it('keeps a selection whose write restamps its listing, even with the list carried over', () => {
+    const next = settleGalleryValues(selected, {
+      ...selected,
+      selectedBoardId: 'cats',
+      selectedImageQuery: { boardId: 'cats' },
     });
-    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'shared' }, 'inbox'))?.boardId).toBe('inbox');
-    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'follow' }, 'moodboard'))).toBeNull();
-    expect(getGalleryRedirectedDestination(view({ autoAddBoardId: 'moodboard' }, 'shared'))).toBeNull();
+
+    expect(next.selectedImageNames).toEqual(['image:a.png', 'image:b.png']);
+  });
+
+  it('keeps a selection the same write sets, as a reveal landing on its item does', () => {
+    const next = settleGalleryValues(selected, {
+      ...selected,
+      selectedBoardId: 'cats',
+      selectedImageNames: ['image:c.png'],
+    });
+
+    expect(next.selectedImageNames).toEqual(['image:c.png']);
+  });
+
+  it('drops a single legacy selection stored without its list', () => {
+    const legacy = { selectedBoardId: 'dogs', selectedImageName: 'image:a.png' };
+
+    expect(settleGalleryValues(legacy, { ...legacy, starredOnly: true }).selectedImageNames).toEqual([]);
   });
 });

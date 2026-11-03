@@ -522,7 +522,7 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
 
     @classmethod
     def _reject_qwen3_vl_architecture(cls, mod: ModelOnDisk) -> None:
-        # `mod.metadata()` caches GGUF string fields across the whole identification sweep and
+        # `mod.metadata()` caches a GGUF's scalar fields across the whole identification sweep and
         # yields {} for anything it cannot read, so a non-GGUF simply finds no architecture here and
         # is left to `_validate_looks_like_gguf_quantized`.
         architecture = mod.metadata().get("general.architecture")
