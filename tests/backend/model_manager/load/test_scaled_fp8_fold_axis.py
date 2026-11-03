@@ -201,7 +201,7 @@ class TestSharedComfyFold:
 
     def test_an_nvfp4_layer_missing_its_global_scale_is_refused_too(self) -> None:
         """The half-state: packed codes and a block-scale grid, no `weight_scale_2`. It is the shape
-        `_find_nvfp4_layers` refuses by name, so a build that loses the global scale somewhere
+        `find_nvfp4_layers` refuses by name, so a build that loses the global scale somewhere
         upstream arrives here looking like ordinary scaled fp8 -- and the fold takes it exactly as
         readily as the whole layer, for the same reason and to the same end. Keying the guard on
         `weight_scale_2` alone, which is what the decode keys on, would let this one through."""
