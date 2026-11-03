@@ -10,7 +10,7 @@ from typing import Callable, Iterator, Literal, Optional
 import torch
 from starlette.concurrency import run_in_threadpool
 
-from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput
+from invokeai.app.invocations.baseinvocation import BaseInvocation, BaseInvocationOutput, services_for_queue_user
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.events.events_common import (
@@ -486,9 +486,11 @@ class DefaultSessionRunner(SessionRunnerBase):
                     execution_workflow_authorizer=workflow_authorizer,
                     execution_workflow_inputs=workflow_inputs,
                 )
+                # The context hands nodes these services too, so it must carry the same user-scoped cache.
+                node_services = services_for_queue_user(self._services, queue_item.user_id)
                 context = build_invocation_context(
                     data=data,
-                    services=self._services,
+                    services=node_services,
                     is_canceled=self._is_canceled,
                 )
 
@@ -508,7 +510,7 @@ class DefaultSessionRunner(SessionRunnerBase):
                     attention_caller(invocation.get_type()),
                     data.invocation_resources,
                 ):
-                    run_result = invocation.invoke_internal_with_effects(context=context, services=self._services)
+                    run_result = invocation.invoke_internal_with_effects(context=context, services=node_services)
                 output = run_result.output
                 control_collection = None
                 if self._on_after_run_node_callbacks and isinstance(invocation, (IterateInvocation, CollectInvocation)):

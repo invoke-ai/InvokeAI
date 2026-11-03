@@ -37,6 +37,17 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
   ensureGalleryBoardDestinations: galleryQueriesMock.ensureGalleryBoardDestinations,
 }));
 
+// Holds an expansion open so a test can edit the project while it is pending; otherwise the real resolver runs.
+const expansionMock = vi.hoisted(() => ({ pending: null as Promise<unknown> | null }));
+vi.mock('@features/generation/prompts', async (importOriginal) => {
+  const original = await importOriginal<{ resolveDynamicPrompts: (...args: unknown[]) => Promise<unknown> }>();
+
+  return {
+    ...original,
+    resolveDynamicPrompts: (...args: unknown[]) => expansionMock.pending ?? original.resolveDynamicPrompts(...args),
+  };
+});
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getInvocationTemplatesSnapshot: () => templatesMock.snapshot,
@@ -201,6 +212,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -245,6 +257,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
         commands,
         formatControlLayerError,
         formatUpscaleMetadataFailure,
+        scopedDefaults: {},
         models: undefined,
         owner: captureAccountScope(),
         prepareCanvasInvocation: vi.fn(),
@@ -313,6 +326,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -333,6 +347,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -358,6 +373,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
       kind: 'error',
       message: 'string_generator: Unbalanced braces',
       title: 'The batch generator could not be resolved',
+      titleKey: 'topbar.invoke.generatorFailed',
     });
   });
 
@@ -376,7 +392,10 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     expect(notify).toHaveBeenCalledWith({
       kind: 'error',
       message: 'Batch node "string_batch" has an empty collection.',
+      messageKey: 'nodes.readiness.batchEmpty',
+      messageValues: { node: 'string_batch' },
       title: 'The batch is not ready',
+      titleKey: 'topbar.invoke.batchNotReady',
     });
   });
 });
@@ -385,7 +404,11 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
   // Seed capabilities to match app boot; submission fails closed without them.
   seedArchitectureCapabilities();
 
-  const drawn = { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 };
+  const drawn = {
+    expandedFrom: { combinatorial: false, maxPrompts: 4, positivePrompt: 'a {red|green} cat' },
+    positivePrompts: ['a green cat'],
+    positivePromptsSampleSeed: 7,
+  };
 
   const submitDrawn = async (sourceId: 'canvas' | 'generate', prepend?: boolean) => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
@@ -427,6 +450,7 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -464,12 +488,12 @@ describe('submitResolvedInvocation with a random dynamic prompt', () => {
 describe('submitResolvedInvocation without dynamic prompts', () => {
   seedArchitectureCapabilities();
 
-  const submitGenerate = async (prepend?: boolean) => {
+  const submitGenerate = async (prepend?: boolean, positivePrompt = 'a cat') => {
     const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
     const project = getActiveProject(
       workbenchReducer(createInitialWorkbenchState(), {
         type: 'setGenerateSettings',
-        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt },
       })
     );
     const route = resolveInvocationRoute(project, 'global', {
@@ -487,6 +511,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -509,6 +534,19 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
     expect(back.mock.calls[0]?.[0]).not.toHaveProperty('prepend');
   });
 
+  it('dispatches a JSON prompt literally, without expanding its braces', async () => {
+    const draft =
+      '```json\n{"width":1024,"height":1536,"bbox_coord_space":"abs","bbox_format":"xyxy","summary":{"caption":"a poster"},"items":[{"label":"object","caption":"a cup","bbox":[0,0,10,10]}]}\n```';
+    const compiled =
+      '{"bbox_coord_space":"abs_centralized","bbox_format":"yxyx","summary":{"caption":"a poster"},"items":[]}';
+    for (const prompt of [draft, compiled]) {
+      const submitted = await submitGenerate(undefined, prompt);
+      expect(submitted).toHaveBeenCalledTimes(1);
+      expect(submitted.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+      submitted.mockRestore();
+    }
+  });
+
   it('keeps Invoke Front on a Workflow dispatch', async () => {
     generatorsMock.resolveWorkflowGenerators.mockImplementation(
       (_client: unknown, pending: Array<{ key: string; nodeId: string }>) =>
@@ -525,6 +563,7 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -535,6 +574,233 @@ describe('submitResolvedInvocation without dynamic prompts', () => {
 
     expect(submitResolved).toHaveBeenCalledTimes(1);
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ prepend: true });
+  });
+});
+
+describe('submitResolvedInvocation for Video', () => {
+  const wanModel = {
+    base: 'wan',
+    file_size: 1,
+    format: 'diffusers',
+    hash: 'wan-t2v-hash',
+    key: 'wan-t2v_a14b-diffusers',
+    name: 'Wan 2.2 t2v_a14b',
+    path: 'wan-t2v_a14b-diffusers',
+    source: 'wan-t2v_a14b-diffusers',
+    source_type: 'path',
+    type: 'main',
+    variant: 't2v_a14b',
+  } as const;
+
+  const submitVideo = async (dynamicPromptsEnabled: boolean) => {
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { dynamicPromptsEnabled, model: wanModel, positivePrompt: 'a {red|green} fox' },
+      widgetId: 'video',
+    });
+    const project = getActiveProject(state);
+    // Infinite staleTime makes the cached expansion authoritative, so no request leaves the test.
+    queryClient.setQueryData(
+      dynamicPromptsKeys.expansion({ combinatorial: true, max_prompts: 10, prompt: 'a {red|green} fox', seed: null }),
+      { error: null, prompts: ['a red fox', 'a green fox'] }
+    );
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {},
+      models: [wanModel],
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(
+        project,
+        'global',
+        { destination: 'gallery', destinationLocked: false, sourceId: 'video', sourceLocked: false },
+        [wanModel]
+      ),
+    });
+
+    return submitResolved;
+  };
+
+  it('expands a dynamic prompt into one video per prompt', async () => {
+    const submitResolved = await submitVideo(true);
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
+      positivePrompts: ['a red fox', 'a green fox'],
+      positivePromptsSampleSeed: null,
+    });
+  });
+
+  it('dispatches the prompt as typed with dynamic prompts off', async () => {
+    const submitResolved = await submitVideo(false);
+
+    expect(submitResolved).toHaveBeenCalledTimes(1);
+    expect(submitResolved.mock.calls[0]?.[0]).not.toHaveProperty('positivePrompts');
+  });
+});
+
+describe('submitResolvedInvocation when the prompt changes while it expands', () => {
+  seedArchitectureCapabilities();
+
+  const wanModel = {
+    base: 'wan',
+    file_size: 1,
+    format: 'diffusers',
+    hash: 'wan-t2v-hash',
+    key: 'wan-t2v_a14b-diffusers',
+    name: 'Wan 2.2 t2v_a14b',
+    path: 'wan-t2v_a14b-diffusers',
+    source: 'wan-t2v_a14b-diffusers',
+    source_type: 'path',
+    type: 'main',
+    variant: 't2v_a14b',
+  } as const;
+  const sdModel: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+
+  const primeVideo = () => {
+    const state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+
+    return workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { model: wanModel, positivePrompt: 'a {red|green} fox' },
+      widgetId: 'video',
+    });
+  };
+  const primeGenerate = () =>
+    workbenchReducer(createInitialWorkbenchState(), {
+      type: 'setGenerateSettings',
+      values: {
+        ...getDefaultGenerateSettings(sdModel),
+        model: sdModel,
+        modelKey: sdModel.key,
+        positivePrompt: 'a {red|green} fox',
+      },
+    });
+
+  /** Invokes, makes `edit` while the expansion is still out, then lets the expansion answer. */
+  const submitWithEditDuringExpansion = async (
+    sourceId: 'generate' | 'video',
+    edit?: (store: ReturnType<typeof createWorkbenchStore>) => void
+  ) => {
+    const store = createWorkbenchStore(sourceId === 'video' ? primeVideo() : primeGenerate());
+    const project = store.getSnapshot().activeProject;
+    const models = sourceId === 'video' ? [wanModel] : undefined;
+    let answer: (response: unknown) => void = () => undefined;
+    expansionMock.pending = new Promise((resolve) => {
+      answer = resolve;
+    });
+
+    try {
+      const submission = submitResolvedInvocation({
+        commands: store.commands,
+        formatControlLayerError,
+        formatUpscaleMetadataFailure,
+        scopedDefaults: {},
+        models,
+        owner: captureAccountScope(),
+        prepareCanvasInvocation: vi.fn(),
+        project,
+        route: resolveInvocationRoute(
+          project,
+          'global',
+          { destination: 'gallery', destinationLocked: false, sourceId, sourceLocked: false },
+          models
+        ),
+      });
+
+      edit?.(store);
+      answer({ error: null, prompts: ['a red fox', 'a green fox'] });
+      await submission;
+    } finally {
+      expansionMock.pending = null;
+    }
+
+    const snapshot = store.getSnapshot();
+
+    return {
+      notices: snapshot.notifications.map((notification) => notification.titleKey),
+      queue: snapshot.activeProject.queue.items,
+    };
+  };
+
+  it.each(['generate', 'video'] as const)('queues nothing from %s and says so', async (sourceId) => {
+    const { notices, queue } = await submitWithEditDuringExpansion(sourceId, (store) =>
+      sourceId === 'video'
+        ? store.commands.widgets.patchValues('video', { positivePrompt: 'a {blue|yellow} bird' })
+        : store.commands.widgets.patchValues('generate', { positivePrompt: 'a {blue|yellow} bird' })
+    );
+
+    expect(queue).toEqual([]);
+    expect(notices).toContain('topbar.invoke.expansionStale');
+  });
+
+  it.each(['generate', 'video'] as const)('queues %s as expanded when the prompt held still', async (sourceId) => {
+    const { notices, queue } = await submitWithEditDuringExpansion(sourceId);
+
+    expect(notices).not.toContain('topbar.invoke.expansionStale');
+    expect(queue[0]?.snapshot.backendSubmission).toMatchObject({ positivePrompts: ['a red fox', 'a green fox'] });
+  });
+});
+
+describe("submitResolvedInvocation reads the user's defaults", () => {
+  seedArchitectureCapabilities();
+
+  it('hands Canvas the compositing and generation flags the defaults give a project that pins none', async () => {
+    const model: MainModelConfig = { base: 'sd-1', key: 'main', name: 'Main', type: 'main' };
+    const state = workbenchReducer(
+      workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' }),
+      {
+        type: 'setGenerateSettings',
+        values: { ...getDefaultGenerateSettings(model), model, modelKey: model.key, positivePrompt: 'a cat' },
+      }
+    );
+    const project = getActiveProject(state);
+    const route = resolveInvocationRoute(project, 'global', {
+      destination: 'gallery',
+      destinationLocked: false,
+      sourceId: 'canvas',
+      sourceLocked: false,
+    });
+    const prepareCanvasInvocation = vi.fn();
+
+    expect(route.validationReasons).toEqual([]);
+
+    await submitResolvedInvocation({
+      commands: createWorkbenchStore().commands,
+      formatControlLayerError,
+      formatUpscaleMetadataFailure,
+      scopedDefaults: {
+        canvas: { outputOnlyMaskedRegions: false },
+        generate: { useCpuNoise: false, useNsfwChecker: true, useWatermark: true },
+      },
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation,
+      project,
+      route,
+    });
+
+    expect(prepareCanvasInvocation).toHaveBeenCalledWith(
+      expect.objectContaining({
+        compositing: expect.objectContaining({ outputOnlyMaskedRegions: false }),
+        projectSettings: expect.objectContaining({ useCpuNoise: false, useNsfwChecker: true, useWatermark: true }),
+      })
+    );
   });
 });
 
@@ -582,6 +848,7 @@ describe('submitResolvedInvocation for Upscale', () => {
       commands,
       formatControlLayerError,
       formatUpscaleMetadataFailure,
+      scopedDefaults: {},
       models: [upscaler],
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),

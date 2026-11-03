@@ -334,6 +334,12 @@ export interface CanvasDocumentCapability {
   captureRestoreAnchor(nodeId: string): CanvasNodeInsertionAnchor | null;
   /** Swaps in a whole new document; the mirror treats it as a document swap and history clears. */
   replaceDocument(document: CanvasDocumentContractV3): boolean;
+  /**
+   * Restores one of the canvas's restore points, a document swap like `replaceDocument` (a Discard all point only
+   * re-stages its results). `keepCurrentAs` keeps the replaced canvas as a point in its place. False when nothing
+   * changed.
+   */
+  restoreSnapshot(snapshotId: string, keepCurrentAs?: { id: string; name: string; createdAt: string }): boolean;
   /** The pure model over the current document; the same instance until the document changes. */
   model(): CanvasDocumentModel | null;
 }
@@ -376,6 +382,13 @@ export interface CanvasHistoryEntries {
   past: readonly string[];
   /** Undone steps, next-redo first. */
   future: readonly string[];
+  /** The oldest steps dropped to stay within the history's entry cap or memory budget since it was last cleared. */
+  evicted: number;
+  /**
+   * Present while nonzero: the steps this canvas's previous engine held when it was disposed, which this one could
+   * not take over. Cleared with the history (Clear history, a document swap).
+   */
+  dropped?: number;
 }
 
 /**
@@ -402,12 +415,27 @@ export interface CanvasHistoryCapability {
 export type ColorSamplePhase = 'preview' | 'commit' | 'cancel';
 
 /**
+ * A tool press the selected layer cannot take, named so the notice can say which layer and why: it is hidden (disabled,
+ * itself or through a group), locked, has its transparency locked against the eraser, or its pixels have not loaded
+ * yet (the engine has started loading them; the next press can edit).
+ */
+export interface CanvasLayerEditRefusal {
+  readonly status: 'layer-hidden' | 'layer-locked' | 'layer-alpha-locked' | 'layer-loading';
+  readonly layerId: string;
+  readonly layerName: string;
+  /** The brush would have painted this image layer in place; a new paint layer above it can take the stroke. */
+  readonly canPaintNewLayer?: boolean;
+}
+
+/**
  * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
- * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting.
+ * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
+ * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
-  | AdjustmentRefusal;
+  | AdjustmentRefusal
+  | CanvasLayerEditRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -704,7 +732,6 @@ export interface CanvasEngineToolCapability extends CanvasToolCapability {
    * router, preserving newer registrations.
    */
   setColorSampleRouter(router: (hex: string, phase: ColorSamplePhase) => boolean): () => void;
-  setInteractionLocked(locked: boolean): void;
 }
 
 /** Why `beginTransform` opened no session; refusals leave the selection and the active tool unchanged. */
@@ -781,7 +808,7 @@ export interface CanvasEngineExportCapability extends CanvasExportCapability {
 export type ControlLayerViewMode = 'original' | 'map' | 'overlay';
 
 /**
- * `missing`: no control layer with a kept original; `locked`: an operation or a generation holds the canvas;
+ * `missing`: no control layer with a kept original; `locked`: an operation holds the document;
  * `stale`: a newer request or an edit of the layer superseded it; `over-budget`: the original's pixels do not fit the
  * raster budget; `failed`: the original could not be decoded.
  */
@@ -803,10 +830,15 @@ export interface CanvasEnginePreviewCapability extends CanvasPreviewCapability {
   ): Promise<'shown' | SubsetOf<CanvasCommandRefusal, 'missing'> | SubsetOf<CanvasTransactionOutcome, 'stale'>>;
   setStagedPreview(input: StagedPreviewInput | null): void;
   /**
+   * Overlay chrome only: outlines where each pending result (staged candidate or result still generating) will land,
+   * the selected one emphasized. Absolute document rects; an equal list repaints nothing.
+   */
+  setStagedRegions(regions: readonly StagedRegion[]): void;
+  /**
    * Display-only: shows a control layer as its kept original, the original under its map at half strength, or
-   * (`map`) as usual. One layer holds a view at a time; refused while the canvas is locked. Any edit or stroke on
-   * the layer, a selection change, a lock, a document replacement and the other resets in ARCHITECTURE.md return it
-   * to the map. Never recorded in history, persisted or exported.
+   * (`map`) as usual. One layer holds a view at a time; refused while an operation holds the document. Any edit or
+   * stroke on the layer, a selection change, an operation taking the document, a document replacement and the other
+   * resets in ARCHITECTURE.md return it to the map. Never recorded in history, persisted or exported.
    */
   setControlLayerView(layerId: string, view: ControlLayerViewMode): Promise<ControlLayerViewOutcome>;
 }
@@ -841,9 +873,18 @@ export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclu
 export interface StagedPreviewPlacement extends Rect {
   opacity: number;
 }
+/**
+ * A staged preview always lands at absolute document coordinates pinned at submission: a candidate at its placement,
+ * a progress frame (scaled to fill) at the rect its run was submitted with. Later bbox edits never move either.
+ */
 export type StagedPreviewInput =
-  | { imageName: string; placement?: StagedPreviewPlacement }
-  | { dataUrl: string; width: number; height: number };
+  | { imageName: string; placement: StagedPreviewPlacement }
+  | { dataUrl: string; placement: StagedPreviewPlacement };
+/** One pending result's landing rect in document space, for the staged-region overlay. */
+export interface StagedRegion {
+  readonly rect: Rect;
+  readonly selected: boolean;
+}
 export type {
   BboxToolOptions,
   BrushOptions,
@@ -1001,3 +1042,4 @@ export {
   resolveLayerThumbnailImageRef,
   type LayerThumbnailFallbackStage,
 } from './render/thumbnail';
+export { HISTORY_MAX_ENTRIES } from './history/history';

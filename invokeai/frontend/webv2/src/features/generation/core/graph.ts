@@ -21,7 +21,7 @@ import {
   coerceSchedulerForGraph,
   getExternalModeReason,
   getExternalProviderNodeType,
-  getFlux2DiffusersComponentSource,
+  getFlux2ComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
   isStrengthOnlyIPAdapterBase,
@@ -31,6 +31,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
@@ -758,8 +759,8 @@ const buildFlux2Graph = (
   projectSettings: GenerationProjectSettings
 ): BackendGraphContract => {
   const isDev = model.variant === 'dev';
-  const sourceModel = getFlux2DiffusersComponentSource(model, settings);
-  const hasBundledComponents = isBundledMainForBase('flux2')(model) || sourceModel;
+  const sourceModel = getFlux2ComponentSource(model, settings);
+  const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
   const mistralEncoderModel =
     settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
       ? settings.mistralEncoderModel
@@ -773,7 +774,7 @@ const buildFlux2Graph = (
 
   if (!hasBundledComponents && (!vaeModel || !encoderModel)) {
     throw new Error(
-      `FLUX.2 non-Diffusers models require a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a compatible Diffusers component source.`
+      `This FLUX.2 model needs a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a FLUX.2 pipeline its loader can take them from.`
     );
   }
 
@@ -1663,7 +1664,18 @@ const buildMossImageGraph = (
   // The denoise node reads the VAE's BatchNorm statistics, which define the latent space it works in.
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
-  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  // The layout node compiles a layout draft (e.g. from Expand Prompt) and canvas regions into the model's layout
+  // prompt at run time, and passes plain text through. Canvas fills `regions`; batch prompt variation still flows
+  // through `positive_prompt`.
+  const layoutPrompt = addNode(graph, {
+    height: denoiseSize.height,
+    id: 'layout_prompt',
+    regions: [],
+    type: 'moss_image_layout_prompt',
+    width: denoiseSize.width,
+  });
+  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1679,6 +1691,10 @@ const buildMossImageGraph = (
     vae: vaeModel ?? undefined,
     ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
   });
+  const metadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  if (metadata) {
+    addEdge(graph, layoutPrompt, 'value', metadata, 'moss_image_layout_prompt');
+  }
 
   return graph;
 };
@@ -1710,6 +1726,16 @@ const buildFlux3Graph = (
     type: 'flux3_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // FLUX.3 LoRAs change the transformer only. Klein and Klein Base share it, so either variant's LoRAs apply.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'flux3_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
+  // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
+  // flows through `positive_prompt`. Without regions the prompt passes through unchanged.
+  const layoutPrompt: BackendInvocationContract = addNode(graph, { id: 'layout_prompt', type: 'flux3_layout_prompt' });
   const posCond = addNode(graph, { id: 'pos_cond', type: 'flux3_text_encoder' });
   const negCond = useCfg ? addNode(graph, { id: 'neg_cond', type: 'flux3_text_encoder' }) : null;
   const denoiseSize = getDenoiseSize(settings, model);
@@ -1736,10 +1762,11 @@ const buildFlux3Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
-  addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+  addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');
+  addEdge(graph, layoutPrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
 
   if (negCond) {
@@ -1750,6 +1777,14 @@ const buildFlux3Graph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addFluxKontextReferenceImages(graph, settings, denoise, 'flux2_reference_image');
+  // With reference images FLUX.3 edits them, and its boxes mark where new content goes in the output.
+  if (
+    graph.edges.some(
+      (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'kontext_conditioning'
+    )
+  ) {
+    layoutPrompt.edit_targets = true;
+  }
   addMetadata(graph, output, settings, model, 'flux3_txt2img', projectSettings, {
     // FLUX.3 offers no scheduler: its denoise node always runs the reference Euler sampler.
     scheduler: 'euler',
@@ -1822,7 +1857,7 @@ const buildIdeogram4Graph = (
   addEdge(graph, posCond, 'conditioning', denoise, 'positive_conditioning');
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
+  const metadata = addMetadata(graph, output, settings, model, 'ideogram4_txt2img', projectSettings, {
     ideogram4_color_palette: settings.ideogram4ColorPalette,
     ideogram4_guidance_scale: settings.ideogram4GuidanceScale ?? undefined,
     ideogram4_mu: settings.ideogram4Mu ?? undefined,
@@ -1833,6 +1868,8 @@ const buildIdeogram4Graph = (
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
+  // Record the caption the encoder saw; the positive prompt alone does not show regions or palette.
+  addEdge(graph, captionBuilder, 'value', metadata, 'ideogram4_caption');
 
   return graph;
 };

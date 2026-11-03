@@ -105,13 +105,39 @@ export interface QueueCoordinatorCallbacks {
   onGalleryRefresh(): void;
 }
 
-type TerminalOutcome = { status: 'completed' } | { status: 'failed'; error: string } | { status: 'canceled' };
+/**
+ * Why a backend item failed: the error the backend reported, a failure it gave no reason for, or the item vanishing
+ * from the queue (a clear deletes rows without a terminal event).
+ */
+export type QueueItemFailureCause = 'removed' | 'reported' | 'unexplained';
+
+type TerminalOutcome =
+  | { status: 'completed' }
+  | { cause: QueueItemFailureCause; error: string; status: 'failed' }
+  | { status: 'canceled' };
 
 /** Thrown by `waitForResults` when the backend reports the run was canceled. */
 export class QueueItemCancelledError extends Error {
   constructor(localQueueItemId: string) {
     super(`Queue item ${localQueueItemId} was canceled.`);
     this.name = 'QueueItemCancelledError';
+  }
+}
+
+/**
+ * Thrown by `waitForResults` when backend items of the run failed. `message` and `failure` describe a representative
+ * failure; `failedBackendItemIds` names every item that genuinely failed, so the failure notice can show and retry
+ * them all. Empty when the run's items only vanished (`failure: 'removed'`).
+ */
+export class QueueItemFailedError extends Error {
+  readonly failedBackendItemIds: readonly number[];
+  readonly failure: QueueItemFailureCause;
+
+  constructor(failedBackendItemIds: readonly number[], message: string, failure: QueueItemFailureCause) {
+    super(message);
+    this.failedBackendItemIds = failedBackendItemIds;
+    this.failure = failure;
+    this.name = 'QueueItemFailedError';
   }
 }
 
@@ -179,6 +205,8 @@ interface RunState {
   backendItemIds: number[];
   backendBatchId?: string;
   outcomePromises: Promise<TerminalOutcome>[];
+  /** Routing still in flight for completed items; a failure waits for it so their results are not dropped. */
+  pendingRouting: Set<Promise<unknown>>;
 }
 
 interface RunProgressState {
@@ -213,7 +241,11 @@ const toTerminalOutcome = (
   }
 
   if (status === 'failed') {
-    return { error: error ?? errorType ?? 'Generation failed.', status: 'failed' };
+    const reason = error ?? errorType;
+
+    return reason
+      ? { cause: 'reported', error: reason, status: 'failed' }
+      : { cause: 'unexplained', error: 'Generation failed.', status: 'failed' };
   }
 
   return { status: 'canceled' };
@@ -600,9 +632,12 @@ export const createQueueCoordinator = (
         // Keep following until routing lands; terminal events precede finished-image selection by network round
         // trips.
         activeProgressTarget.settle(progressTarget);
-        void Promise.resolve(routingPromise)
+        const routing = Promise.resolve(routingPromise)
           .finally(releaseProgressSlot)
           .catch(() => undefined);
+        const pendingRouting = runs.get(wait.localQueueItemId)?.pendingRouting;
+        pendingRouting?.add(routing);
+        void routing.finally(() => pendingRouting?.delete(routing));
       } else {
         releaseProgressSlot();
       }
@@ -688,6 +723,7 @@ export const createQueueCoordinator = (
       outcomePromises: backendItemIds.map((backendItemId) =>
         trackBackendItem(localQueueItemId, backendItemId, trackingContext)
       ),
+      pendingRouting: new Set(),
     });
 
     publishRunProgress(localQueueItemId);
@@ -725,6 +761,7 @@ export const createQueueCoordinator = (
         } catch (error) {
           if (isActive() && error instanceof ApiError && error.status === 404) {
             settleWait(backendItemId, {
+              cause: 'removed',
               error: `Queue item ${backendItemId} is no longer on the backend queue.`,
               status: 'failed',
             });
@@ -1210,10 +1247,20 @@ export const createQueueCoordinator = (
 
     try {
       const outcomes = await Promise.all(run.outcomePromises);
-      const failure = outcomes.find((outcome) => outcome.status === 'failed');
+      // A genuine failure explains the run better than an item that vanished beside it, and leaves something to retry.
+      const isGenuineFailure = (outcome: TerminalOutcome | undefined) =>
+        outcome?.status === 'failed' && outcome.cause !== 'removed';
+      const failedBackendItemIds = run.backendItemIds.filter((_backendItemId, index) =>
+        isGenuineFailure(outcomes[index])
+      );
+      const failure = outcomes.find(isGenuineFailure) ?? outcomes.find((outcome) => outcome.status === 'failed');
 
-      if (failure) {
-        throw new Error(failure.error);
+      if (failure?.status === 'failed') {
+        // The failed status ends routing; let completed siblings' results land first. No timeout bounds this: it waits
+        // on the same result reads the success path awaits, and a route started before dispose still finishes or
+        // fails with its request (unstarted routes are released when the runtime goes inactive).
+        await Promise.all(run.pendingRouting);
+        throw new QueueItemFailedError(failedBackendItemIds, failure.error, failure.cause);
       }
 
       const completedBackendItemIds = run.backendItemIds.filter(

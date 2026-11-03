@@ -65,6 +65,7 @@ vi.mock('@tanstack/react-query', () => ({
 
 vi.mock('@workbench/widgetState', () => ({
   getProjectWidgetValues: () => mocks.galleryValues,
+  getResolvedProjectWidgetValues: () => mocks.galleryValues,
 }));
 
 vi.mock('@workbench/WorkbenchContext', () => ({

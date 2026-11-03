@@ -18,8 +18,11 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewComparisonMode } from './previewSettings';
 
+import { previewStageStore } from './previewHeaderStore';
 import { getFittedFrameCss, PreviewStage } from './PreviewStage';
 import { useCompareLoupe, type CompareLoupePane } from './useCompareLoupe';
+
+const { setStageElement } = previewStageStore;
 
 const COMPARISON_MODES: { labelKey: string; value: PreviewComparisonMode }[] = [
   { labelKey: 'widgets.preview.slider', value: 'slider' },
@@ -153,7 +156,8 @@ export const PreviewCompare = ({
 
   return (
     <Stack gap="3" h="full" minH="0" w="full">
-      <PreviewStage fill="flex" padding="6">
+      {/* Details pins to this stage, above the mode controls, as it pins to the single item's. */}
+      <PreviewStage ref={setStageElement} fill="flex" padding="6">
         {mode === 'slider' ? (
           // Use a plain frame for capture/drag behavior without introducing FittedFrame's shadow.
           <Box

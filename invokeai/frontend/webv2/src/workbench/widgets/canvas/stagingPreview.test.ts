@@ -2,13 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 
+const placement = { height: 240, opacity: 0.4, width: 320, x: 11, y: 17 };
+const submitted = { height: 512, width: 512, x: -40, y: 64 };
+const frame = { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 };
 const base = {
-  bboxHeight: 512,
-  bboxWidth: 512,
-  isGenerationInFlight: false,
   isVisible: true,
   progressImage: null,
-  selectedImageName: null,
+  progressRect: null,
+  selectedCandidate: null,
 } as const;
 
 describe('selectStagedPreviewSource', () => {
@@ -16,68 +17,37 @@ describe('selectStagedPreviewSource', () => {
     expect(selectStagedPreviewSource(base)).toBeNull();
   });
 
-  it('returns the selected candidate when visible and present', () => {
-    expect(selectStagedPreviewSource({ ...base, selectedImageName: 'img-1' })).toEqual({ imageName: 'img-1' });
-  });
-
-  it('carries the selected candidate placement into the image preview', () => {
-    const placement = { height: 240, opacity: 0.4, width: 320, x: 11, y: 17 };
-
-    expect(
-      selectStagedPreviewSource({
-        ...base,
-        selectedImageName: 'img-1',
-        selectedPlacement: placement,
-      })
-    ).toEqual({ imageName: 'img-1', placement });
+  it('returns the selected candidate at its placement when visible', () => {
+    expect(selectStagedPreviewSource({ ...base, selectedCandidate: { imageName: 'img-1', placement } })).toEqual({
+      imageName: 'img-1',
+      placement,
+    });
   });
 
   it('returns null for a selected candidate when the preview is hidden', () => {
-    expect(selectStagedPreviewSource({ ...base, isVisible: false, selectedImageName: 'img-1' })).toBeNull();
-  });
-
-  it('returns the selected candidate even while another canvas slot is generating', () => {
     expect(
-      selectStagedPreviewSource({
-        ...base,
-        isGenerationInFlight: true,
-        progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
-        selectedImageName: 'img-1',
-      })
-    ).toEqual({ imageName: 'img-1' });
+      selectStagedPreviewSource({ ...base, isVisible: false, selectedCandidate: { imageName: 'img-1', placement } })
+    ).toBeNull();
   });
 
-  it('returns the selected placeholder progress frame while generating, scaled to fill the bbox', () => {
-    const source = selectStagedPreviewSource({
-      ...base,
-      isGenerationInFlight: true,
-      progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
+  it('pins the selected placeholder progress frame to its submitted rect, scaled to fill it', () => {
+    // The submitted rect, not the frame's native 64x64 and not wherever the bbox is now.
+    expect(selectStagedPreviewSource({ ...base, progressImage: frame, progressRect: submitted })).toEqual({
+      dataUrl: frame.dataUrl,
+      placement: { ...submitted, opacity: 1 },
     });
-
-    // Fills the bbox dims (512x512), not the progress frame's native 64x64.
-    expect(source).toEqual({ dataUrl: 'data:image/png;base64,AAAA', height: 512, width: 512 });
   });
 
-  it('falls back to the candidate once generation settles (no progress frame)', () => {
+  it('shows the progress frame while the candidate preview is hidden', () => {
     expect(
-      selectStagedPreviewSource({
-        ...base,
-        isGenerationInFlight: true,
-        progressImage: null,
-        selectedImageName: 'img-1',
-      })
-    ).toEqual({ imageName: 'img-1' });
+      selectStagedPreviewSource({ ...base, isVisible: false, progressImage: frame, progressRect: submitted })
+    ).toEqual({ dataUrl: frame.dataUrl, placement: { ...submitted, opacity: 1 } });
   });
 
-  it('ignores a progress frame when the bbox has no area', () => {
+  it('ignores a progress frame without a rect with area', () => {
+    expect(selectStagedPreviewSource({ ...base, progressImage: frame })).toBeNull();
     expect(
-      selectStagedPreviewSource({
-        ...base,
-        bboxHeight: 0,
-        bboxWidth: 0,
-        isGenerationInFlight: true,
-        progressImage: { dataUrl: 'data:image/png;base64,AAAA', height: 64, width: 64 },
-      })
+      selectStagedPreviewSource({ ...base, progressImage: frame, progressRect: { ...submitted, width: 0 } })
     ).toBeNull();
   });
 });
@@ -85,23 +55,26 @@ describe('selectStagedPreviewSource', () => {
 describe('stagedPreviewKey', () => {
   it('is stable per source and distinguishes the source kinds', () => {
     expect(stagedPreviewKey(null)).toBe('none');
-    expect(stagedPreviewKey({ imageName: 'a' })).toBe('image:a');
-    expect(stagedPreviewKey({ imageName: 'a' })).not.toBe(stagedPreviewKey({ imageName: 'b' }));
+    expect(stagedPreviewKey({ imageName: 'a', placement })).toBe(stagedPreviewKey({ imageName: 'a', placement }));
+    expect(stagedPreviewKey({ imageName: 'a', placement })).not.toBe(stagedPreviewKey({ imageName: 'b', placement }));
     // A new progress frame (different data URL) yields a new key so the effect re-fires.
-    expect(stagedPreviewKey({ dataUrl: 'AA', height: 8, width: 8 })).not.toBe(
-      stagedPreviewKey({ dataUrl: 'BB', height: 8, width: 8 })
-    );
+    expect(stagedPreviewKey({ dataUrl: 'AA', placement })).not.toBe(stagedPreviewKey({ dataUrl: 'BB', placement }));
   });
 
-  it('includes every image placement field', () => {
-    const placement = { height: 240, opacity: 0.4, width: 320, x: 11, y: 17 };
+  it('includes every placement field', () => {
     const original = stagedPreviewKey({ imageName: 'a', placement });
 
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a' }));
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, x: 12 } }));
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, y: 18 } }));
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, width: 321 } }));
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, height: 241 } }));
-    expect(original).not.toBe(stagedPreviewKey({ imageName: 'a', placement: { ...placement, opacity: 0.5 } }));
+    for (const changed of [
+      { ...placement, x: 12 },
+      { ...placement, y: 18 },
+      { ...placement, width: 321 },
+      { ...placement, height: 241 },
+      { ...placement, opacity: 0.5 },
+    ]) {
+      expect(stagedPreviewKey({ imageName: 'a', placement: changed })).not.toBe(original);
+      expect(stagedPreviewKey({ dataUrl: 'AA', placement: changed })).not.toBe(
+        stagedPreviewKey({ dataUrl: 'AA', placement })
+      );
+    }
   });
 });

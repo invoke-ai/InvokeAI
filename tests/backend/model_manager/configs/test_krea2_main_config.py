@@ -15,13 +15,16 @@ from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock, patch
 
 import pytest
+import torch
+from safetensors.torch import save_file
 
 from invokeai.backend.architectures import resolve_default_settings
-from invokeai.backend.model_manager.configs.identification_utils import NotAMatchError
+from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.main import (
     _get_krea2_variant_from_name,
     _has_krea2_keys,
 )
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType
 
 # Required fields for the Pydantic config models (mirrors the other config-probe tests).
@@ -195,6 +198,88 @@ class TestKrea2CheckpointVariantDetection:
 
         with pytest.raises(NotAMatchError, match="safetensors"):
             Main_Checkpoint_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+
+class TestKrea2CheckpointQuantizationAtInstall:
+    """What the loader would refuse is refused at install, with the format named: an int8 layer the file marks as
+    something Krea-2 does not decode, or marks only ambiguously in its header. The int4 builds install. Driven
+    through a real `ModelOnDisk` over a real file: identification reads the markers from the file, because its
+    state dict is on the meta device."""
+
+    @staticmethod
+    def _mod(tmp_path: Path, layers: dict[str, dict | None], header: dict[str, dict] | None = None) -> ModelOnDisk:
+        """One int8 layer per entry of `layers`, with that per-tensor marker (None: none), and `header` as the
+        `_quantization_metadata` layers."""
+        state_dict: dict[str, torch.Tensor] = {}
+        for path, marker in layers.items():
+            state_dict[f"{path}.weight"] = torch.zeros(4, 128, dtype=torch.int8)
+            state_dict[f"{path}.weight_scale"] = torch.ones(4)
+            if marker is not None:
+                raw = json.dumps(marker).encode("utf-8")
+                state_dict[f"{path}.comfy_quant"] = torch.frombuffer(bytearray(raw), dtype=torch.uint8).clone()
+        metadata = {"_quantization_metadata": json.dumps({"layers": header})} if header else None
+        path = tmp_path / "krea2_turbo_int4.safetensors"
+        save_file(state_dict, path, metadata=metadata)
+        return ModelOnDisk(path, "random")
+
+    @staticmethod
+    def _identify(mod: ModelOnDisk):
+        from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Krea2_Config
+
+        with (
+            patch("invokeai.backend.model_manager.configs.main._has_krea2_keys", return_value=True),
+            patch("invokeai.backend.model_manager.configs.main.raise_for_override_fields"),
+        ):
+            return Main_Checkpoint_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+    @pytest.mark.parametrize(
+        ("marker", "header"),
+        [
+            pytest.param(None, {"blocks.0.attn.wq": {"format": "convrot_w4a4"}}, id="header only, Starnodes"),
+            pytest.param({"format": "int4_tensorwise", "convrot": True}, None, id="per-tensor, comfy-quants"),
+        ],
+    )
+    def test_an_int4_build_installs(self, tmp_path: Path, marker: dict | None, header: dict | None) -> None:
+        mod = self._mod(tmp_path, {"blocks.0.attn.wq": marker}, header)
+
+        assert self._identify(mod).variant == Krea2VariantType.Turbo
+
+    def test_a_header_naming_its_layers_without_the_checkpoint_prefix_still_names_them(self, tmp_path: Path) -> None:
+        """The loader compares both after stripping the prefix, so identification has to as well."""
+        mod = self._mod(
+            tmp_path, {"model.diffusion_model.blocks.0.attn.wq": None}, {"blocks.0.attn.wq": {"format": "convrot_w4a4"}}
+        )
+
+        assert self._identify(mod).variant == Krea2VariantType.Turbo
+
+    def test_a_format_krea2_does_not_decode_is_refused_by_name(self, tmp_path: Path) -> None:
+        mod = self._mod(tmp_path, {"blocks.0.attn.wq": None}, {"blocks.0.attn.wq": {"format": "asym_w4a8_int8"}})
+
+        with pytest.raises(InvalidMatchError, match="marked 'asym_w4a8_int8'"):
+            self._identify(mod)
+
+    def test_a_per_tensor_marker_wins_over_the_header_as_it_does_at_load(self, tmp_path: Path) -> None:
+        mod = self._mod(
+            tmp_path,
+            {"blocks.0.attn.wq": {"format": "asym_w4a8_int8"}},
+            {"blocks.0.attn.wq": {"format": "convrot_w4a4"}},
+        )
+
+        with pytest.raises(InvalidMatchError, match="marked 'asym_w4a8_int8'"):
+            self._identify(mod)
+
+    def test_a_header_entry_that_does_not_say_whether_the_layer_was_rotated_is_refused(self, tmp_path: Path) -> None:
+        mod = self._mod(tmp_path, {"blocks.0.attn.wq": None}, {"blocks.0.attn.wq": {"format": "int8_tensorwise"}})
+
+        with pytest.raises(InvalidMatchError, match="does not say whether the weight was rotated"):
+            self._identify(mod)
+
+    def test_the_final_block_projections_the_loader_drops_are_not_checked(self, tmp_path: Path) -> None:
+        """One repack quantizes `last.up` in a scheme of its own; the loader discards that layer before it reads any
+        marker, so it loads, and refusing it here would refuse a file that works."""
+        mod = self._mod(tmp_path, {"blocks.0.attn.wq": {"format": "int4_tensorwise", "convrot": True}, "last.up": None})
+
+        assert self._identify(mod).variant == Krea2VariantType.Turbo
 
 
 class TestKrea2DiffusersVariantDetection:

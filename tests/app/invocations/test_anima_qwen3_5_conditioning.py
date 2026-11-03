@@ -5,8 +5,6 @@ step, with that step's sigma -- in float32, because the connector scales sigma b
 it -- while every other Anima model keeps computing its context once.
 """
 
-import subprocess
-import sys
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -77,23 +75,8 @@ def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer
     assert mask.tolist() == [True, True, True]
 
 
-@pytest.mark.platform_independent
-def test_the_qwen3_5_prompt_nodes_do_not_import_transformers_qwen3_5_at_startup() -> None:
-    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it.
-
-    Anima's and MOSS-Image's prompt nodes share the one cold interpreter this needs.
-    """
-    program = (
-        "import sys\n"
-        "import invokeai.app.invocations.text_encoder.anima_text_encoder\n"
-        "import invokeai.app.invocations.text_encoder.moss_image_text_encoder\n"
-        "loaded = [m for m in sys.modules if m.startswith('transformers.models.qwen3_5')]\n"
-        "assert not loaded, loaded\n"
-        "print('OK')\n"
-    )
-    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=300)
-    assert result.returncode == 0, f"stderr:\n{result.stderr[-3000:]}"
-    assert "OK" in result.stdout
+# That the prompt nodes leave transformers' Qwen3.5 modeling unloaded at startup is checked for every node module in
+# `test_node_discovery.py`.
 
 
 def test_an_empty_prompt_is_one_masked_padding_token(monkeypatch) -> None:

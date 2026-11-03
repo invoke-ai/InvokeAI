@@ -27,7 +27,7 @@ await i18n.use(initReactI18next).init({
             expandReferenceImage: 'Expand reference image',
             moveReferenceImageDown: 'Move reference image down',
             moveReferenceImageUp: 'Move reference image up',
-            referenceImage: 'Reference Image',
+            referenceImageNumbered: 'Reference image {{index}}',
             removeReferenceImage: 'Remove reference image',
           },
         },

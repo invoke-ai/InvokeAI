@@ -1,4 +1,4 @@
-import type { QueueItem } from '@features/queue/core/historyTypes';
+import type { QueueItem, QueueRunErrorCode } from '@features/queue/core/historyTypes';
 import type {
   QueueBackendPort,
   QueueEnqueueGenerateRequest,
@@ -9,6 +9,7 @@ import type {
   QueueResultVideo,
   QueueRunOrigin,
 } from '@features/queue/core/types';
+import type { QueueCancelRequestPort } from '@features/queue/runtime/cancelRequests';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import { collectSubmissionInputMediaNames, type SubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
@@ -22,6 +23,7 @@ import {
 } from '@features/queue/core/promptBatch';
 import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
+  buildQueueItemOrigin,
   isTerminalBackendStatus,
   isUtilityQueueItemOrigin,
   parseQueueItemOrigin,
@@ -34,6 +36,7 @@ import {
   createQueueCoordinator,
   QueueEnqueueNotAcceptedError,
   QueueItemCancelledError,
+  QueueItemFailedError,
   type QueueCoordinator,
   type QueueModelLoadPort,
   type QueueNodeExecutionPort,
@@ -133,6 +136,10 @@ export interface QueueHistoryCommands {
   }): void;
   setStatus(payload: {
     error?: string;
+    /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
+    errorCode?: QueueRunErrorCode;
+    /** The backend items whose failure ended the run, so the failure notice can show and retry them. */
+    failedBackendItemIds?: readonly number[];
     notify?: boolean;
     projectId: string;
     queueItemId: string;
@@ -427,8 +434,11 @@ const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
 const isDeterministicServerError = (error: unknown): boolean =>
   error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
 
+const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
+
 export const createQueueRuntime = ({
   backend,
+  cancelRequests = NO_CANCEL_REQUESTS,
   destinations,
   ensureProjectPersisted,
   ensureTemplatesLoaded,
@@ -440,6 +450,8 @@ export const createQueueRuntime = ({
   viewerUserId = null,
 }: {
   backend: QueueBackendPort;
+  /** Cancels this tab already announced; a run they end reports no outcome of its own. */
+  cancelRequests?: QueueCancelRequestPort;
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
   ensureTemplatesLoaded: () => void;
@@ -1165,13 +1177,45 @@ export const createQueueRuntime = ({
         return;
       }
 
+      // A cancel or clear this tab asked for already said so; the run ending is no news.
+      const wasRequestedHere = () =>
+        cancelRequests.wasRequestedHere({
+          backendBatchId: getRouteTarget(history, queueItem.id)?.queueItem?.backendBatchId,
+          backendItemIds,
+          origin: buildQueueItemOrigin(queueItem.id, projectId),
+          submittedAt: queueItem.snapshot.submittedAt,
+        });
+
       if (error instanceof QueueItemCancelledError) {
-        commands.setStatus({ projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        commands.setStatus({ notify: !wasRequestedHere(), projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        return;
+      }
+
+      // A clear deletes rows without a terminal event; the run vanished rather than failed, and there is nothing left
+      // to show or retry.
+      if (error instanceof QueueItemFailedError && error.failure === 'removed') {
+        if (wasRequestedHere()) {
+          commands.setStatus({ notify: false, projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        } else {
+          commands.setStatus({
+            error: error.message,
+            errorCode: 'removed',
+            projectId,
+            queueItemId: queueItem.id,
+            status: 'failed',
+          });
+        }
         return;
       }
 
       commands.setStatus({
         error: toErrorMessage(error),
+        ...(error instanceof QueueItemFailedError
+          ? {
+              failedBackendItemIds: error.failedBackendItemIds,
+              ...(error.failure === 'unexplained' ? { errorCode: 'unexplained' as const } : {}),
+            }
+          : {}),
         projectId,
         queueItemId: queueItem.id,
         status: 'failed',
@@ -1811,6 +1855,7 @@ export const createQueueRuntime = ({
       settleRun(project.id, currentQueueItem.id);
       commands.setStatus({
         error: 'This run was not submitted because its project cannot be saved.',
+        errorCode: 'project-not-saved',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1822,6 +1867,7 @@ export const createQueueRuntime = ({
     if (submission.kind === 'invalid') {
       commands.setStatus({
         error: submission.error,
+        errorCode: 'invalid-submission',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1890,6 +1936,7 @@ export const createQueueRuntime = ({
             settleRun(project.id, currentQueueItem.id);
             commands.setStatus({
               error: error.message,
+              errorCode: 'not-accepted',
               projectId: project.id,
               queueItemId: currentQueueItem.id,
               status: 'failed',
@@ -2244,6 +2291,7 @@ export const createQueueRuntime = ({
               if (exhaustedServerError !== undefined) {
                 commands.setStatus({
                   error: exhaustedServerError,
+                  errorCode: 'server-error',
                   projectId: project.id,
                   queueItemId: currentQueueItem.id,
                   status: 'failed',
@@ -2281,6 +2329,7 @@ export const createQueueRuntime = ({
               }
               commands.setStatus({
                 error: 'This run is no longer on the backend queue (it may have been cleared).',
+                errorCode: 'removed',
                 notify: false,
                 projectId: project.id,
                 queueItemId: currentQueueItem.id,
