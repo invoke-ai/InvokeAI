@@ -2,11 +2,13 @@ import { CompositeNumberInput, CompositeSlider, FormControl, FormLabel, Switch }
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
 import { InformationalPopover } from 'common/components/InformationalPopover/InformationalPopover';
 import {
+  selectHiDiffusionAutoRatios,
   selectHiDiffusionEnabled,
   selectHiDiffusionRauNetEnabled,
   selectHiDiffusionT1Ratio,
   selectHiDiffusionT2Ratio,
   selectHiDiffusionWindowAttnEnabled,
+  setHiDiffusionAutoRatios,
   setHiDiffusionEnabled,
   setHiDiffusionRauNetEnabled,
   setHiDiffusionT1Ratio,
@@ -118,16 +120,62 @@ const RATIO_CONSTRAINTS = {
   },
 } as const;
 
-export const ParamHiDiffusionT1Ratio = memo(() => {
+export const ParamHiDiffusionAutoRatiosToggle = memo(() => {
   const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
-  const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
+  const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const onChange = useCallback((value: number) => dispatch(setHiDiffusionT1Ratio(value)), [dispatch]);
+  const onChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      dispatch(setHiDiffusionAutoRatios(event.target.checked));
+    },
+    [dispatch]
+  );
 
   return (
-    <FormControl isDisabled={!hiDiffusionEnabled} gridColumn="1 / -1">
+    <FormControl>
+      <InformationalPopover feature="hidiffusionRatiosAuto">
+        <FormLabel maxW="100%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
+          {t('parameters.hiDiffusionRatiosAuto')}
+        </FormLabel>
+      </InformationalPopover>
+      <Switch
+        isChecked={hiDiffusionAutoRatios}
+        isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled}
+        onChange={onChange}
+      />
+    </FormControl>
+  );
+});
+
+ParamHiDiffusionAutoRatiosToggle.displayName = 'ParamHiDiffusionAutoRatiosToggle';
+
+export const ParamHiDiffusionT1Ratio = memo(() => {
+  const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
+  const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
+  const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
+  const hiDiffusionT2Ratio = useAppSelector(selectHiDiffusionT2Ratio);
+  const dispatch = useAppDispatch();
+  const { t } = useTranslation();
+
+  const onChange = useCallback(
+    (value: number) => {
+      dispatch(setHiDiffusionT1Ratio(value));
+      if (hiDiffusionT2Ratio > value) {
+        dispatch(setHiDiffusionT2Ratio(value));
+      }
+    },
+    [dispatch, hiDiffusionT2Ratio]
+  );
+
+  return (
+    <FormControl
+      isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled || hiDiffusionAutoRatios}
+      gridColumn="1 / -1"
+    >
       <InformationalPopover feature="hidiffusionT1Ratio">
         <FormLabel minW="9rem" maxW="100%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
           {t('parameters.hiDiffusionT1Ratio')}
@@ -160,6 +208,9 @@ ParamHiDiffusionT1Ratio.displayName = 'ParamHiDiffusionT1Ratio';
 
 export const ParamHiDiffusionT2Ratio = memo(() => {
   const hiDiffusionEnabled = useAppSelector(selectHiDiffusionEnabled);
+  const hiDiffusionRauNetEnabled = useAppSelector(selectHiDiffusionRauNetEnabled);
+  const hiDiffusionAutoRatios = useAppSelector(selectHiDiffusionAutoRatios);
+  const hiDiffusionT1Ratio = useAppSelector(selectHiDiffusionT1Ratio);
   const hiDiffusionT2Ratio = useAppSelector(selectHiDiffusionT2Ratio);
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
@@ -167,7 +218,10 @@ export const ParamHiDiffusionT2Ratio = memo(() => {
   const onChange = useCallback((value: number) => dispatch(setHiDiffusionT2Ratio(value)), [dispatch]);
 
   return (
-    <FormControl isDisabled={!hiDiffusionEnabled} gridColumn="1 / -1">
+    <FormControl
+      isDisabled={!hiDiffusionEnabled || !hiDiffusionRauNetEnabled || hiDiffusionAutoRatios}
+      gridColumn="1 / -1"
+    >
       <InformationalPopover feature="hidiffusionT2Ratio">
         <FormLabel minW="9rem" maxW="100%" whiteSpace="nowrap" overflow="hidden" textOverflow="ellipsis">
           {t('parameters.hiDiffusionT2Ratio')}
@@ -177,7 +231,7 @@ export const ParamHiDiffusionT2Ratio = memo(() => {
         value={hiDiffusionT2Ratio}
         defaultValue={RATIO_CONSTRAINTS.t2.initial}
         min={RATIO_CONSTRAINTS.t2.sliderMin}
-        max={RATIO_CONSTRAINTS.t2.sliderMax}
+        max={hiDiffusionT1Ratio}
         step={RATIO_CONSTRAINTS.t2.coarseStep}
         fineStep={RATIO_CONSTRAINTS.t2.fineStep}
         onChange={onChange}
@@ -187,7 +241,7 @@ export const ParamHiDiffusionT2Ratio = memo(() => {
         value={hiDiffusionT2Ratio}
         defaultValue={RATIO_CONSTRAINTS.t2.initial}
         min={RATIO_CONSTRAINTS.t2.numberInputMin}
-        max={RATIO_CONSTRAINTS.t2.numberInputMax}
+        max={hiDiffusionT1Ratio}
         step={RATIO_CONSTRAINTS.t2.coarseStep}
         fineStep={RATIO_CONSTRAINTS.t2.fineStep}
         onChange={onChange}
