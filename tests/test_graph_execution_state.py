@@ -5859,7 +5859,7 @@ def test_get_collect_iteration_mapping_groups_ignores_skipped_prepared_exec_node
 
     mappings = g._materializer()._get_collect_iteration_mapping_groups(graph._get_input_edges("collect"))
 
-    assert mappings == [((), [("parent", active_exec_id)])]
+    assert mappings == [((), (), [("parent", active_exec_id)])]
 
 
 def test_get_iteration_node_ignores_skipped_prepared_exec_nodes():

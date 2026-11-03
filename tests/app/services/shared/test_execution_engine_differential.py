@@ -14952,3 +14952,290 @@ def test_two_literal_if_sibling_wrappers_share_one_group_with_selected_for(
     root_values = outputs[()]
     assert len(root_values) == 3
     assert root_values == ["s0", "s1", "s2"]
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("with_literal_if", [False, True], ids=["plain", "literal-if"])
+def test_parallel_root_iterates_collect_each_pair_with_both_values_from_third_iterate(
+    force_compatibility_scheduler: bool, with_literal_if: bool
+) -> None:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="a_source", first=[0, 1]),
+        IterateInvocation(id="a"),
+        CollectionConcatInvocation(id="b_source", first=[10, 20, 30]),
+        IterateInvocation(id="b"),
+        CollectionConcatInvocation(id="c_source", first=[100, 200]),
+        IterateInvocation(id="c"),
+        AddInvocation(id="pair"),
+        AddInvocation(id="consumer"),
+        CollectInvocation(id="collect"),
+        AnyTypeTestInvocation(id="downstream"),
+    ]
+    edges: list[Any] = [
+        ("a_source", "collection", "a", "collection"),
+        ("b_source", "collection", "b", "collection"),
+        ("c_source", "collection", "c", "collection"),
+        ("a", "item", "pair", "a"),
+        ("b", "item", "pair", "b"),
+        ("pair", "value", "consumer", "a"),
+        ("c", "item", "consumer", "b"),
+    ]
+    if with_literal_if:
+        nodes.append(IfInvocation(id="literal_if", condition=True))
+        edges.extend([("consumer", "value", "literal_if", "true_input"), ("literal_if", "value", "collect", "item")])
+    else:
+        edges.append(("consumer", "value", "collect", "item"))
+    edges.append(("collect", "collection", "downstream", "value"))
+    graph = _graph_from(
+        nodes,
+        edges,
+    )
+    state = GraphExecutionState(graph=graph)
+    if not force_compatibility_scheduler:
+        state._execution_scheduler = _GenericGraphSchedulerAdapter(state)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    if not force_compatibility_scheduler:
+        assert isinstance(state._execution_scheduler, _GenericGraphSchedulerAdapter)
+    collect_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("collect")
+    ]
+    assert sorted(collect_runs) == [
+        ((a_index, b_index), [a + b + 100, a + b + 200])
+        for a_index, a in enumerate((0, 1))
+        for b_index, b in enumerate((10, 20, 30))
+    ]
+    assert len(state._prepared_registry().get_prepared_ids("pair")) == 6
+    assert len(state._prepared_registry().get_prepared_ids("consumer")) == 12
+    assert len(state._prepared_registry().get_prepared_ids("downstream")) == 6
+    assert all(path != (2,) for path, _ in collect_runs)
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize(
+    ("source", "expected_col1", "expected_col2"),
+    [
+        ([[["a"], []]], [((0,), [["t:a"], []])], [((), [[["t:a"], []]])]),
+        (
+            [[["a", "c"]], []],
+            [((0,), [["t:a", "t:c"]]), ((1,), [[]])],
+            [((), [[["t:a", "t:c"]], [[]]])],
+        ),
+        (
+            [[["a"]], [], [["b"]]],
+            [((0,), [["t:a"]]), ((1,), [[]]), ((2,), [["t:b"]])],
+            [((), [[["t:a"]], [[]], [["t:b"]]])],
+        ),
+    ],
+)
+def test_three_nested_iterates_collect_chains_preserve_every_ordered_execution(
+    force_compatibility_scheduler: bool,
+    source: list[Any],
+    expected_col1: list[tuple[tuple[int, ...], Any]],
+    expected_col2: list[tuple[tuple[int, ...], Any]],
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(id="source", first=source),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="c0"),
+            IterateInvocation(id="it1"),
+            CollectionConcatInvocation(id="c1"),
+            IterateInvocation(id="it2"),
+            MarkedAnyTypeTestInvocation(id="mark", marker="t:"),
+            CollectInvocation(id="col0"),
+            CollectInvocation(id="col1"),
+            CollectInvocation(id="col2"),
+        ],
+        [
+            ("source", "collection", "it0", "collection"),
+            ("it0", "item", "c0", "first"),
+            ("c0", "collection", "it1", "collection"),
+            ("it1", "item", "c1", "first"),
+            ("c1", "collection", "it2", "collection"),
+            ("it2", "item", "mark", "value"),
+            ("mark", "value", "col0", "item"),
+            ("col0", "collection", "col1", "item"),
+            ("col1", "collection", "col2", "item"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if not force_compatibility_scheduler:
+        state._execution_scheduler = _GenericGraphSchedulerAdapter(state)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    if not force_compatibility_scheduler:
+        assert isinstance(state._execution_scheduler, _GenericGraphSchedulerAdapter)
+
+    def records(node: str) -> list[tuple[tuple[int, ...], Any]]:
+        return [
+            (state._get_iteration_path(exec_id), getattr(state.results[exec_id], "collection", None))
+            for exec_id in state._prepared_registry().get_prepared_ids(node)
+        ]
+
+    assert len(records("col1")) == len(expected_col1)
+    assert sorted(records("col1"), key=lambda record: (record[0], repr(record[1]))) == sorted(
+        expected_col1, key=lambda record: (record[0], repr(record[1]))
+    )
+    assert len(records("col2")) == 1
+    assert records("col2") == expected_col2
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+@pytest.mark.parametrize("if_variant", ["plain", "literal", "wired"], ids=["plain", "literal-if", "wired-if"])
+@pytest.mark.parametrize("with_root_item", [False, True], ids=["no-root-S", "root-S"])
+def test_root_item_and_nested_collect_iterate_out2_keep_exact_groups(
+    force_compatibility_scheduler: bool, if_variant: str, with_root_item: bool
+) -> None:
+    nodes: list[Any] = [
+        CollectionConcatInvocation(id="source", first=[[], [["b", ""]]]),
+        IterateInvocation(id="it0"),
+        CollectionConcatInvocation(id="concat"),
+        IterateInvocation(id="it1"),
+        MarkedAnyTypeTestInvocation(id="m1", marker="T:"),
+        CollectInvocation(id="out"),
+        IterateInvocation(id="rit"),
+        MarkedAnyTypeTestInvocation(id="rm", marker="r:"),
+        CollectInvocation(id="out2"),
+    ]
+    edges: list[Any] = [
+        ("source", "collection", "it0", "collection"),
+        ("it0", "item", "concat", "first"),
+        ("concat", "collection", "it1", "collection"),
+        ("it1", "item", "m1", "value"),
+        ("m1", "value", "out", "item"),
+        ("out", "collection", "rit", "collection"),
+        ("rit", "item", "rm", "value"),
+    ]
+    if with_root_item:
+        nodes.append(AnyTypeTestInvocation(id="root", value="S"))
+        edges.append(("root", "value", "out", "item"))
+    if if_variant != "plain":
+        nodes.append(IfInvocation(id="if", condition=True))
+        edges.append(("rm", "value", "if", "true_input"))
+        if if_variant == "wired":
+            nodes.append(BooleanInvocation(id="condition", value=True))
+            edges.append(("condition", "value", "if", "condition"))
+        edges.append(("if", "value", "out2", "item"))
+    else:
+        edges.append(("rm", "value", "out2", "item"))
+    graph = _graph_from(
+        nodes,
+        edges,
+    )
+    state = GraphExecutionState(graph=graph)
+    if not force_compatibility_scheduler:
+        state._execution_scheduler = _GenericGraphSchedulerAdapter(state)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    if not force_compatibility_scheduler:
+        assert isinstance(state._execution_scheduler, _GenericGraphSchedulerAdapter)
+    expected_out = {(0,): ["S"], (1,): ["S", "T:['b', '']"]} if with_root_item else {(0,): [], (1,): ["T:['b', '']"]}
+    expected_out2 = (
+        {(0,): ["r:S"], (1,): ["r:S", "r:T:['b', '']"]} if with_root_item else {(0,): [], (1,): ["r:T:['b', '']"]}
+    )
+    out_records = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out")
+    ]
+    out2_records = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out2")
+    ]
+    assert len(out_records) == len(expected_out)
+    assert dict(out_records) == expected_out
+    assert len(out2_records) == len(expected_out2)
+    assert dict(out2_records) == expected_out2
+    if with_root_item:
+        assert sorted(out_records, key=lambda record: (record[0], repr(record[1]))) == sorted(
+            expected_out.items(), key=lambda record: (record[0], repr(record[1]))
+        )
+        assert sorted(out2_records, key=lambda record: (record[0], repr(record[1]))) == sorted(
+            expected_out2.items(), key=lambda record: (record[0], repr(record[1]))
+        )
+        assert [path for path, _ in out2_records].count((1,)) == 1
+
+
+@pytest.mark.parametrize("force_compatibility_scheduler", [False, True], ids=["generic", "compatibility"])
+def test_literal_false_if_after_collect_chain_keeps_selected_values_and_no_phantom_collect(
+    force_compatibility_scheduler: bool,
+) -> None:
+    graph = _graph_from(
+        [
+            CollectionConcatInvocation(
+                id="source", first=[[[["b"], ["b", "c"]], [["a"], ["c", "b"], ["b", "a", ""]], []], []]
+            ),
+            IterateInvocation(id="it0"),
+            CollectionConcatInvocation(id="concat0"),
+            IterateInvocation(id="it1"),
+            CollectionConcatInvocation(id="concat1"),
+            IterateInvocation(id="it2"),
+            MarkedAnyTypeTestInvocation(id="cm", marker="x"),
+            CollectInvocation(id="col3"),
+            CollectInvocation(id="col4"),
+            MarkedAnyTypeTestInvocation(id="m1", marker="T:"),
+            IfInvocation(id="if", condition=False),
+            CollectionConcatInvocation(id="root", first=["S"]),
+            CollectInvocation(id="out"),
+        ],
+        [
+            ("source", "collection", "it0", "collection"),
+            ("it0", "item", "concat0", "first"),
+            ("concat0", "collection", "it1", "collection"),
+            ("it1", "item", "concat1", "first"),
+            ("concat1", "collection", "it2", "collection"),
+            ("it2", "item", "cm", "value"),
+            ("cm", "value", "col3", "item"),
+            ("col3", "collection", "col4", "item"),
+            ("it1", "item", "m1", "value"),
+            ("m1", "value", "if", "true_input"),
+            ("col4", "collection", "if", "false_input"),
+            ("if", "value", "out", "item"),
+            ("root", "collection", "out", "collection"),
+        ],
+    )
+    state = GraphExecutionState(graph=graph)
+    if not force_compatibility_scheduler:
+        state._execution_scheduler = _GenericGraphSchedulerAdapter(state)
+    trace, state = _run_graph(state, force_compatibility_scheduler=force_compatibility_scheduler)
+    assert state.is_complete(), f"graph stalled after {trace}"
+    assert not state.has_error(), state.errors
+    if not force_compatibility_scheduler:
+        assert isinstance(state._execution_scheduler, _GenericGraphSchedulerAdapter)
+    out_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].collection)
+        for exec_id in state._prepared_registry().get_prepared_ids("out")
+    ]
+    aggregate = [
+        ["x['b']", "x['b', 'c']"],
+        ["x['a']", "x['c', 'b']", "x['b', 'a', '']"],
+        [],
+    ]
+    assert sorted(out_runs, key=lambda record: (record[0], repr(record[1]))) == sorted(
+        [
+            ((0,), ["S", aggregate, aggregate, aggregate]),
+            ((1,), ["S"]),
+        ],
+        key=lambda record: (record[0], repr(record[1])),
+    )
+    if_runs = [
+        (state._get_iteration_path(exec_id), state.results[exec_id].value)
+        for exec_id in state._prepared_registry().get_prepared_ids("if")
+    ]
+    assert sorted(if_runs, key=lambda record: (record[0], repr(record[1]))) == [
+        ((0, 0), aggregate),
+        ((0, 1), aggregate),
+        ((0, 2), aggregate),
+    ]
+    assert all(path != () for path, _ in out_runs)
+    empty_col4_paths = [
+        state._get_iteration_path(exec_id)
+        for exec_id in state._prepared_registry().get_prepared_ids("col4")
+        if state.results[exec_id].collection == [[]]
+    ]
+    assert empty_col4_paths == [(1,)]
