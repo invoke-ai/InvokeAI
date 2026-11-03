@@ -1,0 +1,183 @@
+import { z } from 'zod';
+
+const trimmed = z.string().trim();
+
+export const modelEditSchema = z.object({
+  base: trimmed.min(1, 'Base architecture is required.'),
+  configPath: trimmed,
+  description: trimmed.max(2000, 'Keep the description under 2000 characters.'),
+  format: trimmed.min(1, 'Format is required.'),
+  name: trimmed.min(1, 'Name is required.').max(200, 'Keep the name under 200 characters.'),
+  predictionType: z.union([z.literal(''), z.enum(['epsilon', 'v_prediction', 'sample'])]),
+  sourceUrl: z.union([z.literal(''), z.url({ error: 'Must be a valid http(s) URL.' })]),
+  type: trimmed.min(1, 'Model type is required.'),
+  variant: trimmed,
+});
+
+export type ModelEditFormValues = z.infer<typeof modelEditSchema>;
+
+const optionalBoundedNumber = (min: number, max: number, label: string) =>
+  z
+    .number({ message: `${label} must be a number.` })
+    .min(min, `${label} must be at least ${min}.`)
+    .max(max, `${label} must be at most ${max}.`)
+    .nullable();
+
+/** Null means inherit the app default and corresponds to an unchecked field toggle. */
+export const mainDefaultSettingsSchema = z.object({
+  cfgRescaleMultiplier: optionalBoundedNumber(0, 0.99, 'CFG rescale multiplier'),
+  cfgScale: optionalBoundedNumber(1, 200, 'CFG scale'),
+  // Record validation permits guidance >=1 without an architecture ceiling; generation owns guidance_max. Accept
+  // FLUX Fill's stored default of 30.
+  guidance: optionalBoundedNumber(1, 200, 'Guidance'),
+  height: optionalBoundedNumber(64, 8192, 'Height').refine(
+    (value) => value === null || value % 8 === 0,
+    'Height must be a multiple of 8.'
+  ),
+  scheduler: trimmed.nullable(),
+  steps: optionalBoundedNumber(1, 10000, 'Steps'),
+  // A VAE model key, or the backend sentinel 'default' for "the compatible
+  // default VAE"; null inherits the app-level setting.
+  vae: trimmed.min(1, 'Choose a VAE or turn the field off.').nullable(),
+  vaePrecision: z.enum(['fp16', 'fp32']).nullable(),
+  width: optionalBoundedNumber(64, 8192, 'Width').refine(
+    (value) => value === null || value % 8 === 0,
+    'Width must be a multiple of 8.'
+  ),
+});
+
+export type MainDefaultSettingsFormValues = z.infer<typeof mainDefaultSettingsSchema>;
+
+// Mirror backend LoRA validation: default range [-1, 2], min < max, and enabled weight within the effective range.
+export const loraDefaultSettingsSchema = z
+  .object({
+    weight: optionalBoundedNumber(-10, 10, 'Weight'),
+    weightMax: optionalBoundedNumber(-10, 10, 'Weight max'),
+    weightMin: optionalBoundedNumber(-10, 10, 'Weight min'),
+  })
+  .superRefine((values, context) => {
+    const effectiveMin = values.weightMin ?? -1;
+    const effectiveMax = values.weightMax ?? 2;
+
+    if (effectiveMin >= effectiveMax) {
+      context.addIssue({
+        code: 'custom',
+        message: `Weight min (${effectiveMin}) must be less than weight max (${effectiveMax}).`,
+        path: ['weightMin'],
+      });
+
+      return;
+    }
+
+    if (values.weight !== null && (values.weight < effectiveMin || values.weight > effectiveMax)) {
+      context.addIssue({
+        code: 'custom',
+        message: `Weight (${values.weight}) must be within [${effectiveMin}, ${effectiveMax}].`,
+        path: ['weight'],
+      });
+    }
+  });
+
+export type LoraDefaultSettingsFormValues = z.infer<typeof loraDefaultSettingsSchema>;
+
+const optionalPositiveInteger = (label: string) =>
+  z
+    .number({ message: `${label} must be a number.` })
+    .int(`${label} must be a whole number.`)
+    .positive(`${label} must be greater than 0.`)
+    .nullable();
+
+/**
+ * The hosted-provider record editor. Null numbers mean "not limited" / "no default"; the modes are flags so the
+ * draft store compares flat values.
+ */
+export const externalModelSchema = z
+  .object({
+    providerId: trimmed.min(1, 'Provider is required.'),
+    providerModelId: trimmed.min(1, 'Provider model ID is required.'),
+    modeTxt2img: z.boolean(),
+    modeImg2img: z.boolean(),
+    modeInpaint: z.boolean(),
+    supportsSeed: z.boolean(),
+    supportsReferenceImages: z.boolean(),
+    supportsNegativePrompt: z.boolean(),
+    maxImagesPerRequest: optionalPositiveInteger('Images per request'),
+    maxReferenceImages: optionalPositiveInteger('Reference images'),
+    maxImageWidth: optionalPositiveInteger('Max width'),
+    maxImageHeight: optionalPositiveInteger('Max height'),
+    defaultWidth: optionalPositiveInteger('Default width'),
+    defaultHeight: optionalPositiveInteger('Default height'),
+    defaultNumImages: optionalPositiveInteger('Default image count'),
+  })
+  .superRefine((values, context) => {
+    if (!values.modeTxt2img && !values.modeImg2img && !values.modeInpaint) {
+      context.addIssue({ code: 'custom', message: 'Choose at least one supported mode.', path: ['modeTxt2img'] });
+    }
+
+    // The backend's max size is one object with both sides.
+    if ((values.maxImageWidth === null) !== (values.maxImageHeight === null)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Set both a max width and a max height, or neither.',
+        path: [values.maxImageWidth === null ? 'maxImageWidth' : 'maxImageHeight'],
+      });
+    }
+  });
+
+export type ExternalModelFormValues = z.infer<typeof externalModelSchema>;
+
+/** POSIX (/x), Windows drive (C:\ or C:/), or UNC (\\server) — the shapes in-place installs record. */
+export const isAbsoluteModelPath = (path: string): boolean =>
+  path.startsWith('/') || path.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(path);
+
+/**
+ * Mirrors the backend's `models_path / model.path` resolution: managed models
+ * store paths relative to the models directory, in-place installs store them
+ * absolute. Falls back to the stored path when the directory is unknown.
+ */
+export const resolveModelAbsolutePath = (path: string, modelsDir: string | null): string =>
+  isAbsoluteModelPath(path) || !modelsDir ? path : `${modelsDir.replace(/\/+$/, '')}/${path}`;
+
+/**
+ * One spelling per local path, for comparing paths the server reports in different forms: scan rows carry OS-native
+ * separators while install records store forward slashes. Trims, turns `\` into `/`, drops trailing slashes, and
+ * case-folds Windows drive and UNC paths only, since POSIX file systems are case-sensitive.
+ */
+export const canonicalLocalPath = (path: string): string => {
+  const canonical = path.trim().replaceAll('\\', '/').replace(/\/+$/, '');
+
+  return /^([A-Za-z]:(\/|$)|\/\/)/.test(canonical) ? canonical.toLowerCase() : canonical;
+};
+
+/**
+ * Whether `path` is the models directory or inside it. The comparison is textual — the server reports the directory
+ * resolved, so a symlinked or `~` spelling of it does not match, and a path with `..` segments never does. Windows
+ * drive and UNC paths compare case-insensitively.
+ */
+export const isInModelsDir = (path: string, modelsDir: string | null): boolean => {
+  if (!modelsDir) {
+    return false;
+  }
+
+  const dir = canonicalLocalPath(modelsDir);
+  const candidate = canonicalLocalPath(path);
+
+  if (/(^|\/)\.\.(\/|$)/.test(candidate)) {
+    return false;
+  }
+
+  return dir !== '' && (candidate === dir || candidate.startsWith(`${dir}/`));
+};
+
+/**
+ * Replacement path for a relocated model. Only absolute paths are accepted:
+ * managed models store paths relative to the models directory and must not be
+ * relocated this way.
+ */
+export const modelPathSchema = trimmed
+  .min(1, 'Path is required.')
+  .refine(isAbsoluteModelPath, 'Must be an absolute path.');
+
+export const triggerPhraseSchema = trimmed
+  .min(1, 'Trigger phrase cannot be empty.')
+  .max(200, 'Keep trigger phrases under 200 characters.');

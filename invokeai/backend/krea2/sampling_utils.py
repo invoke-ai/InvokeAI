@@ -7,7 +7,7 @@ diffusers pipeline ``__call__``. These helpers replicate the Krea-2 sampling mat
 Reference: ``diffusers/pipelines/krea2/pipeline_krea2.py`` (diffusers main / 0.39.0.dev0).
 """
 
-from typing import List
+from typing import List, Sequence
 
 import numpy as np
 import torch
@@ -25,11 +25,21 @@ KREA2_MAX_SEQ_LEN = 512
 KREA2_START_IDX = 34  # drop the system-prompt prefix tokens
 KREA2_NUM_SUFFIX_TOKENS = 5
 
-# Resolution-aware time-shift parameters (scheduler_config.json).
-KREA2_BASE_SHIFT = 0.5
-KREA2_MAX_SHIFT = 1.15
-KREA2_BASE_IMAGE_SEQ_LEN = 256
-KREA2_MAX_IMAGE_SEQ_LEN = 6400
+# The Raw checkpoint's scheduler_config.json, for checkpoints that ship none (see `load_scheduler`). Its shift fit ends
+# at 6400 tokens, 1280x1280 of area, and is held there: extrapolated, mu would be 2.2 at 2048x2048, which puts about
+# half of 28 steps above sigma 0.9, and 7.4 at 4096x4096, which puts all of them there, so an img2img start would have
+# no step near the sigma it asks for. Held, Raw ends at Turbo's fixed mu, which ComfyUI also uses for Krea-2 at every
+# size; diffusers' `Krea2Pipeline` extrapolates. The scheduler applies the exponential time shift to the mu it is
+# handed, so Raw's mu goes to `set_timesteps` as it is.
+KREA2_SCHEDULER_CONFIG = {
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 1.15,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 6400,
+    "num_train_timesteps": 1000,
+    "time_shift_type": "exponential",
+}
 # Fixed timestep shift for the distilled (Turbo) checkpoint.
 KREA2_DISTILLED_MU = 1.15
 
@@ -61,6 +71,15 @@ def unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tens
     return latents
 
 
+def _grid_position_ids(index: int, grid_height: int, grid_width: int, device: torch.device) -> torch.Tensor:
+    """(grid_h*grid_w, 3) rotary coordinates (index, h, w) of one latent grid, row-major."""
+    ids = torch.zeros(grid_height, grid_width, 3, device=device)
+    ids[..., 0] = index
+    ids[..., 1] = torch.arange(grid_height, device=device)[:, None]
+    ids[..., 2] = torch.arange(grid_width, device=device)[None, :]
+    return ids.reshape(grid_height * grid_width, 3)
+
+
 def prepare_position_ids(text_seq_len: int, grid_height: int, grid_width: int, device: torch.device) -> torch.Tensor:
     """Build the (text_seq_len + grid_h*grid_w, 3) rotary coordinates.
 
@@ -68,28 +87,40 @@ def prepare_position_ids(text_seq_len: int, grid_height: int, grid_width: int, d
     coordinates. Matches diffusers ``Krea2Pipeline.prepare_position_ids``.
     """
     text_ids = torch.zeros(text_seq_len, 3, device=device)
-    image_ids = torch.zeros(grid_height, grid_width, 3, device=device)
-    image_ids[..., 1] = torch.arange(grid_height, device=device)[:, None]
-    image_ids[..., 2] = torch.arange(grid_width, device=device)[None, :]
-    image_ids = image_ids.reshape(grid_height * grid_width, 3)
-    return torch.cat([text_ids, image_ids], dim=0)
+    return torch.cat([text_ids, _grid_position_ids(0, grid_height, grid_width, device)], dim=0)
 
 
-def calculate_shift(
-    image_seq_len: int,
-    base_image_seq_len: int = KREA2_BASE_IMAGE_SEQ_LEN,
-    max_image_seq_len: int = KREA2_MAX_IMAGE_SEQ_LEN,
-    base_shift: float = KREA2_BASE_SHIFT,
-    max_shift: float = KREA2_MAX_SHIFT,
-) -> float:
-    """Resolution-aware mu (linear interpolation by sequence length).
+def prepare_reference_position_ids(reference_grids: Sequence[tuple[int, int]], device: torch.device) -> torch.Tensor:
+    """Rotary coordinates of the reference tokens alone: reference ``i`` (1-based) carries ``(i, h, w)`` over its
+    own ``(grid_h, grid_w)``, starting from 0."""
+    reference_ids = [
+        _grid_position_ids(index, ref_height, ref_width, device)
+        for index, (ref_height, ref_width) in enumerate(reference_grids, start=1)
+    ]
+    return torch.cat(reference_ids, dim=0) if reference_ids else torch.zeros(0, 3, device=device)
 
-    NOTE: mu is fed straight into ``FlowMatchEulerDiscreteScheduler.set_timesteps(..., mu=mu)``;
-    the exponential time-shift happens inside the scheduler. Do NOT ``exp()`` this value.
+
+def prepare_position_ids_with_references(
+    text_seq_len: int,
+    grid_height: int,
+    grid_width: int,
+    reference_grids: Sequence[tuple[int, int]],
+    device: torch.device,
+) -> torch.Tensor:
+    """Rotary coordinates for ``[text | target | reference 1 | reference 2 | ...]``.
+
+    Text and target are laid out as in ``prepare_position_ids``. Reference ``i`` (1-based) carries
+    ``(i, h, w)`` over its own ``(grid_h, grid_w)``, starting from 0: the first axis is what tells the
+    transformer the reference tokens apart from the target and from each other. This is the layout the
+    ai-toolkit edit LoRAs were trained with (ComfyUI's "index_timestep_zero" reference method).
     """
-    m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
-    b = base_shift - m * base_image_seq_len
-    return image_seq_len * m + b
+    return torch.cat(
+        [
+            prepare_position_ids(text_seq_len, grid_height, grid_width, device),
+            prepare_reference_position_ids(reference_grids, device),
+        ],
+        dim=0,
+    )
 
 
 def build_sigmas(steps: int) -> List[float]:

@@ -1,8 +1,10 @@
+import traceback
 from typing import Any
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
 from invokeai.app.invocations.fields import InputField, UIType
 from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
+from invokeai.app.services.shared.execution_effects import ExecutionRef
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.workflow_records.workflow_records_common import WorkflowCategory, WorkflowNotFoundError
 
@@ -37,6 +39,8 @@ def parse_call_saved_workflow_dynamic_input(field_name: str) -> tuple[str, str]:
 class CallSavedWorkflowInvocation(BaseInvocation):
     """Displays and later executes against a selected saved workflow."""
 
+    execution_effects_enabled = True
+
     workflow_id: str = InputField(
         default="",
         description="The selected saved workflow ID, managed by the workflow editor UI.",
@@ -70,6 +74,38 @@ class CallSavedWorkflowInvocation(BaseInvocation):
         return workflow_record
 
     def invoke(self, context: InvocationContext) -> WorkflowReturnOutput:
-        self.validate_selected_workflow(context)
+        execution = getattr(context, "execution", None)
+        lifecycle_enabled = (
+            getattr(getattr(context, "execution_effects", None), "allow_lifecycle_effects", False) is True
+        )
+        if execution is None or not lifecycle_enabled:
+            self.validate_selected_workflow(context)
+            return WorkflowReturnOutput(values={})
+
+        try:
+            workflow_record = execution.authorize_workflow(self.workflow_id)
+            workflow_inputs = context._data.execution_workflow_inputs
+            if workflow_inputs is None:
+                workflow_inputs = dict(self.workflow_inputs)
+            child = execution.spawn(
+                workflow_record.workflow.model_dump(mode="json"),
+                dict(workflow_inputs),
+            )
+            execution.await_dependency(
+                ExecutionRef(
+                    execution_node_id=child.child_execution_id,
+                    state_id=context._data.execution_state_id,
+                    frame_path=context._data.execution_frame,
+                    frame_id=context._data.execution_frame_id,
+                    workflow_call_depth=context._data.execution_workflow_call_depth,
+                )
+            )
+        except Exception as e:
+            execution.fail(
+                str(e),
+                error_type=type(e).__name__,
+                error_traceback=traceback.format_exc(),
+            )
+            return WorkflowReturnOutput(values={})
 
         return WorkflowReturnOutput(values={})

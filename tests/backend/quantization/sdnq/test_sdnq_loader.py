@@ -1,5 +1,6 @@
 """Integration tests for SDNQ state dict loader."""
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -237,9 +238,17 @@ class TestRaiseOnIncompleteSdnqLoad:
         with pytest.raises(ValueError, match="bias"):
             raise_on_incomplete_sdnq_load("SDNQ test transformer", missing, unexpected)
 
-    def test_unexpected_key_raises(self):
-        with pytest.raises(ValueError, match="not_a_real_param"):
+    def test_unexpected_key_is_logged_not_raised(self, caplog):
+        """Extra keys are exporter noise, so they are reported at DEBUG and never fail the load
+        (issue #9437). Only completeness — a required parameter left on meta — is fatal."""
+        with caplog.at_level(logging.DEBUG, logger="invokeai.backend.util.state_dict_loading"):
             raise_on_incomplete_sdnq_load("SDNQ test", missing_keys=[], unexpected_keys=["not_a_real_param"])
+        assert "not_a_real_param" in caplog.text
+
+    def test_unexpected_key_is_silent_above_debug(self, caplog):
+        with caplog.at_level(logging.INFO, logger="invokeai.backend.util.state_dict_loading"):
+            raise_on_incomplete_sdnq_load("SDNQ test", missing_keys=[], unexpected_keys=["not_a_real_param"])
+        assert caplog.text == ""
 
     def test_allowed_missing_is_tolerated(self):
         # Tied/re-shared weights (e.g. T5 encoder.embed_tokens, Qwen3 lm_head) must not raise.

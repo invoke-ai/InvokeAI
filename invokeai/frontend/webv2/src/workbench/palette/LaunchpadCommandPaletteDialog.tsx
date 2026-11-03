@@ -1,0 +1,124 @@
+import type { WorkbenchPreferences } from '@workbench/settings/contracts';
+
+import { useCapabilities } from '@features/identity';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { useProjectLibrary } from '@workbench/projects/library';
+import { useOpenProjectsSelector } from '@workbench/projects/openProjects';
+import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
+import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import type { PaletteEntry, PaletteSearchProvider, SettingsEntryDeps } from './entries';
+
+import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { buildOpenSettingsEntry, buildSettingsEntries } from './entries';
+import { createProjectsProvider } from './projectsProvider';
+
+/** Launchpad-only palette adapter: navigation, settings and projects; no editor providers. */
+const LaunchpadCommandPaletteDialog = ({
+  isOpen,
+  modifierKeyLabel,
+  onClose,
+  onExitComplete,
+  preferences,
+  settingsEntryDeps,
+}: {
+  isOpen: boolean;
+  modifierKeyLabel: string;
+  onClose: () => void;
+  onExitComplete: () => void;
+  preferences: WorkbenchPreferences;
+  settingsEntryDeps: SettingsEntryDeps;
+}) => {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as { project?: string };
+  const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
+  const settingsSections = useAvailableSettings();
+  const projectLibrary = useProjectLibrary();
+  const openProjectIds = useOpenProjectsSelector((snapshot) => snapshot.ids);
+  // Launchpad settings are a page, not the editor's dialog.
+  const launchpadSettingsDeps = useMemo<SettingsEntryDeps>(
+    () => ({
+      ...settingsEntryDeps,
+      openSettingsSection: (destination) => {
+        const { entryId, sectionId } = typeof destination === 'string' ? { sectionId: destination } : destination;
+        void navigate({
+          params: { section: sectionId },
+          search: entryId ? { setting: entryId } : {},
+          to: '/preferences/$section',
+        });
+      },
+    }),
+    [navigate, settingsEntryDeps]
+  );
+
+  const entries = useMemo<PaletteEntry[]>(() => {
+    const navEntry = ({ id, keywords, run }: { id: string; keywords?: string; run: () => void }): PaletteEntry => ({
+      group: 'Navigation',
+      groupLabel: t('commandPalette.groups.navigation'),
+      id: `launchpad.${id}`,
+      isPersistentRecent: true,
+      keywords,
+      run,
+      showInEmptyState: true,
+      title: t(`commandPalette.launchpad.${id}`),
+    });
+    const navigation: PaletteEntry[] = [
+      navEntry({
+        id: 'openEditor',
+        keywords: 'workbench app project',
+        run: () => void navigate({ search: search.project ? { project: search.project } : {}, to: '/app' }),
+      }),
+      navEntry({ id: 'goToProjects', run: () => void navigate({ to: '/projects' }) }),
+      ...(canManageModels ? [navEntry({ id: 'goToModels', run: () => void navigate({ to: '/models' }) })] : []),
+      ...(canManageNodes ? [navEntry({ id: 'goToNodes', run: () => void navigate({ to: '/nodes' }) })] : []),
+      navEntry({ id: 'goToFonts', keywords: 'font typeface typography', run: () => void navigate({ to: '/fonts' }) }),
+      ...(canManageUsers ? [navEntry({ id: 'goToUsers', run: () => void navigate({ to: '/users' }) })] : []),
+      buildOpenSettingsEntry(t, () => void navigate({ to: '/preferences' })),
+    ];
+
+    return [...navigation, ...buildSettingsEntries(preferences, launchpadSettingsDeps, t, settingsSections)];
+  }, [
+    canManageModels,
+    canManageNodes,
+    canManageUsers,
+    launchpadSettingsDeps,
+    navigate,
+    preferences,
+    search.project,
+    settingsSections,
+    t,
+  ]);
+
+  const providers = useMemo<PaletteSearchProvider[]>(() => {
+    // The session names open projects by id only; the library supplies their names.
+    const openIds = new Set(openProjectIds);
+    const openProjects = projectLibrary.summaries
+      .filter((summary) => openIds.has(summary.id))
+      .map(({ id, name }) => ({ id, name }));
+
+    return [
+      createProjectsProvider({
+        library: projectLibrary,
+        // The same route the Launchpad's project cards and rows link to.
+        openProject: (id) => void navigate({ search: { project: id }, to: '/app' }),
+        openProjects,
+        t,
+      }),
+    ];
+  }, [navigate, openProjectIds, projectLibrary, t]);
+
+  return (
+    <CommandPaletteDialog
+      entries={entries}
+      isOpen={isOpen}
+      modifierKeyLabel={modifierKeyLabel}
+      providers={providers}
+      onClose={onClose}
+      onExitComplete={onExitComplete}
+    />
+  );
+};
+
+export default LaunchpadCommandPaletteDialog;

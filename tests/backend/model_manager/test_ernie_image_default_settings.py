@@ -1,15 +1,15 @@
-from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
+from invokeai.backend.architectures import resolve_default_settings
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 
 
 class TestErnieImageDefaultSettings:
     def test_base_defaults(self) -> None:
-        s = MainModelDefaultSettings.from_base(BaseModelType.ErnieImage, None, "ERNIE-Image")
+        s = resolve_default_settings(BaseModelType.ErnieImage, None, "ERNIE-Image")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (50, 4.0)
 
     def test_turbo_detected_from_name(self) -> None:
-        s = MainModelDefaultSettings.from_base(BaseModelType.ErnieImage, None, "ERNIE-Image-Turbo")
+        s = resolve_default_settings(BaseModelType.ErnieImage, None, "ERNIE-Image-Turbo")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (8, 1.0)
 
@@ -17,14 +17,12 @@ class TestErnieImageDefaultSettings:
         # The two checkpoints are architecturally identical, so detection falls back to the name.
         # Renaming the model in the install dialog must not lose the Turbo defaults, hence the
         # install path is consulted too.
-        s = MainModelDefaultSettings.from_base(
-            BaseModelType.ErnieImage, None, "my ernie", "main/ernie-image/ERNIE-Image-Turbo"
-        )
+        s = resolve_default_settings(BaseModelType.ErnieImage, None, "my ernie", "main/ernie-image/ERNIE-Image-Turbo")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (8, 1.0)
 
     def test_no_turbo_hint_falls_back_to_base_defaults(self) -> None:
-        s = MainModelDefaultSettings.from_base(BaseModelType.ErnieImage, None, "my ernie", "main/ernie-image/whatever")
+        s = resolve_default_settings(BaseModelType.ErnieImage, None, "my ernie", "main/ernie-image/whatever")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (50, 4.0)
 
@@ -32,14 +30,12 @@ class TestErnieImageDefaultSettings:
         # An in-place install records an absolute path, so an unrelated ancestor directory can
         # contain "turbo". Only the install directory's own name may drive detection — otherwise the
         # *base* model silently gets Turbo's 8 steps and CFG 1.0.
-        s = MainModelDefaultSettings.from_base(
-            BaseModelType.ErnieImage, None, "my ernie", "/mnt/turbo-nvme/models/ERNIE-Image"
-        )
+        s = resolve_default_settings(BaseModelType.ErnieImage, None, "my ernie", "/mnt/turbo-nvme/models/ERNIE-Image")
         assert s is not None
         assert (s.steps, s.cfg_scale) == (50, 4.0)
 
     def test_turbo_in_leaf_directory_still_detected(self) -> None:
-        s = MainModelDefaultSettings.from_base(
+        s = resolve_default_settings(
             BaseModelType.ErnieImage, None, "my ernie", "/mnt/turbo-nvme/models/ERNIE-Image-Turbo"
         )
         assert s is not None

@@ -16,7 +16,7 @@
         config.allowUnfree = true;
       };
 
-      python = pkgs.python310;
+      python = pkgs.python312;
 
       mkShell = { dir, install }:
         let

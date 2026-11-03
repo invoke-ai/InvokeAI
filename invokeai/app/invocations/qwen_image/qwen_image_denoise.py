@@ -1,0 +1,818 @@
+import math
+from contextlib import ExitStack
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional, TypeAlias
+
+import torch
+import torchvision.transforms as tv_transforms
+from diffusers.models.controlnets.controlnet_qwenimage import QwenImageControlNetModel
+from diffusers.models.transformers.transformer_qwenimage import QwenImageTransformer2DModel
+from PIL import Image
+from torchvision.transforms.functional import resize as tv_resize
+from tqdm import tqdm
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
+from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
+from invokeai.app.invocations.fields import (
+    DenoiseMaskField,
+    FieldDescriptions,
+    Input,
+    InputField,
+    LatentsField,
+    QwenImageConditioningField,
+    WithBoard,
+    WithMetadata,
+)
+from invokeai.app.invocations.model import TransformerField, VAEField
+from invokeai.app.invocations.primitives import LatentsOutput
+from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
+from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.fun_controlnet.conditioning import build_fun_control_context
+from invokeai.backend.fun_controlnet.hooks import FunControlHooks, install_fun_control, should_apply
+from invokeai.backend.fun_controlnet.qwen_image import QwenImageFunControlBranch
+from invokeai.backend.model_manager.load.load_base import LoadedModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
+    QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
+)
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
+from invokeai.backend.rectified_flow.schedule_shift import ShiftFit, load_scheduler
+from invokeai.backend.stable_diffusion.diffusers_pipeline import (
+    PipelineIntermediateState,
+    image_resized_to_grid_as_tensor,
+)
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import QwenImageConditioningInfo
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
+
+if TYPE_CHECKING:
+    from diffusers.schedulers.scheduling_flow_match_euler_discrete import FlowMatchEulerDiscreteScheduler
+
+# The stock Qwen-Image scheduler, for GGUF and single-file transformers, which ship no scheduler/ folder. Its shift
+# fit runs from 256 tokens (mu 0.5) to 8192 tokens (mu 0.9, about 1448x1448 of area) and is held there. Past that end
+# the line would keep climbing -- mu 1.31 at 2048x2048, 3.79 at 4096x4096, where 28 of 40 steps sit above sigma 0.9
+# and an img2img pass at strength 0.5 starts from sigma 0.95, so it replaces the image instead of refining it.
+# diffusers' QwenImagePipeline extrapolates; ComfyUI samples Qwen-Image at a constant mu of 1.15.
+QWEN_IMAGE_SCHEDULER_CONFIG = {
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 0.9,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 8192,
+    "shift_terminal": 0.02,
+    "num_train_timesteps": 1000,
+    "time_shift_type": "exponential",
+}
+
+QwenImageControlModel: TypeAlias = QwenImageFunControlBranch | QwenImageControlNetModel
+"""Either Qwen-Image ControlNet design: the Fun branch hooked into the transformer's blocks, or the InstantX
+ControlNet run beside it."""
+
+
+@invocation(
+    "qwen_image_denoise",
+    title="Denoise - Qwen Image",
+    tags=["image", "qwen_image"],
+    category="image",
+    version="1.1.1",
+    classification=Classification.Prototype,
+)
+class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+    """Run the denoising process with a Qwen Image model."""
+
+    # If latents is provided, this means we are doing image-to-image.
+    latents: Optional[LatentsField] = InputField(
+        default=None, description=FieldDescriptions.latents, input=Input.Connection
+    )
+    # Reference image latents (encoded through VAE) to concatenate with noisy latents.
+    reference_latents: Optional[LatentsField] = InputField(
+        default=None,
+        description="Reference image latents to guide generation. Encoded through the VAE.",
+        input=Input.Connection,
+    )
+    # denoise_mask is used for image-to-image inpainting. Only the masked region is modified.
+    denoise_mask: Optional[DenoiseMaskField] = InputField(
+        default=None, description=FieldDescriptions.denoise_mask, input=Input.Connection
+    )
+    denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+    denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+    transformer: TransformerField = InputField(
+        description=FieldDescriptions.qwen_image_model, input=Input.Connection, title="Transformer"
+    )
+    positive_conditioning: QwenImageConditioningField = InputField(
+        description=FieldDescriptions.positive_cond, input=Input.Connection
+    )
+    negative_conditioning: Optional[QwenImageConditioningField] = InputField(
+        default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
+    )
+    cfg_scale: float | list[float] = InputField(default=4.0, description=FieldDescriptions.cfg_scale, title="CFG Scale")
+    width: int = InputField(default=1024, multiple_of=16, description="Width of the generated image.")
+    height: int = InputField(default=1024, multiple_of=16, description="Height of the generated image.")
+    steps: int = InputField(default=40, gt=0, description=FieldDescriptions.steps)
+    seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
+    shift: Optional[float] = InputField(
+        default=None,
+        description="Override the sigma schedule shift. "
+        "When set, uses a fixed shift (e.g. 3.0 for Lightning LoRAs) instead of the default dynamic shifting. "
+        "Leave unset for the base model's default schedule, which is resolution-dependent up to the area of the "
+        "scheduler fit's end (about 1448x1448, 2.1 megapixels, for the stock config) and held above it.",
+    )
+    control: Optional[QwenImageControlField] = InputField(
+        default=None,
+        description="Qwen Image ControlNet conditioning: spatial control (Canny, depth, pose, ...) and/or inpainting.",
+        input=Input.Connection,
+    )
+    vae: Optional[VAEField] = InputField(
+        default=None,
+        description=FieldDescriptions.vae + " Required for control conditioning.",
+        input=Input.Connection,
+    )
+
+    @torch.no_grad()
+    def invoke(self, context: InvocationContext) -> LatentsOutput:
+        latents = self._run_diffusion(context)
+        latents = latents.detach().to("cpu")
+
+        name = context.tensors.save(tensor=latents)
+        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+
+    @staticmethod
+    def _schedule(
+        model_path: Path, width: int, height: int, patch_size: int, shift: float | None
+    ) -> tuple["FlowMatchEulerDiscreteScheduler", float]:
+        """The scheduler for this transformer and the mu to set its timesteps with.
+
+        mu is the fixed `shift`'s log when one is set (Lightning LoRAs), else the loaded scheduler config's own
+        resolution-dependent fit over the target image's tokens, held at its end.
+        """
+        scheduler = load_scheduler(model_path, QWEN_IMAGE_SCHEDULER_CONFIG)
+        if shift is not None:
+            return scheduler, math.log(shift)
+        image_seq_len = (height // LATENT_SCALE_FACTOR) * (width // LATENT_SCALE_FACTOR) // patch_size**2
+        return scheduler, ShiftFit.from_scheduler_config(scheduler.config).mu(image_seq_len)
+
+    def _prep_inpaint_mask(self, context: InvocationContext, latents: torch.Tensor) -> torch.Tensor | None:
+        if self.denoise_mask is None:
+            return None
+        mask = context.tensors.load(self.denoise_mask.mask_name)
+        mask = 1.0 - mask
+
+        _, _, latent_height, latent_width = latents.shape
+        mask = tv_resize(
+            img=mask,
+            size=[latent_height, latent_width],
+            interpolation=tv_transforms.InterpolationMode.BILINEAR,
+            antialias=False,
+        )
+
+        mask = mask.to(device=latents.device, dtype=latents.dtype)
+        return mask
+
+    def _load_text_conditioning(
+        self,
+        context: InvocationContext,
+        conditioning_name: str,
+        dtype: torch.dtype,
+        device: torch.device,
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
+        cond_data = context.conditioning.load(conditioning_name)
+        assert len(cond_data.conditionings) == 1
+        conditioning = cond_data.conditionings[0]
+        assert isinstance(conditioning, QwenImageConditioningInfo)
+        conditioning = conditioning.to(dtype=dtype, device=device)
+        return conditioning.prompt_embeds, conditioning.prompt_embeds_mask
+
+    def _get_noise(
+        self,
+        batch_size: int,
+        num_channels_latents: int,
+        height: int,
+        width: int,
+        dtype: torch.dtype,
+        device: torch.device,
+        seed: int,
+    ) -> torch.Tensor:
+        rand_device = "cpu"
+        rand_dtype = torch.float32
+
+        return torch.randn(
+            batch_size,
+            num_channels_latents,
+            int(height) // LATENT_SCALE_FACTOR,
+            int(width) // LATENT_SCALE_FACTOR,
+            device=rand_device,
+            dtype=rand_dtype,
+            generator=torch.Generator(device=rand_device).manual_seed(seed),
+        ).to(device=device, dtype=dtype)
+
+    def _prepare_cfg_scale(self, num_timesteps: int) -> list[float]:
+        if isinstance(self.cfg_scale, float):
+            cfg_scale = [self.cfg_scale] * num_timesteps
+        elif isinstance(self.cfg_scale, list):
+            assert len(self.cfg_scale) == num_timesteps
+            cfg_scale = self.cfg_scale
+        else:
+            raise ValueError(f"Invalid CFG scale type: {type(self.cfg_scale)}")
+        return cfg_scale
+
+    @staticmethod
+    def _pack_latents(
+        latents: torch.Tensor, batch_size: int, num_channels: int, height: int, width: int
+    ) -> torch.Tensor:
+        """Pack 4D latents (B, C, H, W) into 2x2-patched 3D (B, H/2*W/2, C*4)."""
+        latents = latents.view(batch_size, num_channels, height // 2, 2, width // 2, 2)
+        latents = latents.permute(0, 2, 4, 1, 3, 5)
+        latents = latents.reshape(batch_size, (height // 2) * (width // 2), num_channels * 4)
+        return latents
+
+    @staticmethod
+    def _unpack_latents(latents: torch.Tensor, height: int, width: int) -> torch.Tensor:
+        """Unpack 3D patched latents (B, seq, C*4) back to 4D (B, C, H, W)."""
+        batch_size, _num_patches, channels = latents.shape
+        # height/width are in latent space; they must be divisible by 2 for packing
+        h = 2 * (height // 2)
+        w = 2 * (width // 2)
+        latents = latents.view(batch_size, h // 2, w // 2, channels // 4, 2, 2)
+        latents = latents.permute(0, 3, 1, 4, 2, 5)
+        latents = latents.reshape(batch_size, channels // 4, h, w)
+        return latents
+
+    @staticmethod
+    def _align_ref_latent_dims(rh: int, rw: int) -> tuple[int, int]:
+        """Trim reference latent spatial dims to even values for 2x2 packing.
+
+        Raises ValueError if the aligned dims would be < 2 (i.e., the reference
+        latent is too small to produce any valid tokens).
+        """
+        rh_aligned = rh - (rh % 2)
+        rw_aligned = rw - (rw % 2)
+        if rh_aligned < 2 or rw_aligned < 2:
+            raise ValueError(
+                f"Reference latent spatial dims must be >= 2 after even alignment; "
+                f"got ({rh_aligned}, {rw_aligned}) from input shape ({rh}, {rw}). "
+                "Ensure the reference image is at least 16 pixels in each dimension."
+            )
+        return rh_aligned, rw_aligned
+
+    @staticmethod
+    def _build_img_shapes(
+        latent_height: int,
+        latent_width: int,
+        ref_latent_height: int | None = None,
+        ref_latent_width: int | None = None,
+    ) -> list[list[tuple[int, int, int]]]:
+        """Build the img_shapes argument for the transformer.
+
+        The reference segment (if present) must use its own dims so QwenEmbedRope's
+        spatial frequencies position ref tokens distinctly from noisy tokens —
+        otherwise reference content bleeds into the generation as a ghost.
+        """
+        shapes: list[tuple[int, int, int]] = [(1, latent_height // 2, latent_width // 2)]
+        if ref_latent_height is not None and ref_latent_width is not None:
+            shapes.append((1, ref_latent_height // 2, ref_latent_width // 2))
+        return [shapes]
+
+    # diffusers' QwenImageEdit(Plus)Pipeline VAE_IMAGE_SIZE = 1024 * 1024 pixels;
+    # ref images are resized to this area (preserving aspect, snapped to multiples
+    # of 32) before VAE encoding. We mirror this clamp in latent space so direct
+    # backend callers — whose i2l may not pass explicit width/height — don't feed
+    # the transformer an out-of-distribution reference sequence length (which
+    # also causes a VRAM spike for large inputs).
+    _REF_TARGET_PIXEL_AREA: ClassVar[int] = 1024 * 1024
+    _VAE_SCALE_FACTOR: ClassVar[int] = 8
+
+    @classmethod
+    def _maybe_clamp_ref_latent_size(cls, ref_latents: torch.Tensor) -> torch.Tensor:
+        """Bilinear-downscale the reference latent if it exceeds diffusers'
+        VAE_IMAGE_SIZE budget.
+
+        Returns the latent unchanged if it's already within budget.
+        """
+        _, _, rh, rw = ref_latents.shape
+        target_cells = cls._REF_TARGET_PIXEL_AREA // (cls._VAE_SCALE_FACTOR**2)
+        if rh * rw <= target_cells:
+            return ref_latents
+        aspect = rw / rh
+        target_w_px = math.sqrt(cls._REF_TARGET_PIXEL_AREA * aspect)
+        target_h_px = target_w_px / aspect
+        target_w_px = max(32, round(target_w_px / 32) * 32)
+        target_h_px = max(32, round(target_h_px / 32) * 32)
+        target_rh = target_h_px // cls._VAE_SCALE_FACTOR
+        target_rw = target_w_px // cls._VAE_SCALE_FACTOR
+        return torch.nn.functional.interpolate(
+            ref_latents, size=(target_rh, target_rw), mode="bilinear", antialias=False
+        )
+
+    def _run_diffusion(self, context: InvocationContext):
+        inference_dtype = torch.bfloat16
+        device = TorchDevice.choose_torch_device()
+
+        transformer_info = context.models.load(self.transformer.transformer)
+        assert isinstance(transformer_info.model, QwenImageTransformer2DModel)
+        has_zero_cond_t = bool(
+            getattr(transformer_info.model, "zero_cond_t", False)
+            or getattr(transformer_info.model.config, "zero_cond_t", False)
+        )
+        control_info, control_model = self._load_control_model(context, has_zero_cond_t)
+
+        # Load conditioning
+        pos_prompt_embeds, pos_prompt_mask = self._load_text_conditioning(
+            context=context,
+            conditioning_name=self.positive_conditioning.conditioning_name,
+            dtype=inference_dtype,
+            device=device,
+        )
+
+        neg_prompt_embeds = None
+        neg_prompt_mask = None
+        # Match the diffusers pipeline: only enable CFG when cfg_scale > 1 AND negative conditioning is provided.
+        # With cfg_scale <= 1, the negative prediction is unused, so skip it entirely.
+        # For per-step arrays, enable CFG if any step has scale > 1.
+        if isinstance(self.cfg_scale, list):
+            any_cfg_above_one = any(v > 1.0 for v in self.cfg_scale)
+        else:
+            any_cfg_above_one = self.cfg_scale > 1.0
+        do_classifier_free_guidance = self.negative_conditioning is not None and any_cfg_above_one
+        if do_classifier_free_guidance:
+            neg_prompt_embeds, neg_prompt_mask = self._load_text_conditioning(
+                context=context,
+                conditioning_name=self.negative_conditioning.conditioning_name,
+                dtype=inference_dtype,
+                device=device,
+            )
+
+        # Prepare the timestep / sigma schedule
+        patch_size = transformer_info.model.config.patch_size
+        assert isinstance(patch_size, int)
+        # Output channels is 16 (the actual latent channels)
+        out_channels = transformer_info.model.config.out_channels
+        assert isinstance(out_channels, int)
+
+        latent_height = self.height // LATENT_SCALE_FACTOR
+        latent_width = self.width // LATENT_SCALE_FACTOR
+
+        # Use the actual FlowMatchEulerDiscreteScheduler to compute sigmas/timesteps,
+        # exactly matching the diffusers pipeline.
+        import numpy as np
+
+        model_path = context.models.get_absolute_path(context.models.get_config(self.transformer.transformer))
+        scheduler, mu = self._schedule(model_path, self.width, self.height, patch_size, self.shift)
+
+        init_sigmas = np.linspace(1.0, 1.0 / self.steps, self.steps).tolist()
+        scheduler.set_timesteps(sigmas=init_sigmas, mu=mu, device=device)
+
+        # Clip the schedule based on denoising_start/denoising_end to support img2img strength.
+        # The scheduler's sigmas go from high (noisy) to 0 (clean). We clip to the fractional range.
+        sigmas_sched = scheduler.sigmas  # (N+1,) including terminal 0
+        if self.denoising_start > 0 or self.denoising_end < 1:
+            total_sigmas = len(sigmas_sched) - 1  # exclude terminal
+            start_idx = int(round(self.denoising_start * total_sigmas))
+            end_idx = int(round(self.denoising_end * total_sigmas))
+            sigmas_sched = sigmas_sched[start_idx : end_idx + 1]  # +1 to include the next sigma for dt
+            # Rebuild timesteps from clipped sigmas (exclude terminal 0)
+            timesteps_sched = sigmas_sched[:-1] * scheduler.config.num_train_timesteps
+        else:
+            timesteps_sched = scheduler.timesteps
+
+        total_steps = len(timesteps_sched)
+
+        cfg_scale = self._prepare_cfg_scale(total_steps)
+
+        # Load initial latents if provided (for img2img)
+        init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
+        if init_latents is not None:
+            init_latents = init_latents.to(device=device, dtype=inference_dtype)
+            if init_latents.dim() == 5:
+                init_latents = init_latents.squeeze(2)
+
+        # Load reference image latents if provided
+        ref_latents = None
+        if self.reference_latents is not None:
+            ref_latents = context.tensors.load(self.reference_latents.latents_name)
+            ref_latents = ref_latents.to(device=device, dtype=inference_dtype)
+            # The VAE encoder produces 5D latents (B, C, 1, H, W); squeeze the frame dim
+            # so we have 4D (B, C, H, W) for packing.
+            if ref_latents.dim() == 5:
+                ref_latents = ref_latents.squeeze(2)
+
+        # Generate noise (16 channels - the output latent channels)
+        noise = self._get_noise(
+            batch_size=1,
+            num_channels_latents=out_channels,
+            height=self.height,
+            width=self.width,
+            dtype=inference_dtype,
+            device=device,
+            seed=self.seed,
+        )
+
+        # Prepare input latent image
+        if init_latents is not None:
+            s_0 = sigmas_sched[0].item()
+            latents = s_0 * noise + (1.0 - s_0) * init_latents
+        else:
+            if self.denoising_start > 1e-5:
+                raise ValueError("denoising_start should be 0 when initial latents are not provided.")
+            latents = noise
+
+        if total_steps <= 0:
+            return latents
+
+        # Pack latents into 2x2 patches: (B, C, H, W) -> (B, H/2*W/2, C*4)
+        latents = self._pack_latents(latents, 1, out_channels, latent_height, latent_width)
+
+        # Edit models (zero_cond_t=True) expect [noisy_patches ; ref_patches] in the sequence.
+        # Txt2img models (zero_cond_t=False) only take noisy patches.
+        use_ref_latents = has_zero_cond_t
+
+        ref_latents_packed = None
+        ref_latent_height = latent_height
+        ref_latent_width = latent_width
+        if use_ref_latents:
+            if ref_latents is not None:
+                # Defense-in-depth: backend callers (direct API, older graph JSON)
+                # may wire qwen_image_i2l without explicit width/height, producing
+                # a native-resolution reference latent. Clamp here so the
+                # transformer always sees an in-distribution sequence length.
+                ref_latents = self._maybe_clamp_ref_latent_size(ref_latents)
+                _, _, rh, rw = ref_latents.shape
+                ref_latent_height, ref_latent_width = self._align_ref_latent_dims(rh, rw)
+                if ref_latent_height != rh or ref_latent_width != rw:
+                    ref_latents = ref_latents[..., :ref_latent_height, :ref_latent_width]
+            else:
+                # No reference image provided — use zeros so the model still gets the
+                # expected sequence layout.
+                ref_latents = torch.zeros(
+                    1, out_channels, latent_height, latent_width, device=device, dtype=inference_dtype
+                )
+            ref_latents_packed = self._pack_latents(ref_latents, 1, out_channels, ref_latent_height, ref_latent_width)
+
+        # img_shapes tells the transformer the spatial layout of patches. The reference
+        # segment must use the reference latent's own dimensions so RoPE positions it
+        # distinctly from the noisy latent — otherwise the two segments share spatial
+        # positional encoding and the model can't disentangle them, producing a
+        # ghost/doubling artifact across the whole frame. Matches diffusers'
+        # QwenImageEditPipeline / QwenImageEditPlusPipeline.
+        if use_ref_latents:
+            img_shapes = self._build_img_shapes(latent_height, latent_width, ref_latent_height, ref_latent_width)
+        else:
+            img_shapes = self._build_img_shapes(latent_height, latent_width)
+
+        # Prepare inpaint extension (operates in 4D space, so unpack/repack around it)
+        inpaint_mask = self._prep_inpaint_mask(context, noise)  # noise has the right 4D shape
+        inpaint_extension: RectifiedFlowInpaintExtension | None = None
+        if inpaint_mask is not None:
+            assert init_latents is not None
+            inpaint_extension = RectifiedFlowInpaintExtension(
+                init_latents=init_latents,
+                inpaint_mask=inpaint_mask,
+                noise=noise,
+            )
+
+        step_callback = self._build_step_callback(context)
+
+        step_callback(
+            PipelineIntermediateState(
+                step=0,
+                order=1,
+                total_steps=total_steps,
+                timestep=int(timesteps_sched[0].item()) if len(timesteps_sched) > 0 else 0,
+                latents=self._unpack_latents(latents, latent_height, latent_width),
+            ),
+        )
+
+        noisy_seq_len = latents.shape[1]
+        model_input_seq_len = noisy_seq_len + (ref_latents_packed.shape[1] if ref_latents_packed is not None else 0)
+
+        transformer_config = context.models.get_config(self.transformer.transformer)
+        # The forward's activations, which the cache keeps free by offloading as much of the transformer as that
+        # takes, plus the per-forward dequantization transient of an nvfp4 or GGUF build, alive alongside them and
+        # invisible to the estimate. All read from the unlocked model, before the lock; the transient is zero for a
+        # dense build.
+        text_seq_len = max(
+            pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0
+        )
+        working_mem_bytes = self._estimate_working_memory(
+            image_seq_len=model_input_seq_len,
+            text_seq_len=text_seq_len,
+            element_size=inference_dtype.itemsize,
+            control_model=control_model,
+        )
+        # Where SDPA has no fused kernel for the joint [text ; image] sequence (ROCm on Windows, MPS) it materializes
+        # the score matrices, which the linear term above was not priced for: 24 heads x 4608^2 scores is ~1 GB at
+        # 1024px with a 512-token prompt. A text mask, when the encoder emits one, narrows which fused kernels apply.
+        working_mem_bytes += self._attention_score_bytes(
+            transformer_info.model,
+            seq_len=model_input_seq_len + text_seq_len,
+            device=device,
+            dtype=inference_dtype,
+            has_attention_mask=pos_prompt_mask is not None or neg_prompt_mask is not None,
+        )
+        working_mem_bytes += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
+
+        # Encoded ahead of the transformer's lock, so the VAE does not have to fit beside it.
+        control_context: torch.Tensor | None = None
+        if control_model is not None:
+            control_context = self._build_control_context(context, control_model, latent_height, latent_width)
+            control_context = control_context.to(device=device, dtype=inference_dtype)
+
+        with ExitStack() as exit_stack:
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_mem_bytes=working_mem_bytes)
+            )
+            assert isinstance(transformer, QwenImageTransformer2DModel)
+            control_hooks: FunControlHooks | None = None
+            controlnet: QwenImageControlNetModel | None = None
+            if control_info is not None:
+                assert self.control is not None and control_context is not None
+                # Locked with the same working memory: the transformer can no longer be offloaded, so a control model
+                # placed with only the default reservation would fill the room kept for the forward.
+                (_, locked_control) = exit_stack.enter_context(
+                    control_info.model_on_device(working_mem_bytes=working_mem_bytes)
+                )
+                if isinstance(locked_control, QwenImageControlNetModel):
+                    # Run beside the transformer and fed what it is fed: loaded by the same dtype policy, it takes the
+                    # same activations and hands its residuals back in the dtype the transformer adds them in.
+                    controlnet = locked_control
+                else:
+                    assert isinstance(locked_control, QwenImageFunControlBranch)
+                    # Dtype invariant: the loader cast the branch to the device's bfloat16-safe dtype, the policy the
+                    # transformer loaders follow, which is `inference_dtype` wherever this node runs. Should the safe
+                    # dtype ever be another one, the branch still runs its chain in its own dtype and casts every
+                    # tensor on the way in and the hint on the way out (`QwenImageFunControlBranch.block_runner` /
+                    # `add_hint`), so no cache-managed module is cast here.
+                    control_hooks = exit_stack.enter_context(
+                        install_fun_control(
+                            transformer, locked_control, control_context, scale=self.control.control_context_scale
+                        )
+                    )
+            # Quantized weights (packed nvfp4 Linears, GGUF, SDNQ) cannot take a direct patch, so their LoRAs ride as
+            # sidecars. Asked of the loaded module tree: a `checkpoint` build may hold packed Linears.
+            model_is_quantized = requires_sidecar_patching(transformer, transformer_config.format)
+
+            # Apply LoRA patches to the transformer
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
+                    dtype=inference_dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=model_is_quantized,
+                )
+            )
+
+            exit_stack.enter_context(sage_attention_scope())
+
+            for step_idx, t in enumerate(tqdm(timesteps_sched)):
+                # One gate per step: both guidance branches run with the control, or neither does.
+                control_active = self.control is not None and should_apply(
+                    step_idx, total_steps, self.control.begin_step_percent, self.control.end_step_percent
+                )
+                if control_hooks is not None:
+                    control_hooks.active = control_active
+
+                # The pipeline passes timestep / 1000 to the transformer
+                timestep = t.expand(latents.shape[0]).to(inference_dtype)
+
+                # For edit models: concatenate noisy and reference patches along the sequence dim
+                # For txt2img models: just use noisy patches
+                if ref_latents_packed is not None:
+                    model_input = torch.cat([latents, ref_latents_packed], dim=1)
+                else:
+                    model_input = latents
+
+                # The InstantX ControlNet runs once per step, on the positive prompt, and both guidance branches add
+                # its residuals, already scaled: diffusers' QwenImageControlNetPipeline. Skipped outside the step range.
+                controlnet_block_samples: list[torch.Tensor] | None = None
+                if controlnet is not None and control_active:
+                    assert self.control is not None
+                    controlnet_block_samples = controlnet(
+                        hidden_states=model_input,
+                        controlnet_cond=control_context,
+                        conditioning_scale=self.control.control_context_scale,
+                        encoder_hidden_states=pos_prompt_embeds,
+                        encoder_hidden_states_mask=pos_prompt_mask,
+                        timestep=timestep / 1000,
+                        img_shapes=img_shapes,
+                        return_dict=False,
+                    )
+
+                noise_pred_cond = transformer(
+                    hidden_states=model_input,
+                    encoder_hidden_states=pos_prompt_embeds,
+                    encoder_hidden_states_mask=pos_prompt_mask,
+                    timestep=timestep / 1000,
+                    img_shapes=img_shapes,
+                    controlnet_block_samples=controlnet_block_samples,
+                    return_dict=False,
+                )[0]
+                # Only keep the noisy-latent portion of the output
+                noise_pred_cond = noise_pred_cond[:, :noisy_seq_len]
+
+                if do_classifier_free_guidance and neg_prompt_embeds is not None:
+                    noise_pred_uncond = transformer(
+                        hidden_states=model_input,
+                        encoder_hidden_states=neg_prompt_embeds,
+                        encoder_hidden_states_mask=neg_prompt_mask,
+                        timestep=timestep / 1000,
+                        img_shapes=img_shapes,
+                        controlnet_block_samples=controlnet_block_samples,
+                        return_dict=False,
+                    )[0]
+                    noise_pred_uncond = noise_pred_uncond[:, :noisy_seq_len]
+
+                    noise_pred = noise_pred_uncond + cfg_scale[step_idx] * (noise_pred_cond - noise_pred_uncond)
+                else:
+                    noise_pred = noise_pred_cond
+
+                # Euler step using the (possibly clipped) sigma schedule
+                sigma_curr = sigmas_sched[step_idx]
+                sigma_next = sigmas_sched[step_idx + 1]
+                dt = sigma_next - sigma_curr
+                latents = latents.to(torch.float32) + dt * noise_pred.to(torch.float32)
+                latents = latents.to(inference_dtype)
+
+                if inpaint_extension is not None:
+                    sigma_next = sigmas_sched[step_idx + 1].item()
+                    latents_4d = self._unpack_latents(latents, latent_height, latent_width)
+                    latents_4d = inpaint_extension.merge_intermediate_latents_with_init_latents(latents_4d, sigma_next)
+                    latents = self._pack_latents(latents_4d, 1, out_channels, latent_height, latent_width)
+
+                step_callback(
+                    PipelineIntermediateState(
+                        step=step_idx + 1,
+                        order=1,
+                        total_steps=total_steps,
+                        timestep=int(t.item()),
+                        latents=self._unpack_latents(latents, latent_height, latent_width),
+                    ),
+                )
+
+        # Unpack back to 4D then add frame dim for the video-style VAE: (B, C, 1, H, W)
+        latents = self._unpack_latents(latents, latent_height, latent_width)
+        latents = latents.unsqueeze(2)
+        return latents
+
+    def _load_control_model(
+        self, context: InvocationContext, has_zero_cond_t: bool
+    ) -> tuple[LoadedModel, QwenImageControlModel] | tuple[None, None]:
+        """The ControlNet in RAM, and the model it holds, ahead of the transformer's lock so the reservation can size
+        what the ControlNet keeps alive."""
+        if self.control is None:
+            return None, None
+        if self.vae is None:
+            raise ValueError(
+                "Qwen Image ControlNet needs the VAE that encodes its images: connect one to the 'vae' input."
+            )
+        if self.reference_latents is not None:
+            raise ValueError("Qwen Image ControlNet cannot be combined with reference latents.")
+        # Both ControlNets were trained beside the generation transformer. An Edit transformer takes a
+        # [noisy ; reference] sequence and modulates the two apart (zero_cond_t), a layout neither ever saw.
+        if has_zero_cond_t:
+            raise ValueError(
+                "Qwen Image ControlNet applies to the Qwen Image generation transformer, not to an Edit transformer."
+            )
+        control_info = context.models.load(self.control.control_model)
+        control_model = control_info.model
+        if isinstance(control_model, QwenImageControlNetModel):
+            # Its control input is the control image's latent and nothing else: no mask or masked-image channels
+            # an inpainting condition could go into.
+            if self.control.inpaint_image_name is not None or self.control.inpaint_mask_name is not None:
+                raise ValueError(
+                    f"'{self.control.control_model.name}' is an InstantX Qwen Image ControlNet, which takes a control "
+                    "image only and has no inpainting condition: disconnect the inpaint image and mask."
+                )
+        elif not isinstance(control_model, QwenImageFunControlBranch):
+            raise TypeError(
+                f"Expected a Qwen Image ControlNet for '{self.control.control_model.name}', "
+                f"got {type(control_model).__name__}."
+            )
+        return control_info, control_model
+
+    @staticmethod
+    def _estimate_working_memory(
+        image_seq_len: int,
+        text_seq_len: int,
+        element_size: int,
+        *,
+        control_model: QwenImageControlModel | None = None,
+    ) -> int:
+        """Peak transformer activations, in bytes, for the model cache to keep free.
+
+        Estimates pending calibration on this transformer. 0.25 MiB per token plus a 1 GiB base are the figures the
+        Qwen-Image-2.1 node reserves, measured there at 0.14 MiB per token in bf16 on an RTX 4090, with the margin
+        for the allocator. The per-token term is a bf16 figure and scales with `element_size`, the compute dtype's
+        width. The guidance branches run one after the other, so CFG adds nothing to the peak.
+
+        A ControlNet adds image-sized tensors (one batch item, `image_seq_len` tokens at its width):
+
+        - The Fun branch runs its blocks over the image sequence and keeps one hint per block alive until the last
+          listed base layer has consumed it. `blocks + 4` is what Z-Image measured for its adapter over the plain
+          forward (`z_image_denoise.py`), pending the same measurement here.
+        - The InstantX ControlNet adds no fitted coefficient, only what provably stays alive. It runs its forward
+          before the transformer's: its blocks are the transformer's at the same joint sequence and never run beside
+          them, so their activations are inside the base term, and so is the transient at the end of its forward
+          (block outputs, projections, scaled copies: three image-sized tensors per block, under a tenth of the
+          per-token base at Qwen-Image's width). What stays alive through both guidance forwards is the list of
+          scaled residuals, one per block: exactly `blocks` tensors.
+        """
+        mib, gib = 1024**2, 1024**3
+        width = element_size / 2
+        estimated = int((image_seq_len + text_seq_len) * 0.25 * mib * width) + gib
+        if control_model is None:
+            return estimated
+        if isinstance(control_model, QwenImageFunControlBranch):
+            estimated += (
+                (len(control_model.control_blocks) + 4) * image_seq_len * control_model.hidden_size * element_size
+            )
+        else:
+            # The alias's other member. Not `elif` + `assert_never`: mypy cannot narrow a diffusers model class out of
+            # a union, so the remainder would never type as `Never`.
+            estimated += len(control_model.controlnet_blocks) * image_seq_len * control_model.inner_dim * element_size
+        return estimated
+
+    @staticmethod
+    def _attention_score_bytes(
+        transformer: object, *, seq_len: int, device: torch.device, dtype: torch.dtype, has_attention_mask: bool
+    ) -> int:
+        """The score matrix attention materializes on a build without a fused kernel for it (0 where it has one).
+
+        Every block attends the joint [text ; image] sequence once per forward through diffusers' attention dispatch;
+        the padding mask, when the encoder emits one, reaches the kernel as an additive mask.
+        """
+        config = getattr(transformer, "config", None)
+        num_heads = getattr(config, "num_attention_heads", None)
+        head_dim = getattr(config, "attention_head_dim", None)
+        if not isinstance(num_heads, int) or not isinstance(head_dim, int):
+            return 0
+        return sdpa_score_matrix_bytes(
+            device=device,
+            dtype=dtype,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            seq_len=seq_len,
+            has_attn_mask=has_attention_mask,
+            via_diffusers_dispatch=True,
+        )
+
+    def _build_control_context(
+        self, context: InvocationContext, control_model: QwenImageControlModel, latent_height: int, latent_width: int
+    ) -> torch.Tensor:
+        """The packed control context at the generation size, from the control field's images, as ``control_model``
+        takes it: ``(1, S_img, 132)`` control, keep-mask and masked-image latents for the Fun branch, ``(1, S_img, 64)``
+        the control image's latents alone for the InstantX ControlNet (diffusers' QwenImageControlNetPipeline)."""
+        assert self.control is not None and self.vae is not None
+        control = self.control
+        vae_info = context.models.load(self.vae.vae)
+        tiled = control.tiled or context.config.get().force_tiled_decode
+
+        def encode(pixels: torch.Tensor) -> torch.Tensor:
+            latents = QwenImageImageToLatentsInvocation.vae_encode(
+                vae_info=vae_info, image_tensor=pixels, tiled=tiled, tile_size=control.tile_size
+            )
+            # The video-style VAE returns (B, C, 1, h, w); the context is one frame.
+            return latents.squeeze(2)
+
+        def pixels(image_name: str, mode: str) -> torch.Tensor:
+            image = context.images.get_pil(image_name).convert(mode)
+            resample = Image.Resampling.LANCZOS if mode == "RGB" else Image.Resampling.BILINEAR
+            image = image.resize((self.width, self.height), resample)
+            # (1, C, H, W): pixels in [-1, 1], a mask in [0, 1].
+            return image_resized_to_grid_as_tensor(image, normalize=mode == "RGB", multiple_of=16).unsqueeze(0)
+
+        if isinstance(control_model, QwenImageFunControlBranch):
+            context_4d = build_fun_control_context(
+                encode=encode,
+                control_image=pixels(control.image_name, "RGB") if control.image_name is not None else None,
+                inpaint_image=(
+                    pixels(control.inpaint_image_name, "RGB") if control.inpaint_image_name is not None else None
+                ),
+                inpaint_mask=pixels(control.inpaint_mask_name, "L") if control.inpaint_mask_name is not None else None,
+            )
+        else:
+            # The InstantX ControlNet, the alias's other member (see `_estimate_working_memory`).
+            assert control.image_name is not None
+            context_4d = encode(pixels(control.image_name, "RGB"))
+        return self._pack_latents(context_4d, 1, context_4d.shape[1], latent_height, latent_width)
+
+    def _build_step_callback(self, context: InvocationContext) -> Callable[[PipelineIntermediateState], None]:
+        def step_callback(state: PipelineIntermediateState) -> None:
+            context.util.sd_step_callback(state, BaseModelType.QwenImage)
+
+        return step_callback
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        """Iterate over LoRA models to apply to the transformer."""
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

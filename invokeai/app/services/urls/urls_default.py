@@ -1,4 +1,5 @@
 import os
+from urllib.parse import quote
 
 from invokeai.app.services.urls.urls_base import UrlServiceBase
 
@@ -27,7 +28,9 @@ class LocalUrlService(UrlServiceBase):
         return f"{self._base_url}/videos/i/{video_basename}/full"
 
     def get_model_image_url(self, model_key: str) -> str:
-        return f"{self._base_url_v2}/models/i/{model_key}/image"
+        # A key stored by an older version can hold URL syntax (`?`, `#`, `%`); unencoded, `X?y` would address the
+        # route for model `X` instead of this image.
+        return f"{self._base_url_v2}/models/i/{quote(model_key, safe='')}/image"
 
     def get_style_preset_image_url(self, style_preset_id: str) -> str:
         return f"{self._base_url}/style_presets/i/{style_preset_id}/image"

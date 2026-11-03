@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
-from transformers import LlamaConfig, LlamaForCausalLM
+from PIL import Image
+from transformers import BatchFeature, LlamaConfig, LlamaForCausalLM
 
 from invokeai.backend import text_llm_pipeline
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, TextLLMPipeline, _SeededMultinomialMode
@@ -484,3 +485,35 @@ def test_default_system_prompt_content():
     """The default system prompt should mention image generation."""
     assert "image generation" in DEFAULT_SYSTEM_PROMPT.lower()
     assert "prompt" in DEFAULT_SYSTEM_PROMPT.lower()
+
+
+def test_pipeline_conditions_on_an_image_through_the_processor():
+    """The image goes to the processor next to the rendered template, and its pixels reach generate() in
+    the model's dtype while the token ids stay integral."""
+    tokenizer = _make_mock_tokenizer(has_chat_template=True)
+    model = _make_mock_model()
+    model.dtype = torch.bfloat16
+    processor = MagicMock(
+        return_value=BatchFeature(
+            {"input_ids": torch.tensor([[1, 2, 3]]), "pixel_values": torch.zeros(1, 3, 4, 4, dtype=torch.float32)}
+        )
+    )
+    image = Image.new("RGB", (8, 8))
+    pipeline = TextLLMPipeline(model, tokenizer, processor)
+
+    with _patch_streamer():
+        pipeline.run(prompt="she waves", system_prompt="S", device=torch.device("cpu"), image=image)
+
+    messages = tokenizer.apply_chat_template.call_args[0][0]
+    assert messages[-1] == {"role": "user", "content": [{"type": "image"}, {"type": "text", "text": "she waves"}]}
+    assert processor.call_args.kwargs["images"] == [image]
+    tokenizer.assert_not_called()
+    generate_kwargs = model.generate.call_args.kwargs
+    assert generate_kwargs["pixel_values"].dtype == torch.bfloat16
+    assert generate_kwargs["input_ids"].dtype == torch.long
+
+
+def test_pipeline_refuses_an_image_without_a_processor():
+    pipeline = TextLLMPipeline(_make_mock_model(), _make_mock_tokenizer(has_chat_template=True))
+    with pytest.raises(ValueError, match="multimodal model"):
+        pipeline.run(prompt="a cat", image=Image.new("RGB", (8, 8)))

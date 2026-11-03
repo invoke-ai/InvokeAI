@@ -11,7 +11,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from invokeai.app.invocations.flux_model_loader import FluxModelLoaderInvocation
+from invokeai.app.invocations.flux.flux_model_loader import FluxModelLoaderInvocation
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.model_manager.configs.main import Main_SDNQ_Diffusers_FLUX_Config
 from invokeai.backend.model_manager.taxonomy import (

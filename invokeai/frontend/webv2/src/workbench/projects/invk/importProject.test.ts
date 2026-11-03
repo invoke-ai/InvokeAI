@@ -1,0 +1,451 @@
+import { describe, expect, it, vi } from 'vitest';
+
+import type { InvkBoardItem } from './board';
+
+import { binaryEntry, INVK_MAX_ARCHIVE_BYTES, textEntry, writeArchive } from './archive';
+import {
+  createArchiveMediaMaterializer,
+  type InvkArchiveContents,
+  readInvkArchive,
+  restoreArchiveMedia,
+} from './importProject';
+import { createRestoredMediaLedger } from './restoreProjectMedia';
+
+/** The archive's boards, every one staged on the same board: these archives carry only an inbox. */
+const stagedOn = (archive: InvkArchiveContents, stagingBoardId: string) =>
+  (archive.boardSnapshot?.boards ?? []).map((board) => ({ board, stagingBoardId }));
+
+const imageRef = (imageName: string) => ({ height: 64, imageName, width: 64 });
+
+const document = () => ({
+  canvas: { document: { layers: [{ id: 'l1', source: { image: imageRef('a.png'), type: 'image' } }] } },
+  id: 'project-1',
+  layout: {},
+  name: 'My project',
+});
+
+const manifest = (overrides: Record<string, unknown> = {}) => ({
+  appVersion: '7.0',
+  contents: 'workbench-project',
+  createdAt: '2026-08-04T00:00:00.000Z',
+  name: 'My project',
+  version: 2,
+  ...overrides,
+});
+
+const boardItem = (overrides: Partial<InvkBoardItem> = {}): InvkBoardItem => ({
+  category: 'general',
+  kind: 'image',
+  name: 'a.png',
+  starred: false,
+  ...overrides,
+});
+
+const inboxBoard = (items: InvkBoardItem[]) => ({ archived: false, isInbox: true, items, name: 'My project' });
+
+const boardEntry = (items: InvkBoardItem[] = [boardItem()]) =>
+  JSON.stringify({ boards: [inboxBoard(items)], version: 2 });
+
+const archiveFile = async (entries: Record<string, string | Uint8Array>): Promise<File> => {
+  const blob = await writeArchive(
+    new Map(
+      Object.entries(entries).map(([path, value]) => [
+        path,
+        typeof value === 'string' ? textEntry(value) : binaryEntry(value),
+      ])
+    )
+  );
+
+  return new File([blob], 'project.invk');
+};
+
+const validArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
+  archiveFile({
+    'images/a.png': new Uint8Array([1, 2, 3]),
+    'manifest.json': JSON.stringify(manifest()),
+    'project.json': JSON.stringify(document()),
+    ...overrides,
+  });
+
+/** The archive this app writes: a document, its bytes, and the project board it came from. */
+const boardArchive = (overrides: Record<string, string | Uint8Array> = {}) =>
+  archiveFile({
+    'board.json': boardEntry(),
+    'images/a.png': new Uint8Array([1, 2, 3]),
+    'manifest.json': JSON.stringify(manifest()),
+    'project.json': JSON.stringify(document()),
+    ...overrides,
+  });
+
+describe('readInvkArchive', () => {
+  it('refuses an oversized file before allocating its bytes', async () => {
+    const arrayBuffer = vi.fn(() => Promise.resolve(new ArrayBuffer(0)));
+    const file = { arrayBuffer, size: INVK_MAX_ARCHIVE_BYTES + 1 } as unknown as File;
+
+    await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'too-large' });
+    expect(arrayBuffer).not.toHaveBeenCalled();
+  });
+
+  it('returns the manifest, document and bundled images', async () => {
+    const contents = await readInvkArchive(await validArchive());
+
+    expect(contents.manifest.name).toBe('My project');
+    expect(contents.projectDocument).toEqual(document());
+    expect([...contents.images.keys()]).toEqual(['a.png']);
+    expect(contents.cover).toBeNull();
+  });
+
+  it('reads a v3 archive’s workspace beside its content, and none from an older archive', async () => {
+    const workspace = { canvas: { selectedLayerId: null }, layout: { mode: 'kept' } };
+    const v3 = manifest({ documentSchemaVersion: 4, version: 3 });
+
+    const withWorkspace = await readInvkArchive(
+      await validArchive({ 'manifest.json': JSON.stringify(v3), 'workspace.json': JSON.stringify(workspace) })
+    );
+    const without = await readInvkArchive(await validArchive({ 'manifest.json': JSON.stringify(v3) }));
+    const older = await readInvkArchive(await validArchive({ 'workspace.json': JSON.stringify(workspace) }));
+
+    expect(withWorkspace.workspace).toEqual(workspace);
+    expect(without.workspace).toBeNull();
+    expect(older.workspace).toBeNull();
+    await expect(
+      readInvkArchive(await validArchive({ 'manifest.json': JSON.stringify(v3), 'workspace.json': '[1]' }))
+    ).rejects.toMatchObject({ reason: 'damaged' });
+  });
+
+  it('refuses a newer document or canvas schema by its manifest, before reading what it carries', async () => {
+    // Entries a newer build may shape differently: read first, they would look damaged.
+    const unreadable = { 'project.json': '{', 'workspace.json': '[1]' };
+
+    await expect(
+      readInvkArchive(
+        await validArchive({
+          ...unreadable,
+          'manifest.json': JSON.stringify(manifest({ documentSchemaVersion: 5, version: 3 })),
+        })
+      )
+    ).rejects.toMatchObject({ message: 'Project requires document schema 5.', reason: 'unsupported-version' });
+    await expect(
+      readInvkArchive(
+        await validArchive({
+          ...unreadable,
+          'manifest.json': JSON.stringify(manifest({ minimumCanvasSchemaVersion: 99 })),
+        })
+      )
+    ).rejects.toMatchObject({ message: 'Project requires canvas schema 99.', reason: 'unsupported-version' });
+  });
+
+  /** Missing board entries retain legacy semantics; explicit empty entries describe an empty board. */
+  it('reads an archive with no board enumeration as naming no board', async () => {
+    const contents = await readInvkArchive(await validArchive());
+
+    expect(contents.boardSnapshot).toBeNull();
+  });
+
+  it('reads and canonicalizes a board enumeration', async () => {
+    const contents = await readInvkArchive(
+      await boardArchive({
+        'board.json': boardEntry([boardItem({ name: 'z.png' }), boardItem({ kind: 'video', name: 'a.mp4' })]),
+      })
+    );
+
+    // Sorted by kind then name, whatever order the writer used.
+    expect(contents.boardSnapshot?.boards[0]?.items.map((item) => item.name)).toEqual(['z.png', 'a.mp4']);
+  });
+
+  it('reads an empty board without inventing anything', async () => {
+    const contents = await readInvkArchive(await boardArchive({ 'board.json': boardEntry([]) }));
+
+    expect(contents.boardSnapshot).toEqual({ boards: [inboxBoard([])], version: 2 });
+  });
+
+  it.each([
+    ['unparseable', 'not json'],
+    ['a duplicate descriptor', JSON.stringify({ boards: [inboxBoard([boardItem(), boardItem()])], version: 2 })],
+    ['an unsafe name', JSON.stringify({ boards: [inboxBoard([boardItem({ name: '../escape.png' })])], version: 2 })],
+  ])('reports a board enumeration that is %s as damaged', async (_case, contents) => {
+    await expect(readInvkArchive(await boardArchive({ 'board.json': contents }))).rejects.toMatchObject({
+      reason: 'damaged',
+    });
+  });
+
+  /** A ZIP path is attacker-controlled text; a media name from the server never has a separator. */
+  it('ignores bundled entries whose names are not plain basenames', async () => {
+    const contents = await readInvkArchive(
+      await validArchive({
+        'images/': new Uint8Array([]),
+        'images/nested/deep.png': new Uint8Array([4]),
+      })
+    );
+
+    expect([...contents.images.keys()]).toEqual(['a.png']);
+  });
+
+  it('resolves the cover entry named by the manifest', async () => {
+    const contents = await readInvkArchive(
+      await archiveFile({
+        'cover.webp': new Uint8Array([9, 9]),
+        'manifest.json': JSON.stringify(manifest({ cover: 'cover.webp' })),
+        'project.json': JSON.stringify(document()),
+      })
+    );
+
+    expect(contents.cover).toEqual({ bytes: new Uint8Array([9, 9]), entryName: 'cover.webp' });
+  });
+
+  it('refuses a legacy canvas project by name', async () => {
+    const file = await archiveFile({
+      'canvas_state.json': '{}',
+      'manifest.json': JSON.stringify({ appVersion: '6.9', createdAt: '', name: 'Canvas', version: 1 }),
+    });
+
+    await expect(readInvkArchive(file)).rejects.toMatchObject({ reason: 'legacy-canvas-project' });
+  });
+
+  it.each([
+    ['an archive with no manifest', () => archiveFile({ 'project.json': '{}' }), 'not-a-project'],
+    ['a file that is not a ZIP', () => new File(['not a zip'], 'project.invk'), 'not-a-project'],
+    ['a manifest with no document', () => archiveFile({ 'manifest.json': JSON.stringify(manifest()) }), 'damaged'],
+    ['an unparseable document', () => validArchive({ 'project.json': 'not json' }), 'damaged'],
+    ['a document that is an array', () => validArchive({ 'project.json': '[]' }), 'damaged'],
+  ])('refuses %s as %s', async (_label, build, reason) => {
+    await expect(readInvkArchive(await build())).rejects.toMatchObject({ name: 'InvkFormatError', reason });
+  });
+});
+
+describe('createArchiveMediaMaterializer', () => {
+  const bytes = (value: number) => new Uint8Array([value]);
+  const archive = () => ({
+    images: new Map([['a.png', bytes(1)]]),
+    videos: new Map([['clip.mp4', bytes(2)]]),
+  });
+
+  it('uploads each descriptor to the staging board under its archived category', async () => {
+    const uploadBoardImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'fresh.png', width: 1 }));
+    const uploadBoardVideo = vi.fn(() => Promise.resolve({ videoName: 'fresh.mp4' }));
+    const materialize = createArchiveMediaMaterializer(archive(), { uploadBoardImage, uploadBoardVideo });
+    const settled = vi.fn();
+
+    const result = await materialize(
+      [
+        {
+          items: [boardItem({ category: 'control' }), boardItem({ category: 'user', kind: 'video', name: 'clip.mp4' })],
+          stagingBoardId: 'staging',
+        },
+      ],
+      settled
+    );
+
+    expect(uploadBoardImage).toHaveBeenCalledWith(bytes(1), 'a.png', {
+      boardId: 'staging',
+      category: 'control',
+      contentType: 'image/png',
+    });
+    expect(uploadBoardVideo).toHaveBeenCalledWith(bytes(2), 'clip.mp4', {
+      boardId: 'staging',
+      category: 'user',
+      contentType: 'video/mp4',
+    });
+    expect(result.materialized).toEqual([
+      { kind: 'image', name: 'fresh.png', sourceName: 'a.png' },
+      { kind: 'video', name: 'fresh.mp4', sourceName: 'clip.mp4' },
+    ]);
+    expect(settled).toHaveBeenCalledTimes(2);
+  });
+
+  /** Never an existence check: board media is copied, never adopted. See `restoreProjectMedia`. */
+  it('uploads a descriptor whose name the destination may already hold', async () => {
+    const uploadBoardImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `server-${fileName}`, width: 1 })
+    );
+    const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
+      [{ items: [boardItem()], stagingBoardId: 'staging' }],
+      () => undefined
+    );
+
+    expect(result.materialized).toEqual([{ kind: 'image', name: 'server-a.png', sourceName: 'a.png' }]);
+  });
+
+  it('reports a descriptor the archive carried no bytes for', async () => {
+    const uploadBoardImage = vi.fn(() => Promise.reject(new Error('should not be called')));
+    const result = await createArchiveMediaMaterializer(archive(), { uploadBoardImage })(
+      [{ items: [boardItem({ name: 'absent.png' })], stagingBoardId: 'staging' }],
+      () => undefined
+    );
+
+    expect(result.failed).toEqual([{ kind: 'image', name: 'absent.png', reason: 'missing-entry' }]);
+    expect(uploadBoardImage).not.toHaveBeenCalled();
+  });
+
+  it('reports a rejected upload without abandoning the rest of the board', async () => {
+    const uploadBoardImage = vi.fn((_bytes: Uint8Array, fileName: string) =>
+      fileName === 'a.png'
+        ? Promise.reject(new Error('rejected'))
+        : Promise.resolve({ height: 1, imageName: 'fresh.png', width: 1 })
+    );
+    const withSecond = archive();
+
+    withSecond.images.set('b.png', bytes(3));
+
+    const result = await createArchiveMediaMaterializer(withSecond, { uploadBoardImage })(
+      [{ items: [boardItem(), boardItem({ name: 'b.png' })], stagingBoardId: 'staging' }],
+      () => undefined
+    );
+
+    expect(result.failed).toEqual([{ kind: 'image', name: 'a.png', reason: 'upload-failed' }]);
+    expect(result.materialized).toEqual([{ kind: 'image', name: 'fresh.png', sourceName: 'b.png' }]);
+  });
+
+  it('uploads across boards at once, so many small boards are not restored one at a time', async () => {
+    const images = new Map(['a.png', 'b.png', 'c.png'].map((name, index) => [name, bytes(index)]));
+    const releases: (() => void)[] = [];
+    const uploadBoardImage = vi.fn(
+      (_bytes: Uint8Array, fileName: string, options: { boardId?: string }) =>
+        new Promise<{ height: number; imageName: string; width: number }>((resolve) => {
+          releases.push(() => resolve({ height: 1, imageName: `${String(options.boardId)}/${fileName}`, width: 1 }));
+        })
+    );
+
+    const materializing = createArchiveMediaMaterializer({ images, videos: new Map() }, { uploadBoardImage })(
+      [
+        { items: [boardItem({ name: 'a.png' })], stagingBoardId: 'one' },
+        { items: [boardItem({ name: 'b.png' })], stagingBoardId: 'two' },
+        { items: [boardItem({ name: 'c.png' })], stagingBoardId: 'three' },
+      ],
+      () => undefined
+    );
+
+    await vi.waitFor(() => expect(uploadBoardImage).toHaveBeenCalledTimes(3));
+    releases.forEach((release) => release());
+
+    expect((await materializing).materialized.map((entry) => entry.name).sort()).toEqual([
+      'one/a.png',
+      'three/c.png',
+      'two/b.png',
+    ]);
+  });
+});
+
+describe('restoreArchiveMedia', () => {
+  const restoreDeps = (overrides = {}) => ({
+    findExistingImageNames: () => Promise.resolve(new Set<string>()),
+    findExistingVideoNames: () => Promise.resolve(new Set<string>()),
+    starImages: () => Promise.resolve({ failed: [] }),
+    starVideos: () => Promise.resolve({ failed: [] }),
+    uploadBoardImage: (_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `board-${fileName}`, width: 1 }),
+    uploadBoardVideo: (_bytes: Uint8Array, fileName: string) => Promise.resolve({ videoName: `board-${fileName}` }),
+    uploadImage: (_bytes: Uint8Array, fileName: string) =>
+      Promise.resolve({ height: 1, imageName: `loose-${fileName}`, width: 1 }),
+    uploadVideo: (_bytes: Uint8Array, fileName: string) => Promise.resolve({ videoName: `loose-${fileName}` }),
+    ...overrides,
+  });
+
+  /** Transfer media shared by board and document once, remapping the document to the copy. */
+  it('restores an overlapping item once and points the document at the copy', async () => {
+    const archive = await readInvkArchive(await boardArchive());
+    const ledger = createRestoredMediaLedger([]);
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
+
+    const result = await restoreArchiveMedia(
+      archive,
+      {
+        ledger,
+        projectDocument: archive.projectDocument,
+        projectId: 'project-new',
+        stagedBoards: stagedOn(archive, 'staging'),
+      },
+      restoreDeps({ uploadImage })
+    );
+
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect([...result.mappings.images]).toEqual([['a.png', 'board-a.png']]);
+    expect(ledger).toMatchObject({ boardImageNames: ['board-a.png'], imageNames: [] });
+  });
+
+  /** Unreferenced board media is exactly what `board.json` exists to carry. */
+  it('restores board media the document never mentions', async () => {
+    const archive = await readInvkArchive(
+      await boardArchive({
+        'board.json': boardEntry([boardItem({ name: 'unreferenced.png', starred: true })]),
+        'images/unreferenced.png': new Uint8Array([5]),
+      })
+    );
+    const ledger = createRestoredMediaLedger([]);
+    const starImages = vi.fn(() => Promise.resolve({ failed: [] }));
+
+    const result = await restoreArchiveMedia(
+      archive,
+      {
+        ledger,
+        projectDocument: archive.projectDocument,
+        projectId: 'project-new',
+        stagedBoards: stagedOn(archive, 'staging'),
+      },
+      restoreDeps({ starImages })
+    );
+
+    expect(ledger.boardImageNames).toEqual(['board-unreferenced.png']);
+    expect(starImages).toHaveBeenCalledWith(['board-unreferenced.png'], undefined);
+    // The document's own `a.png` is not board media here, so it deduplicates as a plain reference.
+    expect(result.mappings.images.get('a.png')).toBe('loose-a.png');
+    expect(ledger.imageNames).toEqual(['loose-a.png']);
+  });
+
+  it('restores an archive with no board as document references only', async () => {
+    const archive = await readInvkArchive(await validArchive());
+    const ledger = createRestoredMediaLedger([]);
+
+    const result = await restoreArchiveMedia(
+      archive,
+      { ledger, projectDocument: archive.projectDocument, projectId: 'project-new', stagedBoards: [] },
+      restoreDeps()
+    );
+
+    expect(result.boardItemIssues).toEqual([]);
+    expect(ledger).toMatchObject({ boardImageNames: [], boardVideoNames: [], imageNames: ['loose-a.png'] });
+  });
+
+  it('deduplicates a document reference the destination already has', async () => {
+    const archive = await readInvkArchive(await validArchive());
+    const ledger = createRestoredMediaLedger([]);
+    const uploadImage = vi.fn(() => Promise.resolve({ height: 1, imageName: 'never', width: 1 }));
+
+    const result = await restoreArchiveMedia(
+      archive,
+      { ledger, projectDocument: archive.projectDocument, projectId: 'project-new', stagedBoards: [] },
+      restoreDeps({ findExistingImageNames: () => Promise.resolve(new Set(['a.png'])), uploadImage })
+    );
+
+    expect(uploadImage).not.toHaveBeenCalled();
+    expect(result.mappings.images.size).toBe(0);
+  });
+
+  it('announces a bundled video as a video, whatever its extension', async () => {
+    const archive = await readInvkArchive(
+      await boardArchive({
+        'board.json': boardEntry([boardItem({ kind: 'video', name: 'clip.unknown' })]),
+        'videos/clip.unknown': new Uint8Array([7]),
+      })
+    );
+    const uploadBoardVideo = vi.fn(() => Promise.resolve({ videoName: 'board-clip.mp4' }));
+
+    await restoreArchiveMedia(
+      archive,
+      {
+        ledger: createRestoredMediaLedger([]),
+        projectDocument: archive.projectDocument,
+        projectId: 'project-new',
+        stagedBoards: stagedOn(archive, 'staging'),
+      },
+      restoreDeps({ uploadBoardVideo })
+    );
+
+    // Video MIME fallbacks must pass upload type validation.
+    expect(uploadBoardVideo).toHaveBeenCalledWith(new Uint8Array([7]), 'clip.unknown', {
+      boardId: 'staging',
+      category: 'general',
+      contentType: 'video/mp4',
+    });
+  });
+});

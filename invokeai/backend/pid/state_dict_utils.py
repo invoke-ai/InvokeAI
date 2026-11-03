@@ -16,11 +16,27 @@ Deliberately dependency-free — the config imports it during model identificati
 the vendored PiD network stack would be wasted work.
 """
 
+from enum import Enum
 from typing import Any, TypeVar
 
 # NVIDIA's official PiD `.pth` checkpoints store the student under this prefix (see
 # `PidDistillModel.state_dict(prefix="net.")` in the vendored upstream).
 NET_PREFIX = "net."
+
+
+class PiDVersion(str, Enum):
+    """NVIDIA's PiD decoder generations.
+
+    Both share the backbone. v1.5 widens the LQ projection, injects LQ features into the pixel blocks too (PiT)
+    and gates per token rather than per token and channel.
+    """
+
+    V1 = "v1"
+    V1_5 = "v1.5"
+
+
+# dim 0 of `lq_proj.latent_proj.0.weight`, the one shape that tells the generations apart before a network exists.
+PID_VERSION_BY_LQ_HIDDEN_DIM: dict[int, PiDVersion] = {512: PiDVersion.V1, 1024: PiDVersion.V1_5}
 
 # Sibling submodules of the distillation setup. They are not part of PidNet, and some of them shadow
 # its parameter names (`net_ema.lq_proj.…`), so they must be dropped rather than renamed.

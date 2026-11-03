@@ -37,7 +37,6 @@ class Migration32Callback:
             # Foreign keys already point at the correct table, nothing to repair.
             return
 
-        # Rebuild the table with the correct foreign keys referencing models(id).
         cursor.execute("ALTER TABLE model_relationships RENAME TO model_relationships_old;")
         cursor.execute(
             """
@@ -55,7 +54,7 @@ class Migration32Callback:
             """
         )
 
-        # Copy over the existing links, dropping any orphaned rows whose model keys no
+        # Copy over existing links, dropping orphaned rows whose model keys no
         # longer exist -- these would violate the restored foreign keys.
         cursor.execute(
             """

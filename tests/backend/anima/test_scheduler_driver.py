@@ -7,7 +7,7 @@ import inspect
 import pytest
 import torch
 
-from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+from invokeai.app.invocations.anima.anima_denoise import loglinear_timestep_shift
 from invokeai.backend.anima.scheduler_driver import AnimaSchedulerDriver
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, ANIMA_SHIFT
 

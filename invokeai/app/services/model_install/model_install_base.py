@@ -1,4 +1,3 @@
-# Copyright 2023 Lincoln D. Stein and the InvokeAI development team
 """Baseclass definitions for the model installer."""
 
 from abc import ABC, abstractmethod
@@ -166,8 +165,9 @@ class ModelInstallServiceBase(ABC):
         thread and will issue the following events on the event bus:
 
              - model_install_started
+             - model_install_paused
              - model_install_error
-             - model_install_completed
+             - model_install_complete
 
         The `inplace` flag does not affect the behavior of downloaded
         models, which are always moved into the `models` directory.
@@ -198,7 +198,7 @@ class ModelInstallServiceBase(ABC):
         """
 
     @abstractmethod
-    def prune_jobs(self) -> None:
+    def prune_jobs(self) -> List[int]:
         """Prune all completed and errored jobs."""
 
     @abstractmethod
@@ -222,28 +222,46 @@ class ModelInstallServiceBase(ABC):
         """Restart a specific file download for a job."""
 
     @abstractmethod
-    def wait_for_job(self, job: ModelInstallJob, timeout: int = 0) -> ModelInstallJob:
-        """Wait for the indicated job to reach a terminal state.
+    def wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:
+        """Wait for the indicated job to reach a terminal state or pause.
 
-        This will block until the indicated install job has completed,
-        been cancelled, or errored out.
+        This will block until the indicated install job has completed, been cancelled, errored out, or paused.
+        A paused job is returned at once unless a resume or retry of it is being set up, in which case this waits for
+        that to hand the job back to the download queue. A paused job is nonterminal and stays paused until it is
+        resumed or its failed files are retried, so callers must check its status rather than assume the install
+        finished.
 
         :param job: The job to wait on.
         :param timeout: Wait up to indicated number of seconds. Raise a TimeoutError if
-        the job hasn't completed within the indicated time.
+        the job hasn't finished or paused within the indicated time.
+        """
+
+    @abstractmethod
+    def resume_and_wait_for_job(self, job: ModelInstallJob, timeout: float = 0) -> ModelInstallJob:
+        """Resume the job if it is paused, then wait for it as wait_for_job() does.
+
+        For callers that need the model rather than a report, such as an invocation that installs a missing
+        dependency. A resume refused because the job's previous download is still finishing is retried once that
+        settles, if the job is still paused. A resume refused because another caller is already resuming or
+        retrying the job is not retried: this waits for that attempt's outcome instead. A job whose pinned repository
+        revision is gone is returned in ERROR, as resume_job() leaves it, rather than raising.
+
+        :param job: The job to resume and wait on.
+        :param timeout: Wait up to indicated number of seconds in total. Raise a TimeoutError if
+        the job hasn't finished or paused within the indicated time.
         """
 
     @abstractmethod
     def wait_for_installs(self, timeout: int = 0) -> List[ModelInstallJob]:
         """
-        Wait for all pending installs to complete.
+        Wait for pending download and install work to quiesce.
 
-        This will block until all pending installs have
-        completed, been cancelled, or errored out.
+        Returns the tracked jobs, which may include PAUSED nonterminal jobs after a recoverable download failure.
+        Paused jobs do not block this method; callers must resume or retry them before treating installation as done.
 
         :param timeout: Wait up to indicated number of seconds. Raise an Exception('timeout') if
-        installs do not complete within the indicated time. A timeout of zero (the default)
-        will block indefinitely until the installs complete.
+        work does not quiesce within the indicated time. A timeout of zero (the default) will block indefinitely until
+        download and install work quiesces.
         """
 
     @abstractmethod

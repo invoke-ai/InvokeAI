@@ -1,0 +1,516 @@
+import type { RegisteredWidget } from '@workbench/widgetContracts';
+import type {
+  PlacedWidgetRegionItem,
+  WidgetPlacementInstanceMeta,
+  WidgetRegionItem,
+} from '@workbench/widgetRegionViewModel';
+
+import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { Button, IconButton, MenuContent } from '@platform/ui';
+import { ClippedTooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { useFocusRegionProps, useWorkbenchFocus } from '@workbench/focusRegions';
+import { WidgetIcon } from '@workbench/iconResolver';
+import {
+  WidgetChromeSlotById,
+  WidgetIdentityIcon,
+  WidgetRendererById,
+  WidgetSourceLockBadge,
+  useWidgetIntentPreloadProps,
+  type WidgetEnableMenuItem,
+} from '@workbench/widget-frame';
+import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
+import { resolveDockLabel, resolveWidgetLabel } from '@workbench/widgetLabels';
+import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
+import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
+import {
+  createWidgetRegionViewModelFromState,
+  getWidgetRegionItems,
+  isRequiredCenterView,
+} from '@workbench/widgetRegionViewModel';
+import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
+import { Activity, Suspense, use, useCallback, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { ChromeIsland, getChromeIslandMinWidth } from './ChromeIsland';
+import {
+  areInstanceIdListsEqual,
+  getActiveInstanceIdsOutside,
+  useMountedInstanceIds,
+  withoutInstancesShownElsewhere,
+} from './useMountedInstanceIds';
+
+type CenterWidgetItem = PlacedWidgetRegionItem<WidgetPlacementInstanceMeta>;
+
+const CENTER_MENU_POSITIONING = { placement: 'bottom-start' } as const;
+const CENTER_PREFERRED_REGIONS = ['center'] as const;
+
+const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
+// Reserve a usable center width; side panels shrink to honor this floor.
+const CENTER_MIN_WIDTH = '20rem';
+/** The view menu keeps its icon, a few letters of its name, and its chevron; the row scrolls past that. */
+const VIEW_MENU_MIN_WIDTH = '5rem';
+/** Below this center width the view menu shows only its icon and chevron. Matches the Preview's compact density. */
+const CENTER_COMPACT_MAX_WIDTH_PX = 560;
+/** The chrome row's inset on each side (`insetX="2"`); the query container is the row, not the whole center. */
+const CHROME_INSET_PX = 8;
+const CHROME_CONTAINER_CSS = { containerName: 'center-chrome', containerType: 'inline-size' } as const;
+const COMPACT_CHROME = `@container center-chrome (width < ${CENTER_COMPACT_MAX_WIDTH_PX - 2 * CHROME_INSET_PX}px)`;
+/**
+ * The view menu also minimises when the room left to the start island beside the end island is below this, so its name
+ * does not crowd the widget's label (the Preview's board and item name). Queried on a wrapper filling that room: a
+ * content-sized island cannot be its own inline-size container, since containment would collapse it to nothing.
+ */
+const START_ISLAND_ROOM_CSS = {
+  containerName: 'center-start',
+  containerType: 'inline-size',
+  display: 'flex',
+  flex: '1',
+  minW: '0',
+} as const;
+const COMPACT_START = '@container center-start (width < 18rem)';
+const compactViewMenu = <T extends object>(styles: T) => ({ [COMPACT_CHROME]: styles, [COMPACT_START]: styles });
+const VIEW_MENU_TRIGGER_CSS = compactViewMenu({ flexShrink: 0, minW: '8', px: '0' });
+const VIEW_MENU_CONTENT_CSS = { gap: '2', ...compactViewMenu({ gap: '1' }) };
+const VIEW_MENU_LABEL_CSS = compactViewMenu({ display: 'none' });
+/**
+ * The start island gives way first, down to this width: room for the view menu at its own floor, clear of the end cue.
+ * The compact icon-only menu is narrower than that floor, so the reserve also covers it.
+ * The end island's zoom and actions keep their full width up to what that leaves, then scroll.
+ */
+const START_ISLAND_MIN_WIDTH = getChromeIslandMinWidth(VIEW_MENU_MIN_WIDTH);
+const END_ISLAND_MAX_WIDTH = `calc(100% - ${START_ISLAND_MIN_WIDTH} - {spacing.2})`;
+
+export const CenterArea = () => {
+  const { t } = useTranslation();
+  const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const centerRegion = useActiveProjectSelector((project) => project.widgetRegions.center);
+  const { widgets } = useWorkbenchCommands();
+  const getWidgetLabel = useCallback(
+    (manifest: Parameters<typeof resolveWidgetLabel>[0]) => resolveWidgetLabel(manifest, t),
+    [t]
+  );
+
+  const centerRegionViewModel = createWidgetRegionViewModelFromState({
+    getWidgetLabel,
+    region: 'center',
+    regionState: centerRegion,
+    widgetInstances: placementProject.widgetInstances,
+    widgets: getWidgetsForRegion('center'),
+  });
+
+  const centerWidgetMenuItems = useMemo(() => getWidgetRegionItems(centerRegionViewModel), [centerRegionViewModel]);
+
+  const enabledCenterWidgetItems = useMemo(
+    () => centerRegionViewModel.placedItems.filter((item) => item.status === 'enabled'),
+    [centerRegionViewModel.placedItems]
+  );
+
+  const centerViewItems = useMemo(
+    () => enabledCenterWidgetItems.filter((item) => item.widget.manifest.centerPlacement !== 'toolbar'),
+    [enabledCenterWidgetItems]
+  );
+
+  const centerToolbarItems = useMemo(
+    () => enabledCenterWidgetItems.filter((item) => item.widget.manifest.centerPlacement === 'toolbar'),
+    [enabledCenterWidgetItems]
+  );
+
+  const activeCenterViewId = centerViewItems.some((item) => item.id === centerRegion.activeInstanceId)
+    ? centerRegion.activeInstanceId
+    : centerViewItems[0]?.id;
+  const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
+  // The center emptied because its last view floated away: say so, rather than call the view unavailable.
+  const floatedInstance =
+    centerRegion.instanceIds.length === 0 ? placementProject.widgetInstances[centerRegion.activeInstanceId] : undefined;
+  const floatedPlacement = floatedInstance && placementProject.floatingPlacements?.[floatedInstance.id];
+  const floatedWidget = floatedInstance && getWidgetById(floatedInstance.typeId);
+  const projectId = useActiveProjectId();
+  const activeIdsElsewhere = useActiveProjectSelector(
+    (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center', project.floatingWidgets),
+    areInstanceIdListsEqual
+  );
+  const mountedCenterIds = withoutInstancesShownElsewhere(
+    useMountedInstanceIds(activeCenterViewId, projectId),
+    activeCenterViewId,
+    activeIdsElsewhere
+  );
+  const focusRegionProps = useFocusRegionProps('center');
+
+  const openCenterWidget = useCallback(
+    (item: WidgetEnableMenuItem) =>
+      openWidgetPlacement({
+        widgets,
+        getWidgetsForRegion,
+        options: {
+          createNew: item.allowMultiple,
+          preferredRegions: CENTER_PREFERRED_REGIONS,
+        },
+        typeId: item.typeId,
+      }),
+    [widgets]
+  );
+
+  const selectCenterView = useCallback(
+    (instanceId: string) =>
+      revealWidgetPlacement({
+        instanceId: instanceId as CenterWidgetItem['id'],
+        project: placementProject,
+        region: 'center',
+        widgets,
+      }),
+    [placementProject, widgets]
+  );
+
+  const closeActiveCenterView = useCallback(() => {
+    if (activeCenterViewId) {
+      closeWidgetPlacement({
+        widgets,
+        getWidgetById,
+        instanceId: activeCenterViewId,
+        project: placementProject,
+        region: 'center',
+      });
+    }
+  }, [activeCenterViewId, placementProject, widgets]);
+
+  const isActiveViewRequired = activeItem
+    ? isRequiredCenterView(activeItem as WidgetRegionItem, centerViewItems.length)
+    : true;
+
+  const availableCenterItems = useMemo(
+    () => centerWidgetMenuItems.filter((item) => !item.isEnabled && item.status !== 'disabled'),
+    [centerWidgetMenuItems]
+  );
+
+  return (
+    <Flex
+      as="section"
+      bg="bg"
+      direction="column"
+      flex="1"
+      minH="0"
+      minW={CENTER_MIN_WIDTH}
+      style={CENTER_CHROME_INSET_STYLE}
+      {...focusRegionProps}
+    >
+      <Box flex="1" minH="0" position="relative">
+        <Box aria-label={t('widgets.centerRegion')} h="full" role="region">
+          {activeCenterViewId !== undefined && mountedCenterIds.length > 0 ? (
+            mountedCenterIds.map((instanceId) => (
+              <Activity key={instanceId} mode={instanceId === activeCenterViewId ? 'visible' : 'hidden'}>
+                <KeptCenterViewSlot instanceId={instanceId} />
+              </Activity>
+            ))
+          ) : floatedInstance && floatedPlacement ? (
+            <FloatedCenterView
+              dockLabel={resolveDockLabel(floatedPlacement.returnRegion, t)}
+              instanceId={floatedInstance.id}
+              label={
+                floatedInstance.title ?? (floatedWidget ? getWidgetLabel(floatedWidget.manifest) : floatedInstance.id)
+              }
+              typeId={floatedInstance.typeId}
+            />
+          ) : (
+            <FallbackCenterView />
+          )}
+        </Box>
+
+        <Flex
+          css={CHROME_CONTAINER_CSS}
+          data-hotkey-widget-instance-id={activeItem?.id}
+          data-hotkey-widget-region="center"
+          data-hotkey-widget-type-id={activeItem?.typeId}
+          gap="2"
+          insetX="2"
+          justify="space-between"
+          pointerEvents="none"
+          position="absolute"
+          top="2"
+          zIndex="1"
+        >
+          <Box css={START_ISLAND_ROOM_CSS}>
+            <ChromeIsland>
+              <CenterViewMenu
+                activeItem={activeItem}
+                availableItems={availableCenterItems}
+                isCloseDisabled={isActiveViewRequired}
+                items={centerViewItems}
+                onClose={closeActiveCenterView}
+                onOpen={openCenterWidget}
+                onSelect={selectCenterView}
+              />
+              {activeItem ? (
+                <>
+                  <WidgetSourceLockBadge typeId={activeItem.typeId} />
+                  <Suspense fallback={null}>
+                    <WidgetChromeSlotById instanceId={activeItem.id} slot="label" widget={activeItem.widget} />
+                  </Suspense>
+                </>
+              ) : null}
+            </ChromeIsland>
+          </Box>
+
+          {activeItem && activeItem.widget.manifest.chrome?.header !== 'hidden' ? (
+            <ChromeIsland flexShrink={0} maxW={END_ISLAND_MAX_WIDTH}>
+              {centerToolbarItems.map((toolbarItem) => (
+                <WidgetRendererById
+                  key={toolbarItem.id}
+                  instanceId={toolbarItem.id}
+                  widget={toolbarItem.widget}
+                  presentation="compact"
+                  region="center"
+                />
+              ))}
+              <Suspense fallback={null}>
+                <WidgetChromeSlotById instanceId={activeItem.id} slot="actions" widget={activeItem.widget} />
+              </Suspense>
+            </ChromeIsland>
+          ) : null}
+        </Flex>
+      </Box>
+    </Flex>
+  );
+};
+
+const CenterViewMenu = ({
+  activeItem,
+  availableItems,
+  isCloseDisabled,
+  items,
+  onClose,
+  onOpen,
+  onSelect,
+}: {
+  activeItem?: CenterWidgetItem;
+  availableItems: WidgetEnableMenuItem[];
+  isCloseDisabled: boolean;
+  items: CenterWidgetItem[];
+  onClose: () => void;
+  onOpen: (item: WidgetEnableMenuItem) => void;
+  onSelect: (instanceId: string) => void;
+}) => {
+  const { t } = useTranslation();
+  const label = activeItem?.label ?? t('widgets.centerViewEmpty');
+  const triggerLabel = t('widgets.centerViewLabel', { label });
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const labelRef = useRef<HTMLParagraphElement>(null);
+  const triggerIds = useTooltipTriggerIds();
+  // The tooltip names the view only while the container query hides its name.
+  const isLabelHidden = useCallback(() => labelRef.current?.getClientRects().length === 0, []);
+  const selectAndRestoreFocus = useCallback(
+    (instanceId: string) => {
+      onSelect(instanceId);
+      requestAnimationFrame(() => {
+        triggerRef.current?.focus({ preventScroll: true });
+      });
+    },
+    [onSelect]
+  );
+
+  return (
+    <Menu.Root ids={triggerIds} positioning={CENTER_MENU_POSITIONING}>
+      <ClippedTooltip content={triggerLabel} ids={triggerIds} isClipped={isLabelHidden}>
+        <Menu.Trigger asChild>
+          <IconButton
+            ref={triggerRef}
+            aria-label={triggerLabel}
+            color="fg"
+            // The button recipe refuses to shrink; a narrow center truncates the view name beside the widget's label,
+            // and a compact center hides it, leaving the icon and chevron.
+            css={VIEW_MENU_TRIGGER_CSS}
+            flexShrink={1}
+            minW={VIEW_MENU_MIN_WIDTH}
+            overflow="hidden"
+            px="2"
+            size="sm"
+            variant="ghost"
+          >
+            <HStack css={VIEW_MENU_CONTENT_CSS} minW="0">
+              {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
+              <Text ref={labelRef} css={VIEW_MENU_LABEL_CSS} fontWeight="700" truncate>
+                {label}
+              </Text>
+              <ChevronDownIcon size={12} />
+            </HStack>
+          </IconButton>
+        </Menu.Trigger>
+      </ClippedTooltip>
+      <Portal>
+        <Menu.Positioner>
+          <MenuContent minW="14rem">
+            <Menu.ItemGroup>
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
+                {t('widgets.centerViews')}
+              </Menu.ItemGroupLabel>
+              {items.map((item) => (
+                <CenterViewMenuRow
+                  key={item.id}
+                  isActive={item.id === activeItem?.id}
+                  item={item}
+                  onSelect={selectAndRestoreFocus}
+                />
+              ))}
+            </Menu.ItemGroup>
+
+            {availableItems.length > 0 ? (
+              <>
+                <Menu.Separator borderColor="border.subtle" />
+                <Menu.ItemGroup>
+                  <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
+                    {t('widgets.centerViewsAdd')}
+                  </Menu.ItemGroupLabel>
+                  {availableItems.map((item) => (
+                    <CenterViewMenuRow key={item.id} item={item} onOpen={onOpen} />
+                  ))}
+                </Menu.ItemGroup>
+              </>
+            ) : null}
+
+            {activeItem ? (
+              <>
+                <Menu.Separator borderColor="border.subtle" />
+                <Menu.Item disabled={isCloseDisabled} value="close-center-view" onClick={onClose}>
+                  <Icon as={XIcon} boxSize="3.5" color="fg.subtle" />
+                  <Menu.ItemText>{t('widgets.centerViewClose', { label: activeItem.label })}</Menu.ItemText>
+                </Menu.Item>
+              </>
+            ) : null}
+          </MenuContent>
+        </Menu.Positioner>
+      </Portal>
+    </Menu.Root>
+  );
+};
+
+/**
+ * Use Suspense for the center icon's loading state because DeferredResource has no subscription and center widgets
+ * lack frame headers.
+ */
+const CenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  const fallback = useMemo(
+    () => <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} isLoading />,
+    [widget.manifest.icon]
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <LoadedCenterViewIcon widget={widget} />
+    </Suspense>
+  );
+};
+
+const LoadedCenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  use(widget.implementation.load());
+
+  return <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} />;
+};
+
+const CenterViewMenuRow = ({
+  isActive,
+  item,
+  onOpen,
+  onSelect,
+}: {
+  isActive?: boolean;
+  item: CenterWidgetItem | WidgetEnableMenuItem;
+  onOpen?: (item: WidgetEnableMenuItem) => void;
+  onSelect?: (instanceId: string) => void;
+}) => {
+  const handleClick = useCallback(
+    () => (onSelect ? onSelect(item.id) : onOpen?.(item as WidgetEnableMenuItem)),
+    [item, onOpen, onSelect]
+  );
+  const intentPreloadProps = useWidgetIntentPreloadProps(item.widget, item.status === 'disabled');
+
+  return (
+    <Menu.Item
+      role={onSelect ? 'menuitemradio' : undefined}
+      aria-checked={onSelect ? isActive : undefined}
+      value={item.id}
+      disabled={item.status === 'disabled'}
+      {...intentPreloadProps}
+      onClick={handleClick}
+    >
+      <Icon as={CheckIcon} boxSize="3" opacity={isActive ? 1 : 0} />
+      <WidgetIcon icon={item.icon} boxSize="3.5" />
+      <Menu.ItemText>{item.label}</Menu.ItemText>
+    </Menu.Item>
+  );
+};
+
+/** Resolve kept instances from widgetInstances: presets replace region membership but merge and preserve instances. */
+const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
+  const instance = useActiveProjectSelector(
+    (project) => project.widgetInstances[instanceId],
+    areWidgetRenderInstancesEqual
+  );
+  const widget = instance ? getWidgetById(instance.typeId) : undefined;
+
+  if (!instance || !widget || widget.status !== 'enabled') {
+    return <FallbackCenterView />;
+  }
+
+  return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
+};
+
+/** The empty center while its last view is a floating window: where the view went, and the two ways back. */
+const FloatedCenterView = ({
+  dockLabel,
+  instanceId,
+  label,
+  typeId,
+}: {
+  /** The Dock button's label, naming where the window returns to. */
+  dockLabel: string;
+  instanceId: string;
+  label: string;
+  typeId: string;
+}) => {
+  'use no memo';
+  // A cold path that renders only while the center's last view floats: it needs no memo cache, and skipping one
+  // keeps it small in the editor's startup chunk, whose size budget guards it.
+  const { t } = useTranslation();
+  const { widgets } = useWorkbenchCommands();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
+  const handleShow = useCallback(() => {
+    widgets.revealFloating(instanceId);
+    focusFloating(instanceId);
+  }, [focusFloating, instanceId, widgets]);
+  // Docking from here always gives the center its view back, so focus follows it.
+  const handleDock = useCallback(() => {
+    flushWorkbenchDrafts();
+    widgets.dockFloating(instanceId);
+    focusRegion('center', typeId);
+  }, [focusRegion, instanceId, typeId, widgets]);
+
+  return (
+    <Flex align="center" direction="column" gap="3" h="full" justify="center" px="6" textAlign="center" w="full">
+      <Text color="fg.muted" fontSize="lg">
+        {t('widgets.floating.centerFloating', { label })}
+      </Text>
+      <HStack gap="2" wrap="wrap" justify="center">
+        <Button variant="outline" onClick={handleShow}>
+          {t('widgets.floating.showWindow')}
+        </Button>
+        <Button variant="outline" onClick={handleDock}>
+          {dockLabel}
+        </Button>
+      </HStack>
+    </Flex>
+  );
+};
+
+const FallbackCenterView = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" h="full" justify="center" w="full">
+      <Text color="fg.subtle" fontSize="lg">
+        {t('common.widgetViewUnavailable')}
+      </Text>
+    </Flex>
+  );
+};

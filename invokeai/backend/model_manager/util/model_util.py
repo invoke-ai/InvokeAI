@@ -10,6 +10,7 @@ import torch
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.model_manager.taxonomy import ClipVariantType
+from invokeai.backend.quantization.fp8_scaled import is_scale_metadata_key
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -109,14 +110,14 @@ def lora_token_vector_length(checkpoint: dict[str | int, torch.Tensor]) -> Optio
         elif "lokr_" in lora_key:
             if model_key + ".lokr_w1" in checkpoint:
                 _lokr_w1 = checkpoint[model_key + ".lokr_w1"]
-            elif model_key + "lokr_w1_b" in checkpoint:
+            elif model_key + ".lokr_w1_b" in checkpoint:
                 _lokr_w1 = checkpoint[model_key + ".lokr_w1_b"]
             else:
                 return lora_token_vector_length  # unknown format
 
             if model_key + ".lokr_w2" in checkpoint:
                 _lokr_w2 = checkpoint[model_key + ".lokr_w2"]
-            elif model_key + "lokr_w2_b" in checkpoint:
+            elif model_key + ".lokr_w2_b" in checkpoint:
                 _lokr_w2 = checkpoint[model_key + ".lokr_w2_b"]
             else:
                 return lora_token_vector_length  # unknown format
@@ -172,9 +173,14 @@ def convert_bundle_to_flux_transformer_checkpoint(
         if not k.startswith("model.diffusion_model"):
             keys_to_remove.append(k)  # This can be removed in the future if we only want to delete transformer keys
             continue
-        if k.endswith("scale"):
+        if k.endswith("scale") and not is_scale_metadata_key(k):
             # Scale math must be done at bfloat16 due to our current flux model
-            # support limitations at inference time
+            # support limitations at inference time.
+            #
+            # fp8 quantization scales are excluded. `.weight_scale` also ends in "scale", so the
+            # unguarded test folded a scaled-fp8 checkpoint's f32 scales down to bf16 before the
+            # loader ever saw them — 8 mantissa bits for a value every quantized weight is
+            # multiplied by. Only the model's own RMSNorm `.scale` parameters belong here.
             v = v.to(dtype=torch.bfloat16)
         new_key = k.replace("model.diffusion_model.", "")
         original_state_dict[new_key] = v

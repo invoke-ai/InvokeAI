@@ -28,7 +28,19 @@ TI2V_DIM = 3072
 
 
 def _t(*shape: int, dtype: torch.dtype = torch.bfloat16) -> torch.Tensor:
-    return torch.zeros(shape, dtype=dtype)
+    """A tensor with the real layout but a single element of storage.
+
+    The probe classifies Wan checkpoints by shape and dtype -- the width separates A14B from
+    TI2V -- and `_make_mod` hands the dict over without serializing it, so nothing needs real
+    zeros at these widths. Materializing them costs ~5GB per run, which several CI test
+    processes cannot afford at once, so one element is expanded to the full shape instead.
+    """
+    return torch.zeros((), dtype=dtype).expand(shape)
+
+
+def _for_saving(sd: dict) -> dict:
+    """Materializes `_t`'s expanded views; safetensors rejects non-contiguous tensors."""
+    return {key: value.contiguous() for key, value in sd.items()}
 
 
 def _native_sd(in_channels: int = 16, dim: int = A14B_DIM, prefix: str = "") -> dict:
@@ -303,7 +315,7 @@ class TestEndToEndIdentification:
         from safetensors.torch import save_file
 
         path = tmp_path / filename
-        save_file(sd, path)
+        save_file(_for_saving(sd), path)
         return path
 
     @pytest.mark.parametrize(
@@ -479,7 +491,7 @@ class TestExpertFilenameHeuristic:
 
         # A name with no marker at all, so only the metadata can settle the expert.
         path = tmp_path / "my-wan-model.safetensors"
-        save_file(_native_sd(36), path, metadata={k: str(v) for k, v in declared.items()})
+        save_file(_for_saving(_native_sd(36)), path, metadata={k: str(v) for k, v in declared.items()})
 
         config = Main_Checkpoint_Wan_Config.from_model_on_disk(ModelOnDisk(path), _build_overrides(path, path.stem))
         assert config.expert == expected
@@ -491,7 +503,7 @@ class TestExpertFilenameHeuristic:
         from safetensors.torch import save_file
 
         path = tmp_path / "Wan2.2-A14B-I2V-high_noise.safetensors"
-        save_file(_native_sd(36), path, metadata={"model_type": "Wan22-I2V-A14B-low"})
+        save_file(_for_saving(_native_sd(36)), path, metadata={"model_type": "Wan22-I2V-A14B-low"})
 
         config = Main_Checkpoint_Wan_Config.from_model_on_disk(ModelOnDisk(path), _build_overrides(path, path.stem))
         assert config.expert == "high"

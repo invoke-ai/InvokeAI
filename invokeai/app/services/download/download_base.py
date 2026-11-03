@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """Model download service."""
 
 from abc import ABC, abstractmethod
@@ -7,6 +6,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Set, Union
 
+import requests
 from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from pydantic.networks import AnyHttpUrl
 
@@ -34,6 +34,14 @@ class UnknownJobIDException(Exception):
 
 class ServiceInactiveException(Exception):
     """This exception is raised when user attempts to initiate a download before the service is started."""
+
+
+RESUME_REFUSED_MESSAGE = "Resume refused by server. Restart required."
+
+
+def in_progress_path(path: Path) -> Path:
+    """Where a download writes `path` until it is complete."""
+    return path.with_name(path.name + ".downloading")
 
 
 SingleFileDownloadEventHandler = Callable[["DownloadJob"], None]
@@ -192,10 +200,63 @@ class DownloadJob(DownloadJobBase):
     expected_total_bytes: Optional[int] = Field(default=None, description="Expected total size of the download")
     resume_required: bool = Field(default=False, description="True if server refused resume; restart required")
     resume_message: Optional[str] = Field(default=None, description="Message explaining why resume is required")
+    resume_refused: bool = Field(
+        default=False,
+        description="True if the server refused to continue the partial file, so it must restart from the beginning",
+    )
     resume_from_scratch: bool = Field(
         default=False,
-        description="True if resume metadata existed but the partial file was missing and the download restarted from the beginning",
+        description="True if the download restarted from the beginning instead of resuming: its partial file was missing, or could not be checked against the server's current file (no recorded validator, or the server had refused to resume it) and was discarded",
     )
+
+    @property
+    def resume_validator(self) -> Optional[str]:
+        """The If-Range value a resumed request sends: the ETag, else the Last-Modified date, of the revision the
+        partial file holds. With it, a server whose file has changed sends the whole new revision instead of a range."""
+        return self.etag or self.last_modified
+
+    def expected_download_path(self) -> Optional[Path]:
+        """The file this job writes, as far as it is known before a response names it.
+
+        A file destination is that file. A directory destination takes the file name from the response, so this is
+        the recorded `download_path`, else the name of the directory's only partial file; with none or several, it is
+        unknown. A caller that sets `download_path` from untrusted data must keep it inside `dest`.
+        """
+        if not self.dest.is_dir():
+            return self.dest
+        if self.download_path is not None:
+            return self.download_path
+        try:
+            partials = list(self.dest.glob("*.downloading"))
+        except OSError:
+            return None
+        if len(partials) != 1:
+            return None
+        return partials[0].with_name(partials[0].name.removesuffix(".downloading"))
+
+    def may_resume_partial(self) -> bool:
+        """Whether this job's partial file may continue rather than start over.
+
+        A recorded validator lets the server refuse a file that changed since the partial was written. A partial the
+        server already refused holds a revision it no longer continues. A part only interrupted mid-transfer keeps a
+        partial that may resume.
+        """
+        return self.resume_validator is not None and not self.resume_refused
+
+    def resumable_partial(self) -> Optional[Path]:
+        """The partial file this job would continue with a Range request, if one is on disk.
+
+        The request sends `resume_validator` as If-Range when there is one. Without one, nothing stops the server
+        from appending a newer revision of the file to it.
+        """
+        path = self.expected_download_path()
+        if path is None:
+            return None
+        partial = in_progress_path(path)
+        try:
+            return partial if partial.stat().st_size > 0 else None
+        except OSError:
+            return None
 
     def __hash__(self) -> int:
         """Return hash of the string representation of this object, for indexing."""
@@ -222,6 +283,11 @@ class DownloadQueueServiceBase(ABC):
     @abstractmethod
     def stop(self, *args: Any, **kwargs: Any) -> None:
         """Stop the download worker threads."""
+
+    @abstractmethod
+    def head(self, url: str, headers: Optional[dict[str, str]] = None, timeout: float = 15) -> "requests.Response":
+        """Send one HEAD request for `url` the way downloads are sent: through the configured download proxy and
+        address policy. Redirects are not followed; a URL the policy refuses raises `UnsafeDownloadURLException`."""
 
     @abstractmethod
     def download(
@@ -288,7 +354,8 @@ class DownloadQueueServiceBase(ABC):
 
         The `dest` argument is a Path object pointing to a directory. All downloads
         with be placed inside this directory. The callbacks will receive the
-        MultiFileDownloadJob.
+        MultiFileDownloadJob. `on_start` runs as each part starts, once its response
+        headers have arrived; the first call is the job's start.
         """
         pass
 

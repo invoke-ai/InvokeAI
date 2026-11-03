@@ -191,10 +191,13 @@ def _mod(root: Path) -> MagicMock:
 
 def _assert_complete_pipeline(config) -> None:
     assert config.submodels is not None
-    assert SubModelType.Transformer in config.submodels
-    assert SubModelType.TextEncoder in config.submodels
-    assert SubModelType.Tokenizer in config.submodels
-    assert SubModelType.VAE in config.submodels
+    # Recorded relative to the pipeline folder, so the record survives the install moving it.
+    assert {slot: d.path_or_prefix for slot, d in config.submodels.items()} == {
+        SubModelType.Transformer: "transformer",
+        SubModelType.TextEncoder: "text_encoder",
+        SubModelType.Tokenizer: "tokenizer",
+        SubModelType.VAE: "vae",
+    }
     assert is_self_contained_sdnq_pipeline(config)
 
 
@@ -426,6 +429,30 @@ def test_sdnq_pipeline_tokenizer_without_a_declared_class_is_still_recorded(tmp_
     _assert_complete_pipeline(config)
 
 
+@pytest.mark.parametrize(
+    ("factory", "root_name"),
+    [
+        (Main_SDNQ_Diffusers_Flux2_Config, "flux2-escaping-key"),
+        (Main_SDNQ_Diffusers_ZImage_Config, "zimage-escaping-key"),
+    ],
+)
+def test_sdnq_pipeline_index_key_that_escapes_the_pipeline_is_not_recorded(tmp_path: Path, factory, root_name: str):
+    """The record keeps the key and loading joins it onto wherever the model now lives, so `../vae`
+    would be validated beside the staging folder and then loaded beside the installed one."""
+    maker = _make_flux2_pipeline if factory is Main_SDNQ_Diffusers_Flux2_Config else _make_zimage_pipeline
+    root = maker(tmp_path / root_name, "Qwen3ForCausalLM")
+    index_path = root / "model_index.json"
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    index["../vae"] = index.pop("vae")
+    index_path.write_text(json.dumps(index), encoding="utf-8")
+    (root / "vae").rename(root.parent / "vae")
+
+    config = factory.from_model_on_disk(_mod(root), {**_REQUIRED_FIELDS, "path": root.as_posix()})
+
+    assert config.submodels is not None
+    assert SubModelType.VAE not in config.submodels
+
+
 @pytest.mark.parametrize("suffix", [".gguf", ".bin", ".pt"])
 @pytest.mark.parametrize(
     ("factory", "root_name"),
@@ -520,7 +547,7 @@ def test_a_component_the_loader_always_reads_with_sdnq_needs_safetensors_even_wi
 # use — makes it identify as itself. Supporting [dev] SDNQ pipelines end to end is separate work.
 
 _FLUX2_DEV_TRANSFORMER_CONFIG = {
-    # 3 x Mistral Small 3.1 5120, and 48 heads x 128 head_dim -> see configs/flux2_variant.py
+    # 3 x Mistral Small 3 5120, and 48 heads x 128 head_dim -> see configs/flux2_variant.py
     "joint_attention_dim": 15360,
     "attention_head_dim": 128,
     "num_attention_heads": 48,

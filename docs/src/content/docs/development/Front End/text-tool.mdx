@@ -6,18 +6,18 @@ title: 'Canvas Text Tool'
 
 The canvas text workflow is split between a Konva module that owns tool state and a React overlay that handles text entry.
 
-- `invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts`
+- `invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts`
   - Owns the tool, cursor preview, and text session state (including the cursor "T" marker).
   - Manages dynamic cursor contrast, starts sessions on pointer down, and commits sessions by rasterizing the active text block into a new raster layer.
-- `invokeai/frontend/web/src/features/controlLayers/components/Text/CanvasTextOverlay.tsx`
+- `invokeai/frontend/webv1/src/features/controlLayers/components/Text/CanvasTextOverlay.tsx`
   - Renders the on-canvas editor as a `contentEditable` overlay positioned in canvas space.
   - Syncs keyboard input, suppresses app hotkeys, and forwards commits/cancels to the Konva module.
-- `invokeai/frontend/web/src/features/controlLayers/components/Text/TextToolOptions.tsx`
+- `invokeai/frontend/webv1/src/features/controlLayers/components/Text/TextToolOptions.tsx`
   - Provides the font dropdown, size slider/input, formatting toggles, and alignment buttons that appear when the Text tool is active.
 
 ## Rasterization pipeline
 
-`renderTextToCanvas()` (`invokeai/frontend/web/src/features/controlLayers/text/textRenderer.ts`) converts the editor contents into a transparent canvas. The Text tool module configures the renderer with the active font stack, weight, styling flags, alignment, and the active canvas color. The resulting canvas is encoded to a PNG data URL and stored in a new raster layer (`image` object) with a transparent background.
+`renderTextToCanvas()` (`invokeai/frontend/webv1/src/features/controlLayers/text/textRenderer.ts`) converts the editor contents into a transparent canvas. The Text tool module configures the renderer with the active font stack, weight, styling flags, alignment, and the active canvas color. The resulting canvas is encoded to a PNG data URL and stored in a new raster layer (`image` object) with a transparent background.
 
 Layer placement preserves the original click location:
 
@@ -27,14 +27,14 @@ Layer placement preserves the original click location:
 
 ## Font stacks
 
-Font definitions live in `invokeai/frontend/web/src/features/controlLayers/text/textConstants.ts` as ten deterministic stacks (sans, serif, mono, rounded, script, humanist, slab serif, display, narrow, UI serif). Each stack lists system-safe fallbacks so the editor can choose the first available font per platform.
+Font definitions live in `invokeai/frontend/webv1/src/features/controlLayers/text/textConstants.ts` as ten deterministic stacks (sans, serif, mono, rounded, script, humanist, slab serif, display, narrow, UI serif). Each stack lists system-safe fallbacks so the editor can choose the first available font per platform.
 
 The Text tool also supports server-managed custom fonts from the configured `fonts_dir` directory, which defaults to `fonts` in the InvokeAI root:
 
 - `invokeai/app/services/config/config_default.py` ensures the configured directory and its `README.txt` exist.
 - `invokeai/app/api/routers/utilities.py` lists supported font files (`.ttf`, `.otf`, `.woff`, `.woff2`) and serves them to the frontend.
-- `invokeai/frontend/web/src/features/controlLayers/components/Text/TextToolOptions.tsx` groups custom fonts separately from built-in stacks and keeps them disabled until their `FontFace` entries are ready.
-- `invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts` waits for custom font readiness before rasterizing text, avoiding fallback renders when a font has been listed but not fully loaded yet.
+- `invokeai/frontend/webv1/src/features/controlLayers/components/Text/TextToolOptions.tsx` groups custom fonts separately from built-in stacks and keeps them disabled until their `FontFace` entries are ready.
+- `invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasTool/CanvasTextToolModule.ts` waits for custom font readiness before rasterizing text, avoiding fallback renders when a font has been listed but not fully loaded yet.
 
 To add or adjust fonts:
 

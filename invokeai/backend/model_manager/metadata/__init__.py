@@ -22,7 +22,9 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
     AnyModelRepoMetadataValidator,
     BaseMetadata,
     HuggingFaceMetadata,
+    ModelMetadataUnavailableError,
     ModelMetadataWithFiles,
+    ModelRevisionUnavailableError,
     RemoteModelFile,
     UnknownMetadataException,
 )
@@ -33,6 +35,8 @@ __all__ = [
     "HuggingFaceMetadata",
     "HuggingFaceMetadataFetch",
     "ModelMetadataFetchBase",
+    "ModelMetadataUnavailableError",
+    "ModelRevisionUnavailableError",
     "BaseMetadata",
     "ModelMetadataWithFiles",
     "RemoteModelFile",

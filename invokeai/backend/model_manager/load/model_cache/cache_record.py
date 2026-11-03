@@ -114,9 +114,11 @@ class CacheRecord:
         self._locks += 1
 
     def unlock(self) -> None:
-        """Unlock this record."""
+        """Unlock this record. An unlock without a lock to release raises and changes nothing, so the count stays
+        right for the next lock and for the cache's `locks_held`."""
+        if self._locks == 0:
+            raise RuntimeError(f"Model cache entry {self.key} was unlocked more often than it was locked")
         self._locks -= 1
-        assert self._locks >= 0
 
     @property
     def is_locked(self) -> bool:

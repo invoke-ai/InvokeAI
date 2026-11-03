@@ -24,7 +24,11 @@ class InvisibleWatermark:
         encoder = WatermarkEncoder()
         encoder.set_watermark("bytes", watermark_text.encode("utf-8"))
         bgr_encoded = encoder.encode(bgr, "dwtDct")
-        return Image.fromarray(cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB)).convert("RGBA")
+        watermarked = Image.fromarray(cv2.cvtColor(bgr_encoded, cv2.COLOR_BGR2RGB))
+        # The watermark lives in the color channels. Carry the source alpha over, so a masked Canvas result keeps
+        # its transparent surround instead of becoming an opaque rectangle; an image without alpha stays opaque.
+        watermarked.putalpha(image.convert("RGBA").getchannel("A"))
+        return watermarked
 
     @classmethod
     def decode_watermark(cls, image: Image.Image, length: int = 8) -> str:

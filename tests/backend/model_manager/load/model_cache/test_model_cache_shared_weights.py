@@ -53,12 +53,19 @@ def test_two_device_caches_share_one_cpu_copy(mock_logger: MagicMock):
         assert sd_a is sd_b
 
         # Evicting from one device drops only its reference; the weights stay for the other.
+        # (Release the admission grace first: make_room spares entries awaiting their first lock.)
+        record_a = cache_a.get("m")
+        cache_a.lock(record_a, None)
+        cache_a.unlock(record_a)
         cache_a.make_room(10**12)
         assert "m" not in cache_a._cached_models
         assert store.refcount("m") == 1
         assert "m" in store
 
         # Evicting from the last device frees the shared RAM.
+        record_b = cache_b.get("m")
+        cache_b.lock(record_b, None)
+        cache_b.unlock(record_b)
         cache_b.make_room(10**12)
         assert store.refcount("m") == 0
         assert "m" not in store

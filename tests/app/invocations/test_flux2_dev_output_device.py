@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from invokeai.app.invocations.flux2_dev_text_encoder import Flux2DevTextEncoderInvocation
+from invokeai.app.invocations.text_encoder.flux2_dev_text_encoder import Flux2DevTextEncoderInvocation
 
 
 def test_flux2_dev_conditioning_is_saved_on_cpu(monkeypatch):

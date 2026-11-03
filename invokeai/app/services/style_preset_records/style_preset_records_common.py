@@ -3,13 +3,16 @@ import codecs
 import csv
 import json
 from enum import Enum
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import pydantic
-from fastapi import UploadFile
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field, TypeAdapter
 
 from invokeai.app.util.metaenum import MetaEnum
+
+if TYPE_CHECKING:
+    # Only the router passes an upload; the database layer imports this module for its records.
+    from fastapi import UploadFile
 
 
 class StylePresetNotFoundError(Exception):
@@ -88,7 +91,7 @@ class InvalidPresetImportDataError(ValueError):
     pass
 
 
-async def parse_presets_from_file(file: UploadFile) -> list[StylePresetWithoutId]:
+async def parse_presets_from_file(file: "UploadFile") -> list[StylePresetWithoutId]:
     """Parses style presets from a file. The file must be a CSV or JSON file.
 
     If CSV, the file must have the following columns:

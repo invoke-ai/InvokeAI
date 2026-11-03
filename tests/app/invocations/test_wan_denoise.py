@@ -16,20 +16,23 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import MagicMock
 
+import gguf
+import numpy as np
 import pytest
 import torch
 import torch.nn as nn
 
 from invokeai.app.invocations.fields import ImageField, LatentsField, WanConditioningField, WanRefImageConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField, VAEField, WanTransformerField
-from invokeai.app.invocations.wan_denoise import (
+from invokeai.app.invocations.wan.wan_denoise import (
     WanDenoiseInvocation,
     _ExpertSwapper,
     _get_wan_transformer_working_mem_bytes,
 )
-from invokeai.app.invocations.wan_ref_image_encoder import WanRefImageEncoderInvocation
-from invokeai.app.invocations.wan_video_denoise import WanVideoDenoiseInvocation
+from invokeai.app.invocations.wan.wan_ref_image_encoder import WanRefImageEncoderInvocation
+from invokeai.app.invocations.wan.wan_video_denoise import WanVideoDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, WanVariantType
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     WanConditioningInfo,
@@ -92,7 +95,7 @@ def _model_on_device_ctx(model: nn.Module):
 def _make_loaded_model(model: nn.Module) -> MagicMock:
     """Mock ``LoadedModel`` exposing only the methods the denoise loop touches."""
     loaded = MagicMock()
-    loaded.model_on_device = lambda: _model_on_device_ctx(model)
+    loaded.model_on_device = lambda working_mem_bytes=None: _model_on_device_ctx(model)
     return loaded
 
 
@@ -284,9 +287,10 @@ class TestWanDenoiseShapes:
         transformer = _ZeroTransformer()
         loaded = MagicMock()
         loaded.supports_partial_loading = True
-        cached_model = MagicMock()
-        cached_model.cur_vram_bytes.return_value = 5 * 2**30
-        loaded._cache_record.cached_model = cached_model
+        # `LoadedModel` exposes residency as a property, so a MagicMock must be given a real int
+        # here or the swapper's arithmetic compares against a mock.
+        loaded.resident_weight_bytes = 5 * 2**30
+        loaded.weight_bytes = 14 * 2**30
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
         loaded.model_on_device.return_value = device_context
@@ -310,11 +314,55 @@ class TestWanDenoiseShapes:
         loaded.model_on_device.assert_called_once_with(working_mem_bytes=working_mem_bytes)
         loaded.unload_from_vram.assert_called_once_with(3 * 2**30, keep_required_weights_in_vram=True)
 
+    @pytest.mark.parametrize("packed", [True, False], ids=["gguf", "dense"])
+    def test_expert_swapper_reserves_a_gguf_experts_dequant_transient(self, packed: bool) -> None:
+        """Without the aggressive budget there is no estimate, so a GGUF expert's per-forward
+        dequantization copy is the whole request; a dense expert asks for nothing beyond the default."""
+        transformer = _ZeroTransformer()
+        linear = torch.nn.Linear(256, 512, bias=False)
+        if packed:
+            raw = gguf.quantize(np.zeros((512, 256), np.float32), gguf.GGMLQuantizationType.Q8_0)
+            linear.weight = torch.nn.Parameter(
+                GGMLTensor(torch.from_numpy(raw), gguf.GGMLQuantizationType.Q8_0, linear.weight.shape, torch.bfloat16),
+                requires_grad=False,
+            )
+        loaded = MagicMock()
+        loaded.model = torch.nn.Sequential(linear)
+        loaded.supports_partial_loading = True
+        loaded.resident_weight_bytes = 0
+        loaded.weight_bytes = 0
+        device_context = MagicMock()
+        device_context.__enter__.return_value = (None, transformer)
+        loaded.model_on_device.return_value = device_context
+        context = MagicMock()
+        context.models.load.return_value = loaded
+        swapper = _ExpertSwapper(
+            context=context,
+            high_model=MagicMock(),
+            low_model=None,
+            inference_dtype=torch.bfloat16,
+            working_mem_bytes=None,
+            max_resident_model_bytes=2 * 2**30,
+        )
+
+        try:
+            swapper.get(_ExpertSwapper.HIGH)
+        finally:
+            swapper.close()
+
+        ((), kwargs) = loaded.model_on_device.call_args
+        if packed:
+            # At least the bfloat16 copy of the weight it dequantizes on every forward.
+            assert kwargs["working_mem_bytes"] > 512 * 256 * torch.bfloat16.itemsize
+        else:
+            # Zero, which the cache reads as its default working memory.
+            assert kwargs["working_mem_bytes"] == 0
+
     def test_expert_swapper_does_not_trim_when_residency_is_already_targeted(self) -> None:
         transformer = _ZeroTransformer()
         loaded = MagicMock()
         loaded.supports_partial_loading = True
-        loaded._cache_record.cached_model.cur_vram_bytes.return_value = 2 * 2**30
+        loaded.resident_weight_bytes = 2 * 2**30
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
         loaded.model_on_device.return_value = device_context
@@ -342,7 +390,7 @@ class TestWanDenoiseShapes:
         transformer = _ZeroTransformer()
         loaded = MagicMock()
         loaded.supports_partial_loading = False
-        loaded._cache_record.cached_model.cur_vram_bytes.return_value = 5 * 2**30
+        loaded.resident_weight_bytes = 5 * 2**30
         device_context = MagicMock()
         device_context.__enter__.return_value = (None, transformer)
         loaded.model_on_device.return_value = device_context
@@ -362,7 +410,9 @@ class TestWanDenoiseShapes:
         finally:
             swapper.close()
 
-        loaded.model_on_device.assert_called_once_with()
+        # Not the aggressive budget: without partial loading the expert asks only for its own (here zero)
+        # dequantization transient, which the cache reads as its default working memory.
+        loaded.model_on_device.assert_called_once_with(working_mem_bytes=0)
         loaded.unload_from_vram.assert_not_called()
         context.logger.warning.assert_called_once()
 
@@ -410,7 +460,9 @@ class TestWanDenoiseShapes:
             enabled_calls.append(enabled)
             yield
 
-        monkeypatch.setattr("invokeai.app.invocations.wan_denoise.wan_memory_optimization", record_memory_optimization)
+        monkeypatch.setattr(
+            "invokeai.app.invocations.wan.wan_denoise.wan_memory_optimization", record_memory_optimization
+        )
         inv = _make_invocation(
             transformer_field=_wan_transformer_field(),
             pos_field=WanConditioningField(conditioning_name="pos"),
@@ -1012,7 +1064,7 @@ class TestLoRAExpertWiring:
         from unittest.mock import patch
 
         from invokeai.app.invocations.model import LoRAField
-        from invokeai.app.invocations.wan_denoise import _ExpertSwapper  # noqa: F401 (documents the patch target)
+        from invokeai.app.invocations.wan.wan_denoise import _ExpertSwapper  # noqa: F401 (documents the patch target)
 
         captured: dict = {}
 
@@ -1056,7 +1108,7 @@ class TestLoRAExpertWiring:
             steps=2,
             guidance_scale=1.0,
         )
-        with patch("invokeai.app.invocations.wan_denoise._ExpertSwapper", _RecordingSwapper):
+        with patch("invokeai.app.invocations.wan.wan_denoise._ExpertSwapper", _RecordingSwapper):
             inv._run_diffusion(ctx)
 
         assert captured["high_lora_factory"] is not None
@@ -1071,7 +1123,7 @@ class TestDefaultSchedulerForVariant:
     def test_ti2v_5b_returns_unipc_with_flow_config(self) -> None:
         from diffusers import UniPCMultistepScheduler
 
-        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+        from invokeai.app.invocations.wan.wan_denoise import _default_scheduler_for_variant
 
         s = _default_scheduler_for_variant(WanVariantType.TI2V_5B)
         assert isinstance(s, UniPCMultistepScheduler)
@@ -1089,7 +1141,7 @@ class TestDefaultSchedulerForVariant:
         and skews how many steps land above the MoE expert boundary."""
         from diffusers import UniPCMultistepScheduler
 
-        from invokeai.app.invocations.wan_denoise import _default_scheduler_for_variant
+        from invokeai.app.invocations.wan.wan_denoise import _default_scheduler_for_variant
 
         for v in (WanVariantType.T2V_A14B, WanVariantType.I2V_A14B):
             s = _default_scheduler_for_variant(v)

@@ -5,49 +5,19 @@ from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_image_action as _assert_image_action,
+)
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
-from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
+from invokeai.app.services.board_access.board_access_common import ItemAction
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
-
-
-def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board.
-
-    Write access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the board.
-    - The board visibility is Public (public boards accept contributions from any user).
-
-    Reads the board *record*, not its DTO. The decision needs only the owner and the
-    visibility, while BoardService.get_dto also resolves the cover image and runs three COUNT
-    aggregates over the board's contents — six queries to answer a question two columns settle.
-    That cost is the only reason a batch route would be tempted to decide once and reuse the
-    answer for every name, and reusing it is what lets a permission revoked mid-batch keep
-    working until the request ends. One indexed SELECT per name is cheap enough to re-decide.
-    (These routes are sync `def`, so the queries occupy a threadpool worker rather than the
-    event loop — but a 1000-name batch still holds one for six thousand round trips.)
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    try:
-        board = ApiDependencies.invoker.services.board_records.get(board_id)
-    except BoardRecordNotFoundException:
-        raise HTTPException(status_code=404, detail="Board not found")
-    # Anything else — a locked or unreadable database — propagates. Catching it here would
-    # answer "no such board", which the batch loops below treat as a name to skip: a disk error
-    # would then drop names out of the response entirely, reported neither as moved nor as
-    # failed, and the client would show the move as done until the next refresh.
-    if current_user.is_admin:
-        return
-    if board.user_id == current_user.user_id:
-        return
-    if board.board_visibility == BoardVisibility.Public:
-        return
-    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
 def _image_record_exists(image_name: str) -> bool:
@@ -121,11 +91,8 @@ def _remove_from_board_and_classify(image_name: str, old_board_id: str) -> _Scop
 def _assert_image_direct_owner(image_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the image.
 
-    This is intentionally stricter than _assert_image_owner in images.py:
-    board ownership is NOT sufficient here.  Allowing a user to add someone
-    else's image to their own board would grant them mutation rights via the
-    board-ownership fallback in _assert_image_owner, escalating read access
-    into write access.
+    Only an image's owner may put it on a board, whatever their role on the board: adding someone else's image to
+    a board you manage would let you remove and star it there, escalating read access into write access.
     """
     if current_user.is_admin:
         return
@@ -189,7 +156,7 @@ def remove_image_from_board(
     try:
         old_board_id = ApiDependencies.invoker.services.images.get_dto(image_name).board_id or "none"
         if old_board_id != "none":
-            _assert_board_write_access(old_board_id, current_user)
+            _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
         assert_image_move_maintenance_inactive()
         removed_images: set[str] = set()
         failed_images: set[str] = set()
@@ -307,9 +274,9 @@ def add_images_to_board(
                 #
                 # Except that a name deleted between the ownership check and the insert lands
                 # here too, and not as something recognizable: board_images.image_name is a
-                # foreign key onto images.image_name, so the INSERT fails with a bare
-                # sqlite3.IntegrityError. Nothing in the exception says "gone", so the record
-                # is probed instead — only on this path, so the happy path pays nothing.
+                # foreign key onto images.image_name, so the INSERT fails with a
+                # ForeignKeyViolation that does not say which key: the board or the image. So the
+                # record is probed instead — only on this path, so the happy path pays nothing.
                 if not _image_record_exists(image_name):
                     continue
                 failed_images.add(image_name)
@@ -351,7 +318,7 @@ def remove_images_from_board(
                 # letting it escape from inside this handler would replace the 409 with a 500.
                 continue
             if old_board_id != "none":
-                _assert_board_write_access(old_board_id, current_user)
+                _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
         raise
 
     try:
@@ -382,10 +349,9 @@ def remove_images_from_board(
             # The one authorization decision, and it is taken fresh for every name. Memoizing
             # it per board is tempting — the skip removed the early abort that used to cap an
             # unauthorized batch at one check — but a cached True outlives the permission it
-            # recorded: flip a board from Public to Private mid-batch and the rest of the names
-            # are removed on an answer that is no longer true. _assert_board_write_access reads
-            # the board record (one indexed SELECT), so re-deciding costs about what the
-            # get_dto() it replaced cost once.
+            # recorded: restrict a board's general access mid-batch and the rest of the names
+            # are removed on an answer that is no longer true. The decision reads the image's
+            # owner, its board, and that board's access facts (indexed SELECTs).
             #
             # Kept out of the try below so that the only way to skip a name for auth is this
             # branch. Note the two failure modes are not the same: "not allowed" is a skip,
@@ -393,7 +359,7 @@ def remove_images_from_board(
             # could not decide about must be reported rather than silently dropped.
             if old_board_id != "none":
                 try:
-                    _assert_board_write_access(old_board_id, current_user)
+                    _assert_image_action(image_name, current_user, ItemAction.RemoveFromBoard)
                 except HTTPException:
                     continue
                 except Exception:

@@ -32,6 +32,9 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from invokeai.backend.anima.block_layout import adapter_block_positions
+from invokeai.backend.util.logging import InvokeAILogger
+
 ASPP_DEFAULT_DILATIONS: tuple[int, ...] = (1, 2, 4, 8)
 
 _SAVED_COND_PREFIX = "lllite_conditioning1."
@@ -511,10 +514,21 @@ class AnimaControlNetLLLite(nn.Module):
             m.multiplier = multiplier
 
     def apply_to(self, transformer: nn.Module) -> None:
-        """Swap the forward of each target Linear in ``transformer``. Idempotent."""
+        """Swap the forward of each target Linear in ``transformer``. Idempotent.
+
+        An adapter trained on a shallower Anima binds to the blocks where this depth-expanded model keeps
+        them (see ``invokeai.backend.anima.block_layout``).
+        """
         self.restore()
+        depth = len(transformer.blocks)
+        positions = adapter_block_positions(self._max_block_index(), depth)
+        if positions is not None:
+            InvokeAILogger.get_logger(__name__).info(
+                f"ControlNet-LLLite addresses {self._max_block_index() + 1} blocks; binding it to the matching "
+                f"blocks of this {depth}-block model."
+            )
         for m in self.lllite_modules:
-            target = self._resolve_target(transformer, m.lllite_name)
+            target = self._resolve_target(transformer, m.lllite_name, positions)
             if not isinstance(target, nn.Linear):
                 raise TypeError(f"LLLite target for '{m.lllite_name}' is {type(target).__name__}, expected nn.Linear")
             if target.in_features != m.in_dim:
@@ -536,12 +550,19 @@ class AnimaControlNetLLLite(nn.Module):
         for m in self.lllite_modules:
             m.unbind()
 
+    def _max_block_index(self) -> int:
+        return max(
+            int(match.group(1)) for m in self.lllite_modules if (match := MODULE_NAME_PATTERN.match(m.lllite_name))
+        )
+
     @staticmethod
-    def _resolve_target(transformer: nn.Module, name: str) -> nn.Module:
+    def _resolve_target(transformer: nn.Module, name: str, positions: Sequence[int] | None = None) -> nn.Module:
         match = MODULE_NAME_PATTERN.match(name)
         if match is None:
             raise ValueError(f"Unrecognized LLLite module name: '{name}'")
         block_idx = int(match.group(1))
+        if positions is not None:
+            block_idx = positions[block_idx]
         blocks = transformer.blocks
         if block_idx >= len(blocks):
             raise ValueError(

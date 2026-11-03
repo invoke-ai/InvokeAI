@@ -1,6 +1,6 @@
 ## Summary
 
-<!--A description of the changes in this PR. Include the kind of change (fix, feature, docs, etc), the "why" and the "how". Screenshots or videos are useful for frontend changes.-->
+<!-- Lead with the problem and resulting behavior. Keep this short; show a concrete before/after when useful. -->
 
 ## Related Issues / Discussions
 
@@ -8,16 +8,22 @@
 
 ## QA Instructions
 
-<!--WHEN APPLICABLE: Describe how you have tested the changes in this PR. Provide enough detail that a reviewer can reproduce your tests.-->
+<!-- List actual commands/results and relevant reproduction steps. State skipped, failing, or unavailable checks honestly. Include screenshots/video for changed UI and before/after measurements for material performance claims. -->
 
-## Merge Plan
+## Review
 
-<!--WHEN APPLICABLE: Large PRs, or PRs that touch sensitive things like DB schemas, may need some care when merging. For example, a careful rebase by the change author, timing to not interfere with a pending release, or a message to contributors on discord after merging.-->
+<!-- Summarize material findings resolved and remaining risks or limitations. If there were no material findings, say so briefly. Omit subagent counts, review tiers, and review-process narration. Do not attach review transcripts or work logs. -->
+
+## Compatibility / Rollout
+
+<!-- When applicable: persisted-data migrations, API/generated-artifact compatibility, deployment ordering, and recovery considerations. Omit this section when unnecessary. -->
 
 ## Checklist
 
 - [ ] _The PR has a short but descriptive title, suitable for a changelog_
-- [ ] _Tests added / updated (if applicable)_
-- [ ] _❗Changes to a redux slice have a corresponding migration_
+- [ ] _Meaningful regression coverage added / updated where needed; obsolete tests/code removed_
+- [ ] _Persisted-state and API changes include required migrations / compatibility validation_
+- [ ] _Relevant performance/efficiency opportunities considered; material claims have evidence_
+- [ ] _Material review findings resolved and relevant checks rerun_
 - [ ] _Documentation added / updated (if applicable)_
 - [ ] _Updated `What's New` copy (if doing a release after this PR)_

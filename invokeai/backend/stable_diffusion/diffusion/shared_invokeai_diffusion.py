@@ -8,6 +8,7 @@ from typing_extensions import TypeAlias
 
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
+    ConditioningMode,
     IPAdapterData,
     Range,
     TextConditioningData,
@@ -288,7 +289,12 @@ class InvokeAIDiffuserComponent:
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
             ip_masks = [ipa.mask for ipa in ip_adapter_data]
             regional_ip_data = RegionalIPData(
-                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
+                image_prompt_embeds=image_prompt_embeds,
+                scales=scales,
+                masks=ip_masks,
+                dtype=x.dtype,
+                device=x.device,
+                cond_mode=ConditioningMode.Both,
             )
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
@@ -391,26 +397,35 @@ class InvokeAIDiffuserComponent:
         if mid_block_additional_residual is not None:
             uncond_mid_block, cond_mid_block = mid_block_additional_residual.chunk(2)
 
-        #####################
-        # Unconditioned pass
-        #####################
-
-        cross_attention_kwargs = {}
-
-        # Prepare IP-Adapter cross-attention kwargs for the unconditioned pass.
+        # Prepare IP-Adapter cross-attention kwargs
+        regional_ip_data = None
         if ip_adapter_data is not None:
             ip_adapter_conditioning = [ipa.ip_adapter_conditioning for ipa in ip_adapter_data]
-            # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
+
+            # Note that we 'stack' to produce tensors of shape (batch_size, num_ip_images, seq_len, token_len).
             image_prompt_embeds = [
-                torch.unsqueeze(ipa_conditioning.uncond_image_prompt_embeds, dim=0)
+                torch.stack([ipa_conditioning.uncond_image_prompt_embeds, ipa_conditioning.cond_image_prompt_embeds])
                 for ipa_conditioning in ip_adapter_conditioning
             ]
 
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
             ip_masks = [ipa.mask for ipa in ip_adapter_data]
             regional_ip_data = RegionalIPData(
-                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
+                image_prompt_embeds=image_prompt_embeds,
+                scales=scales,
+                masks=ip_masks,
+                dtype=x.dtype,
+                device=x.device,
+                cond_mode=ConditioningMode.Both,
             )
+
+        #####################
+        # Unconditioned pass
+        #####################
+
+        cross_attention_kwargs = {}
+        if regional_ip_data is not None:
+            regional_ip_data.cond_mode = ConditioningMode.Negative
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
@@ -445,20 +460,8 @@ class InvokeAIDiffuserComponent:
         ###################
 
         cross_attention_kwargs = {}
-
-        if ip_adapter_data is not None:
-            ip_adapter_conditioning = [ipa.ip_adapter_conditioning for ipa in ip_adapter_data]
-            # Note that we 'unsqueeze' to produce tensors of shape (batch_size=1, num_ip_images, seq_len, token_len).
-            image_prompt_embeds = [
-                torch.unsqueeze(ipa_conditioning.cond_image_prompt_embeds, dim=0)
-                for ipa_conditioning in ip_adapter_conditioning
-            ]
-
-            scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
-            ip_masks = [ipa.mask for ipa in ip_adapter_data]
-            regional_ip_data = RegionalIPData(
-                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device
-            )
+        if regional_ip_data is not None:
+            regional_ip_data.cond_mode = ConditioningMode.Positive
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.

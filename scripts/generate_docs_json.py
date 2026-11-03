@@ -225,7 +225,7 @@ def write_docs_bundle(bundle: dict[str, Any], output_dir: Path = OUTPUT_DIR) -> 
 
 def _normalize_value(value: Any) -> str | int | float | bool | list[Any] | dict[str, Any] | None:
     if isinstance(value, Path):
-        return str(value)
+        return value.as_posix()
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, list):

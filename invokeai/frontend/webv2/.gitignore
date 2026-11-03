@@ -1,0 +1,14 @@
+dist/
+node_modules/
+stats.html
+artifacts/
+
+# vitest browser-mode failure artifacts
+.vitest/
+__screenshots__/
+
+# planning scratch, never committed
+docs/superpowers/
+*.tsbuildinfo
+vite.config.mjs
+vite.config.d.mts

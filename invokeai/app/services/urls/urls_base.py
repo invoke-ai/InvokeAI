@@ -11,7 +11,7 @@ class UrlServiceBase(ABC):
 
     @abstractmethod
     def get_video_url(self, video_name: str, thumbnail: bool = False) -> str:
-        """Gets the URL for a video or its first-frame thumbnail."""
+        """Gets the URL for a video or its thumbnail."""
         pass
 
     @abstractmethod

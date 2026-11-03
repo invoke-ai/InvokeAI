@@ -1,15 +1,20 @@
 name: install frontend dependencies
 description: Installs frontend dependencies with pnpm, with caching
+inputs:
+  working-directory:
+    description: Directory to install dependencies in
+    required: false
+    default: invokeai/frontend/webv2
 runs:
   using: 'composite'
   steps:
     - name: setup node 22
       uses: actions/setup-node@v6
       with:
-        node-version: '22'
+        node-version-file: '.nvmrc'
 
     - name: setup pnpm
-      uses: pnpm/action-setup@v6
+      uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
       with:
         version: 10
         run_install: false
@@ -30,4 +35,4 @@ runs:
     - name: install frontend dependencies
       run: pnpm install --prefer-frozen-lockfile
       shell: bash
-      working-directory: invokeai/frontend/web
+      working-directory: ${{ inputs.working-directory }}

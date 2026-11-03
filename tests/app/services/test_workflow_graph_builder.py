@@ -1,7 +1,11 @@
+import json
+from pathlib import Path
+
 import pytest
 
-from invokeai.app.services.shared.graph import Graph
+from invokeai.app.services.shared.graph import Graph, InvalidEdgeError
 from invokeai.app.services.shared.workflow_graph_builder import (
+    InvalidWorkflowInputError,
     UnsupportedWorkflowNodeError,
     build_graph_from_workflow,
 )
@@ -103,6 +107,36 @@ def _build_named_return_edges(source: str, source_handle: str):
     ]
 
 
+FOR_LOOP_FIXTURE_DIR = (
+    Path(__file__).parents[3]
+    / "invokeai"
+    / "frontend"
+    / "webv2"
+    / "src"
+    / "features"
+    / "workflow"
+    / "core"
+    / "fixtures"
+)
+
+FOR_LOOP_FIXTURES = sorted(FOR_LOOP_FIXTURE_DIR.glob("for-loop-*.json"))
+# CI's python-tests change filter re-includes this directory by path; a silent empty glob would
+# hide both a moved fixture directory and the resulting stale filter.
+assert FOR_LOOP_FIXTURES, f"no for-loop fixtures found in {FOR_LOOP_FIXTURE_DIR}"
+
+
+@pytest.mark.parametrize("fixture_path", FOR_LOOP_FIXTURES)
+def test_for_loop_fixtures_have_matching_backend_validation(fixture_path: Path):
+    fixture = json.loads(fixture_path.read_text())
+    graph = build_graph_from_workflow(fixture)
+
+    if fixture["fixture"] == "valid":
+        graph.validate_self()
+    else:
+        with pytest.raises(InvalidEdgeError):
+            graph.validate_self()
+
+
 def test_build_graph_from_workflow_converts_invocation_nodes():
     workflow = _build_workflow(
         nodes=[
@@ -120,6 +154,252 @@ def test_build_graph_from_workflow_converts_invocation_nodes():
     assert graph.nodes["add-1"].a == 1
     assert graph.nodes["add-1"].b == 2
     assert graph.nodes["return-1"].get_type() == "workflow_return"
+
+
+def test_build_graph_from_workflow_preserves_loop_linkage_edges():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_workflow_node("for-return-1", "for_return", {}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-for-body",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "item",
+                "target": "for-return-1",
+                "targetHandle": "output",
+            },
+            {
+                "id": "edge-for-linkage",
+                "type": "loop_linkage",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+        ],
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert [edge.type for edge in graph.edges] == ["default", "loop_linkage"]
+    assert graph.edges[1].source.node_id == "for-1"
+    assert graph.edges[1].destination.node_id == "for-return-1"
+
+
+def test_build_graph_from_workflow_canonicalizes_connector_loop_linkage():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_connector_node("connector-1"),
+            _build_workflow_node("for-return-1", "for_return", {}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-for-body",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "item",
+                "target": "for-return-1",
+                "targetHandle": "output",
+            },
+            {
+                "id": "edge-linkage-input",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-1",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-output",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+        ],
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert [edge.type for edge in graph.edges] == ["default", "loop_linkage"]
+    assert graph.edges[1].source.node_id == "for-1"
+    assert graph.edges[1].source.field == "loop_linkage"
+    assert graph.edges[1].destination.node_id == "for-return-1"
+    assert graph.edges[1].destination.field == "loop_linkage"
+
+
+def test_build_graph_from_workflow_canonicalizes_chained_connector_loop_linkage():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_connector_node("connector-1"),
+            _build_connector_node("connector-2"),
+            _build_workflow_node("for-return-1", "for_return", {}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-linkage-input",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-1",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-chain",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "connector-2",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-output",
+                "type": "default",
+                "source": "connector-2",
+                "sourceHandle": "out",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+        ],
+    )
+
+    graph = build_graph_from_workflow(workflow)
+
+    assert len(graph.edges) == 1
+    assert graph.edges[0].type == "loop_linkage"
+    assert graph.edges[0].source.node_id == "for-1"
+    assert graph.edges[0].destination.node_id == "for-return-1"
+
+
+def test_build_graph_from_workflow_rejects_branched_connector_loop_linkage():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_connector_node("connector-1"),
+            _build_workflow_node("for-return-1", "for_return", {}),
+            _build_workflow_node("for-return-2", "for_return", {}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-linkage-input",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-1",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-output-1",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+            {
+                "id": "edge-linkage-output-2",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "for-return-2",
+                "targetHandle": "loop_linkage",
+            },
+        ],
+    )
+
+    with pytest.raises(InvalidWorkflowInputError, match="loop_linkage connector path"):
+        build_graph_from_workflow(workflow)
+
+
+def test_build_graph_from_workflow_rejects_connector_loop_linkage_duplicate_ownership():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_connector_node("connector-1"),
+            _build_connector_node("connector-2"),
+            _build_workflow_node("for-return-1", "for_return", {}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-linkage-input-1",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-1",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-output-1",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+            {
+                "id": "edge-linkage-input-2",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-2",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-linkage-output-2",
+                "type": "default",
+                "source": "connector-2",
+                "sourceHandle": "out",
+                "target": "for-return-1",
+                "targetHandle": "loop_linkage",
+            },
+        ],
+    )
+
+    with pytest.raises(InvalidWorkflowInputError, match="already has a loop linkage"):
+        build_graph_from_workflow(workflow)
+
+
+def test_build_graph_from_workflow_rejects_loop_linkage_connector_ordinary_fanout():
+    workflow = _build_workflow(
+        nodes=[
+            _build_workflow_node("for-1", "for", {"collection": ["a"]}),
+            _build_connector_node("connector-1"),
+            _build_workflow_node("add-1", "add", {"a": 1, "b": 2}),
+            _build_workflow_node("workflow-return-1", "workflow_return", {"values": []}),
+        ],
+        edges=[
+            {
+                "id": "edge-linkage-input",
+                "type": "default",
+                "source": "for-1",
+                "sourceHandle": "loop_linkage",
+                "target": "connector-1",
+                "targetHandle": "in",
+            },
+            {
+                "id": "edge-ordinary-output",
+                "type": "default",
+                "source": "connector-1",
+                "sourceHandle": "out",
+                "target": "add-1",
+                "targetHandle": "a",
+            },
+        ],
+    )
+
+    with pytest.raises(InvalidWorkflowInputError, match="loop_linkage connector path"):
+        build_graph_from_workflow(workflow)
 
 
 def test_build_graph_from_workflow_flattens_connector_edges():

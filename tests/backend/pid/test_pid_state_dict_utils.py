@@ -28,7 +28,8 @@ class TestStripNetPrefix:
 
     def test_a_bare_pid_net_checkpoint_is_untouched(self) -> None:
         """Without the prefix there is no evidence this is a distill serialisation, so nothing is
-        filtered — a stray key should reach the loader's "unexpected keys" check, not vanish."""
+        filtered — a stray key should reach the loader, which reports it at DEBUG and ignores it
+        (issue #9437), rather than vanish here where nothing could report it at all."""
         sd = {"lq_proj.a": torch.zeros(1), "discriminator.y": torch.zeros(1)}
         assert strip_net_prefix(sd) is sd
 

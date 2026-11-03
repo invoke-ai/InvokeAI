@@ -20,6 +20,7 @@ from fastapi.testclient import TestClient
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.database.database import Database
 
 
 class MockApiDependencies(ApiDependencies):
@@ -193,36 +194,30 @@ def test_add_reports_names_refused_by_a_destination_revoked_mid_batch(
     assert set(body["failed_images"]) == {"second.png", "third.png"}
 
 
-def test_sqlite_remove_returns_the_row_count() -> None:
+def test_remove_returns_the_row_count(database: Database) -> None:
     """The storage layer itself: the row count is the only signal the scoped DELETE's scope
     held, and a `None` return silently restores report-a-removal-that-did-not-happen at the
-    route (`None == 0` is False). Stubbed at the cursor in the manner of the image-records
-    storage tests."""
-    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+    route (`None == 0` is False)."""
+    from sqlalchemy import insert
 
-    storage = SqliteBoardImageRecordStorage.__new__(SqliteBoardImageRecordStorage)
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+    from invokeai.app.services.shared.database.schema.images import images
 
-    class _Cursor:
-        rowcount = 0
+    boards = BoardRecordStorage(database)
+    on_board, other_board = boards.save("P", "system").board_id, boards.save("Q", "system").board_id
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(images).values(
+                image_name="raced.png", image_origin="internal", image_category="general", width=1, height=1
+            )
+        )
+    storage = BoardImageRecordStorage(database)
+    storage.add_image_to_board(on_board, "raced.png")
 
-        def execute(self, *args: object, **kwargs: object) -> None:
-            pass
-
-    class _Db:
-        def transaction(self):
-            from contextlib import contextmanager
-
-            @contextmanager
-            def _cm():
-                yield _Cursor()
-
-            return _cm()
-
-    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
-
-    assert storage.remove_image_from_board("raced.png", "board-p") == 0
-    _Cursor.rowcount = 1
-    assert storage.remove_image_from_board("ok.png", "board-p") == 1
+    assert storage.remove_image_from_board("raced.png", other_board) == 0
+    assert storage.remove_image_from_board("raced.png", on_board) == 1
+    assert storage.remove_image_from_board("raced.png", on_board) == 0
 
 
 @pytest.mark.parametrize(

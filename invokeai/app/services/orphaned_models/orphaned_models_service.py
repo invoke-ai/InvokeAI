@@ -4,15 +4,18 @@ Orphaned models are files in the models directory that are not referenced
 in the database models table.
 """
 
-import json
 import shutil
 from pathlib import Path
-from typing import Set
+from typing import TYPE_CHECKING, Set
 
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.model_install.install_staging_ledger import InstallStagingLedger
+from invokeai.backend.util.logging import InvokeAILogger
+
+if TYPE_CHECKING:
+    from invokeai.app.services.model_records import ModelRecordServiceBase
 
 # Scratch area for operations that must build a model on the models volume before registering it -
 # model conversion writes its diffusers copy here. It lives under the models root so the finished
@@ -56,15 +59,16 @@ class OrphanedModelsService:
         ".git",
     }
 
-    def __init__(self, config: InvokeAIAppConfig, db: SqliteDatabase):
+    def __init__(self, config: InvokeAIAppConfig, store: "ModelRecordServiceBase"):
         """Initialize the service.
 
         Args:
             config: Application configuration containing models path
-            db: Database connection for querying registered models
+            store: The model records, whose files are not orphans
         """
         self._config = config
-        self._db = db
+        self._store = store
+        self._logger = InvokeAILogger.get_logger(self.__class__.__name__)
 
     def find_orphaned_models(self) -> list[OrphanedModelInfo]:
         """Find all orphaned model directories.
@@ -72,7 +76,8 @@ class OrphanedModelsService:
         Returns:
             List of OrphanedModelInfo objects describing orphaned directories
         """
-        models_path = self._config.models_path
+        models_path = self._config.models_path.resolve()
+        ledger = InstallStagingLedger(models_path, self._logger)
 
         # Get all model directories registered in the database
         db_model_directories = self._get_registered_model_directories(models_path)
@@ -115,6 +120,9 @@ class OrphanedModelsService:
         # Convert to OrphanedModelInfo objects
         result = []
         for dir_path, files in orphaned_dirs_map.items():
+            # An install or orphan deletion owns the directory or something in it, or it holds recovery data.
+            if ledger.is_protected(dir_path):
+                continue
             # Calculate total size
             total_size = sum(f.stat().st_size for f in files if f.exists())
 
@@ -130,6 +138,33 @@ class OrphanedModelsService:
                 )
             )
 
+        # A staging directory whose install marker is unusable holds no resumable install and no model files yet, often
+        # only partial downloads. Startup keeps it rather than guess, so it is offered here.
+        reported = {Path(info.absolute_path) for info in result}
+        for staging_dir in ledger.abandoned_staging(db_model_directories):
+            staging_dir = staging_dir.resolve()
+            if staging_dir in reported:
+                continue
+            staged_files: list[str] = []
+            staged_size = 0
+            for path in staging_dir.rglob("*"):
+                # A concurrent orphan deletion may remove files while this lists them.
+                try:
+                    if not path.is_file():
+                        continue
+                    staged_size += path.stat().st_size
+                except OSError:
+                    continue
+                staged_files.append(str(path.relative_to(staging_dir)))
+            result.append(
+                OrphanedModelInfo(
+                    path=str(staging_dir.relative_to(models_path)),
+                    absolute_path=str(staging_dir),
+                    files=staged_files,
+                    size_bytes=staged_size,
+                )
+            )
+
         return result
 
     def delete_orphaned_models(self, orphaned_paths: list[str]) -> dict[str, str]:
@@ -142,6 +177,7 @@ class OrphanedModelsService:
             Dictionary mapping paths to status messages ("deleted" or error message)
         """
         models_path = self._config.models_path.resolve()
+        ledger = InstallStagingLedger(models_path, self._logger)
         conversion_scratch_path = (models_path / CONVERSION_SCRATCH_DIRNAME).resolve()
         results = {}
 
@@ -155,6 +191,10 @@ class OrphanedModelsService:
                     results[rel_path] = "error: path is not under models directory"
                     continue
 
+                if full_path == models_path:
+                    results[rel_path] = "error: cannot delete the models directory"
+                    continue
+
                 try:
                     full_path.relative_to(conversion_scratch_path)
                 except ValueError:
@@ -163,13 +203,24 @@ class OrphanedModelsService:
                     results[rel_path] = "error: path is reserved for active conversion"
                     continue
 
+                if ledger.is_protected(full_path):
+                    results[rel_path] = "error: path is reserved by an active install or install recovery"
+                    continue
+
                 if not full_path.exists():
                     results[rel_path] = "error: path does not exist"
                     continue
 
-                # Delete the directory
-                shutil.rmtree(full_path)
-                results[rel_path] = "deleted"
+                claim_root = models_path / full_path.relative_to(models_path).parts[0]
+                # Claim deletion atomically so a local install cannot start using this source after the check.
+                try:
+                    claim = ledger.claim(claim_root)
+                except FileExistsError:
+                    results[rel_path] = "error: path is reserved by an active install or install recovery"
+                    continue
+                with claim:
+                    shutil.rmtree(full_path)
+                    results[rel_path] = "deleted"
 
             except Exception as e:
                 results[rel_path] = f"error: {str(e)}"
@@ -180,36 +231,27 @@ class OrphanedModelsService:
         """Get the set of all model directories from the database."""
         model_directories = set()
 
-        with self._db.transaction() as cursor:
-            cursor.execute("SELECT config FROM models")
-            rows = cursor.fetchall()
+        # Every record's path, also of a record whose config no longer validates: its files are not orphans.
+        for path_str in self._store.get_model_paths():
+            if not path_str:
+                continue
+            path = Path(path_str)
 
-            for row in rows:
-                try:
-                    config = json.loads(row[0])
-                    if "path" in config and config["path"]:
-                        path_str = config["path"]
-                        path = Path(path_str)
+            # If the path is relative, resolve it relative to models_dir
+            if not path.is_absolute():
+                full_path = (models_dir / path).resolve()
+            else:
+                full_path = path.resolve()
 
-                        # If the path is relative, resolve it relative to models_dir
-                        if not path.is_absolute():
-                            full_path = (models_dir / path).resolve()
-                        else:
-                            full_path = path.resolve()
-
-                        # Extract the top-level directory under models_dir
-                        try:
-                            rel_path = full_path.relative_to(models_dir)
-                            if rel_path.parts:
-                                top_level_dir = models_dir / rel_path.parts[0]
-                                model_directories.add(top_level_dir.resolve())
-                        except ValueError:
-                            # Path is not relative to models_dir
-                            model_directories.add(full_path)
-
-                except (json.JSONDecodeError, KeyError, TypeError):
-                    # Skip invalid model configs
-                    continue
+            # Extract the top-level directory under models_dir
+            try:
+                rel_path = full_path.relative_to(models_dir)
+                if rel_path.parts:
+                    top_level_dir = models_dir / rel_path.parts[0]
+                    model_directories.add(top_level_dir.resolve())
+            except ValueError:
+                # Path is not relative to models_dir
+                model_directories.add(full_path)
 
         return model_directories
 

@@ -1,0 +1,240 @@
+import type { ProjectBoardSnapshotBoardDTO, ProjectWithWorkspaceDTO } from '@workbench/projects/api';
+import type { ProjectDocumentV3 } from '@workbench/projects/projectDocument';
+
+import { type AccountScope, assertAccountScopeCurrent, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { createProjectSettled, invalidateBoardLists } from '@workbench/projects/api';
+import { createProjectId } from '@workbench/projects/ids';
+import {
+  collectLiveAssetRefs,
+  remapAssetRefs,
+  selectCoverImageName,
+  stripInstallationState,
+} from '@workbench/projects/projectAssets';
+
+import type { MediaMaterializer } from './restoreProjectMedia';
+import type { ProjectTransferIssues } from './transfer';
+
+import { type CopyMediaResult, copyImagesToBoard, copyVideosToBoard, isRequestCancellation } from './assetTransport';
+import { INVK_MAX_BOARDS, type InvkBoard } from './board';
+import { InvkFormatError, toInvkRefusalError } from './format';
+import { createStagingBoards, placeMemberBoards } from './memberBoards';
+import {
+  createRestoredMediaLedger,
+  restoreProjectMedia,
+  rollbackRestoredMedia,
+  rollbackUnlessProjectExists,
+} from './restoreProjectMedia';
+import { toMediaRefs } from './transfer';
+import { toTransferredProjectCreation } from './transferCreation';
+
+/** Copy board media server-side and reuse external reference identities. */
+
+export interface DuplicateProjectInput {
+  /** The source project's boards with their visible contents, inbox first. */
+  boards: readonly ProjectBoardSnapshotBoardDTO[];
+  owner: AccountScope;
+  /** The acknowledged source record — for an open project, flushed first. */
+  record: ProjectWithWorkspaceDTO;
+  /** Stable identity reserved before the operation, used by retry-safe conflict copies. */
+  identity?: { id: string; name: string };
+}
+
+export interface DuplicateProjectDeps {
+  copyImages?: typeof copyImagesToBoard;
+  copyVideos?: typeof copyVideosToBoard;
+  /** Copying the media, then moving the other boards into the copy. */
+  onProgress?: (progress: { completed: number; phase: 'placing-boards' | 'restoring'; total: number }) => void;
+}
+
+export interface DuplicateProjectResult extends ProjectTransferIssues {
+  /** The cover to record for the copy, or `null` when the source had none this server can serve. */
+  coverImageName: string | null;
+  record: ProjectWithWorkspaceDTO;
+}
+
+/**
+ * Report each batch item's outcome and progress; cancellation aborts the operation rather than becoming a batch
+ * failure.
+ */
+export const createCopyMediaMaterializer = (
+  deps: { copyImages?: typeof copyImagesToBoard; copyVideos?: typeof copyVideosToBoard; signal?: AbortSignal } = {}
+): MediaMaterializer => {
+  const copyImages = deps.copyImages ?? copyImagesToBoard;
+  const copyVideos = deps.copyVideos ?? copyVideosToBoard;
+  const allFailed =
+    (names: string[]) =>
+    (error: unknown): CopyMediaResult => {
+      if (isRequestCancellation(error)) {
+        throw error;
+      }
+
+      return { copied: [], failed: names };
+    };
+
+  // Board by board: each board's media is one batched copy the server does in a single request, so overlapping them
+  // would add server load rather than save round trips.
+  return async (boards, onItemSettled) => {
+    const result: Awaited<ReturnType<MediaMaterializer>> = { failed: [], materialized: [] };
+
+    for (const { items, stagingBoardId } of boards) {
+      const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
+      const videoNames = items.filter((item) => item.kind === 'video').map((item) => item.name);
+      const [images, videos] = await Promise.all([
+        copyImages(imageNames, stagingBoardId, deps.signal).catch(allFailed(imageNames)),
+        copyVideos(videoNames, stagingBoardId, deps.signal).catch(allFailed(videoNames)),
+      ]);
+
+      for (let index = 0; index < items.length; index += 1) {
+        onItemSettled();
+      }
+
+      result.failed.push(
+        ...images.failed.map((name) => ({ kind: 'image' as const, name, reason: 'upload-failed' as const })),
+        ...videos.failed.map((name) => ({ kind: 'video' as const, name, reason: 'upload-failed' as const }))
+      );
+      result.materialized.push(
+        ...images.copied.map((entry) => ({ kind: 'image' as const, name: entry.name, sourceName: entry.sourceName })),
+        ...videos.copied.map((entry) => ({ kind: 'video' as const, name: entry.name, sourceName: entry.sourceName }))
+      );
+    }
+
+    return result;
+  };
+};
+
+/** Project creation commits the staging boards; precommit rollback deletes only ledger-owned resources. */
+export const duplicateProjectRecord = async (
+  input: DuplicateProjectInput,
+  deps: DuplicateProjectDeps = {}
+): Promise<DuplicateProjectResult> => {
+  const { owner } = input;
+  const id = input.identity?.id ?? createProjectId();
+  const name = input.identity?.name ?? `${input.record.name} copy`;
+
+  assertAccountScopeCurrent(owner);
+
+  // Canonicalize with a fresh project identity and reset source board/selection state. The copy carries the
+  // duplicating account's workspace, never another member's: the source record's is the caller's own.
+  const { deserializeProjectDocument, joinProjectRecord } = await import('@workbench/projects/projectHydration');
+
+  assertAccountScopeCurrent(owner);
+
+  const source = joinProjectRecord(input.record);
+  if (source.status === 'malformed') {
+    throw new InvkFormatError('damaged', source.reason);
+  }
+  const loaded = deserializeProjectDocument({ ...stripInstallationState(source.document), id, name });
+
+  if (loaded.status === 'refused') {
+    throw toInvkRefusalError(loaded.refused);
+  }
+
+  if (loaded.status !== 'loaded') {
+    throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
+  }
+
+  const project = loaded.project;
+
+  const { serializeProjectDocument } = await import('@workbench/projects/projectDocument');
+  const canonicalDocument = serializeProjectDocument(project);
+  const boards: InvkBoard[] = input.boards.map((board) => ({
+    archived: board.archived,
+    isInbox: board.is_inbox,
+    items: board.items,
+    name: board.name,
+  }));
+
+  // The same ceiling as an archive: a copy stages and moves each board one request at a time.
+  if (boards.length > INVK_MAX_BOARDS) {
+    throw new InvkFormatError(
+      'too-large',
+      `Project has ${String(boards.length)} boards; a copy carries at most ${String(INVK_MAX_BOARDS)}`
+    );
+  }
+  // Made before anything is staged: every staging board joins it as it is created, so a copy abandoned at any point
+  // can delete them all.
+  const ledger = createRestoredMediaLedger([]);
+  let didCreateProject = false;
+  let didAttemptProjectCreate = false;
+
+  try {
+    assertAccountScopeCurrent(owner);
+
+    const { boards: stagedBoards, inboxStagingBoardId } = await createStagingBoards(boards, name, ledger, owner.signal);
+
+    assertAccountScopeCurrent(owner);
+
+    const restored = await restoreProjectMedia(
+      {
+        boards: stagedBoards.map(({ board, stagingBoardId }) => ({ items: board.items, stagingBoardId })),
+        // Same-server duplication needs no bundled bytes and inherits unresolved external references.
+        coverBytes: null,
+        coverSourceImageName: selectCoverImageName(canonicalDocument),
+        documentRefs: toMediaRefs(collectLiveAssetRefs(canonicalDocument)),
+        ledger,
+        projectId: id,
+      },
+      {
+        // Reuse document-only names without existence probes; references may already be dangling.
+        findExistingImageNames: (names) => Promise.resolve(new Set(names)),
+        findExistingVideoNames: (names) => Promise.resolve(new Set(names)),
+        materializeBoardMedia: createCopyMediaMaterializer({
+          ...(deps.copyImages === undefined ? {} : { copyImages: deps.copyImages }),
+          ...(deps.copyVideos === undefined ? {} : { copyVideos: deps.copyVideos }),
+          signal: owner.signal,
+        }),
+        ...(deps.onProgress === undefined
+          ? {}
+          : { onProgress: (progress) => deps.onProgress?.({ ...progress, phase: 'restoring' }) }),
+        signal: owner.signal,
+      }
+    );
+
+    assertAccountScopeCurrent(owner);
+    didAttemptProjectCreate = true;
+
+    const copied = remapAssetRefs(canonicalDocument, restored.mappings) as unknown as ProjectDocumentV3;
+    // The copy's content and the duplicating account's workspace, which opens on the inbox the create claims, in one
+    // request: the copy never exists without it. A copy created whole carries the workspace inside its document.
+    const record = await createProjectSettled(
+      {
+        ...toTransferredProjectCreation(copied, inboxStagingBoardId),
+        minimum_canvas_schema_version: input.record.minimum_canvas_schema_version,
+        name,
+        project_id: id,
+      },
+      owner
+    );
+
+    didCreateProject = true;
+    assertAccountScopeCurrent(owner);
+    // The copy exists; its other boards can now belong to it. Reported, never fatal, from here on. Lists fetched
+    // while they were still staged, the create's own refresh among them, would keep showing them in the Library.
+    const boardIssues = await placeMemberBoards(stagedBoards, record.project_id, {
+      onProgress: (completed, total) => deps.onProgress?.({ completed, phase: 'placing-boards', total }),
+      signal: owner.signal,
+    }).finally(() => invalidateBoardLists(owner));
+    assertAccountScopeCurrent(owner);
+
+    return {
+      boardIssues,
+      boardItemIssues: restored.boardItemIssues,
+      coverImageName: restored.coverImageName,
+      documentReferenceIssues: restored.documentReferenceIssues,
+      record,
+    };
+  } catch (error) {
+    // The staging boards it deletes may already be listed: uploads to them announce themselves.
+    const rollback = () =>
+      rollbackRestoredMedia(ledger, { signal: owner.signal }).finally(() => invalidateBoardLists(owner));
+
+    // Before the create was even attempted nothing is ambiguous: whatever was staged or copied is ours to drop.
+    if (!didAttemptProjectCreate && isAccountScopeCurrent(owner)) {
+      await rollback();
+    } else {
+      await rollbackUnlessProjectExists(error, didCreateProject, owner, rollback);
+    }
+
+    throw error;
+  }
+};

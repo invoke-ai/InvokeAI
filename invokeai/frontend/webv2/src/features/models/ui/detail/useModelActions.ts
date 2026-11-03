@@ -1,0 +1,74 @@
+import type { ModelConfig } from '@features/models/core/types';
+
+import { convertModelToDiffusers, deleteModel, reidentifyModel } from '@features/models/data/api';
+import { removeModelsFromStore, replaceModelInStore } from '@features/models/data/modelsStore';
+import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
+import { pruneModelsUiKeys } from '@features/models/ui/uiStore';
+import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+
+/** Share lifecycle actions and notifications across surfaces; callers own confirmation UI. */
+type ModelActionTarget = Pick<ModelConfig, 'key' | 'name'>;
+
+export const useModelActions = () => {
+  const { t } = useTranslation();
+  const notify = useNotify();
+  // Use independent action guards so a slow conversion cannot swallow a delete.
+  const { run: runRemove } = useScopedAction();
+  const { run: runConvert } = useScopedAction();
+  const { run: runReidentify } = useScopedAction();
+
+  const remove = useCallback(
+    (model: ModelActionTarget) =>
+      runRemove(
+        async (owner) => {
+          await deleteModel(model.key, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          // The relationships store prunes itself off this library change.
+          removeModelsFromStore([model.key]);
+          pruneModelsUiKeys([model.key]);
+          // A deleted starter must lose its "Installed" badge in Add Models.
+          refreshStartersIfLoaded();
+          notify.success(t('models.modelDeleted'), model.name);
+        },
+        (message) => notify.error(t('models.deleteFailed'), message)
+      ),
+    [notify, runRemove, t]
+  );
+
+  const convert = useCallback(
+    (model: ModelActionTarget) =>
+      runConvert(
+        async (owner) => {
+          const converted = await convertModelToDiffusers(model.key, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          replaceModelInStore(converted);
+          notify.success(t('models.convertedToDiffusers'), model.name);
+        },
+        (message) => notify.error(t('models.conversionFailed'), message)
+      ),
+    [notify, runConvert, t]
+  );
+
+  const reidentify = useCallback(
+    (model: ModelActionTarget) =>
+      runReidentify(
+        async (owner) => {
+          const identified = await reidentifyModel(model.key, owner.signal);
+
+          assertAccountScopeCurrent(owner);
+          replaceModelInStore(identified);
+          notify.success(t('models.modelReidentified'), model.name);
+        },
+        (message) => notify.error(t('models.reidentifyFailed'), message)
+      ),
+    [notify, runReidentify, t]
+  );
+
+  return { convert, reidentify, remove };
+};

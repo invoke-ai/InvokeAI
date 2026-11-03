@@ -1,4 +1,3 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development team
 """
 This module implements a system in which model loaders register the
 type, base and format of models that they know how to load.
@@ -15,12 +14,14 @@ Use like this:
 
 """
 
+import inspect
 from abc import ABC, abstractmethod
 from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.load import ModelLoaderBase
+from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageDeclaration, declare_fp8_storage
+from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
@@ -30,17 +31,21 @@ class ModelLoaderRegistryBase(ABC):
     @classmethod
     @abstractmethod
     def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
-    ) -> Callable[[Type[ModelLoaderBase]], Type[ModelLoaderBase]]:
+        cls,
+        type: ModelType,
+        format: ModelFormat,
+        base: BaseModelType = BaseModelType.Any,
+        fp8_storage: Fp8StorageDeclaration = None,
+    ) -> Callable[[Type[ModelLoader]], Type[ModelLoader]]:
         """Define a decorator which registers the subclass of loader."""
 
     @classmethod
     @abstractmethod
     def get_implementation(
         cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], Config_Base, Optional[SubModelType]]:
+    ) -> Tuple[Type[ModelLoader], Config_Base, Optional[SubModelType]]:
         """
-        Get subclass of ModelLoaderBase registered to handle base and type.
+        Get subclass of ModelLoader registered to handle base and type.
 
         Parameters:
         :param config: Model configuration record, as returned by ModelRecordService
@@ -52,7 +57,7 @@ class ModelLoaderRegistryBase(ABC):
         """
 
 
-TModelLoader = TypeVar("TModelLoader", bound=ModelLoaderBase)
+TModelLoader = TypeVar("TModelLoader", bound=ModelLoader)
 
 
 class ModelLoaderRegistry(ModelLoaderRegistryBase):
@@ -60,21 +65,36 @@ class ModelLoaderRegistry(ModelLoaderRegistryBase):
     This class allows model loaders to register their type, base and format.
     """
 
-    _registry: Dict[str, Type[ModelLoaderBase]] = {}
+    _registry: Dict[str, Type[ModelLoader]] = {}
 
     @classmethod
     def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
+        cls,
+        type: ModelType,
+        format: ModelFormat,
+        base: BaseModelType = BaseModelType.Any,
+        fp8_storage: Fp8StorageDeclaration = None,
     ) -> Callable[[Type[TModelLoader]], Type[TModelLoader]]:
-        """Define a decorator which registers the subclass of loader."""
+        """Define a decorator which registers the subclass of loader.
+
+        `fp8_storage` is where a loader says it does *not* implement FP8 Storage, as
+        `NotApplicable(reason)` or `Unimplemented(reason)`; the default means it does. The UI derived
+        that from the model type alone, and so offered a control that 19 of its 52 keys ignore --
+        see `fp8_capability.py` for why the answer belongs on this key and nowhere coarser.
+        """
 
         def decorator(subclass: Type[TModelLoader]) -> Type[TModelLoader]:
+            # `ModelLoader` is where a cold load is checked against edits of its record, so a loader built
+            # directly on `ModelLoaderBase` could cache a model built from a superseded record.
+            if not (inspect.isclass(subclass) and issubclass(subclass, ModelLoader)):
+                raise TypeError(f"{subclass!r} must subclass ModelLoader to be registered as a model loader")
             key = cls._to_registry_key(base, type, format)
             if key in cls._registry:
                 raise Exception(
                     f"{subclass.__name__} is trying to register as a loader for {base}/{type}/{format}, but this type of model has already been registered by {cls._registry[key].__name__}"
                 )
             cls._registry[key] = subclass
+            declare_fp8_storage(base, type, format, fp8_storage)
             return subclass
 
         return decorator
@@ -82,8 +102,8 @@ class ModelLoaderRegistry(ModelLoaderRegistryBase):
     @classmethod
     def get_implementation(
         cls, config: AnyModelConfig, submodel_type: Optional[SubModelType]
-    ) -> Tuple[Type[ModelLoaderBase], Config_Base, Optional[SubModelType]]:
-        """Get subclass of ModelLoaderBase registered to handle base and type."""
+    ) -> Tuple[Type[ModelLoader], Config_Base, Optional[SubModelType]]:
+        """Get subclass of ModelLoader registered to handle base and type."""
 
         key1 = cls._to_registry_key(config.base, config.type, config.format)  # for a specific base type
         key2 = cls._to_registry_key(BaseModelType.Any, config.type, config.format)  # with wildcard Any

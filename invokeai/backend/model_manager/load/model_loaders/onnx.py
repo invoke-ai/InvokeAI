@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for Onnx model loading in InvokeAI."""
 
 # This should work the same as Stable Diffusion pipelines

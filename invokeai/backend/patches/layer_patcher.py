@@ -3,6 +3,7 @@ from contextlib import AbstractContextManager, ExitStack, contextmanager
 from typing import Dict, Iterable, Optional, Tuple
 
 import torch
+from transformers import CLIPTextModel
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
@@ -10,7 +11,6 @@ from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlL
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
@@ -41,6 +41,10 @@ class LayerPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
+        # Where each sidecar-applied leaf patch's tensors lived before they were moved onto the device,
+        # so the `finally` can put them back. Keyed by identity: one patch object can be applied to many
+        # modules, and only its first, pre-move placement is the one to restore.
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]] = {}
         cache_pins = ExitStack()
         try:
             # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
@@ -76,6 +80,7 @@ class LayerPatcher:
                         patch_weight=patch_weight,
                         original_weights=original_weights,
                         original_modules=original_modules,
+                        patch_placements=patch_placements,
                         dtype=dtype,
                         force_direct_patching=force_direct_patching,
                         force_sidecar_patching=force_sidecar_patching,
@@ -94,6 +99,12 @@ class LayerPatcher:
                 # Note: This logic assumes no nested modules in original_modules.
                 for orig_module in original_modules.values():
                     orig_module.clear_patches()
+
+                # Return every sidecar-applied patch to where it came from. `clear_patches()` only
+                # drops the module's reference; without this the tensors stay on the device, inside
+                # an object the model cache owns and believes is in RAM.
+                for leaf, leaf_device, leaf_dtype in patch_placements.values():
+                    leaf.to(device=leaf_device, dtype=leaf_dtype)
             finally:
                 cache_pins.close()
 
@@ -106,6 +117,7 @@ class LayerPatcher:
         patch_weight: float,
         original_weights: OriginalWeightsStorage,
         original_modules: dict[str, torch.nn.Module],
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]],
         dtype: torch.dtype,
         force_direct_patching: bool,
         force_sidecar_patching: bool,
@@ -185,6 +197,7 @@ class LayerPatcher:
                     patch=layer,
                     patch_weight=patch_weight,
                     original_modules=original_modules,
+                    patch_placements=patch_placements,
                     dtype=dtype,
                 )
             else:
@@ -224,63 +237,97 @@ class LayerPatcher:
         # We intentionally move to the target device first, then cast. Experimentally, this was found to
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
-        patch.to(device=device)
-        patch.to(dtype=torch.float32)
+        #
+        # `patch` is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
+        # tensors in place -- so whatever is done here outlives the patch and is what the cache is
+        # left holding. Both moves are undone in the `finally` below, also on the early return and
+        # when a move, `get_parameters` or the weight update raises.
+        leaf_placements = LayerPatcher._leaf_placements(patch)
+        try:
+            patch.to(device=device)
+            patch.to(dtype=torch.float32)
 
-        # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
-        # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
-        params_dict = patch.get_parameters(dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight)
-        if not params_dict:
-            logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
-            logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
-            return
+            # TODO(ryand): Using torch.autocast(...) over explicit casting may offer a speed benefit on CUDA
+            # devices here. Experimentally, it was found to be very slow on CPU. More investigation needed.
+            params_dict = patch.get_parameters(
+                dict(module_to_patch.named_parameters(recurse=False)), weight=patch_weight
+            )
+            if not params_dict:
+                logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                logger.warning(f"LoRA patch returned no parameters for module: {module_to_patch_key}")
+                return
 
-        for param_name, param_weight in params_dict.items():
-            param_key = module_to_patch_key + "." + param_name
-            module_param = module_to_patch.get_parameter(param_name)
+            for param_name, param_weight in params_dict.items():
+                param_key = module_to_patch_key + "." + param_name
+                module_param = module_to_patch.get_parameter(param_name)
 
-            # Save original weight
-            original_weights.save(param_key, module_param)
+                # Save original weight
+                original_weights.save(param_key, module_param)
 
-            # Handle layers that change the shape of the original layer.
-            # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
-            # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
-            if module_param.nelement() != param_weight.nelement():
-                if isinstance(patch, FluxControlLoRALayer):
-                    # FLUX Control LoRAs intentionally expand layers - pad with zeros
-                    expanded_weight = pad_with_zeros(module_param, param_weight.shape)
-                    setattr(
-                        module_to_patch,
-                        param_name,
-                        torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
-                    )
-                    # Point at the module's live (expanded) parameter so the out-of-place weight
-                    # update below lands on the module. `expanded_weight` is a detached raw tensor;
-                    # reassigning its `.data` would not propagate to the newly-set Parameter.
-                    module_param = module_to_patch.get_parameter(param_name)
-                else:
-                    # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
-                    logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
-                    logger.warning(
-                        f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
-                        f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
-                        "This LoRA may be incompatible with this model architecture."
-                    )
-                    continue
+                # Handle layers that change the shape of the original layer.
+                # FLUX control LoRAs intentionally expand certain layers - we pad the original weight with zeros.
+                # For other LoRAs (e.g., Z-Image with architecture mismatch), skip incompatible layers with a warning.
+                if module_param.nelement() != param_weight.nelement():
+                    if isinstance(patch, FluxControlLoRALayer):
+                        # FLUX Control LoRAs intentionally expand layers - pad with zeros
+                        expanded_weight = pad_with_zeros(module_param, param_weight.shape)
+                        setattr(
+                            module_to_patch,
+                            param_name,
+                            torch.nn.Parameter(expanded_weight, requires_grad=module_param.requires_grad),
+                        )
+                        # Point at the module's live (expanded) parameter so the out-of-place weight
+                        # update below lands on the module. `expanded_weight` is a detached raw tensor;
+                        # reassigning its `.data` would not propagate to the newly-set Parameter.
+                        module_param = module_to_patch.get_parameter(param_name)
+                    else:
+                        # For other LoRAs, shape mismatch indicates architecture incompatibility - skip the layer
+                        logger = InvokeAILogger.get_logger(LayerPatcher.__name__)
+                        logger.warning(
+                            f"Skipping LoRA layer '{module_to_patch_key}.{param_name}' due to shape mismatch: "
+                            f"model has {module_param.nelement()} elements, LoRA expects {param_weight.nelement()}. "
+                            "This LoRA may be incompatible with this model architecture."
+                        )
+                        continue
 
-            # Convert param_weight to the correct device and dtype, then apply to model weights.
-            param_weight_converted = param_weight.to(device=device, dtype=dtype)
-            # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
-            # are patching may be the model's canonical CPU copy, which is shared across the
-            # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
-            # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
-            # here would corrupt that shared/cached tensor — and every other device's view of it.
-            # Reassigning `.data` leaves the original tensor untouched while giving this module the
-            # patched weights, and is memory-equivalent (the in-place form already allocated the
-            # `module_param.data + param_weight_converted` temporary).
-            module_param.data = module_param.data + param_weight_converted
+                # Convert param_weight to the correct device and dtype, then apply to model weights.
+                param_weight_converted = param_weight.to(device=device, dtype=dtype)
+                # Apply out-of-place (assign a new tensor) rather than an in-place `copy_`. The weight we
+                # are patching may be the model's canonical CPU copy, which is shared across the
+                # per-device model caches in multi-GPU mode (see SharedCpuWeightsStore) and is also the
+                # cache's keep_ram_copy used to restore the model after unpatching. An in-place mutation
+                # here would corrupt that shared/cached tensor — and every other device's view of it.
+                # Reassigning `.data` leaves the original tensor untouched while giving this module the
+                # patched weights, and is memory-equivalent (the in-place form already allocated the
+                # `module_param.data + param_weight_converted` temporary).
+                module_param.data = module_param.data + param_weight_converted
+        finally:
+            # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
+            # cached record's size for the rest of the process, while the cache went on billing the size
+            # it measured at `put()`.
+            for leaf, leaf_device, leaf_dtype in leaf_placements:
+                leaf.to(device=leaf_device, dtype=leaf_dtype)
 
-        patch.to(device=TorchDevice.CPU_DEVICE)
+    @staticmethod
+    def _leaf_placements(patch: BaseLayerPatch) -> list[tuple[BaseLayerPatch, torch.device, torch.dtype]]:
+        """The device and dtype each leaf patch's tensors currently sit on, so they can be put back.
+
+        Patches carry their tensors in subclass-specific attributes rather than as registered
+        parameters, so a leaf's placement is read from its first real tensor instead of from
+        `nn.Module` state. Wrapper patches (`MergedLayerPatch`, `SwappedHalvesLayerPatch`) hold only
+        sub-patches, alone or in a list or tuple, and those need not share a dtype; so the leaves
+        under them are recorded and restored one by one. Leaves without tensors have nothing to restore.
+        """
+        sub_patches = [
+            item
+            for value in vars(patch).values()
+            for item in (value if isinstance(value, (list, tuple)) else (value,))
+            if isinstance(item, BaseLayerPatch)
+        ]
+        if sub_patches:
+            return [leaf for sub_patch in sub_patches for leaf in LayerPatcher._leaf_placements(sub_patch)]
+        tensor = next((value for value in vars(patch).values() if isinstance(value, torch.Tensor)), None)
+        return [] if tensor is None else [(patch, tensor.device, tensor.dtype)]
 
     @staticmethod
     @torch.no_grad()
@@ -290,12 +337,24 @@ class LayerPatcher:
         patch: BaseLayerPatch,
         patch_weight: float,
         original_modules: dict[str, torch.nn.Module],
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device, torch.dtype]],
         dtype: torch.dtype,
     ):
         """Apply a single LoRA wrapper patch to a module."""
-        # Move the LoRA layer to the same device/dtype as the orig module.
-        first_param = next(module_to_patch.parameters())
-        device = first_param.device
+        # Move the LoRA layer to the same device/dtype as the orig module. Quantized modules
+        # that register their weights as buffers (e.g. MiniMax H3's Int8ConvrotLinear) have no
+        # parameters at all — fall back to the first buffer for the device reference.
+        first_tensor = next(module_to_patch.parameters(), None)
+        if first_tensor is None:
+            first_tensor = next(module_to_patch.buffers())
+        device = first_tensor.device
+        # Same in-place mutation of the cache's own object as the direct path, but this one had no
+        # counterpart: `clear_patches()` drops the module's reference and leaves the tensors on the
+        # device. The record is RAM-pinned, so `cur_vram_bytes()` reports zero for it and
+        # `full_unload_from_vram()` early-returns -- the cache cannot reclaim what it cannot see.
+        # Recorded here and restored in the `finally`.
+        for leaf_placement in LayerPatcher._leaf_placements(patch):
+            patch_placements.setdefault(id(leaf_placement[0]), leaf_placement)
         patch.to(device=device, dtype=dtype)
 
         if module_to_patch_key not in original_modules:
@@ -347,6 +406,11 @@ class LayerPatcher:
         Returns:
             tuple[str, torch.nn.Module]: A tuple containing the module key and the submodule.
         """
+        # LoRA formats address CLIP text encoder 1 under `text_model`, a wrapper transformers >=5.6 removed from
+        # CLIPTextModel (CLIPTextModelWithProjection keeps it), so drop the prefix for that class.
+        if isinstance(model, CLIPTextModel):
+            layer_key = layer_key.removeprefix("text_model_" if layer_key_is_flattened else "text_model.")
+
         if not layer_key_is_flattened:
             return layer_key, model.get_submodule(layer_key)
 

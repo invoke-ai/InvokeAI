@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for LoRA model loading in InvokeAI."""
 
 from logging import Logger
@@ -60,7 +59,14 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
 from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
     lora_model_from_krea2_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.ltx2_lora_conversion_utils import lora_model_from_ltx2_state_dict
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils import (
+    lora_model_from_minimax_h3_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
+from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+    lora_model_from_qwen_image_21_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
@@ -176,6 +182,9 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.QwenImage:
             model = lora_model_from_qwen_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.QwenImage21:
+            # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
+            model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Krea2:
             # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
             # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).
@@ -187,6 +196,18 @@ class LoRALoader(ModelLoader):
             # Wan LoRAs use Kohya / diffusers PEFT / native PEFT formats targeting
             # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
             model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.MiniMaxH3:
+            # MiniMax H3 LoRAs use PEFT lora_A/lora_B or kohya-flattened keys in the
+            # checkpoint's native single-file layout (fused qkv_proj / SwiGLU fc1, adaln_proj).
+            # alpha=None -> a file's own .alpha tensors, else alpha=rank, matching the
+            # published Turbo LoRA's "no extra scaling".
+            model = lora_model_from_minimax_h3_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.LTX2:
+            # LTX-2 LoRAs use PEFT lora_A/lora_B keys in the official Lightricks single-file
+            # layout; the conversion renames them onto the transformer's diffusers module paths
+            # with the same map the base checkpoint goes through. alpha=None -> alpha=rank, which
+            # is what the published distilled accelerator (no .alpha tensors) expects.
+            model = lora_model_from_ltx2_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

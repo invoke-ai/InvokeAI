@@ -67,6 +67,10 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       :::note[Linux ARM64 / aarch64]
         On Linux ARM64 devices (e.g. Raspberry Pi 5), use `--extra cpu` and omit `--extra xformers`. torch and torchvision are installed from PyPI (CPU-only wheels) — CUDA and ROCm acceleration are not available on this platform.
       :::
+
+      :::note[Windows on ARM64 (RTX Spark)]
+        Use `--python cpython-3.12-windows-aarch64-none` (uv otherwise installs an x86_64 interpreter) and omit `--extra xformers`. Whichever GPU extra you pass, the lockfile installs NVIDIA's torch 2.14.0+cu134 build and Invoke's self-built OpenCV, blake3 and tiktoken wheels; no `--index` options are needed because `uv sync` reads them from `pyproject.toml`. Put an `ffmpeg` on `PATH` for the video tests.
+      :::
   6. At this point, you should have Invoke installed, a venv set up and activated, and the server running. But you will see a warning in the terminal that no UI was found. If you go to the URL for the server, you won't get a UI.
 
         This is because the UI build is not distributed with the source code. You need to build it manually. End the running server instance.
@@ -75,14 +79,14 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
   7. Install the frontend dev toolchain, paying attention to versions:
 
-        - [`nodejs`](https://nodejs.org/) (tested on LTS, v22)
+        - [`nodejs`](https://nodejs.org/) (use the version in `.nvmrc`)
         - [`pnpm`](https://pnpm.io/installation) (tested on v10)
 
   8. Do a production build of the frontend:
 
         ```sh
-        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/web
-        pnpm i
+        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/webv2
+        pnpm install --frozen-lockfile
         pnpm build
         ```
 
@@ -101,16 +105,18 @@ This will allow you to avoid restarting the server (and reloading models) in mos
 
 The backend tests require the `test` dependency group, which you installed during the initial setup.
 
-See the [Tests](../tests) documentation for information about running and writing tests.
+See the [Tests](/development/guides/tests/) documentation for information about running and writing tests.
 
 ## Frontend Development
+
+The default frontend is `webv2`. To use legacy `web`, build it with `make frontend-legacy-build` and launch `invokeai-web --web-legacy`.
 
 You'll need to run `pnpm build` every time you pull in new changes to the frontend.
 
 Another option is to skip the build and instead run the UI in dev mode:
 
 ```sh
-cd invokeai/frontend/web
+cd invokeai/frontend/webv2
 pnpm dev
 ```
 
