@@ -100,20 +100,27 @@ def _text_chunk(key: str, value: str) -> bytes:
     return _chunk(b"iTXt", keyword + b"\x00\x00\x00\x00\x00" + value.encode("utf-8"))
 
 
-def _check_encodable(raster: RasterImage) -> None:
-    descriptor = raster.descriptor
-    what = f"{raster.dtype} {descriptor.channels.value}/{descriptor.color.value}/{descriptor.alpha.value}"
-    if raster.dtype not in (np.dtype(np.uint8), np.dtype(np.uint16)):
-        raise PngCodecError(f"cannot write {what} as PNG: only uint8 and uint16 rasters")
+def png_descriptor_refusal(descriptor: RasterDescriptor) -> str | None:
+    """Why a uint8/uint16 raster with this descriptor cannot be written as PNG, or None when it can."""
+    what = f"{descriptor.channels.value}/{descriptor.color.value}/{descriptor.alpha.value}"
     if descriptor.channels not in (RasterChannels.L, RasterChannels.RGB, RasterChannels.RGBA):
         # OpenCV cannot write gray+alpha PNGs, and widening to RGBA would change the file's meaning.
-        raise PngCodecError(f"cannot write {what} as PNG: only L, RGB and RGBA")
+        return f"cannot write {what} as PNG: only L, RGB and RGBA"
     if (
         descriptor.color is not ColorEncoding.SRGB
         or descriptor.value_range is not ValueRange.UNIT
         or descriptor.alpha is AlphaMode.PREMULTIPLIED
     ):
-        raise PngCodecError(f"cannot write {what} as PNG: only sRGB, unit-range, straight-alpha rasters")
+        return f"cannot write {what} as PNG: only sRGB, unit-range, straight-alpha rasters"
+    return None
+
+
+def _check_encodable(raster: RasterImage) -> None:
+    if raster.dtype not in (np.dtype(np.uint8), np.dtype(np.uint16)):
+        raise PngCodecError(f"cannot write {raster.dtype} raster as PNG: only uint8 and uint16 rasters")
+    refusal = png_descriptor_refusal(raster.descriptor)
+    if refusal is not None:
+        raise PngCodecError(refusal)
 
 
 def encode_png(raster: RasterImage, text: PngText | None = None, *, compress_level: int = 1) -> bytes:
@@ -256,8 +263,71 @@ def _validate_ihdr(ihdr: bytes, limits: PngLimits) -> tuple[int, int, int, int, 
     return width, height, _SAMPLES_BY_COLOR_TYPE[color_type], bit_depth, interlace
 
 
+@dataclass(frozen=True)
+class PngHeader:
+    width: int
+    height: int
+    bit_depth: int
+    channels: RasterChannels | None  # None for palette and invalid color types
+
+
+def png_ihdr(data: bytes) -> PngHeader | None:
+    """The IHDR fields of a PNG, or None when `data` does not start with a signature and an IHDR chunk. A cheap sniff:
+    nothing is validated beyond that, so it never replaces `decode_png`."""
+    if len(data) < _AFTER_IHDR or data[: len(_SIGNATURE)] != _SIGNATURE or data[12:16] != b"IHDR":
+        return None
+    width, height, bit_depth, color_type = struct.unpack_from(">IIBB", data, 16)
+    samples = _SAMPLES_BY_COLOR_TYPE.get(color_type)
+    return PngHeader(width, height, bit_depth, _CHANNELS_BY_SAMPLES[samples] if samples else None)
+
+
+def read_png_text(data: bytes, limits: PngLimits = DEFAULT_PNG_LIMITS) -> PngText:
+    """The Invoke text fields of a PNG, read from its chunks under the same structure, text and chunk limits as
+    `decode_png` but without decoding the pixels."""
+    return _parse_png(data, limits).text
+
+
+@dataclass
+class _ParsedPng:
+    shape: tuple[int, int, int, int, int]
+    text: PngText
+    icc_profile: bytes | None
+    view: memoryview
+    ihdr_chunk: bytes
+    idat_span: list[int]
+    other_chunks_present: bool
+    end: int  # position after IEND
+
+
 def decode_png(data: bytes, limits: PngLimits = DEFAULT_PNG_LIMITS) -> DecodedPng:
     """Decode an 8- or 16-bit gray, gray+alpha, RGB or RGBA PNG. Anything else, or over `limits`, is rejected."""
+    parsed = _parse_png(data, limits)
+    width, height, samples, bit_depth, _ = parsed.shape
+    view, position, idat_span = parsed.view, parsed.end, parsed.idat_span
+    iend_chunk = bytes(view[position - 12 : position])
+    if (
+        not parsed.other_chunks_present
+        and idat_span[0] == len(_SIGNATURE) + len(parsed.ihdr_chunk)
+        and idat_span[1] == position - 12
+    ):
+        png = data  # nothing to strip
+    else:
+        png = b"".join([_SIGNATURE, parsed.ihdr_chunk, view[idat_span[0] : idat_span[1]], iend_chunk])
+    pixels = _decode_pixels(png, width, height, samples, bit_depth)
+
+    descriptor = RasterDescriptor(
+        channels=_CHANNELS_BY_SAMPLES[samples],
+        color=ColorEncoding.SRGB,
+        value_range=ValueRange.UNIT,
+        alpha=AlphaMode.STRAIGHT if samples in (2, 4) else AlphaMode.NONE,
+        channel_count=samples,
+        icc_profile=parsed.icc_profile,
+    )
+    return DecodedPng(raster=RasterImage._adopt(pixels, descriptor), text=parsed.text)
+
+
+def _parse_png(data: bytes, limits: PngLimits) -> _ParsedPng:
+    """Walks and validates every chunk (structure, CRCs, limits) and collects text and ICC; decodes no pixels."""
     if data[: len(_SIGNATURE)] != _SIGNATURE:
         raise PngCodecError("not a PNG file (bad signature)")
 
@@ -372,23 +442,7 @@ def decode_png(data: bytes, limits: PngLimits = DEFAULT_PNG_LIMITS) -> DecodedPn
     if not idat_state:
         raise PngCodecError("PNG has no image data")
 
-    width, height, samples, bit_depth, _ = shape
-    iend_chunk = bytes(view[position - 12 : position])
-    if not other_chunks_present and idat_span[0] == len(_SIGNATURE) + len(ihdr_chunk) and idat_span[1] == position - 12:
-        png = data  # nothing to strip
-    else:
-        png = b"".join([_SIGNATURE, ihdr_chunk, view[idat_span[0] : idat_span[1]], iend_chunk])
-    pixels = _decode_pixels(png, width, height, samples, bit_depth)
-
-    descriptor = RasterDescriptor(
-        channels=_CHANNELS_BY_SAMPLES[samples],
-        color=ColorEncoding.SRGB,
-        value_range=ValueRange.UNIT,
-        alpha=AlphaMode.STRAIGHT if samples in (2, 4) else AlphaMode.NONE,
-        channel_count=samples,
-        icc_profile=icc_profile,
-    )
-    return DecodedPng(raster=RasterImage._adopt(pixels, descriptor), text=PngText(**texts))
+    return _ParsedPng(shape, PngText(**texts), icc_profile, view, ihdr_chunk, idat_span, other_chunks_present, position)
 
 
 def _decode_pixels(png: bytes, width: int, height: int, samples: int, bit_depth: int) -> np.ndarray:

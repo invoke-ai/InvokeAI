@@ -120,12 +120,7 @@ def read_precise_asset(path: Path) -> RasterImage:
     Only PRECISE_ASSET_VERSION is accepted; callers compare a stored version with it to report a mismatch.
     """
     with open(path, "rb") as f:
-        header_length, header = _read_header(f)
-        file_size = f.seek(0, 2)
-        descriptor, dtype, shape, pixel_range, icc_range = _validate_header(header)
-        if file_size != 8 + header_length + max(pixel_range[1], icc_range[1] if icc_range else 0):
-            raise PreciseAssetError("file size does not match the tensor offsets")
-        data_start = 8 + header_length
+        data_start, descriptor, dtype, shape, pixel_range, icc_range = _read_validated_header(f)
 
         pixels = np.empty(shape, dtype=dtype)
         f.seek(data_start + pixel_range[0])
@@ -150,6 +145,30 @@ def read_precise_asset(path: Path) -> RasterImage:
     except RasterError as e:
         raise PreciseAssetError(f"invalid descriptor: {e}") from e
     return RasterImage._adopt(pixels, descriptor)
+
+
+def read_precise_descriptor(path: Path) -> RasterDescriptor:
+    """The descriptor of the asset at `path` (without its ICC profile), from the header alone: no pixel byte is read.
+
+    Header, bounds and the file size against the tensor offsets are validated exactly as `read_precise_asset` does,
+    and the errors are the same: PreciseAssetError for corrupt or unsupported content, OSError (including a missing
+    file) unchanged.
+    """
+    with open(path, "rb") as f:
+        return _read_validated_header(f)[1]
+
+
+def _read_validated_header(
+    f,
+) -> tuple[int, RasterDescriptor, np.dtype, tuple[int, int, int], tuple[int, int], tuple[int, int] | None]:
+    """Reads and validates the header; returns the data section's start, descriptor (no ICC), pixel dtype and shape, and
+    the pixel and ICC byte ranges relative to the data section."""
+    header_length, header = _read_header(f)
+    file_size = f.seek(0, 2)
+    descriptor, dtype, shape, pixel_range, icc_range = _validate_header(header)
+    if file_size != 8 + header_length + max(pixel_range[1], icc_range[1] if icc_range else 0):
+        raise PreciseAssetError("file size does not match the tensor offsets")
+    return 8 + header_length, descriptor, dtype, shape, pixel_range, icc_range
 
 
 def _read_header(f) -> tuple[int, dict[str, Any]]:

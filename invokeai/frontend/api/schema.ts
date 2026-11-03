@@ -1599,6 +1599,51 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/images/i/{image_name}/export-formats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Image Export Formats
+         * @description Lists the formats the image can be downloaded in besides its gallery file: `png16` for an image with a
+         *     precise asset, none for an ordinary image.
+         */
+        get: operations["get_image_export_formats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/images/i/{image_name}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export Image
+         * @description Downloads the image as a 16-bit PNG made from its precise asset (`format=png16`).
+         *
+         *     Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+         *     Returns 409 for an image without an exportable precise asset (the detail says why), for non-finite pixels, and
+         *     while image storage maintenance is active; 503 with `Retry-After` while another export runs.
+         */
+        get: operations["export_image"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/images/i/{image_name}/thumbnail": {
         parameters: {
             query?: never;
@@ -20918,6 +20963,20 @@ export type components = {
              * @description The id of the board the image belongs to, if one exists.
              */
             board_id?: string | null;
+        };
+        /**
+         * ImageExportFormat
+         * @description A file format an image can be downloaded in besides its gallery file.
+         * @enum {string}
+         */
+        ImageExportFormat: "png16";
+        /** ImageExportFormats */
+        ImageExportFormats: {
+            /**
+             * Formats
+             * @description The export formats available for the image; empty for an ordinary image.
+             */
+            formats: components["schemas"]["ImageExportFormat"][];
         };
         /**
          * ImageField
@@ -60597,6 +60656,110 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    get_image_export_formats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The name of the image */
+                image_name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ImageExportFormats"];
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_image: {
+        parameters: {
+            query: {
+                /** @description The export format */
+                format: components["schemas"]["ImageExportFormat"];
+            };
+            header?: never;
+            path: {
+                /** @description The name of the image to export */
+                image_name: string;
+            };
+            cookie?: {
+                invokeai_media_token?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The image in the requested format */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": unknown;
+                };
+            };
+            /** @description Image not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The image has no exportable precise asset, its pixels cannot be represented, or image storage maintenance is active */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description The precise asset is corrupt or the export failed */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Another export is running; retry shortly */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

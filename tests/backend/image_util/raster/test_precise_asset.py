@@ -22,6 +22,7 @@ from invokeai.backend.image_util.raster.precise_asset import (
     MAX_ICC_BYTES,
     PreciseAssetError,
     read_precise_asset,
+    read_precise_descriptor,
     write_precise_asset,
 )
 
@@ -433,3 +434,25 @@ def test_deeply_nested_header_is_corruption_not_a_crash(tmp_path):
     path.write_bytes(struct.pack("<Q", len(raw)) + raw)
     with pytest.raises(PreciseAssetError):
         read_precise_asset(path)
+
+
+@pytest.mark.parametrize(("channels", "count", "alpha", "color"), CHANNEL_CASES)
+def test_descriptor_is_read_from_the_header_without_the_icc_profile(tmp_path, channels, count, alpha, color):
+    descriptor = make_descriptor(channels, count, alpha, color, icc=None if channels is RasterChannels.DATA else b"icc")
+    write_precise_asset(RasterImage.from_array(sample_array(np.float32, (2, 3, count)), descriptor), tmp_path / "a.st")
+
+    read = read_precise_descriptor(tmp_path / "a.st")
+
+    assert read == make_descriptor(channels, count, alpha, color)
+
+
+def test_descriptor_reader_applies_the_header_and_size_validation_of_the_full_reader(tmp_path):
+    path = tmp_path / "bad.st"
+    write_crafted(path, good_header(), payload=bytes(5))  # one byte short of the declared pixels
+    with pytest.raises(PreciseAssetError):
+        read_precise_descriptor(path)
+    path.write_bytes(struct.pack("<Q", 5) + b"[1,2]")
+    with pytest.raises(PreciseAssetError):
+        read_precise_descriptor(path)
+    with pytest.raises(FileNotFoundError):
+        read_precise_descriptor(tmp_path / "nope.st")

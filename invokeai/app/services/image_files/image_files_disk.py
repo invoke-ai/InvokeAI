@@ -25,7 +25,13 @@ from invokeai.app.services.image_files.image_files_common import (
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.util.no_replace import file_signature, publish_noreplace
 from invokeai.app.util.thumbnails import get_thumbnail_name, make_thumbnail
-from invokeai.backend.image_util.raster.precise_asset import read_precise_asset, write_precise_asset
+from invokeai.backend.image_util.raster.descriptor import RasterDescriptor
+from invokeai.backend.image_util.raster.png_codec import PngText, read_png_text
+from invokeai.backend.image_util.raster.precise_asset import (
+    read_precise_asset,
+    read_precise_descriptor,
+    write_precise_asset,
+)
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -742,6 +748,12 @@ class DiskImageFileStorage(ImageFileStorageBase):
         except FileNotFoundError as e:
             raise ImageFileNotFoundException(f"Precise asset of {image_name} not found") from e
 
+    def read_precise_descriptor(self, image_name: str, image_subfolder: str = "") -> RasterDescriptor:
+        try:
+            return read_precise_descriptor(self.get_precise_path(image_name, image_subfolder))
+        except FileNotFoundError as e:
+            raise ImageFileNotFoundException(f"Precise asset of {image_name} not found") from e
+
     def __resolve_path(self, base_folder: Path, filename: str, image_subfolder: str) -> Path:
         # Validate the filename itself (no path separators allowed in the filename)
         basename = Path(filename).name
@@ -784,6 +796,12 @@ class DiskImageFileStorage(ImageFileStorageBase):
         """Validates the path given for an image or thumbnail."""
         path = path if isinstance(path, Path) else Path(path)
         return path.exists()
+
+    def read_png_text(self, image_name: str, image_subfolder: str = "") -> PngText:
+        try:
+            return read_png_text(self.get_path(image_name, image_subfolder=image_subfolder).read_bytes())
+        except FileNotFoundError as e:
+            raise ImageFileNotFoundException(f"Image file of {image_name} not found") from e
 
     def get_workflow(self, image_name: str, image_subfolder: str = "") -> str | None:
         image = self.get(image_name, image_subfolder=image_subfolder)

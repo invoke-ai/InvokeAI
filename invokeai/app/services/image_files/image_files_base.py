@@ -7,6 +7,8 @@ from PIL.Image import Image as PILImageType
 
 if TYPE_CHECKING:
     # Not at runtime: the raster package imports torch, which the database layer (it imports this module) must not load.
+    from invokeai.backend.image_util.raster.descriptor import RasterDescriptor
+    from invokeai.backend.image_util.raster.png_codec import PngText
     from invokeai.backend.image_util.raster.raster import RasterImage
 
 
@@ -32,6 +34,12 @@ class ImageFileStorageBase(ABC):
     def read_precise(self, image_name: str, image_subfolder: str = "") -> "RasterImage":
         """Reads an image's precise asset. Raises ImageFileNotFoundException when the file is missing and
         PreciseAssetError when it is corrupt or unsupported."""
+        pass
+
+    @abstractmethod
+    def read_precise_descriptor(self, image_name: str, image_subfolder: str = "") -> "RasterDescriptor":
+        """Reads the descriptor of an image's precise asset from its header only. Raises ImageFileNotFoundException
+        when the file is missing and PreciseAssetError when it is corrupt or unsupported."""
         pass
 
     @abstractmethod
@@ -177,6 +185,13 @@ class ImageFileStorageBase(ABC):
     @abstractmethod
     def rollback_delete(self, token: object) -> None:
         """Restores files represented by a staged-delete token."""
+        pass
+
+    @abstractmethod
+    def read_png_text(self, image_name: str, image_subfolder: str = "") -> "PngText":
+        """Reads the Invoke text fields of an image's gallery PNG from its chunks, without decoding the pixels or
+        touching the image cache. Raises ImageFileNotFoundException when the file is missing and PngCodecError when
+        it is not a PNG the codec accepts."""
         pass
 
     @abstractmethod

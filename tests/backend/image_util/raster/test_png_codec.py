@@ -26,6 +26,8 @@ from invokeai.backend.image_util.raster.png_codec import (
     PngText,
     decode_png,
     encode_png,
+    png_ihdr,
+    read_png_text,
 )
 
 SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -801,3 +803,49 @@ class TestValidStreamsOfAnySize:
         png = png_from_stream(24, 20, depth, color_type, stream)
         np.testing.assert_array_equal(decode_png(png).raster.view(), pixels)
         Image.open(io.BytesIO(png)).load()  # Pillow accepts it too
+
+
+def test_read_png_text_returns_the_text_fields_without_decoding_pixels():
+    raster = RasterImage.from_array(np.arange(24, dtype=np.uint16).reshape(2, 4, 3), descriptor())
+    text = PngText(METADATA, WORKFLOW, GRAPH, RESOLVED)
+    png = encode_png(raster, text)
+    # Garbage inside the (CRC-protected) IDAT stream would fail a decode; the chunk reader never looks at it.
+    idat = png.index(b"IDAT") - 4  # start of the IDAT chunk
+    iend = png.index(b"IEND") - 4
+    payload = bytes(iend - idat - 12)
+    broken = png[:idat] + struct.pack(">I", len(payload)) + b"IDAT" + payload
+    broken += struct.pack(">I", zlib.crc32(b"IDAT" + payload)) + png[iend:]
+
+    assert read_png_text(png) == text
+    assert read_png_text(broken) == text
+    with pytest.raises(PngCodecError):
+        decode_png(broken)
+
+
+def test_read_png_text_enforces_the_text_limits():
+    png = encode_png(
+        RasterImage.from_array(np.zeros((2, 2, 3), np.uint8), descriptor()), PngText(invokeai_metadata="x" * 100)
+    )
+
+    with pytest.raises(PngCodecError):
+        read_png_text(
+            png, PngLimits(max_side=16, max_pixels=256, max_text_bytes=10, max_icc_bytes=10, max_ancillary_chunks=8)
+        )
+
+
+@pytest.mark.parametrize(
+    ("channels", "dtype", "depth"),
+    [(RasterChannels.RGB, np.uint16, 16), (RasterChannels.RGBA, np.uint8, 8), (RasterChannels.L, np.uint16, 16)],
+)
+def test_png_ihdr_reads_size_depth_and_channels(channels, dtype, depth):
+    png = encode_png(RasterImage.from_array(np.zeros((3, 5, CHANNEL_COUNTS[channels]), dtype), descriptor(channels)))
+
+    header = png_ihdr(png)
+
+    assert (header.width, header.height, header.bit_depth, header.channels) == (5, 3, depth, channels)
+
+
+def test_png_ihdr_returns_none_for_anything_that_is_not_a_png_start():
+    assert png_ihdr(b"") is None
+    assert png_ihdr(b"GIF89a" + bytes(40)) is None
+    assert png_ihdr(SIGNATURE + bytes(30)) is None

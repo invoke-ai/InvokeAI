@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from typing import Optional
@@ -24,7 +25,14 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_base import ImageServiceABC
-from invokeai.app.services.images.images_common import ImageDTO, image_record_to_dto
+from invokeai.app.services.images.images_common import (
+    ImageDTO,
+    ImageExport,
+    ImageExportBusyError,
+    ImageExportFormat,
+    ImageExportUnavailableError,
+    image_record_to_dto,
+)
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.bulk_media_delete import StagedMediaDeleteAdapter, delete_media_by_names
 from invokeai.app.services.shared.intermediate_delete import (
@@ -42,6 +50,13 @@ from invokeai.backend.image_util.raster.descriptor import (
     RasterConversionError,
     ValueRange,
 )
+from invokeai.backend.image_util.raster.png_codec import (
+    PngCodecError,
+    decode_png,
+    encode_png,
+    png_descriptor_refusal,
+    png_ihdr,
+)
 from invokeai.backend.image_util.raster.precise_asset import (
     PRECISE_ASSET_FORMAT,
     PRECISE_ASSET_VERSION,
@@ -52,6 +67,32 @@ from invokeai.backend.image_util.raster.raster import RasterImage
 
 _DISPLAY_CHANNELS = (RasterChannels.L, RasterChannels.LA, RasterChannels.RGB, RasterChannels.RGBA)
 _ICC_HEADER_BYTES = 128
+
+# One export at a time per process, and never a waiting thread: a second request is answered "busy". The claim is held
+# until the response has streamed the last chunk to the socket, so at most one export file is in memory. Peak memory of
+# one export: the exact raster (float32 assets: 4 bytes per sample, up to 4 GiB at the asset bound) is replaced by its uint16
+# quantization (2 bytes per sample; uint16 assets skip this copy), the PNG writer makes an OpenCV BGR(A) copy of that
+# (RGB and RGBA only, 2 bytes per sample), the encoder allocates its output buffer, and the final bytes are one more
+# copy of that buffer. Only the final bytes outlive the call; they stay alive until the claim is released.
+_EXPORT_SLOT = threading.Lock()
+
+
+class _ExportSlotClaim:
+    """Releases `_EXPORT_SLOT` once. A response whose client disconnected may never run its background task, so
+    dropping the claim releases it too."""
+
+    def __init__(self) -> None:
+        self._held = True
+        self._guard = threading.Lock()
+
+    def release(self) -> None:
+        with self._guard:
+            held, self._held = self._held, False
+        if held:
+            _EXPORT_SLOT.release()
+
+    def __del__(self) -> None:
+        self.release()
 
 
 def _require_matching_icc(raster: RasterImage) -> None:
@@ -531,6 +572,23 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting image file")
             raise e
 
+    def _has_current_precise_asset(self, image_name: str) -> bool:
+        """Whether the association row names a precise asset this build reads; PreciseAssetError for another
+        format or version. The one row check behind `get_raster`, `get_export_formats` and the export."""
+        asset = self.__invoker.services.database.queries.image_precise_assets.get(image_name)
+        if asset is None:
+            return False
+        if (asset.asset_format, asset.format_version) != (PRECISE_ASSET_FORMAT, PRECISE_ASSET_VERSION):
+            self.__invoker.services.logger.error(
+                f"Precise asset of {image_name} has unsupported format {asset.asset_format!r}, "
+                f"version {asset.format_version}"
+            )
+            raise PreciseAssetError(
+                f"Unsupported precise asset for {image_name}: format {asset.asset_format!r}, "
+                f"version {asset.format_version}"
+            )
+        return True
+
     def get_raster(self, image_name: str) -> RasterImage:
         """The one place that decides where an image's pixels come from.
 
@@ -539,14 +597,8 @@ class ImageService(ImageServiceABC):
         """
         services = self.__invoker.services
         record = self.get_record(image_name)
-        asset = services.database.queries.image_precise_assets.get(image_name)
-        if asset is None:
+        if not self._has_current_precise_asset(image_name):
             return raster_from_pil(services.image_files.get(image_name, image_subfolder=record.image_subfolder))
-        if (asset.asset_format, asset.format_version) != (PRECISE_ASSET_FORMAT, PRECISE_ASSET_VERSION):
-            raise PreciseAssetError(
-                f"Unsupported precise asset for {image_name}: format {asset.asset_format!r}, "
-                f"version {asset.format_version}"
-            )
         try:
             return services.image_files.read_precise(image_name, record.image_subfolder)
         except (ImageFileNotFoundException, PreciseAssetError):
@@ -555,6 +607,77 @@ class ImageService(ImageServiceABC):
 
     def has_precise_asset(self, image_name: str) -> bool:
         return self.__invoker.services.database.queries.image_precise_assets.get(image_name) is not None
+
+    def is_precise_png_upload(self, contents: bytes) -> bool:
+        services = self.__invoker.services
+        if not services.configuration.precise_image_storage:
+            return False
+        header = png_ihdr(contents)
+        if header is None or header.bit_depth != 16:
+            return False
+        if header.channels is RasterChannels.LA:
+            # The gallery stores it as 8-bit RGBA, and the PNG writer cannot encode LA, so no export could return it.
+            services.logger.warning("Storing the uploaded 16-bit gray+alpha PNG without precision")
+            return False
+        return header.channels in (RasterChannels.RGB, RasterChannels.RGBA)
+
+    def create_from_precise_png(self, contents: bytes, **save_options) -> Optional[ImageDTO]:
+        services = self.__invoker.services
+        try:
+            raster = decode_png(contents).raster
+            return self.create_from_raster(raster, **save_options)
+        except (PngCodecError, RasterConversionError, PreciseAssetError) as e:
+            # Refused before anything was persisted (limits, malformed file, ICC profile of another color space).
+            services.logger.warning(f"Storing the uploaded 16-bit PNG without precision: {e}")
+            return None
+
+    def get_export_formats(self, image_name: str) -> list[ImageExportFormat]:
+        record = self.get_record(image_name)
+        services = self.__invoker.services
+        # Lists only what `export_png16` can deliver. The pixels are quantized to uint16 first, so only the
+        # descriptor decides (the PNG writer has no gray+alpha). An asset that cannot be read lists nothing; the
+        # export itself reports why.
+        try:
+            if not self._has_current_precise_asset(image_name):
+                return []
+            descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError, OSError) as e:
+            services.logger.warning(f"Precise asset of {image_name} is unreadable, so it has no export formats: {e}")
+            return []
+        return [ImageExportFormat.PNG16] if png_descriptor_refusal(descriptor) is None else []
+
+    def export_png16(self, image_name: str) -> ImageExport:
+        record = self.get_record(image_name)
+        services = self.__invoker.services
+        if not _EXPORT_SLOT.acquire(blocking=False):
+            raise ImageExportBusyError("Another image export is running")
+        claim = _ExportSlotClaim()
+        try:
+            if not self._has_current_precise_asset(image_name):
+                raise ImageExportUnavailableError(f"{image_name} has no precise asset to export as a 16-bit PNG")
+            try:
+                descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
+            except (ImageFileNotFoundException, PreciseAssetError):
+                services.logger.error(f"Failed to read precise asset of {image_name}")
+                raise
+            refusal = png_descriptor_refusal(descriptor)
+            if refusal is not None:
+                raise ImageExportUnavailableError(refusal)
+            raster = self.get_raster(image_name)
+            if raster.dtype != numpy.uint16:
+                # Float assets: display quantization (clip to 0-1, round half to even). Non-finite values raise
+                # RasterConversionError. uint16 assets are encoded as they are, without a copy.
+                raster = quantize_unit(raster, numpy.uint16)
+            try:
+                text = services.image_files.read_png_text(image_name, record.image_subfolder)
+                content = encode_png(raster, text, compress_level=1)
+            except Exception:
+                services.logger.error(f"Failed to encode the 16-bit PNG of {image_name}")
+                raise
+        except BaseException:
+            claim.release()
+            raise
+        return ImageExport(content, claim.release)
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:

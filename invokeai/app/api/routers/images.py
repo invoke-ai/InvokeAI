@@ -3,13 +3,15 @@ import io
 import json
 import traceback
 from datetime import date
+from pathlib import PurePath
 from typing import Annotated, ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.routing import APIRouter
 from PIL import Image
 from pydantic import BaseModel, Field, StringConstraints, model_validator
+from starlette.background import BackgroundTask
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
@@ -47,6 +49,10 @@ from invokeai.app.services.image_records.image_records_common import (
 from invokeai.app.services.images.images_common import (
     DeleteImagesResult,
     ImageDTO,
+    ImageExportBusyError,
+    ImageExportFormat,
+    ImageExportFormats,
+    ImageExportUnavailableError,
     ImageUrlsDTO,
     StarredImagesResult,
     UnstarredImagesResult,
@@ -54,6 +60,9 @@ from invokeai.app.services.images.images_common import (
 from invokeai.app.services.intermediates.intermediates_base import IntermediatesCaller
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults, SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
+from invokeai.backend.image_util.raster.descriptor import RasterConversionError
+from invokeai.backend.image_util.raster.png_codec import PngCodecError
+from invokeai.backend.image_util.raster.precise_asset import PreciseAssetError
 from invokeai.backend.image_util.util import np_to_pil, pil_to_np
 
 images_router = APIRouter(prefix="/v1/images", tags=["images"])
@@ -75,6 +84,15 @@ MAX_IMAGE_BATCH_SIZE = 1000
 # Names are UUID-derived filenames; the bound only exists to keep a hostile body from
 # turning into megabytes of SQL parameters.
 ImageName = Annotated[str, StringConstraints(max_length=255)]
+
+
+_EXPORT_CHUNK_BYTES = 4 * 1024 * 1024
+
+
+async def _iter_chunks(content: bytes):
+    view = memoryview(content)
+    for start in range(0, len(view), _EXPORT_CHUNK_BYTES):
+        yield view[start : start + _EXPORT_CHUNK_BYTES]
 
 
 def _get_image_cache_control() -> str:
@@ -143,15 +161,15 @@ async def upload_image(
         raise HTTPException(status_code=415, detail="Not an image")
 
     contents = await file.read()
+
+    def _read_image() -> Image.Image:
+        image = Image.open(io.BytesIO(contents))
+        # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
+        image.load()
+        return image
+
     try:
-
-        def _read_image() -> Image.Image:
-            image = Image.open(io.BytesIO(contents))
-            # Pillow discovers PNG text chunks after IDAT only when the pixels are fully loaded.
-            image.load()
-            return image
-
-        pil_image = await asyncio.to_thread(_read_image)
+        pil_image: Optional[Image.Image] = await asyncio.to_thread(_read_image)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=415, detail="Failed to read image")
@@ -195,22 +213,37 @@ async def upload_image(
         except Exception:
             raise HTTPException(status_code=500, detail="Failed to resize image")
 
+    services = ApiDependencies.invoker.services
+    save_options = {
+        "image_origin": ResourceOrigin.EXTERNAL,
+        "image_category": image_category,
+        "session_id": session_id,
+        "board_id": board_id,
+        "metadata": extracted_metadata.invokeai_metadata,
+        "workflow": extracted_metadata.invokeai_workflow,
+        "graph": extracted_metadata.invokeai_graph,
+        "resolved_inputs": extracted_metadata.invokeai_resolved_inputs,
+        "is_intermediate": is_intermediate,
+        "user_id": current_user.user_id,
+        "project_id": project_id,
+    }
+
     try:
-        image_dto = await asyncio.to_thread(
-            ApiDependencies.invoker.services.images.create,
-            image=pil_image,
-            image_origin=ResourceOrigin.EXTERNAL,
-            image_category=image_category,
-            session_id=session_id,
-            board_id=board_id,
-            metadata=extracted_metadata.invokeai_metadata,
-            workflow=extracted_metadata.invokeai_workflow,
-            graph=extracted_metadata.invokeai_graph,
-            resolved_inputs=extracted_metadata.invokeai_resolved_inputs,
-            is_intermediate=is_intermediate,
-            user_id=current_user.user_id,
-            project_id=project_id,
-        )
+        image_dto: Optional[ImageDTO] = None
+        # Precise storage keeps the exact pixels of a 16-bit PNG; edits (crop, resize) work on the 8-bit copy as before.
+        if (
+            not crop_visible
+            and not resize_to
+            and await asyncio.to_thread(services.images.is_precise_png_upload, contents)
+        ):
+            # The 8-bit copy is only needed if the precise save falls back; dropping it keeps both decodes from
+            # being held at once.
+            pil_image = None
+            image_dto = await asyncio.to_thread(services.images.create_from_precise_png, contents, **save_options)
+        if image_dto is None:
+            if pil_image is None:
+                pil_image = await asyncio.to_thread(_read_image)
+            image_dto = await asyncio.to_thread(services.images.create, image=pil_image, **save_options)
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
@@ -465,6 +498,82 @@ def get_image_full(
         return response
     except Exception:
         raise HTTPException(status_code=404)
+
+
+@images_router.get(
+    "/i/{image_name}/export-formats",
+    operation_id="get_image_export_formats",
+    response_model=ImageExportFormats,
+    responses={404: {"description": "Image not found"}},
+)
+def get_image_export_formats(
+    current_user: CurrentUserOrDefault,
+    image_name: str = Path(description="The name of the image"),
+) -> ImageExportFormats:
+    """Lists the formats the image can be downloaded in besides its gallery file: `png16` for an image with a
+    precise asset, none for an ordinary image."""
+    _assert_image_read_access(image_name, current_user)
+    try:
+        formats = ApiDependencies.invoker.services.images.get_export_formats(image_name)
+    except ImageRecordNotFoundException:
+        raise HTTPException(status_code=404, detail="Image not found")
+    return ImageExportFormats(formats=formats)
+
+
+@images_router.get(
+    "/i/{image_name}/export",
+    operation_id="export_image",
+    response_class=Response,
+    responses={
+        200: {"description": "The image in the requested format", "content": {"image/png": {}}},
+        404: {"description": "Image not found"},
+        409: {
+            "description": "The image has no exportable precise asset, its pixels cannot be represented, or image "
+            "storage maintenance is active"
+        },
+        500: {"description": "The precise asset is corrupt or the export failed"},
+        503: {"description": "Another export is running; retry shortly"},
+    },
+)
+def export_image(
+    current_user: CurrentMediaUserOrDefault,
+    image_name: str = Path(description="The name of the image to export"),
+    format: ImageExportFormat = Query(description="The export format"),
+) -> Response:
+    """Downloads the image as a 16-bit PNG made from its precise asset (`format=png16`).
+
+    Browser media requests authenticate with the path-scoped HttpOnly cookie set at login.
+    Returns 409 for an image without an exportable precise asset (the detail says why), for non-finite pixels, and
+    while image storage maintenance is active; 503 with `Retry-After` while another export runs.
+    """
+    _assert_image_read_access(image_name, current_user)
+    assert_image_move_maintenance_inactive()
+
+    try:
+        export = ApiDependencies.invoker.services.images.export_png16(image_name)
+    except (ImageRecordNotFoundException, ImageFileNotFoundException):
+        raise HTTPException(status_code=404, detail="Image not found")
+    except (ImageExportUnavailableError, RasterConversionError) as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    except ImageExportBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "1"})
+    except (PreciseAssetError, PngCodecError):
+        # Already logged by the service with the image name.
+        raise HTTPException(status_code=500, detail="The image could not be exported")
+    # A plain Response hands uvicorn the whole body at once and `transport.write` returns immediately, so a background
+    # task would free the slot while the body only sits in the transport buffer. Streaming in chunks makes uvicorn
+    # await `drain()` between them: the task runs after the last chunk has been flushed to the socket buffer, at most
+    # one chunk plus the transport's high-water mark before the client has it all.
+    response = StreamingResponse(
+        _iter_chunks(export.content),
+        media_type="image/png",
+        headers={"Content-Length": str(len(export.content))},
+        background=BackgroundTask(export.release),
+    )
+    # Same policy as /full: the precise asset is immutable, so the file is cacheable like the gallery image.
+    response.headers["Cache-Control"] = _get_image_cache_control()
+    response.headers["Content-Disposition"] = f'attachment; filename="{PurePath(image_name).stem}-16bit.png"'
+    return response
 
 
 @images_router.get(

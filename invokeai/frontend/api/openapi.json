@@ -7366,6 +7366,139 @@
         }
       }
     },
+    "/api/v1/images/i/{image_name}/export-formats": {
+      "get": {
+        "tags": ["images"],
+        "summary": "Get Image Export Formats",
+        "description": "Lists the formats the image can be downloaded in besides its gallery file: `png16` for an image with a\nprecise asset, none for an ordinary image.",
+        "operationId": "get_image_export_formats",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The name of the image",
+              "title": "Image Name"
+            },
+            "description": "The name of the image"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImageExportFormats"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/images/i/{image_name}/export": {
+      "get": {
+        "tags": ["images"],
+        "summary": "Export Image",
+        "description": "Downloads the image as a 16-bit PNG made from its precise asset (`format=png16`).\n\nBrowser media requests authenticate with the path-scoped HttpOnly cookie set at login.\nReturns 409 for an image without an exportable precise asset (the detail says why), for non-finite pixels, and\nwhile image storage maintenance is active; 503 with `Retry-After` while another export runs.",
+        "operationId": "export_image",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "image_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The name of the image to export",
+              "title": "Image Name"
+            },
+            "description": "The name of the image to export"
+          },
+          {
+            "name": "format",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ImageExportFormat",
+              "description": "The export format"
+            },
+            "description": "The export format"
+          },
+          {
+            "name": "invokeai_media_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Invokeai Media Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The image in the requested format",
+            "content": {
+              "image/png": {}
+            }
+          },
+          "404": {
+            "description": "Image not found"
+          },
+          "409": {
+            "description": "The image has no exportable precise asset, its pixels cannot be represented, or image storage maintenance is active"
+          },
+          "500": {
+            "description": "The precise asset is corrupt or the export failed"
+          },
+          "503": {
+            "description": "Another export is running; retry shortly"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/images/i/{image_name}/thumbnail": {
       "get": {
         "tags": ["images"],
@@ -51933,6 +52066,27 @@
         ],
         "title": "ImageDTO",
         "description": "Deserialized image record, enriched for the frontend."
+      },
+      "ImageExportFormat": {
+        "type": "string",
+        "enum": ["png16"],
+        "title": "ImageExportFormat",
+        "description": "A file format an image can be downloaded in besides its gallery file."
+      },
+      "ImageExportFormats": {
+        "properties": {
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/ImageExportFormat"
+            },
+            "type": "array",
+            "title": "Formats",
+            "description": "The export formats available for the image; empty for an ordinary image."
+          }
+        },
+        "type": "object",
+        "required": ["formats"],
+        "title": "ImageExportFormats"
       },
       "ImageField": {
         "properties": {

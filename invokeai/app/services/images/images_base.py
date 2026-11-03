@@ -11,7 +11,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
-from invokeai.app.services.images.images_common import ImageDTO
+from invokeai.app.services.images.images_common import ImageDTO, ImageExport, ImageExportFormat
 from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults, SQLiteDirection
 from invokeai.backend.image_util.raster.raster import RasterImage
@@ -133,6 +133,53 @@ class ImageServiceABC(ABC):
     @abstractmethod
     def has_precise_asset(self, image_name: str) -> bool:
         """Whether the image has a precise asset, according to its association row."""
+        pass
+
+    @abstractmethod
+    def is_precise_png_upload(self, contents: bytes) -> bool:
+        """Whether an uploaded file should be stored with its exact pixels: precise storage is on and the file is a
+        16-bit RGB or RGBA PNG. A 16-bit gray+alpha PNG is not (its export could not be written) and logs a warning."""
+        pass
+
+    @abstractmethod
+    def create_from_precise_png(
+        self,
+        contents: bytes,
+        image_origin: ResourceOrigin,
+        image_category: ImageCategory,
+        session_id: Optional[str] = None,
+        board_id: Optional[str] = None,
+        is_intermediate: Optional[bool] = False,
+        metadata: Optional[str] = None,
+        workflow: Optional[str] = None,
+        graph: Optional[str] = None,
+        user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
+        resolved_inputs: Optional[str] = None,
+    ) -> Optional[ImageDTO]:
+        """Stores a PNG that `is_precise_png_upload` accepted with its exact pixels (`create_from_raster`). Returns
+        None, after one warning, when the codec rejects the file or the raster cannot be stored precisely; nothing
+        is persisted then and the caller stores the file as an ordinary image."""
+        pass
+
+    @abstractmethod
+    def get_export_formats(self, image_name: str) -> list[ImageExportFormat]:
+        """Lists the formats the image can be exported in: `png16` for an image whose precise asset the export can
+        deliver, none otherwise (including an unreadable asset, which is logged). Raises ImageRecordNotFoundException
+        for an unknown image."""
+        pass
+
+    @abstractmethod
+    def export_png16(self, image_name: str) -> ImageExport:
+        """Makes a 16-bit PNG from the image's precise asset, carrying its ICC profile and the same metadata,
+        workflow, graph and resolved-inputs strings as the gallery PNG.
+
+        Never waits: raises ImageExportBusyError while another export holds the slot. On success the caller owns the
+        slot and must call `release` once the file has been sent; on any error it is already released. Raises
+        ImageRecordNotFoundException for an unknown image, ImageExportUnavailableError (with the reason) for an image
+        without a row or with an asset the PNG writer cannot encode, RasterConversionError for non-finite pixels,
+        ImageFileNotFoundException for a missing asset file and PreciseAssetError for a corrupt or unsupported one.
+        """
         pass
 
     @abstractmethod
