@@ -5,6 +5,7 @@ import type { DynamicPromptsConfig } from './dynamicPrompts';
 import type {
   AspectRatioId,
   ComponentModelConfig,
+  DynamicPromptsSettings,
   GenerateLora,
   GenerateModelConfig,
   GenerateReferenceImage,
@@ -31,7 +32,12 @@ import {
   KREA2_REBALANCE_WEIGHT_COUNT,
 } from './conditioningRebalance';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
-import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import {
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  isDynamicPromptsSeedBehaviour,
+  sanitizeMaxPrompts,
+  sanitizeSampleSeed,
+} from './dynamicPrompts';
 import {
   GEMINI_TEMPERATURE_MAX,
   GEMINI_TEMPERATURE_MIN,
@@ -97,17 +103,7 @@ export const isAspectRatioId = (value: unknown): value is AspectRatioId =>
 export const DIMENSION_GRID = 8;
 
 /** The expansion config the settings describe, under the names the expansion route and preview use. */
-export const getDynamicPromptsConfig = (
-  settings: Pick<
-    GenerateSettings,
-    | 'dynamicPromptsCombinatorial'
-    | 'dynamicPromptsEnabled'
-    | 'dynamicPromptsMaxPrompts'
-    | 'dynamicPromptsResample'
-    | 'dynamicPromptsSampleSeed'
-    | 'dynamicPromptsSeedBehaviour'
-  >
-): DynamicPromptsConfig => ({
+export const getDynamicPromptsConfig = (settings: DynamicPromptsSettings): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
   enabled: settings.dynamicPromptsEnabled,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
@@ -115,6 +111,45 @@ export const getDynamicPromptsConfig = (
   sampleSeed: settings.dynamicPromptsSampleSeed,
   seedBehaviour: settings.dynamicPromptsSeedBehaviour,
 });
+
+/** The flat settings field behind each dynamic prompts config key. */
+const DYNAMIC_PROMPT_SETTING_KEYS = {
+  combinatorial: 'dynamicPromptsCombinatorial',
+  enabled: 'dynamicPromptsEnabled',
+  maxPrompts: 'dynamicPromptsMaxPrompts',
+  resample: 'dynamicPromptsResample',
+  sampleSeed: 'dynamicPromptsSampleSeed',
+  seedBehaviour: 'dynamicPromptsSeedBehaviour',
+} as const satisfies Record<keyof DynamicPromptsConfig, keyof DynamicPromptsSettings>;
+
+/** A dynamic prompts panel edit, as the settings patch that stores it. */
+export const getDynamicPromptsSettingsPatch = (patch: Partial<DynamicPromptsConfig>): Partial<DynamicPromptsSettings> =>
+  Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => [DYNAMIC_PROMPT_SETTING_KEYS[key as keyof DynamicPromptsConfig], value])
+  );
+
+/** Each field a stored record lacks reads as its default: Generate's unless the surface gives its own. */
+export const normalizeDynamicPromptsSettings = (
+  values: Partial<Record<keyof DynamicPromptsSettings, unknown>>,
+  defaults: Readonly<DynamicPromptsSettings> = DEFAULT_DYNAMIC_PROMPTS_SETTINGS
+): DynamicPromptsSettings => ({
+  dynamicPromptsCombinatorial:
+    typeof values.dynamicPromptsCombinatorial === 'boolean'
+      ? values.dynamicPromptsCombinatorial
+      : defaults.dynamicPromptsCombinatorial,
+  dynamicPromptsEnabled:
+    typeof values.dynamicPromptsEnabled === 'boolean' ? values.dynamicPromptsEnabled : defaults.dynamicPromptsEnabled,
+  dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts, defaults.dynamicPromptsMaxPrompts),
+  dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
+  dynamicPromptsResample:
+    typeof values.dynamicPromptsResample === 'boolean'
+      ? values.dynamicPromptsResample
+      : defaults.dynamicPromptsResample,
+  dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
+    ? values.dynamicPromptsSeedBehaviour
+    : defaults.dynamicPromptsSeedBehaviour,
+});
+
 export const MIN_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MAX_NEGATIVE_PROMPT_HEIGHT_PX = 240;
 export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
@@ -906,15 +941,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       MAX_HIDIFFUSION_RATIO,
       DEFAULT_HIDIFFUSION_T2_RATIO
     ),
-    dynamicPromptsCombinatorial:
-      typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
-    dynamicPromptsEnabled: values.dynamicPromptsEnabled !== false,
-    dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
-    dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
-    dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,
-    dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
-      ? values.dynamicPromptsSeedBehaviour
-      : 'per-iteration',
+    ...normalizeDynamicPromptsSettings(values),
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
     modelKey: values.modelKey as string,
