@@ -36,7 +36,7 @@ export interface ControlViewControllerOptions {
   readonly reserve: (bytes: number) => RasterMemoryReservationResult;
   /** Accounts the decoded surface as retained pixels until the view releases it. */
   readonly trackDetached: (bytes: number) => RasterMemoryLease;
-  /** Whether an operation or a generation holds the canvas; views are refused meanwhile. */
+  /** Whether an operation holds the document; views are refused meanwhile. */
   readonly isLocked: () => boolean;
   readonly invalidateLayer: (layerId: string) => void;
   readonly publish: (view: ControlLayerView | null) => void;

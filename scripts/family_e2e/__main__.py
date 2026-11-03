@@ -21,11 +21,17 @@ from scripts.family_e2e.gpu_memory import UnsupportedPlatformError
 from scripts.family_e2e.graphs import ExportError
 from scripts.family_e2e.manifest import DEFAULT_ARM, Manifest, ManifestError, load_manifest
 from scripts.family_e2e.metrics import MB
-from scripts.family_e2e.records import RUN_INFO_FILE, load_records, load_run_info, run_id_profile, write_run_info
+from scripts.family_e2e.records import (
+    RUN_INFO_FILE,
+    load_records,
+    load_run_info,
+    remaining_steps,
+    run_id_profile,
+    write_run_info,
+)
 from scripts.family_e2e.references import AcceptError, accept
 from scripts.family_e2e.report import write_report
 from scripts.family_e2e.runner import (
-    SERVER_ROLES,
     RunnerError,
     RunStopped,
     finish_run,
@@ -37,7 +43,7 @@ from scripts.family_e2e.runner import (
     open_gpu,
     preflight,
     read_heartbeat,
-    remaining_steps,
+    recorded_server,
     run,
     run_lock,
     save_calibration,
@@ -199,7 +205,7 @@ def cmd_stop(args: argparse.Namespace) -> int:
         heartbeat = read_heartbeat(run_dir)
     # The runner first: it would otherwise notice its server dying and record a crash.
     killed, survivors = kill_recorded([("runner", heartbeat.get("runner"))])
-    killed_servers, left = kill_recorded([(role, heartbeat.get(role)) for role in SERVER_ROLES])
+    killed_servers, left = kill_recorded(recorded_server(heartbeat))
     killed += killed_servers
     survivors = ", ".join(s for s in (survivors, left) if s)
     if survivors:

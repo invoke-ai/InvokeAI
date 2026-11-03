@@ -15,7 +15,7 @@ import { ConfirmDialog } from './ConfirmDialog';
 import { List } from './list/List';
 import { ListItem } from './list/ListItem';
 import { listRowsFromItems } from './list/listRows';
-import { ManagerColumn, ManagerDetailHeader, ManagerLayout } from './ManagerLayout';
+import { ManagerColumn, ManagerDetailHeader, ManagerLayout, ManagerSearchField } from './ManagerLayout';
 import { MenuContent } from './Menu';
 
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
@@ -29,11 +29,12 @@ const NARROW_PX = 640;
 const ITEMS = Array.from({ length: 60 }, (_, index) => ({ id: `item-${index}`, name: `Item ${index}` }));
 
 /**
- * A manager in miniature: rows open the detail, a portaled menu can too, the detail deletes its item through a
- * confirmation, and a footer reports progress under both panes.
+ * A manager in miniature: a search field heads the library, rows open the detail, a portaled menu can too, the detail
+ * deletes its item through a confirmation, and a footer reports progress under both panes.
  */
 const Harness = () => {
   const [items, setItems] = useState(ITEMS);
+  const [query, setQuery] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -99,6 +100,7 @@ const Harness = () => {
           addAction={{ label: 'Add items', onAdd: () => setIsDetailOpen(true) }}
           title="Items"
         >
+          <ManagerSearchField label="Search items" placeholder="Search" value={query} onChange={setQuery} />
           <List
             activeKey={activeId}
             label="Item library"
@@ -130,15 +132,9 @@ const setWidth = async (width: number) => {
   });
 };
 
-const render = async (width: number) => {
+const render = async (width: number, content = <Harness />) => {
   host.style.cssText = `height:480px;width:${String(width)}px;`;
-  await act(() =>
-    root.render(
-      <ChakraProvider value={system}>
-        <Harness />
-      </ChakraProvider>
-    )
-  );
+  await act(() => root.render(<ChakraProvider value={system}>{content}</ChakraProvider>));
 };
 
 const library = () => page.getByRole('list', { name: 'Item library' });
@@ -151,6 +147,14 @@ const viewport = () => host.querySelector<HTMLElement>('[data-list-viewport]')!;
 const draft = () => host.querySelector<HTMLInputElement>('input[aria-label="Draft"]')!;
 const focused = () => document.activeElement as HTMLElement;
 const isShown = (element: Element) => element.checkVisibility({ visibilityProperty: true });
+const search = () => page.getByRole('textbox', { name: 'Search items' });
+/** A `/` press from the focused element, or the body; says whether the layout consumed it. */
+const pressSlash = () => {
+  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: '/' });
+  focused().dispatchEvent(event);
+
+  return event.defaultPrevented;
+};
 
 beforeEach(() => {
   applyThemeToRoot(DEFAULT_THEME_ID);
@@ -313,6 +317,78 @@ describe('ManagerLayout', () => {
     await expect.element(page.getByRole('heading', { name: 'item-5' })).toBeVisible();
     await vi.waitFor(() => expect(focused()).toBe(back().element()));
   });
+  describe('the `/` search shortcut', () => {
+    it('focuses and selects the search from anywhere in the page, and types into fields', async () => {
+      await render(WIDE_PX);
+      await userEvent.fill(search(), 'kept');
+      await act(() => (document.activeElement as HTMLElement).blur());
+      expect(focused()).toBe(document.body);
+
+      await userEvent.keyboard('/');
+
+      await expect.element(search()).toHaveFocus();
+      const field = search().element() as HTMLInputElement;
+      expect([field.value, field.selectionStart, field.selectionEnd]).toEqual(['kept', 0, 4]);
+
+      // Inside a field the key is text: the detail's draft and the search itself.
+      await userEvent.click(draft());
+      await userEvent.keyboard('/');
+      expect(draft().value).toBe('/');
+      await expect.element(search()).not.toHaveFocus();
+      await userEvent.clear(search());
+      await userEvent.keyboard('/');
+      await expect.element(search()).toHaveValue('/');
+    });
+
+    it('leaves the key to an open menu', async () => {
+      await render(WIDE_PX);
+      await page.getByRole('button', { name: 'Item actions' }).click();
+      await expect.element(page.getByRole('menuitem', { name: 'Open item 5' })).toBeVisible();
+
+      await userEvent.keyboard('/');
+
+      await expect.element(page.getByRole('menuitem', { name: 'Open item 5' })).toBeVisible();
+      expect(focused().closest('[role="menu"]')).not.toBeNull();
+    });
+
+    it('answers only in the manager on screen', async () => {
+      // The hidden one registers first, as an earlier visited Launchpad page does.
+      await render(
+        WIDE_PX,
+        <>
+          <div hidden>
+            <Harness />
+          </div>
+          <Harness />
+        </>
+      );
+      const [hiddenSearch, shownSearch] = [...host.querySelectorAll<HTMLElement>('[data-manager-search]')];
+
+      await userEvent.keyboard('/');
+
+      expect(focused()).toBe(shownSearch);
+      expect(focused()).not.toBe(hiddenSearch);
+    });
+
+    it('does nothing while the single-pane view shows the detail', async () => {
+      await render(NARROW_PX);
+      await row('Item 2').click();
+      await expect.element(back()).toHaveFocus();
+
+      expect(pressSlash()).toBe(false);
+      await expect.element(back()).toHaveFocus();
+    });
+
+    it('does nothing while a modal is open', async () => {
+      await render(WIDE_PX);
+      await page.getByRole('button', { name: 'Delete item' }).click();
+      await expect.element(page.getByRole('alertdialog')).toBeVisible();
+
+      expect(pressSlash()).toBe(false);
+      expect(page.getByRole('alertdialog').element().contains(focused())).toBe(true);
+    });
+  });
+
   describe('with the footer filling the panes, as a maximized queue does', () => {
     const grid = () => host.querySelector<HTMLElement>('[data-view]')!.getBoundingClientRect();
     /** Relative to the manager, which focusing a control may scroll within the test frame. */

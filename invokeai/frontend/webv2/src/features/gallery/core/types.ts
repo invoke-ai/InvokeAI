@@ -112,7 +112,10 @@ export interface GalleryImage extends GeneratedImageContract {
   hasWorkflow?: boolean;
 }
 
-export type GalleryImageMetadata = Record<string, unknown>;
+/** A gallery item's recorded generation metadata, image or video. */
+export type GalleryMediaMetadata = Record<string, unknown>;
+
+export type GalleryImageMetadata = GalleryMediaMetadata;
 
 /**
  * Per-name outcome of a bulk delete. The backend deletes each name independently, so a

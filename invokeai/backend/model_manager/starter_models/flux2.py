@@ -1,6 +1,7 @@
 """FLUX.2 starter models."""
 
 from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
     flux2_dev_cow_mistral_q4,
     flux2_dev_cow_mistral_q8,
     flux2_klein_qwen3_4b_encoder,
@@ -73,6 +74,15 @@ flux2_vae = StarterModel(
     type=ModelType.VAE,
 )
 
+taef2 = StarterModel(
+    name="TAEF2 (FLUX.2 preview decoder)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/madebyollin/taef2/resolve/bd244ebfe4398c84fbf312a2f1c868c676b500e3/taef2.safetensors",
+    description=f"Sharp live previews for FLUX.2 and ERNIE-Image. {TINY_AUTOENCODER_NOTE} ~11MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
+)
+
 flux2_klein_4b = StarterModel(
     name="FLUX.2 Klein 4B (Diffusers)",
     base=BaseModelType.Flux2,
@@ -95,6 +105,19 @@ flux2_klein_4b_fp8 = StarterModel(
     base=BaseModelType.Flux2,
     source="https://huggingface.co/black-forest-labs/FLUX.2-klein-4b-fp8/resolve/main/flux-2-klein-4b-fp8.safetensors",
     description="FLUX.2 Klein 4B FP8 quantized - smaller and faster. Installs with VAE and Qwen3 4B encoder. ~4GB",
+    type=ModelType.Main,
+    dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
+)
+
+# A community repack, pinned to a commit for the same reason as the Klein 9B int8 entry below: the decode follows
+# the file's own `comfy_quant` marker, and a reupload at the same path could change what that marker says.
+flux2_klein_4b_int8 = StarterModel(
+    name="FLUX.2 Klein 4B (int8)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/supermind/int8_convrot_models/resolve/eb6682675836a42aa91fd4effcd77d68fe60ff42/diffusion_models/flux/flux-2-klein-4b_int8_convrot.safetensors",
+    description="FLUX.2 Klein 4B in ComfyUI int8_convrot, from supermind's community repack (no first-party int8 "
+    "build of FLUX.2 exists). Its int8 layers stay int8 on every supported GPU, about 4.1GB once loaded; int8 "
+    "Compute can run them on NVIDIA int8 tensor cores. Installs with VAE and Qwen3 4B encoder. ~4.1GB",
     type=ModelType.Main,
     dependencies=[flux2_vae, flux2_klein_qwen3_4b_encoder],
 )
@@ -265,6 +288,17 @@ flux2_dev_gguf_q8_0 = StarterModel(
     description="FLUX.2 [dev] transformer Q8_0 — highest GGUF fidelity. ~35.5GB",
     type=ModelType.Main,
     format=ModelFormat.GGUFQuantized,
+    dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
+)
+
+flux2_dev_fp8_mixed = StarterModel(
+    name="FLUX.2 [dev] Transformer (FP8 mixed)",
+    base=BaseModelType.Flux2,
+    source="https://huggingface.co/Comfy-Org/Flux-2-Dev/resolve/9630c1b4b6e690497ae0c19bb6b1b35d4ebedcb7/split_files/diffusion_models/flux2_dev_fp8mixed.safetensors",
+    description="FLUX.2 [dev] transformer in Comfy-Org's scaled fp8 mixed build. FP8 Storage is switched on when it "
+    "is installed, so its fp8 layers stay fp8, about 35.5GB once loaded: more than a 24GB card holds whole, so "
+    "partial loading streams the rest. ~35.5GB. Non-Commercial License.",
+    type=ModelType.Main,
     dependencies=[flux2_vae, flux2_dev_cow_mistral_q8],
 )
 

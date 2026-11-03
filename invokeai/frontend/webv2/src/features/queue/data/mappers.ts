@@ -56,6 +56,7 @@ export const mapQueueItemDTO = (dto: QueueServerItemDTO): QueueItemReadModel => 
   userDisplayName: dto.user_display_name,
   userEmail: dto.user_email,
   userId: dto.user_id,
+  workflowName: typeof dto.workflow?.name === 'string' ? dto.workflow.name : undefined,
 });
 
 /** The saved execution data alone; the live row keeps its own narrower mapping. */

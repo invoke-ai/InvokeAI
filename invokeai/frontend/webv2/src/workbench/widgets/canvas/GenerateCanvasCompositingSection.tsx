@@ -16,8 +16,7 @@ import {
   CANVAS_MASK_BLUR_MAX,
   readCanvasCompositingSettings,
 } from '@workbench/widgets/canvas/invoke/canvasCompositing';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useWidgetValuesSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,14 +26,11 @@ const COHERENCE_MODES: readonly CanvasCoherenceMode[] = ['Gaussian Blur', 'Box B
 // Match full-width menus to the trigger width and start edge.
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
-const selectCanvasValues = (project: Parameters<typeof getProjectWidgetValues>[0]): Record<string, unknown> =>
-  getProjectWidgetValues(project, 'canvas');
-
 export const GenerateCanvasCompositingSection = () => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
   const projectId = useActiveProjectId();
-  const values = useActiveProjectSelector(selectCanvasValues);
+  const values = useWidgetValuesSelector('canvas', (canvasValues) => canvasValues);
   const settings = useMemo(() => readCanvasCompositingSettings(values), [values]);
 
   const patch = useCallback(

@@ -12,17 +12,21 @@ import { createDefaultVideoWidgetValues, normalizeVideoWidgetValues, VideoUiProv
 import { useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import {
   getVideoSpanPlaybackState,
   requestVideoSpanPlayback,
   subscribeVideoSpanPlaybackState,
 } from '@workbench/widgets/preview/spanPlaybackRequest';
-import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { getProjectWidgetValues } from '@workbench/widgetState';
+import {
+  useActiveProjectSelector,
+  useWidgetValuesSelector,
+  useWorkbenchCommands,
+  useWorkbenchQueries,
+} from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-
-const EMPTY_GALLERY_VALUES: Record<string, unknown> = Object.freeze({});
 
 /** Video owns its prompt in widget values; do not join the draft shared by Generate/Upscale. */
 export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) => {
@@ -43,9 +47,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   );
   // Panel uploads land where new results do: the auto-add board, resolved when the upload starts, against the board
   // listing as it is then.
-  const galleryValues = useActiveProjectSelector(
-    (activeProject) => getProjectWidgetInstance(activeProject, 'gallery')?.state?.values ?? EMPTY_GALLERY_VALUES
-  );
+  const galleryValues = useWidgetValuesSelector('gallery', (values) => values, Object.is);
   // Read the gallery values through a ref so board selection does not recreate project actions.
   const galleryValuesRef = useRef(galleryValues);
   // Async clip resolution can outlive a project switch; callbacks must check the live project.
@@ -77,6 +79,14 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
 
     return target ? getProjectWidgetValues(target, 'video') : {};
   }, [projectId, queries]);
+  const notify = useNotify();
+  const notifications = useMemo<VideoUiAdapter['notifications']>(
+    () => ({
+      info: (title) => notify.info(title),
+      undoable: (title, notice) => notify.undoable(title, { ...notice, projectId }),
+    }),
+    [notify, projectId]
+  );
   const reportError = useCallback<VideoUiAdapter['reportError']>(
     (message) => commands.notifications.reportError({ area: 'video', message, namespace: 'generation' }),
     [commands]
@@ -127,6 +137,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
       ...project,
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       readValues,
@@ -139,6 +150,7 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
     [
       findInGallery,
       getUploadBoardId,
+      notifications,
       patchValues,
       playVideoSpanInPreview,
       project,

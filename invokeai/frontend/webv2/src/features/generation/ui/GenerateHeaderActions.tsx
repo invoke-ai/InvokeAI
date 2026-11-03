@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
+import { offerGenerateUndo } from './generateUndo';
 import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 import {
   getModelDefaultsPatch,
@@ -55,12 +56,22 @@ export const GenerateHeaderActions = () => {
     flushGenerateDrafts();
     const resolved = resolveDefaults(ui.generateValues.getSnapshot());
 
-    if (resolved) {
-      ui.settings.patchGenerateSettings(
-        getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels),
-        projectId
-      );
+    if (!resolved) {
+      return;
     }
+
+    const patch = getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels);
+
+    ui.settings.patchGenerateSettings(patch, projectId);
+    offerGenerateUndo({
+      after: { ...resolved.settings, ...patch },
+      before: resolved.settings,
+      projectId,
+      slot: 'settings',
+      t,
+      title: t('widgets.generate.resetToModelDefaultsDone', { name: resolved.selectedModel.name }),
+      ui,
+    });
   };
 
   const resetLabel = t('widgets.generate.resetAllToModelDefaults');

@@ -20,7 +20,7 @@ import type {
 import type { ProjectEvent } from './projectEventContracts';
 import type { ProjectWorkflowCollection, ProjectWorkflowHistories } from './projectWorkflows';
 import type { WorkbenchQueueState } from './queueHistoryContracts';
-import type { ProjectSettings } from './settings/contracts';
+import type { ProjectSettings, ScopedDefaults } from './settings/contracts';
 import type { WidgetFailure, WidgetInstanceContract, WidgetInstanceId, WidgetTypeId } from './widgetContracts';
 
 export type { ProjectEvent, ProjectEventType } from './projectEventContracts';
@@ -91,6 +91,8 @@ export interface WorkbenchState {
   autosave: AutosaveState;
   account: AccountState;
   widgetFailures: WidgetFailure[];
+  /** Mirror of the user's `WorkbenchPreferences.scopedDefaults`: reads resolve pins over defaults in one snapshot. */
+  scopedDefaults: ScopedDefaults;
 }
 
 export interface BackendConnectionState {
@@ -106,13 +108,37 @@ export type WorkbenchNotificationKind = 'error' | 'success' | 'info';
 /** `run-outcome`: a queue item the user submitted failed or was cancelled. */
 export type WorkbenchNotificationCategory = 'enqueue' | 'run-outcome';
 
+/**
+ * A follow-up a notification offers, as plain data: notifications live in workbench state, so they never hold a
+ * closure. The notification toaster resolves each kind to a label and a handler (see
+ * `shell/notifications/README.md`); a kind it cannot offer right now is left out.
+ */
+export type WorkbenchNotificationAction =
+  | { kind: 'open-widget'; widgetId: WidgetTypeId }
+  /** Opens the queue at this backend item. */
+  | { kind: 'reveal-queue-item'; itemId: number }
+  /**
+   * Re-runs these failed or canceled backend items of one run from their saved sessions, once, in one request.
+   * `canvasProjectId`: a Canvas run's project, whose rerun is staged only by a tab with it open.
+   */
+  | { kind: 'retry-queue-item'; itemIds: readonly number[]; canvasProjectId?: string }
+  /**
+   * Runs the closure `useNotify().undoable` holds in its session-only registry, at most once. With `projectId`, only
+   * while that project is open. `label` replaces "Undo" when the button brings back something other than the
+   * reported action.
+   */
+  | { kind: 'undo'; undoId: string; projectId?: string; label?: string };
+
 export interface WorkbenchNotification {
   id: string;
   kind: WorkbenchNotificationKind;
   title: string;
   titleKey?: string;
+  /** Interpolation values for `titleKey`; `title` holds the same text in English. */
+  titleValues?: Readonly<Record<string, string | number>>;
   message?: string;
   messageKey?: string;
+  messageValues?: Readonly<Record<string, string | number>>;
   createdAt: string;
   projectId?: string;
   isRead: boolean;
@@ -120,6 +146,10 @@ export interface WorkbenchNotification {
   category?: WorkbenchNotificationCategory;
   /** Coalesced repeat count (see addNotification); absent = 1. */
   occurrenceCount?: number;
+  /** Buttons its toast shows, primary first. */
+  actions?: readonly WorkbenchNotificationAction[];
+  /** Its toast stays until dismissed, for failures the user must not miss. */
+  persistent?: boolean;
 }
 
 export interface PromptHistoryItem {
@@ -127,14 +157,28 @@ export interface PromptHistoryItem {
   negativePrompt: string | null;
 }
 
+/**
+ * A layout change worth reporting with an Undo toast; the step that made it carries this (see
+ * `shell/LayoutUndoNotices.tsx`). Steps without one, such as a resize or a route change, are undone only by the
+ * layout undo command.
+ */
+export type LayoutUndoNotice =
+  /** The active preset's saved arrangement was laid out again over unsaved changes. */
+  | { kind: 'revert'; presetId: LayoutPresetId }
+  /** Another preset's unsaved arrangement in this project was dropped. */
+  | { kind: 'discardCopy'; presetId: LayoutPresetId }
+  | { kind: 'switchPreset'; presetId: LayoutPresetId }
+  | { kind: 'removeWidget'; instanceId: WidgetInstanceId };
+
 export interface UndoRedoEntry {
   id: string;
   createdAt: string;
   label: string;
   project: ProjectUndoSnapshot;
-  /** Edits that arrive as a stream (typing, dragging) share a key so they fold into one step. */
+  notice?: LayoutUndoNotice;
+  /** Edits that arrive as a stream (a dragged divider, a moved window) share a key so they fold into one step. */
   mergeKey?: string;
-  /** When the entry last absorbed a same-key edit; the merge window runs from here. */
+  /** When the step last absorbed a same-key edit; the merge window runs from here. */
   mergedAt?: string;
 }
 

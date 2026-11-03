@@ -14,11 +14,11 @@ import { cropAllLayersToFrame, getCropAllUnavailableReasonKey } from './canvasCo
  * cannot run it stays reachable by keyboard and says why.
  */
 export const CanvasCropAllLayersMenuItem = ({
-  interactionLocked,
+  documentEditingLocked,
   layers,
 }: {
-  /** The canvas is generating, has staged results, or is applying an edit. */
-  interactionLocked: boolean;
+  /** An operation (Filter, Select Object) holds the document. */
+  documentEditingLocked: boolean;
   layers: Pick<CanvasEngineLayerCapability, 'cropAllLayersToBbox'>;
 }) => {
   const { t } = useTranslation();
@@ -26,7 +26,7 @@ export const CanvasCropAllLayersMenuItem = ({
   const documentReasonKey = useActiveProjectSelector((project) =>
     getCropAllUnavailableReasonKey(project.canvas.document)
   );
-  const reasonKey = interactionLocked ? 'widgets.layers.actions.interactionLocked' : documentReasonKey;
+  const reasonKey = documentEditingLocked ? 'widgets.layers.actions.operationLocked' : documentReasonKey;
   const onSelect = useCallback(() => void cropAllLayersToFrame(layers, notify, t), [layers, notify, t]);
 
   return (
