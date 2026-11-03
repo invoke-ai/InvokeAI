@@ -69,7 +69,10 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
           size="xs"
           variant="ghost"
           flexShrink={0}
-          onClick={select(layer.onResetToBuiltIn!)}
+          onClick={(event) => {
+            event.preventDefault();
+            select(layer.onResetToBuiltIn!)();
+          }}
         >
           <Dot />
         </IconButton>

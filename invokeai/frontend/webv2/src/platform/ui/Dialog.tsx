@@ -1,11 +1,11 @@
 // eslint-disable-next-line no-restricted-imports -- the one wrapper the restriction routes every dialog through
 import { Dialog as ChakraDialog, useDialogContext } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { useLayoutEffect } from 'react';
 
 import { registerModalPresence } from './modalPresence';
 
 const ModalPresenceRegistration = () => {
-  useMountEffect(registerModalPresence);
+  useLayoutEffect(registerModalPresence, []);
 
   return null;
 };
