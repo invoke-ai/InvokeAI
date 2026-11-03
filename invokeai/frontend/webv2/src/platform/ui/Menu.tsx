@@ -15,7 +15,7 @@ import {
 } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
-import { useCallback, useId, useMemo } from 'react';
+import { createContext, useCallback, useContext, useId, useMemo } from 'react';
 
 import { IconButton, useUnavailableControl } from './Button';
 import { MiddleTruncate } from './MiddleTruncate';
@@ -24,11 +24,40 @@ import { useRegisterWidgetOverlay } from './widgetOverlays';
 
 type MenuContentProps = ComponentProps<typeof Menu.Content>;
 
-/** Menu content closes with its owning widget; the theme recipe owns chrome. */
-export const MenuContent = (props: MenuContentProps) => {
+/** A menu rooted inside another menu's content is its submenu, which opens flush beside its item. */
+const InsideMenuContentContext = createContext(false);
+
+/**
+ * Menu content closes with its owning widget; the theme recipe owns chrome.
+ *
+ * Every menu but a submenu has an arrow pointing at its anchor. The recipe sizes it from the anchor: a trigger or any
+ * other box gets one, and a context menu, anchored to the pointer's point, gets none. The arrow is the content's next
+ * sibling, not its child: menu content scrolls, which would clip an arrow poking out of it. Zag finds it in the
+ * positioner all the same. It must stay after the content: Zag reads the menu's z-index from the positioner's first
+ * child, and the recipe hides it with content kept mounted but hidden through a sibling selector.
+ */
+export const MenuContent = ({ children, ...props }: MenuContentProps) => {
   const menu = useMenuContext();
+  const isSubmenu = useContext(InsideMenuContentContext);
   const stale = useRegisterWidgetOverlay(menu.open, menu.setOpen);
-  return stale ? null : <Menu.Content {...props} />;
+  if (stale) {
+    return null;
+  }
+  // Zag puts the placement on the content's props; their React type lists only standard attributes.
+  const { 'data-placement': placement } = menu.getContentProps() as { 'data-placement'?: string };
+  return (
+    <>
+      <Menu.Content {...props}>
+        <InsideMenuContentContext value>{children}</InsideMenuContentContext>
+      </Menu.Content>
+      {isSubmenu ? null : (
+        // The content's own state and placement, so the recipe animates the arrow as Chakra animates the content.
+        <Menu.Arrow data-placement={placement} data-state={menu.open ? 'open' : 'closed'}>
+          <Menu.ArrowTip />
+        </Menu.Arrow>
+      )}
+    </>
+  );
 };
 
 export interface MenuHeadingGroupProps {

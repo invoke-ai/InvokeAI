@@ -320,6 +320,21 @@ describe('ImageContextMenu deletion delegation', () => {
   });
 });
 
+describe('ImageContextMenu placement', () => {
+  it('opens at the right-click with no arrow, and no arrow-sized gap below the pointer', async () => {
+    await renderMenu(createActions(vi.fn(() => Promise.resolve())), [image('single.png')]);
+    const menu = document.querySelector<HTMLElement>('[role="menu"][data-state="open"]')!;
+    const arrow = menu.parentElement!.querySelector<HTMLElement>('[data-part="arrow"]');
+
+    // The harness right-clicks at (20, 20): a 1px anchor, then the default 8px gutter, where an arrow would add 6.
+    await vi.waitFor(() => {
+      expect(menu.dataset.placement).toBe('bottom-start');
+      expect(arrow?.querySelector<HTMLElement>('[data-part="arrow-tip"]')?.offsetWidth ?? 0).toBe(0);
+      expect(menu.getBoundingClientRect().top).toBeCloseTo(20 + 1 + 8, 0);
+    });
+  });
+});
+
 describe('ImageContextMenu find in gallery', () => {
   it('reveals a single image or video by its gallery reference', async () => {
     findGalleryItem.mockClear();

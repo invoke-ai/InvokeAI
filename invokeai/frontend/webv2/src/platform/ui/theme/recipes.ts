@@ -33,6 +33,47 @@ const controlSizes = <T>(
     CONTROL_SIZES.map((size) => [size, build(stock?.[basis[size]] ?? stock?.xl, `{sizes.control.${size}}`, size)])
   );
 
+/**
+ * Arrowed surfaces (menus, popovers, hover cards) keep the tip clear of the content's rounded corners: the arrow box gets
+ * a transparent border of the corner radius plus a margin. Floating UI keeps the whole box within the content's edge,
+ * so the tip never lands on a corner curve; a small trigger at the end of a bar shifts the panel instead. Zag's gutter
+ * reads the box's inner height, which the border leaves at the visible size. An arrow of no size gets no border either,
+ * so Floating UI has nothing to centre on the anchor and leaves the panel where its placement puts it. The box overlaps
+ * the content and is transparent, so it lets the pointer through.
+ */
+const arrowClearOfCorners = (visibleSize: string) => ({
+  '--arrow-visible-size': visibleSize,
+  '--arrow-clearance': 'min(calc({radii.md} + 2px), calc(var(--arrow-visible-size) * 1000))',
+  '--arrow-size': 'calc(var(--arrow-visible-size) + 2 * var(--arrow-clearance))',
+  borderColor: 'transparent',
+  borderStyle: 'solid',
+  borderWidth: 'var(--arrow-clearance)',
+  pointerEvents: 'none',
+});
+
+/**
+ * A popover's or hover card's arrow sits inside its content, which is `position: relative`, so Zag's offset out of the
+ * content lands on the padding edge, one border width (1px) inside the outer edge. Moved out by that width, away from
+ * the content only, it centres on the outer edge, as a menu's arrow does beside its content.
+ */
+const arrowOnContentBorderEdge = {
+  '[data-placement^=bottom] > &': { translate: '0 -1px' },
+  '[data-placement^=top] > &': { translate: '0 1px' },
+  '[data-placement^=right] > &': { translate: '-1px 0' },
+  '[data-placement^=left] > &': { translate: '1px 0' },
+};
+
+/**
+ * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus the
+ * content's 1px border, which it covers so tip and panel share one outline, it never draws over the content or its
+ * items. A tip of no size draws no border either.
+ */
+const arrowTipOutsideContent = {
+  borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
+  borderTopWidth: 'min(1px, var(--arrow-visible-size))',
+  clipPath: 'polygon(0 0, calc(100% + 1.5px) 0, 0 calc(100% + 1.5px))',
+};
+
 /** Extend the tooltip recipe; replacing it drops arrow size/background variables. */
 export const tooltipSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tooltip,
@@ -79,9 +120,17 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
       color: 'fg',
       maxWidth: '18rem',
     },
+    arrow: {
+      ...chakraSlotRecipes.hoverCard.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowOnContentBorderEdge,
+    },
     arrowTip: {
       ...chakraSlotRecipes.hoverCard.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
+      // The visible tip is part of the card: resting the pointer on it keeps the card open.
+      pointerEvents: 'auto',
     },
   },
   defaultVariants: { size: 'xs' },
@@ -102,9 +151,15 @@ export const popoverSlotRecipe = defineSlotRecipe({
       _open: { animationStyle: 'slide-fade-in', animationDuration: 'faster' },
       _closed: { animationStyle: 'slide-fade-out', animationDuration: 'faster' },
     },
+    arrow: {
+      ...chakraSlotRecipes.popover.base?.arrow,
+      ...arrowClearOfCorners('{sizes.3}'),
+      ...arrowOnContentBorderEdge,
+    },
     arrowTip: {
       ...chakraSlotRecipes.popover.base?.arrowTip,
       borderColor: 'border.emphasized',
+      ...arrowTipOutsideContent,
     },
   },
 });
@@ -558,6 +613,18 @@ export const dropdownGroupLabel = {
   textTransform: 'uppercase',
 };
 
+/**
+ * A menu's arrow points at its anchor when the anchor is a box: a trigger, or a measured one. A context menu is
+ * anchored to the pointer, a point of at most 1px with nothing to point at, so its arrow's visible size is nothing. Zag sets
+ * the anchor's size on the positioner as it places the menu; until then, a box is assumed. The placement after that,
+ * which Floating UI's auto-update makes as soon as its resize observer reports the content, drops the shrunken arrow's
+ * height from the gutter. Zag's one-shot repositions (`listeners: false`: `Menu.ContextTrigger`, an `anchorPoint`
+ * prop, `TRIGGER_VALUE.SET`) get no such second placement and would keep a point-anchored menu 6px further out; the app
+ * uses none of them.
+ */
+const MENU_ARROW_SIZE =
+  'min({sizes.3}, max(0px, calc((min(var(--reference-width, 2px), var(--reference-height, 2px)) - 1px) * 1000)))';
+
 export const menuSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.menu,
   base: {
@@ -565,6 +632,23 @@ export const menuSlotRecipe = defineSlotRecipe({
     content: {
       ...chakraSlotRecipes.menu.base?.content,
       ...dropdownContent,
+    },
+    arrow: {
+      ...chakraSlotRecipes.menu.base?.arrow,
+      ...arrowClearOfCorners(MENU_ARROW_SIZE),
+      // Beside the content, the arrow is outside the scope of its `--menu-bg`.
+      '--arrow-background': `colors.${dropdownContent.bg}`,
+      // MenuContent mirrors the content's state and placement onto the arrow, so it slides and fades with the content.
+      _open: chakraSlotRecipes.menu.base?.content?._open,
+      // Held at its last frame: it ends with the content's exit, which unmounts both.
+      _closed: { ...chakraSlotRecipes.menu.base?.content?._closed, animationFillMode: 'forwards' },
+      // Content kept mounted when closed is hidden; the arrow beside it goes with it.
+      '[hidden] + &': { display: 'none' },
+    },
+    arrowTip: {
+      ...chakraSlotRecipes.menu.base?.arrowTip,
+      borderColor: dropdownContent.borderColor,
+      ...arrowTipOutsideContent,
     },
     item: {
       ...chakraSlotRecipes.menu.base?.item,

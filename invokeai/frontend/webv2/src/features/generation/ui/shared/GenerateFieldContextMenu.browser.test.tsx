@@ -85,6 +85,23 @@ describe('GenerateFieldContextMenu', () => {
     expect(openMenus()[0]?.textContent).toContain('Reset CFG');
   });
 
+  it('opens at the pointer with nothing to point at: no arrow, and no arrow-sized gap below the click', async () => {
+    await renderFields();
+    const steps = field('Steps');
+
+    await rightClick(steps);
+    await expect.poll(() => openMenus()[0]?.textContent).toContain('Reset Steps');
+    await settle();
+    const menu = openMenus()[0]!;
+
+    const arrow = menu.parentElement!.querySelector<HTMLElement>('[data-part="arrow"]');
+    expect(arrow?.querySelector<HTMLElement>('[data-part="arrow-tip"]')?.offsetWidth ?? 0).toBe(0);
+    // The click lands 8px into the field; the menu opens the default 8px gutter below it, where an arrow would add 6.
+    const gap = menu.getBoundingClientRect().top - (steps.getBoundingClientRect().top + 8);
+    expect(gap).toBeGreaterThanOrEqual(7);
+    expect(gap).toBeLessThan(11);
+  });
+
   it('keeps a menu open when right-clicked itself, then still moves to the next field', async () => {
     await renderFields();
 
