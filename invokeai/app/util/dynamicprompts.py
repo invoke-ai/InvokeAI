@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
 
 from dynamicprompts.commands import (
     Command,
+    LiteralCommand,
     SequenceCommand,
     VariantCommand,
     WildcardCommand,
@@ -17,29 +18,57 @@ from dynamicprompts.wildcards import WildcardManager
 from pyparsing import ParseException
 
 
-def _iter_wildcard_names(command: Command) -> Iterator[str]:
-    """Recursively yield the statically-known wildcard names referenced by `command`."""
+def _iter_wildcard_names(
+    command: Command,
+    variables: Mapping[str, Command] | None = None,
+    sampling: frozenset[str] = frozenset(),
+) -> Iterator[str]:
+    """Recursively yield the statically-known wildcard names that sampling `command` would evaluate.
+
+    Variables are tracked the way `SamplingContext` resolves them, so a wildcard is only reported when
+    it can actually run: a lazy assignment's value counts where the variable is read, a variable
+    default counts only while the variable is unset, and an immediate assignment counts where it is
+    assigned.
+    """
+    if variables is None:
+        variables = {}
     if isinstance(command, WildcardCommand):
         # The wildcard name may itself be a dynamic Command (e.g. `__${var}__`). Only plain string
         # names can be validated ahead of time, so the dynamic case is intentionally skipped.
         if isinstance(command.wildcard, str):
             yield command.wildcard
     elif isinstance(command, SequenceCommand):
+        # Mirrors `SamplingContext.process_variable_assignments`: every assignment in the sequence is
+        # applied against the enclosing scope before any other token is sampled, the last one wins.
+        assigned: dict[str, Command] = {}
         for token in command.tokens:
-            yield from _iter_wildcard_names(token)
+            if not isinstance(token, VariableAssignmentCommand):
+                continue
+            if not token.overwrite and token.name in variables:
+                assigned[token.name] = variables[token.name]
+            elif token.immediate:
+                # `${c=!{__nope__|x}}` samples its value right away, whether or not `c` is read.
+                yield from _iter_wildcard_names(token.value, variables, sampling)
+                assigned[token.name] = LiteralCommand("")
+            else:
+                assigned[token.name] = token.value
+        scope = {**variables, **assigned} if assigned else variables
+        for token in command.tokens:
+            if not isinstance(token, VariableAssignmentCommand):
+                yield from _iter_wildcard_names(token, scope, sampling)
     elif isinstance(command, VariantCommand):
         for value in command.values:
-            yield from _iter_wildcard_names(value)
+            yield from _iter_wildcard_names(value, variables, sampling)
     elif isinstance(command, WrapCommand):
-        yield from _iter_wildcard_names(command.wrapper)
-        yield from _iter_wildcard_names(command.inner)
-    elif isinstance(command, VariableAssignmentCommand):
-        # `${c={__nope__|x}}` evaluates its value just like the bare variant would.
-        yield from _iter_wildcard_names(command.value)
+        yield from _iter_wildcard_names(command.wrapper, variables, sampling)
+        yield from _iter_wildcard_names(command.inner, variables, sampling)
     elif isinstance(command, VariableAccessCommand):
-        # `${c:{__nope__|x}}` falls back to its default when `c` is unset.
-        if command.default is not None:
-            yield from _iter_wildcard_names(command.default)
+        # `${c}` samples the value bound to `c`, and `${c:{__nope__|x}}` falls back to its default
+        # only when `c` is unset. A recursive reference is left to the sampler's own RecursionError.
+        if command.name not in sampling:
+            target = variables.get(command.name, command.default)
+            if target is not None:
+                yield from _iter_wildcard_names(target, variables, sampling | {command.name})
     # LiteralCommand references no wildcards.
 
 

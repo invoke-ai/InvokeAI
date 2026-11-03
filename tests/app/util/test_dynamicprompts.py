@@ -4,7 +4,7 @@ import pytest
 from dynamicprompts.generators import CombinatorialPromptGenerator
 from dynamicprompts.wildcards import WildcardManager
 
-from invokeai.app.util.dynamicprompts import find_missing_wildcards
+from invokeai.app.util.dynamicprompts import expand_dynamic_prompt, find_missing_wildcards
 
 
 @pytest.fixture
@@ -89,3 +89,20 @@ def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_vari
 ) -> None:
     assert find_missing_wildcards("${c={__colors__|x}} a ${c}", wildcard_manager) == []
     assert find_missing_wildcards("a ${c:__colors__} ${d}", wildcard_manager) == []
+
+
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # `c` is set, so the default never runs.
+        "${c=red} a ${c:{__nope__|x}}",
+        # The lazy value is never read.
+        "${c={__nope__|x}} a",
+        # The lazy value is replaced before `c` is read.
+        "${c={__nope__|x}} ${c=red} a ${c}",
+    ],
+)
+def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
+    assert find_missing_wildcards(prompt) == []
+    result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
+    assert result.error is None
