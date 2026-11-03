@@ -25,7 +25,7 @@ import { NodeFieldControl } from './NodeFieldControl';
 
 type FormViewContext = {
   projectGraph: ProjectGraphState;
-  sectionGapPx: number;
+  columnGap: '1' | '3';
   openSections: Readonly<Record<string, boolean>>;
   invalidFieldIds: ReadonlySet<string>;
   onSectionOpenChange: (sectionId: string, open: boolean) => void;
@@ -48,15 +48,8 @@ const SECTION_SEPARATOR_STYLES = {
   },
   '&[data-section-boundary]::before': { opacity: 1 },
 } as const;
-const DEFAULT_SECTION_GAP_PX = 8;
 
-export const LinearFormView = ({
-  projectGraph,
-  sectionGapPx = DEFAULT_SECTION_GAP_PX,
-}: {
-  projectGraph: ProjectGraphState;
-  sectionGapPx?: number;
-}) => {
+export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkflowHostCommands();
   const { project } = useWorkflowUi();
@@ -66,6 +59,14 @@ export const LinearFormView = ({
   const rootChildren = getFormChildren(projectGraph.form);
   const root = projectGraph.form.elements[projectGraph.form.rootElementId];
   const layout = root?.type === 'container' ? root.data.layout : 'column';
+  const hasCollapsibleHeadings = useMemo(
+    () =>
+      Object.values(projectGraph.form.elements).some(
+        (element) => element.type === 'heading' && element.data.collapsible === true
+      ),
+    [projectGraph.form.elements]
+  );
+  const columnGap: '1' | '3' = hasCollapsibleHeadings ? '1' : '3';
   const invalidFieldIds = useMemo(() => getInvalidFormFieldIds(projectGraph, templates), [projectGraph, templates]);
   const openSections = useMemo(
     () => getFormSectionOpenState({ formSectionsOpen: storedOpenSections }, projectGraph.id),
@@ -89,8 +90,8 @@ export const LinearFormView = ({
     [project, projectGraph.id, projectId, widgets]
   );
   const context = useMemo(
-    () => ({ projectGraph, sectionGapPx, invalidFieldIds, openSections, onSectionOpenChange }),
-    [projectGraph, sectionGapPx, invalidFieldIds, openSections, onSectionOpenChange]
+    () => ({ projectGraph, columnGap, invalidFieldIds, openSections, onSectionOpenChange }),
+    [projectGraph, columnGap, invalidFieldIds, openSections, onSectionOpenChange]
   );
 
   if (rootChildren.length === 0) {
@@ -107,7 +108,7 @@ export const LinearFormView = ({
   }
 
   return (
-    <Stack direction={layout} gap={layout === 'row' ? '3' : `${sectionGapPx}px`} p="3" minW="0">
+    <Stack direction={layout} gap={layout === 'row' ? '3' : columnGap} p="3" minW="0">
       <ViewChildren context={context} elements={rootChildren} layout={layout} />
     </Stack>
   );
@@ -117,7 +118,7 @@ const ViewChildren = ({
   context,
   elements,
   layout,
-  gap = `${context.sectionGapPx}px`,
+  gap = `var(--chakra-spacing-${context.columnGap})`,
 }: {
   context: FormViewContext;
   elements: readonly WorkflowFormElement[];
@@ -266,7 +267,7 @@ const ViewElement = ({
           css={boundaryStyles}
           data-section-boundary={showBoundary ? '' : undefined}
           direction={element.data.layout}
-          gap={element.data.layout === 'row' ? '3' : `${context.sectionGapPx}px`}
+          gap={element.data.layout === 'row' ? '3' : context.columnGap}
           minW="0"
           position="relative"
         >
@@ -279,6 +280,12 @@ const ViewElement = ({
       );
     case 'node-field':
       return <NodeFieldControl element={element} projectGraph={context.projectGraph} />;
+    case 'heading':
+      return (
+        <Text fontSize="lg" fontWeight="700">
+          {element.data.content}
+        </Text>
+      );
     case 'text':
       return (
         <LinkifiedText color="fg.muted" fontSize="xs" whiteSpace="pre-wrap">

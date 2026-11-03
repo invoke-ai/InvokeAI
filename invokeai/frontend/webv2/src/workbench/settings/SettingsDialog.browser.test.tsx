@@ -8,7 +8,6 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { queueWidgetManifest } from '@workbench/widgets/queue/manifest';
-import { workflowWidgetManifest } from '@workbench/widgets/workflow/manifest';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -39,10 +38,7 @@ vi.mock('./CustomSettingsEditors', () => ({
 const testProject = {
   id: 'settings-test-project',
   settings: { antialiasProgressImages: true, useCpuNoise: false },
-  widgetInstances: { 'settings-test-widget': { id: 'settings-test-widget', typeId: 'queue' } } as Record<
-    string,
-    { id: string; typeId: string }
-  >,
+  widgetInstances: { 'settings-test-widget': { id: 'settings-test-widget', typeId: 'queue' } },
 };
 
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
@@ -52,7 +48,7 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectId: () => 'settings-test-project',
   useWorkbenchQueries: () => ({
     isActiveProject: (projectId: string) => projectId === 'settings-test-project',
-    getProject: () => testProject,
+    getProject: () => ({ widgetInstances: { 'settings-test-widget': { typeId: 'queue' } } }),
   }),
 }));
 
@@ -79,7 +75,7 @@ const quickWidgetProps: WidgetViewProps = {
   runtime: {} as WidgetRuntimeApi,
 };
 
-const render = async (quick = false, widgetProps = quickWidgetProps) => {
+const render = async (quick = false) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
@@ -87,7 +83,7 @@ const render = async (quick = false, widgetProps = quickWidgetProps) => {
           <button type="button" onClick={() => openWorkbenchSettings('behavior')}>
             Open settings
           </button>
-          {quick ? <WidgetSettingsButton {...widgetProps} /> : null}
+          {quick ? <WidgetSettingsButton {...quickWidgetProps} /> : null}
           <SettingsDialogHost />
         </I18nextProvider>
       </ChakraProvider>
@@ -132,25 +128,9 @@ afterEach(async () => {
   delete document.documentElement.dataset.reduceMotion;
   closeWorkbenchSettings();
   accountLifecycle.invalidate();
-  delete testProject.widgetInstances['workflow-widget'];
 });
 
 describe('settings dialog', () => {
-  it('saves form section spacing from the Workflow widget settings slider', async () => {
-    const instance = { ...quickWidgetProps.instance, id: 'workflow-widget', typeId: 'workflow' };
-    testProject.widgetInstances[instance.id] = { id: instance.id, typeId: instance.typeId };
-    await render(true, { ...quickWidgetProps, instance, manifest: workflowWidgetManifest });
-    const gear = page.getByRole('button', { name: i18n.t('widgets.settingsLabel', { label: 'Workflow' }) });
-    await act(() => gear.click());
-    await waitForOpen();
-    const slider = page.getByRole('slider', { name: 'Spacing between form sections (px)' });
-    await expect.element(slider).toBeVisible();
-    await expect.element(slider).toHaveAttribute('aria-valuenow', '8');
-    slider.element().focus();
-    await act(() => userEvent.keyboard('{End}'));
-    await expect.poll(() => getWorkbenchPreferences().workflowFormSectionGapPx).toBe(36);
-  });
-
   it('edits a matching preference and reveals it in its section without losing its value', async () => {
     await render();
     await open();

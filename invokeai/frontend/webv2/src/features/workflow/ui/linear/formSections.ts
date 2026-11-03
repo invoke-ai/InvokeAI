@@ -1,15 +1,17 @@
-import type { WorkflowFormElement } from '@features/workflow/contracts';
+import type { HeadingFormElement, WorkflowFormElement } from '@features/workflow/contracts';
 
 type BodyElement = Exclude<WorkflowFormElement, { type: 'heading' }>;
-type HeadingElement = Extract<WorkflowFormElement, { type: 'heading' }>;
 
 export type FormSectionItem =
-  | { kind: 'element'; element: BodyElement }
-  | { kind: 'section'; heading: HeadingElement; body: BodyElement[] };
+  | { kind: 'element'; element: WorkflowFormElement }
+  | { kind: 'section'; heading: HeadingFormElement; body: BodyElement[] };
 
 const SECTION_STATE_KEY = 'formSectionsOpen';
 
-/** Headings group only siblings; dividers end sections and only redundant inter-section lines are omitted. */
+const isCollapsibleHeading = (element: WorkflowFormElement | undefined): element is HeadingFormElement =>
+  element?.type === 'heading' && element.data.collapsible === true;
+
+/** Collapsible headings group following siblings until the next heading or divider; static headings stay inline. */
 export const groupFormSections = (elements: readonly WorkflowFormElement[]): FormSectionItem[] => {
   const groups: FormSectionItem[] = [];
   let current: Extract<FormSectionItem, { kind: 'section' }> | null = null;
@@ -18,10 +20,15 @@ export const groupFormSections = (elements: readonly WorkflowFormElement[]): For
     if (element.type === 'heading') {
       if (current) {
         groups.push(current);
+        current = null;
       }
-      current = { kind: 'section', heading: element, body: [] };
+      if (element.data.collapsible) {
+        current = { kind: 'section', heading: element, body: [] };
+      } else {
+        groups.push({ kind: 'element', element });
+      }
     } else if (element.type === 'divider') {
-      const separatesAdjacentSections = current !== null && elements[index + 1]?.type === 'heading';
+      const separatesAdjacentSections = current !== null && isCollapsibleHeading(elements[index + 1]);
       if (current) {
         groups.push(current);
         current = null;

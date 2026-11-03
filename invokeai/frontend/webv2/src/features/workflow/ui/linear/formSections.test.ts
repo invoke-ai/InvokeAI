@@ -4,7 +4,11 @@ import { describe, expect, it } from 'vitest';
 
 import { getFormSectionOpenState, groupFormSections, updateFormSectionOpenState } from './formSections';
 
-const heading = (id: string): WorkflowFormElement => ({ id, type: 'heading', data: { content: id } });
+const heading = (id: string, collapsible = true): WorkflowFormElement => ({
+  id,
+  type: 'heading',
+  data: { content: id, ...(collapsible ? { collapsible: true } : {}) },
+});
 const text = (id: string): WorkflowFormElement => ({ id, type: 'text', data: { content: id } });
 const divider = (id: string): WorkflowFormElement => ({ id, type: 'divider' });
 
@@ -26,6 +30,27 @@ describe('linear workflow form sections', () => {
       { kind: 'element', element: { id: 'separator' } },
       { kind: 'element', element: { id: 'between' } },
       { kind: 'section', heading: { id: 'output' }, body: [{ id: 'field-b' }] },
+    ]);
+  });
+
+  it('leaves non-collapsible headings inline and ends any open collapsible section before them', () => {
+    const sections = groupFormSections([
+      heading('static-first', false),
+      text('field-a'),
+      heading('collapsible-mid', true),
+      text('field-b'),
+      divider('before-static'),
+      heading('static-tail', false),
+      text('field-c'),
+    ]);
+
+    expect(sections).toMatchObject([
+      { kind: 'element', element: { id: 'static-first', type: 'heading' } },
+      { kind: 'element', element: { id: 'field-a' } },
+      { kind: 'section', heading: { id: 'collapsible-mid' }, body: [{ id: 'field-b' }] },
+      { kind: 'element', element: { id: 'before-static', type: 'divider' } },
+      { kind: 'element', element: { id: 'static-tail', type: 'heading' } },
+      { kind: 'element', element: { id: 'field-c' } },
     ]);
   });
 

@@ -103,6 +103,11 @@ const isFormElementLike = (value: unknown): boolean => {
         typeof data.fieldIdentifier.fieldName === 'string'
       );
     case 'heading':
+      return (
+        isRecord(data) &&
+        typeof data.content === 'string' &&
+        (data.collapsible === undefined || typeof data.collapsible === 'boolean')
+      );
     case 'text':
       return isRecord(data) && typeof data.content === 'string';
     case 'divider':
@@ -733,7 +738,7 @@ export type ProjectGraphAction =
       content?: string;
       layout?: 'row' | 'column';
     }
-  | { type: 'setFormElementContent'; elementId: string; content: string }
+  | { type: 'setFormElementContent'; elementId: string; content: string; collapsible?: boolean }
   | { type: 'setNodeFieldShowDescription'; elementId: string; showDescription: boolean }
   | { type: 'setNodeFieldShowShuffle'; elementId: string; showShuffle: boolean }
   /** Replaces the element's control settings bag, already serialized in the legacy shape by the caller. */
@@ -815,6 +820,7 @@ const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
     case 'setFormElementContent':
+      return action.collapsible === undefined ? `${action.type}:${action.elementId}` : undefined;
     case 'setNodeFieldSettings':
       return `${action.type}:${action.elementId}`;
     case 'setMetadata':
@@ -1223,13 +1229,20 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
         return document;
       }
 
+      const data =
+        element.type === 'heading' && action.collapsible !== undefined
+          ? action.collapsible
+            ? { content: action.content, collapsible: true }
+            : { content: action.content }
+          : { ...element.data, content: action.content };
+
       return {
         ...document,
         form: {
           ...document.form,
           elements: {
             ...document.form.elements,
-            [element.id]: { ...element, data: { ...element.data, content: action.content } },
+            [element.id]: { ...element, data },
           },
         },
       };

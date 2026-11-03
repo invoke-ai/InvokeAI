@@ -1,4 +1,4 @@
-import { Box, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
+import { Box, Checkbox, HStack, Icon, Input, Menu, Portal, Separator, Stack, Text, Textarea } from '@chakra-ui/react';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import {
   DndContext,
@@ -217,7 +217,12 @@ const BuilderCardBase = ({
             {title}
           </Text>
           <Box flex="1" />
-          <HStack flexShrink={0} gap="0" onPointerDown={(event) => event.stopPropagation()}>
+          <HStack
+            flexShrink={0}
+            gap="0"
+            onKeyDown={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+          >
             {extraActions}
             <Tooltip content={t('widgets.workflow.formBuilder.remove')}>
               <IconButton
@@ -474,8 +479,35 @@ const BuilderElementBase = ({
       );
     }
     case 'heading': {
+      const collapsible = Boolean(element.data.collapsible);
+
       return (
-        <BuilderCard element={element} title={title}>
+        <BuilderCard
+          element={element}
+          extraActions={
+            <Checkbox.Root
+              checked={collapsible}
+              colorPalette="accent"
+              mr="1.5"
+              size="sm"
+              onCheckedChange={(details) =>
+                editGraph({
+                  collapsible: Boolean(details.checked),
+                  content: element.data.content,
+                  elementId: element.id,
+                  type: 'setFormElementContent',
+                })
+              }
+            >
+              <Checkbox.HiddenInput />
+              <Checkbox.Control />
+              <Checkbox.Label color="fg.muted" fontSize="xs">
+                {t('widgets.workflow.formBuilder.collapsibleSection')}
+              </Checkbox.Label>
+            </Checkbox.Root>
+          }
+          title={title}
+        >
           <Input
             aria-label={t('widgets.workflow.formBuilder.headingLabel')}
             fontSize="lg"

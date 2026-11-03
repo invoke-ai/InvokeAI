@@ -211,6 +211,8 @@ export interface HeadingFormElement {
   parentId?: string;
   data: {
     content: string;
+    /** Groups following sibling elements into a collapsible section until the next heading or divider. */
+    collapsible?: boolean;
   };
 }
 

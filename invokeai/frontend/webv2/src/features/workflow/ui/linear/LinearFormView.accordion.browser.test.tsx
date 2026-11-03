@@ -1,19 +1,21 @@
 import type { InvocationTemplate, ProjectGraphState } from '@features/workflow/contracts';
+import type { ProjectGraphAction } from '@features/workflow/core/document';
 import type * as workflowReact from '@features/workflow/react';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GenerateCollapsibleSection } from '@features/generation/ui/shared/GenerateCollapsibleSection';
 import { WorkflowUiProvider } from '@features/workflow/react';
-import { buildInvocationNode, createProjectGraph } from '@features/workflow/utility';
+import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
-import { act } from 'react';
+import { act, useCallback, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
+import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
 
 const numericInput = (name: string, title: string, value: number): InvocationTemplate['inputs'][string] => ({
@@ -54,10 +56,15 @@ const numericTemplate: InvocationTemplate = {
   version: '1.0.0',
 };
 
+const TEMPLATES_SNAPSHOT = {
+  error: null,
+  status: 'loaded' as const,
+  templates: { [numericTemplate.type]: numericTemplate },
+};
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<typeof workflowReact>()),
-  useInvocationTemplatesSelector: (select: (snapshot: unknown) => unknown) =>
-    select({ error: null, status: 'loaded', templates: { [numericTemplate.type]: numericTemplate } }),
+  useInvocationTemplatesSelector: (select: (snapshot: unknown) => unknown) => select(TEMPLATES_SNAPSHOT),
 }));
 
 vi.mock('@features/generation/ui/GenerationUiContext', () => ({
@@ -85,7 +92,12 @@ const graph: ProjectGraphState = {
         },
       },
       intro: { id: 'intro', type: 'text', parentId: 'root', data: { content: 'Always visible' } },
-      input: { id: 'input', type: 'heading', parentId: 'root', data: { content: 'Input section' } },
+      input: {
+        id: 'input',
+        type: 'heading',
+        parentId: 'root',
+        data: { collapsible: true, content: 'Input section' },
+      },
       missing: {
         id: 'missing',
         type: 'node-field',
@@ -98,10 +110,15 @@ const graph: ProjectGraphState = {
       },
       divider: { id: 'divider', type: 'divider', parentId: 'root' },
       between: { id: 'between', type: 'text', parentId: 'root', data: { content: 'Between sections' } },
-      output: { id: 'output', type: 'heading', parentId: 'root', data: { content: 'Output section' } },
+      output: {
+        id: 'output',
+        type: 'heading',
+        parentId: 'root',
+        data: { collapsible: true, content: 'Output section' },
+      },
       result: { id: 'result', type: 'text', parentId: 'root', data: { content: 'A retained value' } },
       boundary: { id: 'boundary', type: 'divider', parentId: 'root' },
-      tail: { id: 'tail', type: 'heading', parentId: 'root', data: { content: 'Final section' } },
+      tail: { id: 'tail', type: 'heading', parentId: 'root', data: { collapsible: true, content: 'Final section' } },
       end: { id: 'end', type: 'text', parentId: 'root', data: { content: 'Final value' } },
     },
   },
@@ -136,7 +153,12 @@ const layoutGraph = (layout: 'row' | 'column', atRoot = false): ProjectGraphStat
               after: { id: 'after', type: 'text' as const, parentId: 'root', data: { content: 'After row' } },
             }
           : {}),
-        heading: { id: 'heading', type: 'heading', parentId: containerId, data: { content: 'Numeric section' } },
+        heading: {
+          id: 'heading',
+          type: 'heading',
+          parentId: containerId,
+          data: { collapsible: true, content: 'Numeric section' },
+        },
         first: {
           id: 'first',
           type: 'node-field',
@@ -182,14 +204,14 @@ const widgets = {
 };
 const adapter = { commands: { editGraph: vi.fn() }, project, widgets } as unknown as WorkflowUiAdapter;
 
-const renderForm = async (sectionGapPx?: number, projectGraph = graph, withNativeReference = false) => {
+const renderForm = async (projectGraph = graph, withNativeReference = false) => {
   snapshot = { ...snapshot, projectGraph };
   await act(() => {
     root.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
           <WorkflowUiProvider adapter={adapter}>
-            <LinearFormView projectGraph={projectGraph} sectionGapPx={sectionGapPx} />
+            <LinearFormView projectGraph={projectGraph} />
           </WorkflowUiProvider>
           {withNativeReference ? (
             <div data-testid="native-reference">
@@ -239,7 +261,7 @@ describe('native workflow-form accordion', () => {
     'preserves side-by-side fields in a headed row (root: %s), including after reopening',
     async (atRoot) => {
       const projectGraph = layoutGraph('row', atRoot);
-      await renderForm(16, projectGraph);
+      await renderForm(projectGraph);
       const first = host.querySelector<HTMLInputElement>('input[aria-label="First value"]')!;
       const second = host.querySelector<HTMLInputElement>('input[aria-label="Second value"]')!;
       expect(first).not.toBeNull();
@@ -273,7 +295,7 @@ describe('native workflow-form accordion', () => {
     if (rootElement.type === 'container') {
       rootElement.data.children = ['first', 'second'];
     }
-    await renderForm(16, projectGraph);
+    await renderForm(projectGraph);
     const first = host.querySelector<HTMLInputElement>('input[aria-label="First value"]')!;
     const second = host.querySelector<HTMLInputElement>('input[aria-label="Second value"]')!;
     expect(Math.abs(first.getBoundingClientRect().top - second.getBoundingClientRect().top)).toBeLessThanOrEqual(1);
@@ -281,7 +303,7 @@ describe('native workflow-form accordion', () => {
   });
 
   it('keeps a column section vertical instead of inheriting row behavior globally', async () => {
-    await renderForm(16, layoutGraph('column', true));
+    await renderForm(layoutGraph('column', true));
     const first = host.querySelector<HTMLInputElement>('input[aria-label="First value"]')!;
     const second = host.querySelector<HTMLInputElement>('input[aria-label="Second value"]')!;
     expect(second.getBoundingClientRect().top).toBeGreaterThanOrEqual(first.getBoundingClientRect().bottom);
@@ -301,12 +323,17 @@ describe('native workflow-form accordion', () => {
         parentId: 'group',
         data: { layout: 'column', children: ['inner-title', 'inner-a', 'inner-b', 'missing'] },
       },
-      'inner-title': { id: 'inner-title', type: 'heading', parentId: 'inner', data: { content: 'Inner column' } },
+      'inner-title': {
+        id: 'inner-title',
+        type: 'heading',
+        parentId: 'inner',
+        data: { collapsible: true, content: 'Inner column' },
+      },
       'inner-a': { id: 'inner-a', type: 'text', parentId: 'inner', data: { content: 'Nested first' } },
       'inner-b': { id: 'inner-b', type: 'text', parentId: 'inner', data: { content: 'Nested second' } },
       missing: { ...structuredClone(graph.form.elements.missing!), parentId: 'inner' },
     });
-    await renderForm(12, projectGraph);
+    await renderForm(projectGraph);
     const first = page.getByText('Nested first').element().getBoundingClientRect();
     const second = page.getByText('Nested second').element().getBoundingClientRect();
     expect(second.top).toBeGreaterThanOrEqual(first.bottom);
@@ -328,7 +355,7 @@ describe('native workflow-form accordion', () => {
         heading.data.content = 'Repeated section';
       }
     }
-    await renderForm(16, projectGraph);
+    await renderForm(projectGraph);
     const triggers = [...host.querySelectorAll<HTMLButtonElement>('[data-part="trigger"]')].filter(
       (button) => button.textContent?.trim() === 'Repeated section'
     );
@@ -343,7 +370,7 @@ describe('native workflow-form accordion', () => {
     const other = { ...structuredClone(graph), id: 'other-workflow' };
     await renderForm();
     await act(() => userEvent.click(page.getByRole('button', { name: 'Output section' })));
-    await renderForm(16, other);
+    await renderForm(other);
     await expect.element(page.getByRole('button', { name: 'Output section' })).toHaveAttribute('aria-expanded', 'true');
     await renderForm();
     await expect
@@ -360,7 +387,7 @@ describe('native workflow-form accordion', () => {
       heading.data.content = label;
     }
     host.style.width = '280px';
-    await renderForm(8, projectGraph);
+    await renderForm(projectGraph);
     const trigger = page.getByRole('button', { name: label.trim() });
     await expect.element(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(host.scrollWidth).toBeLessThanOrEqual(host.clientWidth + 1);
@@ -368,8 +395,8 @@ describe('native workflow-form accordion', () => {
     await expect.element(trigger).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('matches native Generate header styling while retaining a distinct configurable section gap', async () => {
-    await renderForm(24, graph, true);
+  it('matches native Generate header styling and spacing', async () => {
+    await renderForm(graph, true);
     const native = host.querySelector<HTMLElement>('[data-testid="native-reference"] [data-part="trigger"]')!;
     const workflow = page.getByRole('button', { name: 'Output section' }).element();
     const nativeLabel = native.querySelector('span')!;
@@ -387,12 +414,12 @@ describe('native workflow-form accordion', () => {
     for (const property of ['height', 'paddingInlineStart', 'paddingInlineEnd'] as const) {
       expect(getComputedStyle(workflow)[property]).toBe(getComputedStyle(native)[property]);
     }
-    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('24px');
+    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
     const section = workflow.closest<HTMLElement>('[data-part="root"]')!;
     expect(getComputedStyle(section).borderTopWidth).toBe('0px');
   });
 
-  it('shows the native thin boundary only between two closed column sections, centered in the chosen gap', async () => {
+  it('shows the native thin boundary only between two closed column sections, centered in the 4px gap', async () => {
     const projectGraph = layoutGraph('column', true);
     const rootElement = projectGraph.form.elements.root!;
     if (rootElement.type === 'container') {
@@ -400,10 +427,15 @@ describe('native workflow-form accordion', () => {
     }
     Object.assign(projectGraph.form.elements, {
       boundary: { id: 'boundary', type: 'divider', parentId: 'root' },
-      additional: { id: 'additional', type: 'heading', parentId: 'root', data: { content: 'Additional section' } },
+      additional: {
+        id: 'additional',
+        type: 'heading',
+        parentId: 'root',
+        data: { collapsible: true, content: 'Additional section' },
+      },
       extra: { id: 'extra', type: 'text', parentId: 'root', data: { content: 'Second section content' } },
     });
-    await renderForm(24, projectGraph, true);
+    await renderForm(projectGraph, true);
     const first = page.getByRole('button', { name: 'Numeric section' });
     const second = page.getByRole('button', { name: 'Additional section' });
     const firstRoot = first.element().closest<HTMLElement>('[data-part="root"]')!;
@@ -411,7 +443,7 @@ describe('native workflow-form accordion', () => {
     const boundary = () => getComputedStyle(secondRoot, '::before');
     expect(boundary().opacity).toBe('0');
     expect(boundary().borderTopWidth).toBe('1px');
-    expect(boundary().top).toBe('-12px');
+    expect(boundary().top).toBe('-2px');
     expect(boundary().pointerEvents).toBe('none');
     await act(() => userEvent.click(second));
     await expect.element(second).toHaveAttribute('aria-expanded', 'false');
@@ -429,7 +461,7 @@ describe('native workflow-form accordion', () => {
     expect(boundary().borderTopColor).toBe(getComputedStyle(nativeRoot, '::before').borderTopColor);
     await act(() => userEvent.click(first));
     await expect.poll(() => boundary().opacity).toBe('0');
-    await renderForm(24, layoutGraph('row', true));
+    await renderForm(layoutGraph('row', true));
     const rowRoot = page
       .getByRole('button', { name: 'Numeric section' })
       .element()
@@ -464,7 +496,7 @@ describe('native workflow-form accordion', () => {
           id: 'additional',
           type: 'heading',
           parentId: bothWrapped ? 'next' : 'root',
-          data: { content: 'Additional section' },
+          data: { collapsible: true, content: 'Additional section' },
         },
         extra: {
           id: 'extra',
@@ -473,7 +505,7 @@ describe('native workflow-form accordion', () => {
           data: { content: 'Second section content' },
         },
       });
-      await renderForm(24, projectGraph);
+      await renderForm(projectGraph);
       const first = page.getByRole('button', { name: 'Numeric section' });
       const second = page.getByRole('button', { name: 'Additional section' });
       await act(() => userEvent.click(first));
@@ -500,14 +532,14 @@ describe('native workflow-form accordion', () => {
       if (rootElement.type === 'container') {
         rootElement.data.layout = 'row';
       }
-      await renderForm(24, structuredClone(projectGraph));
+      await renderForm(structuredClone(projectGraph));
       await expect.poll(() => visibleBoundaries().length).toBe(0);
       if (rootElement.type === 'container') {
         rootElement.data.layout = 'column';
         rootElement.data.children.splice(1, 0, 'between');
       }
       elements.between = { id: 'between', type: 'text', parentId: 'root', data: { content: 'Visible interruption' } };
-      await renderForm(24, structuredClone(projectGraph));
+      await renderForm(structuredClone(projectGraph));
       await expect.poll(() => visibleBoundaries().length).toBe(0);
       await expect.element(page.getByText('Visible interruption')).toBeVisible();
       if (!bothWrapped && rootElement.type === 'container') {
@@ -517,7 +549,7 @@ describe('native workflow-form accordion', () => {
         if (group.type === 'container') {
           group.data.children = ['first', 'second'];
         }
-        await renderForm(24, structuredClone(projectGraph));
+        await renderForm(structuredClone(projectGraph));
         await expect.poll(() => visibleBoundaries().length).toBe(1);
         expectCenteredBoundary();
       }
@@ -532,17 +564,27 @@ describe('native workflow-form accordion', () => {
       rootElement.data.children = ['outer-heading', 'group', 'next'];
     }
     Object.assign(elements, {
-      'outer-heading': { id: 'outer-heading', type: 'heading', parentId: 'root', data: { content: 'Outer section' } },
+      'outer-heading': {
+        id: 'outer-heading',
+        type: 'heading',
+        parentId: 'root',
+        data: { collapsible: true, content: 'Outer section' },
+      },
       next: {
         id: 'next',
         type: 'container',
         parentId: 'root',
         data: { layout: 'column', children: ['additional', 'extra'] },
       },
-      additional: { id: 'additional', type: 'heading', parentId: 'next', data: { content: 'Additional section' } },
+      additional: {
+        id: 'additional',
+        type: 'heading',
+        parentId: 'next',
+        data: { collapsible: true, content: 'Additional section' },
+      },
       extra: { id: 'extra', type: 'text', parentId: 'next', data: { content: 'Second section content' } },
     });
-    await renderForm(36, projectGraph);
+    await renderForm(projectGraph);
     await act(() => userEvent.click(page.getByRole('button', { name: 'Numeric section' })));
     await act(() => userEvent.click(page.getByRole('button', { name: 'Additional section' })));
     await expect.poll(() => visibleBoundaries().length).toBe(1);
@@ -563,14 +605,14 @@ describe('native workflow-form accordion', () => {
       group.data.children.unshift('before');
     }
     elements.before!.parentId = 'group';
-    await renderForm(36, structuredClone(projectGraph));
+    await renderForm(structuredClone(projectGraph));
     await expect.poll(() => visibleBoundaries().length).toBe(0);
     await expect.element(page.getByText('Before row')).toBeVisible();
   });
 
   it('collapses only fields under the clicked heading, preserving errors and later siblings', async () => {
     await renderForm();
-    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('8px');
+    expect(getComputedStyle(host.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
     const input = page.getByRole('button', { name: /^Input section/ });
     await expect.element(input).toHaveAttribute('aria-expanded', 'true');
     await act(() => userEvent.click(input));
@@ -599,10 +641,10 @@ describe('native workflow-form accordion', () => {
     expect(snapshot.workflowValues.formSectionsOpen).toEqual({ [graph.id]: { output: true } });
   });
 
-  it('uses the chosen section gap, hides only inter-section dividers, and leaves collapsed headers unfilled', async () => {
-    await renderForm(8);
+  it('hides only inter-section dividers, leaves collapsed headers unfilled, and toggles headings between static and collapsible in Edit', async () => {
+    await renderForm();
     const stack = host.querySelector<HTMLElement>('.chakra-stack')!;
-    expect(getComputedStyle(stack).gap).toBe('8px');
+    expect(getComputedStyle(stack).gap).toBe('4px');
     expect(host.querySelectorAll('[role="separator"]')).toHaveLength(1);
 
     const input = page.getByRole('button', { name: /^Input section/ });
@@ -610,6 +652,62 @@ describe('native workflow-form accordion', () => {
     await expect.element(input).toHaveAttribute('aria-expanded', 'false');
     const section = input.element().closest<HTMLElement>('[data-scope="collapsible"][data-part="root"]')!;
     expect(getComputedStyle(section).backgroundColor).toBe('rgba(0, 0, 0, 0)');
-    expect(getComputedStyle(stack).gap).toBe('8px');
+
+    // Verify FormBuilderTab checkbox opts a static heading into and out of a collapsible section.
+    const initial = layoutGraph('column', true);
+    const heading = initial.form.elements.heading!;
+    if (heading.type === 'heading') {
+      delete heading.data.collapsible;
+    }
+    snapshot = { ...snapshot, projectGraph: initial };
+
+    const BuilderAndView = () => {
+      const [current, setCurrent] = useState(initial);
+      const editGraph = useCallback((action: ProjectGraphAction) => {
+        setCurrent((prev) => {
+          const next = projectGraphReducer(prev, action);
+          snapshot = { ...snapshot, projectGraph: next };
+          return next;
+        });
+      }, []);
+      const editAdapter = useMemo(
+        () =>
+          ({
+            commands: { editGraph, redo: vi.fn(), undo: vi.fn() },
+            project,
+            widgets,
+          }) as unknown as WorkflowUiAdapter,
+        [editGraph]
+      );
+
+      return (
+        <ChakraProvider value={system}>
+          <I18nextProvider i18n={i18n}>
+            <WorkflowUiProvider adapter={editAdapter}>
+              <FormBuilderTab projectGraph={current} />
+              <div data-testid="live-view">
+                <LinearFormView projectGraph={current} />
+              </div>
+            </WorkflowUiProvider>
+          </I18nextProvider>
+        </ChakraProvider>
+      );
+    };
+
+    await act(() => {
+      root.render(<BuilderAndView />);
+    });
+
+    const viewHost = host.querySelector<HTMLElement>('[data-testid="live-view"]')!;
+    expect(viewHost.querySelector('[data-scope="collapsible"]')).toBeNull();
+    expect(viewHost.textContent).toContain('Numeric section');
+    expect(getComputedStyle(viewHost.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('12px');
+
+    const checkbox = page.getByRole('checkbox', { name: 'Collapsible section' });
+    await expect.element(checkbox).not.toBeChecked();
+    await act(() => userEvent.click(checkbox));
+    await expect.element(checkbox).toBeChecked();
+    expect(viewHost.querySelector('[data-scope="collapsible"]')).not.toBeNull();
+    expect(getComputedStyle(viewHost.querySelector<HTMLElement>('.chakra-stack')!).gap).toBe('4px');
   });
 });

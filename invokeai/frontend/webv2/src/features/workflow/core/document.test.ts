@@ -356,6 +356,31 @@ describe('projectGraphReducer', () => {
     const shuffledField = next.form.elements[field?.id ?? ''];
 
     expect(shuffledField?.type === 'node-field' && shuffledField.data.showShuffle).toBe(true);
+
+    next = projectGraphReducer(next, { content: 'Section A', elementType: 'heading', type: 'addFormElement' });
+    const heading = getFormChildren(next.form).find((candidate) => candidate.type === 'heading');
+    expect(heading?.type === 'heading' && heading.data).toEqual({ content: 'Section A' });
+
+    next = projectGraphReducer(next, {
+      collapsible: true,
+      content: 'Section A',
+      elementId: heading?.id ?? '',
+      type: 'setFormElementContent',
+    });
+    const collapsibleHeading = next.form.elements[heading?.id ?? ''];
+    expect(collapsibleHeading?.type === 'heading' && collapsibleHeading.data).toEqual({
+      collapsible: true,
+      content: 'Section A',
+    });
+
+    next = projectGraphReducer(next, {
+      collapsible: false,
+      content: 'Section A',
+      elementId: heading?.id ?? '',
+      type: 'setFormElementContent',
+    });
+    const staticHeading = next.form.elements[heading?.id ?? ''];
+    expect(staticHeading?.type === 'heading' && staticHeading.data).toEqual({ content: 'Section A' });
   });
 
   it('updates metadata via patch', () => {

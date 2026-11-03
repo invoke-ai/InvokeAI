@@ -344,6 +344,37 @@ describe('parseWorkflowJson tolerance', () => {
     });
   });
 
+  it('preserves collapsible heading flags while keeping static headings free of default flags', () => {
+    const { document, warnings } = parseWorkflowJson({
+      edges: [],
+      form: {
+        elements: {
+          h1: { data: { collapsible: true, content: 'Collapsible' }, id: 'h1', parentId: 'root', type: 'heading' },
+          h2: { data: { collapsible: false, content: 'Static' }, id: 'h2', parentId: 'root', type: 'heading' },
+          root: { data: { children: ['h1', 'h2'], layout: 'column' }, id: 'root', type: 'container' },
+        },
+        rootElementId: 'root',
+      },
+      name: 'Headings',
+      nodes: [],
+      version: '1.0.0',
+    });
+
+    expect(warnings).toEqual([]);
+    expect(document.form.elements.h1).toEqual({
+      data: { collapsible: true, content: 'Collapsible' },
+      id: 'h1',
+      parentId: 'root',
+      type: 'heading',
+    });
+    expect(document.form.elements.h2).toEqual({
+      data: { content: 'Static' },
+      id: 'h2',
+      parentId: 'root',
+      type: 'heading',
+    });
+  });
+
   it('migrates pre-form exposedFields into form elements', () => {
     const { document, warnings } = parseWorkflowJson({
       edges: [],
