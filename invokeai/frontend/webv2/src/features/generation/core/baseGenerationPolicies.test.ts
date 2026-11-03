@@ -656,7 +656,7 @@ describe('component policies', () => {
             vae: qwenImageVae,
           })
         )
-      ).toEqual(['Reference Image #1 is not supported by qwen-image model.']);
+      ).toEqual(['qwen-image model cannot use reference image 1. Turn it off, or remove it.']);
     });
 
     it('allows text-only prompts, which is what the GGUF encoder is for', () => {

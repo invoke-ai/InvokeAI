@@ -2498,15 +2498,20 @@ const getReferenceImageValidationIssues = (
   const qwenVLEncoder = settings.qwenVLEncoderModel;
   if (
     qwenVLEncoder?.format === 'gguf_quantized' &&
-    enabled.some(
+    settings.referenceImages.some(
       (referenceImage) =>
+        referenceImage.isEnabled &&
         referenceImage.config.type === 'qwen_image_reference_image' &&
         getReferenceImageConfigSupported(model, referenceImage)
     )
   ) {
-    reasons.push(
-      `Qwen VL Encoder "${qwenVLEncoder.name}" is a GGUF build with no vision tower, so it cannot read reference ` +
-        'images. Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.'
+    issues.push(
+      createUntranslatedGenerationIssue(
+        `Qwen VL Encoder "${qwenVLEncoder.name}" is a GGUF build with no vision tower, so it cannot read reference ` +
+          'images. Select a safetensors or Diffusers Qwen VL Encoder, or turn the reference images off.',
+        REFERENCE_IMAGES_TARGET,
+        { key: 'qwenVLEncoderModel', kind: 'clearModel' }
+      )
     );
   }
 
