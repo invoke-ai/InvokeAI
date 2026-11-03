@@ -731,17 +731,13 @@ zimage_bundle: list[StarterModel] = [
     flux_vae,
 ]
 
-# Klein 4B and 9B (each with its Qwen3 encoder), the PiD super-resolution decoder for their latents, and FLUX.2 [dev]
-# at GGUF Q4 with its cow-mistral encoder. [dev] is non-commercial; the Klein models are not.
+# Klein 4B only (~11 GB): it is Apache 2.0 and ungated, so one click needs no Hugging Face token and installs
+# nothing non-commercial. Klein 9B and FLUX.2 [dev] (non-commercial, gated on BFL's repos) and the PiD decoder
+# (non-commercial weights) stay available a la carte.
 flux2_bundle: list[StarterModel] = [
     flux2_klein_4b_gguf_q4,
     flux2_klein_qwen3_4b_encoder,
-    flux2_klein_9b_gguf_q4,
-    flux2_klein_qwen3_8b_encoder,
     flux2_vae,
-    pid_decoder_flux2_2k,
-    flux2_dev_gguf_q4_k_m,
-    flux2_dev_cow_mistral_q4,
 ]
 
 # Turbo only: both checkpoints are 8B and the full pipeline is a large download, so the bundle
