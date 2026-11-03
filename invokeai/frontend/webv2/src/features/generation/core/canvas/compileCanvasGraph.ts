@@ -1040,6 +1040,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
   if (input.controlLayers && input.controlLayers.length > 0) {
     addControlLayers(backendGraph, {
       base: model.base as SupportedGenerateBase,
+      denoise: family.denoise,
       inpaint,
       layers: input.controlLayers,
       modelVariant: model.variant ?? undefined,
@@ -1055,8 +1056,13 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     if (isLayoutRegionalGuidanceBase(regionalBase)) {
       LAYOUT_REGION_GRAFTS[regionalBase](family, { bbox, layoutKinds: regionalSupport.layoutKinds, regions });
     } else {
+      if (!family.conditioning) {
+        throw new Error(`Regional guidance has no global conditioning to join in the ${model.name} graph.`);
+      }
       addRegionalGuidance(backendGraph, {
         base: regionalBase,
+        conditioning: family.conditioning,
+        denoise: family.denoise,
         modelVariant: model.variant,
         regions,
         ...(regionalBase === 'krea-2'
