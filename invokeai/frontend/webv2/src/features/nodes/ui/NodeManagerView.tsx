@@ -1,6 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop */
 import { ensureCustomNodePacksLoaded, getCustomNodesSnapshot } from '@features/nodes/data/nodesStore';
-import { NodeActivityBar } from '@features/nodes/ui/activity/NodeActivityBar';
+import { NodeInstallQueue } from '@features/nodes/ui/install-queue/NodeInstallQueue';
 import {
   closeNodePackDetail,
   openNodesManagerTab,
@@ -18,10 +18,11 @@ import { LibraryColumn } from './manager/LibraryColumn';
 
 const openAddNodes = () => openNodesManagerTab('add');
 
-/** Full custom nodes manager: the pack library, the detail pane, and recent activity under both. */
+/** Full custom nodes manager: the pack library, the detail pane, and the install queue under both. */
 export const NodeManagerView = () => {
   const { t } = useTranslation();
   const detailOpen = useNodesUiSelector((snapshot) => snapshot.detailOpen);
+  const queueFillsPane = useNodesUiSelector((snapshot) => snapshot.queueExpanded && snapshot.queueMaximized);
   const addAction = useMemo(() => ({ label: t('nodes.addNodes'), onAdd: openAddNodes }), [t]);
 
   useMountEffect(() => {
@@ -43,7 +44,8 @@ export const NodeManagerView = () => {
     <ManagerLayout
       backLabel={t('nodes.backToList')}
       detail={<DetailPane />}
-      footer={<NodeActivityBar />}
+      footer={<NodeInstallQueue />}
+      footerFills={queueFillsPane}
       isDetailOpen={detailOpen ?? false}
       library={<LibraryColumn addAction={addAction} />}
       onBack={closeNodePackDetail}

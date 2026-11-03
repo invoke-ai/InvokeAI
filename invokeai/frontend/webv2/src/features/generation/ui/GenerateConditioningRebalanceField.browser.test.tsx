@@ -36,7 +36,7 @@ await i18n.use(initReactI18next).init({
             krea2RebalancePresetActions: 'Preset actions',
             krea2RebalancePresetCustom: 'Custom',
             krea2RebalancePresetDelete: 'Delete preset',
-            krea2RebalancePresetDeleteBody: 'Delete "{{name}}"?',
+            krea2RebalancePresetDeleted: 'Deleted preset {{name}}',
             krea2RebalancePresetName: 'Preset name',
             krea2RebalancePresetRename: 'Rename preset',
             krea2RebalancePresetSave: 'Save current as preset',
@@ -62,15 +62,19 @@ const onCommitImmediate = vi.fn();
 const savePreset = vi.fn();
 const renamePreset = vi.fn();
 const removePreset = vi.fn();
+const restorePreset = vi.fn();
+const undoable = vi.fn();
 
 let customPresets: RebalancePreset[] = [];
 
 const buildAdapter = (): GenerationUiAdapter =>
   ({
+    notifications: { undoable },
     rebalancePresets: {
       presets: customPresets,
       remove: removePreset,
       rename: renamePreset,
+      restore: restorePreset,
       save: savePreset,
     },
   }) as unknown as GenerationUiAdapter;
@@ -160,6 +164,8 @@ beforeEach(() => {
   savePreset.mockClear();
   renamePreset.mockClear();
   removePreset.mockClear();
+  restorePreset.mockClear();
+  undoable.mockClear();
 });
 
 afterEach(async () => {
@@ -183,15 +189,23 @@ describe('GenerateConditioningRebalanceField', () => {
     expect(document.querySelector('svg[aria-hidden]')).not.toBeNull();
   });
 
-  it('turns the editor on from the collapsed row', async () => {
+  it('turns the editor on and off from the collapsed row label', async () => {
     await renderField({ krea2RebalanceEnabled: false });
 
-    const toggle = byLabel('Conditioning rebalance');
+    const label = () =>
+      [...document.querySelectorAll<HTMLElement>('[data-scope="switch"][data-part="label"]')].find(
+        (element) => element.textContent === 'Conditioning rebalance'
+      );
 
-    await interact(() => toggle?.click());
+    await interact(() => label()?.click());
 
     expect(onCommitImmediate).toHaveBeenCalledWith({ krea2RebalanceEnabled: true });
     expect(bars()).toHaveLength(12);
+
+    await interact(() => label()?.click());
+
+    expect(onCommitImmediate).toHaveBeenLastCalledWith({ krea2RebalanceEnabled: false });
+    expect(bars()).toHaveLength(0);
   });
 
   it('labels the axis by encoder depth rather than a frequency metaphor', async () => {
@@ -281,5 +295,27 @@ describe('GenerateConditioningRebalanceField', () => {
     await interact(() => nameInput.form?.requestSubmit());
 
     expect(savePreset).toHaveBeenCalledWith('Punchy', DEFAULT_KREA2_REBALANCE_WEIGHTS, 4);
+  });
+
+  const PUNCHY_WEIGHTS = '1,1,1,1,1,1,1,2.5,5,1.1,4,7';
+
+  it('deletes the selected saved preset at once and offers an Undo that restores it at its position', async () => {
+    const punchy: RebalancePreset = { id: 'punchy', label: 'Punchy', multiplier: 2, weights: PUNCHY_WEIGHTS };
+    customPresets = [{ id: 'soft', label: 'Soft', multiplier: 1, weights: DEFAULT_KREA2_REBALANCE_WEIGHTS }, punchy];
+    await renderField({ krea2RebalanceMultiplier: 2, krea2RebalanceWeights: PUNCHY_WEIGHTS });
+
+    await interact(() => byLabel('Preset actions')?.click());
+    const deleteItem = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) =>
+      item.textContent?.includes('Delete preset')
+    );
+    await interact(() => deleteItem?.click());
+
+    expect(document.querySelector('[role="alertdialog"], [role="dialog"]')).toBeNull();
+    expect(removePreset).toHaveBeenCalledExactlyOnceWith('punchy');
+    expect(undoable).toHaveBeenCalledExactlyOnceWith('Deleted preset Punchy', { onUndo: expect.any(Function) });
+
+    undoable.mock.calls[0]![1].onUndo();
+
+    expect(restorePreset).toHaveBeenCalledExactlyOnceWith(punchy, 1);
   });
 });

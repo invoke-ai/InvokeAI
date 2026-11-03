@@ -21,6 +21,8 @@ type GalleryMaintenanceOperation = components['schemas']['GalleryMaintenanceOper
 type GalleryMaintenancePreview = components['schemas']['GalleryMaintenancePreview'];
 type GalleryMaintenanceResult = components['schemas']['GalleryMaintenanceResult'];
 
+// The settings entry draws the divider under the last row.
+const LAST_ROW_STYLE = { borderBottomWidth: '0' } as const;
 const ACTIONS: Record<
   GalleryMaintenanceOperation,
   { label: string; confirmLabel: string; description: string; title: string }
@@ -304,7 +306,7 @@ export const GalleryMaintenance = () => {
       {Object.entries(ACTIONS).map(([operationId, action]) => {
         const actionOperation = operationId as GalleryMaintenanceOperation;
         return (
-          <Box key={actionOperation} py="4" borderBottomWidth="1px" borderColor="border.subtle">
+          <Box key={actionOperation} py="4" borderBottomWidth="1px" borderColor="border.subtle" _last={LAST_ROW_STYLE}>
             <Flex align={ROW_ALIGN} direction={ROW_DIRECTION} gap="3">
               <Stack flex="1" gap="1">
                 <Text fontSize="lg" fontWeight="500">

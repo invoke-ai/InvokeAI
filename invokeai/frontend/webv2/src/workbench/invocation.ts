@@ -2,10 +2,12 @@ import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { CanvasLayerContract, CanvasRegionalGuidanceLayerContract } from '@workbench/canvas-engine/api';
 import type {
+  DynamicPromptsExpansionSource,
   InvocationMode,
   InvocationRoute,
   InvocationValidationReason,
   InvocationSourceId,
+  RouteIssue,
   ResolvedInvocationRoute,
   ResultDestination,
 } from '@workbench/invocationContracts';
@@ -15,21 +17,23 @@ import type { WidgetId } from '@workbench/widgetContracts';
 import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
+  describeGenerationIssue,
+  expandsDynamicPrompts,
   getEffectivePrompts,
-  getGenerationModelAvailabilityReasons,
-  getGenerationValidationReasons,
+  getGenerateInvocationIssues,
   isExternalTextOnlyCanvasModel,
   isGenerateModelConfig,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
+  normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
-  resolveExternalCanvasRequestSize,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { localizeForLoopValidationReason } from '@features/workflow/utility';
+import { localizeWorkflowReadinessReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import {
   compileContributingLayers,
@@ -48,6 +52,52 @@ import {
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
+
+/**
+ * What the route's positive prompt expands from, with the sample seed to draw with, or null when the route sends its
+ * prompt as typed: Upscale and workflows never expand, and dynamic prompts may be off or the prompt plain. Canvas
+ * expands Generate's prompt.
+ */
+export const getDynamicPromptsExpansionSource = (
+  project: Project,
+  sourceId: InvocationSourceId
+): (DynamicPromptsExpansionSource & { sampleSeed: number }) | null => {
+  if (sourceId === 'upscale' || sourceId === 'workflow') {
+    return null;
+  }
+
+  const settings =
+    sourceId === 'video'
+      ? normalizeVideoWidgetValues(getProjectWidgetValues(project, 'video'))
+      : normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
+
+  if (!settings) {
+    return null;
+  }
+
+  const positivePrompt =
+    'promptTemplate' in settings ? getEffectivePrompts(settings).positivePrompt : settings.positivePrompt;
+
+  return expandsDynamicPrompts(positivePrompt, settings.dynamicPromptsEnabled)
+    ? {
+        combinatorial: settings.dynamicPromptsCombinatorial,
+        maxPrompts: settings.dynamicPromptsMaxPrompts,
+        positivePrompt,
+        sampleSeed: settings.dynamicPromptsSampleSeed,
+      }
+    : null;
+};
+
+/** Whether a submission prepared from `prepared` (null: not expanded) still describes what `current` compiles. */
+export const isSameDynamicPromptsExpansionSource = (
+  prepared: DynamicPromptsExpansionSource | null,
+  current: DynamicPromptsExpansionSource | null
+): boolean =>
+  prepared === null || current === null
+    ? prepared === current
+    : prepared.positivePrompt === current.positivePrompt &&
+      prepared.combinatorial === current.combinatorial &&
+      prepared.maxPrompts === current.maxPrompts;
 
 export interface InvocationSourceMeta {
   id: InvocationSourceId;
@@ -83,6 +133,9 @@ export const isInvocationSourceAvailable = (id: InvocationSourceId): boolean =>
   invocationSources.some((source) => source.id === id && source.available);
 
 export const getDestinationLabel = (id: ResultDestination): string => destinationLabels.get(id) ?? 'Canvas';
+
+/** Locking routing pins both halves; either one locked reads as a locked route. */
+export const isRoutingLocked = (route: InvocationRoute): boolean => route.sourceLocked || route.destinationLocked;
 
 export const formatRoute = (route: InvocationRoute): string =>
   `${getSourceLabel(route.sourceId)} → ${getDestinationLabel(route.destination)}`;
@@ -274,38 +327,26 @@ const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
   models?: readonly ModelConfig[],
   canvasBbox?: InvocationRouteInput['canvasBbox']
-): string[] => {
+): InvocationValidationReason[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
   if (!values || !isSupportedGenerateModel(values.model)) {
-    return ['Generate needs a supported model before it can be invoked.'];
+    return [{ generationIssue: NO_GENERATE_MODEL_ISSUE }];
   }
 
-  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for its size nearest the
-  // bbox, so readiness validates that size and permits an advertised whole-image mode; the compiler validates the
-  // captured one. Generate itself remains strictly text-to-image.
-  const providerModes =
-    canvasBbox !== undefined && values.model.type === 'external_image_generator'
-      ? (values.model.capabilities?.modes ?? ['txt2img'])
-      : null;
-  const mode = providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img';
+  const layoutDraftReason = getLayoutDraftRejectionReason({
+    base: values.model.base,
+    positivePrompt: values.positivePrompt,
+    promptTemplate: values.promptTemplate,
+  });
 
+  // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
   return [
-    ...getGenerationValidationReasons(
-      values.model,
-      providerModes !== null && canvasBbox
-        ? { ...values, ...resolveExternalCanvasRequestSize(values.model, canvasBbox) }
-        : values,
-      mode
-    ),
-    ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
-    ...[
-      getLayoutDraftRejectionReason({
-        base: values.model.base,
-        positivePrompt: values.positivePrompt,
-        promptTemplate: values.promptTemplate,
-      }),
-    ].filter((reason) => reason !== null),
+    ...getGenerateInvocationIssues(values, {
+      ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
+      ...(models ? { models } : {}),
+    }).map((generationIssue) => ({ generationIssue })),
+    ...(layoutDraftReason === null ? [] : [layoutDraftReason]),
   ];
 };
 
@@ -350,7 +391,7 @@ export const resolveInvocationRouteInput = (
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
   } else if (sourceWidgetId && !isWidgetMounted(input, sourceWidgetId)) {
-    validationReasons.push(`The ${getSourceLabel(sourceId)} widget is not mounted in this project.`);
+    validationReasons.push({ routeIssue: { kind: 'sourceNotMounted', sourceId } });
   }
 
   if (sourceId === 'generate') {
@@ -378,7 +419,7 @@ export const resolveInvocationRouteInput = (
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
-      validationReasons.push('Canvas generation frame must have a positive area.');
+      validationReasons.push({ routeIssue: { kind: 'emptyCanvasFrame' } });
     }
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
@@ -436,7 +477,7 @@ export const resolveInvocationRouteInput = (
   if (!destinationAvailable) {
     validationReasons.push(`${getDestinationLabel(destination)} is not an available result destination.`);
   } else if (!destinationCompatible) {
-    validationReasons.push('Video results can only be sent to the Gallery. Switch the destination to Gallery.');
+    validationReasons.push({ routeIssue: { kind: 'videoNeedsGallery' } });
   }
 
   return {
@@ -455,11 +496,31 @@ export const resolveInvocationRouteInput = (
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
 
-/** Words any route validation reason for display; control-layer issues come from the locale. */
+/** What each source and destination is called in the UI: the widget that runs or receives the work. */
+export const ROUTE_LABEL_KEYS: Record<InvocationSourceId | ResultDestination, string> = {
+  canvas: 'widgets.labels.canvas',
+  gallery: 'widgets.labels.gallery',
+  generate: 'widgets.labels.generate',
+  upscale: 'widgets.labels.upscale',
+  video: 'widgets.labels.video',
+  workflow: 'widgets.labels.workflow',
+};
+
+const describeRouteIssue = (issue: RouteIssue, t: (key: string, options?: Record<string, unknown>) => string): string =>
+  t(
+    `topbar.invoke.routeIssues.${issue.kind}`,
+    issue.kind === 'sourceNotMounted' ? { source: t(ROUTE_LABEL_KEYS[issue.sourceId]) } : undefined
+  );
+
+/** Words any route validation reason for display; every structured reason comes from the locale. */
 export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
   typeof reason === 'object' && 'controlLayerIssue' in reason
     ? describeControlLayerIssue(t, reason.controlLayerIssue)
-    : localizeForLoopValidationReason(reason, t);
+    : typeof reason === 'object' && 'generationIssue' in reason
+      ? describeGenerationIssue(t, reason.generationIssue)
+      : typeof reason === 'object' && 'routeIssue' in reason
+        ? describeRouteIssue(reason.routeIssue, t)
+        : localizeWorkflowReadinessReason(reason, t);

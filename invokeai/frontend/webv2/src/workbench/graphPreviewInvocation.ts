@@ -23,6 +23,7 @@ export interface GraphPreviewInvokeDeps {
   owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
   project: Project;
+  scopedDefaults: SubmitResolvedInvocationDeps['scopedDefaults'];
   sourceId: InvocationSourceId | undefined;
 }
 
@@ -38,6 +39,7 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
   owner,
   prepareCanvasInvocation: prepareCanvas,
   project,
+  scopedDefaults,
   sourceId,
 }: GraphPreviewInvokeDeps): boolean => {
   if (!sourceId || !isAccountScopeCurrent(owner)) {
@@ -70,6 +72,7 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     prepareCanvasInvocation: prepareCanvas,
     project,
     route,
+    scopedDefaults,
   }).finally(() => endInvocationPreparation(preparationLease));
   return true;
 };

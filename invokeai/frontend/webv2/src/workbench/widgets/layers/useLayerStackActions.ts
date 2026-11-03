@@ -142,15 +142,30 @@ export const useLayerStackActions = (
         disabled: editingLocked,
         icon: allVisible ? EyeIcon : EyeOffIcon,
         id: 'toggleVisibility',
-        label: t(allVisible ? 'widgets.layers.groupActions.hideAll' : 'widgets.layers.groupActions.showAll'),
+        // Overlay stacks hide on the canvas only (the stack still shapes generation), and say so.
+        label: t(
+          axis === 'hidden'
+            ? allVisible
+              ? 'widgets.layers.groupActions.hideAllOnCanvas'
+              : 'widgets.layers.groupActions.showAllOnCanvas'
+            : allVisible
+              ? 'widgets.layers.groupActions.hideAll'
+              : 'widgets.layers.groupActions.showAll'
+        ),
         run: () => {
           const { ids, nextVisible } = planStackVisibilityToggle(nodes, axis);
           if (ids.length === 0) {
             return;
           }
           if (axis === 'hidden') {
-            commitPrepared(t('widgets.layers.groupActions.toggleHidden'), (model) =>
-              model.prepare({ type: 'set-hidden', updates: ids.map((id) => ({ id, isHidden: !nextVisible })) })
+            commitPrepared(
+              t(
+                nextVisible
+                  ? 'widgets.layers.groupActions.showAllOnCanvas'
+                  : 'widgets.layers.groupActions.hideAllOnCanvas'
+              ),
+              (model) =>
+                model.prepare({ type: 'set-hidden', updates: ids.map((id) => ({ id, isHidden: !nextVisible })) })
             );
             return;
           }

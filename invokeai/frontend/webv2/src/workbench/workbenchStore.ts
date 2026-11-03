@@ -93,9 +93,13 @@ const createCommands = (
 
   return {
     account: {
+      /** Patches the active project's settings, or those of `projectId` while it is open. */
       updateProjectPreferences: command(
         'setActiveProjectSettings',
-        (settings: ActionPayload<'setActiveProjectSettings'>['settings']) => ({ settings })
+        (settings: ActionPayload<'setActiveProjectSettings'>['settings'], projectId?: string) => ({
+          settings,
+          ...(projectId ? { projectId } : {}),
+        })
       ),
     },
     canvas: {
@@ -147,6 +151,15 @@ const createCommands = (
           preserveNavigationQuery,
           projectId,
           selectionPage,
+        })
+      ),
+      /** Select an image or video picked outside the Gallery's listing; Preview navigates within the item's own board. */
+      selectItemInItsBoard: command(
+        'selectGalleryItem',
+        (item: ActionPayload<'selectGalleryItem'>['item'], projectId?: string) => ({
+          item,
+          navigateItemBoard: true,
+          projectId,
         })
       ),
       setCompareItem: command(
@@ -273,6 +286,10 @@ const createCommands = (
         'removePromptFromHistory',
         (prompt: ActionPayload<'removePromptFromHistory'>['prompt'], projectId?: string) => ({ projectId, prompt })
       ),
+      restorePromptHistory: command(
+        'restorePromptHistory',
+        (items: ActionPayload<'restorePromptHistory'>['items'], projectId: string) => ({ items, projectId })
+      ),
       setBatchCount: command('setGenerateBatchCount', (batchCount: number, projectId?: string) => ({
         batchCount,
         projectId,
@@ -353,6 +370,12 @@ const createCommands = (
         })
       ),
       reset: command('resetActiveLayout'),
+      /** Steps the project's layout back (the active project by default), or back to before one step's change. */
+      undo: command('undoProjectChange', (projectId?: string, throughEntryId?: string) => ({
+        ...(projectId === undefined ? {} : { projectId }),
+        ...(throughEntryId === undefined ? {} : { throughEntryId }),
+      })),
+      redo: command('redoProjectChange', (projectId?: string) => (projectId === undefined ? {} : { projectId })),
       /** Discards the named preset's unsaved arrangement in the active project. */
       revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
         presetId,
@@ -384,7 +407,14 @@ const createCommands = (
     notifications: {
       add: command('recordNotice'),
       clear: command('clearNotifications'),
+      dismiss: command('dismissNotification', (notificationId: string) => ({ notificationId })),
+      withdrawRetry: command('withdrawNotificationRetry', (itemIds: readonly number[]) => ({ itemIds })),
       markAllRead: command('markAllNotificationsRead'),
+      markRead: command('markNotificationsRead', (notificationIds: readonly string[]) => ({ notificationIds })),
+      restore: command(
+        'restoreNotifications',
+        (notifications: ActionPayload<'restoreNotifications'>['notifications']) => ({ notifications })
+      ),
       recordWidgetFailure: command(
         'recordWidgetFailure',
         (failure: ActionPayload<'recordWidgetFailure'>['failure']) => ({ failure })
@@ -454,13 +484,11 @@ const createCommands = (
         (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
           projectId,
           queueItemId,
-          ...(notice ? { notice } : {}),
+          ...(notice !== undefined ? { notice } : {}),
         })
       ),
-      cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
-      cancelAllExceptCurrent: command(
-        'cancelAllQueueItemsExceptCurrent',
-        (projectId?: string, currentQueueItemId?: string | null) => ({ currentQueueItemId, projectId })
+      cancelUnsubmitted: command('cancelUnsubmittedQueueItems', (projectId?: string) =>
+        projectId === undefined ? {} : { projectId }
       ),
       clearCompleted: command('clearCompletedQueueItems'),
       markBackendCancelled: command('markQueueItemBackendCancelled'),
@@ -489,6 +517,11 @@ const createCommands = (
       raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
+      /** Deletes these pins from the instance, so it follows the user's defaults for them. */
+      clearInstanceValues: command(
+        'clearWidgetInstanceValues',
+        (instanceId: string, keys: readonly string[], projectId?: string) => ({ instanceId, keys, projectId })
+      ),
       patchInstanceValues: command(
         'patchWidgetInstanceValues',
         (instanceId: string, values: Record<string, unknown>, projectId?: string) => ({
@@ -682,6 +715,8 @@ export type WorkbenchPersistenceCommands = ReturnType<typeof createPersistenceAd
 
 export interface WorkbenchInternalAdapters {
   persistence: WorkbenchPersistenceCommands;
+  /** Mirrors the settings store's `scopedDefaults` into the aggregate; only the workbench runtime calls it. */
+  setScopedDefaults: (scopedDefaults: WorkbenchState['scopedDefaults']) => void;
 }
 
 export interface WorkbenchSnapshot {
@@ -692,6 +727,7 @@ export interface WorkbenchSnapshot {
   hasHydrated: boolean;
   notifications: WorkbenchState['notifications'];
   projects: WorkbenchState['projects'];
+  scopedDefaults: WorkbenchState['scopedDefaults'];
 }
 
 /** Imperative, read-only views for event handlers that must observe post-flush state. */
@@ -729,6 +765,7 @@ const createSnapshot = (state: WorkbenchState, hasHydrated: boolean): WorkbenchS
   hasHydrated,
   notifications: state.notifications,
   projects: state.projects,
+  scopedDefaults: state.scopedDefaults,
 });
 
 const hasPersistedStateChanged = (previous: WorkbenchState, next: WorkbenchState): boolean =>
@@ -910,7 +947,9 @@ export const createWorkbenchStore = (
   initialState = createInitialWorkbenchState(),
   options: WorkbenchStoreOptions = {}
 ): WorkbenchInternalStore => {
-  let state = initialState;
+  // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
+  // settings subscription keeps the mirror current from then on.
+  let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -995,6 +1034,7 @@ export const createWorkbenchStore = (
     getState,
     internal: {
       persistence: createPersistenceAdapter(dispatch, getState),
+      setScopedDefaults: (scopedDefaults) => dispatch({ scopedDefaults, type: 'setScopedDefaults' }),
     },
     queries: {
       getProject: (projectId) => state.projects.find((project) => project.id === projectId) ?? null,

@@ -2,10 +2,10 @@ import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
 import { Badge, Field, HStack, Input, Stack } from '@chakra-ui/react';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
-import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
+import { SettingLayerIndicator } from '@platform/ui/settings/SettingLayerIndicator';
 import { getImageMapClusterEps, MAX_CLUSTER_EPS, MIN_CLUSTER_EPS } from '@workbench/image-map/imageMapSettings';
 import { imageMapStore } from '@workbench/image-map/imageMapStore';
-import { useWidgetSettingsTarget } from '@workbench/settings/useWidgetSettingsTarget';
+import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -39,7 +39,12 @@ const forDisplay = (eps: number): string => String(Number(eps.toPrecision(3)));
  */
 export const ClusterStrengthField = ({ field, surface, target }: SettingFieldProps) => {
   const { t } = useTranslation();
-  const { disabled, patch, value: chosen } = useWidgetSettingsTarget('image-map', target, getImageMapClusterEps);
+  const {
+    disabled,
+    layer,
+    set,
+    value: chosen,
+  } = useLayeredSetting('image-map', 'clusterEps', target, getImageMapClusterEps, null, field);
   // What the server actually clustered with, which is the heuristic's answer
   // whenever nothing has been chosen.
   // Only this one field of the snapshot: the footer's index counts tick about
@@ -81,7 +86,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
   const commit = useCallback(
     (eps: number | null) => {
       pending.current = false;
-      patch({ clusterEps: eps });
+      set(eps);
 
       if (eps === null) {
         // Refilled from here rather than left to the sync effect below:
@@ -92,7 +97,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
         show(resolvedRef.current);
       }
     },
-    [patch, show]
+    [set, show]
   );
 
   useEffect(() => {
@@ -211,6 +216,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
 
   return (
     <Field.Root
+      data-setting-control=""
       alignItems={surface === 'quick' ? 'stretch' : DIALOG_ALIGNMENT}
       disabled={disabled}
       display="flex"
@@ -224,7 +230,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
           <Field.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
             {label}
           </Field.Label>
-          {chosen !== null ? <ModifiedSettingIndicator label={label} /> : null}
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
         </HStack>
         {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
         {invalid ? <Field.ErrorText fontSize="md">{invalid}</Field.ErrorText> : null}

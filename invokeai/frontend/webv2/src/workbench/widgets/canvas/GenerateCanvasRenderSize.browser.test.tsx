@@ -145,7 +145,7 @@ const canvasValues = () => harness.project.getSnapshot().values.canvas;
 /** The section header's size badge. */
 const badgeText = () =>
   [...(host?.querySelectorAll('span') ?? [])].find(
-    (element) => element.childElementCount === 0 && /^\d+x\d+/.test(element.textContent ?? '')
+    (element) => element.childElementCount === 0 && /^\d+×\d+/.test(element.textContent ?? '')
   )?.textContent;
 const statusText = () =>
   [...(host?.querySelectorAll('p') ?? [])].find((element) => element.textContent?.includes('MP'))?.textContent;
@@ -265,7 +265,7 @@ describe('Size section in canvas mode', () => {
     await expect.element(renderAt()).toHaveTextContent('Optimal for model');
     // People who knew the setting by its legacy name find it in the select's description, tooltip open or not.
     await expect.element(renderAt()).toHaveAccessibleDescription(/^Scale before processing/);
-    expect(badgeText()).toBe('384x384 → 512x512');
+    expect(badgeText()).toBe('384×384 → 512×512');
     expect(statusText()).toMatch(/^512×512 · 0\.26 MP/);
     // The stage fits the larger render size: 88px of preview spans 512px.
     expect(ghostSize()).toEqual([88, 88]);
@@ -278,7 +278,7 @@ describe('Size section in canvas mode', () => {
     await chooseRenderAt('Frame size');
 
     expect(canvasValues().scaleMethod).toBe('none');
-    expect(badgeText()).toBe('384x384');
+    expect(badgeText()).toBe('384×384');
     expect(statusText()).toMatch(/^0\.15 MP/);
     expect(ghostSize()).toEqual([88, 88]);
   });
@@ -302,7 +302,7 @@ describe('Size section in canvas mode', () => {
 
     expect(canvasValues().scaledWidth).toBe(1024);
     await expect.element(width).toHaveValue('1024');
-    expect(badgeText()).toBe('384x384 → 1024x512');
+    expect(badgeText()).toBe('384×384 → 1024×512');
     expect(statusText()).toMatch(/^1024×512 · 0\.52 MP/);
     // The preview spans the wider render size: 88px for 1024px, so the ghost is 44px tall.
     expect(ghostSize()).toEqual([88, 44]);
@@ -358,7 +358,7 @@ describe('Size section in canvas mode', () => {
     );
 
     await expect.element(renderAt()).not.toBeInTheDocument();
-    expect(badgeText()).toBe('384x384');
+    expect(badgeText()).toBe('384×384');
     expect(statusText()).toMatch(/^0\.15 MP/);
     await expect.element(resetSizeButton()).toBeInTheDocument();
     // The ghost is the recommended 512x512, not the canvas's custom render size.

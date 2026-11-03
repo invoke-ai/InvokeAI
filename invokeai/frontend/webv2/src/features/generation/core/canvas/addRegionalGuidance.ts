@@ -19,7 +19,7 @@ const NEG_COND_COLLECT_ID = 'neg_cond_collect';
 /** The bases whose text encoder accepts a region mask and whose denoiser accepts a conditioning list. */
 export type MaskRegionalGuidanceBase = 'sd-1' | 'sd-2' | 'sdxl' | 'flux' | 'flux2' | 'krea-2' | 'z-image' | 'anima';
 /** The bases that read regions as boxes of a structured layout prompt; a mask contributes only its bounds. */
-export type LayoutRegionalGuidanceBase = 'moss-image' | 'ideogram-4';
+export type LayoutRegionalGuidanceBase = 'moss-image' | 'ideogram-4' | 'flux3';
 export type RegionalGuidanceBase = MaskRegionalGuidanceBase | LayoutRegionalGuidanceBase;
 
 /** How a base consumes a region: as masked conditioning, or as a layout box around the mask. */
@@ -68,6 +68,8 @@ const REGIONAL_GUIDANCE_SUPPORT: Record<MaskRegionalGuidanceBase, MaskSupportRow
   },
   // The structured caption has only `obj` elements.
   'ideogram-4': { label: 'Ideogram 4', layoutKinds: ['object'], mode: 'layout', referenceImages: null },
+  // Regions become rows of the box table, one kind per graph: objects, or targets of an edit with reference images.
+  flux3: { label: 'FLUX.3', layoutKinds: ['object'], mode: 'layout', referenceImages: null },
 };
 
 /** Frontend graph keys are narrower than backend capability answers. */

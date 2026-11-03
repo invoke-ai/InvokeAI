@@ -1,27 +1,16 @@
 import type { GalleryBoardOrderBy, GalleryOrderDir } from '@features/gallery/core/types';
 
-import { HStack, Icon, Input, InputGroup, Menu, Portal } from '@chakra-ui/react';
+import { HStack, Icon, Input, InputGroup, Menu } from '@chakra-ui/react';
 import { DEFAULT_GALLERY_SETTINGS } from '@features/gallery/core/settings';
-import { CloseButton, IconButton } from '@platform/ui/Button';
-import { MenuContent } from '@platform/ui/Menu';
-import { Tooltip } from '@platform/ui/Tooltip';
-import {
-  ArchiveIcon,
-  CalendarIcon,
-  CheckIcon,
-  FolderIcon,
-  SearchIcon,
-  SlidersHorizontalIcon,
-  type LucideIcon,
-} from 'lucide-react';
+import { CloseButton } from '@platform/ui/Button';
+import { ArchiveIcon, CalendarIcon, CheckIcon, FolderIcon, SearchIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useMenuTriggerIds } from './galleryMenuIds';
+import { GalleryFilterMenu } from './GalleryFilterMenu';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} size="md" />;
-const SORT_MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 export const GalleryBoardFilters = ({
   searchTerm,
@@ -36,8 +25,6 @@ export const GalleryBoardFilters = ({
   const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const { boardOrderBy, boardOrderDir, showArchivedBoards, showDateBoards, showOtherProjectBoards } = gallery.settings;
-  const menuTriggerIds = useMenuTriggerIds();
-  // Highlight non-default visibility so filtering is apparent with the menu closed.
   const isVisibilityFiltered =
     showArchivedBoards !== DEFAULT_GALLERY_SETTINGS.showArchivedBoards ||
     showDateBoards !== DEFAULT_GALLERY_SETTINGS.showDateBoards ||
@@ -106,76 +93,59 @@ export const GalleryBoardFilters = ({
           onKeyDown={handleSearchKeyDown}
         />
       </InputGroup>
-      <Menu.Root closeOnSelect={false} ids={menuTriggerIds} positioning={SORT_MENU_POSITIONING}>
-        <Tooltip content={t('widgets.gallery.filterAndSortBoards')} ids={menuTriggerIds}>
-          <Menu.Trigger asChild>
-            <IconButton
-              aria-label={t('widgets.gallery.filterAndSortBoards')}
-              color={isVisibilityFiltered ? 'fg' : 'fg.muted'}
-              variant="ghost"
-            >
-              <Icon as={SlidersHorizontalIcon} boxSize="3.5" />
-            </IconButton>
-          </Menu.Trigger>
-        </Tooltip>
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent minW="12rem">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel>{t('widgets.gallery.boardVisibility')}</Menu.ItemGroupLabel>
-                <BoardVisibilityItem
-                  icon={CalendarIcon}
-                  isChecked={showDateBoards}
-                  label={t('widgets.gallery.dateBoards')}
-                  value="date-boards"
-                  onSelect={handleToggleDateBoards}
-                />
-                <BoardVisibilityItem
-                  icon={ArchiveIcon}
-                  isChecked={showArchivedBoards}
-                  label={t('widgets.gallery.archivedBoards')}
-                  value="archived-boards"
-                  onSelect={handleToggleArchivedBoards}
-                />
-                <BoardVisibilityItem
-                  icon={FolderIcon}
-                  isChecked={showOtherProjectBoards}
-                  label={t('widgets.gallery.otherProjectBoards')}
-                  value="other-project-boards"
-                  onSelect={handleToggleOtherProjectBoards}
-                />
-              </Menu.ItemGroup>
-              <Menu.Separator />
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel>{t('widgets.gallery.sortBoardsBy')}</Menu.ItemGroupLabel>
-                <Menu.RadioItemGroup value={boardOrderBy} onValueChange={handleOrderByChange}>
-                  <Menu.RadioItem value="created_at">
-                    <Menu.ItemIndicator />
-                    <Menu.ItemText>{t('common.created')}</Menu.ItemText>
-                  </Menu.RadioItem>
-                  <Menu.RadioItem value="board_name">
-                    <Menu.ItemIndicator />
-                    <Menu.ItemText>{t('common.name')}</Menu.ItemText>
-                  </Menu.RadioItem>
-                </Menu.RadioItemGroup>
-              </Menu.ItemGroup>
-              <Menu.Separator />
-              <Menu.ItemGroup>
-                <Menu.RadioItemGroup value={boardOrderDir} onValueChange={handleOrderDirChange}>
-                  <Menu.RadioItem value="DESC">
-                    <Menu.ItemIndicator />
-                    <Menu.ItemText>{t('widgets.gallery.sortBoardsDescending')}</Menu.ItemText>
-                  </Menu.RadioItem>
-                  <Menu.RadioItem value="ASC">
-                    <Menu.ItemIndicator />
-                    <Menu.ItemText>{t('widgets.gallery.sortBoardsAscending')}</Menu.ItemText>
-                  </Menu.RadioItem>
-                </Menu.RadioItemGroup>
-              </Menu.ItemGroup>
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
+      <GalleryFilterMenu isFiltered={isVisibilityFiltered} label={t('widgets.gallery.filterAndSortBoards')}>
+        <Menu.ItemGroup>
+          <Menu.ItemGroupLabel>{t('widgets.gallery.boardVisibility')}</Menu.ItemGroupLabel>
+          <BoardVisibilityItem
+            icon={CalendarIcon}
+            isChecked={showDateBoards}
+            label={t('widgets.gallery.dateBoards')}
+            value="date-boards"
+            onSelect={handleToggleDateBoards}
+          />
+          <BoardVisibilityItem
+            icon={ArchiveIcon}
+            isChecked={showArchivedBoards}
+            label={t('widgets.gallery.archivedBoards')}
+            value="archived-boards"
+            onSelect={handleToggleArchivedBoards}
+          />
+          <BoardVisibilityItem
+            icon={FolderIcon}
+            isChecked={showOtherProjectBoards}
+            label={t('widgets.gallery.otherProjectBoards')}
+            value="other-project-boards"
+            onSelect={handleToggleOtherProjectBoards}
+          />
+        </Menu.ItemGroup>
+        <Menu.Separator />
+        <Menu.ItemGroup>
+          <Menu.ItemGroupLabel>{t('widgets.gallery.sortBoardsBy')}</Menu.ItemGroupLabel>
+          <Menu.RadioItemGroup value={boardOrderBy} onValueChange={handleOrderByChange}>
+            <Menu.RadioItem value="created_at">
+              <Menu.ItemIndicator />
+              <Menu.ItemText>{t('common.created')}</Menu.ItemText>
+            </Menu.RadioItem>
+            <Menu.RadioItem value="board_name">
+              <Menu.ItemIndicator />
+              <Menu.ItemText>{t('common.name')}</Menu.ItemText>
+            </Menu.RadioItem>
+          </Menu.RadioItemGroup>
+        </Menu.ItemGroup>
+        <Menu.Separator />
+        <Menu.ItemGroup>
+          <Menu.RadioItemGroup value={boardOrderDir} onValueChange={handleOrderDirChange}>
+            <Menu.RadioItem value="DESC">
+              <Menu.ItemIndicator />
+              <Menu.ItemText>{t('widgets.gallery.sortBoardsDescending')}</Menu.ItemText>
+            </Menu.RadioItem>
+            <Menu.RadioItem value="ASC">
+              <Menu.ItemIndicator />
+              <Menu.ItemText>{t('widgets.gallery.sortBoardsAscending')}</Menu.ItemText>
+            </Menu.RadioItem>
+          </Menu.RadioItemGroup>
+        </Menu.ItemGroup>
+      </GalleryFilterMenu>
     </HStack>
   );
 };
