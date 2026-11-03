@@ -10,6 +10,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { GenerateAdvancedFields } from './GenerateAdvancedFields';
 
@@ -121,8 +122,13 @@ describe('GenerateAdvancedFields HiDiffusion controls', () => {
     expect(rauNet?.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
     expect(sliderByLabel('HiDiffusion: T1 Ratio')?.getAttribute('aria-disabled')).toBe('true');
 
-    await settle(() => main?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    // A disabled row's label is inert; the enabled row's label toggles its own switch.
+    await act(() => userEvent.click(rauNet!.querySelector<HTMLElement>('[data-part="label"]')!, { force: true }));
+    expect(onCommit).not.toHaveBeenCalled();
+
+    await act(() => userEvent.click(main!.querySelector<HTMLElement>('[data-part="label"]')!));
     expect(onCommit).toHaveBeenCalledWith({ hiDiffusionEnabled: true });
+    expect(onCommit).toHaveBeenCalledTimes(1);
   });
 
   it('omits HiDiffusion controls for SD2', async () => {

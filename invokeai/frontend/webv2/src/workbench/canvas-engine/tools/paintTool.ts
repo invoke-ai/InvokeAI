@@ -5,13 +5,15 @@
  * layer-local, so moving or transforming the layer carries it.
  */
 
+import type { CanvasLayerEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { Mat2d, PointerInput } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafPaintable, isLayerTransparencyLocked } from '@workbench/canvas-engine/document/layerEligibility';
+import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import { isLayerTransparencyLocked, leafEditRefusal } from '@workbench/canvas-engine/document/layerEligibility';
 import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
 import { applyToPoint, fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 
@@ -84,6 +86,60 @@ const targetMatrix = ({ transform }: PaintTarget): Mat2d | null =>
     ? fromTRS({ x: transform.x, y: transform.y }, transform.rotation, transform.scaleX, transform.scaleY)
     : null;
 
+/** Reports why the selected layer refused the press, naming it for the notice. */
+const refuse = (
+  ctx: ToolContext,
+  layer: CanvasLayerContract,
+  status: CanvasLayerEditRefusal['status'],
+  extra: Pick<CanvasLayerEditRefusal, 'canPaintNewLayer'> = {}
+): null => {
+  ctx.reportEditRefusal?.({ layerId: layer.id, layerName: layer.name, status, ...extra });
+  return null;
+};
+
+/**
+ * True when the layer's durable pixels are not in the cache yet. Painting now would grow a transparent stroke-sized
+ * cache over them, so the press asks for them and says the layer is loading; the next press can edit the complete
+ * pixels. A durable source can legitimately have no cache while disabled or outside the current frame.
+ */
+const awaitsPixels = (ctx: ToolContext, layerId: string, hasDurablePixels: boolean): boolean => {
+  if (!hasDurablePixels) {
+    return false;
+  }
+  const entry = ctx.layers.get(layerId);
+  if (entry && !entry.stale) {
+    return false;
+  }
+  ctx.requestLayerRasterization?.(layerId);
+  return true;
+};
+
+/**
+ * Why a press of `tool` on the selected leaf would be refused before it starts, without side effects: drives the
+ * not-allowed cursor. Loading pixels are not predicted; the press itself reports them.
+ */
+const predictRefusal = (
+  leaf: SemanticLeaf | null,
+  tool: PaintToolSpec['id']
+): CanvasLayerEditRefusal['status'] | null => {
+  const selected = leaf?.layer;
+  if (!leaf || !selected) {
+    return null;
+  }
+  const paintsInPlace =
+    selected.type === 'raster'
+      ? selected.source.type === 'paint' || selected.source.type === 'image'
+      : selected.type === 'control' || isMaskLayer(selected);
+  if (!paintsInPlace) {
+    return null;
+  }
+  const refusal = leafEditRefusal(leaf);
+  if (refusal) {
+    return refusal;
+  }
+  return tool === 'eraser' && isLayerTransparencyLocked(selected) ? 'layer-alpha-locked' : null;
+};
+
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
 const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
   const doc = ctx.getDocument();
@@ -94,20 +150,13 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
   const selected = leaf?.layer;
 
   if (leaf && selected && selected.type === 'raster' && selected.source.type === 'paint') {
-    // Locked/disabled paint targets refuse rather than silently creating another layer.
-    if (!isLeafPaintable(leaf)) {
-      return null;
+    // Locked/hidden paint targets refuse rather than silently creating another layer.
+    const refusal = leafEditRefusal(leaf);
+    if (refusal) {
+      return refuse(ctx, selected, refusal);
     }
-    if (selected.source.bitmap) {
-      const entry = ctx.layers.get(selected.id);
-      if (!entry || entry.stale) {
-        // A durable paint source can legitimately have no cache while disabled
-        // or outside the current frame. Never grow a transparent stroke-sized
-        // cache over it; the compositor's rasterization pass will publish the
-        // source first, and the next gesture can edit the complete pixels.
-        ctx.requestLayerRasterization?.(selected.id);
-        return null;
-      }
+    if (awaitsPixels(ctx, selected.id, selected.source.bitmap !== null)) {
+      return refuse(ctx, selected, 'layer-loading');
     }
     const edit = ctx.beginStrokeEdit();
     // The cache (if any) keeps its current content extent; the stroke grows it.
@@ -119,43 +168,40 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       : null;
   }
 
-  const imageSelected = leaf && selected?.type === 'raster' && selected.source.type === 'image';
-  if (imageSelected && tool === 'eraser') {
-    // Erasing materializes image pixels as an undoable paint layer in place; locked, disabled, unready or
-    // transparency-locked images refuse without spawning.
-    if (!isLeafPaintable(leaf) || isLayerTransparencyLocked(selected)) {
-      return null;
+  if (leaf && selected?.type === 'raster' && selected.source.type === 'image') {
+    // The brush and eraser paint a raster image in place, materializing it as an undoable paint layer under its
+    // transparency lock. A locked or hidden image refuses (the brush offers a new paint layer instead of making one
+    // unasked), as does one whose pixels have not loaded; the eraser also refuses a transparency lock. A rasterized
+    // image whose spatial adjustments have not landed refuses `not-ready` (or names the stack that cannot run).
+    const refusal = leafEditRefusal(leaf);
+    if (refusal) {
+      return refuse(ctx, selected, refusal, tool === 'brush' ? { canPaintNewLayer: true } : {});
     }
-    const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
-    // No transform on purpose: see the brush branch below.
-    return transaction ? editTarget(transaction, transaction.layerId) : null;
-  }
-  const imageCache = imageSelected ? ctx.layers.peek(selected.id) : undefined;
-  if (imageSelected && isLeafPaintable(leaf) && imageCache && !imageCache.stale) {
-    // The brush paints a paintable, rasterized image in place the same way, under its transparency lock; a locked,
-    // disabled or not yet rasterized image keeps the brush's auto-created paint layer below. A rasterized image whose
-    // spatial adjustments have not landed refuses `not-ready` (or names the stack that cannot run) and drops the
-    // stroke with a notice, as the eraser does.
     const transparencyLocked = isLayerTransparencyLocked(selected);
+    if (tool === 'eraser' && transparencyLocked) {
+      return refuse(ctx, selected, 'layer-alpha-locked');
+    }
+    if (awaitsPixels(ctx, selected.id, true)) {
+      return refuse(ctx, selected, 'layer-loading');
+    }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
     // No transform on purpose: materialization BAKES the layer's placement
     // into document-space pixels and resets the layer to identity, so the
     // session's document coordinates already are the cache's coordinates.
-    return transaction ? editTarget(transaction, transaction.layerId, { transparencyLocked }) : null;
+    return transaction
+      ? editTarget(transaction, transaction.layerId, tool === 'brush' ? { transparencyLocked } : {})
+      : null;
   }
 
   if (leaf && selected && isMaskLayer(selected)) {
-    // Paint mask alpha directly, adding/removing coverage. Locked/disabled masks refuse and never auto-create
+    // Paint mask alpha directly, adding/removing coverage. Locked/hidden masks refuse and never auto-create
     // paint layers.
-    if (!isLeafPaintable(leaf)) {
-      return null;
+    const refusal = leafEditRefusal(leaf);
+    if (refusal) {
+      return refuse(ctx, selected, refusal);
     }
-    if (selected.mask.bitmap) {
-      const entry = ctx.layers.get(selected.id);
-      if (!entry || entry.stale) {
-        ctx.requestLayerRasterization?.(selected.id);
-        return null;
-      }
+    if (awaitsPixels(ctx, selected.id, selected.mask.bitmap !== null)) {
+      return refuse(ctx, selected, 'layer-loading');
     }
     const edit = ctx.beginStrokeEdit();
     return edit
@@ -163,9 +209,17 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       : null;
   }
 
-  if (selected?.type === 'control') {
+  if (leaf && selected?.type === 'control') {
+    const refusal = leafEditRefusal(leaf);
+    if (refusal) {
+      return refuse(ctx, selected, refusal);
+    }
+    const durable = selected.source.type === 'image' || (selected.source.type === 'paint' && !!selected.source.bitmap);
+    if (awaitsPixels(ctx, selected.id, durable)) {
+      return refuse(ctx, selected, 'layer-loading');
+    }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
-    // No transform on purpose: see the materialized-eraser branch above.
+    // No transform on purpose: see the raster-image branch above.
     return transaction ? editTarget(transaction, transaction.layerId) : null;
   }
 
@@ -243,7 +297,12 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
   };
 
   return {
-    cursor: () => 'crosshair',
+    // Not-allowed over a selection the press would refuse; the ring still shows the brush size.
+    cursor: (ctx) => {
+      const doc = ctx.getDocument();
+      const leaf = doc?.selectedLayerId ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
+      return !session && predictRefusal(leaf, spec.id) ? 'not-allowed' : 'crosshair';
+    },
     id: spec.id,
     onDeactivate: (ctx, opts) => {
       try {
@@ -272,6 +331,10 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       // Every refusal below ends the admitted edit (and removes a layer the gesture created).
       if (resolvedTarget.transparencyLocked && spec.id === 'eraser') {
         resolvedTarget.cancel();
+        const layer = getDocumentLayer(ctx.getDocument(), resolvedTarget.layerId);
+        if (layer) {
+          refuse(ctx, layer, 'layer-alpha-locked');
+        }
         return;
       }
       const composite = resolvedTarget.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;

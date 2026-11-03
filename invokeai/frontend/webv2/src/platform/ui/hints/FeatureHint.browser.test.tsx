@@ -309,7 +309,8 @@ describe('FeatureHint', () => {
       );
       // Past the corridor's grace window and the close delay after it.
       await settle(1500);
-      await act(() => userEvent.hover(document.querySelector('[data-scope="hover-card"][data-part="content"] h2')!));
+      // The title, the card's first paragraph.
+      await act(() => userEvent.hover(document.querySelector('[data-scope="hover-card"][data-part="content"] p')!));
       await settle(500);
 
       expect(cardText()).toContain('CLIP Skip');

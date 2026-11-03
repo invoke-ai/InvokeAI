@@ -197,6 +197,7 @@ def _build_queue_item(session: GraphExecutionState) -> SimpleNamespace:
         status="in_progress",
         session=session,
         session_id=session.id,
+        user_id="system",
     )
 
 

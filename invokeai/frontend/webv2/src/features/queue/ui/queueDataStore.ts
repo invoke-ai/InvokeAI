@@ -1,3 +1,4 @@
+import type { QueueItem } from '@features/queue/core/historyTypes';
 import type {
   QueueCounts,
   QueueItemDetailReadModel,
@@ -5,14 +6,16 @@ import type {
   QueueQueryScope,
 } from '@features/queue/core/types';
 
+import { getPersonalQueueActivity } from '@features/queue/core/types';
 import { invalidateQueueQueries } from '@features/queue/data/queries';
 import { getQueueItemDetailOptions, getQueueReadModelOptions } from '@features/queue/publicApi';
 import { queryClient } from '@platform/query/client';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 
 import { getCurrentBatchItems } from './currentBatchItems';
 import { clearProgressForQueueItemsWithResults } from './queueProgressCleanup';
-import { useQueueQueryScope } from './queueScope';
+import { getQueueOpenWorkElsewhere, useQueueQueryScope } from './queueScope';
 
 const EMPTY_COUNTS: QueueCounts = {
   canceled: 0,
@@ -41,6 +44,24 @@ const useQueueReadModel = () => {
   const scope = useQueueQueryScope();
 
   return useQuery(getQueueReadModelOptions(scope, onQueueRead));
+};
+
+/**
+ * The viewer's open work in the queue scope beyond `projectItems`, the active project's runs (see
+ * `getQueueOpenWorkElsewhere`), so a surface can count the project's runs and this without counting anything twice.
+ */
+export const useQueueOpenWorkElsewhere = (projectItems: QueueItem[]): number => {
+  const model = useQueueReadModel().data;
+
+  return useMemo(() => {
+    if (!model) {
+      return 0;
+    }
+
+    const { inProgress, pending } = getPersonalQueueActivity(model.status.queue);
+
+    return getQueueOpenWorkElsewhere(model, inProgress + pending, { queue: { items: projectItems } });
+  }, [model, projectItems]);
 };
 
 /** Invalidate queue data; TanStack Query deduplicates concurrent callers. */

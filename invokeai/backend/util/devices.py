@@ -431,6 +431,16 @@ class TorchDevice:
         return device
 
     @classmethod
+    def synchronize(cls, device: torch.device) -> None:
+        """Wait for the work already queued on `device`. A no-op on CPU, which runs synchronously."""
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        elif device.type == "xpu":
+            torch.xpu.synchronize(device)
+        elif device.type == "mps":
+            torch.mps.synchronize()
+
+    @classmethod
     def empty_cache(cls, force: bool = False) -> bool:
         """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
 

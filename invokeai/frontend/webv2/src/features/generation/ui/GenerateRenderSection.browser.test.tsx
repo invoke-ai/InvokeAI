@@ -73,7 +73,8 @@ void i18n.use(initReactI18next).init({
             ideogram4ColorPalette: 'Color palette',
             ideogram4GuidanceScale: 'Guidance',
             ideogram4Mu: 'Mu',
-            ideogram4MuHelp: 'Timestep shift. Higher values spend more of the schedule at high noise.',
+            ideogram4MuHelp:
+              'Timestep shift. Higher values spend more of the schedule at high noise. Set by the sampler preset unless overridden.',
             ideogram4PresetDerived: 'Set by the sampler preset unless overridden.',
             ideogram4SamplerPreset: 'Sampler preset',
             ideogram4Steps: 'Steps',
@@ -95,7 +96,6 @@ void i18n.use(initReactI18next).init({
             seedVarianceHelp: 'Perturbs conditioning so nearby seeds diverge more.',
             seedVarianceRandomize: 'Randomized channels',
             seedVarianceStrength: 'Variance strength',
-            override: 'Override',
             timestepShift: 'Shift',
             qwenImageShiftHelp: 'Auto derives the schedule shift from the image size; Lightning LoRAs expect 3.',
             timestepShiftHelp: 'Auto derives the schedule shift from the image size.',
@@ -462,6 +462,14 @@ describe('GenerateRenderSection guidance field', () => {
       ['2', '100'],
     ]);
     expect(ranges('Mu')).toEqual([['-4', '4']]);
+
+    // Off hands Mu to the sampler preset, and its description says so.
+    const muInput = [...(host?.querySelectorAll<HTMLInputElement>('input[type="checkbox"]') ?? [])].find(
+      (input) => document.getElementById(input.getAttribute('aria-labelledby') ?? '')?.textContent === 'Mu'
+    );
+    expect(document.getElementById(muInput?.getAttribute('aria-describedby') ?? '')?.textContent).toContain(
+      'Set by the sampler preset unless overridden.'
+    );
   });
 
   it('names the broken bound on the field, not only in the Invoke button tooltip', async () => {
@@ -535,7 +543,7 @@ describe('GenerateRenderSection model-family tuning', () => {
 
   it('offers the shift override to Z-Image and Qwen Image, and seed variance to Z-Image only', async () => {
     const onCommit = await render(zImageModel);
-    const override = switchNamed('Override');
+    const override = switchNamed('Shift');
 
     expect(override).not.toBeNull();
     expect(slidersNamed('Shift')).toHaveLength(0);
@@ -549,18 +557,34 @@ describe('GenerateRenderSection model-family tuning', () => {
     const onOverriddenCommit = await render(zImageModel, { zImageShift: 2.5 });
     expect(slidersNamed('Shift')[0]?.getAttribute('aria-valuenow')).toBe('2.5');
     // Turning the override off hands the shift back to the node, rather than leaving the last value in place.
-    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
     expect(onOverriddenCommit).toHaveBeenCalledWith({ zImageShift: null });
 
     await settle(() => root?.unmount());
     const onQwenCommit = await render(qwenImageModel);
     expect(switchNamed('Seed variance')).toBeNull();
-    await settle(() => switchNamed('Override')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
+    await settle(() => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="control"]')?.click());
     expect(onQwenCommit).toHaveBeenCalledWith({ qwenImageShift: 3 });
 
     await settle(() => root?.unmount());
     await render(sd1Model);
-    expect(switchNamed('Override')).toBeNull();
+    expect(switchNamed('Shift')).toBeNull();
+  });
+
+  it('toggles the shift override from its label without handing focus to the slider it pairs with', async () => {
+    const onCommit = await render(zImageModel, { zImageShift: 2.5 }, true);
+    const label = () => switchNamed('Shift')?.querySelector<HTMLElement>('[data-part="label"]');
+    const shiftInput = host?.querySelector<HTMLInputElement>('input[aria-label="Shift"]');
+
+    expect(shiftInput).not.toBeNull();
+    await act(() => userEvent.click(label()!));
+
+    expect(onCommit).toHaveBeenCalledWith({ zImageShift: null });
+    expect(document.activeElement).not.toBe(shiftInput);
+    expect(slidersNamed('Shift')).toHaveLength(0);
+
+    await act(() => userEvent.click(label()!));
+    expect(onCommit).toHaveBeenLastCalledWith({ zImageShift: 3 });
   });
 
   it('keeps the shift override while a typed value passes outside its bounds', async () => {

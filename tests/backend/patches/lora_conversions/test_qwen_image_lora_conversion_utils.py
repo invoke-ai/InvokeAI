@@ -1,5 +1,6 @@
 """Tests for Qwen Image LoRA conversion utilities."""
 
+import pytest
 import torch
 
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import (
@@ -105,16 +106,17 @@ def test_diffusers_conversion_produces_correct_layer_keys():
     assert set(model.layers.keys()) == expected_keys
 
 
-def test_diffusers_with_transformer_prefix_strips_it():
-    """Diffusers keys with 'transformer.' prefix get it stripped."""
+@pytest.mark.parametrize("prefix", ["transformer.", "diffusion_model.", "base_model.model."])
+def test_diffusers_key_prefix_is_stripped(prefix: str):
+    """The diffusers (`transformer.`), ComfyUI (`diffusion_model.`) and raw PEFT (`base_model.model.`) prefixes
+    are stripped, so the layer names a module of the transformer."""
     state_dict = {
-        "transformer.transformer_blocks.0.attn.to_k.lora_down.weight": torch.empty(64, 3072),
-        "transformer.transformer_blocks.0.attn.to_k.lora_up.weight": torch.empty(3072, 64),
+        f"{prefix}transformer_blocks.0.attn.to_k.lora_down.weight": torch.empty(64, 3072),
+        f"{prefix}transformer_blocks.0.attn.to_k.lora_up.weight": torch.empty(3072, 64),
     }
     model = lora_model_from_qwen_image_state_dict(state_dict, alpha=None)
 
-    expected_key = f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_k"
-    assert expected_key in model.layers
+    assert set(model.layers) == {f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_k"}
 
 
 # ---- Unknown key handling tests ----

@@ -1,17 +1,8 @@
-import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { IconButton, MenuContent } from '@platform/ui';
-import {
-  BrushIcon,
-  FolderPlusIcon,
-  ImagePlusIcon,
-  MapPinIcon,
-  PlusIcon,
-  SlidersHorizontalIcon,
-  SquareDashedBottomIcon,
-} from 'lucide-react';
+import { PlusIcon } from 'lucide-react';
 import { Fragment, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,22 +10,13 @@ import type { AddLayerItemId } from './addLayerMenu';
 import type { LayerSurfaceAnchor } from './layerRowCommands';
 
 import { ADD_LAYER_MENU, isAddLayerItemAvailable } from './addLayerMenu';
+import { LAYER_KIND_ICONS } from './layerTypeIcon';
 import { useAddLayer } from './useAddLayer';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 type MenuPositioning = ComponentProps<typeof Menu.Root>['positioning'];
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
-
-/** Icon per add-layer item (kept in the view; the menu structure itself is pure data). */
-const ADD_LAYER_ICONS: Record<AddLayerItemId, LucideIcon> = {
-  control: SlidersHorizontalIcon,
-  group: FolderPlusIcon,
-  inpaint_mask: SquareDashedBottomIcon,
-  raster: BrushIcon,
-  regional_guidance: MapPinIcon,
-  regional_reference_image: ImagePlusIcon,
-};
 
 /** Share grouped add-layer choices between header and empty-area menus; useAddLayer owns creation. */
 const AddLayerMenuItems = () => {
@@ -56,7 +38,7 @@ const AddLayerMenuItems = () => {
             {group.items
               .filter((item) => isAddLayerItemAvailable(item.id, base))
               .map((item) => {
-                const ItemIcon = ADD_LAYER_ICONS[item.id];
+                const ItemIcon = LAYER_KIND_ICONS[item.id];
                 return (
                   <Menu.Item key={item.id} value={item.id} onSelect={handleSelect(item.id)}>
                     <HStack gap="2" minW="0" w="full">

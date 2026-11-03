@@ -588,11 +588,11 @@ def test_should_use_fp8_allows_z_image():
 
 
 def test_should_use_fp8_refuses_a_loader_that_declared_it_does_not_implement_the_cast():
-    """A Z-Image ControlNet asks for fp8 and its loader never casts, so the gate must say no.
+    """A Z-Image ControlNet asks for fp8 and its loader does not implement the cast, so the gate must say no.
 
     Not the same question as the one above: Z-Image *main* implements the cast. Both are
     `base=z-image`, which is why the answer cannot live on the architecture -- it lives on the
-    loader key, and `ZImageControlCheckpointModel` declares `Unimplemented` there.
+    loader key, and `ZImageFunControlNetLoader` declares `Unimplemented` there.
 
     The device probe must not run for it either: an inert request is no reason to touch the GPU.
     """

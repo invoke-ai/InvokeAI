@@ -36,6 +36,7 @@ const BASE_LABELS: Record<string, string> = {
   external: 'External',
   flux: 'FLUX',
   flux2: 'FLUX.2',
+  flux3: 'FLUX.3',
   'ideogram-4': 'Ideogram 4',
   'krea-2': 'Krea-2',
   'minimax-h3': 'MiniMax H3',

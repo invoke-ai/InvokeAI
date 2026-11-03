@@ -14,6 +14,7 @@ import type { TFunction } from 'i18next';
 import { createControlLayer, createDocumentModel } from '@workbench/canvas-engine/api';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
+import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
@@ -111,9 +112,7 @@ const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyCo
   reportStructuralCommit: () => undefined,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
   engine: createEngine(),
-  hasSelectedStagedCandidate: false,
-  hasStagingSlots: false,
-  isInteractionLocked: false,
+  hasMultipleStagingSlots: false,
   notifyLayerDuplicateFailed: vi.fn(),
   pasteFromClipboard,
   resetActiveColors: vi.fn(),
@@ -138,29 +137,58 @@ beforeEach(() => {
   pasteFromClipboard = vi.fn();
 });
 
-describe('staging precedence', () => {
+describe('while results are staged', () => {
   it.each([
     ['canvas.prevEntity', -1],
-    ['canvas.nudgeLeft', -1],
     ['canvas.nextEntity', 1],
-    ['canvas.nudgeRight', 1],
-  ] as const)('%s cycles staged images while slots exist', (commandId, direction) => {
-    const engine = run(commandId, { hasStagingSlots: true });
-    expect(dispatch).toHaveBeenCalledWith({ direction, type: 'cycleStagedImage' } satisfies CanvasProjectMutation);
+  ] as const)('%s steps through the staged results, and only that', (commandId, direction) => {
+    const engine = run(commandId, { hasMultipleStagingSlots: true });
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({
+      direction,
+      type: 'cycleStagedImage',
+    } satisfies CanvasProjectMutation);
     expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
   });
 
-  it('nudges instead of cycling when no staging slot exists', () => {
-    const engine = run('canvas.nudgeLeft');
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledWith(-1, 0);
+  it('walks the layers instead when only one result is staged or generating: there is nothing to step to', () => {
+    run('canvas.nextEntity', { hasMultipleStagingSlots: false });
+    expect(dispatch).toHaveBeenCalledExactlyOnceWith({ id: 'b', type: 'setCanvasSelectedLayer' });
   });
 
-  it('delete discards the selected staged candidate before touching layers', () => {
-    const engine = run('canvas.deleteSelected', { hasSelectedStagedCandidate: true });
-    expect(dispatch).toHaveBeenCalledWith({ type: 'discardSelectedStagedImage' });
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-    expect(engine.selection.eraseSelection).not.toHaveBeenCalled();
+  it.each([
+    ['canvas.nudgeLeft', -1, 0],
+    ['canvas.nudgeRight', 1, 0],
+    ['canvas.nudgeUp', 0, -1],
+    ['canvas.nudgeDown', 0, 1],
+  ] as const)('%s nudges the selected layer, never steps through results', (commandId, dx, dy) => {
+    const engine = run(commandId, { hasMultipleStagingSlots: true });
+    expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledExactlyOnceWith(dx, dy);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('Delete erases the pixel selection, or deletes the layer, instead of discarding a result', () => {
+    const erasing = run('canvas.deleteSelected', {
+      engine: createEngine({ hasSelection: true }),
+      hasMultipleStagingSlots: true,
+    });
+    expect(erasing.selection.eraseSelection).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
+
+    const deleting = run('canvas.deleteSelected', { hasMultipleStagingSlots: true });
+    expect(deleting.layers.commitPrepared).toHaveBeenCalledOnce();
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('locks nothing else: tools, history, selection and layer commands run as usual', () => {
+    expect(run('canvas.tool.brush', { hasMultipleStagingSlots: true }).tools.setTool).toHaveBeenCalledWith('brush');
+    expect(run('canvas.undo', { hasMultipleStagingSlots: true }).history.undo).toHaveBeenCalledOnce();
+    expect(run('canvas.selectAll', { hasMultipleStagingSlots: true }).selection.selectAll).toHaveBeenCalledOnce();
+    expect(run('canvas.duplicateLayer', { hasMultipleStagingSlots: true }).layers.duplicateLayers).toHaveBeenCalledWith(
+      ['a']
+    );
+    const crop = contextOf({ hasMultipleStagingSlots: true });
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', crop);
+    expect(crop.cropAllLayers).toHaveBeenCalledOnce();
   });
 });
 
@@ -214,9 +242,8 @@ describe('layer navigation without staging', () => {
     expect(dispatch).toHaveBeenLastCalledWith(select('d'));
   });
 
-  it('stays put on the only layer and while interaction is locked', () => {
+  it('stays put on the only layer', () => {
     run('canvas.nextEntity', { document: documentOf([rasterLayer('a')], 'a') });
-    run('canvas.prevEntity', { document: documentOf(layers, 'a'), isInteractionLocked: true });
     expect(dispatch).not.toHaveBeenCalled();
   });
 
@@ -245,37 +272,6 @@ describe('layer navigation without staging', () => {
   });
 });
 
-describe('interaction lock', () => {
-  it('allows only the view tool', () => {
-    const engine = run('canvas.tool.view', { isInteractionLocked: true });
-    expect(engine.tools.setTool).toHaveBeenCalledWith('view');
-  });
-
-  it.each([
-    'canvas.tool.brush',
-    'canvas.deleteSelected',
-    'canvas.undo',
-    'canvas.selectAll',
-    'canvas.nudgeLeft',
-    'canvas.layerToFront',
-    'canvas.duplicateLayer',
-    'canvas.mergeDown',
-  ])('blocks %s', (commandId) => {
-    const engine = run(commandId, { isInteractionLocked: true });
-    expect(engine.tools.setTool).not.toHaveBeenCalled();
-    expect(engine.layers.commitPrepared).not.toHaveBeenCalled();
-    expect(engine.layers.nudgeSelectedLayer).not.toHaveBeenCalled();
-    expect(engine.history.undo).not.toHaveBeenCalled();
-    expect(engine.selection.selectAll).not.toHaveBeenCalled();
-    expect(dispatch).not.toHaveBeenCalled();
-  });
-
-  it('still cycles staging while locked (staging is checked first)', () => {
-    run('canvas.nextEntity', { hasStagingSlots: true, isInteractionLocked: true });
-    expect(dispatch).toHaveBeenCalledWith({ direction: 1, type: 'cycleStagedImage' });
-  });
-});
-
 describe('nudge', () => {
   it.each([
     ['canvas.nudgeUp', 0, -1],
@@ -290,7 +286,7 @@ describe('nudge', () => {
   });
 
   it('large nudges are unaffected by staging slots', () => {
-    const engine = run('canvas.nudgeRightLarge', { hasStagingSlots: true });
+    const engine = run('canvas.nudgeRightLarge', { hasMultipleStagingSlots: true });
     expect(engine.layers.nudgeSelectedLayer).toHaveBeenCalledWith(10, 0);
     expect(dispatch).not.toHaveBeenCalled();
   });
@@ -459,14 +455,10 @@ describe('clipboard', () => {
 });
 
 describe('crop all layers to frame', () => {
-  it('runs the canvas menu action, but not while interaction is locked', () => {
-    const free = contextOf();
-    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', free);
-    expect(free.cropAllLayers).toHaveBeenCalledOnce();
-
-    const locked = contextOf({ isInteractionLocked: true });
-    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', locked);
-    expect(locked.cropAllLayers).not.toHaveBeenCalled();
+  it('runs the canvas menu action', () => {
+    const ctx = contextOf();
+    executeCanvasHotkeyCommand('canvas.cropAllLayersToFrame', ctx);
+    expect(ctx.cropAllLayers).toHaveBeenCalledOnce();
   });
 });
 
@@ -809,18 +801,16 @@ describe('group selection', () => {
 });
 
 describe('active color pair commands', () => {
-  it('routes X to swap and D to reset, even while interaction is locked', () => {
-    for (const isInteractionLocked of [false, true]) {
-      const swapCtx = contextOf({ isInteractionLocked });
-      executeCanvasHotkeyCommand('canvas.toggleFillColor', swapCtx);
-      expect(swapCtx.swapActiveColors).toHaveBeenCalledTimes(1);
-      expect(swapCtx.resetActiveColors).not.toHaveBeenCalled();
+  it('routes X to swap and D to reset', () => {
+    const swapCtx = contextOf();
+    executeCanvasHotkeyCommand('canvas.toggleFillColor', swapCtx);
+    expect(swapCtx.swapActiveColors).toHaveBeenCalledTimes(1);
+    expect(swapCtx.resetActiveColors).not.toHaveBeenCalled();
 
-      const resetCtx = contextOf({ isInteractionLocked });
-      executeCanvasHotkeyCommand('canvas.setFillColorsToDefault', resetCtx);
-      expect(resetCtx.resetActiveColors).toHaveBeenCalledTimes(1);
-      expect(resetCtx.dispatch).not.toHaveBeenCalled();
-    }
+    const resetCtx = contextOf();
+    executeCanvasHotkeyCommand('canvas.setFillColorsToDefault', resetCtx);
+    expect(resetCtx.resetActiveColors).toHaveBeenCalledTimes(1);
+    expect(resetCtx.dispatch).not.toHaveBeenCalled();
   });
 });
 
@@ -828,6 +818,39 @@ describe('registration tables', () => {
   // Everything the mounted Canvas registers: its own keys, the companion keys and the header's commands. The
   // companion widget registers a subset (history plus companion keys), so it is covered too.
   const allEntries = [...CANVAS_COMPANION_HOTKEYS, ...CANVAS_ONLY_HOTKEYS, ...CANVAS_HEADER_HOTKEYS];
+
+  // Hotkey settings list the catalog, so a Canvas binding shows (and can be rebound) before any Canvas mounts.
+  it('mirrors every registered key in the hotkey catalog with the same defaults, under Canvas', () => {
+    const catalogDefaults = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map((hotkey) => [hotkey.id, hotkey.defaultKeys])
+    );
+    const registeredDefaults = Object.fromEntries(allEntries.map(([id, , keys]) => [id, [...keys]]));
+
+    expect(registeredDefaults).toEqual(catalogDefaults);
+  });
+
+  // The Canvas (and Layers) register every row with `allowInEditable: false` and no other flag, so a row that reads
+  // otherwise in Hotkeys settings or answers before the Canvas mounts would describe a different key.
+  it('mirrors the flags the Canvas registers its keys with', () => {
+    const catalogFlags = Object.fromEntries(
+      firstPartyHotkeyCatalog
+        .filter((hotkey) => hotkey.category === 'canvas')
+        .map(({ allowInEditable, allowInModal, id, preventDefault, targetSelector }) => [
+          id,
+          {
+            allowInEditable: allowInEditable === true,
+            allowInModal: allowInModal === true,
+            preventDefault: preventDefault !== false,
+            targetSelector: targetSelector ?? null,
+          },
+        ])
+    );
+    const registeredFlags = { allowInEditable: false, allowInModal: false, preventDefault: true, targetSelector: null };
+
+    expect(catalogFlags).toEqual(Object.fromEntries(allEntries.map(([id]) => [id, registeredFlags])));
+  });
 
   it('gives Transform Shift+T as its only default', () => {
     expect(CANVAS_COMPANION_HOTKEYS.find(([id]) => id === 'canvas.transformSelected')?.[2]).toEqual(['shift+t']);
@@ -846,7 +869,6 @@ describe('registration tables', () => {
     const engine = createEngine();
     const ctx = {
       engine,
-      isInteractionLocked: false,
       reportTransformRefusal: vi.fn(),
       resetActiveColors: vi.fn(),
       selectedLayerId: null,

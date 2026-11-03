@@ -11,6 +11,7 @@ import pytest
 import torch
 
 from invokeai.app.invocations.flux2_denoise import Flux2DenoiseInvocation
+from invokeai.backend.flux2.latent_norm import bn_normalize
 
 # Measured on the BFL FLUX.2 VAE (bn.running_mean / bn.running_var): mean ~0, var ~3.13.
 BN_STD_VALUE = 1.7676
@@ -66,7 +67,7 @@ def test_start_latents_differ_from_normalizing_the_raw_mixture() -> None:
         bn_std=bn_std,
     )
 
-    buggy = invocation._bn_normalize(t_0 * noise + (1.0 - t_0) * init_latents, bn_mean, bn_std)
+    buggy = bn_normalize(t_0 * noise + (1.0 - t_0) * init_latents, bn_mean, bn_std)
     # The buggy variant attenuates the noise term by 1 / bn_std.
     assert not torch.allclose(x, buggy, atol=1e-3)
     assert torch.allclose(x - buggy, t_0 * (noise - (noise - bn_mean) / bn_std), atol=1e-5)

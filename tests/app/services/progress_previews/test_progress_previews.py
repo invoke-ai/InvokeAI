@@ -61,6 +61,20 @@ def test_frames_inside_the_interval_are_dropped_except_final_and_indeterminate_o
     assert store.reserve_revision(1, "session-1", 0.3) == 4
 
 
+def test_a_producer_interval_widens_the_throttle_but_never_narrows_it() -> None:
+    clock = _Clock()
+    store = MemoryProgressPreviews(clock=clock)
+
+    assert store.reserve_revision(1, "session-1", 0.1, min_interval_s=1.0) == 1
+    clock.now += 0.5
+    assert store.reserve_revision(1, "session-1", 0.2, min_interval_s=1.0) is None
+    assert store.reserve_revision(1, "session-1", 1.0, min_interval_s=1.0) == 2
+    clock.now += 1.0
+    assert store.reserve_revision(1, "session-1", 0.3, min_interval_s=1.0) == 3
+    clock.now += PROGRESS_IMAGE_MIN_INTERVAL_S / 2
+    assert store.reserve_revision(1, "session-1", 0.4, min_interval_s=0.0) is None
+
+
 def test_throttle_is_per_item() -> None:
     clock = _Clock()
     store = MemoryProgressPreviews(clock=clock)
