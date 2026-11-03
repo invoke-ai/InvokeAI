@@ -1153,6 +1153,8 @@ export const listItemSlotRecipe = defineSlotRecipe({
       minW: 0,
       position: 'relative',
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
+      // A disabled row stays focusable, so its content dims instead of the root: the focus ring keeps full strength.
+      _disabled: { cursor: 'not-allowed', '& > *': { opacity: 0.5 } },
       // Rows of a page being replaced stay readable; only the pointer says the list is working.
       '&[data-busy]': { cursor: 'progress' },
     },

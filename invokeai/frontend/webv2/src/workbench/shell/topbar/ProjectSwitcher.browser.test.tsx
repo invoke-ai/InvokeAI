@@ -59,7 +59,11 @@ vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
 vi.mock('@platform/ui/ConfirmDialog', () => ({ ConfirmDialog: () => null }));
 vi.mock('@workbench/components/QueueProgressIndicator', () => ({ QueueCircularProgress: () => null }));
 vi.mock('@workbench/launchpad/formatRelativeTime', () => ({ formatRelativeTime: () => '' }));
-vi.mock('@workbench/projects/components', () => ({ OpenProjectDialog: () => null }));
+vi.mock('@workbench/projects/components/OpenProjectDialog', () => ({
+  OpenProjectDialog: ({ isOpen }: { isOpen: boolean }) => (
+    <div data-open={String(isOpen)} data-testid="open-project-dialog" />
+  ),
+}));
 vi.mock('@workbench/projects/components/DeleteProjectDialog', () => ({ DeleteProjectDialog: () => null }));
 vi.mock('@workbench/projects/library', () => ({
   refreshProjectLibrary: vi.fn(() => Promise.resolve()),
@@ -187,6 +191,20 @@ describe('ProjectSwitcher', () => {
     await act(() => document.querySelector<HTMLElement>('[role="menuitem"][data-value="rename-project"]')?.focus());
     await act(() => userEvent.keyboard('{Enter}'));
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"][data-state="open"]')).not.toBeNull());
+  });
+
+  it('loads the Open Project dialog only once it is asked for, and opens it', async () => {
+    const dialog = () => document.querySelector('[data-testid="open-project-dialog"]');
+    let openItem: HTMLElement | undefined;
+    await vi.waitFor(() => {
+      openItem = document.querySelector<HTMLElement>('[role="menuitem"][data-value="open-project"]') ?? undefined;
+      expect(openItem).toBeDefined();
+    });
+    expect(dialog()).toBeNull();
+
+    await act(() => userEvent.click(openItem!));
+
+    await vi.waitFor(() => expect(dialog()?.getAttribute('data-open')).toBe('true'));
   });
 
   it('brightens the trigger chevron while hovered and while the menu is open, like the app menu', async () => {

@@ -303,6 +303,32 @@ describe('list dividers', () => {
     expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
   });
 
+  it('keeps a disabled row and its neighbouring dividers unchanged on hover', async () => {
+    // Transitions finish within a frame, so hidden hairlines would already read as hidden.
+    document.documentElement.dataset.reduceMotion = 'true';
+    try {
+      await render(
+        <ListStack dividers label="subjects">
+          <ListItem title="one" onPress={vi.fn()} />
+          <ListItem isDisabled title="two" onPress={vi.fn()} />
+          <ListItem title="three" onPress={vi.fn()} />
+        </ListStack>
+      );
+      const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+      const background = getComputedStyle(row).backgroundColor;
+
+      // Force past Playwright's actionability check: the row is aria-disabled on purpose.
+      await userEvent.hover(row.querySelector('button')!, { force: true });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      expect(getComputedStyle(row).backgroundColor).toBe(background);
+      expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
+    } finally {
+      delete document.documentElement.dataset.reduceMotion;
+    }
+  });
+
   it('opens a menu-only row from keyboard, assistive-tech, and touch activation, but not a mouse click', async () => {
     const onContextMenu = vi.fn();
     await render(
