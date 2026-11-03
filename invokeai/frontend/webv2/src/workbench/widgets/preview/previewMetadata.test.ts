@@ -195,3 +195,82 @@ it('shows useful controls, authored layers, adapters and family settings with ra
   expect(entries.some((entry) => entry.value.includes('My edges') && entry.value.includes('Edges'))).toBe(true);
   expect(metadata.canvas_v3_metadata.document.stacks.control[0]?.id).toBe('c');
 });
+
+it('describes v4 IP-Adapters including model, image, vision, method, weight and schedule', () => {
+  const entry = {
+    ip_adapter_model: { model_name: 'Portrait', base_model: 'sdxl' },
+    image: { image_name: 'portrait.png' },
+    clip_vision_model: 'ViT-G',
+    method: 'style_precise',
+    weight: 0.65,
+    begin_step_percent: 0.2,
+    end_step_percent: 0.9,
+  };
+  const parsed = parsePreviewMetadata({ ipAdapters: [entry] }, image);
+  expect(parsed).toHaveLength(1);
+  expect(parsed[0]?.value).toBe('Portrait · portrait.png · ViT-G · style_precise · Weight 0.65 · Steps 0.2–0.9');
+  expect(parsePreviewMetadata({ ref_images: [], ipAdapters: [entry] }, image)).toEqual([]);
+});
+
+it.each(['array', 'entities'] as const)(
+  'summarizes historical global references in a %s without counting them as Canvas layers',
+  (shape) => {
+    const reference = {
+      id: 'global-style',
+      type: 'reference_image',
+      name: 'Global style',
+      isEnabled: true,
+      ipAdapter: {
+        type: 'ip_adapter',
+        model: { key: 'style', name: 'Historical style', base: 'sdxl', type: 'ip_adapter' },
+        image: { image_name: 'style.png', width: 320, height: 200 },
+        weight: 0.6,
+        method: 'composition',
+        clipVisionModel: 'ViT-L',
+        beginEndStepPct: [0.1, 0.8],
+      },
+    };
+    const canvas = {
+      rasterLayers: [{ id: 'raster', type: 'raster_layer', name: 'Authored raster' }],
+      controlLayers: [],
+      inpaintMasks: [],
+      regionalGuidance: [],
+      referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+    };
+    const metadata = {
+      canvas_v2_metadata: canvas,
+      ipAdapters: [{ ip_adapter_model: { name: 'Duplicate alias' }, image: { image_name: 'style.png' }, weight: 0.6 }],
+    };
+    const parsed = parsePreviewMetadata(metadata, image);
+    expect(values(parsed)).toMatchObject({
+      'ref_images-0': 'Historical style · ip_adapter · style.png · ViT-L · composition · Weight 0.6 · Steps 0.1–0.8',
+      canvasLayerCount: '1 layer',
+    });
+    expect(parsed.find((entry) => entry.key === 'ref_images-0')?.label).toBe('Reference images');
+    expect(parsed.filter((entry) => entry.value.includes('Historical style'))).toHaveLength(1);
+    expect(
+      parsed.some((entry) => entry.value.includes('Duplicate alias') || entry.value.includes('Global style'))
+    ).toBe(false);
+    for (const ref_images of [
+      [],
+      [
+        {
+          id: 'modern',
+          config: {
+            type: 'ip_adapter',
+            model: { name: 'Modern style' },
+            image: { image_name: 'modern.png' },
+            weight: 0.4,
+          },
+        },
+      ],
+    ]) {
+      const modern = parsePreviewMetadata({ ...metadata, ref_images }, image);
+      expect(
+        modern.some((entry) => entry.value.includes('Historical style') || entry.value.includes('Duplicate alias'))
+      ).toBe(false);
+      expect(modern.filter((entry) => entry.key.startsWith('ref_images-'))).toHaveLength(ref_images.length);
+      expect(values(modern).canvasLayerCount).toBe('1 layer');
+    }
+  }
+);

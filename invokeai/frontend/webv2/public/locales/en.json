@@ -3887,6 +3887,7 @@
         "control_layers": "Executed controls",
         "controlnets": "ControlNets",
         "t2iAdapters": "T2i adapters",
+        "ipAdapters": "IP-Adapters",
         "regions": "Regions",
         "canvas_layers": "Canvas layers",
         "metadata_source": "Metadata source"
@@ -5924,7 +5925,7 @@
           "beforeCanvasRecall": "Before metadata recall",
           "canvasRecalled": "Canvas layers and available settings recalled. Replaced canvases remain available in History restore points.",
           "canvasPartial": "Some canvas metadata could not be restored: {{items}}. Existing work was preserved.",
-          "referenceImagesPartial": "Some recorded reference images are unavailable. Existing references were kept when none could be restored.",
+          "referenceImagesPartial": "Some recorded reference images are unavailable or unsupported. Existing references were kept when none could be restored.",
           "canvasReasons": {
             "record-too-large": "the canvas record exceeds the metadata size limit",
             "invalid-record": "the canvas metadata version is damaged or unsupported",
@@ -5934,6 +5935,8 @@
             "model-changed": "the model changed while metadata was loading",
             "canvas-pending-results": "recalled layers were added to keep staged and running results",
             "canvas-limit": "the recalled layers could not fit in the current canvas",
+            "unsupported-control": "a recorded control weight schedule or resize mode cannot be represented in Canvas",
+            "unsupported-legacy-layers": "legacy vector layers cannot be restored",
             "invalid-control": "a control entry is damaged",
             "invalid-control-image": "a control image is unavailable",
             "image-lookup-failed": "canvas images could not be checked; try recalling again",

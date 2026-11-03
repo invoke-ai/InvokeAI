@@ -33,13 +33,14 @@ import {
   isAccountScopeCurrent,
   type AccountScope,
 } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 
 import type { CanvasRecallTarget } from './canvasRecall';
 
 import {
   buildImageRecallSettings,
   getImageRecallMessage,
-  getMetadataReferenceImages,
+  readMetadataReferenceImages,
   getImageRecallTitle,
   isImageRecallKindAvailable,
   type ImageRecallKind,
@@ -204,18 +205,28 @@ export const executeLoadMediaWorkflow = async ({
 const getReferenceImageName = (referenceImage: GenerateReferenceImage): string | null =>
   referenceImage.config.image ? getEffectiveReferenceImage(referenceImage.config.image).image_name : null;
 
-/** The names of the references' effective assets the gallery still has, in one bulk lookup; none asks nothing. */
-const resolveAvailableReferenceImageNames = async (
-  referenceImages: readonly GenerateReferenceImage[],
-  signal: AbortSignal
-): Promise<ReadonlySet<string>> => {
-  const names = [...new Set(referenceImages.flatMap((referenceImage) => getReferenceImageName(referenceImage) ?? []))];
-
-  if (names.length === 0) {
-    return new Set();
+/** Sequential, deduplicated lookups respect the Gallery API's 1,000-name request limit. */
+const resolveReferenceImages = async (
+  names: readonly string[],
+  signal: AbortSignal,
+  isCurrent: () => boolean = () => true
+): Promise<Map<string, GalleryImage>> => {
+  const assets = new Map<string, GalleryImage>();
+  const distinctNames = [...new Set(names)];
+  for (let offset = 0; offset < distinctNames.length; offset += 1000) {
+    if (signal.aborted || !isCurrent()) {
+      throw new DOMException('Recall is no longer current', 'AbortError');
+    }
+    const batch = distinctNames.slice(offset, offset + 1000);
+    const images = await galleryImages.resolveMany(batch, signal);
+    if (signal.aborted || !isCurrent()) {
+      throw new DOMException('Recall is no longer current', 'AbortError');
+    }
+    for (const image of images) {
+      assets.set(image.imageName, image);
+    }
   }
-
-  return new Set((await galleryImages.resolveMany(names, signal)).map((availableImage) => availableImage.imageName));
+  return assets;
 };
 
 /** Entries without an asset, or whose effective asset is not among `availableNames`, are dropped. */
@@ -233,7 +244,17 @@ export const filterAvailableReferenceImages = async (
   referenceImages: GenerateReferenceImage[],
   signal: AbortSignal
 ): Promise<GenerateReferenceImage[]> =>
-  keepAvailableReferenceImages(referenceImages, await resolveAvailableReferenceImageNames(referenceImages, signal));
+  keepAvailableReferenceImages(
+    referenceImages,
+    new Set(
+      (
+        await resolveReferenceImages(
+          referenceImages.flatMap((reference) => getReferenceImageName(reference) ?? []),
+          signal
+        )
+      ).keys()
+    )
+  );
 
 /** Why `getCurrentGenerateValues` answered null: no supported model, or no table to initialise from. */
 export const getMissingGenerateValuesMessage = (t: TFunction): string =>
@@ -342,8 +363,33 @@ export const executeImageRecall = async ({
       kind === 'dimensions' ? null : await fetchGalleryImageMetadata(queryClient, owner, image.imageName);
     // Only all/remix recall references. Checked against the record, not the built list, so the check happens before
     // the snapshot below.
-    const recordedReferences = kind === 'all' || kind === 'remix' ? getMetadataReferenceImages(metadata) : null;
-    const availableReferenceNames = await resolveAvailableReferenceImageNames(recordedReferences ?? [], owner.signal);
+    const referenceRecord = kind === 'all' || kind === 'remix' ? readMetadataReferenceImages(metadata) : null;
+    let referenceAssets = new Map<string, GalleryImage>();
+    let referenceLookupFailed = false;
+    try {
+      referenceAssets = await resolveReferenceImages(
+        referenceRecord?.names ?? [],
+        owner.signal,
+        () => isAccountScopeCurrent(owner) && (!canvasTarget || Boolean(canvasTarget.getProject()))
+      );
+    } catch (error) {
+      assertAccountScopeCurrent(owner);
+      if (canvasTarget && !canvasTarget.getProject()) {
+        return false;
+      }
+      const networkFailure =
+        error instanceof TypeError &&
+        ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'fetch failed'].includes(
+          error.message
+        );
+      if (!(error instanceof ApiError) && !networkFailure) {
+        throw error;
+      }
+      referenceLookupFailed = true;
+    }
+    const hydratedReferences = referenceRecord ? readMetadataReferenceImages(metadata, referenceAssets) : null;
+    const recordedReferences = hydratedReferences?.images ?? null;
+    const availableReferenceNames = new Set(referenceAssets.keys());
 
     assertAccountScopeCurrent(owner);
     if (canvasTarget && !canvasTarget.getProject()) {
@@ -357,6 +403,8 @@ export const executeImageRecall = async ({
       ('canvas_v3_metadata' in metadata ||
         'canvas_v2_metadata' in metadata ||
         'control_layers' in metadata ||
+        'controlnets' in metadata ||
+        't2iAdapters' in metadata ||
         'strength' in metadata ||
         'denoise_strength' in metadata)
         ? await import('./canvasRecall')
@@ -369,6 +417,7 @@ export const executeImageRecall = async ({
           isCanvasFrame,
           kind,
           metadata,
+          referenceAssets,
           models,
           supportedModels,
           vaeModels,
@@ -406,6 +455,7 @@ export const executeImageRecall = async ({
       isCanvasFrame,
       kind,
       metadata,
+      referenceAssets,
       models,
       supportedModels,
       vaeModels,
@@ -455,6 +505,9 @@ export const executeImageRecall = async ({
     const skippedConcepts = result.skipped.filter((skipped) => skipped.subject === 'concept');
     const skippedRefiner = result.skipped.find((skipped) => skipped.subject === 'refiner');
     const skipMessages = [
+      referenceLookupFailed ||
+      readMetadataReferenceImages(metadata, referenceAssets, models, result.values.model).partial ||
+      referenceRecord?.names.some((name) => !availableReferenceNames.has(name)) ||
       recordedReferences?.some((reference) => {
         const name = getReferenceImageName(reference);
         return name === null || !availableReferenceNames.has(name);

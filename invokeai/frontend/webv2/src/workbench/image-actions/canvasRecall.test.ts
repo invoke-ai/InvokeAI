@@ -765,3 +765,439 @@ it('recalls complete Canvas processing settings through their owner bounds and s
   expect(malformed.partial).toBe(true);
   expect(malformed.document?.stacks.raster).toHaveLength(1);
 });
+
+const standaloneControl = () => ({
+  control_model: { base: 'sdxl', type: 'controlnet', hash: 'control-hash', key: 'old-install', name: 'Edges' },
+  image: { image_name: 'original.png' },
+  processed_image: { image_name: 'processed.png' },
+  control_weight: 0.65,
+  begin_step_percent: 0.15,
+  end_step_percent: 0.85,
+  control_mode: 'more_control',
+});
+
+it.each(['all', 'remix'] as const)(
+  'recalls standalone name-only controls through Gallery %s with actual map dimensions and a restore point',
+  async (kind) => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    target.commands.canvas.apply(target.projectId, { type: 'replaceCanvasDocument', document: document() });
+    const before = target.getProject()!.canvas.document;
+    const t2i = { base: 'sdxl', type: 't2i_adapter', key: 't2i', name: 'Sketch' } as ModelConfig;
+    api.metadata.mockResolvedValue({
+      width: 1024,
+      height: 768,
+      controlnets: [standaloneControl()],
+      t2iAdapters: [
+        {
+          t2i_adapter_model: t2i,
+          image: { image_name: 'sketch.png' },
+          weight: 0.4,
+          begin_step_percent: 0,
+          end_step_percent: 0.6,
+        },
+      ],
+    });
+    api.resolveMany.mockImplementation((names: string[]) =>
+      Promise.resolve(names.map((imageName) => ({ imageName, width: 512, height: 256 })))
+    );
+    expect(
+      await executeImageRecall({
+        commands: store.commands,
+        canvasTarget: target,
+        getGenerateValues: () => ({ modelKey: main.key }),
+        image: { imageName: 'legacy.png', width: 1024, height: 768 } as GalleryImage,
+        kind,
+        models: [...models, t2i],
+        projectId: target.projectId,
+        queryClient: new QueryClient(),
+        t,
+      })
+    ).toBe(true);
+    expect(api.resolveMany).toHaveBeenCalledExactlyOnceWith(['processed.png', 'sketch.png'], expect.any(AbortSignal));
+    const after = target.getProject()!.canvas;
+    expect(after.document.stacks.control).toEqual([
+      expect.objectContaining({
+        source: { type: 'image', image: { imageName: 'processed.png', width: 512, height: 256 } },
+        transform: { x: -128, y: 96, rotation: 0, scaleX: 1.5, scaleY: 4 },
+        adapter: {
+          model: controlModel.key,
+          kind: 'controlnet',
+          weight: 0.65,
+          beginEndStepPct: [0.15, 0.85],
+          controlMode: 'more_control',
+        },
+      }),
+      expect.objectContaining({
+        adapter: expect.objectContaining({ model: 't2i', kind: 't2i_adapter', weight: 0.4, beginEndStepPct: [0, 0.6] }),
+      }),
+    ]);
+    expect(after.document.stacks.raster).toEqual(before.stacks.raster);
+    expect(after.snapshots.at(-1)?.document).toEqual(before);
+  }
+);
+
+it.each([
+  ['flux', 'control_lora', 'control_lora'],
+  ['anima', 'controlnet', 'anima_lllite'],
+  ['qwen-image', 'controlnet', 'qwen_image_control'],
+  ['flux2', 'controlnet', 'flux2_control'],
+] as const)('infers standalone %s control kind from installed model identity', async (base, type, kind) => {
+  const adapter = {
+    base,
+    type,
+    key: 'installed',
+    name: 'Installed',
+    hash: 'portable',
+    cond_in_channels: 3,
+  } as ModelConfig;
+  const model = { base, key: 'main', name: 'Main', type: 'main', variant: 'dev' } as MainModelConfig;
+  api.resolveMany.mockResolvedValue([{ imageName: 'processed.png', width: 640, height: 480 }]);
+  const plan = await prepareCanvasRecall({
+    metadata: {
+      controlnets: [
+        {
+          ...standaloneControl(),
+          control_model: { base, type, hash: 'portable' },
+          begin_step_percent: 0,
+          end_step_percent: 1,
+        },
+      ],
+    },
+    model,
+    models: [model, adapter],
+    owner: captureAccountScope(),
+  });
+  expect(plan.problems).toEqual([]);
+  expect(plan.document?.stacks.control[0]).toMatchObject({ adapter: { model: 'installed', kind } });
+});
+
+it.each([
+  { controlnets: [] },
+  { controlnets: 'damaged' },
+  { controlnets: [{ ...standaloneControl(), control_weight: [0.2, 0.9] }] },
+  { controlnets: [{ ...standaloneControl(), resize_mode: 'crop_resize' }] },
+  { controlnets: [{ ...standaloneControl(), control_model: { key: 'deleted' } }] },
+  { controlnets: [{ ...standaloneControl(), processed_image: { image_name: 'deleted.png' } }] },
+])('preserves authored Canvas when standalone controls cannot be restored: %j', async (metadata) => {
+  api.resolveMany.mockImplementation((names: string[]) =>
+    Promise.resolve(
+      names.filter((name) => name !== 'deleted.png').map((imageName) => ({ imageName, width: 320, height: 200 }))
+    )
+  );
+  const store = createWorkbenchStore();
+  const target = targetFor(store);
+  target.commands.canvas.apply(target.projectId, { type: 'replaceCanvasDocument', document: document() });
+  const before = target.getProject()!.canvas;
+  const add = vi.spyOn(store.commands.notifications, 'add');
+  api.metadata.mockResolvedValue({ ...metadata, positive_prompt: 'still independent' });
+  expect(
+    await executeImageRecall({
+      commands: store.commands,
+      canvasTarget: target,
+      getGenerateValues: () => ({ modelKey: main.key }),
+      image: { imageName: 'legacy.png', width: 1024, height: 768 } as GalleryImage,
+      kind: 'all',
+      models,
+      projectId: target.projectId,
+      queryClient: new QueryClient(),
+      t,
+    })
+  ).toBe(true);
+  expect(target.getProject()!.canvas).toBe(before);
+  expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({
+    positivePrompt: 'still independent',
+  });
+  expect(add).toHaveBeenCalledWith(
+    expect.objectContaining({ title: 'widgets.gallery.itemActions.recall.partiallyRecalled' })
+  );
+});
+
+it.each([false, true])(
+  'keeps modern control records authoritative over standalone aliases (empty=%s)',
+  async (empty) => {
+    const control = {
+      model: controlModel,
+      image: { image_name: 'modern.png', width: 300, height: 200 },
+      position: { x: -70, y: 90 },
+      weight: 0.3,
+    };
+    api.resolveMany.mockResolvedValue([{ imageName: 'modern.png', width: 600, height: 400 }]);
+    const plan = await prepareCanvasRecall({
+      metadata: { control_layers: empty ? [] : [control], controlnets: [standaloneControl()] },
+      model: main,
+      models,
+      owner: captureAccountScope(),
+    });
+    expect(plan.document?.stacks.control).toHaveLength(empty ? 0 : 1);
+    if (empty) {
+      expect(api.resolveMany).not.toHaveBeenCalled();
+    } else {
+      expect(api.resolveMany).toHaveBeenCalledExactlyOnceWith(['modern.png'], expect.any(AbortSignal));
+      expect(plan.document?.stacks.control[0]).toMatchObject({
+        transform: { x: -70, y: 90, scaleX: 1, scaleY: 1 },
+        source: { image: { width: 600, height: 400 } },
+      });
+    }
+  }
+);
+
+it('bounds standalone asset reads, deduplicates maps and refuses a stale project before the next batch', async () => {
+  let current = true;
+  const controls = Array.from({ length: 1002 }, (_, index) => ({
+    ...standaloneControl(),
+    processed_image: { image_name: `map-${index % 1001}.png` },
+  }));
+  api.resolveMany.mockImplementation((names: string[]) => {
+    current = false;
+    return Promise.resolve(names.map((imageName) => ({ imageName, width: 64, height: 64 })));
+  });
+  const plan = await prepareCanvasRecall({
+    metadata: { controlnets: controls },
+    model: main,
+    models,
+    owner: captureAccountScope(),
+    isCurrent: () => current,
+  });
+  expect(api.resolveMany).toHaveBeenCalledOnce();
+  expect(api.resolveMany.mock.calls[0]![0]).toHaveLength(1000);
+  expect(plan.document).toBeNull();
+  expect(plan.problems).toContain('canvas-changed');
+});
+
+it('reports legacy vector loss as partial instead of replacing authored work', async () => {
+  const layer = {
+    id: 'raster',
+    name: 'Legacy raster',
+    isEnabled: true,
+    isLocked: false,
+    position: { x: 0, y: 0 },
+    opacity: 1,
+    objects: [{ id: 'image', type: 'image', image: { image_name: 'raster.png', width: 320, height: 200 } }],
+  };
+  const plan = await prepareCanvasRecall({
+    metadata: {
+      canvas_v2_metadata: {
+        rasterLayers: [layer],
+        controlLayers: [],
+        inpaintMasks: [],
+        regionalGuidance: [],
+        vectorLayers: [{ id: 'vector' }],
+      },
+    },
+    model: main,
+    models,
+    owner: captureAccountScope(),
+  });
+  expect(plan.document?.stacks.raster).toHaveLength(1);
+  expect(plan.partial).toBe(true);
+  expect(plan.problems).toContain('unsupported-legacy-layers');
+});
+
+it.each(['partial', 'pending'] as const)(
+  'fits standalone maps to the active frame while preserving authored work in a %s merge',
+  async (mode) => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    target.commands.canvas.apply(target.projectId, { type: 'replaceCanvasDocument', document: document() });
+    if (mode === 'pending') {
+      store.commands.canvas.appendStagingCandidate({
+        projectId: target.projectId,
+        candidate: {
+          imageName: 'staged.png',
+          imageUrl: '',
+          thumbnailUrl: '',
+          width: 100,
+          height: 100,
+          queuedAt: '',
+          sourceQueueItemId: '',
+          placement: { x: 0, y: 0, width: 100, height: 100, opacity: 1 },
+        },
+      });
+    }
+    const before = target.getProject()!.canvas;
+    api.resolveMany.mockResolvedValue([{ imageName: 'processed.png', width: 256, height: 512 }]);
+    const controls = [
+      standaloneControl(),
+      ...(mode === 'partial' ? [{ ...standaloneControl(), control_weight: [0.2, 0.9] }] : []),
+    ];
+    const plan = await prepareCanvasRecall({
+      metadata: { width: 1024, height: 768, controlnets: controls },
+      model: main,
+      models,
+      owner: captureAccountScope(),
+    });
+    expect(
+      commitCanvasRecall({ plan, target, expectedDocument: before.document, restorePointName: 'Before recall' })
+    ).toBe(true);
+    const after = target.getProject()!.canvas;
+    expect(after.document.bbox).toEqual(before.document.bbox);
+    expect(after.document.stacks.raster).toEqual(before.document.stacks.raster);
+    expect(after.document.stacks.control).toHaveLength(2);
+    expect(
+      after.document.stacks.control.find(
+        (node) =>
+          node.type === 'control' && node.source.type === 'image' && node.source.image.imageName === 'processed.png'
+      )
+    ).toMatchObject({
+      transform: { x: -128, y: 96, rotation: 0, scaleX: 3, scaleY: 2 },
+    });
+    expect(after.stagingArea).toEqual(before.stagingArea);
+    expect(after.snapshots).toHaveLength(0);
+    expect(plan.partial).toBe(true);
+  }
+);
+
+it('preserves authored controls for a malformed modern list rather than interpreting it as an empty list', async () => {
+  const plan = await prepareCanvasRecall({
+    metadata: { control_layers: null, controlnets: [standaloneControl()] },
+    model: main,
+    models,
+    owner: captureAccountScope(),
+  });
+  expect(plan.document).toBeNull();
+  expect(plan.problems).toContain('invalid-control');
+  expect(api.resolveMany).not.toHaveBeenCalled();
+});
+
+it('keeps Generate recall independent when the second standalone-control asset batch fails', async () => {
+  const store = createWorkbenchStore();
+  const target = targetFor(store);
+  const before = target.getProject()!.canvas;
+  api.metadata.mockResolvedValue({
+    positive_prompt: 'independent',
+    controlnets: Array.from({ length: 1001 }, (_, index) => ({
+      ...standaloneControl(),
+      processed_image: { image_name: `map-${index}.png` },
+    })),
+  });
+  api.resolveMany
+    .mockImplementationOnce((names: string[]) =>
+      Promise.resolve(names.map((imageName) => ({ imageName, width: 64, height: 64 })))
+    )
+    .mockRejectedValueOnce(new ApiError('Unavailable', 503));
+  expect(
+    await executeImageRecall({
+      commands: store.commands,
+      canvasTarget: target,
+      getGenerateValues: () => ({ modelKey: main.key }),
+      image: { imageName: 'legacy.png', width: 512, height: 512 } as GalleryImage,
+      kind: 'remix',
+      models,
+      queryClient: new QueryClient(),
+      projectId: target.projectId,
+      t,
+    })
+  ).toBe(true);
+  expect(target.getProject()!.canvas).toBe(before);
+  expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({ positivePrompt: 'independent' });
+  expect(api.resolveMany.mock.calls.map(([names]) => names.length)).toEqual([1000, 1]);
+});
+
+it('stops reference hydration after the originating project changes before the second batch or any commit', async () => {
+  const store = createWorkbenchStore();
+  const target = targetFor(store);
+  const ipModel = { base: 'sdxl', type: 'ip_adapter', key: 'ip', name: 'IP' } as ModelConfig;
+  api.metadata.mockResolvedValue({
+    positive_prompt: 'stale',
+    ipAdapters: Array.from({ length: 1001 }, (_, index) => ({
+      ip_adapter_model: ipModel,
+      image: { image_name: `ref-${index}.png` },
+      weight: 0.5,
+      method: 'full',
+      clip_vision_model: 'ViT-H',
+      begin_step_percent: 0,
+      end_step_percent: 1,
+    })),
+  });
+  const setSettings = vi.spyOn(store.commands.generation, 'setSettings');
+  const before = target.getProject()!.canvas;
+  api.resolveMany.mockImplementation((names: string[]) => {
+    store.commands.projects.create();
+    return Promise.resolve(names.map((imageName) => ({ imageName, width: 64, height: 64 })));
+  });
+  expect(
+    await executeImageRecall({
+      commands: store.commands,
+      canvasTarget: {
+        ...target,
+        getProject: () => (store.queries.isActiveProject(target.projectId) ? target.getProject() : null),
+      },
+      getGenerateValues: () => ({ modelKey: main.key }),
+      image: { imageName: 'legacy.png', width: 512, height: 512 } as GalleryImage,
+      kind: 'all',
+      models: [...models, ipModel],
+      queryClient: new QueryClient(),
+      projectId: target.projectId,
+      t,
+    })
+  ).toBe(false);
+  expect(api.resolveMany).toHaveBeenCalledOnce();
+  expect(setSettings).not.toHaveBeenCalled();
+  expect(target.getProject()!.canvas).toBe(before);
+});
+
+it.each([
+  ['array', 'all'],
+  ['array', 'remix'],
+  ['entities', 'all'],
+  ['entities', 'remix'],
+] as const)(
+  'warns when Gallery %s historical references are refused during %s, preserving existing references and Canvas',
+  async (shape, kind) => {
+    const store = createWorkbenchStore();
+    const target = targetFor(store);
+    const before = target.getProject()!.canvas;
+    const ipModel = { base: 'sdxl', key: 'ip', name: 'IP', type: 'ip_adapter' } as ModelConfig;
+    const currentReference = {
+      id: 'current',
+      isEnabled: true,
+      config: {
+        type: 'ip_adapter',
+        model: ipModel,
+        image: { original: { image: { image_name: 'current.png', width: 100, height: 100 } } },
+        weight: 0.5,
+        beginEndStepPct: [0, 1],
+        clipVisionModel: 'ViT-H',
+        method: 'full',
+      },
+    };
+    const refused = { id: 'old', ipAdapter: { type: 'ip_adapter', image: null } };
+    api.metadata.mockResolvedValue({
+      positive_prompt: 'still recallable',
+      canvas_v2_metadata: {
+        rasterLayers: [],
+        controlLayers: [],
+        inpaintMasks: [],
+        regionalGuidance: [],
+        referenceImages: shape === 'array' ? [refused] : { entities: [refused] },
+      },
+    });
+    const add = vi.spyOn(store.commands.notifications, 'add');
+    expect(
+      await executeImageRecall({
+        commands: store.commands,
+        canvasTarget: target,
+        getGenerateValues: () => ({ modelKey: main.key, referenceImages: [currentReference] }),
+        image: { imageName: 'historical.png', width: 512, height: 512 } as GalleryImage,
+        kind,
+        models: [...models, ipModel],
+        queryClient: new QueryClient(),
+        projectId: target.projectId,
+        t,
+      })
+    ).toBe(true);
+    expect(target.getProject()!.canvas).toBe(before);
+    expect(getProjectWidgetValues(target.getProject()!, 'generate')).toMatchObject({
+      positivePrompt: 'still recallable',
+      referenceImages: [currentReference],
+    });
+    expect(api.resolveMany).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'widgets.gallery.itemActions.recall.partiallyRecalled',
+        message: 'widgets.gallery.itemActions.recall.referenceImagesPartial',
+      })
+    );
+  }
+);

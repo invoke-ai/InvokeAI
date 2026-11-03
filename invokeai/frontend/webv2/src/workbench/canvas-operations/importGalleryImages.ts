@@ -392,6 +392,20 @@ export const commitCanvasRecall = ({
   let applied = false;
   if (plan.document) {
     const document = structuredClone(plan.document);
+    if (plan.fitControlsToFrame) {
+      const frame = project.canvas.document.bbox;
+      for (const control of document.stacks.control) {
+        if (control.type === 'control' && control.source.type === 'image') {
+          control.transform = {
+            x: frame.x,
+            y: frame.y,
+            rotation: 0,
+            scaleX: frame.width / control.source.image.width,
+            scaleY: frame.height / control.source.image.height,
+          };
+        }
+      }
+    }
     // Fresh ids avoid collisions in partial/append recalls and old engine caches on wholesale replacement.
     const remappedIds = new Map<string, string>();
     const remap = (nodes: CanvasNodeContract[]): void => {

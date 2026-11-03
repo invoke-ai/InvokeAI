@@ -1,6 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import { readRecordedModelRef } from '@workbench/image-actions';
+import { getLegacyCanvasReferenceEntries } from '@workbench/image-actions/imageRecall';
 
 /**
  * Parse variable untyped generation metadata tolerantly into display rows; skip unknown or malformed fields while the
@@ -224,8 +225,18 @@ export const parsePreviewMetadata = (
       metadata.ideogram4_color_palette.filter((term) => typeof term === 'string').join(', ')
     );
   }
-  for (const key of ['loras', 'ref_images', 'control_layers', 'controlnets', 't2iAdapters', 'regions'] as const) {
-    const values = metadata[key];
+  const legacyReferences = getLegacyCanvasReferenceEntries(metadata);
+  const showLegacyReferences = !Array.isArray(metadata.ref_images) && Boolean(legacyReferences?.length);
+  for (const key of [
+    'loras',
+    'ref_images',
+    'control_layers',
+    'controlnets',
+    't2iAdapters',
+    'ipAdapters',
+    'regions',
+  ] as const) {
+    const values = key === 'ref_images' && showLegacyReferences ? legacyReferences : metadata[key];
     if (!Array.isArray(values) || values.length === 0) {
       continue;
     }
@@ -233,36 +244,45 @@ export const parsePreviewMetadata = (
     if ((key === 'controlnets' || key === 't2iAdapters') && Array.isArray(metadata.control_layers)) {
       continue;
     }
+    if (key === 'ipAdapters' && (Array.isArray(metadata.ref_images) || showLegacyReferences)) {
+      continue;
+    }
     values.slice(0, 100).forEach((entry, index) => {
       if (!isRecord(entry)) {
         return;
       }
-      const config = isRecord(entry.config) ? entry.config : entry;
+      const config = isRecord(entry.config) ? entry.config : isRecord(entry.ipAdapter) ? entry.ipAdapter : entry;
       const model = modelName(
         config.model ?? config.lora ?? config.control_model ?? config.t2i_adapter_model ?? config.ip_adapter_model
       );
-      const asset = isRecord(config.image) ? config.image : null;
+      const image = Array.isArray(config.image) && config.image.length === 1 ? config.image[0] : config.image;
+      const asset = isRecord(image) ? image : null;
       const original =
         asset && isRecord(asset.original) && isRecord(asset.original.image) ? asset.original.image : asset;
       const parts = [
         model,
         getString(config, 'type'),
-        getString(config, 'imageName') ?? getString(original ?? {}, 'image_name'),
+        getString(config, 'imageName') ??
+          getString(original ?? {}, 'image_name') ??
+          (Array.isArray(config.image)
+            ? config.image
+                .slice(0, 100)
+                .flatMap((image) => (isRecord(image) ? (getString(image, 'image_name') ?? []) : []))
+                .join(', ')
+            : null),
         getString(config, 'positivePrompt'),
+        getString(config, 'clip_vision_model') ?? getString(config, 'clipVisionModel'),
+        getString(config, 'method'),
       ];
       const weight = config.weight ?? config.control_weight;
       if (typeof weight === 'number' && Number.isFinite(weight)) {
         parts.push(t('widgets.preview.metadataWeight', { weight }));
       }
-      if (
-        typeof config.begin_step_percent === 'number' &&
-        Number.isFinite(config.begin_step_percent) &&
-        typeof config.end_step_percent === 'number' &&
-        Number.isFinite(config.end_step_percent)
-      ) {
-        parts.push(
-          t('widgets.preview.metadataSchedule', { begin: config.begin_step_percent, end: config.end_step_percent })
-        );
+      const [begin, end] = Array.isArray(config.beginEndStepPct)
+        ? config.beginEndStepPct
+        : [config.begin_step_percent, config.end_step_percent];
+      if (typeof begin === 'number' && Number.isFinite(begin) && typeof end === 'number' && Number.isFinite(end)) {
+        parts.push(t('widgets.preview.metadataSchedule', { begin, end }));
       }
       if (parts.some(Boolean)) {
         push(`${key}-${index}`, metadataLabel(key), parts.filter(Boolean).join(' · '), true);
@@ -323,9 +343,9 @@ export const parsePreviewMetadata = (
       }
       return count;
     };
-    const counts = Object.values(stacks ?? legacyCanvas!)
-      .filter(Array.isArray)
-      .map((nodes) => visit(nodes, 0));
+    const counts = Object.entries(stacks ?? legacyCanvas!).flatMap(([key, nodes]) =>
+      key !== 'referenceImages' && Array.isArray(nodes) ? [visit(nodes, 0)] : []
+    );
     push(
       'canvasLayerCount',
       metadataLabel('canvas_layers'),

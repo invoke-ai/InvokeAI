@@ -71,6 +71,8 @@ const hasCanvasRecall = (metadata: unknown): boolean =>
   ('canvas_v3_metadata' in metadata ||
     'canvas_v2_metadata' in metadata ||
     'control_layers' in metadata ||
+    'controlnets' in metadata ||
+    't2iAdapters' in metadata ||
     typeof (metadata.strength ?? metadata.denoise_strength) === 'number');
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
@@ -1107,43 +1109,171 @@ const getMetadataConcepts = (
   return { loras, skipped };
 };
 
-/**
- * The references the image was generated with, or null when the record says nothing about them. An explicitly
- * empty modern list means it used none; only a list with no usable entry falls back to the pre-v6 canvas slot.
- */
-export const getMetadataReferenceImages = (metadata: unknown): GenerateReferenceImage[] | null => {
+// A refused sentinel makes truncation partial without inspecting entries beyond the recall limit.
+const boundReferenceEntries = (entries: unknown[]): unknown[] =>
+  entries.length > 10000 ? [...entries.slice(0, 10000), null] : entries;
+
+/** Historical Canvas global references were serialized both as an array and as an entity container. */
+export const getLegacyCanvasReferenceEntries = (metadata: unknown): unknown[] | null => {
+  const references = getRecord(metadata, 'canvas_v2_metadata')?.referenceImages;
+  const entries = Array.isArray(references) ? references : isRecord(references) ? references.entities : null;
+  return Array.isArray(entries) ? entries : null;
+};
+
+/** A bounded projection of supported reference records, before asset dimensions are available. */
+const getMetadataReferenceEntries = (metadata: unknown): unknown[] | null => {
   if (!isRecord(metadata)) {
     return null;
   }
-
-  if (Array.isArray(metadata.ref_images) && metadata.ref_images.length === 0) {
-    return [];
+  if (
+    Array.isArray(metadata.ref_images) &&
+    (metadata.ref_images.length === 0 ||
+      normalizeReferenceImages(metadata.ref_images.slice(0, 10000)).some((ref) => ref.config.image))
+  ) {
+    return boundReferenceEntries(metadata.ref_images);
   }
-
-  const direct = normalizeReferenceImages(metadata.ref_images).filter(
-    (referenceImage) => referenceImage.config.image !== null
-  );
-  if (direct.length > 0) {
-    return direct;
-  }
-
-  const canvasMetadata = getRecord(metadata, 'canvas_v2_metadata');
-  const referenceImages = getRecord(canvasMetadata, 'referenceImages');
-  const legacyEntities = referenceImages?.entities;
-  if (!Array.isArray(legacyEntities)) {
-    return null;
-  }
-
-  const legacy = normalizeReferenceImages(
-    legacyEntities.map((entry) =>
+  const legacyEntities = getLegacyCanvasReferenceEntries(metadata);
+  let rejectedHistoricalReferences = false;
+  if (Array.isArray(legacyEntities) && legacyEntities.length > 0) {
+    const entries = boundReferenceEntries(legacyEntities).map((entry) =>
       isRecord(entry) && isRecord(entry.ipAdapter)
         ? { config: entry.ipAdapter, id: entry.id, isEnabled: entry.isEnabled }
         : entry
-    )
-  ).filter((referenceImage) => referenceImage.config.image !== null);
-
-  return legacy.length > 0 ? legacy : null;
+    );
+    if (normalizeReferenceImages(entries).some((ref) => ref.config.image)) {
+      return entries;
+    }
+    rejectedHistoricalReferences = true;
+  }
+  if (!('ipAdapters' in metadata)) {
+    return rejectedHistoricalReferences ? [null] : null;
+  }
+  if (!Array.isArray(metadata.ipAdapters) || metadata.ipAdapters.length === 0) {
+    return [null];
+  }
+  return boundReferenceEntries(metadata.ipAdapters).map((entry, index) => {
+    if (!isRecord(entry)) {
+      return null;
+    }
+    // The modern slot holds one image. Splitting a multi-image embedding changes what the adapter computes.
+    const image = Array.isArray(entry.image) && entry.image.length === 1 ? entry.image[0] : entry.image;
+    const model = toRecordedModelRef(entry.ip_adapter_model);
+    const begin = entry.begin_step_percent ?? 0,
+      end = entry.end_step_percent ?? 1;
+    if (
+      !isRecord(image) ||
+      typeof image.image_name !== 'string' ||
+      !image.image_name ||
+      !model ||
+      typeof entry.weight !== 'number' ||
+      !Number.isFinite(entry.weight) ||
+      entry.weight < -1 ||
+      entry.weight > 2 ||
+      typeof begin !== 'number' ||
+      typeof end !== 'number' ||
+      !Number.isFinite(begin) ||
+      !Number.isFinite(end) ||
+      begin < 0 ||
+      end > 1 ||
+      begin > end ||
+      !['full', 'style', 'composition', 'style_strong', 'style_precise'].includes(String(entry.method)) ||
+      !['ViT-L', 'ViT-H', 'ViT-G'].includes(String(entry.clip_vision_model))
+    ) {
+      return null;
+    }
+    return {
+      legacyIPAdapter: true,
+      id: `legacy-ip-adapter-${index}`,
+      isEnabled: true,
+      config: {
+        type: 'ip_adapter',
+        image,
+        weight: entry.weight,
+        beginEndStepPct: [begin, end],
+        method: entry.method,
+        clipVisionModel: entry.clip_vision_model,
+        model: {
+          key: model.key ?? '',
+          hash: model.hash ?? undefined,
+          name: model.name ?? '',
+          base: model.base ?? '',
+          type: model.type ?? 'ip_adapter',
+        },
+      },
+    };
+  });
 };
+
+/** Reads references without transport; name-only v4 assets wait for their actual Gallery dimensions. */
+export const readMetadataReferenceImages = (
+  metadata: unknown,
+  assets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>,
+  models?: readonly ComponentModelConfig[],
+  mainModel?: GenerateModelConfig
+): { images: GenerateReferenceImage[] | null; names: string[]; partial: boolean } => {
+  const entries = getMetadataReferenceEntries(metadata);
+  if (entries === null) {
+    return { images: null, names: [], partial: false };
+  }
+  const names = new Set<string>();
+  const ipAdapterModels = models?.filter((model) => model.type === 'ip_adapter');
+  const hydrated = entries.map((entry) => {
+    if (!isRecord(entry) || !isRecord(entry.config)) {
+      return entry;
+    }
+    const rawEntry = entry;
+    let config = entry.config;
+    if (config.type === 'ip_adapter' && Array.isArray(config.weight)) {
+      return null;
+    }
+    if (entry.legacyIPAdapter && models) {
+      const ref = toRecordedModelRef(config.model);
+      const installed = ref
+        ? resolveRecordedModel(ref, ipAdapterModels ?? [], { ...IMAGE_RECORDED_MODEL_POLICY, hashMiss: 'matchName' })
+        : null;
+      if (
+        !installed ||
+        installed === 'ambiguous' ||
+        (ref?.base && ref.base !== installed.base) ||
+        (ref?.type && ref.type !== installed.type) ||
+        (mainModel && installed.base !== mainModel.base)
+      ) {
+        return null;
+      }
+      config = { ...config, model: installed };
+      entry = { ...entry, config };
+    }
+    const asset = config.image;
+    const effective =
+      isRecord(asset) && isRecord(asset.crop)
+        ? asset.crop.image
+        : isRecord(asset) && isRecord(asset.original)
+          ? asset.original.image
+          : asset;
+    const name = isRecord(effective) ? (effective.image_name ?? effective.imageName) : null;
+    if (typeof name === 'string' && name.length > 0) {
+      names.add(name);
+      const resolved = assets?.get(name);
+      if (resolved && isRecord(asset) && !('original' in asset)) {
+        return {
+          ...rawEntry,
+          config: { ...config, image: { image_name: name, width: resolved.width, height: resolved.height } },
+        };
+      }
+    }
+    return entry;
+  });
+  const images = normalizeReferenceImages(hydrated).filter((ref) => ref.config.image !== null);
+  return {
+    images: images.length > 0 || entries.length === 0 ? images : null,
+    names: [...names],
+    partial: images.length < entries.length,
+  };
+};
+
+/** Existing pure callers can read dimensioned references; transport recall hydrates name-only records first. */
+export const getMetadataReferenceImages = (metadata: unknown): GenerateReferenceImage[] | null =>
+  readMetadataReferenceImages(metadata).images;
 
 /**
  * Point each recorded adapter at the installed model it names, or clear it so Generate asks for one: a reinstall gives
@@ -1227,10 +1357,12 @@ export const getImageRecallCapabilities = ({
   const hasSize = hasMetadataSize(metadata, currentValues.model);
   const hasSettings = hasGenerationSettings(metadata, clipSkipModel);
   const hasComponents = hasComponentModels(metadata, models);
-  const recordedReferenceImages = getMetadataReferenceImages(metadata);
+  const referenceRecord = readMetadataReferenceImages(metadata);
+  const recordedReferenceImages = referenceRecord.images;
   const hasReferenceImages =
-    recordedReferenceImages !== null &&
-    (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0);
+    referenceRecord.names.length > 0 ||
+    (recordedReferenceImages !== null &&
+      (recordedReferenceImages.length > 0 || currentValues.referenceImages.length > 0));
   const hasModel = supportedMetadataModel !== null;
   const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
@@ -1296,6 +1428,7 @@ export const buildImageRecallSettings = ({
   isCanvasFrame = false,
   kind,
   metadata,
+  referenceAssets,
   supportedModels,
   models,
   vaeModels,
@@ -1306,6 +1439,7 @@ export const buildImageRecallSettings = ({
   isCanvasFrame?: boolean;
   kind: ImageRecallKind;
   metadata: unknown;
+  referenceAssets?: ReadonlyMap<string, Pick<GalleryImage, 'width' | 'height'>>;
   supportedModels: GenerateModelConfig[];
   models: ComponentModelConfig[];
   vaeModels: VaeModelConfig[];
@@ -1319,6 +1453,7 @@ export const buildImageRecallSettings = ({
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
   // A restored provider size is what the provider was asked for; the recorded size may be a Canvas frame instead.
   let restoredProviderSize = false;
+  let referenceRecall: ReturnType<typeof readMetadataReferenceImages> | null = null;
 
   if (kind === 'all' || kind === 'remix') {
     const model = getSupportedMetadataModel(metadata, supportedModels);
@@ -1425,7 +1560,8 @@ export const buildImageRecallSettings = ({
     // Recalled reference images must fit the effective model — when the
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
-    const recordedReferenceImages = getMetadataReferenceImages(metadata);
+    referenceRecall = readMetadataReferenceImages(metadata, referenceAssets, models, values.model);
+    const recordedReferenceImages = referenceRecall.images;
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),
       values.model,
@@ -1550,7 +1686,10 @@ export const buildImageRecallSettings = ({
     }
   }
 
-  return fields.length > 0 || skipped.length > 0 || ((kind === 'all' || kind === 'remix') && hasCanvasRecall(metadata))
+  return fields.length > 0 ||
+    skipped.length > 0 ||
+    ((kind === 'all' || kind === 'remix') &&
+      (hasCanvasRecall(metadata) || referenceRecall?.partial || (referenceRecall?.names.length ?? 0) > 0))
     ? { fields, skipped, values }
     : null;
 };

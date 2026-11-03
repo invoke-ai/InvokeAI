@@ -1,3 +1,4 @@
+import type { GalleryImage } from '@features/gallery';
 import type { GenerateModelConfig, ComponentModelConfig } from '@features/generation/contracts';
 import type { CanvasDocumentContractV3, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
@@ -40,13 +41,19 @@ export interface CanvasRecallPlan {
   /** Partial recall merges instead of replacing authored work. */
   partial: boolean;
   controlsOnly?: boolean;
+  /** Standalone executed maps have frame-relative placement, never authored Canvas coordinates. */
+  fitControlsToFrame?: boolean;
   problems: string[];
   settings: Record<string, unknown>;
 }
 
 export const hasCanvasMetadata = (metadata: unknown): boolean =>
   isRecord(metadata) &&
-  ('canvas_v3_metadata' in metadata || 'canvas_v2_metadata' in metadata || 'control_layers' in metadata);
+  ('canvas_v3_metadata' in metadata ||
+    'canvas_v2_metadata' in metadata ||
+    'control_layers' in metadata ||
+    'controlnets' in metadata ||
+    't2iAdapters' in metadata);
 
 export const readCanvasStrength = (metadata: unknown): number | null => {
   if (!isRecord(metadata)) {
@@ -152,8 +159,11 @@ export const prepareCanvasRecall = async ({
   models,
   owner,
   isCurrent,
+  resolvedImages = new Map<string, GalleryImage>(),
 }: {
   isCurrent?: () => boolean;
+  /** Internal recursion reuses asset reads from standalone control projection. */
+  resolvedImages?: Map<string, GalleryImage>;
   metadata: unknown;
   model: GenerateModelConfig;
   models: readonly ComponentModelConfig[];
@@ -175,15 +185,168 @@ export const prepareCanvasRecall = async ({
     plan.problems.push('record-too-large');
     return plan;
   }
+  const lookupImages = async (names: string[]): Promise<boolean> => {
+    if (isCurrent && !isCurrent()) {
+      plan.settings = {};
+      plan.problems.push('canvas-changed');
+      return false;
+    }
+    const missing = [...new Set(names)].filter((name) => !resolvedImages.has(name));
+    assertAccountScopeCurrent(owner);
+    for (let offset = 0; offset < missing.length; offset += IMAGE_LOOKUP_BATCH_SIZE) {
+      try {
+        const images = await galleryImages.resolveMany(
+          missing.slice(offset, offset + IMAGE_LOOKUP_BATCH_SIZE),
+          owner.signal
+        );
+        assertAccountScopeCurrent(owner);
+        if (isCurrent && !isCurrent()) {
+          plan.settings = {};
+          plan.problems.push('canvas-changed');
+          return false;
+        }
+        for (const image of images) {
+          resolvedImages.set(image.imageName, image);
+        }
+      } catch (error) {
+        assertAccountScopeCurrent(owner);
+        if (isCurrent && !isCurrent()) {
+          plan.settings = {};
+          plan.problems.push('canvas-changed');
+          return false;
+        }
+        const networkFailure =
+          error instanceof TypeError &&
+          [
+            'Failed to fetch',
+            'NetworkError when attempting to fetch resource.',
+            'Load failed',
+            'fetch failed',
+          ].includes(error.message);
+        if (!(error instanceof ApiError) && !networkFailure) {
+          throw error;
+        }
+        plan.settings = {};
+        plan.partial = true;
+        plan.problems.push('image-lookup-failed');
+        return false;
+      }
+    }
+    return true;
+  };
   const record = metadata.canvas_v3_metadata;
   if (!isRecord(record) || record.version !== 1) {
     if ('canvas_v3_metadata' in metadata) {
       plan.problems.push('invalid-record');
       return plan;
     }
+    let legacyMetadata = metadata;
+    const standalone = !('canvas_v2_metadata' in metadata) && !('control_layers' in metadata);
+    if (!('canvas_v2_metadata' in metadata)) {
+      let controls: unknown[];
+      if (standalone) {
+        controls = [];
+        for (const key of ['controlnets', 't2iAdapters'] as const) {
+          if (!(key in metadata)) {
+            continue;
+          }
+          const entries = metadata[key];
+          if (!Array.isArray(entries)) {
+            plan.problems.push('invalid-control');
+            continue;
+          }
+          if (controls.length + entries.length > 10000) {
+            plan.problems.push('record-too-large');
+          }
+          for (const entry of entries.slice(0, 10000 - controls.length)) {
+            controls.push(
+              isRecord(entry)
+                ? {
+                    ...entry,
+                    model: entry[key === 'controlnets' ? 'control_model' : 't2i_adapter_model'],
+                    weight: key === 'controlnets' ? entry.control_weight : entry.weight,
+                  }
+                : entry
+            );
+          }
+        }
+        // Old aliases describe executed adapters; an empty or damaged list never means Clear Canvas.
+        if (controls.length === 0) {
+          plan.problems.push('invalid-control');
+          return plan;
+        }
+      } else {
+        if (!Array.isArray(metadata.control_layers)) {
+          plan.problems.push('invalid-control');
+          return plan;
+        }
+        if (metadata.control_layers.length > 10000) {
+          plan.problems.push('record-too-large');
+        }
+        controls = metadata.control_layers.slice(0, 10000);
+      }
+      const names = controls.flatMap((control) => {
+        const asset = isRecord(control) ? (control.processed_image ?? control.image) : null;
+        return isRecord(asset) && typeof asset.image_name === 'string' && asset.image_name ? [asset.image_name] : [];
+      });
+      if (!(await lookupImages(names))) {
+        return plan;
+      }
+      controls = controls.map((control) => {
+        if (!isRecord(control)) {
+          return control;
+        }
+        if (
+          standalone &&
+          control.control_mode !== undefined &&
+          !['balanced', 'more_prompt', 'more_control', 'unbalanced'].includes(String(control.control_mode))
+        ) {
+          plan.problems.push('invalid-control');
+          return null;
+        }
+        if (standalone && Array.isArray(control.weight)) {
+          plan.problems.push('unsupported-control');
+          return null;
+        }
+        if (
+          standalone &&
+          control.resize_mode !== undefined &&
+          control.resize_mode !== 'just_resize' &&
+          control.resize_mode !== 'just_resize_simple'
+        ) {
+          plan.problems.push('unsupported-control');
+          return null;
+        }
+        const asset = control.processed_image ?? control.image;
+        const resolved =
+          isRecord(asset) && typeof asset.image_name === 'string' ? resolvedImages.get(asset.image_name) : null;
+        if (!resolved) {
+          plan.problems.push('invalid-control-image');
+        }
+        return {
+          ...control,
+          image: resolved
+            ? {
+                image_name: resolved.imageName,
+                width: resolved.width ?? (isRecord(asset) ? asset.width : undefined),
+                height: resolved.height ?? (isRecord(asset) ? asset.height : undefined),
+              }
+            : null,
+          processed_image: null,
+        };
+      });
+      legacyMetadata = { ...metadata, control_layers: controls };
+    }
+    if (
+      isRecord(metadata.canvas_v2_metadata) &&
+      Array.isArray(metadata.canvas_v2_metadata.vectorLayers) &&
+      metadata.canvas_v2_metadata.vectorLayers.length > 0
+    ) {
+      plan.problems.push('unsupported-legacy-layers');
+    }
     let converted;
     try {
-      converted = await prepareLegacyCanvasMetadata(metadata, owner, isCurrent);
+      converted = await prepareLegacyCanvasMetadata(legacyMetadata, owner, isCurrent);
     } catch (error) {
       assertAccountScopeCurrent(owner);
       if (isCurrent && !isCurrent()) {
@@ -199,6 +362,7 @@ export const prepareCanvasRecall = async ({
       return plan;
     }
     return prepareCanvasRecall({
+      resolvedImages,
       metadata: { ...metadata, canvas_v3_metadata: converted.record },
       model,
       models,
@@ -208,6 +372,7 @@ export const prepareCanvasRecall = async ({
       ...result,
       partial: result.partial || plan.problems.length > 0,
       controlsOnly: !('canvas_v2_metadata' in metadata),
+      fitControlsToFrame: standalone,
       problems: [...plan.problems, ...result.problems],
     }));
   }
@@ -276,43 +441,10 @@ export const prepareCanvasRecall = async ({
   };
   Object.values(document.stacks).forEach(collect);
   const names = [...new Set(leaves.flatMap(sourceNames))];
-  const available = new Set<string>();
-  assertAccountScopeCurrent(owner);
-  for (let offset = 0; offset < names.length; offset += IMAGE_LOOKUP_BATCH_SIZE) {
-    let images;
-    try {
-      images = await galleryImages.resolveMany(names.slice(offset, offset + IMAGE_LOOKUP_BATCH_SIZE), owner.signal);
-    } catch (error) {
-      assertAccountScopeCurrent(owner);
-      if (isCurrent && !isCurrent()) {
-        plan.settings = {};
-        plan.problems.push('canvas-changed');
-        return plan;
-      }
-      // Fetch rejects with these browser-specific TypeErrors; asset mapping errors must still surface.
-      const networkFailure =
-        error instanceof TypeError &&
-        ['Failed to fetch', 'NetworkError when attempting to fetch resource.', 'Load failed', 'fetch failed'].includes(
-          error.message
-        );
-      if (!(error instanceof ApiError) && !networkFailure) {
-        throw error;
-      }
-      plan.settings = {};
-      plan.partial = true;
-      plan.problems.push('image-lookup-failed');
-      return plan;
-    }
-    assertAccountScopeCurrent(owner);
-    if (isCurrent && !isCurrent()) {
-      plan.settings = {};
-      plan.problems.push('canvas-changed');
-      return plan;
-    }
-    for (const image of images) {
-      available.add(image.imageName);
-    }
+  if (!(await lookupImages(names))) {
+    return plan;
   }
+  const available = new Set(resolvedImages.keys());
   const controlModels = isRecord(record.controlModels) ? record.controlModels : {};
   const keep = (nodes: CanvasNodeContract[]): CanvasNodeContract[] =>
     nodes.flatMap((node): CanvasNodeContract[] => {
@@ -328,7 +460,7 @@ export const prepareCanvasRecall = async ({
         plan.problems.push(node.name);
         return [];
       }
-      if (node.type === 'control' && node.adapter.model) {
+      if (node.type === 'control' && (node.adapter.model || controlModels[node.id])) {
         const resolved = resolveModel(controlModels[node.id] ?? node.adapter.model, models);
         const kind = resolved ? deriveControlKind(resolved) : null;
         if (

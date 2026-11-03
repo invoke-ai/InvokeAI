@@ -290,32 +290,92 @@ describe('Preview query-driven Details', () => {
     ],
   };
 
-  it('shows readable control metadata from the emitted English namespace beside root actions', async () => {
-    const localization = createInstance().use(initReactI18next);
-    await localization.init({
-      initAsync: false,
-      lng: 'en',
-      resources: {
-        en: {
-          translation: await fetch('/locales/en.json').then((response) => response.json()),
-          metadata: await fetch('/locales/en.metadata.json').then((response) => response.json()),
-        },
+  it.each([
+    {
+      label: 'Executed controls',
+      expected: 'Depth model',
+      metadata: { control_layers: [{ model: { name: 'Depth model' }, type: 'controlnet', weight: 0.75 }] },
+    },
+    {
+      label: 'IP-Adapters',
+      expected: 'Portrait model',
+      metadata: {
+        ipAdapters: [
+          {
+            ip_adapter_model: { name: 'Portrait model' },
+            image: { image_name: 'portrait.png' },
+            clip_vision_model: 'ViT-G',
+            method: 'style_precise',
+            weight: 0.75,
+            begin_step_percent: 0.2,
+            end_step_percent: 0.9,
+          },
+        ],
       },
-    });
-    galleryMocks.imageMetadata.mockResolvedValueOnce({
-      control_layers: [{ model: { name: 'Depth model' }, type: 'controlnet', weight: 0.75 }],
-    });
-    await renderDetails({ isOpen: true, item: imageItem, localization });
-    await act(async () => {
-      await vi.waitFor(() => expect(document.body.textContent).toContain('Depth model'));
-    });
-    const controlRow = [...document.querySelectorAll('.chakra-data-list__item')].find((row) =>
-      row.textContent?.includes('Depth model')
-    );
-    expect(controlRow?.querySelector('dt')?.textContent).toBe('Executed controls');
-    expect(controlRow?.textContent).toContain('Weight 0.75');
-    expect(controlRow?.querySelector('button[aria-label="Copy"]')).not.toBeNull();
-  });
+    },
+    ...(['array', 'entities'] as const).map((shape) => {
+      const reference = {
+        id: 'global-style',
+        type: 'reference_image',
+        name: 'Global style',
+        ipAdapter: {
+          type: 'ip_adapter',
+          model: { name: 'Historical portrait' },
+          image: { image_name: 'portrait.png', width: 320, height: 200 },
+          clipVisionModel: 'ViT-G',
+          method: 'style_precise',
+          weight: 0.75,
+          beginEndStepPct: [0.2, 0.9],
+        },
+      };
+      return {
+        label: 'Reference images',
+        expected: 'Historical portrait',
+        metadata: {
+          canvas_v2_metadata: {
+            rasterLayers: [],
+            controlLayers: [],
+            inpaintMasks: [],
+            regionalGuidance: [],
+            referenceImages: shape === 'array' ? [reference] : { entities: [reference] },
+          },
+        },
+      };
+    }),
+  ])(
+    'shows readable $label metadata from the emitted English namespace beside root actions',
+    async ({ label, expected, metadata }) => {
+      const localization = createInstance().use(initReactI18next);
+      await localization.init({
+        initAsync: false,
+        lng: 'en',
+        resources: {
+          en: {
+            translation: await fetch('/locales/en.json').then((response) => response.json()),
+            metadata: await fetch('/locales/en.metadata.json').then((response) => response.json()),
+          },
+        },
+      });
+      galleryMocks.imageMetadata.mockResolvedValueOnce(metadata);
+      await renderDetails({ isOpen: true, item: imageItem, localization });
+      await act(async () => {
+        await vi.waitFor(() => expect(document.body.textContent).toContain(expected));
+      });
+      const controlRow = [...document.querySelectorAll('.chakra-data-list__item')].find((row) =>
+        row.textContent?.includes(expected)
+      );
+      expect(controlRow?.querySelector('dt')?.textContent).toBe(label);
+      if (label !== 'Executed controls') {
+        expect(controlRow?.textContent).toContain('portrait.png · ViT-G · style_precise · Weight 0.75 · Steps 0.2–0.9');
+      }
+      expect(controlRow?.textContent).toContain('Weight 0.75');
+      expect(controlRow?.querySelector('button[aria-label="Copy"]')).not.toBeNull();
+      if (label === 'Reference images') {
+        expect(document.body.textContent).toContain('0 layers');
+        expect(document.body.textContent).not.toContain('Global style');
+      }
+    }
+  );
 
   it.each([imageItem, videoItem])(
     'loads $kind metadata labels on opening, preserving rows and raw tabs while pending',
