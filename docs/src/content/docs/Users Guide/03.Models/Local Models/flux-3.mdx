@@ -1,7 +1,7 @@
 ---
 title: FLUX.3
 description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, LoRAs, layout boxes from Canvas regional guidance and the GGUF / single-file workflow.
-lastUpdated: 2026-11-02
+lastUpdated: 2026-11-03
 sidebar:
   order: 6
 ---
@@ -126,6 +126,11 @@ are trained on Klein Base. How well one holds up at Klein's step count depends o
   naming what does not apply. That includes distillation extracts that change norm scales or add the flow-map embedder
   (`delta.*` tensors, `set_weight`), such as terminusresearch's Klein extract: to sample with distilled weights,
   install FLUX.3 Klein itself.
+- A LoRA is recognized as a FLUX.3 LoRA by at least one module that only FLUX.3's transformer has: its mode blocks,
+  modulations, embedders or the feed-forward layers (`ff.linear_in`, `ff.linear_out`) of its single blocks. A LoRA that
+  changes only modules other transformers share, such as the attention layers of the single blocks (`attn.to_q` and
+  the like), is not recognized as a FLUX.3 LoRA. It is registered as an unknown model, which cannot be used as a LoRA,
+  or, with `allow_unknown_models` off, refused at install.
 - PDD few-step LoRAs carry per-step output heads (`proj_out.weight` or `pdd.heads`), which PDD's own sampler fuses per
   jump. InvokeAI loads such a LoRA without them and says so in the log. Use it on Klein Base with CFG Scale `1.0` and
   4 to 8 steps; results differ from those of PDD's own sampler.
