@@ -59,6 +59,7 @@ const GEMMA4_ENCODER = config('gemma4-encoder', 'gemma4_encoder', { cpu_only: nu
 const QWEN3_VL_ENCODER_WITHOUT_CPU_ONLY = config('qwen3-vl-encoder', 'qwen3_vl_encoder', {});
 const LORA = config('lora-1', 'lora', { trigger_phrases: null });
 const EMBEDDING = config('embedding-1', 'embedding', {});
+const CONTROL_LORA = config('control-lora-1', 'control_lora', { trigger_phrases: null });
 
 const ignoreConfirm = () => undefined;
 
@@ -124,14 +125,18 @@ describe('ModelDetail', () => {
     expect(hasCpuSwitch()).toBe(false);
   });
 
-  it('offers trigger phrases exactly when the config carries trigger_phrases', async () => {
-    setModelsSnapshotForTests({ models: [LORA, EMBEDDING], status: 'loaded' });
+  it('offers trigger phrases when the config carries trigger_phrases, except on Control LoRAs', async () => {
+    setModelsSnapshotForTests({ models: [LORA, EMBEDDING, CONTROL_LORA], status: 'loaded' });
     const hasTriggerPhrases = () => host.querySelector('[data-section="trigger-phrases"]') !== null;
 
     await renderDetail(LORA.key);
     expect(hasTriggerPhrases()).toBe(true);
 
     await renderDetail(EMBEDDING.key);
+    expect(hasTriggerPhrases()).toBe(false);
+
+    // Prompt triggers never read Control LoRAs, so phrases stored there would have no effect.
+    await renderDetail(CONTROL_LORA.key);
     expect(hasTriggerPhrases()).toBe(false);
   });
 });

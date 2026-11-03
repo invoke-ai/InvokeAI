@@ -88,12 +88,12 @@ const selectModelShell = (snapshot: ModelsSnapshot, modelKey: string): ModelDeta
   const model = findModel(snapshot, modelKey);
 
   // The backend serializes `cpu_only` and `trigger_phrases` (null when unset) on exactly the configs that store them,
-  // so presence decides which editors appear. Flags rather than the values, so editing them does not re-render the
-  // whole detail.
+  // so presence decides which editors appear. Control LoRAs store `trigger_phrases` but prompt triggers never read
+  // them, so they get no editor. Flags rather than the values, so editing them does not re-render the whole detail.
   return model
     ? {
         hasCpuOnlySetting: supportsCpuOnlySetting(model),
-        hasTriggerPhrases: model.trigger_phrases !== undefined,
+        hasTriggerPhrases: model.trigger_phrases !== undefined && model.type !== 'control_lora',
         key: model.key,
         type: model.type,
       }
