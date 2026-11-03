@@ -18,6 +18,7 @@ import {
   hasArchitectureCapabilities,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
@@ -207,7 +208,7 @@ const flux2KleinQwen3Slot = (model: MainModelConfig): UpscaleComponentSlot => ({
   field: 'qwen3EncoderModel',
   label: (typeof model.variant === 'string' && FLUX2_KLEIN_QWEN3_LABELS[model.variant]) || 'Qwen3 encoder',
 });
-// FLUX.2 [dev] reads Mistral Small 3.1. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
+// FLUX.2 [dev] reads Mistral Small 3.2. ERNIE-Image's Ministral 3B is the same model type, and [dev] was not
 // trained on it.
 const FLUX2_MISTRAL_SLOT: UpscaleComponentSlot = {
   accepts: isFlux2MistralEncoder,
@@ -376,16 +377,11 @@ export const UPSCALE_ARCHITECTURES = {
     tileControlNet: null,
   },
   flux2: {
-    // Both loaders fall back to a bundled main model's own encoder and VAE; [dev]'s counts only a Diffusers
-    // install as bundled, Klein's a complete SDNQ pipeline too.
+    // Both loaders fall back to a bundled main model's own encoder and VAE.
     components: (model) =>
-      model.variant === 'dev'
-        ? model.format === 'diffusers'
-          ? NO_COMPONENTS
-          : { slots: [FLUX2_MISTRAL_SLOT], vae: true }
-        : isBundledMainForBase('flux2')(model)
-          ? NO_COMPONENTS
-          : { slots: [flux2KleinQwen3Slot(model)], vae: true },
+      isBundledFlux2Main(model)
+        ? NO_COMPONENTS
+        : { slots: [model.variant === 'dev' ? FLUX2_MISTRAL_SLOT : flux2KleinQwen3Slot(model)], vae: true },
     denoiseGrid: 16,
     // `flux2_denoise` clips by sigma value like FLUX.1, then re-spaces the window to the requested steps.
     indexClipping: null,

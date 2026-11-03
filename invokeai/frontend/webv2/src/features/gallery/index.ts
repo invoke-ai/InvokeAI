@@ -6,6 +6,7 @@ export type {
   GalleryImage,
   GalleryImageMetadata,
   GalleryImagesPage,
+  GalleryMediaMetadata,
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,
@@ -48,7 +49,6 @@ import {
   getGalleryImagesByNames,
   getGalleryImageWorkflow,
   getGalleryItemByRef,
-  getGalleryVideoMetadata,
   getGalleryVideoWorkflow,
   isInvalidGalleryBoardDestination,
   makeImageCanvasAsset,
@@ -81,7 +81,6 @@ export const galleryItems = {
 
 /** Focused read-only details needed by mixed-media preview surfaces. */
 export const galleryVideos = {
-  metadata: getGalleryVideoMetadata,
   workflow: getGalleryVideoWorkflow,
 } as const;
 

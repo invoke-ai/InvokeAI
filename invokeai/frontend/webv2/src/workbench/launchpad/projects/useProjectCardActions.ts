@@ -1,8 +1,14 @@
 import type { DeleteProjectBoards } from '@workbench/projects/api';
 
-import { toaster } from '@platform/ui';
+import { ACTION_TOAST_DURATION_MS, createActionToast, toaster } from '@platform/ui/toaster';
 import { useQueryClient } from '@tanstack/react-query';
-import { deleteLibraryProject, renameLibraryProject, type ProjectSummary } from '@workbench/projects/library';
+import { useNavigate } from '@tanstack/react-router';
+import {
+  deleteLibraryProject,
+  describeProjectDeletionFailure,
+  renameLibraryProject,
+  type ProjectSummary,
+} from '@workbench/projects/library';
 import { useDuplicateProject, useExportLibraryProject } from '@workbench/projects/useProjectFileActions';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -24,6 +30,7 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
   const startExport = useExportLibraryProject();
   const startDuplicate = useDuplicateProject();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const rename = useCallback(
     async (name: string) => {
@@ -65,14 +72,25 @@ export const useProjectCardActions = (summary: ProjectSummary): ProjectCardActio
           .then((module) => module.invalidateGallery(queryClient))
           .catch(() => undefined);
       } catch (error) {
-        toaster.create({
-          description: error instanceof Error ? error.message : undefined,
+        const { message, offersQueue } = describeProjectDeletionFailure(error, t);
+        // The runs holding it show in the editor's queue; the Launchpad has none to reveal, so it opens the project.
+        createActionToast({
+          actions: offersQueue
+            ? [
+                {
+                  label: t('projects.openProject'),
+                  onClick: () => void navigate({ search: { project: summary.id }, to: '/app' }),
+                },
+              ]
+            : [],
+          description: message,
+          duration: offersQueue ? ACTION_TOAST_DURATION_MS : undefined,
           title: t('projects.deleteFailed'),
           type: 'error',
         });
       }
     },
-    [queryClient, summary.id, t]
+    [navigate, queryClient, summary.id, t]
   );
 
   // Stabilize the actions object so virtualized row renders do not invalidate derived menu callbacks.

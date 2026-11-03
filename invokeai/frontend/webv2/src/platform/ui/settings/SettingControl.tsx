@@ -3,16 +3,17 @@ import { Select } from '@platform/ui/Select';
 import { useCallback, useId, useMemo, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { SettingFieldProps } from './contracts';
+import type { SettingFieldProps, SettingLayer } from './contracts';
 
 import { resolveSettingsText } from './contracts';
-import { ModifiedSettingIndicator } from './ModifiedSettingIndicator';
+import { SettingLayerIndicator } from './SettingLayerIndicator';
 
 export interface SettingControlProps extends Pick<SettingFieldProps, 'field' | 'surface'> {
   value: boolean | number | string;
   onChange: (value: boolean | number | string) => void;
   disabled?: boolean;
-  isModified?: boolean;
+  /** The row's own value, if it has one; the binding decides (see {@link SettingLayer}). */
+  layer?: SettingLayer;
 }
 
 const DIALOG_DIRECTION = { base: 'column', md: 'row' } as const;
@@ -21,7 +22,7 @@ const DIALOG_CONTROL_WIDTH = { base: 'full', md: '52' } as const;
 const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetached: true } as const;
 
 /** Presentation only. Normalization, persistence and side effects belong to the binding. */
-export const SettingControl = ({ field, surface, value, onChange, disabled, isModified }: SettingControlProps) => {
+export const SettingControl = ({ field, surface, value, onChange, disabled, layer }: SettingControlProps) => {
   const { t } = useTranslation();
   const descriptionId = useId();
   const label = resolveSettingsText(field.label, t);
@@ -67,6 +68,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
   if (field.kind === 'boolean') {
     return (
       <Switch.Root
+        data-setting-control=""
         checked={value === true}
         disabled={disabled}
         display="flex"
@@ -81,7 +83,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
             <Switch.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
               {label}
             </Switch.Label>
-            {isModified ? <ModifiedSettingIndicator label={label} /> : null}
+            {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
           </HStack>
           {description ? (
             <Text id={descriptionId} color="fg.muted" fontSize="md">
@@ -99,6 +101,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
 
   return (
     <Field.Root
+      data-setting-control=""
       disabled={disabled}
       display="flex"
       flexDirection={surface === 'quick' ? 'column' : DIALOG_DIRECTION}
@@ -111,7 +114,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
           <Field.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
             {label}
           </Field.Label>
-          {isModified ? <ModifiedSettingIndicator label={label} /> : null}
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
         </HStack>
         {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
       </Stack>

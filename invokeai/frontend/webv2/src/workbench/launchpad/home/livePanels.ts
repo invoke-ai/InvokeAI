@@ -3,5 +3,5 @@
  * per panel.
  */
 export { RecentOutputs } from '@features/gallery/launchpad';
-export { ModelsNotice } from '@features/models/launchpad';
+export { ModelsNotice, ModelsRequiredHint } from '@features/models/launchpad';
 export { QueueStatusBand } from '@features/queue/launchpad';

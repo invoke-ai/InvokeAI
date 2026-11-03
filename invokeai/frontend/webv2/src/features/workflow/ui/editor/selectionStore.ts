@@ -48,6 +48,12 @@ export const requestNodeSelection = (nodeIds: string[]): void => {
   workflowSelectionStore.patchSnapshot({ selectionRequest: { nodeIds, token: previousToken + 1 } });
 };
 
+/**
+ * Selects one node and zooms the editor to it: at once in a mounted editor, else when the next one mounts. Callers
+ * show the Workflow editor first; the linear form panel does not apply selection requests.
+ */
+export const revealWorkflowNode = (nodeId: string): void => requestNodeSelection([nodeId]);
+
 export const clearNodeSelectionRequest = (): void => {
   workflowSelectionStore.patchSnapshot({ selectionRequest: null });
 };

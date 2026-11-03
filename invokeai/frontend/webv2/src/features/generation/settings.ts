@@ -11,6 +11,7 @@ export {
   deriveAspectRatioId,
   GENERATE_UI_STATE_KEYS,
   getDefaultLoraWeight,
+  getGenerateValuesRevertPatch,
   getModelDefaultVae,
   hasModelDefaultVae,
   isAspectRatioLocked,
@@ -53,9 +54,9 @@ export {
   isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
+  getGenerateInvocationIssues,
   getGenerationModelAvailabilityReasons,
   getGenerationUiPolicy,
-  getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptHistoryRecallPatch,
   getSchedulerOptions,
@@ -63,11 +64,24 @@ export {
   isArchitectureDescribed,
   isGenerateModelSelectable,
   isKnownScheduler,
+  isLossyModelSwitch,
   isReferenceImageSupported,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
   SCHEDULER_OPTIONS,
   type GenerateModelSelectionResult,
+  type GenerateModelSwitchChange,
+  type GenerateModelSwitchChangeKind,
+  type GenerateModelSwitchSubject,
 } from './core/baseGenerationPolicies';
+export {
+  describeGenerationIssue,
+  describeGenerationIssueFix,
+  getGenerationIssueFixPatch,
+  type GenerateSectionId,
+  type GenerationIssue,
+  type GenerationIssueFix,
+} from './core/generationIssues';
 export { hasArchitectureCapabilities } from './core/architectureCapabilities';
 export {
   describeExternalCanvasRefusal,
@@ -91,6 +105,7 @@ export {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isDiffusersMainForBase,
   isFlux2MistralEncoder,
@@ -119,10 +134,11 @@ export {
 } from './core/sdxlRefiner';
 export {
   createDynamicPromptsSampleSeed,
+  describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
-  hasDynamicPromptSyntax,
+  expandsDynamicPrompts,
   isDynamicPromptsSeedBehaviour,
   planGenerateSubmission,
   sanitizeDynamicPromptsConfig,
@@ -137,6 +153,7 @@ export {
   getPromptHistoryItemFromGenerateSettings,
   MAX_PROMPT_HISTORY,
   removePromptHistoryItem,
+  restorePromptHistoryItems,
 } from './core/promptHistory';
 export {
   applyProjectPromptDraft,

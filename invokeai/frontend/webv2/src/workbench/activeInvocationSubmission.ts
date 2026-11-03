@@ -113,6 +113,7 @@ export const submitActiveInvocation = async (
       ...(prepend ? { prepend } : {}),
       project: snapshot.activeProject,
       route,
+      scopedDefaults: snapshot.scopedDefaults,
     });
   } catch (error) {
     if (!activeRuntime.isCurrent(owner)) {

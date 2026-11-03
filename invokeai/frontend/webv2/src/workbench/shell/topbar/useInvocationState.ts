@@ -6,6 +6,8 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { useDynamicPrompts } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
+  describeDynamicPromptsFailure,
+  describeGenerationIssue,
   getEffectivePrompts,
   normalizeGenerateSettings,
   sanitizeBatchCount,
@@ -35,6 +37,10 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { getInvocationIssueTarget, type InvocationIssue } from './invokeIssueTargets';
+
+export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTargets';
 
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
@@ -82,6 +88,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
+  enabled: values.dynamicPromptsEnabled,
   maxPrompts: values.dynamicPromptsMaxPrompts,
   resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
@@ -99,12 +106,6 @@ export const isBatchCountFixed = (sourceId: InvocationRoute['sourceId'], values:
 
 export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Record<string, unknown>): number =>
   isBatchCountFixed(sourceId, values) ? 1 : sanitizeBatchCount(values.batchCount);
-
-/** Why Invoke cannot run, worded for the user; `layerId` names the canvas layer to show for it. */
-export interface InvocationIssue {
-  message: string;
-  layerId: string | null;
-}
 
 export interface InvocationState {
   batchCount: number;
@@ -174,21 +175,22 @@ export const useInvocationState = (): InvocationState => {
       : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule.
-  const expansionReason = promptExpansion.isError
-    ? 'The prompt could not be expanded.'
-    : (promptExpansion.error ?? null);
+  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
+  const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
   const issues = useMemo(
     (): InvocationIssue[] => [
-      ...(isConnected ? [] : [{ layerId: null, message: 'The backend is disconnected.' }]),
-      ...(expansionReason === null ? [] : [{ layerId: null, message: expansionReason }]),
+      ...(isConnected
+        ? []
+        : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
+      ...(expansionReason === null ? [] : [{ message: expansionReason, target: { kind: 'prompt' } } as const]),
       ...resolvedRoute.validationReasons.map((reason) => ({
-        layerId: typeof reason === 'object' && 'controlLayerIssue' in reason ? reason.controlLayerIssue.layerId : null,
         message: localizeInvocationValidationReason(reason, t),
+        target: getInvocationIssueTarget(reason, invocation.sourceId),
       })),
     ],
-    [expansionReason, isConnected, resolvedRoute.validationReasons, t]
+    [expansionReason, invocation.sourceId, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 

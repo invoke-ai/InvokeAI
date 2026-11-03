@@ -87,7 +87,7 @@ describe('filter footer errors', () => {
       root!.render(
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
-            <Footer engine={engine as never} isExternalInteractionLocked={false} />
+            <Footer engine={engine as never} />
           </I18nextProvider>
         </ChakraProvider>
       )

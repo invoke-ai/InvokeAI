@@ -27,7 +27,7 @@ def _run_one_node(monkeypatch: pytest.MonkeyPatch, invoke) -> Mock:
     invocation = session.next()
 
     services = SimpleNamespace(
-        configuration=SimpleNamespace(node_cache_size=0, offload_text_encoders_to_idle_gpus=False),
+        configuration=SimpleNamespace(node_cache_size=0, multiuser=False, offload_text_encoders_to_idle_gpus=False),
         progress_previews=MemoryProgressPreviews(),
         events=Mock(),
         logger=Mock(),

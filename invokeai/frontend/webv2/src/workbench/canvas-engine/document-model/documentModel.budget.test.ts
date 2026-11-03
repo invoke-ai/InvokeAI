@@ -402,7 +402,6 @@ describe('reducer → mirror value edits at the 10,000-node limit', () => {
         onDocumentReplaced: () => undefined,
         onLayerOrderChanged: () => undefined,
         onLayersChanged,
-        onStagingChanged: () => undefined,
       }
     );
     const depth = getDocumentIndex(project.canvas.document).byId.get('l0')!.path.length;

@@ -1,10 +1,17 @@
 # pyright: reportPrivateUsage=false
 from contextlib import suppress
+from types import SimpleNamespace
+from typing import ClassVar
+from unittest.mock import MagicMock
 
-from invokeai.app.invocations.fields import ImageField
+import pytest
+
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation, services_for_queue_user
+from invokeai.app.invocations.fields import ImageField, InputField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
-from tests.test_nodes import PromptTestInvocation
+from invokeai.app.services.shared.invocation_context import InvocationContext
+from tests.test_nodes import PromptTestInvocation, PromptTestInvocationOutput
 
 
 def test_invocation_cache_memory_max_cache_size():
@@ -205,3 +212,123 @@ def test_invocation_cache_memory_purges_video_outputs_on_video_deletion():
     cache._delete_by_match("clip.mp4")
     assert cache.get(1) is None
     assert len(cache._cache) == 0
+
+
+@invocation("test_cache_scope_recorder", version="1.0.0", use_cache=True)
+class CacheScopeRecorderInvocation(BaseInvocation):
+    """Records which queueing user each real invoke() ran for."""
+
+    prompt: str = InputField(default="")
+    calls: ClassVar[list] = []
+
+    def invoke(self, context: InvocationContext) -> PromptTestInvocationOutput:
+        user_id = context._data.queue_item.user_id
+        type(self).calls.append(user_id)
+        return PromptTestInvocationOutput(prompt=f"{self.prompt} for {user_id}")
+
+
+@invocation("test_cache_scope_custom_override", version="1.0.0", use_cache=True)
+class CacheScopeCustomOverrideInvocation(CacheScopeRecorderInvocation):
+    """A node pack that owns its cache logic, keying it through services.invocation_cache.create_key."""
+
+    def invoke_internal(self, context: InvocationContext, services) -> PromptTestInvocationOutput:
+        key = services.invocation_cache.create_key(self)
+        cached = services.invocation_cache.get(key)
+        if cached is None:
+            cached = self.invoke(context)
+            services.invocation_cache.save(key, cached)
+        return cached
+
+
+@invocation("test_cache_scope_context_services_override", version="1.0.0", use_cache=True)
+class CacheScopeContextServicesOverrideInvocation(CacheScopeRecorderInvocation):
+    """A node pack that owns its cache logic through context._services, ignoring the services argument."""
+
+    def invoke_internal(self, context: InvocationContext, services) -> PromptTestInvocationOutput:
+        cache = context._services.invocation_cache
+        key = cache.create_key(self)
+        cached = cache.get(key)
+        if cached is None:
+            cached = self.invoke(context)
+            cache.save(key, cached)
+        return cached
+
+
+CACHE_SCOPE_NODE_CLASSES = [
+    CacheScopeRecorderInvocation,
+    CacheScopeCustomOverrideInvocation,
+    CacheScopeContextServicesOverrideInvocation,
+]
+
+
+def _cache_services(*, multiuser: bool) -> SimpleNamespace:
+    return SimpleNamespace(
+        configuration=SimpleNamespace(node_cache_size=5, multiuser=multiuser),
+        invocation_cache=MemoryInvocationCache(max_cache_size=5),
+        intermediates=MagicMock(),
+        logger=MagicMock(),
+    )
+
+
+def _run(
+    services: SimpleNamespace,
+    user_id: str | None,
+    session_id: str = "session",
+    node_class: type[CacheScopeRecorderInvocation] = CacheScopeRecorderInvocation,
+) -> str:
+    """Dispatch one node the way the session processor does, for a queue item owned by `user_id`."""
+    node = node_class(id=f"node-{len(node_class.calls)}", prompt="p")
+    node_services = services_for_queue_user(services, user_id)  # type: ignore[arg-type]
+    # Like run_node, the context carries the same per-user services as the dispatch.
+    context = SimpleNamespace(
+        _data=SimpleNamespace(queue_item=SimpleNamespace(user_id=user_id, session_id=session_id)),
+        _services=node_services,
+        _skip_invocation_cache=False,
+    )
+    return node.invoke_internal_with_effects(context, node_services).output.prompt  # type: ignore[arg-type]
+
+
+@pytest.fixture(autouse=True)
+def _reset_recorder_calls():
+    CacheScopeRecorderInvocation.calls.clear()
+
+
+@pytest.mark.parametrize("node_class", CACHE_SCOPE_NODE_CLASSES)
+def test_multiuser_cache_hits_never_cross_users(node_class: type[CacheScopeRecorderInvocation]):
+    services = _cache_services(multiuser=True)
+
+    assert _run(services, "alice", node_class=node_class) == "p for alice"
+    # Bob's identical node must run invoke() rather than receive alice's output.
+    assert _run(services, "bob", node_class=node_class) == "p for bob"
+    assert CacheScopeRecorderInvocation.calls == ["alice", "bob"]
+
+
+@pytest.mark.parametrize("node_class", CACHE_SCOPE_NODE_CLASSES)
+def test_multiuser_cache_still_hits_for_the_same_user(node_class: type[CacheScopeRecorderInvocation]):
+    services = _cache_services(multiuser=True)
+
+    assert _run(services, "alice", "s1", node_class) == "p for alice"
+    assert _run(services, "alice", "s2", node_class) == "p for alice"
+    assert CacheScopeRecorderInvocation.calls == ["alice"]
+
+
+@pytest.mark.parametrize("node_class", CACHE_SCOPE_NODE_CLASSES)
+@pytest.mark.parametrize("user_id", [None, ""])
+def test_multiuser_cache_is_bypassed_without_a_queueing_user(
+    user_id: str | None, node_class: type[CacheScopeRecorderInvocation]
+):
+    services = _cache_services(multiuser=True)
+
+    _run(services, user_id, node_class=node_class)
+    _run(services, user_id, node_class=node_class)
+    assert CacheScopeRecorderInvocation.calls == [user_id, user_id]
+    assert len(services.invocation_cache._cache) == 0
+
+
+def test_single_user_cache_is_shared_across_sessions():
+    services = _cache_services(multiuser=False)
+
+    assert services_for_queue_user(services, "system") is services  # type: ignore[arg-type]
+    assert _run(services, "system", "s1") == "p for system"
+    assert _run(services, "other", "s2") == "p for system"
+    assert CacheScopeRecorderInvocation.calls == ["system"]

@@ -333,6 +333,17 @@
     },
     {
       "category": "PATHS",
+      "default": "prompt_files",
+      "description": "Path to the directory holding prompt list files readable by the Prompts from File node. The node cannot read outside this directory.",
+      "env_var": "INVOKEAI_PROMPT_FILES_DIR",
+      "literal_values": [],
+      "name": "prompt_files_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "workflow_thumbnails",
       "description": "Path to directory for workflow thumbnails.",
       "env_var": "INVOKEAI_WORKFLOW_THUMBNAILS_DIR",
