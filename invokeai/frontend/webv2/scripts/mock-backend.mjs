@@ -2256,7 +2256,8 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
           return json(404, { detail: 'Model not found' });
         }
         if (method === 'PATCH') {
-          // Mirrors ModelRecordService.update_model: submitted fields replace stored ones wholesale; the key stays.
+          // Submitted fields replace stored ones wholesale and the key stays, as in ModelRecordService.update_model.
+          // Unlike the backend, it accepts any field: no validation and no 409 for a field the model's config lacks.
           const updated = { ...model, ...(await readJsonBody(request)), key };
           state.models.set(key, updated);
           return json(200, clone(updated));
