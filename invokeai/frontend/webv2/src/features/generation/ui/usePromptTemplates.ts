@@ -17,6 +17,7 @@ import {
   updatePromptTemplate,
 } from '@features/generation/data/promptTemplates';
 import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -29,6 +30,14 @@ export interface PromptTemplateCatalog {
   templates: PromptTemplateRecord[];
   isLoading: boolean;
   isLoaded: boolean;
+  /** The last read failed; any templates listed are from an earlier read. */
+  isError: boolean;
+  /** A retry after a failed read is on its way. */
+  isRetrying: boolean;
+  /** The server's reason for the failed read, when it gave one. */
+  errorDetail: string | null;
+  /** Settles once the read it starts does. */
+  retry: () => Promise<unknown>;
   create: (draft: PromptTemplateCreateDraft) => Promise<PromptTemplateRecord>;
   update: (template: PromptTemplateRecord, draft: PromptTemplateUpdateDraft) => Promise<PromptTemplateRecord>;
   remove: (template: PromptTemplateRecord) => Promise<void>;
@@ -86,9 +95,13 @@ export const usePromptTemplates = ({ isEnabled = true }: { isEnabled?: boolean }
     defaultTemplates: classified.defaultTemplates,
     exportCsv: exportPromptTemplates,
     importFile,
+    errorDetail: query.isError ? getApiErrorMessage(query.error, '') || null : null,
+    isError: query.isError,
     isLoaded: query.isSuccess,
     isLoading: query.isPending,
+    isRetrying: query.isError && query.isFetching,
     remove,
+    retry: () => query.refetch(),
     personalTemplates: classified.personalTemplates,
     sharedTemplates: classified.sharedTemplates,
     templates: classified.templates,

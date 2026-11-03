@@ -9,3 +9,4 @@
 - Hooks must match CI's Ruff version and config. Validation never rewrites formatting.
 - Follow [the PR template](pull_request_template.md). Short summaries. Omit subagent counts, tiers, process narration.
 - Workflow changes neither configure hosted branch protection nor install local hooks. Verify before claiming either.
+- Windows ARM64 lock gate (`required-environments`, `scripts/check_platform_locks.py`) blocks by design. When a bump trips it: pin the last version with a win_arm64 wheel behind an ARM64 marker, drop an optional package there by marker with a degraded path and a `system-requirements.mdx` entry, or self-build it (procedure in `build-win-arm64-wheels.yml`'s header).

@@ -9,6 +9,7 @@ export const toTitleCase = (value: string): string =>
 
 export type ModelBaseColorPalette =
   | 'aqua'
+  | 'azure'
   | 'blue'
   | 'coral'
   | 'cyan'
@@ -17,6 +18,7 @@ export type ModelBaseColorPalette =
   | 'green'
   | 'ice'
   | 'lavender'
+  | 'lime'
   | 'mint'
   | 'orange'
   | 'periwinkle'
@@ -83,6 +85,12 @@ export const MODEL_BASES = {
     label: 'FLUX.2',
     colorPalette: 'ice',
   },
+  flux3: {
+    base: 'flux3',
+    label: 'FLUX.3',
+    // A deeper sky blue: the next step on from FLUX.2's ice, as ice is from FLUX.1's teal.
+    colorPalette: 'azure',
+  },
   cogview4: {
     base: 'cogview4',
     label: 'CogView4',
@@ -123,6 +131,11 @@ export const MODEL_BASES = {
     base: 'anima',
     label: 'Anima',
     colorPalette: 'pink',
+  },
+  'moss-image': {
+    base: 'moss-image',
+    label: 'MOSS-Image',
+    colorPalette: 'lime',
   },
   wan: {
     base: 'wan',

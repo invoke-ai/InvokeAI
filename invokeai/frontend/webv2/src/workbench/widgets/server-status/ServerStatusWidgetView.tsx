@@ -34,11 +34,15 @@ export const ServerStatusWidgetView = ({ presentation }: WidgetViewProps) => {
 
   if (isDisconnected) {
     return (
-      <StatusWidgetChip icon={CircleXIcon} tone="error">
+      <StatusWidgetChip hiddenLabel={t('widgets.labels.serverStatus')} icon={CircleXIcon} tone="error">
         {label}
       </StatusWidgetChip>
     );
   }
 
-  return <StatusWidgetChip icon={PlugZapIcon}>{label}</StatusWidgetChip>;
+  return (
+    <StatusWidgetChip hiddenLabel={t('widgets.labels.serverStatus')} icon={PlugZapIcon}>
+      {label}
+    </StatusWidgetChip>
+  );
 };

@@ -3,7 +3,7 @@ import type { GalleryBoard, GalleryBoardAccess, GalleryBoardAction } from '@feat
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -17,20 +17,25 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, values?: Record<string, unknown>) => {
       const messages: Record<string, string> = {
-        'widgets.gallery.assetCount': `${String(values?.count)} assets`,
+        'widgets.gallery.assetCount': `${String(values?.count)} uploads`,
         'common.cancel': 'Cancel',
-        'widgets.gallery.boardItemCounts': `${String(values?.images)} · ${String(values?.videos)} · ${String(
-          values?.assets
-        )}`,
-        'widgets.gallery.deleteBoard': 'Delete Board',
-        'widgets.gallery.deleteBoardAndMedia': 'Delete Board and Media',
-        'widgets.gallery.deleteBoardDescription': 'Choose whether the board media moves or is deleted.',
-        'widgets.gallery.deleteBoardOnly': 'Delete Board Only',
+        'widgets.gallery.deleteBoard': 'Delete board',
+        'widgets.gallery.deleteBoardAndMedia': `Delete board and ${String(values?.count)} items`,
+        'widgets.gallery.deleteBoardDescription': `Its ${String(values?.media)} move to Uncategorized.`,
+        'widgets.gallery.deleteBoardEmptyDescription': 'The board is empty.',
+        'widgets.gallery.deleteBoardIncludeMedia': `Also permanently delete its ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
-        'widgets.gallery.downloadBoardWithOmission': `Download Board (${String(values?.count)} video omitted)`,
+        'widgets.gallery.deleteBoardTypeName': `Type "${String(values?.name)}" to confirm`,
+        'widgets.gallery.downloadBoard': 'Download board',
+        'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
+        'widgets.gallery.mediaCountsThree': `${String(values?.first)}, ${String(values?.second)} and ${String(
+          values?.third
+        )}`,
+        'widgets.gallery.mediaCountsTwo': `${String(values?.first)} and ${String(values?.second)}`,
         'widgets.gallery.videoCount': `${String(values?.count)} videos`,
         'widgets.gallery.boardGroups.library': 'Library',
+        'widgets.gallery.boardGroups.projects': 'Projects',
         'widgets.gallery.moveBoard': 'Move to…',
       };
 
@@ -66,7 +71,8 @@ const context = {
   gallery: {
     boards: [board],
     projectBoardId: null,
-    settings: { autoAddBoardId: 'follow' },
+    selectedBoardId: 'board-1',
+    settings: { autoAddBoardId: null, followSelectedBoard: false },
   },
   projectId: 'p1',
   projectName: 'Mahogany House',
@@ -77,7 +83,7 @@ const context = {
 } as unknown as GalleryWidgetContextValue;
 const targetContext = {
   ...context,
-  gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1' } },
+  gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1', followSelectedBoard: false } },
 } as unknown as GalleryWidgetContextValue;
 
 let host: HTMLDivElement | null = null;
@@ -109,21 +115,134 @@ afterEach(async () => {
 });
 
 it('states the exact number of videos omitted from the image-only board archive', () => {
-  expect(document.body.textContent).toContain('Download Board (1 video omitted)');
+  expect(document.body.textContent).toContain('Download board (1 video omitted)');
 });
 
-it('shows image, video, and asset counts before deleting a mixed-media board', async () => {
-  const deleteItem = Array.from(document.querySelectorAll('[role="menuitem"]')).find(
-    (element) => element.textContent === 'Delete Board'
+it('offers a plain board download when the board holds no videos', async () => {
+  await renderMenuFor({ ...board, videoCount: 0 } as GalleryBoard);
+
+  expect(menuItemLabels()).toContain('Download board');
+  expect(document.body.textContent).not.toContain('omitted');
+});
+
+const openDeleteDialog = async () => {
+  const deleteItem = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (element) => element.textContent === 'Delete board'
   );
 
   expect(deleteItem).toBeDefined();
-  await act(() => userEvent.click(deleteItem as HTMLElement));
+  await act(() => userEvent.click(deleteItem!));
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).not.toBeNull());
 
-  await vi.waitFor(() => {
-    expect(document.body.textContent).toContain('2 images · 1 videos · 0 assets');
-  });
-  expect(document.body.textContent).toContain('Delete Board and Media');
+  return document.querySelector<HTMLElement>('[role="alertdialog"]')!;
+};
+
+const dialogButton = (label: string) =>
+  Array.from(document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] button')).find(
+    (button) => button.textContent === label
+  );
+
+it('deletes the board and keeps its media unless the user also asks to delete the media', async () => {
+  const dialog = await openDeleteDialog();
+
+  // Only the kinds the board holds, and where they go.
+  expect(dialog.textContent).toContain('Its 2 images and 1 videos move to Uncategorized.');
+  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+  await act(() => userEvent.click(dialogButton('Delete board')!));
+
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false);
+});
+
+it('deletes the media too only behind its checkbox, naming how many items go', async () => {
+  const dialog = await openDeleteDialog();
+
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  expect(dialog.textContent).toContain('Also permanently delete its 3 items');
+  await act(() => userEvent.click(dialogButton('Delete board and 3 items')!));
+
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+});
+
+it('asks for the board name before deleting many items with it', async () => {
+  await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
+  const dialog = await openDeleteDialog();
+
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  const confirm = dialogButton('Delete board and 61 items')!;
+  expect(confirm.disabled).toBe(true);
+
+  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
+  expect(confirm.disabled).toBe(false);
+  await act(() => userEvent.click(confirm));
+
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+});
+
+it('starts each opening of the delete dialog over, for the same board too', async () => {
+  await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
+  let dialog = await openDeleteDialog();
+
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  await act(() => userEvent.type(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!, 'Board 1'));
+  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(false);
+  await act(() => userEvent.click(dialogButton('Cancel')!));
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+
+  dialog = await openDeleteDialog();
+
+  expect(dialog.querySelector<HTMLInputElement>('input[type="checkbox"]')?.checked).toBe(false);
+  expect(dialog.querySelector('input:not([type="checkbox"])')).toBeNull();
+  expect(dialogButton('Delete board and 61 items')).toBeUndefined();
+  expect(dialogButton('Delete board')!.disabled).toBe(false);
+
+  // Asking again for the media brings back an empty name field and a refused delete.
+  await act(() => userEvent.click(dialog.querySelector<HTMLElement>('[data-part="label"]')!));
+  expect(dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!.value).toBe('');
+  expect(dialogButton('Delete board and 61 items')!.disabled).toBe(true);
+});
+
+/** The panel's part: the menu target clears when the menu closes. */
+const ControlledMenu = ({ initialTarget }: { initialTarget: typeof target }) => {
+  const [menuTarget, setMenuTarget] = useState<typeof target | null>(initialTarget);
+  const close = useCallback(() => setMenuTarget(null), []);
+
+  return <GalleryBoardMenu target={menuTarget} onClose={close} />;
+};
+
+const openMenus = () => document.querySelectorAll('[role="menu"][data-state="open"]');
+
+it.each(['cancel', 'delete'] as const)(
+  'closes the board menu as its delete dialog opens, and keeps it closed after %s',
+  async (outcome) => {
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={context}>
+            <ControlledMenu initialTarget={target} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+    expect(openMenus()).toHaveLength(1);
+
+    await openDeleteDialog();
+    await vi.waitFor(() => expect(openMenus()).toHaveLength(0));
+
+    await act(() => userEvent.click(dialogButton(outcome === 'cancel' ? 'Cancel' : 'Delete board')!));
+    await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull());
+
+    expect(openMenus()).toHaveLength(0);
+    expect(document.activeElement?.closest('[role="menu"]')).toBeNull();
+  }
+);
+
+it('offers no media choice for an empty board', async () => {
+  await renderMenuFor({ ...board, imageCount: 0, videoCount: 0 } as GalleryBoard);
+  const dialog = await openDeleteDialog();
+
+  expect(dialog.textContent).toContain('The board is empty.');
+  expect(dialog.querySelector('input[type="checkbox"]')).toBeNull();
 });
 
 it('makes the board the auto-add destination', async () => {
@@ -132,10 +251,13 @@ it('makes the board the auto-add destination', async () => {
   expect(autoAddItem?.textContent).toBe('widgets.gallery.autoAddToBoard');
   await act(() => userEvent.click(autoAddItem!));
 
-  expect(context.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: 'board-1' });
+  expect(context.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({
+    autoAddBoardId: 'board-1',
+    followSelectedBoard: false,
+  });
 });
 
-it('hands results back to the selected board from the auto-add board itself', async () => {
+it('hands results back to the default destination from the auto-add board itself', async () => {
   await act(async () => {
     root?.render(
       <ChakraProvider value={system}>
@@ -152,7 +274,15 @@ it('hands results back to the selected board from the auto-add board itself', as
   expect(item?.textContent).toBe('widgets.gallery.stopAutoAdd');
   await act(() => userEvent.click(item!));
 
-  expect(context.actions.updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'follow' });
+  expect(context.actions.updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: null, followSelectedBoard: false });
+});
+
+it('offers neither choice on the default destination, where results already go', async () => {
+  await renderMenuFor(board, {
+    gallery: { ...context.gallery, projectBoardId: 'board-1' } as GalleryWidgetContextValue['gallery'],
+  });
+
+  expect(document.querySelector('[role="menuitem"][data-value="auto-add-board"]')).toBeNull();
 });
 
 const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<GalleryWidgetContextValue> = {}) => {
@@ -173,6 +303,27 @@ const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<Gallery
   });
 };
 
+const projectGroupElement = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="group"]')).find(
+    (element) => element.querySelector('[data-part="item-group-label"]')?.textContent === 'Projects'
+  );
+
+const projectGroup = () => {
+  const group = projectGroupElement();
+
+  return group
+    ? {
+        label: 'Projects',
+        items: Array.from(group.querySelectorAll('[role="menuitem"]')).map((item) => item.textContent),
+      }
+    : undefined;
+};
+
+const libraryItem = () =>
+  Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
+    (element) => element.textContent === 'Library'
+  );
+
 const menuItemLabels = () =>
   Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).map((item) => item.textContent);
 
@@ -191,6 +342,10 @@ it('offers every tier but the one the board is in, and moves it there', async ()
   expect(
     menuItemLabels().filter((label) => label === 'Library' || label === 'Harbor Tower' || label === 'Mahogany House')
   ).toEqual(['Library', 'Harbor Tower']);
+  // The Library stands apart, above the projects' heading.
+  expect(projectGroup()).toEqual({ label: 'Projects', items: ['Harbor Tower'] });
+  expect(libraryItem()?.closest('[role="group"]')).toBeNull();
+  expect(libraryItem()?.nextElementSibling?.getAttribute('role')).toBe('separator');
 
   const library = Array.from(document.querySelectorAll<HTMLElement>('[role="menuitem"]')).find(
     (element) => element.textContent === 'Library'
@@ -214,6 +369,9 @@ it('offers a Library board the open project first', async () => {
   expect(
     menuItemLabels().filter((label) => label === 'Library' || label === 'Harbor Tower' || label === 'Mahogany House')
   ).toEqual(['Mahogany House', 'Harbor Tower']);
+  expect(projectGroup()).toEqual({ label: 'Projects', items: ['Mahogany House', 'Harbor Tower'] });
+  expect(libraryItem()).toBeUndefined();
+  expect(projectGroupElement()?.previousElementSibling?.getAttribute('role')).not.toBe('separator');
 });
 
 it('leaves an inbox with only the actions its project does not own', async () => {
@@ -223,7 +381,7 @@ it('leaves an inbox with only the actions its project does not own', async () =>
 
   expect(labels).toContain('widgets.gallery.exportProjectFromBoard');
   expect(labels).not.toContain('Move to…');
-  expect(labels).not.toContain('Delete Board');
+  expect(labels).not.toContain('Delete board');
   expect(labels).not.toContain('widgets.gallery.renameBoard');
 });
 
@@ -252,7 +410,7 @@ const ALL_ACTIONS: GalleryBoardAction[] = [
 it('offers a viewer only what they may do, and says whose board it is and whom to ask', async () => {
   await renderMenuFor(withAccess('viewer', ['read']), { boardSharing: true });
 
-  expect(menuItemLabels()).toEqual(['Download Board (1 video omitted)']);
+  expect(menuItemLabels()).toEqual(['Download board (1 video omitted)']);
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.header.viewer');
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.askToAdd');
 });
@@ -264,7 +422,7 @@ it('lets an editor rename and archive someone else’s board, but not move, shar
 
   expect(menuItemLabels()).toEqual([
     'widgets.gallery.autoAddToBoard',
-    'Download Board (1 video omitted)',
+    'Download board (1 video omitted)',
     'widgets.gallery.renameBoard',
     'widgets.gallery.archiveBoard',
   ]);
@@ -297,7 +455,7 @@ it('gives an admin someone else’s board to manage, but no move into their own 
 
   const labels = menuItemLabels();
   expect(document.body.textContent).toContain('widgets.gallery.boardAccess.header.admin');
-  expect(labels).toContain('Delete Board');
+  expect(labels).toContain('Delete board');
   expect(labels).not.toContain('Move to…');
 });
 

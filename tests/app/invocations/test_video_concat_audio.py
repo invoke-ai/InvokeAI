@@ -71,6 +71,7 @@ def _invocation(n_videos: int = 2, transition: str = "cut", transition_frames: i
     )
 
 
+@pytest.mark.ffmpeg
 class TestExtraction:
     def test_roundtrip_tone(self, tmp_path):
         clip = _make_clip(tmp_path, "a", 32, freq=440.0)
@@ -99,6 +100,7 @@ class TestResample:
             resample_linear(np.zeros(10, dtype=np.float32), 5)
 
 
+@pytest.mark.ffmpeg
 class TestBuildAudioTrack:
     def _build(self, paths, frame_counts, invocation=None, output_fps=FPS, native=None, durations=None):
         inv = invocation or _invocation(n_videos=len(paths))
@@ -256,6 +258,7 @@ class TestBuildAudioTrack:
         assert abs(_dominant_freq(pcm[:, half + RATE // 4 :], rate) - 880.0) < 15.0
 
 
+@pytest.mark.ffmpeg
 class TestMux:
     def test_end_to_end_cut_produces_audible_mp4(self, tmp_path):
         """The full pipeline the node runs: silent video encode -> audio build -> mux."""

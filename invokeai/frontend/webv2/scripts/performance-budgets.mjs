@@ -787,6 +787,98 @@ export const createBrowserSamplePlan = ({ scoredSamples, traceSamples, warmups }
   ];
 };
 
+// Routine checks need repeated resource observations, but only full profiles can compare timings.
+export const createBrowserRunPlan = ({ sampling, timingPolicy, profile = false, updateBaseline = false }) => {
+  const fullPlan = createBrowserSamplePlan(sampling);
+  if (profile || updateBaseline || timingPolicy.enforce) {
+    return { mode: 'profile', sampling, samples: fullPlan };
+  }
+  return {
+    mode: 'resources',
+    sampling: { resourceSamples: 2 },
+    samples: [
+      { index: 0, kind: 'resource' },
+      { index: 1, kind: 'resource' },
+    ],
+  };
+};
+
+const median = (values) => {
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+
+  if (sorted.length % 2 === 0) {
+    return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
+  }
+  return sorted[middle] ?? 0;
+};
+
+const summarizeVariance = (values) => {
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.reduce((total, value) => total + (value - mean) ** 2, 0) / Math.max(1, values.length - 1);
+  const standardDeviation = Math.sqrt(variance);
+
+  return {
+    coefficientOfVariation: mean === 0 ? 0 : standardDeviation / mean,
+    maximum: Math.max(...values),
+    mean,
+    minimum: Math.min(...values),
+    standardDeviation,
+  };
+};
+
+export const summarizeBrowserSamples = (samples, mode) => {
+  const first = samples[0];
+  for (const sample of samples.slice(1)) {
+    for (const key of ['profileCounts', 'scriptSourceOwners']) {
+      if (JSON.stringify(first[key]) !== JSON.stringify(sample[key])) {
+        throw new Error(
+          `${key} were unstable between observed samples.\nExpected ${JSON.stringify(first[key])}\nReceived ${JSON.stringify(sample[key])}`
+        );
+      }
+    }
+  }
+  const maximumResources = (key) =>
+    Object.fromEntries(
+      BROWSER_RESOURCE_METRIC_KEYS.map((metric) => [metric, Math.max(...samples.map((sample) => sample[key][metric]))])
+    );
+  const resources = {
+    activatedResources: maximumResources('activatedResources'),
+    profileCounts: first.profileCounts,
+    rawSamples: samples.map(({ activatedResources, resources, timing }) => ({
+      activatedResources,
+      resources,
+      ...(mode === 'profile' ? { timing } : {}),
+    })),
+    resources: maximumResources('resources'),
+    scriptSourceOwners: first.scriptSourceOwners,
+  };
+  if (mode !== 'profile') {
+    return resources;
+  }
+  const timingKeys = [
+    'domContentLoadedMs',
+    'layoutAckMs',
+    'layoutReturnSwitchMs',
+    'layoutSwitchMs',
+    'loadMs',
+    'longestTaskMs',
+    'projectSwitchMs',
+    'routeReadyMs',
+  ];
+  const values = (key) => samples.map((sample) => sample.timing[key]);
+  return {
+    ...resources,
+    ...Object.fromEntries(
+      timingKeys
+        .filter((key) => key !== 'longestTaskMs')
+        .map((key) => [key.replace(/Ms$/, 'MedianMs'), median(values(key))])
+    ),
+    longestTaskMaxMs: Math.max(...values('longestTaskMs')),
+    variance: Object.fromEntries(timingKeys.map((key) => [key, summarizeVariance(values(key))])),
+  };
+};
+
 export const summarizeBrowserResources = (resources) => {
   const uniqueResources = [...new Map(resources.map((resource) => [resource.path, resource])).values()];
   const sum = (kind) =>

@@ -12,11 +12,13 @@ const sources = import.meta.glob('./react.ts', { eager: true, import: 'default',
  * module orders differ, so only the entry's import surface can be checked cheaply.
  */
 describe('gallery React entry', () => {
-  it('reaches only the eager UI port and core types', () => {
+  it('reaches only the eager UI port, the image recovery leaf hook and core types', () => {
     const source = sources['./react.ts'];
     const specifiers = [...(source ?? '').matchAll(/from '([^']+)'/g)].map(([, specifier]) => specifier);
 
     expect(source).toBeDefined();
-    expect(new Set(specifiers)).toEqual(new Set(['./ui/GalleryUiContext', './core/types']));
+    expect(new Set(specifiers)).toEqual(
+      new Set(['./ui/GalleryUiContext', './ui/useGalleryImageRecovery', './core/types'])
+    );
   });
 });

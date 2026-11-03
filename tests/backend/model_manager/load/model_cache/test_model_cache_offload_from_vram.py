@@ -43,7 +43,7 @@ def moved(cache: ModelCache):
 
     with (
         patch.object(cache, "_move_model_to_ram", side_effect=move),
-        patch(f"{MODULE}._has_dedicated_vram", return_value=True),
+        patch(f"{MODULE}.device_has_dedicated_vram", return_value=True),
         patch(f"{MODULE}.TorchDevice.empty_cache") as empty_cache,
     ):
         yield keys, empty_cache
@@ -112,9 +112,42 @@ def test_offload_model_from_vram_still_moves_one_model_with_its_submodels(cache:
     assert sorted(keys) == ["flux", "flux:vae"]
 
 
-def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache):
+@pytest.mark.parametrize("device", ["cpu", "mps", "xpu:2"])
+def test_a_device_whose_vram_is_system_ram_moves_nothing(cache: ModelCache, device: str):
     """CPU, MPS and integrated GPUs: moving a model "to RAM" would copy it within the same memory."""
-    cache.put("flux:transformer", torch.nn.Linear(MB // 4, 1, bias=False))
-    with patch.object(cache, "_move_model_to_ram") as move:
+    _put(cache, "flux:transformer", 1)
+    with (
+        patch.object(cache, "_execution_device", torch.device(device)),
+        patch("invokeai.backend.util.devices.xpu_device_is_integrated", return_value=True),
+        patch.object(cache, "_move_model_to_ram", return_value=MB) as move,
+        patch(f"{MODULE}.TorchDevice.empty_cache"),
+    ):
         assert cache.offload_models_from_vram_except(set()) == 0
     move.assert_not_called()
+
+
+def test_a_calibration_offload_moves_every_other_unlocked_entry_out_whole(cache: ModelCache, moved):
+    """`offload_unlocked_models_from_vram` keeps exact cache keys: the VAE being locked stays, its UNet sibling goes,
+    and each entry is asked to free all its bytes, so none is split."""
+    keys, empty_cache = moved
+    _put(cache, "sdxl:unet", 8)
+    _put(cache, "sdxl:text_encoder_2", 2)
+    _put(cache, "sdxl:vae", 1)
+    _put(cache, "controlnet", 1)
+    cache._cached_models["controlnet"].lock()
+    requested: dict[str, int] = {}
+    real_move = cache._move_model_to_ram
+
+    def record(cache_entry, vram_bytes_to_free, keep_required_weights_in_vram=None):
+        requested[cache_entry.key] = vram_bytes_to_free
+        return real_move(cache_entry, vram_bytes_to_free, keep_required_weights_in_vram)
+
+    with patch.object(cache, "_move_model_to_ram", side_effect=record):
+        freed = cache.offload_unlocked_models_from_vram(keep_cache_keys=("sdxl:vae",))
+
+    assert sorted(keys) == ["sdxl:text_encoder_2", "sdxl:unet"]
+    assert requested == {
+        key: cache._cached_models[key].cached_model.total_bytes() for key in ("sdxl:unet", "sdxl:text_encoder_2")
+    }
+    assert freed == 10 * MB and len(cache._cached_models) == 4
+    empty_cache.assert_called_once()

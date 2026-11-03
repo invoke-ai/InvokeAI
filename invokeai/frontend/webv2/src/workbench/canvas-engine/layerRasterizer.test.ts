@@ -4,9 +4,10 @@ import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { ImageUnavailableError } from '@workbench/canvas-engine/render/rasterizers/imageRasterizer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createLayerRasterizer, type CreateLayerRasterizerDeps } from './layerRasterizer';
+import { createLayerRasterizer, type CreateLayerRasterizerDeps, RASTERIZATION_RETRY_BASE_MS } from './layerRasterizer';
 
 const surface = (width = 4, height = 4): RasterSurface =>
   ({
@@ -123,6 +124,7 @@ const makeHarness = (overrides: Partial<CreateLayerRasterizerDeps> = {}): Harnes
       layerCache: {
         get: vi.fn(() => entry),
         getOrCreateRect: vi.fn(() => entry),
+        peek: vi.fn(() => entry),
         publishRasterized: vi.fn((_layerId: string, _rect: unknown, _pixels: unknown, family?: string) => {
           entry.renderedFontFamily = family;
           return { ...entry, version: entry.version + 1 };
@@ -275,6 +277,108 @@ describe('failure', () => {
       'layer-1',
       expect.any(Error)
     );
+  });
+
+  it('reports a source that keeps failing once, and remembers the failure until the layer changes', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValue(new Error('decode failed'));
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(harness.rasterize).toHaveBeenCalledTimes(2);
+    expect(harness.spies.reportError).toHaveBeenCalledOnce();
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+
+    // Another image is another failure, worth its own notice.
+    const replaced = rasterLayer({ source: { image: { height: 4, imageName: 'b.png', width: 4 }, type: 'image' } });
+    harness.document.value = documentOf([replaced]);
+    expect(rasterizer.getFailure(replaced)).toBeNull();
+    await expect(rasterizer.getOrStartLayerRasterization(replaced, harness.document.value)).resolves.toBe('error');
+    expect(harness.spies.reportError).toHaveBeenCalledTimes(2);
+  });
+
+  it('lets a failed source retry after a backoff that doubles per failure, reporting it once', async () => {
+    const timers: { callback: () => void; delayMs: number }[] = [];
+    const rasterizer = createLayerRasterizer({
+      ...harness.deps,
+      setTimer: (callback, delayMs) => {
+        timers.push({ callback, delayMs });
+        return () => undefined;
+      },
+    });
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValue(new Error('backend restarting'));
+    const layer = rasterLayer();
+
+    await rasterizer.getOrStartLayerRasterization(layer, harness.document.value);
+    expect(rasterizer.isBackingOff(layer)).toBe(true);
+    timers.at(-1)!.callback();
+    // The backoff's end lets the display try again, and says so; the failure itself is still on record.
+    expect(rasterizer.isBackingOff(layer)).toBe(false);
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+    expect(harness.spies.invalidateLayerRender).toHaveBeenCalledWith('layer-1');
+
+    await rasterizer.getOrStartLayerRasterization(layer, harness.document.value);
+    expect(timers.map(({ delayMs }) => delayMs)).toEqual([
+      RASTERIZATION_RETRY_BASE_MS,
+      RASTERIZATION_RETRY_BASE_MS * 2,
+    ]);
+    expect(harness.spies.reportError).toHaveBeenCalledOnce();
+  });
+
+  it('records an image that could not be fetched as unavailable: backed off, reported once per kind', async () => {
+    const timers: { callback: () => void; delayMs: number }[] = [];
+    const rasterizer = createLayerRasterizer({
+      ...harness.deps,
+      setTimer: (callback, delayMs) => {
+        timers.push({ callback, delayMs });
+        return () => undefined;
+      },
+    });
+    (harness.entry as { stale: boolean }).stale = true;
+    const outage = new ImageUnavailableError('a.png', { cause: new Error('503') });
+    harness.rasterize.mockRejectedValue(outage);
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('unavailable');
+    expect(harness.spies.setStatus).toHaveBeenCalledWith('layer-1', 'error');
+    expect(rasterizer.getFailure(layer)).toBe('unavailable');
+    expect(rasterizer.isBackingOff(layer)).toBe(true);
+
+    timers.at(-1)!.callback();
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('unavailable');
+    expect(timers.map(({ delayMs }) => delayMs)).toEqual([
+      RASTERIZATION_RETRY_BASE_MS,
+      RASTERIZATION_RETRY_BASE_MS * 2,
+    ]);
+    // The notice carries the wrapper, which names the image, with the resolver's error as its cause.
+    expect(harness.spies.reportError.mock.calls).toEqual([['Layer thumbnail rasterization failed', 'layer-1', outage]]);
+
+    // Once the image is gone for good, the same key reads as unreadable, and that new kind is reported.
+    const gone = new Error('decode failed');
+    harness.rasterize.mockRejectedValue(gone);
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(rasterizer.getFailure(layer)).toBe('unreadable');
+    expect(harness.spies.reportError.mock.calls.at(-1)).toEqual([
+      'Layer thumbnail rasterization failed',
+      'layer-1',
+      gone,
+    ]);
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    expect(harness.spies.reportError).toHaveBeenCalledTimes(2);
+  });
+
+  it('forgets a failure once a retry publishes', async () => {
+    const rasterizer = createLayerRasterizer(harness.deps);
+    (harness.entry as { stale: boolean }).stale = true;
+    harness.rasterize.mockRejectedValueOnce(new Error('network blip'));
+    const layer = rasterLayer();
+
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('error');
+    await expect(rasterizer.getOrStartLayerRasterization(layer, harness.document.value)).resolves.toBe('published');
+    expect(rasterizer.getFailure(layer)).toBeNull();
   });
 
   it('still reports error when diagnostics itself throws', async () => {

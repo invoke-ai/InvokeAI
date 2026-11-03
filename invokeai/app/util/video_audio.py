@@ -26,6 +26,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from invokeai.app.services.session_processor.session_processor_common import CanceledException
+from invokeai.app.util.process_tree import kill_process_tree
 
 # How often a running ffmpeg child is checked for cancellation, and how much of its stderr is kept.
 _CANCEL_POLL_SECONDS = 0.1
@@ -74,8 +75,7 @@ def run_ffmpeg_process(
                     raise subprocess.TimeoutExpired(command, timeout)
         finally:
             if proc.returncode is None:
-                proc.kill()
-                proc.wait()
+                kill_process_tree(proc)
         # Only the tail is ever reported; a decoder logging per packet could write a great deal.
         stderr.seek(0, 2)
         stderr.seek(max(0, stderr.tell() - _STDERR_TAIL_BYTES))

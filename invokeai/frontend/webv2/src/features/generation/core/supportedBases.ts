@@ -9,6 +9,7 @@ export const SUPPORTED_GENERATE_BASES = [
   'sd-3',
   'flux',
   'flux2',
+  'flux3',
   'cogview4',
   'ernie-image',
   'qwen-image',
@@ -18,6 +19,7 @@ export const SUPPORTED_GENERATE_BASES = [
   'qwen-image-2-1',
   'wan',
   'anima',
+  'moss-image',
 ] as const satisfies readonly KnownGenerationModelBase[];
 
 export type SupportedGenerateBase = (typeof SUPPORTED_GENERATE_BASES)[number];

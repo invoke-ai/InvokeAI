@@ -1,3 +1,4 @@
+import { ClipboardUnavailableError } from '@platform/browser/clipboard';
 import { describe, expect, it, vi } from 'vitest';
 
 import { decodeImageBlob, readClipboardImage } from './canvasClipboard';
@@ -12,8 +13,8 @@ const item = (types: string[], payload: Record<string, Blob> = {}): ClipboardIte
   }) as unknown as ClipboardItem;
 
 describe('readClipboardImage', () => {
-  it('returns null when the clipboard API is unavailable', async () => {
-    await expect(readClipboardImage({ clipboard: undefined })).resolves.toBeNull();
+  it('rejects when the clipboard API is unavailable, so paste can say why', async () => {
+    await expect(readClipboardImage({ clipboard: {} })).rejects.toBeInstanceOf(ClipboardUnavailableError);
   });
 
   it('returns null when permission is refused rather than throwing', async () => {
@@ -21,6 +22,15 @@ describe('readClipboardImage', () => {
     // defocused document refuses too — so it must not surface as an error.
     const clipboard = { read: () => Promise.reject(new Error('NotAllowedError')) };
     await expect(readClipboardImage({ clipboard })).resolves.toBeNull();
+  });
+
+  it("rejects with the item's own error when a listed image cannot be retrieved", async () => {
+    const failure = new DOMException('Image data unavailable', 'DataError');
+    const clipboard = {
+      read: () =>
+        Promise.resolve([{ getType: () => Promise.reject(failure), types: ['image/png'] } as unknown as ClipboardItem]),
+    };
+    await expect(readClipboardImage({ clipboard })).rejects.toBe(failure);
   });
 
   it('returns null when the clipboard holds no image', async () => {

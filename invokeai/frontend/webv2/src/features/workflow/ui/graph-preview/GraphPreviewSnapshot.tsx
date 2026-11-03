@@ -84,7 +84,7 @@ export const GraphPreviewSnapshot = ({
           const surface = stageRef.current?.firstElementChild;
 
           if (!(surface instanceof HTMLElement)) {
-            throw new Error('The graph preview unmounted before it could be captured.');
+            throw new TypeError('The graph preview unmounted before it could be captured.');
           }
 
           onCapture(await captureSurface(surface));

@@ -6,7 +6,17 @@ test_projection.py; this file catches the failure those fits cannot see: an inst
 silently lost compilation.
 """
 
-import numba
+import pytest
+
+from invokeai.backend.util.host_platform import is_windows_arm64
+
+if is_windows_arm64():
+    # No numba wheel for this Python, so pyproject excludes the umap/numba stack here and the image map
+    # takes compute_umap's PCA fallback; that path is covered by test_projection.py. Only here: anywhere
+    # else a missing numba is exactly the broken resolution this module exists to catch.
+    pytest.skip("umap-learn/numba are not installed on Windows ARM64", allow_module_level=True)
+
+import numba  # noqa: E402
 
 
 def test_numba_jit_is_active() -> None:

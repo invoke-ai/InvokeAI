@@ -19,7 +19,7 @@ import torch
 from PIL import Image
 
 from invokeai.backend.architectures.facet import Facet
-from invokeai.backend.architectures.registry import ArchitectureError, require
+from invokeai.backend.architectures.registry import ArchitectureError, get, require
 from invokeai.backend.model_manager.taxonomy import AnyVariant, BaseModelType
 
 _DEFS_PACKAGE: Final = "invokeai/backend/architectures/defs/"
@@ -568,7 +568,7 @@ FLUX2_32 = LatentSpace(
     rgb_factors=FLUX2_LATENT_RGB_FACTORS,
     rgb_bias=FLUX2_LATENT_RGB_BIAS,
 )
-"""AutoencoderKLFlux2: FLUX.2, ERNIE-Image and Ideogram 4."""
+"""AutoencoderKLFlux2: FLUX.2, FLUX.3, ERNIE-Image, Ideogram 4 and MOSS-Image."""
 
 MINIMAX_H3_24 = LatentSpace(
     channels=24,
@@ -658,6 +658,29 @@ class LatentSpaceFacet(Facet):
             if space.channels == channels:
                 return space
         return self.primary
+
+    def with_channels(self, channels: int) -> LatentSpace | None:
+        """The declared space with this many latent channels, or None.
+
+        Unlike `resolve`, an unknown count is no match rather than the primary: a caller asking by
+        channel count is pairing a model with a space, and a fallback would pair it with the wrong one.
+        `by_variant` names no space of its own, so `primary` and `alternates` cover it.
+        """
+        return next((space for space in (self.primary, *self.alternates) if space.channels == channels), None)
+
+
+def latent_space_with_channels(base: BaseModelType, channels: int) -> LatentSpace | None:
+    """The space `base` denoises in that has `channels` latent channels; None if it declares none.
+
+    Tiny AutoEncoders consume diffusion-space latents, which is exactly what a `LatentSpace` describes,
+    so a TAE recorded as `(base, channels)` serves every architecture whose sample resolves to the same
+    space *object*. Spaces are shared by identity -- SD15_4 by SD 1 and SD 2, FLUX_16 by FLUX.1 and
+    Z-Image, FLUX2_32 by FLUX.2, ERNIE-Image and Ideogram 4, WAN21_16 by Wan, Qwen-Image, Krea-2 and
+    Anima -- so one TAE record serves them all. Compare results with `is`: `LatentSpace` holds lists
+    and is unhashable.
+    """
+    facet = get(base, LatentSpaceFacet)
+    return None if facet is None else facet.with_channels(channels)
 
 
 def resolve_latent_space(base: BaseModelType, sample: torch.Tensor) -> LatentSpace:

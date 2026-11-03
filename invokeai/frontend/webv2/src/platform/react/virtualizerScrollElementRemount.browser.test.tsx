@@ -4,18 +4,21 @@ import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * On scroll-element replacement, browsers can clamp restored offsets without an event. Verify the local
- * virtualizer patch reconciles actual position instead of rendering a stale empty range.
+ * Browsers clamp an offset written past shorter content and report it late or never, e.g. on scroll-element
+ * replacement. Verify the local virtualizer patch reconciles actual position instead of rendering a stale range.
  */
 
 const ROW_HEIGHT = 50;
 
-/** The live virtualizer instance, so a test can assert its internal scroll bookkeeping. */
-let instance: {
-  isScrolling: boolean;
-  scrollDirection: string | null;
-  scrollToIndex: (index: number) => void;
-} | null = null;
+/** The live virtualizer instance's scroll bookkeeping, so a test can stage and assert it. */
+type ScrollInternals = {
+  _holdOffset: number;
+  _reportedOverscroll: boolean;
+  pendingWrite: { smooth: boolean; target: number } | null;
+  scrollOffset: number | null;
+};
+
+let instance: ScrollInternals | null = null;
 
 const VirtualList = ({ count, isListMounted }: { count: number; isListMounted: boolean }) => {
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -87,37 +90,73 @@ afterEach(async () => {
 });
 
 describe('useVirtualizer scroll element remount', () => {
-  it('does not consume a programmatic scroll\u2019s pending intent while reconciling', async () => {
-    // Retain programmatic scroll intent during reconciliation; clearing it suppresses the matching event and
-    // leaves scrolling state/direction stale.
+  /** Sets an own scrollTop value to model pre-event state without Chromium racing the assertion with a native event. */
+  const stageScrollTop = (scroller: HTMLElement | null, offset: number) => {
+    Object.defineProperty(scroller, 'scrollTop', { configurable: true, value: offset, writable: true });
+  };
+
+  it('still exposes the private virtual-core members the local patch reads', async () => {
+    // patches/react-hook-tanstack-virtual.patch reads these members. If upstream renames one, the reconcile
+    // quietly stops running, and the tests below still pass because they set these members themselves.
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await render(1000, true);
+    const members = instance as unknown as Record<string, unknown>;
+
+    expect(typeof members._holdOffset).toBe('number');
+    expect(Object.hasOwn(members, 'pendingWrite')).toBe(true);
+    expect(typeof members.maybeNotify).toBe('function');
+  });
+
+  it('does not consume a programmatic scroll\u2019s pending write while reconciling', async () => {
+    // Clearing the pending write would make its scroll event match the reconciled offset and be dropped as
+    // spurious, leaving scrolling state and an in-flight scrollToIndex without it.
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
 
     await render(1000, true);
     const scroller = host.querySelector<HTMLElement>('[data-testid="scroller"]');
-    const internals = instance as unknown as {
-      _intendedScrollOffset: number | null;
-      scrollOffset: number | null;
-    };
+    const internals = instance!;
+    const pendingWrite = { smooth: false, target: 400 * ROW_HEIGHT };
 
-    // Set an own scrollTop value to model pre-event state without Chromium racing the assertion by delivering a
-    // native scroll event.
     await act(() => {
-      Object.defineProperty(scroller, 'scrollTop', {
-        configurable: true,
-        value: 400 * ROW_HEIGHT,
-        writable: true,
-      });
+      stageScrollTop(scroller, 400 * ROW_HEIGHT);
       internals.scrollOffset = 0;
-      internals._intendedScrollOffset = 400 * ROW_HEIGHT;
+      internals.pendingWrite = pendingWrite;
       root?.render(<VirtualList count={1000} isListMounted />);
     });
 
     // The reconciliation ran: the cached offset now matches the element...
     expect(internals.scrollOffset).toBe(400 * ROW_HEIGHT);
-    // ...and it left the pending intent alone, so the guard stays armed.
-    expect(internals._intendedScrollOffset).toBe(400 * ROW_HEIGHT);
+    // ...and it left the pending write for its scroll event.
+    expect(internals.pendingWrite).toBe(pendingWrite);
+  });
+
+  it('keeps a held scroll correction instead of reconciling it away', async () => {
+    // While a correction is held, the layout offset differs from the element by it on purpose; adopting the
+    // element's offset would drop the correction and shift the rows under the reader.
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+
+    await render(1000, true);
+    const scroller = host.querySelector<HTMLElement>('[data-testid="scroller"]');
+    const internals = instance!;
+
+    await act(() => {
+      stageScrollTop(scroller, 400 * ROW_HEIGHT);
+      internals.scrollOffset = 400 * ROW_HEIGHT + 100;
+      internals._holdOffset = 100;
+      // A reported rubber-band bounce keeps the hold from being written during the commit.
+      internals._reportedOverscroll = true;
+      root?.render(<VirtualList count={1000} isListMounted />);
+    });
+
+    expect(internals._holdOffset).toBe(100);
+    expect(internals.scrollOffset).toBe(400 * ROW_HEIGHT + 100);
   });
 
   it('recovers when the restored offset is clamped by shorter remounted content', async () => {

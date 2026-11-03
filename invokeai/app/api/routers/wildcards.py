@@ -1,9 +1,13 @@
+from typing import Annotated
+
 from fastapi import Body, HTTPException, Path
 from fastapi.routing import APIRouter
+from pydantic import StringConstraints
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.services.wildcard_records.wildcard_records_common import (
+    DeleteWildcardsResult,
     WildcardChanges,
     WildcardNameConflictError,
     WildcardNotFoundError,
@@ -12,6 +16,10 @@ from invokeai.app.services.wildcard_records.wildcard_records_common import (
 )
 
 wildcards_router = APIRouter(prefix="/v1/wildcards", tags=["wildcards"])
+
+# The most ids one batch delete takes; clients send larger selections in batches of this size.
+MAX_WILDCARD_BATCH_SIZE = 1000
+WildcardId = Annotated[str, StringConstraints(max_length=255)]
 
 
 def _get_owned_wildcard(wildcard_id: str, user_id: str) -> WildcardRecordDTO:
@@ -88,3 +96,28 @@ def delete_wildcard(
     """Deletes a wildcard owned by the current user."""
     _get_owned_wildcard(wildcard_id, current_user.user_id)
     ApiDependencies.invoker.services.wildcard_records.delete(wildcard_id)
+
+
+@wildcards_router.post(
+    "/delete",
+    operation_id="delete_wildcards",
+    response_model=DeleteWildcardsResult,
+)
+def delete_wildcards(
+    current_user: CurrentUserOrDefault,
+    wildcard_ids: list[WildcardId] = Body(
+        description="The ids of the wildcards to delete",
+        embed=True,
+        min_length=1,
+        max_length=MAX_WILDCARD_BATCH_SIZE,
+    ),
+) -> DeleteWildcardsResult:
+    """Deletes those of the wildcards that the current user owns.
+
+    Unknown ids and other users' ids are skipped and left out of the result, as the single delete answers 404
+    for both, so the result never confirms that someone else's id exists.
+    """
+    deleted_ids = ApiDependencies.invoker.services.wildcard_records.delete_many(
+        user_id=current_user.user_id, wildcard_ids=wildcard_ids
+    )
+    return DeleteWildcardsResult(deleted_ids=deleted_ids)

@@ -60,6 +60,7 @@ jobs:
           files_yaml: |
             webv2:
               - '.github/workflows/frontend-tests.yml'
+              - '.github/workflows/frontend-checks.yml'
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
@@ -97,7 +98,7 @@ jobs:
 
       - name: release completion gates
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm check:release'
+        run: 'pnpm check:release:tests'
         shell: bash
         env:
           WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}

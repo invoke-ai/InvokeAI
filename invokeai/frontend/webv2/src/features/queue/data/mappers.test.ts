@@ -34,6 +34,7 @@ describe('queue transport mappers', () => {
         user_display_name: 'Ada',
         user_email: 'ada@example.com',
         user_id: 'user-1',
+        workflow: { name: 'Portrait upscale', nodes: [] },
       })
     ).toEqual({
       batchId: 'batch-1',
@@ -59,6 +60,7 @@ describe('queue transport mappers', () => {
       userDisplayName: 'Ada',
       userEmail: 'ada@example.com',
       userId: 'user-1',
+      workflowName: 'Portrait upscale',
     });
   });
 
@@ -75,6 +77,24 @@ describe('queue transport mappers', () => {
     expect(item.fieldValues).toBeUndefined();
     expect(item.resultImageNames).toEqual([]);
     expect(item).not.toHaveProperty('session');
+  });
+
+  it('reads naive server timestamps as UTC, keeping null and ISO values', () => {
+    const item = mapQueueItemDTO({
+      batch_id: 'batch-3',
+      completed_at: '2026-10-19 08:05:30.5',
+      created_at: '2026-10-19 08:00:00.123',
+      item_id: 9,
+      session_id: 'session-3',
+      started_at: null,
+      status: 'completed',
+      updated_at: '2026-10-19T08:05:30.500Z',
+    });
+
+    expect(item.createdAt).toBe('2026-10-19T08:00:00.123Z');
+    expect(item.completedAt).toBe('2026-10-19T08:05:30.500Z');
+    expect(item.startedAt).toBeNull();
+    expect(item.updatedAt).toBe('2026-10-19T08:05:30.500Z');
   });
 
   it('maps status and id-list response names at the adapter boundary', () => {

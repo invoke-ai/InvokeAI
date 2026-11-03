@@ -1,6 +1,7 @@
 """FLUX.1 starter models."""
 
 from invokeai.backend.model_manager.starter_models.common import (
+    TINY_AUTOENCODER_NOTE,
     clip_l_encoder,
     clip_vit_l_image_encoder,
     gemma2_2b_encoder,
@@ -22,6 +23,15 @@ flux_vae = StarterModel(
     source="black-forest-labs/FLUX.1-schnell::ae.safetensors",
     description="FLUX VAE compatible with both schnell and dev variants.",
     type=ModelType.VAE,
+)
+
+taef1 = StarterModel(
+    name="TAEF1 (FLUX.1 preview decoder)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/madebyollin/taef1/resolve/b1b2d00e9e440cfbf3dedb34266864da86016ceb/diffusion_pytorch_model.safetensors",
+    description=f"Sharp live previews for FLUX.1 and Z-Image. {TINY_AUTOENCODER_NOTE} ~10MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 # NVIDIA PiD decoders (https://huggingface.co/nvidia/PiD). Code is Apache-2.0; weights are NSCLv1 (non-commercial /
@@ -168,6 +178,29 @@ flux_krea_quantized = StarterModel(
     base=BaseModelType.Flux,
     source="https://huggingface.co/InvokeAI/FLUX.1-Krea-dev-GGUF/resolve/main/flux1-krea-dev-Q4_K_M.gguf",
     description="FLUX.1 Krea dev quantized (q4_k_m). Total size with dependencies: ~12GB",
+    type=ModelType.Main,
+    dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+)
+
+flux_krea_fp8 = StarterModel(
+    name="FLUX.1 Krea dev (fp8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/Comfy-Org/Flux-1-Krea-Dev/resolve/d9d7c421e64d3a80b16a79c0fdc9989bfdaa6f01/split_files/diffusion_models/flux1-krea-dev_fp8_scaled.safetensors",
+    description="FLUX.1 Krea dev transformer in Comfy-Org's scaled fp8 build. FP8 Storage is switched on when it is "
+    "installed, so its fp8 layers stay fp8, about 11.9GB once loaded. ~11.9GB; total size with dependencies: ~18GB",
+    type=ModelType.Main,
+    dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
+)
+
+# A community repack, pinned to a commit for the same reason as FLUX.1 dev (int8) above: the decode follows the
+# file's own `comfy_quant` marker, and a reupload at the same path could change what that marker says.
+flux_krea_int8 = StarterModel(
+    name="FLUX.1 Krea dev (int8)",
+    base=BaseModelType.Flux,
+    source="https://huggingface.co/rockerBOO/flux.1-krea-dev-convrot-int8/resolve/b1487ea0f81f052852e9230537baefee8c2f73d6/flux1-krea-dev-int8convrot.safetensors",
+    description="FLUX.1 Krea dev transformer in ComfyUI int8_convrot, from rockerBOO's community repack (no "
+    "first-party int8 build of FLUX.1 exists). Its int8 layers stay int8 on every supported GPU, about 14.1GB once "
+    "loaded; int8 Compute can run them on NVIDIA int8 tensor cores. ~14.1GB; total size with dependencies: ~20GB",
     type=ModelType.Main,
     dependencies=[t5_8b_quantized_encoder, flux_vae, clip_l_encoder],
 )

@@ -5,8 +5,8 @@ import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/react';
-import { getAuthSession, subscribeAuthSession } from '@features/identity';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import { getAuthSession, getCapabilities, subscribeAuthSession } from '@features/identity';
+import { ensureModelsLoaded, openModelManager, useModelsSelector } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { hasPendingWorkflowQueueItem } from '@features/queue';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/react';
@@ -26,16 +26,21 @@ import {
   createInvocationRouteInputSelector,
   formatRoute,
   isInvocationRouteValid,
+  localizeInvocationValidationReason,
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
 import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
-import { getActiveProjectWorkflow } from '@workbench/projectWorkflows';
-import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
+import { getActiveProjectWorkflow, getProjectWorkflowHistory } from '@workbench/projectWorkflows';
+import {
+  getWorkbenchPreferences,
+  patchWorkbenchPreferences,
+  subscribeWorkbenchPreferences,
+} from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -55,6 +60,8 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
   workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
+  workflowLibrarySort: preferences.workflowLibrarySort,
+  workflowLibraryThumbnailFit: preferences.workflowLibraryThumbnailFit,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
   workflowValidateConnections: preferences.workflowValidateConnections,
@@ -148,14 +155,16 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           availabilityModels
         );
 
+        const message = route.validationMessage;
+
         return {
           canInvoke: isInvocationRouteValid(route) && !isPreparing,
           label: formatRoute(route),
           validationMessage: isPreparing
             ? t('topbar.invoke.preparing')
-            : typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
-              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
-              : route.validationMessage,
+            : message === undefined
+              ? undefined
+              : localizeInvocationValidationReason(message, t),
         };
       },
       invoke: async (sourceId) => {
@@ -165,13 +174,16 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           const { prepareCanvasInvocation } = await import('@workbench/widgets/canvas/invoke/prepareCanvasInvocation');
 
           assertAccountScopeCurrent(owner);
+          const snapshot = queries.getSnapshot();
           return resolveAndSubmitGraphPreviewInvocation({
             commands,
             formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+            formatUpscaleMetadataFailure: (name) => t('widgets.gallery.itemActions.upscale.metadataFailed', { name }),
             models: availabilityModels,
             owner,
             prepareCanvasInvocation,
-            project: queries.getSnapshot().activeProject,
+            project: snapshot.activeProject,
+            scopedDefaults: snapshot.scopedDefaults,
             sourceId,
           });
         } catch (error) {
@@ -216,11 +228,14 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         source: store,
         select: (snapshot) => {
           const activeWorkflow = getActiveProjectWorkflow(snapshot.activeProject);
+          const history = getProjectWorkflowHistory(snapshot.activeProject, activeWorkflow.document.id);
 
           return {
             activeWorkflow,
             activeWorkflowId: activeWorkflow.document.id,
-            galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
+            canRedo: history.future.length > 0,
+            canUndo: history.past.length > 0,
+            galleryValues: getResolvedProjectWidgetValues(snapshot.activeProject, 'gallery', snapshot.scopedDefaults),
             id: snapshot.activeProject.id,
             isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
             projectGraph: activeWorkflow.document,
@@ -254,7 +269,10 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     () =>
       createProjectedExternalStore({
         source: { getSnapshot: getAuthSession, subscribe: subscribeAuthSession },
-        select: (session) => ({ canUseCache: !session.multiuserEnabled || session.user?.is_admin === true }),
+        select: (session) => ({
+          canManageNodes: getCapabilities(session).canManageNodes,
+          canUseCache: !session.multiuserEnabled || session.user?.is_admin === true,
+        }),
         isEqual: shallowEqual,
       }),
     []
@@ -290,12 +308,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         subscribeOrigin: nodeExecutionStore.subscribeOrigin,
       },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
-      // Lazy-load manager filter state to preserve editor bundle boundaries; seed it before hash navigation.
-      openAddModels: (query) => {
-        void import('@features/models/launchpad').then(({ requestAddModelsSearch }) => {
-          requestAddModelsSearch(query);
-          window.location.hash = `#/models?project=${encodeURIComponent(queries.getSnapshot().activeProject.id)}`;
-        });
+      openAddModels: (query) => openModelManager({ projectId: queries.getSnapshot().activeProject.id, search: query }),
+      openNodesManager: () => {
+        window.location.hash = '#/nodes';
       },
       performance: {
         mark: (name, source) => markWorkbenchPerf(name, source),
@@ -305,6 +320,9 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       persistence,
       preferences,
       project,
+      setLibraryPreferences: (patch) => {
+        void patchWorkbenchPreferences(patch);
+      },
       widgets: {
         // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
         open: (options) => {

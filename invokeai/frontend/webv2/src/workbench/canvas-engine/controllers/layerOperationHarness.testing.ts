@@ -1,6 +1,7 @@
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
-import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { CanvasEditIntent, CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
+import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -14,6 +15,10 @@ export interface LayerOperationHarnessOptions {
   /** History byte budget; an edit whose entry can never fit is refused. */
   readonly historyBytes?: number;
   readonly gestureActive?: boolean;
+  /** Observes where the context ends an open structural preview (`getDocument`, `begin`). */
+  readonly endStructuralPreview?: () => void;
+  /** Real canvases for pixel checks in browser tests; the stub backend otherwise. */
+  readonly backend?: RasterBackend;
 }
 
 /**
@@ -25,7 +30,7 @@ export const createLayerOperationHarness = (
   document: CanvasDocumentContractV3,
   options: LayerOperationHarnessOptions = {}
 ) => {
-  const backend = createTestStubRasterBackend();
+  const backend = options.backend ?? createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
   const history = createHistory({ byteBudget: options.historyBytes });
   let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
@@ -34,6 +39,11 @@ export const createLayerOperationHarness = (
   });
   const listeners = new Set<() => void>();
   const dispatched: CanvasProjectMutation[] = [];
+  /** User edits routed to the invocation controller; system-origin publications never appear here. */
+  const committedEdits: CanvasEditIntent[] = [];
+  /** An operation's edit lease: while held, edits without the operation's owner are refused. */
+  let editingLocked = false;
+  const lockListeners = new Set<() => void>();
   const installed: PreparedLayerCacheReplacement[] = [];
   const state = {
     gestureActive: options.gestureActive ?? false,
@@ -45,7 +55,9 @@ export const createLayerOperationHarness = (
   let reserved = 0;
   let nextId = 0;
   const ctx = createCanvasMutationContext({
-    commitEdit: () => undefined,
+    commitEdit: (intent) => {
+      committedEdits.push(intent);
+    },
     createLayerId: () => `new-${(nextId += 1)}`,
     dispatch: (action) => {
       dispatched.push(action);
@@ -62,7 +74,14 @@ export const createLayerOperationHarness = (
       return true;
     },
     editOwner: Symbol('harness'),
-    editingLocked: { get: () => false, subscribe: () => () => undefined },
+    endStructuralPreview: options.endStructuralPreview,
+    editingLocked: {
+      get: () => editingLocked,
+      subscribe: (listener) => {
+        lockListeners.add(listener);
+        return () => lockListeners.delete(listener);
+      },
+    },
     getDocument: () => project.canvas.document,
     getReducerDocument: () => project.canvas.document,
     history,
@@ -100,6 +119,7 @@ export const createLayerOperationHarness = (
   });
   return {
     backend,
+    committedEdits,
     ctx,
     dispatched,
     document: () => project.canvas.document,
@@ -107,6 +127,12 @@ export const createLayerOperationHarness = (
     installed,
     layers,
     reservedBytes: () => reserved,
+    setEditingLocked: (locked: boolean) => {
+      editingLocked = locked;
+      for (const listener of lockListeners) {
+        listener();
+      }
+    },
     state,
   };
 };

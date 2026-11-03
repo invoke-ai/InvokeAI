@@ -8,6 +8,7 @@ import { ChakraProvider, createListCollection, Menu, Portal, Select } from '@cha
 import { PromptTextarea } from '@features/generation/components';
 import { adjustFocusedPromptAttention } from '@features/generation/react';
 import { MenuContent } from '@platform/ui/Menu';
+import { SegmentedControl } from '@platform/ui/SegmentedControl';
 import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
@@ -36,6 +37,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useOptionalWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchExtensions: () => runtimeMocks.extensions,
   useWorkbenchInternalStore: () => runtimeMocks.store,
+  // No canvas engine is live here, so a frame resize the runtime asks for stays a plain write.
+  useWorkbenchLiveCanvasEngines: () => ({ commitFrame: () => false }),
   useWorkbenchQueries: () => runtimeMocks.store.queries,
   useWorkbenchSubscription: () => runtimeMocks.store.subscribe,
 }));
@@ -304,6 +307,50 @@ describe('WorkbenchHotkeyRuntime and selected-image shortcuts', () => {
   });
 });
 
+describe('WorkbenchHotkeyRuntime and catalog rows a widget also contributes', () => {
+  // The catalog lists Canvas's keys for settings; the mounted Canvas registers the same ids. Its own registration
+  // decides how the key behaves, so a widget flag the catalog row lacks is not overridden by the row.
+  it('lets the widget registration of a catalog id answer, with its own flags', async () => {
+    const canvas = document.createElement('div');
+    canvas.dataset.hotkeyWidgetInstanceId = 'canvas';
+    canvas.dataset.hotkeyWidgetRegion = 'center';
+    canvas.dataset.hotkeyWidgetTypeId = 'canvas';
+    host!.append(canvas);
+    const source: WidgetContributionSource = {
+      instanceId: 'canvas',
+      projectId: projectId(),
+      region: 'center',
+      typeId: 'canvas',
+    };
+
+    await act(() => {
+      runtimeMocks.extensions.commands.register({
+        handler: () => ran.push('canvas.tool.brush'),
+        id: 'canvas.tool.brush',
+        source,
+        title: 'Brush',
+      });
+      runtimeMocks.extensions.hotkeys.register({
+        commandId: 'canvas.tool.brush',
+        defaultKeys: ['b'],
+        id: 'canvas.tool.brush',
+        preventDefault: false,
+        source,
+        title: 'Brush',
+      });
+    });
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'KeyB', key: 'b' });
+
+    await act(async () => {
+      canvas.dispatchEvent(event);
+      await Promise.resolve();
+    });
+
+    expect(ran).toEqual(['canvas.tool.brush']);
+    expect(event.defaultPrevented).toBe(false);
+  });
+});
+
 describe('WorkbenchHotkeyRuntime and open menus', () => {
   let menuRoot: Root | null = null;
 
@@ -512,5 +559,71 @@ describe('WorkbenchHotkeyRuntime and prompt weighting', () => {
 
     expect(claimed).toBe(false);
     expect(textarea.value).toBe('a cat');
+  });
+});
+
+const VIEW_OPTIONS = [
+  { label: 'Original', value: 'original' },
+  { label: 'Map', value: 'map' },
+  { label: 'Overlay', value: 'overlay' },
+];
+
+describe('WorkbenchHotkeyRuntime and a focused segmented control', () => {
+  let controlRoot: Root | null = null;
+
+  afterEach(async () => {
+    await act(() => controlRoot?.unmount());
+    controlRoot = null;
+  });
+
+  const Segments = () => {
+    const [value, setValue] = useState('map');
+    return (
+      <SegmentedControl ariaLabel="View" isFullWidth={false} options={VIEW_OPTIONS} value={value} onChange={setValue} />
+    );
+  };
+
+  it('leaves arrow keys to the radio group while Gallery, which binds them, holds focus', async () => {
+    // Gallery's grid binds the plain arrows to its own navigation.
+    contribute('gallery.galleryNavRight', 'arrowright', 'focused-region', {
+      instanceId: 'gallery',
+      projectId: projectId(),
+      region: 'right',
+      typeId: 'gallery',
+    });
+    await pressOn('right');
+    const controlHost = document.createElement('div');
+    host!.append(controlHost);
+    controlRoot = createRoot(controlHost);
+    await act(() => {
+      controlRoot?.render(
+        <ChakraProvider value={system}>
+          <Segments />
+        </ChakraProvider>
+      );
+    });
+    const radio = (value: string) => controlHost.querySelector<HTMLInputElement>(`input[value="${value}"]`)!;
+    const prevented: boolean[] = [];
+    // Registered after the runtime's listener, so it sees the press once the runtime has handled it.
+    const record = (event: KeyboardEvent) => prevented.push(event.defaultPrevented);
+    window.addEventListener('keydown', record);
+
+    try {
+      await act(async () => {
+        radio('map').focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+    } finally {
+      window.removeEventListener('keydown', record);
+    }
+
+    expect(prevented).toEqual([false]);
+    expect(ran).toEqual([]);
+    expect(radio('overlay').checked).toBe(true);
+    expect(document.activeElement).toBe(radio('overlay'));
+
+    // Outside the radio group the same press is Gallery's.
+    await pressKey('ArrowRight', host!.querySelector('[data-testid="right"]')!);
+    expect(ran).toEqual(['gallery.galleryNavRight']);
   });
 });

@@ -40,6 +40,8 @@ import { userEvent } from 'vitest/browser';
 import type { ProjectedChildRow } from './layerChildRows';
 import type { LayerRowCommands } from './layerRowCommands';
 
+import { ADJUSTMENT_SPINNER_DELAY_MS } from './AdjustmentStatusIcon';
+import { createFakeAdjustmentStatus } from './AdjustmentStatusIcon.testing';
 import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSelection';
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
 import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX } from './layerPanelRows';
@@ -47,7 +49,7 @@ import { clearLayerPropertiesRequest, requestLayerProperties } from './layerProp
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
-vi.mock('./ControlLayerWarningIcon', () => ({ ControlLayerWarningIcon: () => null }));
+vi.mock('./ControlLayerStatusIcon', () => ({ ControlLayerStatusIcon: () => null }));
 vi.mock('./LayerThumbnail', () => ({ LayerThumbnail: () => <span data-testid="thumbnail" /> }));
 vi.mock('./LayerStackHeader', () => ({
   LayerStackHeader: ({
@@ -119,6 +121,7 @@ void i18n.use(initReactI18next).init({
               reorder: 'Reorder layer',
               select: 'Select {{name}}',
               showModifiers: 'Show modifiers',
+              showOnCanvas: 'Show on canvas',
               toggleLock: 'Toggle lock',
               toggleActive: 'Toggle layer active',
               toggleVisibility: 'Toggle visibility',
@@ -190,6 +193,7 @@ const withOperations = (engine: LayersTreeEngine): LayersTreeEngine => {
   attachCanvasOperations(engine, operationHarness as never);
   return engine;
 };
+const adjustmentStatus = createFakeAdjustmentStatus();
 // The real engine handle is stable across document changes; this one reads the harness's latest document.
 let harnessDocument = createEmptyCanvasDocument();
 const engine = withOperations({
@@ -206,7 +210,7 @@ const engine = withOperations({
     },
   },
   exports: { exportBakedLayerBlob: exportBakedLayerBlob, hasExportableLayerContent: () => false },
-  interaction: { get: () => false },
+  interaction: { get: () => false, ...adjustmentStatus.interaction },
   layers: {
     commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
       committedEdits.push(edit);
@@ -487,6 +491,54 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(group).toHaveAttribute('aria-selected', 'false');
   });
 
+  it('shows a delayed spinner while adjustments compute and a described warning when they cannot run', async () => {
+    await renderTree(nested());
+    const top = treeitem('Top');
+    const statusIcon = (row: HTMLElement, key: string): HTMLElement | null =>
+      row.querySelector<HTMLElement>(`[role="img"][aria-label="widgets.layers.adjustments.status.${key}"]`);
+    const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      // A job that ends before the delay never shows the spinner.
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await act(() => adjustmentStatus.set('top', 'idle'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS);
+      expect(statusIcon(top, 'computing')).toBeNull();
+
+      await act(() => adjustmentStatus.set('top', 'computing'));
+      await advance(ADJUSTMENT_SPINNER_DELAY_MS - 1);
+      expect(statusIcon(top, 'computing')).toBeNull();
+      await advance(1);
+      expect(statusIcon(top, 'computing')).not.toBeNull();
+      expect(top).not.toHaveAttribute('aria-describedby');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    await act(() => adjustmentStatus.set('top', 'too-large'));
+    expect(statusIcon(top, 'computing')).toBeNull();
+    const warning = statusIcon(top, 'tooLarge')!;
+    expect(warning).not.toBeNull();
+    // The icon is pointer-only, so focusing the row is how the keyboard reaches the explanation.
+    expect(top.getAttribute('aria-describedby')).toBe(warning.id);
+    expect(tabStops()).toHaveLength(1);
+
+    // A group reports through the same store, by its own id; other rows stay clear.
+    await act(() => adjustmentStatus.set('g', 'over-budget'));
+    expect(statusIcon(treeitem('Group'), 'overBudget')).not.toBeNull();
+    expect(treeitem('Bottom').querySelector('[role="img"]')).toBeNull();
+
+    await act(() => {
+      adjustmentStatus.set('top', 'idle');
+      adjustmentStatus.set('g', 'idle');
+    });
+    expect(top.querySelector('[role="img"]')).toBeNull();
+    expect(top).not.toHaveAttribute('aria-describedby');
+  });
+
   it('walks rows with the arrow keys, opens and enters groups, climbs to the parent, and jumps with End', async () => {
     await renderTree(nested());
     treeitem('Top').focus();
@@ -590,14 +642,33 @@ describe('LayersTree selection, surfaces and structure', () => {
     expect(output('layer-order')).toBe('');
   });
 
-  it('keeps the visibility dot isolated from row selection', async () => {
+  it('keeps the visibility eye isolated from row selection', async () => {
     await renderTree(trio());
-    const dot = host!.querySelector<HTMLButtonElement>(
+    const eye = host!.querySelector<HTMLButtonElement>(
       '[data-layer-row-id="first"] button[aria-label="Toggle layer active"]'
     )!;
-    await act(() => userEvent.click(dot));
-    expect(dot).toHaveAttribute('aria-pressed', 'false');
+    await act(() => userEvent.click(eye));
+    expect(eye).toHaveAttribute('aria-pressed', 'false');
     expect(output('selected-layer')).toBe('none');
+  });
+
+  it('marks an overlay hidden on the canvas only, and brings it back from the row', async () => {
+    await renderTree([
+      layerContract('shown', 'inpaint_mask', { name: 'Shown' }),
+      layerContract('masked', 'inpaint_mask', { isHidden: true, name: 'Masked' }),
+    ]);
+    const showOnCanvas = (id: string) =>
+      host!.querySelector<HTMLButtonElement>(`[data-layer-row-id="${id}"] button[aria-label="Show on canvas"]`);
+    expect(showOnCanvas('shown')).toBeNull();
+    // Still used by generation, so its own eye stays open.
+    expect(
+      host!.querySelector('[data-layer-row-id="masked"] button[aria-label="Toggle layer active"]')
+    ).toHaveAttribute('aria-pressed', 'true');
+    await act(() => userEvent.click(showOnCanvas('masked')!));
+    expect(committedEdits.at(-1)!.forward).toEqual({
+      type: 'setCanvasLayersHidden',
+      updates: [{ id: 'masked', isHidden: false }],
+    });
   });
 
   it('routes the row menu and right-click to the panel surface host by id', async () => {
@@ -635,10 +706,9 @@ describe('LayersTree selection, surfaces and structure', () => {
         return true;
       },
       selectedLayerIds: ['l59'],
-      hasStagingSlots: false,
-      hasSelectedStagedCandidate: false,
-      isInteractionLocked: false,
+      hasMultipleStagingSlots: false,
       copySelection: vi.fn(),
+      cropAllLayers: vi.fn(),
       swapActiveColors: vi.fn(),
       resetActiveColors: vi.fn(),
       pasteFromClipboard: vi.fn(),
@@ -646,6 +716,7 @@ describe('LayersTree selection, surfaces and structure', () => {
       reportStructuralCommit: vi.fn(),
       reportPreparedCommit: vi.fn(),
       reportLayerOperation: vi.fn(),
+      reportTransformRefusal: vi.fn(),
       t: (key) => key,
     };
     await act(() => executeCanvasHotkeyCommand('canvas.nextEntity', ctx));

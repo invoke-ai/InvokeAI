@@ -1,18 +1,21 @@
-import type { FocusEvent, ReactNode } from 'react';
+import type { ChangeEvent, FocusEvent, ReactNode } from 'react';
 
-import { Box, Flex, HStack, Icon, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, Input, InputGroup, Kbd, Text, type SystemStyleObject } from '@chakra-ui/react';
+import { focusSearchOnSlash } from '@platform/browser/searchShortcut';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { ArrowLeftIcon, PlusIcon } from 'lucide-react';
+import { ArrowLeftIcon, PlusIcon, SearchIcon, XIcon } from 'lucide-react';
 import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { Button, IconButton } from './Button';
+import { isModalPresent } from './modalPresence';
 import { Tooltip } from './Tooltip';
 
 /**
  * The list/detail shell shared by the Launchpad managers (models, nodes, fonts, preferences). Side by side when
  * both panes fit; below that one pane at a time, the library first, the detail behind a Back control in its header.
  * A footer (install queue, activity) stays visible under whichever pane shows. The column and the detail header
- * share one header height so their bottom borders line up.
+ * share one header height so their bottom borders line up. A bare `/` focuses the manager's search field (a
+ * {@link ManagerSearchField}, or any field marked `data-manager-search`) while it is in view.
  */
 
 /** The library takes 39% of the manager, between 20rem and 28rem. */
@@ -25,6 +28,7 @@ const LIBRARY_WIDTH = 'clamp(20rem, 39cqi, 28rem)';
 const SINGLE_PANE = '@container manager (width < 50rem)';
 const SINGLE_PANE_FLAG = '--manager-single-pane';
 const HEADER_MIN_HEIGHT = '2.75rem';
+const SEARCH_SELECTOR = '[data-manager-search]';
 /** Persistent popups whose closing hands focus back to a trigger the pane switch may have hidden. */
 const POPUP_SELECTOR = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
 const TABBABLE_SELECTOR = [
@@ -324,6 +328,20 @@ export const ManagerLayout = ({
     };
   });
 
+  // Every manager the Launchpad keeps mounted listens; only the shown one has its search field in view. A modal
+  // suspends the key, as it does application shortcuts.
+  useMountEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (gridRef.current && !isModalPresent(event)) {
+        focusSearchOnSlash(event, gridRef.current, SEARCH_SELECTOR);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  });
+
   const handleFocus = useCallback((event: FocusEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement;
 
@@ -354,6 +372,61 @@ export const ManagerLayout = ({
         </Box>
       </Box>
     </ManagerBackContext.Provider>
+  );
+};
+
+const SEARCH_ICON = <Icon as={SearchIcon} boxSize="3.5" color="fg.subtle" />;
+const SEARCH_HINT = (
+  <Kbd aria-hidden pointerEvents="none" variant="outline">
+    /
+  </Kbd>
+);
+
+/**
+ * The library's search field, which `/` focuses; the key's hint shows while it is empty. With a `clearLabel`, a
+ * query puts a clear control in the hint's place.
+ */
+export const ManagerSearchField = ({
+  clearLabel,
+  label,
+  onChange,
+  placeholder,
+  size,
+  value,
+}: {
+  clearLabel?: string;
+  label: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  size?: 'md' | 'lg';
+  value: string;
+}) => {
+  const change = useCallback((event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value), [onChange]);
+  const clear = useCallback(() => onChange(''), [onChange]);
+  const endElement = useMemo(() => {
+    if (!value) {
+      return SEARCH_HINT;
+    }
+
+    return clearLabel ? (
+      <IconButton aria-label={clearLabel} me="-2" size="sm" tooltip={clearLabel} variant="ghost" onClick={clear}>
+        <XIcon />
+      </IconButton>
+    ) : undefined;
+  }, [clear, clearLabel, value]);
+
+  return (
+    <InputGroup endElement={endElement} startElement={SEARCH_ICON}>
+      <Input
+        aria-keyshortcuts="/"
+        aria-label={label}
+        data-manager-search=""
+        placeholder={placeholder}
+        size={size}
+        value={value}
+        onChange={change}
+      />
+    </InputGroup>
   );
 };
 

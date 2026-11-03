@@ -32,6 +32,7 @@ Shared generated API contracts and their CI gates: [../api/AGENTS.md](../api/AGE
 No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backend, which picks its own free port. Arguments go to `vite dev`. Default Vite port 5174 taken: pick a spare, `pnpm dev:mock --port 5273 --strictPort`. `pnpm dev` alone proxies to a real backend at `http://127.0.0.1:9090`.
 
 - `INVOKEAI_MOCK_BACKEND_PROFILE`: `representative` (default) or `empty`. `POST /__reset` on the mock origin printed at startup restores fixtures; `?profile=` switches them. Unimplemented endpoints return 404.
+- `POST /__models` with `{"set": "anima-lllite"}` or `{"set": "spandrel"}` adds opt-in model seeds (adapters and upscalers installed before their channels or scale were recorded); re-identify fills those fields. `{"set": "control-sdxl"}` adds SDXL ControlNets naming their preprocessor in both id forms, a Union, an unpurposed model and a T2I-Adapter; `{"set": "control-flux"}` adds FLUX dev with a depth Control LoRA and a Union ControlNet. `/__reset` drops them.
 - Stop servers by PID (`ss -ltnp`), not `pkill -f`: its pattern can match the invoking shell. Restart after merges that add mock endpoints.
 - Provider/context error from a `?t=` module after source edits: full reload before calling it a product bug. HMR can split context modules.
 
@@ -56,4 +57,6 @@ No Python backend: `pnpm dev:mock` serves the app against the in-repo mock backe
 - Use real IndexedDB, Web Locks, focus, pointer, rendering where mocks cannot prove correctness.
 - Droppable enabled only after drag start: drag through dnd-kit mouse sensors with `dragWithMouse` (`@platform/browser/mouseDrag.testing`). Single-jump drags such as `userEvent.dragAndDrop` miss it.
 
-Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility. Docs-only changes: formatting and link review, no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.
+Unit tests cache transformed modules between runs in ignored `node_modules/.vitest-cache`.
+
+Focused checks during development. `check:release` before code-milestone readiness: lint, all tests, architecture performance/build, project-file journeys, accessibility. CI splits completion between `lint:code` and `check:release:tests`; together they run each gate once. Routine browser performance checks take two resource observations per fixture; `test:performance:browser:profile` and baseline updates use full timing sampling. Docs-only changes: formatting and link review, no application tests. Architecture inventories and performance reports stay in ignored `artifacts/`, never committed.

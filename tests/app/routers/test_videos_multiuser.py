@@ -41,6 +41,8 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.users.users_common import UserCreateRequest
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException
+from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
 from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.app.util.video_ingest import MediaProbe
 from tests.fixtures.sqlite_database import sqlite_cursor
@@ -349,10 +351,43 @@ def test_unreadable_storage_does_not_read_as_a_deleted_video(
 
     mock_invoker.services.videos.get_dto = MagicMock(side_effect=sqlite3.OperationalError("database is locked"))
 
-    # Uncaught in the route, so a 500 in production; the test client re-raises instead of
-    # rendering it. Either way it must not be the 404 that clears the user's reference.
-    with pytest.raises(sqlite3.OperationalError):
-        client.get("/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"})
+    # Must be a retryable 500, not the 404 that clears the user's reference.
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        "/api/v1/videos/i/unreadable.mp4", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_unreadable_storage_does_not_read_as_missing_video_metadata(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    """Clients cache a metadata/workflow 404 as "nothing recorded", so a busy database must not answer it."""
+    import sqlite3
+
+    setattr(
+        mock_invoker.services.videos,
+        service_method,
+        MagicMock(side_effect=sqlite3.OperationalError("database is locked")),
+    )
+
+    response = TestClient(client.app, raise_server_exceptions=False).get(
+        f"/api/v1/videos/i/unreadable.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+@pytest.mark.parametrize(("route", "service_method"), [("metadata", "get_metadata"), ("workflow", "get_workflow")])
+def test_video_deleted_mid_request_answers_metadata_404(
+    client: TestClient, mock_invoker: Invoker, admin_token: str, route: str, service_method: str
+):
+    setattr(mock_invoker.services.videos, service_method, MagicMock(side_effect=VideoRecordNotFoundException))
+
+    response = client.get(f"/api/v1/videos/i/gone.mp4/{route}", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_revoking_access_to_a_live_video_stays_a_denial(client: TestClient, mock_invoker: Invoker, user1_token: str):
@@ -588,6 +623,7 @@ def test_video_star_endpoints_dedupe_names_and_report_partial_failures(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -643,6 +679,7 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     assert not leaked, f"tmp files leaked after 415: {leaked}"
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
     client: TestClient, mock_invoker: Invoker, user1_token: str
 ):
@@ -738,6 +775,7 @@ def _make_fixture_media(path: Path, *args: str) -> Path:
     return path
 
 
+@pytest.mark.ffmpeg
 def test_upload_h264_mov_is_remuxed_and_created(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -773,6 +811,7 @@ def test_upload_h264_mov_is_remuxed_and_created(
     assert stored_was_mp4 == [True]
 
 
+@pytest.mark.ffmpeg
 def test_upload_audio_file_is_wrapped_and_marked(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -801,6 +840,7 @@ def test_upload_audio_file_is_wrapped_and_marked(
     assert (create_kwargs["width"], create_kwargs["height"]) == (640, 360)
 
 
+@pytest.mark.ffmpeg
 def test_upload_mp4_with_non_aac_audio_gets_audio_normalized(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1136,7 +1176,7 @@ def test_get_video_workflow_returns_workflow_and_graph_for_owner(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}'}
+    assert response.json() == {"workflow": '{"nodes": []}', "graph": '{"edges": []}', "resolved_inputs": None}
 
 
 def test_get_video_workflow_returns_nulls_when_video_has_none(
@@ -1154,14 +1194,14 @@ def test_get_video_workflow_returns_nulls_when_video_has_none(
     )
 
     assert response.status_code == status.HTTP_200_OK
-    assert response.json() == {"workflow": None, "graph": None}
+    assert response.json() == {"workflow": None, "graph": None, "resolved_inputs": None}
 
 
 def test_get_video_workflow_missing_video_returns_404(client: TestClient, mock_invoker: Invoker, user1_token: str):
     user1 = mock_invoker.services.users.get_by_email("user1@test.com")
     assert user1 is not None
     mock_invoker.services.video_records.get_user_id.return_value = user1.user_id
-    mock_invoker.services.videos.get_workflow.side_effect = Exception("video file not found")
+    mock_invoker.services.videos.get_workflow.side_effect = VideoFileNotFoundException()
 
     response = client.get(
         "/api/v1/videos/i/mine_a.mp4/workflow",
@@ -1299,6 +1339,7 @@ def _upload(client: TestClient, token: str, body: bytes, metadata: str | None = 
         )
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1333,6 +1374,7 @@ def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
     assert kwargs["graph"] == tags["invokeai_graph"]
 
 
+@pytest.mark.ffmpeg
 def test_upload_video_client_metadata_wins_over_the_embedded_copy(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1361,6 +1403,7 @@ def test_upload_video_without_embedded_tags_stores_no_metadata(
     assert (kwargs["metadata"], kwargs["workflow"], kwargs["graph"]) == (None, None, None)
 
 
+@pytest.mark.ffmpeg
 def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
@@ -1403,6 +1446,7 @@ def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
     assert stored_tags == [{}]
 
 
+@pytest.mark.ffmpeg
 def test_upload_ignores_an_embedded_metadata_record_over_the_form_field_cap(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):

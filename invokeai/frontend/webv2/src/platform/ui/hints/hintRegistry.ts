@@ -25,7 +25,6 @@ export const FEATURE_HINTS = {
   concepts: { href: SUPPORT_CONCEPTS },
   conditioningRebalance: {},
   conditioningRebalanceGain: {},
-  controlLayerWeight: { href: 'https://support.invoke.ai/support/solutions/articles/151000178148' },
   creativity: {},
   denoisingStrength: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000094998-image-to-image',
@@ -40,6 +39,8 @@ export const FEATURE_HINTS = {
   hidiffusionT2Ratio: { href: 'https://github.com/megvii-research/HiDiffusion' },
   hidiffusionWindowAttn: { href: 'https://github.com/megvii-research/HiDiffusion' },
   imageInfluence: {},
+  krea2ReferenceKvCache: {},
+  krea2ReferenceMode: {},
   layerStackControl: {},
   layerStackInpaintMask: {},
   layerStackRaster: {},
@@ -63,6 +64,7 @@ export const FEATURE_HINTS = {
   referenceImage: {
     href: 'https://support.invoke.ai/support/solutions/articles/151000159340-global-and-regional-reference-images-ip-adapters-',
   },
+  referenceImageStrength: {},
   referenceImageWeight: {},
   refinerAestheticScore: {},
   refinerCfgScale: {},

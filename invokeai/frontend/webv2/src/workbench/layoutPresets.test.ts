@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { builtInLayoutPresetDescriptors, layoutPresets } from './layoutPresets';
+import { builtInLayoutPresetDescriptors, getLayoutPresetLabel, layoutPresets } from './layoutPresets';
 
 describe('built-in layout preset descriptors', () => {
   it('has a widget instance for every instance id a preset places', () => {
@@ -53,11 +53,23 @@ describe('built-in layout preset descriptors', () => {
         defaultRoute: { destination: 'gallery', sourceId: 'workflow' },
         hotkeyId: 'selectAutomatePreset',
         iconId: 'workflow',
-        label: 'Automate',
+        label: 'Workflow',
         presetId: 'automate',
       },
     ]);
     expect(layoutPresets).toEqual(builtInLayoutPresetDescriptors.map(({ preset }) => preset));
+  });
+
+  it('names each built-in preset through the locale, Automate as Workflow', () => {
+    const t = (key: string) => `t:${key}`;
+
+    expect(layoutPresets.map((preset) => getLayoutPresetLabel(preset, t))).toEqual([
+      't:topbar.presets.builtInLabels.compose',
+      't:topbar.presets.builtInLabels.edit',
+      't:topbar.presets.builtInLabels.video',
+      't:topbar.presets.builtInLabels.automate',
+    ]);
+    expect(getLayoutPresetLabel({ label: 'My layout' }, t)).toBe('My layout');
   });
 
   it('ships task-focused widget sets in interaction-priority order', () => {

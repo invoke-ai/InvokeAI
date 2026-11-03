@@ -85,4 +85,46 @@ describe('NodeContextMenu', () => {
     expect(hint('duplicate')).toBe('workflows.duplicateSelection');
     expect(hint('toggle-open')).toBeNull();
   });
+
+  it('offers both pastes on empty canvas, disabled with an empty clipboard, anchored where the menu opened', async () => {
+    const onPaste = vi.fn();
+    const renderPane = (canPaste: boolean) =>
+      act(() =>
+        root.render(
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider adapter={adapter}>
+              <NodeContextMenu
+                canPaste={canPaste}
+                menuState={paneMenuState}
+                onAddConnector={vi.fn()}
+                onClose={vi.fn()}
+                onCopy={vi.fn()}
+                onDelete={vi.fn()}
+                onDuplicate={vi.fn()}
+                onPaste={onPaste}
+                onToggleOpen={vi.fn()}
+                onUpdate={vi.fn()}
+              />
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        )
+      );
+    const item = (value: string) => document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${value}"]`)!;
+
+    await renderPane(false);
+    expect(item('paste').getAttribute('aria-disabled')).toBe('true');
+    expect(item('paste-with-connections').getAttribute('aria-disabled')).toBe('true');
+
+    await renderPane(true);
+    await act(() => item('paste').click());
+    await renderPane(true);
+    await act(() => item('paste-with-connections').click());
+
+    expect(onPaste.mock.calls).toEqual([
+      [false, paneMenuState.position],
+      [true, paneMenuState.position],
+    ]);
+  });
 });
+
+const paneMenuState = { kind: 'pane', position: { x: 140, y: -60 }, x: 20, y: 20 } as const;

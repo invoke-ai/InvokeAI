@@ -1416,6 +1416,21 @@
         "vae"
       ]
     },
+    "spandrel_image_to_image": {
+      "inputs": [],
+      "literalInputs": {
+        "image": [],
+        "image_to_image_model": [],
+        "is_intermediate": [
+          false
+        ],
+        "metadata": [],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
     "spandrel_image_to_image_autoscale": {
       "inputs": [],
       "literalInputs": {
@@ -1425,12 +1440,16 @@
         "image": [],
         "image_to_image_model": [],
         "is_intermediate": [
+          false,
           true
         ],
+        "metadata": [],
         "scale": [
+          2,
           4
         ],
         "use_cache": [
+          false,
           true
         ]
       },

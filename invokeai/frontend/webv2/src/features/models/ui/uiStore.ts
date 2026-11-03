@@ -19,8 +19,8 @@ export interface HFLookupState {
 
 export interface ModelsUiSnapshot {
   activeTab: ModelManagerTab;
-  /** Consume Add Models search once on mount; null means no seed, distinct from a seeded empty string. */
-  addModelsSeed: string | null;
+  /** Add Models' search / URL / path box, kept while the manager is closed or another tab shows. */
+  addModelsQuery: string;
   /** One-shot starter type filter for links identifying a missing model kind rather than a name. */
   addModelsTypeSeed: ModelTaxonomyType | null;
   /** Model focused in the manager library's detail pane. */
@@ -55,7 +55,7 @@ export interface ModelsUiSnapshot {
 const createInitialModelsUiSnapshot = (): ModelsUiSnapshot => ({
   activeModelKey: null,
   activeTab: 'add',
-  addModelsSeed: null,
+  addModelsQuery: '',
   addModelsTypeSeed: null,
   detailOpen: null,
   filters: { ...DEFAULT_LIBRARY_FILTERS },
@@ -178,13 +178,13 @@ export const openAddModelsWithBundle = (bundleName: string): void => {
 };
 
 /**
- * Seed Add Models search for external requirement links and clear scan/repo results that would hide the starter
- * catalog.
+ * Search Add Models for external requirement links, replacing whatever the box held, and clear scan/repo results that
+ * would hide the starter catalog.
  */
 export const requestAddModelsSearch = (query: string): void => {
   updateModelsUi({
     activeTab: 'add',
-    addModelsSeed: query,
+    addModelsQuery: query,
     addModelsTypeSeed: null,
     hfLookup: null,
     queueMaximized: false,
@@ -197,7 +197,8 @@ export const requestAddModelsSearch = (query: string): void => {
 export const requestAddModelsTypeFilter = (typeFilter: ModelTaxonomyType): void => {
   updateModelsUi({
     activeTab: 'add',
-    addModelsSeed: null,
+    // Old search text would hide the very models the link asks for.
+    addModelsQuery: '',
     addModelsTypeSeed: typeFilter,
     hfLookup: null,
     queueMaximized: false,
@@ -206,18 +207,19 @@ export const requestAddModelsTypeFilter = (typeFilter: ModelTaxonomyType): void 
   });
 };
 
-/** Reads a pending seed without consuming it — safe to call from a `useState` initializer, which StrictMode double-invokes. */
-export const getAddModelsSeed = (): string => store.getSnapshot().addModelsSeed ?? '';
+export const setAddModelsQuery = (addModelsQuery: string): void => {
+  updateModelsUi({ addModelsQuery });
+};
 
-/** Pure read, like {@link getAddModelsSeed}. */
+/** Reads the pending type seed without consuming it, so a `useState` initializer StrictMode runs twice sees it. */
 export const getAddModelsTypeSeed = (): ModelTaxonomyType | null => store.getSnapshot().addModelsTypeSeed;
 
-/** Consume seeds silently; subscribers do not read them and the mounting reader already captured them. */
-export const clearAddModelsSeeds = (): void => {
+/** Consume the type seed silently; subscribers do not read it and the mounting reader already captured it. */
+export const clearAddModelsTypeSeed = (): void => {
   const snapshot = store.getSnapshot();
 
-  if (snapshot.addModelsSeed !== null || snapshot.addModelsTypeSeed !== null) {
-    store.setSnapshotSilently({ ...snapshot, addModelsSeed: null, addModelsTypeSeed: null });
+  if (snapshot.addModelsTypeSeed !== null) {
+    store.setSnapshotSilently({ ...snapshot, addModelsTypeSeed: null });
   }
 };
 

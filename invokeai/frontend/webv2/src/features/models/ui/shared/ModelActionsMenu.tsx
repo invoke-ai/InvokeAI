@@ -17,7 +17,7 @@ import { useTranslation } from 'react-i18next';
 
 export type ModelActionsModel = Pick<ModelConfig, 'base' | 'format' | 'key' | 'name' | 'type'>;
 
-export type PendingModelAction = { kind: 'convert' | 'delete'; model: ModelActionsModel } | null;
+export type PendingModelAction = { kind: 'convert' | 'delete' | 'reidentify'; model: ModelActionsModel } | null;
 
 export const ModelActionMenuItems = ({
   extraItems,
@@ -70,7 +70,20 @@ export const ModelActionMenuItems = ({
   );
 };
 
-/** Confirms whichever destructive action is pending (convert replaces the original checkpoint file). */
+/**
+ * Confirms whichever destructive action is pending: convert replaces the original checkpoint file; re-identify resets
+ * the model's custom variant and default settings.
+ */
+const CONFIRM_COPY = {
+  convert: { bodyKey: 'models.convertBody', confirmKey: 'models.convert', titleKey: 'models.convertToDiffusers' },
+  delete: { bodyKey: 'models.deleteBody', confirmKey: 'models.deleteModel', titleKey: 'models.deleteModel' },
+  reidentify: {
+    bodyKey: 'models.reidentifyConfirmBody',
+    confirmKey: 'models.reidentify',
+    titleKey: 'models.reidentifyConfirmTitle',
+  },
+} as const;
+
 export const ModelActionConfirmDialog = ({
   finalFocusEl,
   onClose,
@@ -85,19 +98,16 @@ export const ModelActionConfirmDialog = ({
   pending: PendingModelAction;
 }) => {
   const { t } = useTranslation();
-  const { convert, remove } = useModelActions();
+  const { convert, reidentify, remove } = useModelActions();
+  const copy = CONFIRM_COPY[pending?.kind ?? 'delete'];
 
   return (
     <ConfirmDialog
-      body={
-        pending?.kind === 'convert'
-          ? t('models.convertBody', { name: pending.model.name })
-          : t('models.deleteBody', { name: pending?.model.name ?? '' })
-      }
-      confirmLabel={pending?.kind === 'convert' ? t('models.convert') : t('models.deleteModel')}
+      body={t(copy.bodyKey, { name: pending?.model.name ?? '' })}
+      confirmLabel={t(copy.confirmKey)}
       finalFocusEl={finalFocusEl}
       isOpen={pending !== null}
-      title={pending?.kind === 'convert' ? t('models.convertToDiffusers') : t('models.deleteModel')}
+      title={t(copy.titleKey)}
       onClose={onClose}
       onConfirm={async () => {
         if (!pending) {
@@ -106,6 +116,11 @@ export const ModelActionConfirmDialog = ({
 
         if (pending.kind === 'convert') {
           await convert(pending.model);
+          return;
+        }
+
+        if (pending.kind === 'reidentify') {
+          await reidentify(pending.model);
           return;
         }
 

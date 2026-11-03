@@ -31,6 +31,7 @@ const EXPECTED_DEFAULTS: Record<string, Record<string, unknown>> = {
   spandrel_filter: { model: null, autoScale: true, scale: 1 },
   img_blur: { blur_type: 'gaussian', radius: 8 },
   img_noise: { noise_type: 'gaussian', amount: 0.3, noise_color: true, size: 1 },
+  grayscale: {},
 };
 
 const EXPECTED_TYPES = Object.keys(EXPECTED_DEFAULTS);
@@ -43,10 +44,10 @@ const SPANDREL_MODEL = {
 };
 
 describe('CONTROL_FILTERS registry', () => {
-  it('contains the legacy filters plus the Scribble preset', () => {
+  it('contains the legacy filters plus the Scribble preset and Grayscale', () => {
     const types = CONTROL_FILTERS.map((definition) => definition.type);
-    expect(types).toHaveLength(17);
-    expect(new Set(types).size).toBe(17);
+    expect(types).toHaveLength(18);
+    expect(new Set(types).size).toBe(18);
     expect(types).toEqual(EXPECTED_TYPES);
   });
 
@@ -145,7 +146,10 @@ describe('buildFilterGraph', () => {
 
   it('builds the direct legacy filter nodes with default params', () => {
     const directTypes = EXPECTED_TYPES.filter(
-      (type) => !['adjust_image', 'spandrel_filter', 'img_blur', 'img_noise', 'scribble_edge_detection'].includes(type)
+      (type) =>
+        !['adjust_image', 'spandrel_filter', 'img_blur', 'img_noise', 'scribble_edge_detection', 'grayscale'].includes(
+          type
+        )
     );
     for (const type of directTypes) {
       const { graph, outputNodeId } = buildFilterGraph(type, imageName);
@@ -181,6 +185,49 @@ describe('buildFilterGraph', () => {
       type: 'hed_edge_detection',
     });
     expect(outputNodeId).toBe(FILTER_NODE_ID);
+  });
+
+  it('builds Grayscale as a mode round trip, so the layer stays RGB', () => {
+    const { graph, outputNodeId } = buildFilterGraph('grayscale', imageName);
+
+    expect(graph.nodes[FILTER_NODE_ID]).toMatchObject({
+      image: { image_name: imageName },
+      mode: 'L',
+      type: 'img_conv',
+    });
+    expect(graph.nodes.control_filter_rgb).toEqual({
+      id: 'control_filter_rgb',
+      is_intermediate: true,
+      mode: 'RGB',
+      type: 'img_conv',
+      use_cache: true,
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'image', node_id: 'control_filter_rgb' },
+        source: { field: 'image', node_id: FILTER_NODE_ID },
+      },
+    ]);
+    expect(outputNodeId).toBe('control_filter_rgb');
+  });
+
+  it('restores the source alpha onto the Grayscale result, not onto the intermediate L image', () => {
+    const { graph, outputNodeId } = buildFilterGraph('grayscale', imageName, undefined, {
+      height: 8,
+      preserveTransparency: true,
+      width: 8,
+    });
+
+    expect(graph.nodes[FILTER_NODE_ID]).not.toHaveProperty('image');
+    expect(graph.edges).toContainEqual({
+      destination: { field: 'image', node_id: FILTER_NODE_ID },
+      source: { field: 'image', node_id: 'control_filter_flatten' },
+    });
+    expect(graph.edges).toContainEqual({
+      destination: { field: 'image', node_id: 'control_filter_restore_alpha' },
+      source: { field: 'image', node_id: 'control_filter_rgb' },
+    });
+    expect(outputNodeId).toBe('control_filter_restore_alpha');
   });
 
   it('flattens transparent control inputs over white before processing and reapplies their alpha', () => {

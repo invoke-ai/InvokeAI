@@ -1,4 +1,5 @@
 import importlib
+import importlib.util
 import pkgutil
 import subprocess
 import sys
@@ -7,6 +8,7 @@ import textwrap
 import pytest
 
 import invokeai
+from invokeai.backend.util.host_platform import is_windows_arm64
 
 KNOWN_IMPORT_ERRORS = {
     "invokeai.backend.image_util.normal_bae.nets.submodules.efficientnet_repo.setup",
@@ -24,6 +26,14 @@ KNOWN_IMPORT_ERRORS = {
     "invokeai.backend.quantization.bnb_nf4",
     "invokeai.backend.quantization.bnb_llm_int8",
 }
+if is_windows_arm64():
+    # mediapipe has no Windows ARM64 build; this module is imported lazily by the face nodes. Everywhere
+    # else mediapipe is installed, so this module failing to import is a real regression.
+    KNOWN_IMPORT_ERRORS.add("invokeai.backend.image_util.mediapipe_face.mediapipe_face_common")
+if importlib.util.find_spec("triton") is None:
+    # The int8 compute kernels import Triton at the top and are loaded lazily, only where Triton is installed (not on
+    # macOS). Where it is installed, this module failing to import is a real regression.
+    KNOWN_IMPORT_ERRORS.add("invokeai.backend.quantization.int8_matmul_kernels")
 
 
 def test_invokeai_imports():

@@ -1,0 +1,64 @@
+{
+  "guided_filter": {
+    "guide": [
+      [0, 0, 1],
+      [0, 1, 1],
+      [0, 1, 1]
+    ],
+    "signal": [
+      [0.1, 0.2, 0.9],
+      [0, 0.8, 1],
+      [0.2, 0.7, 0.95]
+    ],
+    "radius": 1,
+    "epsilon": 0.1,
+    "expected": [
+      [0.22415975, 0.27506159, 0.78571646],
+      [0.22110961, 0.75936384, 0.79556096],
+      [0.23253705, 0.74957011, 0.78752683]
+    ],
+    "atol": 0.00001,
+    "expected_derivation": "Independent scalar evaluation of the guided-filter equations; each normalized 3x3 box mean enumerates samples with BORDER_REFLECT_101, and coefficient means use a second scalar box pass."
+  },
+  "multiscale_band": {
+    "lightness": [
+      [0.15, 0.2, 0.25],
+      [0.2, 0.85, 0.9],
+      [0.25, 0.9, 0.95]
+    ],
+    "inner_radius": 0,
+    "outer_radius": 1,
+    "epsilon": 0.1,
+    "expected": [
+      [-0.16519206, -0.17117175, -0.14883187],
+      [-0.17117175, 0.11232731, 0.13516251],
+      [-0.14883187, 0.13516251, 0.15758353]
+    ],
+    "atol": 0.00001,
+    "expected_derivation": "Input minus an independently evaluated radius-1 self-guided smooth, using scalar reflected box means and the variance/covariance equations. The radius-0 fine smooth is the input by definition."
+  },
+  "color_adapter": {
+    "rgb": [
+      [
+        [255, 0, 0],
+        [0, 255, 0]
+      ],
+      [
+        [0, 0, 255],
+        [255, 255, 255]
+      ]
+    ],
+    "expected_oklab": [
+      [
+        [0.62795536, 0.22486306, 0.1258463],
+        [0.86643961, -0.23388757, 0.17949848]
+      ],
+      [
+        [0.45201372, -0.03245698, -0.31152815],
+        [1.0, 0.0, 0.0]
+      ]
+    ],
+    "atol": 0.00002,
+    "expected_derivation": "Canonical Oklab equations applied independently to the four sRGB primaries/white: piecewise sRGB decoding, the published linear-sRGB-to-LMS and cube-root-LMS-to-Oklab matrices, evaluated in float64."
+  }
+}

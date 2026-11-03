@@ -7,6 +7,7 @@ import type {
 import { describe, expect, it } from 'vitest';
 
 import {
+  getControlImageState,
   hasControlLayerContent,
   hasRegionalGuidanceMaskContent,
   isCompositableControlLayer,
@@ -87,5 +88,17 @@ describe('isCompositableRegionalGuidanceLayer', () => {
     expect(isCompositableRegionalGuidanceLayer(regionalLayer('disabled', { isEnabled: false }))).toBe(false);
     expect(isCompositableRegionalGuidanceLayer(regionalLayer('empty', { bitmap: null }))).toBe(false);
     expect(isCompositableRegionalGuidanceLayer(controlLayer('not-regional') as CanvasLayerContract)).toBe(false);
+  });
+});
+
+describe('getControlImageState', () => {
+  const photo = { image: { height: 64, imageName: 'photo.png', width: 96 }, type: 'image' } as const;
+  const emptyPaint = { bitmap: null, type: 'paint' } as const;
+
+  it('reads the original before the map, and live strokes the document has not saved yet', () => {
+    const detectedMap = { ...controlLayer('detected', { source: emptyPaint }), original: photo };
+    expect(getControlImageState(detectedMap, true)).toBe('image');
+    expect(getControlImageState(controlLayer('drawn', { source: emptyPaint }), true)).toBe('drawn');
+    expect(getControlImageState(controlLayer('empty', { source: emptyPaint }), false)).toBe('empty');
   });
 });

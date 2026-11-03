@@ -39,6 +39,7 @@ import {
 import type { ModelInstallJob, ModelInstallStatus } from 'services/api/types';
 import { $isConnected } from 'services/events/stores';
 
+import { canResumeDownload, describeDownloadPartError, getProblemDownloadParts } from './modelInstallParts';
 import { ModelInstallQueueBadge } from './ModelInstallQueueBadge';
 
 type ModelListItemProps = {
@@ -361,9 +362,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
     return '';
   }, [displayStatus, installJob.bytes, installJob.download_parts, installJob.total_bytes]);
 
-  const restartRequiredParts = useMemo(() => {
-    return installJob.download_parts?.filter((part) => part.resume_required || part.status === 'error') ?? [];
-  }, [installJob.download_parts]);
+  const restartRequiredParts = useMemo(() => getProblemDownloadParts(installJob), [installJob]);
 
   useEffect(() => {
     if (resumeFromScratchShown.current) {
@@ -383,7 +382,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
   const hasRestartRequired = isRestartableStatus(displayStatus) && restartRequiredParts.length > 0;
 
   const canPause = displayStatus === 'downloading' || displayStatus === 'waiting';
-  const canResume = displayStatus === 'paused' && !hasRestartRequired;
+  const canResume = displayStatus === 'paused' && canResumeDownload(installJob);
   const canCancel =
     displayStatus === 'downloading' ||
     displayStatus === 'waiting' ||
@@ -468,8 +467,8 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
                     <Badge colorScheme={isResumeRequired ? 'orange' : 'red'} fontSize="10px">
                       {isResumeRequired ? t('modelManager.restartRequired') : t('queue.failed')}
                     </Badge>
-                    <Text fontSize="xs" color="warning.400">
-                      {isResumeRequired ? t('modelManager.resumeRefused') : t('queue.failed')}
+                    <Text fontSize="xs" color="warning.400" noOfLines={2} wordBreak="break-word">
+                      {isResumeRequired ? t('modelManager.resumeRefused') : describeDownloadPartError(part)}
                     </Text>
                     <IconButton
                       size="xs"
@@ -500,7 +499,7 @@ export const ModelInstallQueueItem = memo((props: ModelListItemProps) => {
             </Tooltip>
           )}
           <ModelInstallQueueBadge status={displayStatus} label={hasVisibleError} />
-          {hasRestartRequired && (
+          {hasRestartRequired && !canResume && (
             <Tooltip label={t('modelManager.restartRequiredTooltip')}>
               <Box>
                 <Badge colorScheme="red">{t('modelManager.restartRequired')}</Badge>

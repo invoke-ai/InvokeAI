@@ -21,6 +21,8 @@ export interface WorkflowLibraryGridProps {
   error: string | null;
   /** What has the actions menu open, so that tile's control can name it. */
   openMenuAnchor?: WorkflowCardMenuAnchor | null;
+  /** Project workflows reuse the grid but have no library visibility state. */
+  showVisibilityStatus?: boolean;
   /** Missing-model counts by workflow id; absent ids render no badge. */
   missingCounts?: ReadonlyMap<string, number>;
   selectedWorkflowId: string | null;
@@ -55,6 +57,7 @@ export const WorkflowLibraryGrid = ({
   error,
   missingCounts = NO_MISSING_COUNTS,
   openMenuAnchor = null,
+  showVisibilityStatus = false,
   onContextMenu,
   onOpen,
   onSelect,
@@ -117,6 +120,7 @@ export const WorkflowLibraryGrid = ({
                     : null
                 }
                 missingCount={missingCounts.get(entry.item.workflow_id) ?? 0}
+                showVisibilityStatus={showVisibilityStatus}
                 onContextMenu={onContextMenu}
                 onOpen={onOpen}
                 onSelect={onSelect}

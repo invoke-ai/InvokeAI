@@ -1,4 +1,4 @@
-import type { GalleryVideoItem } from '@features/gallery';
+import type { GalleryImage, GalleryVideoItem } from '@features/gallery';
 import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type {
@@ -9,9 +9,12 @@ import type {
   VideoWidgetValues,
 } from '@features/video';
 import type { AccountScope } from '@platform/state/accountLifecycle';
+import type { QueryClient } from '@tanstack/react-query';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
+import type { TFunction } from 'i18next';
 
-import { galleryImages, galleryItems, galleryVideos } from '@features/gallery';
+import { galleryImages, galleryItems } from '@features/gallery';
+import { fetchGalleryVideoMetadata } from '@features/gallery/queries';
 import {
   createDefaultVideoWidgetValues,
   createVideoConditioningClip,
@@ -19,7 +22,7 @@ import {
   createVideoSourceClip,
   getConditioningClipPatch,
   getDefaultReferenceConditioning,
-  getDefaultReferenceImageDetail,
+  DEFAULT_REFERENCE_IMAGE_DETAIL,
   getFrameImagePatch,
   getInitialVideoPatch,
   getReferencesPatch,
@@ -30,55 +33,23 @@ import {
   normalizeVideoWidgetValues,
   syncVideoWidgetValuesWithModels,
 } from '@features/video';
+import { mapWithConcurrency } from '@platform/core/concurrency';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
-  registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 
 import {
   buildVideoRecallSettings,
   getVideoRecallMessage,
   getVideoRecallTitle,
   type VideoRecallKind,
+  type VideoRecallMediaNames,
 } from './videoRecall';
 
-const videoMetadataRequests = new Map<string, { owner: AccountScope; promise: Promise<unknown> }>();
-
-registerAccountOwnedResource({
-  clear: () => {
-    videoMetadataRequests.clear();
-  },
-  name: 'video-recall-metadata',
-});
-
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-const loadVideoMetadata = (videoName: string, owner: AccountScope): Promise<unknown> => {
-  const cachedRequest = videoMetadataRequests.get(videoName);
-
-  if (cachedRequest?.owner === owner) {
-    return cachedRequest.promise;
-  }
-
-  const request = galleryVideos
-    .metadata(videoName, owner.signal)
-    .then((metadata) => {
-      assertAccountScopeCurrent(owner);
-
-      return metadata;
-    })
-    .catch((error: unknown) => {
-      if (videoMetadataRequests.get(videoName)?.promise === request) {
-        videoMetadataRequests.delete(videoName);
-      }
-      throw error;
-    });
-
-  videoMetadataRequests.set(videoName, { owner, promise: request });
-  return request;
-};
 
 export const getCurrentVideoValues = ({
   models,
@@ -90,6 +61,108 @@ export const getCurrentVideoValues = ({
   const normalized = normalizeVideoWidgetValues(videoValues) ?? createDefaultVideoWidgetValues(models);
 
   return syncVideoWidgetValuesWithModels(normalized, models);
+};
+
+/** There is no bulk video read; this bounds the per-video reads one recall keeps in flight. */
+const VIDEO_RESOLVE_CONCURRENCY = 4;
+
+/** The gallery's current records of the media a recall names, by name; a medium the gallery no longer has is absent. */
+interface ResolvedVideoRecallMedia {
+  images: ReadonlyMap<string, GalleryImage>;
+  videos: ReadonlyMap<string, GalleryVideoItem>;
+}
+
+const NO_RESOLVED_MEDIA: ResolvedVideoRecallMedia = { images: new Map(), videos: new Map() };
+
+/**
+ * Read every named medium once: the images in one bulk read, the videos a few at a time. A 404 means the medium was
+ * deleted and a 403 that it sits on a board the caller can no longer read: either way it is gone for this caller, and
+ * the recall goes on without it, as the bulk image read drops images it cannot return. Any other failure rejects, so
+ * the recall reports it rather than applying with media silently missing.
+ */
+const resolveVideoRecallMedia = async (
+  names: VideoRecallMediaNames,
+  signal: AbortSignal
+): Promise<ResolvedVideoRecallMedia> => {
+  const imageNames = new Set<string>();
+  const videoNames = new Set<string>();
+
+  for (const name of [names.firstFrameName, names.lastFrameName]) {
+    if (name !== null) {
+      imageNames.add(name);
+    }
+  }
+  for (const name of [names.conditioningClip?.name ?? null, names.sourceVideoName]) {
+    if (name !== null) {
+      videoNames.add(name);
+    }
+  }
+  for (const reference of names.references) {
+    (reference.kind === 'image' ? imageNames : videoNames).add(reference.name);
+  }
+
+  const [images, videos] = await Promise.all([
+    imageNames.size > 0 ? galleryImages.resolveMany([...imageNames], signal) : [],
+    mapWithConcurrency(
+      [...videoNames],
+      VIDEO_RESOLVE_CONCURRENCY,
+      async (name): Promise<[string, GalleryVideoItem] | null> => {
+        try {
+          const item = await galleryItems.resolve({ kind: 'video', name }, signal);
+
+          return item.kind === 'video' ? [name, item] : null;
+        } catch (error) {
+          if (error instanceof ApiError && (error.status === 403 || error.status === 404)) {
+            return null;
+          }
+          throw error;
+        }
+      },
+      { signal }
+    ),
+  ]);
+
+  return {
+    images: new Map(images.map((image) => [image.imageName, image])),
+    // An aborted read leaves holes; the caller's account check fences it.
+    videos: new Map(videos.flatMap((entry) => (entry ? [entry] : []))),
+  };
+};
+
+/**
+ * A partial recall names media on top of the panel's own. One the effective model cannot use would still displace
+ * the held media it conflicts with before the reconcile below dropped it, so it is dropped up front instead.
+ */
+const pruneUnusablePartialMedia = ({
+  mediaNames: names,
+  values,
+}: {
+  mediaNames: VideoRecallMediaNames;
+  values: VideoWidgetValues;
+}): void => {
+  if (!values.model) {
+    return;
+  }
+
+  const policy = getVideoModelPolicy(values.model, values);
+  const modes = policy.modes;
+
+  if (!modes.includes('reference')) {
+    names.references = [];
+  }
+  if (!modes.includes('first-frame') && !modes.includes('first-last')) {
+    names.firstFrameName = null;
+  }
+  if (!modes.includes('last-frame') && !modes.includes('first-last')) {
+    names.lastFrameName = null;
+  }
+  if (!modes.includes('extend') && !policy.references?.extend) {
+    names.sourceVideoName = null;
+    names.sourceVideoTrim = null;
+  }
+  if (names.conditioningClip && !modes.includes(CONDITIONING_ROLE_MODE[names.conditioningClip.role])) {
+    names.conditioningClip = null;
+  }
 };
 
 interface VideoRecallNotice {
@@ -122,6 +195,8 @@ export const executeVideoRecall = async ({
   models,
   owner: callerOwner,
   projectId,
+  queryClient,
+  t,
 }: {
   commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
   getVideoValues: () => Record<string, unknown>;
@@ -131,6 +206,8 @@ export const executeVideoRecall = async ({
   /** Caller-captured identity lifetime; direct synchronous callers may omit it. */
   owner?: AccountScope;
   projectId?: string;
+  queryClient: QueryClient;
+  t: TFunction;
 }): Promise<boolean> => {
   const owner = callerOwner ?? captureAccountScope();
 
@@ -141,7 +218,7 @@ export const executeVideoRecall = async ({
   let metadata: unknown;
 
   try {
-    metadata = await loadVideoMetadata(item.name, owner);
+    metadata = await fetchGalleryVideoMetadata(queryClient, owner, item.name);
   } catch (error: unknown) {
     return reportVideoRecallError(commands, owner, error, projectId);
   }
@@ -149,8 +226,8 @@ export const executeVideoRecall = async ({
   return applyVideoRecallMetadata({
     commands,
     emptyNotice: {
-      message: 'This video does not include supported Video metadata.',
-      title: 'No recallable video data',
+      message: t('widgets.gallery.itemActions.recall.videoMetadataUnsupported'),
+      title: t('widgets.gallery.itemActions.recall.nothingRecalledVideo'),
     },
     getVideoValues,
     kind,
@@ -158,6 +235,7 @@ export const executeVideoRecall = async ({
     models,
     owner,
     projectId,
+    t,
   });
 };
 
@@ -177,6 +255,7 @@ export const applyVideoRecallMetadata = async ({
   partial = false,
   projectId,
   requireGenerationMode = true,
+  t,
 }: {
   commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
   /** Shown when nothing in the record applies. */
@@ -191,52 +270,45 @@ export const applyVideoRecallMetadata = async ({
   projectId?: string;
   /** See `buildVideoRecallSettings`. */
   requireGenerationMode?: boolean;
+  t: TFunction;
 }): Promise<boolean> => {
   try {
     assertAccountScopeCurrent(owner);
-    // Snapshot the panel AFTER the fetch: an edit made while the metadata
-    // loaded must survive into the base the recall applies on top of.
-    const currentValues = getCurrentVideoValues({ models, videoValues: getVideoValues() });
-    const result = buildVideoRecallSettings({
-      currentValues,
-      kind,
-      metadata,
-      models,
-      partial,
-      requireGenerationMode,
-    });
+    const build = (videoValues: Record<string, unknown>) => {
+      const currentValues = getCurrentVideoValues({ models, videoValues });
+      const result = buildVideoRecallSettings({
+        currentValues,
+        kind,
+        metadata,
+        models,
+        partial,
+        requireGenerationMode,
+      });
+
+      if (result && partial) {
+        pruneUnusablePartialMedia(result);
+      }
+      return { currentValues, result };
+    };
+    // A first build only decides what to read: the media the recall would apply, judged against the model it would
+    // settle on, so a recall that ends early or drops a medium never reads it.
+    const planned = build(getVideoValues()).result;
+    const resolved = planned?.fields.includes('media')
+      ? await resolveVideoRecallMedia(planned.mediaNames, owner.signal)
+      : NO_RESOLVED_MEDIA;
+
+    assertAccountScopeCurrent(owner);
+    // Snapshot the panel AFTER every read, and yield nothing until the commit: an edit made while the metadata or
+    // its media loaded must survive into the base the recall applies on top of. A medium this build names that the
+    // first did not (the panel's model changed meanwhile) was not read, and is left out like a deleted one.
+    const { currentValues, result } = build(getVideoValues());
 
     if (!result) {
       commands.notifications.add({ kind: 'info', ...emptyNotice });
       return false;
     }
 
-    // A partial recall names media on top of the panel's own. One the panel's model cannot use would still displace
-    // the held media it conflicts with before the mode check below dropped it, so it is dropped up front instead.
-    if (partial && result.values.model) {
-      const policy = getVideoModelPolicy(result.values.model, result.values);
-      const modes = policy.modes;
-      const names = result.mediaNames;
-
-      if (!modes.includes('reference')) {
-        names.references = [];
-      }
-      if (!modes.includes('first-frame') && !modes.includes('first-last')) {
-        names.firstFrameName = null;
-      }
-      if (!modes.includes('last-frame') && !modes.includes('first-last')) {
-        names.lastFrameName = null;
-      }
-      if (!modes.includes('extend') && !policy.references?.extend) {
-        names.sourceVideoName = null;
-        names.sourceVideoTrim = null;
-      }
-      if (names.conditioningClip && !modes.includes(CONDITIONING_ROLE_MODE[names.conditioningClip.role])) {
-        names.conditioningClip = null;
-      }
-    }
-
-    // Resolve media names against the gallery for dimensions/probe data and drop deleted references.
+    // Hydrate media names from the gallery's records (dimensions/probe data) and drop deleted media.
     if (result.fields.includes('media')) {
       // A full recall that cleared held media changed the panel even if nothing named below hydrates.
       const clearedMedia = (
@@ -244,14 +316,8 @@ export const applyVideoRecallMetadata = async ({
       ).some((slot) => result.values[slot] !== currentValues[slot]);
       let recalledMedia = false;
       const { firstFrameName, lastFrameName, sourceVideoName } = result.mediaNames;
-      const frameNames = [firstFrameName, lastFrameName].filter((name): name is string => name !== null);
-      const resolvedFrames =
-        frameNames.length > 0 ? await galleryImages.resolveMany([...new Set(frameNames)], owner.signal) : [];
-
-      assertAccountScopeCurrent(owner);
-      const framesByName = new Map(resolvedFrames.map((frame) => [frame.imageName, frame]));
-      const firstFrame = firstFrameName ? framesByName.get(firstFrameName) : undefined;
-      const lastFrame = lastFrameName ? framesByName.get(lastFrameName) : undefined;
+      const firstFrame = firstFrameName ? resolved.images.get(firstFrameName) : undefined;
+      const lastFrame = lastFrameName ? resolved.images.get(lastFrameName) : undefined;
 
       // Through the panel's own frame patch: a partial recall can land a frame beside a clip the panel holds for its
       // picture, which the frame displaces exactly as setting it by hand would.
@@ -280,91 +346,69 @@ export const applyVideoRecallMetadata = async ({
 
       const { conditioningClip } = result.mediaNames;
 
-      if (conditioningClip) {
-        try {
-          const clipItem = await galleryItems.resolve({ kind: 'video', name: conditioningClip.name }, owner.signal);
+      const clipItem = conditioningClip ? resolved.videos.get(conditioningClip.name) : undefined;
 
-          assertAccountScopeCurrent(owner);
-          if (clipItem?.kind === 'video') {
-            // The recorded role, not the one a fresh drop would default to: the run held that
-            // modality clean, and the other role is a different generation entirely.
-            result.values = {
-              ...result.values,
-              conditioningClip: {
-                ...createVideoConditioningClip({
-                  durationSeconds: clipItem.durationSeconds,
-                  fps: clipItem.fps,
-                  height: clipItem.height,
-                  name: clipItem.name,
-                  width: clipItem.width,
-                }),
-                role: conditioningClip.role,
-              },
-              // A soundtrack keeps the frames hydrated above: they anchored the picture made for it.
-              ...(isConditioningClipExcludingFrames(conditioningClip)
-                ? { firstFrameImage: null, lastFrameImage: null }
-                : {}),
-              references: [],
-              sourceVideo: null,
-            };
-            recalledMedia = true;
-          }
-        } catch {
-          assertAccountScopeCurrent(owner);
-          // The clip is gone; the rest of the recall still applies.
-        }
+      // A clip that is gone leaves the rest of the recall to apply.
+      if (conditioningClip && clipItem) {
+        // The recorded role, not the one a fresh drop would default to: the run held that
+        // modality clean, and the other role is a different generation entirely.
+        result.values = {
+          ...result.values,
+          conditioningClip: {
+            ...createVideoConditioningClip({
+              durationSeconds: clipItem.durationSeconds,
+              fps: clipItem.fps,
+              height: clipItem.height,
+              name: clipItem.name,
+              width: clipItem.width,
+            }),
+            role: conditioningClip.role,
+          },
+          // A soundtrack keeps the frames hydrated above: they anchored the picture made for it.
+          ...(isConditioningClipExcludingFrames(conditioningClip)
+            ? { firstFrameImage: null, lastFrameImage: null }
+            : {}),
+          references: [],
+          sourceVideo: null,
+        };
+        recalledMedia = true;
       }
 
-      if (sourceVideoName) {
-        try {
-          const sourceItem = await galleryItems.resolve({ kind: 'video', name: sourceVideoName }, owner.signal);
+      const sourceItem = sourceVideoName ? resolved.videos.get(sourceVideoName) : undefined;
 
-          assertAccountScopeCurrent(owner);
-          if (sourceItem?.kind === 'video') {
-            const rebuiltClip = createVideoSourceClip({
-              durationSeconds: sourceItem.durationSeconds,
-              fps: sourceItem.fps,
-              height: sourceItem.height,
-              name: sourceItem.name,
-              width: sourceItem.width,
-            });
-            // Restore recorded trim against the fresh estimate; default trim would select different frames.
-            const trim = rebuiltClip.numFrames >= 2 ? result.mediaNames.sourceVideoTrim : null;
-            const startFrame = trim
-              ? Math.min(Math.max(trim.startFrame, 0), rebuiltClip.numFrames - 2)
-              : rebuiltClip.startFrame;
-            const endFrame = trim
-              ? Math.min(Math.max(trim.endFrame, startFrame + 1), rebuiltClip.numFrames - 1)
-              : rebuiltClip.endFrame;
+      // A source clip that is gone leaves the rest of the recall to apply.
+      if (sourceItem) {
+        const rebuiltClip = createVideoSourceClip({
+          durationSeconds: sourceItem.durationSeconds,
+          fps: sourceItem.fps,
+          height: sourceItem.height,
+          name: sourceItem.name,
+          width: sourceItem.width,
+        });
+        // Restore recorded trim against the fresh estimate; default trim would select different frames.
+        const trim = rebuiltClip.numFrames >= 2 ? result.mediaNames.sourceVideoTrim : null;
+        const startFrame = trim
+          ? Math.min(Math.max(trim.startFrame, 0), rebuiltClip.numFrames - 2)
+          : rebuiltClip.startFrame;
+        const endFrame = trim
+          ? Math.min(Math.max(trim.endFrame, startFrame + 1), rebuiltClip.numFrames - 1)
+          : rebuiltClip.endFrame;
 
-            result.values = {
-              ...result.values,
-              firstFrameImage: null,
-              sourceVideo: { ...rebuiltClip, endFrame, startFrame },
-            };
-            recalledMedia = true;
-          }
-        } catch {
-          assertAccountScopeCurrent(owner);
-          // The source clip is gone; the rest of the recall still applies.
-        }
+        result.values = {
+          ...result.values,
+          firstFrameImage: null,
+          sourceVideo: { ...rebuiltClip, endFrame, startFrame },
+        };
+        recalledMedia = true;
       }
 
       if (result.mediaNames.references.length > 0) {
         // Hydrate references in recorded order, dropping deleted media without reordering survivors.
-        const imageNames = result.mediaNames.references
-          .filter((reference): reference is typeof reference & { kind: 'image' } => reference.kind === 'image')
-          .map((reference) => reference.name);
-        const resolvedImages =
-          imageNames.length > 0 ? await galleryImages.resolveMany([...new Set(imageNames)], owner.signal) : [];
-
-        assertAccountScopeCurrent(owner);
-        const imagesByName = new Map(resolvedImages.map((image) => [image.imageName, image]));
         const references: VideoReferenceItem[] = [];
 
         for (const recorded of result.mediaNames.references) {
           if (recorded.kind === 'image') {
-            const image = imagesByName.get(recorded.name);
+            const image = resolved.images.get(recorded.name);
 
             if (image) {
               references.push({
@@ -375,36 +419,32 @@ export const applyVideoRecallMetadata = async ({
             }
             continue;
           }
-          try {
-            const item = await galleryItems.resolve({ kind: 'video', name: recorded.name }, owner.signal);
 
-            assertAccountScopeCurrent(owner);
-            if (item?.kind !== 'video') {
-              continue;
-            }
-            const clip = createVideoSourceClip({
-              durationSeconds: item.durationSeconds,
-              fps: item.fps,
-              height: item.height,
-              name: item.name,
-              width: item.width,
-            });
-            // Restore the recorded trim, clamped to the fresh frame-count estimate.
-            const startFrame = recorded.trim ? Math.min(Math.max(recorded.trim.startFrame, 0), clip.numFrames - 1) : 0;
-            const endFrame = recorded.trim
-              ? Math.min(Math.max(recorded.trim.endFrame, startFrame), clip.numFrames - 1)
-              : clip.numFrames - 1;
-            // Any valid recorded conditioning wins; otherwise use add-path defaults, including soundtrack
-            // conditioning for wrapped audio.
-            const conditioning = isVideoReferenceConditioning(recorded.conditioning)
-              ? recorded.conditioning
-              : getDefaultReferenceConditioning(item.mediaOrigin);
+          const item = resolved.videos.get(recorded.name);
 
-            references.push({ clip: { ...clip, endFrame, startFrame }, conditioning, kind: 'video' });
-          } catch {
-            assertAccountScopeCurrent(owner);
-            // The reference video is gone; the rest of the recall still applies.
+          // The reference video is gone; the rest of the recall still applies.
+          if (!item) {
+            continue;
           }
+          const clip = createVideoSourceClip({
+            durationSeconds: item.durationSeconds,
+            fps: item.fps,
+            height: item.height,
+            name: item.name,
+            width: item.width,
+          });
+          // Restore the recorded trim, clamped to the fresh frame-count estimate.
+          const startFrame = recorded.trim ? Math.min(Math.max(recorded.trim.startFrame, 0), clip.numFrames - 1) : 0;
+          const endFrame = recorded.trim
+            ? Math.min(Math.max(recorded.trim.endFrame, startFrame), clip.numFrames - 1)
+            : clip.numFrames - 1;
+          // Any valid recorded conditioning wins; otherwise use add-path defaults, including soundtrack
+          // conditioning for wrapped audio.
+          const conditioning = isVideoReferenceConditioning(recorded.conditioning)
+            ? recorded.conditioning
+            : getDefaultReferenceConditioning(item.mediaOrigin);
+
+          references.push({ clip: { ...clip, endFrame, startFrame }, conditioning, kind: 'video' });
         }
 
         if (references.length > 0) {
@@ -515,8 +555,8 @@ export const applyVideoRecallMetadata = async ({
     }
     commands.notifications.add({
       kind: 'success',
-      message: getVideoRecallMessage(result.fields),
-      title: getVideoRecallTitle(kind),
+      message: getVideoRecallMessage(result.fields, t),
+      title: getVideoRecallTitle(kind, t),
     });
     return true;
   } catch (error: unknown) {
@@ -664,7 +704,7 @@ export const placeVideoImage = ({
       displaced: Boolean(values.conditioningClip || (values.sourceVideo && !referenceExtend)),
       patch: getReferencesPatch({
         referenceExtend,
-        references: [...kept, { detail: getDefaultReferenceImageDetail(kept), image, kind: 'image' }],
+        references: [...kept, { detail: DEFAULT_REFERENCE_IMAGE_DETAIL, image, kind: 'image' }],
       }),
       slot: 'reference',
       status: 'placed',

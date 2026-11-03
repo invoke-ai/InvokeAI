@@ -27,7 +27,7 @@ export interface ModelFilterSortOption<Field extends ModelSortField = ModelSortF
   labelKey: string;
 }
 
-/** The one source of sort options; derive narrower menus by filtering. */
+/** The installed library's sort options; the starter list names its own (see `StarterFilterMenu`). */
 export const SORT_FIELD_OPTIONS: readonly ModelFilterSortOption[] = [
   { field: 'default', labelKey: 'models.sort.default' },
   { field: 'name', labelKey: 'models.sort.name' },

@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 import httpx
 import pytest
-from huggingface_hub.errors import HfHubHTTPError
+from huggingface_hub.errors import HfHubHTTPError, OfflineModeIsEnabled, RevisionNotFoundError
 from requests import HTTPError, Request, Response, Timeout
 
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.metadata.metadata_base import (
     HF_METADATA_REQUEST_TIMEOUT_SECONDS,
     HuggingFaceMetadata,
     ModelMetadataUnavailableError,
+    ModelRevisionUnavailableError,
     RemoteModelFile,
     UnknownMetadataException,
 )
@@ -95,6 +96,16 @@ def test_model_info_transport_errors_are_retryable_metadata_failures(
 
     with pytest.raises(ModelMetadataUnavailableError):
         fetcher.from_id("org/repo")
+
+
+def test_offline_mode_is_an_unavailable_metadata_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With HF_HUB_OFFLINE=1 the hub client refuses every request; that must read as metadata being unavailable."""
+    api = Mock()
+    api.model_info.side_effect = OfflineModeIsEnabled("offline")
+    monkeypatch.setattr("invokeai.backend.model_manager.metadata.fetch.huggingface.HfApi", lambda: api)
+
+    with pytest.raises(ModelMetadataUnavailableError):
+        HuggingFaceMetadataFetch().from_id("org/repo")
 
 
 @pytest.mark.parametrize("status_code", [429, 500, 503])
@@ -226,3 +237,129 @@ def test_variant_fallback_gives_each_model_info_request_its_timeout() -> None:
         HF_METADATA_REQUEST_TIMEOUT_SECONDS,
         HF_METADATA_REQUEST_TIMEOUT_SECONDS,
     ]
+
+
+def _hf_api_returning(monkeypatch: pytest.MonkeyPatch, **model_info_kwargs) -> Mock:
+    api = Mock()
+    api.model_info.return_value = SimpleNamespace(
+        id="org/repo", siblings=[SimpleNamespace(rfilename="model.safetensors", size=4, lfs=None)], **model_info_kwargs
+    )
+    monkeypatch.setattr("invokeai.backend.model_manager.metadata.fetch.huggingface.HfApi", lambda: api)
+    return api
+
+
+@pytest.mark.parametrize(
+    ("variant", "branch"), [(None, "main"), (ModelRepoVariant.FP16, "fp16")], ids=["default-branch", "variant-branch"]
+)
+def test_lookup_urls_name_the_branch_users_install_from(
+    monkeypatch: pytest.MonkeyPatch, variant: ModelRepoVariant | None, branch: str
+) -> None:
+    """URLs a lookup returns become install sources and model records, which must keep naming the branch."""
+    api = _hf_api_returning(monkeypatch, sha="abc123")
+
+    metadata = HuggingFaceMetadataFetch().from_id("org/repo", variant)
+
+    assert api.model_info.call_args.kwargs["revision"] == variant
+    assert isinstance(metadata, HuggingFaceMetadata)
+    expected = [f"https://huggingface.co/org/repo/resolve/{branch}/model.safetensors"]
+    assert [str(f.url) for f in metadata.files] == expected
+    assert [str(url) for url in metadata.ckpt_urls or []] == expected
+
+
+def test_pinned_to_commit_lookup_names_the_current_commit_in_file_urls(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = _hf_api_returning(monkeypatch, sha="abc123")
+
+    metadata = HuggingFaceMetadataFetch().from_id("org/repo", pin_to_commit=True)
+
+    assert api.model_info.call_args.kwargs["revision"] is None
+    assert isinstance(metadata, HuggingFaceMetadata)
+    assert metadata.revision == "abc123"
+    assert [str(f.url) for f in metadata.files] == ["https://huggingface.co/org/repo/resolve/abc123/model.safetensors"]
+
+
+def test_pinned_lookup_reads_and_names_that_revision(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = _hf_api_returning(monkeypatch, sha="abc123")
+
+    metadata = HuggingFaceMetadataFetch().from_id("org/repo", ModelRepoVariant.FP16, revision="abc123")
+
+    assert api.model_info.call_args.kwargs["revision"] == "abc123"
+    assert isinstance(metadata, HuggingFaceMetadata)
+    assert [str(f.url) for f in metadata.files] == ["https://huggingface.co/org/repo/resolve/abc123/model.safetensors"]
+
+
+def test_pinned_lookup_of_a_vanished_revision_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    api = _hf_api_returning(monkeypatch)
+    response = httpx.Response(404, request=httpx.Request("GET", "https://huggingface.co/api/models/org/repo"))
+    api.model_info.side_effect = RevisionNotFoundError("Revision not found", response=response)
+
+    with pytest.raises(ModelRevisionUnavailableError, match="abc123"):
+        HuggingFaceMetadataFetch().from_id("org/repo", revision="abc123")
+
+    assert api.model_info.call_count == 1
+
+
+def test_custom_session_looks_up_slash_revision_as_one_path_segment() -> None:
+    revision = "refs/pr/1"
+    expected_url = "https://huggingface.co/api/models/org/repo/revision/refs%2Fpr%2F1"
+    session = Mock()
+    response = _requests_response(200, b'{"id":"org/repo","siblings":[]}')
+
+    def respond_to_encoded_revision(url: str, **_kwargs):
+        if url == expected_url:
+            return response
+        return _requests_response(404, headers={"X-Error-Code": "RevisionNotFound"})
+
+    session.get.side_effect = respond_to_encoded_revision
+
+    metadata = HuggingFaceMetadataFetch(session).from_id("org/repo", revision=revision)
+
+    assert metadata.revision == revision
+    assert session.get.call_args.args[0] == expected_url
+
+
+def test_model_index_is_read_from_the_metadata_revision() -> None:
+    session = Mock()
+    response = Mock(status_code=200)
+    response.json.return_value = {"text_encoder": []}
+    session.get.return_value = response
+    metadata = HuggingFaceMetadata(
+        id="org/repo",
+        name="repo",
+        files=[
+            RemoteModelFile(
+                url="https://huggingface.co/org/repo/resolve/abc123/model_index.json", path=Path("model_index.json")
+            ),
+        ],
+    )
+    metadata._revision = "abc123"
+
+    metadata.download_urls(session=session)
+
+    assert session.get.call_args.args[0] == "https://huggingface.co/org/repo/resolve/abc123/model_index.json"
+
+
+@pytest.mark.parametrize(
+    "url_repo",
+    ["org/repo", "ORG/Repo", "org/old-name"],
+    ids=["same-id", "id-in-another-case", "renamed-repo"],
+)
+def test_metadata_read_back_from_json_reads_the_model_index_of_its_pinned_commit(url_repo: str) -> None:
+    """Install jobs persist their metadata as JSON; the pinned commit must survive it, or model_index.json would be
+    read from the default branch while every file comes from the commit. File URLs name the repo as it was asked
+    for, which can differ from the id the hub reports."""
+    commit = "a" * 40
+    pinned = HuggingFaceMetadata(
+        id="org/repo",
+        name="repo",
+        files=[
+            RemoteModelFile(url=f"https://huggingface.co/{url_repo}/resolve/{commit}/{path}", path=Path(path))
+            for path in ("model_index.json", "unet/config.json")
+        ],
+    )
+    pinned._revision = commit
+    session = Mock()
+    session.get.return_value.json.return_value = {"unet": []}
+
+    HuggingFaceMetadataFetch.from_json(pinned.model_dump_json()).download_urls(session=session)
+
+    assert session.get.call_args.args[0] == f"https://huggingface.co/org/repo/resolve/{commit}/model_index.json"

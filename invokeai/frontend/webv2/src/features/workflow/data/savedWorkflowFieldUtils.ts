@@ -2,6 +2,8 @@ import type { ComboboxOption } from '@platform/ui';
 
 import type { ListWorkflowsParams, WorkflowCallCompatibility, WorkflowLibraryListItem, WorkflowRecordDTO } from './api';
 
+import { getWorkflowRecordCategory } from './api';
+
 export const MISSING_WORKFLOW_OPTION_VALUE = '__missing_workflow__';
 
 export type SavedWorkflowSelectionState =
@@ -146,20 +148,14 @@ export const getSavedWorkflowDisplayState = (
 /** Maps the detail endpoint's full record into the same shape as list results. */
 export const getSavedWorkflowListItemFromRecord = (record: WorkflowRecordDTO): WorkflowLibraryListItem => ({
   call_saved_workflow_compatibility: record.call_saved_workflow_compatibility,
-  category:
-    record.category === 'default' ||
-    (typeof record.workflow.meta === 'object' &&
-      record.workflow.meta !== null &&
-      (record.workflow.meta as { category?: unknown }).category === 'default')
-      ? 'default'
-      : 'user',
+  category: getWorkflowRecordCategory(record) ?? 'user',
   created_at: record.created_at,
-  description: typeof record.workflow.description === 'string' ? record.workflow.description : record.description,
+  description: typeof record.workflow.description === 'string' ? record.workflow.description : '',
   is_public: record.is_public,
   name: record.name,
   opened_at: record.opened_at,
   revision: record.revision,
-  tags: typeof record.workflow.tags === 'string' ? record.workflow.tags : record.tags,
+  tags: typeof record.workflow.tags === 'string' ? record.workflow.tags : null,
   thumbnail_url: record.thumbnail_url,
   updated_at: record.updated_at,
   user_id: record.user_id,

@@ -155,6 +155,30 @@ def test_rejected_update_preserves_the_complete_stored_record(
     assert after.model_dump() == before.model_dump()
 
 
+@pytest.mark.parametrize("new_key", ["key2", "../../pwned"])
+def test_update_refuses_to_change_the_key(store: ModelRecordServiceBase, new_key: str) -> None:
+    """The row keeps its key, so a different key written into the stored config would leave a record that reports
+    a key nothing can look it up by."""
+    original = example_ti_config("key1")
+    store.add_model(original)
+    before = store.get_model(original.key)
+
+    with pytest.raises(ValueError, match="key cannot be changed"):
+        store.update_model(original.key, ModelRecordChanges(key=new_key, name="renamed"), allow_class_change=True)
+
+    assert store.get_model(original.key).model_dump() == before.model_dump()
+    assert not store.exists(new_key)
+
+
+def test_update_accepts_the_unchanged_key_echoed_back(store: ModelRecordServiceBase) -> None:
+    """The edit form posts the whole record back, key included."""
+    store.add_model(example_ti_config("key1"))
+
+    updated = store.update_model("key1", ModelRecordChanges(key="key1", name="renamed"))
+
+    assert (updated.key, updated.name) == ("key1", "renamed")
+
+
 def test_rejected_class_change_preserves_the_original_record(store: ModelRecordServiceBase) -> None:
     original = example_ti_config("key1")
     store.add_model(original)

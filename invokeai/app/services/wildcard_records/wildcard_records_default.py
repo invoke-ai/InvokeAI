@@ -56,5 +56,8 @@ class WildcardRecordsStorage(WildcardRecordsStorageBase):
     def delete(self, wildcard_id: str) -> None:
         self._queries.wildcards.delete(wildcard_id)
 
+    def delete_many(self, user_id: str, wildcard_ids: list[str]) -> list[str]:
+        return self._queries.wildcards.delete_owned(user_id, list(dict.fromkeys(wildcard_ids)))
+
     def get_many(self, user_id: str) -> list[WildcardRecordDTO]:
         return self._queries.wildcards.owned_by(user_id)

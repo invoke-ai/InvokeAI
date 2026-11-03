@@ -1,4 +1,4 @@
-import type { QueueItem } from '@features/queue/core/historyTypes';
+import type { QueueItem, QueueRunErrorCode } from '@features/queue/core/historyTypes';
 import type {
   QueueBackendPort,
   QueueEnqueueGenerateRequest,
@@ -9,9 +9,10 @@ import type {
   QueueResultVideo,
   QueueRunOrigin,
 } from '@features/queue/core/types';
+import type { QueueCancelRequestPort } from '@features/queue/runtime/cancelRequests';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
-import { collectGraphInputMediaNames } from '@features/queue/core/graphInputMedia';
+import { collectSubmissionInputMediaNames, type SubmissionInputMediaNames } from '@features/queue/core/graphInputMedia';
 import {
   isQueuePromptSeedBehaviour,
   isQueueSeedStep,
@@ -22,6 +23,7 @@ import {
 } from '@features/queue/core/promptBatch';
 import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import {
+  buildQueueItemOrigin,
   isTerminalBackendStatus,
   isUtilityQueueItemOrigin,
   parseQueueItemOrigin,
@@ -34,6 +36,7 @@ import {
   createQueueCoordinator,
   QueueEnqueueNotAcceptedError,
   QueueItemCancelledError,
+  QueueItemFailedError,
   type QueueCoordinator,
   type QueueModelLoadPort,
   type QueueNodeExecutionPort,
@@ -133,6 +136,10 @@ export interface QueueHistoryCommands {
   }): void;
   setStatus(payload: {
     error?: string;
+    /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
+    errorCode?: QueueRunErrorCode;
+    /** The backend items whose failure ended the run, so the failure notice can show and retry them. */
+    failedBackendItemIds?: readonly number[];
     notify?: boolean;
     projectId: string;
     queueItemId: string;
@@ -161,7 +168,7 @@ const getQueueRunOrigin = (projectId: string, queueItem: QueueItem): QueueRunOri
     : undefined;
 };
 
-/** Read compiled graphs to identify input passthroughs; legacy or invalid snapshots may lack them. */
+/** Legacy or invalid snapshots may lack a compiled graph. */
 const getQueueItemCompiledGraph = (queueItem: QueueItem): unknown => {
   const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
   return submission && typeof submission === 'object' && 'graph' in submission ? submission.graph : undefined;
@@ -427,8 +434,11 @@ const TRANSIENT_SERVER_STATUSES = [502, 503, 504];
 const isDeterministicServerError = (error: unknown): boolean =>
   error instanceof ApiError && error.status >= 500 && !TRANSIENT_SERVER_STATUSES.includes(error.status);
 
+const NO_CANCEL_REQUESTS: QueueCancelRequestPort = { wasRequestedHere: () => false };
+
 export const createQueueRuntime = ({
   backend,
+  cancelRequests = NO_CANCEL_REQUESTS,
   destinations,
   ensureProjectPersisted,
   ensureTemplatesLoaded,
@@ -440,6 +450,8 @@ export const createQueueRuntime = ({
   viewerUserId = null,
 }: {
   backend: QueueBackendPort;
+  /** Cancels this tab already announced; a run they end reports no outcome of its own. */
+  cancelRequests?: QueueCancelRequestPort;
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
   ensureTemplatesLoaded: () => void;
@@ -968,6 +980,23 @@ export const createQueueRuntime = ({
     return queueItem.snapshot.destination === 'gallery' && boardId && boardId !== 'none' ? boardId : null;
   };
 
+  // Submissions are immutable once enqueued, so a batch's input media is collected once and reused by every partial
+  // and final result route; scanning batch data per route would repeat a walk over every batch item.
+  const submissionInputMedia = new WeakMap<object, SubmissionInputMediaNames>();
+  const getSubmissionInputMediaNames = (queueItem: QueueItem): SubmissionInputMediaNames => {
+    const submission: unknown = queueItem.snapshot.backendSubmission;
+    if (!submission || typeof submission !== 'object') {
+      return collectSubmissionInputMediaNames(submission);
+    }
+
+    let inputMedia = submissionInputMedia.get(submission);
+    if (!inputMedia) {
+      inputMedia = collectSubmissionInputMediaNames(submission);
+      submissionInputMedia.set(submission, inputMedia);
+    }
+    return inputMedia;
+  };
+
   const addImagesToDestination = async (queueItem: QueueItem, images: QueueResultImage[]): Promise<void> => {
     const boardId = getResultDestinationBoardId(queueItem);
     const imageNames = images.filter((image) => !image.boardId).map((image) => image.imageName);
@@ -1022,7 +1051,7 @@ export const createQueueRuntime = ({
     }
 
     // Exclude video primitives' echoed input clips from generated results.
-    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const inputMedia = getSubmissionInputMediaNames(queueItem);
     const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
 
     if (videoNames.length === 0 || !isActive()) {
@@ -1083,7 +1112,7 @@ export const createQueueRuntime = ({
 
   /** Drop input passthroughs and requested intermediates; echoed source media must not move boards on every run. */
   const selectVisibleImages = (queueItem: QueueItem, allImages: QueueResultImage[]): QueueResultImage[] => {
-    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const inputMedia = getSubmissionInputMediaNames(queueItem);
     const producedImages = allImages.filter((image) => !inputMedia.imageNames.has(image.imageName));
 
     return queueItem.snapshot.filterIntermediateResults
@@ -1148,13 +1177,45 @@ export const createQueueRuntime = ({
         return;
       }
 
+      // A cancel or clear this tab asked for already said so; the run ending is no news.
+      const wasRequestedHere = () =>
+        cancelRequests.wasRequestedHere({
+          backendBatchId: getRouteTarget(history, queueItem.id)?.queueItem?.backendBatchId,
+          backendItemIds,
+          origin: buildQueueItemOrigin(queueItem.id, projectId),
+          submittedAt: queueItem.snapshot.submittedAt,
+        });
+
       if (error instanceof QueueItemCancelledError) {
-        commands.setStatus({ projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        commands.setStatus({ notify: !wasRequestedHere(), projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        return;
+      }
+
+      // A clear deletes rows without a terminal event; the run vanished rather than failed, and there is nothing left
+      // to show or retry.
+      if (error instanceof QueueItemFailedError && error.failure === 'removed') {
+        if (wasRequestedHere()) {
+          commands.setStatus({ notify: false, projectId, queueItemId: queueItem.id, status: 'cancelled' });
+        } else {
+          commands.setStatus({
+            error: error.message,
+            errorCode: 'removed',
+            projectId,
+            queueItemId: queueItem.id,
+            status: 'failed',
+          });
+        }
         return;
       }
 
       commands.setStatus({
         error: toErrorMessage(error),
+        ...(error instanceof QueueItemFailedError
+          ? {
+              failedBackendItemIds: error.failedBackendItemIds,
+              ...(error.failure === 'unexplained' ? { errorCode: 'unexplained' as const } : {}),
+            }
+          : {}),
         projectId,
         queueItemId: queueItem.id,
         status: 'failed',
@@ -1794,6 +1855,7 @@ export const createQueueRuntime = ({
       settleRun(project.id, currentQueueItem.id);
       commands.setStatus({
         error: 'This run was not submitted because its project cannot be saved.',
+        errorCode: 'project-not-saved',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1805,6 +1867,7 @@ export const createQueueRuntime = ({
     if (submission.kind === 'invalid') {
       commands.setStatus({
         error: submission.error,
+        errorCode: 'invalid-submission',
         projectId: project.id,
         queueItemId: currentQueueItem.id,
         status: 'failed',
@@ -1873,6 +1936,7 @@ export const createQueueRuntime = ({
             settleRun(project.id, currentQueueItem.id);
             commands.setStatus({
               error: error.message,
+              errorCode: 'not-accepted',
               projectId: project.id,
               queueItemId: currentQueueItem.id,
               status: 'failed',
@@ -2227,6 +2291,7 @@ export const createQueueRuntime = ({
               if (exhaustedServerError !== undefined) {
                 commands.setStatus({
                   error: exhaustedServerError,
+                  errorCode: 'server-error',
                   projectId: project.id,
                   queueItemId: currentQueueItem.id,
                   status: 'failed',
@@ -2264,6 +2329,7 @@ export const createQueueRuntime = ({
               }
               commands.setStatus({
                 error: 'This run is no longer on the backend queue (it may have been cleared).',
+                errorCode: 'removed',
                 notify: false,
                 projectId: project.id,
                 queueItemId: currentQueueItem.id,

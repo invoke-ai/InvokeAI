@@ -66,16 +66,24 @@ registerAccountOwnedResource({
 
 /** A settled publication: like the controller's result, except a failed one retries through the same settlement. */
 export type WorkflowPublicationOutcome =
-  | Exclude<WorkflowPublicationResult, { status: 'failed' }>
+  | Exclude<WorkflowPublicationResult, { status: 'failed' | 'partial' }>
   | { status: 'failed'; message: string; retry: () => Promise<WorkflowPublicationOutcome> }
+  | {
+      status: 'partial';
+      libraryWorkflowId: string;
+      message: string;
+      retry: () => Promise<WorkflowPublicationOutcome>;
+    }
   | { status: 'rejected'; message: string };
 
-export type WorkflowPublicationFailure = Extract<WorkflowPublicationOutcome, { status: 'failed' }>;
+export type WorkflowPublicationFailure = Extract<WorkflowPublicationOutcome, { status: 'failed' | 'partial' }>;
 
 export interface PublishProjectWorkflowOptions {
   workflowId: string;
   /** Names the new template; the project workflow keeps its own name. */
   name: string;
+  /** Explicit visibility intent used by multiuser saves. Omitted in single-user mode. */
+  isPublic?: boolean;
 }
 
 export interface UpdateProjectWorkflowSourceOptions {
@@ -90,7 +98,11 @@ export interface WorkflowPublication {
   /** Replaces the template the project workflow came from, at exactly the revision the caller reviewed. */
   updateSource: (options: UpdateProjectWorkflowSourceOptions) => Promise<WorkflowPublicationOutcome>;
   /** Creates a template from a document that is not (yet) a project workflow, such as a compiled preview. */
-  saveDocumentAsNew: (document: ProjectGraphState, name: string) => Promise<WorkflowPublicationOutcome>;
+  saveDocumentAsNew: (
+    document: ProjectGraphState,
+    name: string,
+    isPublic?: boolean
+  ) => Promise<WorkflowPublicationOutcome>;
   /** Resends the captured request of a failed publication. */
   retry: (result: WorkflowPublicationFailure) => Promise<WorkflowPublicationOutcome>;
   isPublishing: (workflowId: string) => boolean;
@@ -134,7 +146,11 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         if (target.updateSource) {
           commands.setWorkflowSource(
             { projectId: target.projectId, workflowId: target.workflowId },
-            { libraryWorkflowId: result.libraryWorkflowId, revision: result.revision }
+            {
+              libraryWorkflowId: result.libraryWorkflowId,
+              ...(result.ownerUserId ? { ownerUserId: result.ownerUserId } : {}),
+              revision: result.revision,
+            }
           );
         }
 
@@ -175,7 +191,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
     function settleWithRetry(result: WorkflowPublicationResult, target: PublicationTarget): WorkflowPublicationOutcome {
       const key = unresolvedKey(target.projectId, target.workflowId);
 
-      if (result.status === 'failed') {
+      if (result.status === 'failed' || result.status === 'partial') {
         const failure: WorkflowPublicationFailure = {
           ...result,
           retry: async () => settleWithRetry(await result.retry(), target),
@@ -195,7 +211,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
   );
 
   const saveAsNew = useCallback(
-    async ({ name, workflowId }: PublishProjectWorkflowOptions): Promise<WorkflowPublicationOutcome> => {
+    async ({ isPublic, name, workflowId }: PublishProjectWorkflowOptions): Promise<WorkflowPublicationOutcome> => {
       const snapshot = project.getSnapshot();
       const entry = snapshot.workflows.find((candidate) => candidate.document.id === workflowId);
 
@@ -223,6 +239,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         projectId: snapshot.id,
         workflow: serializeWorkflowJson(entry.document),
         workflowId,
+        ...(isPublic === undefined ? {} : { isPublic }),
       });
 
       return settleWithRetry(result, target);
@@ -265,7 +282,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
   );
 
   const saveDocumentAsNew = useCallback(
-    async (document: ProjectGraphState, name: string): Promise<WorkflowPublicationOutcome> => {
+    async (document: ProjectGraphState, name: string, isPublic?: boolean): Promise<WorkflowPublicationOutcome> => {
       const rejection = validate(document);
 
       if (rejection) {
@@ -281,6 +298,7 @@ export const useWorkflowPublication = (): WorkflowPublication => {
         projectId,
         workflow: serializeWorkflowJson(document),
         workflowId: document.id,
+        ...(isPublic === undefined ? {} : { isPublic }),
       });
 
       return settleWithRetry(result, target);

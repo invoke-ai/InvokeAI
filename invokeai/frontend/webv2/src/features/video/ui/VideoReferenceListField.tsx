@@ -19,7 +19,7 @@ import {
   clampReferenceSampleFrames,
   createVideoReferenceEntry,
   formatReferencePromptLabels,
-  getDefaultReferenceImageDetail,
+  DEFAULT_REFERENCE_IMAGE_DETAIL,
   referencePromptLabels,
   referenceSampleFrames,
   resizeReferenceSampleWindow,
@@ -452,8 +452,7 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
         return [
           ...current,
           {
-            // Derive defaults from the live list because another image may have arrived during the await.
-            detail: getDefaultReferenceImageDetail(current),
+            detail: DEFAULT_REFERENCE_IMAGE_DETAIL,
             image: { height: image.height, image_name: image.name, width: image.width },
             kind: 'image',
           },

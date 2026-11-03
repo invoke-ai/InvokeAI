@@ -98,6 +98,14 @@ describe('projectGraphReducer', () => {
     expect(node.position).toEqual({ x: 5, y: 6 });
   });
 
+  it('starts gallery image outputs saving to the gallery and every other node intermediate', () => {
+    expect(buildInvocationNode({ ...template, type: 'save_image' }, { x: 0, y: 0 }).data.isIntermediate).toBe(false);
+    expect(buildInvocationNode({ ...template, type: 'save_image_to_file' }, { x: 0, y: 0 }).data.isIntermediate).toBe(
+      false
+    );
+    expect(buildInvocationNode({ ...template, type: 'img_resize' }, { x: 0, y: 0 }).data.isIntermediate).toBe(true);
+  });
+
   it('removing nodes drops their edges and exposed form fields', () => {
     const { doc, nodeAId, nodeBId } = createDocWithNodes();
     let next = projectGraphReducer(doc, { edge: createEdge(nodeAId, nodeBId), type: 'addEdge' });
@@ -153,6 +161,25 @@ describe('projectGraphReducer', () => {
     });
 
     expect(next.edges).toEqual([firstEdge, secondEdge]);
+  });
+
+  it('addGraphElements connects pasted nodes to existing sources but never fills one input twice', () => {
+    const { doc, nodeAId, nodeBId } = createDocWithNodes();
+    const pasted = buildInvocationNode(template, { x: 64, y: 64 });
+    const collect = buildInvocationNode({ ...template, type: 'collect' }, { x: 96, y: 96 });
+    const fromA = { ...createEdge(nodeAId, pasted.id), id: 'edge-from-a' };
+    const fromB = { ...createEdge(nodeBId, pasted.id), id: 'edge-from-b' };
+    const fromGone = { ...createEdge('deleted-node', pasted.id), id: 'edge-from-gone', targetHandle: 'b' };
+    const itemFromA = { ...createEdge(nodeAId, collect.id), id: 'item-from-a', targetHandle: 'item' };
+    const itemFromB = { ...createEdge(nodeBId, collect.id), id: 'item-from-b', targetHandle: 'item' };
+    const next = projectGraphReducer(doc, {
+      edges: [fromA, fromB, fromGone, itemFromA, itemFromB],
+      nodes: [pasted, collect],
+      type: 'addGraphElements',
+    });
+
+    // The first edge into `a` wins; a collect's `item` keeps every connection; a missing source is dropped.
+    expect(next.edges.map((edge) => edge.id)).toEqual(['edge-from-a', 'item-from-a', 'item-from-b']);
   });
 
   it('addGraphElements drops colliding node ids and their edges', () => {
@@ -547,6 +574,19 @@ describe('node updates', () => {
     expect(update.document.edges.map((edge) => edge.id)).toEqual(['e-a']);
     expect(isFieldExposed(update.document.form, { fieldName: 'a', nodeId: 'add-1' })).toBe(true);
     expect(isFieldExposed(update.document.form, { fieldName: 'z', nodeId: 'add-1' })).toBe(false);
+  });
+
+  it('keeps a Save Image node intermediate when the user chose that before the update', () => {
+    const saveTemplate: InvocationTemplate = { ...template, type: 'save_image' };
+    const stored: WorkflowInvocationNode = {
+      ...buildInvocationNode(saveTemplate, { x: 0, y: 0 }),
+      data: { ...buildInvocationNode(saveTemplate, { x: 0, y: 0 }).data, isIntermediate: true },
+      id: 'save-1',
+    };
+    const doc: ProjectGraphState = { ...createProjectGraph('update-test'), nodes: [stored] };
+    const updated = updateWorkflowNodes(doc, { save_image: { ...saveTemplate, version: '1.1.0' } }).document.nodes[0];
+
+    expect(updated?.type === 'invocation' && updated.data).toMatchObject({ isIntermediate: true, version: '1.1.0' });
   });
 
   it('fills a cleared value from the template but keeps dynamic and extra-input node inputs', () => {

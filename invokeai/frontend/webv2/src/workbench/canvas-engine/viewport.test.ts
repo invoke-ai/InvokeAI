@@ -1,7 +1,6 @@
 import type { Vec2 } from '@workbench/canvas-engine/types';
 
 import { applyToPoint } from '@workbench/canvas-engine/math/mat2d';
-import { ZOOM_PRESETS } from '@workbench/canvas-engine/math/snapping';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createViewport } from './viewport';
@@ -42,14 +41,61 @@ describe('createViewport', () => {
     closeTo(vp.documentToScreen(docUnderAnchorBefore), anchor);
   });
 
-  it('wheelZoom is continuous and does not snap to a preset', () => {
-    // Small zoom steps must move instead of sticking inside preset capture bands.
-    const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
-    const anchor: Vec2 = { x: 0, y: 0 };
+  it('wheelZoom notches that would pass 87% → 101% → 118% rest on 100% first', () => {
+    const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 0.87 });
+    const anchor: Vec2 = { x: 120, y: 80 };
+    const docUnderAnchor = vp.screenToDocument(anchor);
+    const zooms: number[] = [];
 
-    vp.wheelZoom(-1, anchor);
+    for (let notch = 0; notch < 3; notch += 1) {
+      vp.wheelZoom(-100, anchor);
+      zooms.push(vp.getZoom());
+    }
+
+    expect(zooms[0]).toBe(1);
+    // Leaving 100%, zoom continues from where the wheel would have been: 87% after two notches.
+    expect(zooms[1]).toBeCloseTo(0.87 * Math.exp(0.3), 9);
+    expect(zooms[2]).toBeCloseTo(0.87 * Math.exp(0.45), 9);
+    closeTo(vp.documentToScreen(docUnderAnchor), anchor);
+  });
+
+  it('wheelZoom starts afresh after any other zoom change, even one to the same zoom', () => {
+    const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
+    // Resting on 100% with the intended zoom at about 101.8%, just inside the tolerance.
+    vp.wheelZoom(-12, { x: 0, y: 0 });
+    expect(vp.getZoom()).toBe(1);
+
+    // Fit lands on exactly 100%. Had the remembered intended zoom survived it, this small step would leave 100%.
+    vp.fitToView({ height: 100, width: 100, x: 0, y: 0 }, { height: 200, width: 200 }, 50);
+    vp.wheelZoom(-2, { x: 0, y: 0 });
+
+    expect(vp.getZoom()).toBe(1);
+  });
+
+  it('wheelZoom starts a new gesture from the zoom shown after a pause in wheel events', () => {
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1_000);
+    try {
+      const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
+      // Resting on 100% with the intended zoom at about 101.8%, just inside the tolerance.
+      vp.wheelZoom(-12, { x: 0, y: 0 });
+      expect(vp.getZoom()).toBe(1);
+
+      // A pause ends the gesture: this small step starts from 100% and stays on it, where it would otherwise leave.
+      now.mockReturnValue(1_400);
+      vp.wheelZoom(-2, { x: 0, y: 0 });
+
+      expect(vp.getZoom()).toBe(1);
+    } finally {
+      now.mockRestore();
+    }
+  });
+
+  it('wheelZoom leaves a snap point once leftover movement in the same gesture crosses its tolerance', () => {
+    const vp = createViewport({ pan: { x: 0, y: 0 }, zoom: 1 });
+    vp.wheelZoom(-12, { x: 0, y: 0 });
+    vp.wheelZoom(-2, { x: 0, y: 0 });
+
     expect(vp.getZoom()).toBeGreaterThan(1);
-    expect(ZOOM_PRESETS).not.toContain(vp.getZoom());
   });
 
   it('wheelZoom crosses a preset instead of parking on it', () => {

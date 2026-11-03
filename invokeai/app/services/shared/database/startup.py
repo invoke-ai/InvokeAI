@@ -8,7 +8,7 @@ from sqlalchemy import inspect
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
-from invokeai.app.services.shared.database.database import Database, parse_database_url
+from invokeai.app.services.shared.database.database import Database, parse_database_url, redacted_url
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator, NoImageFiles
 
@@ -98,7 +98,7 @@ def redacted_database_url(url: Optional[str]) -> Optional[str]:
     if not url:
         return url
     try:
-        return parse_database_url(url).render_as_string(hide_password=True)
+        return redacted_url(parse_database_url(url))
     except ValueError:
         # Not a URL that could be opened either; show none of it.
         return "***"

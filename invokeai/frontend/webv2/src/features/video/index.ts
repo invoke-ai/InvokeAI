@@ -15,6 +15,7 @@ export type {
   WanTargetResolution,
 } from './core/types';
 export {
+  DEFAULT_REFERENCE_IMAGE_DETAIL,
   clearDeletedVideoMedia,
   cloneVideoWidgetValues,
   createVideoConditioningClip,
@@ -22,7 +23,6 @@ export {
   createVideoSourceClip,
   getDefaultConditioningRole,
   getDefaultReferenceConditioning,
-  getDefaultReferenceImageDetail,
   areFrameImagesHeld,
   createFrameImageSetter,
   getConditioningClipPatch,

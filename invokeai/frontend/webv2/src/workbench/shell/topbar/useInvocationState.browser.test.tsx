@@ -1,5 +1,7 @@
 import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
+import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
 import type { Project } from '@workbench/projectContracts';
+import type * as settingsStoreModule from '@workbench/settings/store';
 import type { ReactNode } from 'react';
 
 import {
@@ -12,7 +14,23 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const harness = vi.hoisted(() => ({ project: null as unknown }));
+const harness = vi.hoisted(() => ({
+  project: null as unknown,
+  submit: vi.fn((_args: Record<string, unknown>) => Promise.resolve()),
+  // Stands in for the backend: one prompt per `|` alternative when expansion is on and the prompt has braces.
+  useDynamicPrompts: vi.fn((prompt: string, config: { enabled: boolean } | null) => {
+    const isDynamic = config?.enabled === true && prompt.includes('{');
+
+    return {
+      count: isDynamic ? prompt.split('|').length : 1,
+      error: null,
+      isDynamic,
+      isError: false,
+      isLoading: false,
+      prompts: [],
+    };
+  }),
+}));
 
 // A controllable stand-in for the node-template store, so a test can decide which of the two stores
 // the route depends on finishes loading last.
@@ -40,9 +58,30 @@ const templates = vi.hoisted(() => {
   };
 });
 
-vi.mock('@features/generation/react', () => ({
-  useDynamicPrompts: () => ({ count: 1, error: null, isDynamic: false, isError: false, isLoading: false, prompts: [] }),
-}));
+// A controllable stand-in for the account preferences, so a test can change the remembered control-model picks.
+const preferences = vi.hoisted(() => {
+  const listeners = new Set<() => void>();
+  let controlModelMemory: Record<string, string> = {};
+
+  return {
+    get: () => controlModelMemory,
+    reset: () => {
+      controlModelMemory = {};
+    },
+    set: (next: Record<string, string>) => {
+      controlModelMemory = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+  };
+});
+
+vi.mock('@features/generation/react', () => ({ useDynamicPrompts: harness.useDynamicPrompts }));
 vi.mock('@features/models', () => ({
   ensureModelsLoaded: () => Promise.resolve(),
   // One snapshot object, as the real store hands out. A fresh `models` array per render would change
@@ -54,7 +93,15 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   getInvocationTemplatesSnapshot: () => templates.get(),
   subscribeInvocationTemplates: templates.subscribe,
 }));
-vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: () => Promise.resolve() }));
+vi.mock('@workbench/settings/store', async (importOriginal) => {
+  const actual = await importOriginal<typeof settingsStoreModule>();
+  return {
+    ...actual,
+    getWorkbenchPreferences: () => ({ ...actual.getWorkbenchPreferences(), controlModelMemory: preferences.get() }),
+    subscribeWorkbenchPreferences: (listener: () => void) => preferences.subscribe(listener),
+  };
+});
+vi.mock('@workbench/activeInvocationSubmission', () => ({ submitActiveInvocation: harness.submit }));
 vi.mock('@workbench/invocationPreparation', () => ({ useIsInvocationPreparing: () => false }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(harness.project as Project),
@@ -65,12 +112,17 @@ vi.mock('@workbench/WorkbenchContext', () => ({
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 
 import { useInvocationState } from './useInvocationState';
 
 const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
-const modelsSnapshot = { models: [sdxlModel], status: 'loaded' };
+const depthModel = (key: string) => ({ base: 'sdxl', key, name: key, type: 'controlnet' });
+const modelsSnapshot = {
+  models: [sdxlModel, depthModel('sdxl-depth-a'), depthModel('sdxl-depth-b')],
+  status: 'loaded',
+};
 
 const activeProject = (state: ReturnType<typeof createInitialWorkbenchState>): Project =>
   state.projects.find((candidate) => candidate.id === state.activeProjectId)!;
@@ -99,9 +151,20 @@ const Probe = (): ReactNode => {
   const state = useInvocationState();
 
   return (
-    <span data-batch-count={state.batchCount} data-testid="reasons">
-      {state.blockingReasons.join(' | ')}
-    </span>
+    <>
+      <span data-batch-count={state.batchCount} data-prompt-count={state.promptExpansion.count} data-testid="reasons">
+        {state.issues.map((issue) => issue.message).join(' | ')}
+      </span>
+      <span data-testid="issue-layers">
+        {state.issues.map(({ target }) => (target.kind === 'layer' ? target.layerId : '-')).join(' | ')}
+      </span>
+      <button data-testid="invoke-front" type="button" onClick={() => void state.invoke({ prepend: true })}>
+        Invoke front
+      </button>
+      <button data-testid="invoke" type="button" onClick={() => void state.invoke()}>
+        Invoke
+      </button>
+    </>
   );
 };
 
@@ -124,15 +187,15 @@ afterEach(async () => {
   root = null;
   resetArchitectureCapabilities();
   templates.reset();
+  preferences.reset();
 });
 
 describe('useInvocationState and the architecture capability table', () => {
   it('stops blocking Invoke as soon as a retried load succeeds', async () => {
     await renderProbe(buildGenerateProject());
 
-    expect(blockingReasons()).toBe(
-      'Model capabilities are not available. Generation is blocked until they load; if this persists, retry from the Generate panel.'
-    );
+    // Worded from the locale, which this probe leaves untranslated.
+    expect(blockingReasons()).toBe('widgets.generate.issues.capabilitiesUnavailable');
 
     // Capability arrival alone must recompute the route after retry succeeds.
     await act(() => {
@@ -153,13 +216,13 @@ describe('useInvocationState and the workflow node templates', () => {
       )
     );
 
-    expect(blockingReasons()).toContain('Node definitions are still loading.');
+    expect(blockingReasons()).toContain('nodes.readiness.templatesLoading');
 
     await act(() => {
       templates.set({ error: null, status: 'loaded', templates: {} });
     });
 
-    expect(blockingReasons()).not.toContain('Node definitions are still loading.');
+    expect(blockingReasons()).not.toContain('nodes.readiness.templatesLoading');
   });
 
   it("reports the workflow widget's own iteration count for a workflow route", async () => {
@@ -170,5 +233,100 @@ describe('useInvocationState and the workflow node templates', () => {
     await renderProbe(activeProject(state));
 
     expect(host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-batch-count')).toBe('3');
+  });
+});
+
+describe('useInvocationState invoke', () => {
+  it('forwards a front-of-queue request to the submission, and leaves it out otherwise', async () => {
+    harness.submit.mockClear();
+    await renderProbe(buildGenerateProject());
+
+    await act(() => host!.querySelector<HTMLButtonElement>('[data-testid="invoke-front"]')!.click());
+    await act(() => host!.querySelector<HTMLButtonElement>('[data-testid="invoke"]')!.click());
+
+    expect(harness.submit.mock.calls[0]![0]).toMatchObject({ prepend: true });
+    expect(harness.submit.mock.calls[1]![0].prepend).toBeUndefined();
+  });
+});
+
+describe('useInvocationState and the remembered control-model picks', () => {
+  it('re-resolves a canvas route when a remembered pick settles a choice between control models', async () => {
+    const depthLayer: CanvasControlLayerContract = {
+      adapter: { beginEndStepPct: [0, 0.75], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 0.75 },
+      blendMode: 'normal',
+      controlType: 'depth',
+      detection: null,
+      id: 'depth-layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Depth 1',
+      opacity: 1,
+      source: { image: { height: 64, imageName: 'depth.png', width: 64 }, type: 'image' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'control',
+      withTransparencyEffect: true,
+    };
+    const project = buildGenerateProject();
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+    await renderProbe({
+      ...project,
+      canvas: { ...project.canvas, document: { ...project.canvas.document, stacks: stacksFrom([depthLayer]) } },
+      invocation: { ...project.invocation, sourceId: 'canvas' },
+    });
+
+    expect(blockingReasons()).toContain('widgets.layers.control.invalidLayer');
+    // The control layer's issue names the layer, so Invoke can show it; the others name none.
+    const layers = host!.querySelector('[data-testid="issue-layers"]')!.textContent!.split(' | ');
+    expect(layers.filter((layerId) => layerId !== '-')).toEqual(['depth-layer']);
+    expect(blockingReasons().split(' | ')[layers.indexOf('depth-layer')]).toContain(
+      'widgets.layers.control.invalidLayer'
+    );
+
+    await act(() => {
+      preferences.set({ 'sdxl:depth': 'sdxl-depth-b' });
+    });
+
+    expect(blockingReasons()).not.toContain('widgets.layers.control.invalidLayer');
+  });
+});
+
+describe('useInvocationState and Video dynamic prompts', () => {
+  const renderVideo = async (videoValues: Record<string, unknown>) => {
+    setArchitectureCapabilities(architectureCapabilitiesFixture);
+    let state = workbenchReducer(createInitialWorkbenchState(), {
+      region: 'left',
+      type: 'toggleRegionWidget',
+      widgetId: 'video',
+    });
+    state = workbenchReducer(state, {
+      type: 'patchWidgetValues',
+      values: { positivePrompt: 'a {cat|dog|bird}' },
+      widgetId: 'generate',
+    });
+    state = workbenchReducer(state, { type: 'patchWidgetValues', values: videoValues, widgetId: 'video' });
+    state = workbenchReducer(state, { sourceId: 'video', type: 'setInvocationSource' });
+    harness.useDynamicPrompts.mockClear();
+    await renderProbe(activeProject(state));
+
+    return host?.querySelector('[data-testid="reasons"]')?.getAttribute('data-prompt-count');
+  };
+
+  it("counts the Video prompt's expansion with Video's settings, not Generate's prompt", async () => {
+    expect(await renderVideo({ positivePrompt: 'a {red|green} fox' })).toBe('2');
+    expect(harness.useDynamicPrompts).toHaveBeenLastCalledWith(
+      'a {red|green} fox',
+      expect.objectContaining({ enabled: true, maxPrompts: 10 })
+    );
+  });
+
+  it('counts a Video prompt saved before Video expanded prompts as typed', async () => {
+    // The prompt height marks a panel saved before; one without dynamic prompts settings runs its prompt as typed.
+    expect(
+      await renderVideo({
+        dynamicPromptsEnabled: undefined,
+        positivePrompt: 'a {red|green} fox',
+        positivePromptHeightPx: 96,
+      })
+    ).toBe('1');
   });
 });

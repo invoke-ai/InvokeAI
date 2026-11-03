@@ -13,11 +13,16 @@ import {
   getFilterNumberBounds,
   isSpandrelModelIdentifier,
 } from '@workbench/canvas-operations/api';
+import { PropertySegmentedRow } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SELECT_POSITIONING_DOWN = { placement: 'bottom-end', sameWidth: false } as const;
 const SPANDREL_MODEL_TYPES: ModelTaxonomyType[] = ['spandrel_image_to_image'];
+/** More choices than this no longer fit one segmented row in the pane, so they stay a select. */
+const MAX_SEGMENTED_ENUM_OPTIONS = 4;
+
+type EnumPresentation = 'select' | 'segmented';
 
 interface LayerFilterControlsProps {
   filterType: string;
@@ -26,6 +31,8 @@ interface LayerFilterControlsProps {
   focusFilter: boolean;
   /** Which controls to render; the context toolbar shows the type in its bar and the parameters in its More menu. */
   parts?: 'all' | 'params' | 'type';
+  /** `segmented` shows an enum parameter with few enough options as one segmented row; others stay selects. */
+  enumPresentation?: EnumPresentation;
   onFilterTypeChange(value: string): void;
   onSettingsChange(value: Record<string, unknown>): void;
 }
@@ -43,6 +50,7 @@ const getLayerFilterControlPolicy = () =>
 
 export const LayerFilterControls = ({
   disabled,
+  enumPresentation = 'select',
   filterType,
   focusFilter,
   onFilterTypeChange,
@@ -110,6 +118,7 @@ export const LayerFilterControls = ({
             <FilterParamField
               key={param.key}
               disabled={disabled}
+              enumPresentation={enumPresentation}
               param={param}
               policy={policy}
               settings={settings}
@@ -123,6 +132,7 @@ export const LayerFilterControls = ({
 
 interface FilterParamFieldProps {
   disabled: boolean;
+  enumPresentation: EnumPresentation;
   param: FilterParamSpec;
   policy: ReturnType<typeof getLayerFilterControlPolicy>;
   settings: Record<string, unknown>;
@@ -130,7 +140,15 @@ interface FilterParamFieldProps {
   onChange: (key: string, value: unknown) => void;
 }
 
-const FilterParamField = ({ disabled, param, policy, settings, value, onChange }: FilterParamFieldProps) => {
+const FilterParamField = ({
+  disabled,
+  enumPresentation,
+  param,
+  policy,
+  settings,
+  value,
+  onChange,
+}: FilterParamFieldProps) => {
   const { t } = useTranslation();
   const label = t(`widgets.layers.control.filterParams.${param.key}`, param.key);
   // A number shows its scrub locally; settings change (and the filter reruns) once per gesture.
@@ -149,6 +167,7 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
     },
     [onChange, param.key]
   );
+  const handleSegment = useCallback((next: string) => onChange(param.key, next), [onChange, param.key]);
   const handleNumberEnd = useCallback(
     (next: number) => {
       setDraftNumber(null);
@@ -174,15 +193,14 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
     [onChange, param.key]
   );
 
-  const enumCollection = useMemo(
+  const enumItems = useMemo(
     () =>
       param.kind === 'enum'
-        ? createListCollection({
-            items: param.options.map((option) => ({ label: t(option.labelKey, option.value), value: option.value })),
-          })
+        ? param.options.map((option) => ({ label: t(option.labelKey, option.value), value: option.value }))
         : null,
     [param, t]
   );
+  const enumCollection = useMemo(() => (enumItems ? createListCollection({ items: enumItems }) : null), [enumItems]);
   const enumCurrent =
     param.kind === 'enum' && typeof value === 'string' && param.options.some((option) => option.value === value)
       ? value
@@ -213,6 +231,18 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
           <Text fontSize="md">{label}</Text>
         </Switch.Label>
       </Switch.Root>
+    );
+  }
+
+  if (enumItems && enumPresentation === 'segmented' && enumItems.length <= MAX_SEGMENTED_ENUM_OPTIONS) {
+    return (
+      <PropertySegmentedRow
+        disabled={disabled}
+        label={label}
+        options={enumItems}
+        value={String(enumCurrent)}
+        onValueChange={handleSegment}
+      />
     );
   }
 

@@ -178,6 +178,47 @@ describe('buildMaterializedPixelLayer', () => {
     expect(before.source.type).toBe('image');
   });
 
+  it("moves a control layer's kept original with the baked transform", () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const before = control({
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      original: { image: { height: 10, imageName: 'photo', width: 10 }, type: 'image' },
+      originalTransform: { rotation: 0, scaleX: 1, scaleY: 1, x: 5, y: 0 },
+      transform: { rotation: 0, scaleX: 2, scaleY: 2, x: 10, y: 20 },
+    });
+
+    const after = buildMaterializedPixelLayer(before, { height: 20, width: 20, x: 10, y: 20 });
+
+    expect(after).toMatchObject({ controlType: 'depth', detection: depth, original: before.original });
+    expect(after.type === 'control' && after.originalTransform).toEqual({
+      rotation: 0,
+      scaleX: 2,
+      scaleY: 2,
+      x: 20,
+      y: 20,
+    });
+  });
+
+  it('detaches a control layer whose original the bake would shear', () => {
+    const depth = { settings: {}, type: 'depth_anything_depth_estimation' };
+    const before = control({
+      controlType: 'depth',
+      detection: depth,
+      filter: depth,
+      original: { image: { height: 10, imageName: 'photo', width: 10 }, type: 'image' },
+      originalTransform: { rotation: Math.PI / 4, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      transform: { rotation: 0, scaleX: 2, scaleY: 1, x: 0, y: 0 },
+    });
+
+    const after = buildMaterializedPixelLayer(before, { height: 10, width: 20, x: 0, y: 0 });
+
+    expect(after).toMatchObject({ controlType: 'depth', detection: null, filter: depth });
+    expect(after).not.toHaveProperty('original');
+    expect(after).not.toHaveProperty('originalTransform');
+  });
+
   it('clears raster adjustments after baking them into a paint source', () => {
     const before: CanvasLayerContract = {
       adjustments: [

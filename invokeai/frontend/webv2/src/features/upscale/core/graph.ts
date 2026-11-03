@@ -2,6 +2,7 @@ import type {
   BackendGraphContract,
   BackendInvocationContract,
   GenerationProjectSettings,
+  ImageWithDims,
   MainModelConfig,
   ResultDestination,
 } from '@features/generation/contracts';
@@ -20,11 +21,12 @@ import {
 import { isBundledMainForBase } from '@features/generation/settings';
 
 import type { UpscaleBase, UpscaleIndexClipping } from './settings';
-import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
+import type { CompiledUpscaleGraph, SpandrelModelConfig, UpscaleWidgetValues } from './types';
 
 import {
   activeUpscaleComponents,
   coerceUpscaleScheduler,
+  getSpandrelNativeScale,
   getUpscaleValidationReasons,
   upscaleArchitectureFor,
   upscaleDenoiseDimension,
@@ -965,16 +967,110 @@ const UPSCALE_PATH_BUILDERS = {
   'z-image': buildZImageUpscalePath,
 } satisfies Record<UpscaleBase, UpscalePathBuilder>;
 
+export interface ModelOnlyUpscaleRequest {
+  image: ImageWithDims;
+  upscaleModel: SpandrelModelConfig;
+  /**
+   * A Scale runs the upscaler until it reaches it; `'native'` runs the model once, at its own scale, sized as that Scale
+   * would be when it is recorded and left unsized when it is not.
+   */
+  scale: number | 'native';
+  destination: ResultDestination;
+  /** The source image's metadata, copied into the result's; null when the source has none. */
+  sourceMetadata: Record<string, unknown> | null;
+}
+
+/**
+ * The upscaler alone, with no main model or detail pass: the Upscale widget's Model only mode at its Scale, and the
+ * image menu's one-click upscale at one of its factors or the model's native scale.
+ *
+ * The result carries the source image's metadata, so Recall and Remix restore how the source was made, plus what the
+ * upscale did. It sits on the output node as a literal rather than in a `core_metadata` node, which would validate the
+ * copied keys against today's fields (an older image's model record fails that) and stamp today's `metadata_version`
+ * over the source's.
+ */
+export const compileModelOnlyUpscaleGraph = ({
+  destination,
+  image,
+  scale,
+  sourceMetadata,
+  upscaleModel,
+}: ModelOnlyUpscaleRequest): CompiledUpscaleGraph => {
+  const graph: BackendGraphContract = { edges: [], id: 'upscale-graph', nodes: {} };
+  // The queue's generate submission writes the batch's prompts and seed into these; nothing in this graph reads them.
+  addNode(graph, { id: 'positive_prompt', type: 'string' });
+  addNode(graph, { id: 'negative_prompt', type: 'string' });
+  addNode(graph, { id: 'seed', type: 'integer' });
+
+  const upscaleScale = scale === 'native' ? getSpandrelNativeScale(upscaleModel) : scale;
+  // A source that was itself upscaled names its own upscale; none of those keys may survive into this one.
+  const {
+    upscale_initial_image: _initialImage,
+    upscale_model: _model,
+    upscale_scale: _scale,
+    ...copiedMetadata
+  } = sourceMetadata ?? {};
+  const metadata = {
+    ...copiedMetadata,
+    upscale_initial_image: { height: image.height, image_name: image.image_name, width: image.width },
+    upscale_model: toModelIdentifier(upscaleModel),
+    ...(upscaleScale === null ? {} : { upscale_scale: upscaleScale }),
+  };
+
+  addNode(graph, {
+    id: 'upscale_output',
+    image: { image_name: image.image_name },
+    image_to_image_model: toModelIdentifier(upscaleModel),
+    is_intermediate: destination === 'canvas',
+    metadata,
+    // Matches the Refine graph's first pass, so both modes size a result alike. Only an upscaler of unknown native
+    // scale runs a plain pass: there is no factor to give the autoscale node.
+    ...(upscaleScale === null
+      ? { type: 'spandrel_image_to_image' }
+      : { fit_to_multiple_of_8: true, scale: upscaleScale, type: 'spandrel_image_to_image_autoscale' }),
+    // A cached output would hand back the earlier result's image instead of a new one.
+    use_cache: false,
+  });
+
+  return {
+    backendGraph: graph,
+    graph: toGraphContract(graph, `${upscaleModel.name} upscale`),
+    negativePromptNodeId: 'negative_prompt',
+    outputNodeId: 'upscale_output',
+    positivePromptNodeId: 'positive_prompt',
+    seedNodeId: 'seed',
+  };
+};
+
+/**
+ * `sourceMetadata` is read only in Model only mode: the input image's metadata, which that mode copies into the
+ * result's.
+ */
 export const compileUpscaleGraph = (
   settings: UpscaleWidgetValues,
   destination: ResultDestination,
   projectSettings: UpscaleProjectSettings,
-  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda'
+  randDevice = projectSettings.useCpuNoise ? 'cpu' : 'cuda',
+  sourceMetadata: Record<string, unknown> | null = null
 ): CompiledUpscaleGraph => {
   const reasons = getUpscaleValidationReasons(settings);
 
   if (reasons.length > 0) {
     throw new Error(reasons[0]);
+  }
+
+  if (settings.mode === 'model-only') {
+    if (!settings.inputImage || !settings.upscaleModel) {
+      throw new Error('Upscale settings are incomplete.');
+    }
+
+    return compileModelOnlyUpscaleGraph({
+      destination,
+      image: settings.inputImage,
+      scale: settings.scale,
+      sourceMetadata,
+      upscaleModel: settings.upscaleModel,
+    });
   }
 
   const { inputImage, model, upscaleModel } = settings;

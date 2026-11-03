@@ -38,7 +38,7 @@ from invokeai.app.services.shared.database.dialect import (
     like_contains,
 )
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, day_after, mapped, read, write
-from invokeai.app.services.shared.database.queries.board_access import readable_board
+from invokeai.app.services.shared.database.queries.board_access import listed_board
 from invokeai.app.services.shared.database.schema.boards import board_images, boards
 from invokeai.app.services.shared.database.schema.images import images
 
@@ -193,14 +193,6 @@ def _parameters(
     }
 
 
-def _listed_board(scoped: bool) -> list[ColumnElement[bool]]:
-    """The conditions on a board whose images the scope lists: active, and with `scoped` one the account may read
-    (its own, shared with everyone, or shared with the account)."""
-    if not scoped:
-        return [_B.archived == false()]
-    return [_B.archived == false(), readable_board(bindparam("user_id"))]
-
-
 def _conditions(shape: _Shape, joined: bool) -> list[ColumnElement[bool]]:
     """The listing's conditions. `joined` lists through a LEFT JOIN of the board memberships, for the board data a
     page of records returns; else the memberships are checked per image, so that SQLite scans the images alone."""
@@ -221,13 +213,13 @@ def _conditions(shape: _Shape, joined: bool) -> list[ColumnElement[bool]]:
             conditions.append(own)
     elif shape.board == "all":
         if joined:
-            board = exists(select(literal(1)).where(_B.board_id == _BI.board_id, *_listed_board(shape.scoped)))
+            board = exists(select(literal(1)).where(_B.board_id == _BI.board_id, *listed_board(shape.scoped)))
         else:
             memberships = board_images.join(boards, _B.board_id == _BI.board_id)
             board = exists(
                 select(literal(1))
                 .select_from(memberships)
-                .where(_BI.image_name == _I.image_name, *_listed_board(shape.scoped))
+                .where(_BI.image_name == _I.image_name, *listed_board(shape.scoped))
             )
         conditions.append(or_(and_(on_no_board, own) if shape.scoped else on_no_board, board))
     elif shape.board == "one":

@@ -7,12 +7,13 @@ import { describe, expect, it } from 'vitest';
 import type { TileControlNetModelConfig, UpscaleWidgetValues } from './types';
 
 import {
+  compileModelOnlyUpscaleGraph,
   compileUpscaleGraph,
   getUpscaleControlNetValues,
   getUpscaleDenoisingStart,
   getZImageTileControlValues,
 } from './graph';
-import { createDefaultUpscaleWidgetValues } from './settings';
+import { createDefaultUpscaleWidgetValues, normalizeUpscaleWidgetValues } from './settings';
 
 const model = (key: string, type: string, base: string, name = key): ModelConfig => ({
   base,
@@ -129,6 +130,145 @@ describe('compileUpscaleGraph', () => {
     const graph = compileUpscaleGraph(createValues('sd-1'), 'gallery', { useCpuNoise: false }, 'xpu').backendGraph;
 
     expect(graph.nodes.core_metadata?.rand_device).toBe('xpu');
+  });
+
+  it('refines values saved before modes existed, whatever source metadata is offered', () => {
+    const { mode: _mode, ...saved } = createValues('sd-1');
+    const values = normalizeUpscaleWidgetValues(saved) as UpscaleWidgetValues;
+    const nodes = compileUpscaleGraph(values, 'gallery', { useCpuNoise: false }, 'cuda', { prompt: 'source' })
+      .backendGraph.nodes;
+
+    expect(nodes.tiled_multidiffusion_denoise_latents).toBeDefined();
+    expect(nodes.core_metadata).toMatchObject({ creativity: 0, type: 'core_metadata' });
+    expect(nodes.core_metadata).not.toHaveProperty('prompt');
+  });
+});
+
+describe('model-only upscale graph', () => {
+  const image = { height: 101, image_name: 'input.png', width: 203 };
+  const upscaler = (scale: number | null) => ({
+    ...model('ultrasharp', 'spandrel_image_to_image', 'any', '4x-UltraSharp'),
+    scale,
+    type: 'spandrel_image_to_image' as const,
+  });
+  const UPSCALER_ID = {
+    base: 'any',
+    hash: 'ultrasharp-hash',
+    key: 'ultrasharp',
+    name: '4x-UltraSharp',
+    type: 'spandrel_image_to_image',
+  };
+  const SOURCE_METADATA = {
+    height: 512,
+    metadata_version: 1,
+    model: { key: 'legacy-main', model_name: 'old shape' },
+    positive_prompt: 'a lighthouse',
+    seed: 42,
+    upscale_initial_image: { height: 1, image_name: 'older.png', width: 1 },
+    upscale_model: { key: 'older-upscaler' },
+    upscale_scale: 8,
+    width: 768,
+  };
+
+  it('runs the upscaler alone at the widget Scale, with no main model', () => {
+    const values = {
+      ...createDefaultUpscaleWidgetValues(),
+      inputImage: image,
+      mode: 'model-only' as const,
+      scale: 2,
+      upscaleModel: upscaler(4),
+    };
+
+    for (const destination of ['gallery', 'canvas'] as const) {
+      const compiled = compileUpscaleGraph(values, destination, { useCpuNoise: false }, 'cuda', null);
+      const { edges, nodes } = compiled.backendGraph;
+
+      expect(Object.keys(nodes).sort()).toEqual(['negative_prompt', 'positive_prompt', 'seed', 'upscale_output']);
+      expect(edges).toEqual([]);
+      expect(compiled.outputNodeId).toBe('upscale_output');
+      expect(nodes.upscale_output).toMatchObject({
+        fit_to_multiple_of_8: true,
+        image: { image_name: 'input.png' },
+        image_to_image_model: UPSCALER_ID,
+        is_intermediate: destination === 'canvas',
+        scale: 2,
+        type: 'spandrel_image_to_image_autoscale',
+        use_cache: false,
+      });
+    }
+  });
+
+  it('runs an upscaler of unknown native scale once, as a plain pass', () => {
+    const output = compileModelOnlyUpscaleGraph({
+      destination: 'gallery',
+      image,
+      scale: 'native',
+      sourceMetadata: null,
+      upscaleModel: upscaler(null),
+    }).backendGraph.nodes.upscale_output;
+
+    expect(output).toMatchObject({ is_intermediate: false, type: 'spandrel_image_to_image', use_cache: false });
+    expect(output).not.toHaveProperty('scale');
+    expect(output).not.toHaveProperty('fit_to_multiple_of_8');
+  });
+
+  it('sizes a recorded native scale as that Scale, so the menu and the widget give the same result', () => {
+    const compile = (scale: number | 'native') =>
+      compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image,
+        scale,
+        sourceMetadata: null,
+        upscaleModel: upscaler(4),
+      }).backendGraph.nodes.upscale_output;
+
+    expect(compile('native')).toEqual(compile(4));
+    expect(compile('native')).toMatchObject({
+      fit_to_multiple_of_8: true,
+      scale: 4,
+      type: 'spandrel_image_to_image_autoscale',
+    });
+  });
+
+  it("copies the source image's metadata verbatim, replacing only what it says about an earlier upscale", () => {
+    const metadata = compileModelOnlyUpscaleGraph({
+      destination: 'gallery',
+      image,
+      scale: 2,
+      sourceMetadata: SOURCE_METADATA,
+      upscaleModel: upscaler(4),
+    }).backendGraph.nodes.upscale_output?.metadata;
+
+    expect(metadata).toEqual({
+      height: 512,
+      metadata_version: 1,
+      model: { key: 'legacy-main', model_name: 'old shape' },
+      positive_prompt: 'a lighthouse',
+      seed: 42,
+      upscale_initial_image: { height: 101, image_name: 'input.png', width: 203 },
+      upscale_model: UPSCALER_ID,
+      upscale_scale: 2,
+      width: 768,
+    });
+  });
+
+  it('records only the upscale for a source with no metadata, and no scale when the model never recorded one', () => {
+    const metadata = (scale: number | null) =>
+      compileModelOnlyUpscaleGraph({
+        destination: 'gallery',
+        image,
+        scale: 'native',
+        sourceMetadata: scale === null ? SOURCE_METADATA : null,
+        upscaleModel: upscaler(scale),
+      }).backendGraph.nodes.upscale_output?.metadata;
+
+    expect(metadata(4)).toEqual({
+      upscale_initial_image: { height: 101, image_name: 'input.png', width: 203 },
+      upscale_model: UPSCALER_ID,
+      upscale_scale: 4,
+    });
+    expect(metadata(null)).not.toHaveProperty('upscale_scale');
+    expect(metadata(null)).toMatchObject({ positive_prompt: 'a lighthouse', upscale_model: UPSCALER_ID });
   });
 });
 
@@ -716,12 +856,15 @@ describe('Creativity on index-clipping architectures', () => {
 });
 
 describe('schedulers on the upscale pass', () => {
-  // A stored Heun or LCM on a flow model -- left from SD, recalled, or picked before the list was
-  // narrowed -- would start the pass from pure noise, or on Anima below the blend.
+  // A stored LCM on a flow model, or Heun on Anima -- left from SD, recalled, or picked before the
+  // list was narrowed -- would start the pass from pure noise, or on Anima below the blend. FLUX.2
+  // steps with Euler whenever the pass starts above pure noise.
   it.each([
     ['flux', () => createFluxValues(), 'lcm', 'euler'],
+    ['flux', () => createFluxValues(), 'heun', 'heun'],
     ['flux2', () => createFlux2Values('klein_4b'), 'heun', 'euler'],
-    ['z-image', () => createZImageValues(), 'heun', 'euler'],
+    ['z-image', () => createZImageValues(), 'lcm', 'euler'],
+    ['z-image', () => createZImageValues(), 'heun', 'heun'],
     ['anima', () => createAnimaValues(), 'heun', 'euler'],
     ['anima', () => createAnimaValues(), 'dpmpp_2m', 'dpmpp_2m'],
     ['sd-1', () => createValues('sd-1'), 'heun', 'heun'],

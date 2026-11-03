@@ -33,9 +33,20 @@ const INTENTS: Record<LaunchpadIntentId, LaunchpadIntent> = {
 export const isLaunchpadIntentId = (value: unknown): value is LaunchpadIntentId =>
   typeof value === 'string' && LAUNCHPAD_INTENT_IDS.includes(value as LaunchpadIntentId);
 
-/** Share built-in labels without loading widget-region snapshots; layoutPresets derives its labels from this map. */
+/**
+ * Share built-in labels without loading widget-region snapshots; layoutPresets derives its labels from these maps.
+ * The keys name what a preset is called in the UI; the English labels are the shipped defaults that a stored rename
+ * is compared with. Ids stay as they were (`automate`): layouts and saved bindings persist them.
+ */
+export const BUILT_IN_LAYOUT_PRESET_LABEL_KEYS: Record<BuiltInLayoutPresetId, string> = {
+  automate: 'topbar.presets.builtInLabels.automate',
+  compose: 'topbar.presets.builtInLabels.compose',
+  edit: 'topbar.presets.builtInLabels.edit',
+  video: 'topbar.presets.builtInLabels.video',
+};
+
 export const BUILT_IN_LAYOUT_PRESET_LABELS: Record<BuiltInLayoutPresetId, string> = {
-  automate: 'Automate',
+  automate: 'Workflow',
   compose: 'Compose',
   edit: 'Edit',
   video: 'Video',

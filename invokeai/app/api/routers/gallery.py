@@ -20,6 +20,15 @@ from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginat
 
 gallery_router = APIRouter(prefix="/v1/gallery", tags=["gallery"])
 
+# Scopes rather than boards: the listing itself limits them to what the caller may read, so no board is checked.
+_BOARD_SENTINELS = ("none", "all")
+
+BoardIdQuery = Query(
+    default=None,
+    description="The board id to filter by. Use 'none' for items on no board (the current user's, unless an "
+    "administrator), or 'all' for those items plus the items on every non-archived board the current user may read.",
+)
+
 MediaKindQuery = Query(
     default=None,
     description="List only images ('image') or only videos ('video'). Omit to include both. Totals, positions and "
@@ -40,10 +49,7 @@ def list_gallery_items(
         description="The categories to include. Shared between images and videos.",
     ),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate items."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find items without a board.",
-    ),
+    board_id: Optional[str] = BoardIdQuery,
     # Bounds matter: these flow verbatim into SQL, and a negative LIMIT means
     # *unlimited* in SQLite — one request would materialize the entire gallery.
     offset: int = Query(default=0, ge=0, description="The page offset"),
@@ -64,7 +70,7 @@ def list_gallery_items(
     ),
 ) -> OffsetPaginatedResults[GalleryItem]:
     """Returns a paginated, time-sorted stream of polymorphic gallery items (images + videos)."""
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in _BOARD_SENTINELS:
         _assert_board_read_access(board_id, current_user)
 
     return ApiDependencies.invoker.services.gallery.list_items(
@@ -101,10 +107,7 @@ def get_gallery_item_location(
         description="The categories to include. Shared between images and videos.",
     ),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate items."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find items without a board.",
-    ),
+    board_id: Optional[str] = BoardIdQuery,
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred: Optional[bool] = Query(
         default=None,
@@ -120,7 +123,7 @@ def get_gallery_item_location(
     ),
 ) -> GalleryItemLocation:
     """Returns exact item's position in an ordinary filtered gallery listing."""
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in _BOARD_SENTINELS:
         _assert_board_read_access(board_id, current_user)
 
     location = ApiDependencies.invoker.services.gallery.get_item_location(
@@ -157,10 +160,7 @@ def list_gallery_item_names(
         description="The categories to include. Shared between images and videos.",
     ),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate items."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find items without a board.",
-    ),
+    board_id: Optional[str] = BoardIdQuery,
     created_date: Optional[str] = Query(
         default=None,
         description="Restrict to items created on this ISO date, e.g. '2026-03-18'. Used by date-based virtual boards.",
@@ -185,7 +185,7 @@ def list_gallery_item_names(
     Names are polymorphic: image and video names are interleaved by `created_at`. A name ending
     in `.mp4` is a video.
     """
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in _BOARD_SENTINELS:
         _assert_board_read_access(board_id, current_user)
 
     try:
@@ -223,10 +223,7 @@ def get_gallery_item_names(
         description="The categories to include. Shared between images and videos.",
     ),
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate items."),
-    board_id: Optional[str] = Query(
-        default=None,
-        description="The board id to filter by. Use 'none' to find items without a board.",
-    ),
+    board_id: Optional[str] = BoardIdQuery,
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred items first"),
     starred: Optional[bool] = Query(
@@ -248,7 +245,7 @@ def get_gallery_item_names(
     list. The `kind` discriminator here costs a model per row — ~800ms on a 200k-item library —
     for a value callers already derive from the file extension.
     """
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in _BOARD_SENTINELS:
         _assert_board_read_access(board_id, current_user)
 
     try:

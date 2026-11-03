@@ -198,6 +198,24 @@ describe('per-workflow edit history', () => {
     });
   });
 
+  it('retains verified ownership when an existing library source gains it', () => {
+    const unverified = setProjectWorkflowSource(session(createProjectGraph('a')), 'a', {
+      libraryWorkflowId: 'lib-1',
+      revision: 5,
+    });
+    const verified = setProjectWorkflowSource(unverified, 'a', {
+      libraryWorkflowId: 'lib-1',
+      ownerUserId: 'owner-a',
+      revision: 5,
+    });
+
+    expect(verified.workflows.entries[0]?.source).toEqual({
+      libraryWorkflowId: 'lib-1',
+      ownerUserId: 'owner-a',
+      revision: 5,
+    });
+  });
+
   it('folds a stream of same-key edits into one step and separates them after a pause', () => {
     vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
 
@@ -432,6 +450,30 @@ describe('persisted collections', () => {
         entries: [{ ...good.entries[0], source: { libraryWorkflowId: 'lib', revision: 'x' } }],
       })?.entries[0]?.source
     ).toEqual({ libraryWorkflowId: 'lib', revision: null });
+  });
+
+  it('preserves stable library ownership when a project collection is reopened', () => {
+    const good = createProjectWorkflowCollection(createProjectGraph('a'));
+    const reopened = normalizeProjectWorkflowCollection({
+      ...good,
+      entries: [
+        {
+          ...good.entries[0]!,
+          source: {
+            canUpdate: true,
+            libraryWorkflowId: 'lib',
+            ownerUserId: 'owner-a',
+            revision: 3,
+          },
+        },
+      ],
+    });
+
+    expect(reopened?.entries[0]?.source).toEqual({
+      libraryWorkflowId: 'lib',
+      ownerUserId: 'owner-a',
+      revision: 3,
+    });
   });
 
   it('strips write provenance for portable documents', () => {

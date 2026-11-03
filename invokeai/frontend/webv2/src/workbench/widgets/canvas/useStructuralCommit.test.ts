@@ -12,6 +12,7 @@ import {
   baselineConfig,
   baselinePatch,
   commitPreparedEdit,
+  reportLayerOperation,
   reportPreparedCommit,
   reportStructuralCommit,
 } from './useStructuralCommit';
@@ -41,6 +42,25 @@ describe('reportStructuralCommit', () => {
     reportStructuralCommit(result, report, t);
 
     expect(report).toHaveBeenCalledWith('widgets.canvas.structural.failed', message);
+  });
+});
+
+describe('reportLayerOperation', () => {
+  it.each([
+    ['too-large', 'widgets.layers.adjustments.refusal.tooLarge'],
+    ['over-budget', 'widgets.layers.adjustments.refusal.overBudget'],
+    ['error', 'widgets.layers.adjustments.refusal.error'],
+  ] as const)('names the layer or group whose adjustments refused %s', (reason, key) => {
+    const report = vi.fn();
+    const translate = vi.fn((key: string, options?: { name?: string }) => `${key}:${options?.name ?? ''}`);
+
+    reportLayerOperation(
+      { ownerId: 'g', ownerName: 'Sky', reason, status: 'adjustment-refused' },
+      report,
+      translate as unknown as TFunction
+    );
+
+    expect(report).toHaveBeenCalledWith('widgets.layers.actions.actionFailed:', `${key}:Sky`);
   });
 });
 

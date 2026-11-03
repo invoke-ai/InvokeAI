@@ -6,6 +6,7 @@ import type {
 } from '@workbench/widgetContracts';
 
 import { Box, Code, Flex, HStack, ScrollArea, Stack, Text, useRecipe } from '@chakra-ui/react';
+import { canCopyText, copyText } from '@platform/browser/clipboard';
 import { createLogger } from '@platform/logging/logger';
 import { Button } from '@platform/ui/Button';
 import { toaster } from '@platform/ui/toaster';
@@ -62,6 +63,7 @@ const WidgetFailureCard = ({
   const viewportRef = useRef<HTMLDivElement | null>(null);
 
   useScrollAreaPhantomHeal(viewportRef);
+  const canCopy = canCopyText();
   // The card has no other feedback channel: without a toast the click is
   // indistinguishable from one that silently failed.
   const copy = useCallback(
@@ -98,7 +100,13 @@ const WidgetFailureCard = ({
         <Button alignSelf="start" size="sm" variant="outline" onClick={onRetry}>
           {t('widgets.failure.retry')}
         </Button>
-        <Button alignSelf="start" size="sm" variant="outline" onClick={copy}>
+        <Button
+          unavailableReason={canCopy ? undefined : t('common.copyUnavailable')}
+          alignSelf="start"
+          size="sm"
+          variant="outline"
+          onClick={copy}
+        >
           {t('widgets.failure.copyError')}
         </Button>
       </Stack>
@@ -218,9 +226,7 @@ export class WidgetFailureBoundary extends Component<WidgetFailureBoundaryProps,
   private handleCopyError = (): Promise<void> => {
     const { details, error } = this.state;
 
-    return error && navigator.clipboard
-      ? navigator.clipboard.writeText(details ?? error.message)
-      : Promise.reject(new Error('clipboard unavailable'));
+    return error ? copyText(details ?? error.message) : Promise.reject(new Error('No error to copy.'));
   };
 
   static getDerivedStateFromProps(

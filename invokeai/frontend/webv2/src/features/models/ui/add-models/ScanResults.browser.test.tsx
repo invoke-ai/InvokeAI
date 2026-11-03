@@ -44,6 +44,11 @@ const installedModel = {
 const noop = () => undefined;
 const NO_PENDING: ReadonlySet<string> = new Set<string>();
 const SCAN = { path: '/home/user/downloads', results: [{ is_installed: false, path: SCANNED_PATH }] };
+// What a scan on Windows reports: OS-native separators.
+const WINDOWS_SCAN = {
+  path: 'C:\\Users\\me\\loras',
+  results: [{ is_installed: false, path: 'C:\\Users\\me\\loras\\x.safetensors' }],
+};
 
 const Harness = () => (
   <ChakraProvider value={system}>
@@ -110,6 +115,62 @@ describe('ScanResults install badge lifecycle', () => {
     expect(viewModel).toBeDefined();
     await act(() => viewModel!.click());
     expect(getModelsUiSnapshotForTests()).toMatchObject({ activeModelKey: 'installed-key', activeTab: 'details' });
+  });
+});
+
+describe('ScanResults on Windows paths', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('marks a backslash row installed once the library holds it under forward slashes, with no rescan', async () => {
+    accountLifecycle.activate('scan-results-windows', ':user:scan-results-windows');
+    setModelsSnapshotForTests({ models: [], status: 'loaded' });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <ScanResults
+            fp8Storage={false}
+            inplace
+            pendingSources={NO_PENDING}
+            scan={WINDOWS_SCAN}
+            onClear={noop}
+            onInstall={noop}
+            onInstallAll={noop}
+            onSetFp8Storage={noop}
+            onSetInplace={noop}
+          />
+        </ChakraProvider>
+      );
+    });
+    expect(host.textContent).not.toContain('models.installed');
+
+    // Install records store paths with forward slashes, as the backend writes them.
+    await act(async () => {
+      setModelsSnapshotForTests({
+        models: [
+          {
+            ...installedModel,
+            key: 'windows-lora',
+            path: 'C:/Users/me/loras/x.safetensors',
+            source: 'C:/Users/me/loras/x.safetensors',
+          },
+        ],
+        status: 'loaded',
+      });
+      await Promise.resolve();
+    });
+
+    expect(host.textContent).toContain('models.installed');
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent === 'models.viewModel')).toBe(true);
   });
 });
 

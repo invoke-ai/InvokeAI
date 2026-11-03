@@ -146,6 +146,7 @@ def hanging_worker(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(video_thumbnails, "_worker_command", _hang_command)
 
 
+@pytest.mark.ffmpeg
 class TestHappyPathThroughSubprocess:
     def test_probe_returns_metadata(self, synthetic_mp4: Path) -> None:
         width, height, duration, fps = probe_video(synthetic_mp4)
@@ -162,6 +163,7 @@ class TestHappyPathThroughSubprocess:
         assert decoder_frame_count(synthetic_mp4) == FRAMES
 
 
+@pytest.mark.ffmpeg
 class TestUnreadableInput:
     def test_probe_rejects_garbage_bytes(self, tmp_path: Path) -> None:
         bogus = tmp_path / "junk.mp4"
@@ -206,6 +208,7 @@ class TestHungDecoderIsBounded:
 
 
 class TestStreamedDecoderIsBounded:
+    @pytest.mark.ffmpeg
     def test_streams_real_frames_through_worker(self, synthetic_mp4: Path) -> None:
         frames = list(iter_video_frames(synthetic_mp4))
         assert len(frames) == FRAMES
@@ -619,6 +622,7 @@ class TestWorkerDecodeBounds:
         worker._assert_decodable_dims(Path("fake.mp4"))  # must not raise
 
 
+@pytest.mark.ffmpeg
 class TestStreamBackendFallback:
     """_stream must fall back to cv2 like probe/frame/count do (JPPhoto review
     2026-07-21) — a file accepted at upload via the cv2 fallback previously worked in
@@ -1073,6 +1077,7 @@ class TestRepresentativeThumbnailFrame:
         assert frame is dark
         assert timeouts == [10.0, 5.0]
 
+    @pytest.mark.ffmpeg
     def test_walks_past_a_black_lead_in_through_the_worker(self, ladder_mp4: Path) -> None:
         """End to end: the opening rung and the first deeper rung both decode to black and are
         rejected; the search continues to the lit frame instead of settling."""
@@ -1083,6 +1088,7 @@ class TestRepresentativeThumbnailFrame:
         assert FrameScore.measure(frame).informative
         assert np.asarray(frame).mean() > 60
 
+    @pytest.mark.ffmpeg
     def test_falls_back_to_frame_zero_when_metadata_overstates(self, synthetic_mp4: Path) -> None:
         """Container metadata is untrusted: fps/duration claiming frames that don't exist
         (indices 100+ of a 12-frame clip) must still produce a thumbnail (frame 0), not a
@@ -1091,3 +1097,71 @@ class TestRepresentativeThumbnailFrame:
         assert frame is not None
         value = np.asarray(frame)[0, 0, 0].astype(int)
         assert abs(value - 32) <= 8  # frame 0
+
+
+@pytest.mark.ffmpeg
+class TestFrameCountOffTheFfmpegBackend:
+    """OpenCV without its FFmpeg backend (Media Foundation, in the Windows ARM64 wheel) derives the
+    frame count from the container duration, which a soundtrack outlasting the video stretches."""
+
+    FPS = 16
+
+    @pytest.fixture
+    def clip_with_longer_audio(self, tmp_path: Path) -> Path:
+        import imageio_ffmpeg
+
+        from invokeai.app.util.video_encoding import make_mp4_writer, write_stereo_wav
+
+        video = tmp_path / "video.mp4"
+        writer = make_mp4_writer(video, self.FPS)
+        for _ in range(40):
+            writer.append_data(np.zeros((32, 32, 3), dtype=np.uint8))
+        writer.close()
+        audio = tmp_path / "audio.wav"
+        write_stereo_wav(audio, np.zeros((2, 80 * 44100 // self.FPS), dtype=np.float32), 44100)
+        clip = tmp_path / "clip.mp4"
+        subprocess.run(
+            [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", "-i", str(video), "-i", str(audio)]
+            + ["-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "aac", str(clip)],
+            check=True,
+        )
+        return clip
+
+    @pytest.fixture(autouse=True)
+    def media_foundation_capture(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import cv2
+
+        real_capture = cv2.VideoCapture
+
+        class MediaFoundationCapture:
+            def __init__(self, path: str) -> None:
+                self._capture = real_capture(path)
+                self._duration_frames = 80.0  # the container's duration (the audio's) times the frame rate
+
+            def isOpened(self) -> bool:
+                return self._capture.isOpened()
+
+            def getBackendName(self) -> str:
+                return "MSMF"
+
+            def get(self, prop: int) -> float:
+                return self._duration_frames if prop == cv2.CAP_PROP_FRAME_COUNT else self._capture.get(prop)
+
+            def release(self) -> None:
+                self._capture.release()
+
+        monkeypatch.setattr(cv2, "VideoCapture", MediaFoundationCapture)
+
+    def test_count_is_the_video_stream_packets(self, clip_with_longer_audio: Path) -> None:
+        assert video_decode_worker._count(clip_with_longer_audio) == 40
+
+    def test_probe_fallback_duration_is_the_videos(
+        self, clip_with_longer_audio: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def no_imageio(*_args, **_kwargs):
+            raise RuntimeError("force the OpenCV fallback")
+
+        monkeypatch.setattr(video_decode_worker.iio, "immeta", no_imageio)
+        _width, _height, duration, fps, _codec = video_decode_worker._probe(clip_with_longer_audio)
+        assert fps == pytest.approx(self.FPS)
+        assert duration == pytest.approx(40 / self.FPS)

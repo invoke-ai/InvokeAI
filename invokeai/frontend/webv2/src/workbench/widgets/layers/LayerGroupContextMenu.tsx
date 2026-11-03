@@ -25,6 +25,7 @@ import {
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
+  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderPlusIcon,
@@ -40,9 +41,9 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { COLOR_LABEL_ITEMS } from './colorLabels';
-import { ADJUSTMENT_ADD_ITEMS } from './layerContextActions';
+import { ADJUSTMENT_ADD_ITEMS, adjustmentAddActionId } from './layerContextActions';
 import { canGroupSelection, groupLayers, ungroupLayers } from './layerGroupCommands';
-import { createIdentityAdjustment } from './layerOps';
+import { createAdjustmentEntry } from './layerOps';
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
 
@@ -148,7 +149,7 @@ export const LayerGroupContextMenu = ({
     }
   }, [menuOpen, onClose]);
   const handleToggleEnabled = useCallback(
-    () => patch(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !group.isEnabled }),
+    () => patch(t('widgets.layers.actions.toggleActive'), { isEnabled: !group.isEnabled }),
     [group.isEnabled, patch, t]
   );
   const handleToggleLock = useCallback(
@@ -157,8 +158,9 @@ export const LayerGroupContextMenu = ({
   );
   const handleToggleHidden = useCallback(
     () =>
-      commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-        model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
+      commitPrepared(
+        t(group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'),
+        (model) => model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
       ),
     [commitPrepared, group.id, group.isHidden, t]
   );
@@ -184,7 +186,7 @@ export const LayerGroupContextMenu = ({
         return;
       }
       if (result.status !== 'nothing') {
-        reportLayerOperation(result.status, notify.error, t);
+        reportLayerOperation(result.status === 'unreadable' ? result : result.status, notify.error, t);
         return;
       }
     } catch {
@@ -211,7 +213,7 @@ export const LayerGroupContextMenu = ({
 
   const handleAddAdjustment = useCallback(
     (type: CanvasAdjustmentEntry['type']) => () => {
-      const entry = createIdentityAdjustment(type);
+      const entry = createAdjustmentEntry(type);
       const before = group.adjustments ?? [];
       commitPrepared(t('widgets.layers.menu.addAdjustment'), (model) =>
         model.prepare({
@@ -302,7 +304,7 @@ export const LayerGroupContextMenu = ({
                       key={item.type}
                       icon={item.icon}
                       label={t(item.labelKey)}
-                      value={`add-${item.type}`}
+                      value={adjustmentAddActionId(item)}
                       onSelect={handleAddAdjustment(item.type)}
                     />
                   ))}
@@ -315,16 +317,18 @@ export const LayerGroupContextMenu = ({
       <Menu.Separator borderColor="border.subtle" />
       <MenuActionItem
         disabled={locked}
-        icon={group.isEnabled ? CircleOffIcon : CircleIcon}
-        label={t(group.isEnabled ? 'widgets.layers.actions.disableGroup' : 'widgets.layers.actions.enableGroup')}
+        icon={group.isEnabled ? EyeOffIcon : EyeIcon}
+        label={t(group.isEnabled ? 'widgets.layers.actions.hideGroup' : 'widgets.layers.actions.showGroup')}
         value="enabled"
         onSelect={handleToggleEnabled}
       />
       {hideable ? (
         <MenuActionItem
           disabled={locked}
-          icon={group.isHidden ? EyeIcon : EyeOffIcon}
-          label={t('widgets.layers.actions.toggleHidden')}
+          icon={group.isHidden ? EyeIcon : EyeClosedIcon}
+          label={t(
+            group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'
+          )}
           value="hidden"
           onSelect={handleToggleHidden}
         />

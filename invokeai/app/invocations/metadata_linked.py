@@ -800,7 +800,7 @@ class ZImageDenoiseMetaInvocation(ZImageDenoiseInvocation, WithMetadata):
     title=f"{AnimaDenoiseInvocation.UIConfig.title} + Metadata",
     tags=["anima", "latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="metadata",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class AnimaDenoiseMetaInvocation(AnimaDenoiseInvocation, WithMetadata):

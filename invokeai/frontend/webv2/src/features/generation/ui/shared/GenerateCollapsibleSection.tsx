@@ -3,6 +3,8 @@ import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { ChevronRightIcon } from 'lucide-react';
 import { useCallback } from 'react';
 
+import { GenerateSectionIssueBadge } from './GenerateIssues';
+
 type Props = {
   label: string;
   isOpen?: boolean;
@@ -51,6 +53,7 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
     <Collapsible.Root
       className="generate-section"
       css={SECTION_STYLES}
+      data-generate-section={sectionId}
       _open={SECTION_OPEN_STYLES}
       defaultOpen={sectionId === undefined ? defaultOpen : undefined}
       open={resolvedOpen}
@@ -79,6 +82,7 @@ export const GenerateCollapsibleSection = ({ badges, children, defaultOpen, isOp
         </Text>
 
         <Flex gap={1} ml="auto" fontFamily="mono">
+          {sectionId === undefined ? null : <GenerateSectionIssueBadge section={sectionId} />}
           {badges}
         </Flex>
       </Collapsible.Trigger>

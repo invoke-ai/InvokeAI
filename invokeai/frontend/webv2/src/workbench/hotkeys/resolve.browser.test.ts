@@ -34,7 +34,6 @@ describe('resolveHotkey with target-scoped bindings', () => {
     commandId: 'fallback',
     defaultKeys: ['ctrl+arrowup'],
     id: 'fallback',
-    implemented: true,
     keys: ['ctrl+arrowup'],
     scope: { kind: 'global' },
     title: 'Fallback',
@@ -93,7 +92,6 @@ describe('resolveHotkey inside an open popup', () => {
     commandId: 'eraser',
     defaultKeys: ['e'],
     id: 'eraser',
-    implemented: true,
     keys: ['e'],
     scope: { kind: 'widget', typeIds: ['canvas'] },
     title: 'Eraser',
@@ -129,5 +127,61 @@ describe('resolveHotkey inside an open popup', () => {
     expect(pressIn('<div data-target role="listbox" tabindex="-1"></div>', 'mod+enter', { key: 'Enter', ...mod })).toBe(
       'app.invoke'
     );
+  });
+});
+
+describe('resolveHotkey on a focused radio group or slider', () => {
+  const host = document.createElement('div');
+
+  document.body.append(host);
+
+  afterEach(() => {
+    host.replaceChildren();
+  });
+
+  const context: HotkeyContext = {
+    activeInstanceId: 'gallery',
+    activeWidgetTypeId: 'gallery',
+    focusedRegion: 'right',
+    isModalPresent: false,
+    projectId: 'project-1',
+  };
+  // Gallery's arrow navigation, as its grid registers it.
+  const galleryRight: RegisteredHotkey = {
+    category: 'gallery',
+    commandId: 'gallery.galleryNavRight',
+    defaultKeys: ['arrowright'],
+    id: 'gallery.galleryNavRight',
+    keys: ['arrowright'],
+    scope: { kind: 'widget', typeIds: ['gallery'] },
+    title: 'Navigate right',
+  };
+  const editableRight: RegisteredHotkey = {
+    allowInEditable: true,
+    category: 'app',
+    commandId: 'editable',
+    defaultKeys: ['arrowright'],
+    id: 'editable',
+    keys: ['arrowright'],
+    scope: { kind: 'global' },
+    title: 'Editable',
+  };
+
+  const pressRightIn = (html: string, hotkey: RegisteredHotkey) => {
+    host.innerHTML = html;
+    const event = new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' });
+    host.querySelector('[data-target]')!.dispatchEvent(event);
+
+    return resolveHotkey({ context, event, hotkeys: [hotkey], matchedKey: 'arrowright' })?.commandId ?? null;
+  };
+
+  it('leaves the arrow to the radio group instead of moving the gallery selection', () => {
+    expect(pressRightIn('<input data-target type="radio" />', galleryRight)).toBeNull();
+    expect(pressRightIn('<input data-target type="range" />', galleryRight)).toBeNull();
+    expect(pressRightIn('<button data-target type="button">x</button>', galleryRight)).toBe('gallery.galleryNavRight');
+  });
+
+  it('still resolves a binding that opts into editable targets', () => {
+    expect(pressRightIn('<input data-target type="radio" />', editableRight)).toBe('editable');
   });
 });

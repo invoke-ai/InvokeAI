@@ -1,5 +1,6 @@
 import type { LayerThumbnailRequestResult } from '@workbench/canvas-engine/capabilities';
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasLayerContract,
   CanvasLayerSourceContract,
@@ -9,7 +10,7 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 
 import { lookupDocumentLayer } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
-import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
+import { applyAdjustments, isIdentityAdjustments, noiseGrainSpan } from '@workbench/canvas-engine/render/adjustments';
 import { renderControlTransparency } from '@workbench/canvas-engine/render/controlTransparency';
 import { colorizeMask } from '@workbench/canvas-engine/render/maskFill';
 import { fitThumbnailSize } from '@workbench/canvas-engine/render/thumbnail';
@@ -24,6 +25,11 @@ export interface ThumbnailControllerOptions {
   readonly getMaskPattern: (style: string, color: string) => RasterSurface | null;
   readonly isDisposed: () => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
+  /**
+   * What the display shows for a raster layer's cache (a spatial interim included), or null; never builds a
+   * layer-sized surface.
+   */
+  readonly peekDisplayedSurface: (layer: CanvasLayerContract, entry: LayerCacheEntry) => RasterSurface | null;
   readonly rasterize: (
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3
@@ -37,6 +43,27 @@ export interface ThumbnailControllerOptions {
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   readonly pin?: (layerId: string) => { release(): void };
 }
+
+/**
+ * Bounded fallback without a display copy: the stack's per-pixel part adjusts the downscaled pixels (spatial entries
+ * read whole-layer neighborhoods a thumbnail cannot reproduce, so it leaves them out), its noise on the thumbnail's own
+ * grid. A downscale box-averages about 1/scale × 1/scale pixels, which leaves grain spanning `noiseGrainSpan` pixels
+ * `scale × span` of its σ once blocks are larger than the grain (exact for white noise), and keeps it when they are
+ * smaller; the grain itself shrinks to `size × scale` thumbnail pixels, at least one. An approximation: exact only in
+ * those limits, and it ignores how resampling actually weights pixels.
+ */
+const atThumbnailScale = (adjustments: CanvasAdjustmentsContract, scale: number): CanvasAdjustmentsContract =>
+  scale >= 1
+    ? adjustments
+    : adjustments.map((entry) =>
+        entry.type === 'noise'
+          ? {
+              ...entry,
+              amount: entry.amount * Math.min(1, scale * noiseGrainSpan(entry.size)),
+              size: Math.max(1, entry.size * scale),
+            }
+          : entry
+      );
 
 /** Owns bounded thumbnail rendering and lazy rasterization status. */
 export class ThumbnailController {
@@ -73,16 +100,20 @@ export class ThumbnailController {
       thumbnail.ctx.clearRect(0, 0, width, height);
       thumbnail.ctx.globalAlpha = 1;
       thumbnail.ctx.globalCompositeOperation = 'source-over';
-      thumbnail.ctx.drawImage(entry.surface.canvas, 0, 0, width, height);
+      const adjusted = layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments) ? layer.adjustments : null;
+      // Downscale what the display shows when it is current, so the thumbnail matches the canvas's grain, color and
+      // spatial adjustments; a spatial result landing republishes the thumbnail.
+      const displayed = adjusted ? this.deps.peekDisplayedSurface(layer, entry) : null;
+      thumbnail.ctx.drawImage((displayed ?? entry.surface).canvas, 0, 0, width, height);
       const checker = context.createPattern(this.deps.getCheckerboard().canvas as CanvasImageSource, 'repeat');
       if (checker) {
         context.fillStyle = checker;
         context.fillRect(0, 0, width, height);
       }
       let display = thumbnail;
-      if (layer.type === 'raster' && !isIdentityAdjustments(layer.adjustments)) {
+      if (adjusted && !displayed) {
         const pixels = thumbnail.ctx.getImageData(0, 0, width, height);
-        applyAdjustments(pixels, layer.adjustments);
+        applyAdjustments(pixels, atThumbnailScale(adjusted, width / entry.surface.width), { x: 0, y: 0 });
         thumbnail.ctx.putImageData(pixels, 0, 0);
       } else if (layer.type === 'control' && layer.withTransparencyEffect) {
         display = renderControlTransparency(this.deps.backend, thumbnail, width, height);

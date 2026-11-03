@@ -1,10 +1,10 @@
 import type { GalleryImage } from '@features/gallery';
-import type { ModelConfig } from '@features/models';
 import type { CanvasDocumentCapability, CanvasLayerCapability, LayerStackKind } from '@workbench/canvas-engine/api';
 import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
+import { galleryImageUrls } from '@features/gallery/utility';
 import { getArchitectureCapabilitiesSnapshot } from '@features/generation/runtime';
 import {
   calculateNewSize,
@@ -12,24 +12,25 @@ import {
   isArchitectureDescribed,
   normalizeGenerateWidgetValues,
 } from '@features/generation/settings';
-import { getModelsSnapshot } from '@features/models';
 import { mapWithConcurrency } from '@platform/core/concurrency';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
-import { captureInsertionAnchor, getDocumentLeaves } from '@workbench/canvas-engine/api';
-import { resolveDefaultControlModelForBase } from '@workbench/widgets/layers/controlModelOptions';
 import {
+  captureInsertionAnchor,
   createControlLayer,
+  getDocumentLeaves,
+  nextControlLayerName,
+} from '@workbench/canvas-engine/api';
+import {
   createEmptyPaintLayer,
   createInpaintMaskFromImage,
   createLayerId,
   createRegionalGuidanceFromImage,
   createRegionalGuidanceLayerWithRefImage,
   DEFAULT_INPAINT_MASK_FILL,
-  nextControlLayerName,
   nextInpaintMaskName,
   nextRegionalGuidanceFillColor,
   nextRegionalGuidanceName,
@@ -54,7 +55,6 @@ export type ImportGalleryImagesResult =
 
 interface BuildLayerContext {
   bbox: Project['canvas']['document']['bbox'];
-  defaultControlModel: string | null;
   existingLayers: readonly CanvasLayerContract[];
   modelBase: string | null;
 }
@@ -101,10 +101,12 @@ const buildLayer = (
     case 'control':
     case 'control-resized':
       return withBboxOrigin(
-        {
-          ...createControlLayer(nextControlLayerName(names), id, context.modelBase, context.defaultControlModel),
+        createControlLayer({
+          base: context.modelBase,
+          id,
+          name: nextControlLayerName(names),
           source: { image: ref, type: 'image' },
-        },
+        }),
         context.bbox
       );
     case 'inpaint-mask':
@@ -151,17 +153,14 @@ const buildLayer = (
 const buildLayers = (
   images: readonly LayerImage[],
   destination: GalleryCanvasImportDestination,
-  project: Project,
-  models: readonly ModelConfig[]
+  project: Project
 ): CanvasLayerContract[] => {
   const layers: CanvasLayerContract[] = [];
   const modelBase = getSelectedModelBase(project);
-  const defaultControlModel = resolveDefaultControlModelForBase(models, modelBase);
   for (const image of images) {
     layers.push(
       buildLayer(image, destination, {
         bbox: project.canvas.document.bbox,
-        defaultControlModel,
         existingLayers: [...getDocumentLeaves(project.canvas.document), ...layers],
         modelBase,
       })
@@ -185,7 +184,8 @@ const resizeImages = async (
   const dimensions = getGenerationDimensions(generateValues?.model);
   const results = await mapWithConcurrency(images, 4, async (image): Promise<ResizeResult> => {
     try {
-      const response = await fetchImage(image.imageUrl, { signal });
+      // Derived from the name, never the caller's cached URL: a URL saved at another origin is a cross-origin fetch.
+      const response = await fetchImage(galleryImageUrls.full(image.imageName), { signal });
 
       signal.throwIfAborted();
       if (!response.ok) {
@@ -227,7 +227,7 @@ const resizeImages = async (
   };
 };
 
-type GalleryImportEngine = {
+export type GalleryImportEngine = {
   readonly projectId: string;
   readonly document: Pick<CanvasDocumentCapability, 'captureInsertionAnchor'>;
   readonly layers: CanvasLayerCapability;
@@ -242,8 +242,6 @@ export const importGalleryImagesToCanvas = async (options: {
   images: readonly GalleryImage[];
   project: Project;
   fetchImage?: typeof fetch;
-  /** Model list used to pick a default control model; defaults to the loaded models snapshot. */
-  models?: readonly ModelConfig[];
   uploadImage?: typeof uploadCanvasImage;
 }): Promise<ImportGalleryImagesResult> => {
   const owner = captureAccountScope();
@@ -255,7 +253,6 @@ export const importGalleryImagesToCanvas = async (options: {
     getProject,
     images,
     isActiveProject,
-    models = getModelsSnapshot().models,
     project,
     uploadImage = uploadCanvasImage,
   } = options;
@@ -296,7 +293,7 @@ export const importGalleryImagesToCanvas = async (options: {
       failedImageNames = resized.failedImageNames;
     }
 
-    const layers = buildLayers(layerImages, destination, project, models);
+    const layers = buildLayers(layerImages, destination, project);
     const previousSelectedLayerId = capturedDocument.selectedLayerId;
     const anchorFor = (stack: LayerStackKind) =>
       matchingProjectEngine

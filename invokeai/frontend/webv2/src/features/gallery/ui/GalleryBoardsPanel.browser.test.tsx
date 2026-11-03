@@ -4,7 +4,9 @@ import type { GalleryBoard } from '@features/gallery/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, KeyboardSensor, MouseSensor, pointerWithin, useSensor, useSensors } from '@dnd-kit/core';
 import { DEFAULT_GALLERY_SETTINGS, type GallerySettings } from '@features/gallery/core/settings';
+import { galleryBoardsOptions } from '@features/gallery/data/queries';
 import { dragWithMouse } from '@platform/browser/mouseDrag.testing';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -84,12 +86,15 @@ const createGallery = (settings: Partial<GallerySettings> = {}): GalleryStateVie
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
+    isSearchActive: false,
     items: [],
+    listingBoardId: 'dogs',
     page: 0,
     pendingPlaceholders: [],
     primarySelectedItemKey: null,
     projectBoardId: 'mine',
     revealTargetPage: null,
+    searchScope: 'board',
     searchTerm: '',
     selectedBoardId: 'dogs',
     semanticImageQuery: null,
@@ -135,20 +140,26 @@ const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDr
     region: 'left',
   } as unknown as GalleryWidgetContextValue;
 
+  // The listing submissions decide destinations from, as an earlier submission would have left it.
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(galleryBoardsOptions({ includeArchived: true }).queryKey, gallery.boards);
+
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
-        <GalleryWidgetContext value={contextValue}>
-          {withDrag ? (
-            <WorkbenchDrag>
-              <GalleryBoardsPanel />
-            </WorkbenchDrag>
-          ) : (
-            <DndContext>
-              <GalleryBoardsPanel />
-            </DndContext>
-          )}
-        </GalleryWidgetContext>
+        <QueryClientProvider client={queryClient}>
+          <GalleryWidgetContext value={contextValue}>
+            {withDrag ? (
+              <WorkbenchDrag>
+                <GalleryBoardsPanel />
+              </WorkbenchDrag>
+            ) : (
+              <DndContext>
+                <GalleryBoardsPanel />
+              </DndContext>
+            )}
+          </GalleryWidgetContext>
+        </QueryClientProvider>
       </ChakraProvider>
     )
   );
@@ -157,7 +168,7 @@ const renderPanel = async (gallery: GalleryStateView = createGallery(), { withDr
 const getBoardRows = (): HTMLElement[] =>
   Array.from(
     host?.querySelectorAll<HTMLElement>(
-      '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions)'
+      '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions):not([data-gallery-project-group])'
     ) ?? []
   );
 
@@ -171,7 +182,7 @@ const getRowsBySection = (): Record<string, string[]> => {
     // The row buttons only: not the section's own trigger, nor a row's trailing ⋮ control.
     result[label] = Array.from(
       section.querySelectorAll<HTMLElement>(
-        '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions)'
+        '[data-scope="collapsible"][data-part="content"] button[type="button"]:not(.board-row-actions):not([data-gallery-project-group])'
       )
     ).map((row) =>
       (row.textContent ?? '')
@@ -183,6 +194,14 @@ const getRowsBySection = (): Record<string, string[]> => {
 
   return result;
 };
+
+const AUTO_ADD_TARGET = '[role="img"][aria-label="widgets.gallery.autoAddTarget"]';
+
+/** Labels of the rows marked as where new results go. */
+const getAutoAddRows = (): string[] =>
+  getBoardRows()
+    .filter((row) => row.querySelector(AUTO_ADD_TARGET) !== null)
+    .map((row) => (row.textContent ?? '').replace(/\d+ \| \d+$/, '').trim());
 
 const getSearchInput = (): HTMLInputElement => {
   const input = host?.querySelector<HTMLInputElement>('input');
@@ -273,6 +292,8 @@ describe('GalleryBoardsPanel', () => {
     expect(sections['Mahogany House']).toEqual(['Inbox', 'Façades']);
     expect(sections.Library).toEqual(['Uncategorized', 'dogs', 'Cats']);
     expect(sections.Archived).toEqual(['GORL']);
+    // Nothing chosen: new results go to the project's inbox, and only its row says so.
+    expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
   it('lists other projects under their names only when they are shown', async () => {
@@ -452,6 +473,16 @@ describe('GalleryBoardsPanel', () => {
       await dragWithMouse(row('Private sketches'), heading('Harbor Tower'));
 
       expect(actions.moveBoard).not.toHaveBeenCalled();
+    });
+
+    it("takes a drop on a collapsed project's group, by its heading", async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }), {
+        withDrag: true,
+      });
+
+      await dragWithMouse(row('dogs'), heading('Harbor Tower'));
+
+      expect(actions.moveBoard).toHaveBeenCalledExactlyOnceWith('dogs', 'p2', 'Harbor Tower');
     });
 
     it('takes a drop on a collapsed tier, by its heading', async () => {
@@ -657,19 +688,30 @@ describe('GalleryBoardsPanel', () => {
     expect(actions.updateSettings).toHaveBeenCalledWith({ expandedBoardSections: ['other-users'] });
   });
 
-  it('marks the inbox Auto when the selected board is one the caller may only view', async () => {
+  it('marks the inbox as the destination when the followed selected board is one the caller may only view', async () => {
     const shared = createBoard({
       access: { actions: ['read'], adminOverride: false, generalAccess: 'viewer', role: 'viewer' },
       id: 'refs',
       name: 'Client references',
       ownerName: 'Cleo',
     });
-    await renderPanel({ ...createGallery(), boards: [...boards, shared], selectedBoardId: 'refs' });
+    await renderPanel({
+      ...createGallery({ followSelectedBoard: true }),
+      boards: [...boards, shared],
+      selectedBoardId: 'refs',
+    });
 
-    const inboxRow = getBoardRows().find((row) => row.textContent?.startsWith('Inbox'));
-    const sharedRow = getBoardRows().find((row) => row.textContent?.startsWith('Client references'));
-    expect(inboxRow?.textContent).toContain('widgets.gallery.autoAddBadge');
-    expect(sharedRow?.textContent).not.toContain('widgets.gallery.autoAddBadge');
+    // Only the inbox is marked, not the followed board that refuses results.
+    expect(getAutoAddRows()).toEqual(['Inbox']);
+  });
+
+  it('marks the board results go to as submissions decide it: a chosen board, else the inbox', async () => {
+    await renderPanel(createGallery({ autoAddBoardId: 'dogs' }));
+    expect(getAutoAddRows()).toEqual(['dogs']);
+
+    // A chosen board no listing holds any more (deleted elsewhere) sends results to the inbox.
+    await renderPanel(createGallery({ autoAddBoardId: 'gone' }));
+    expect(getAutoAddRows()).toEqual(['Inbox']);
   });
 
   it('persists a collapsed section', async () => {
@@ -680,6 +722,50 @@ describe('GalleryBoardsPanel', () => {
     await click(trigger!);
 
     expect(actions.updateSettings).toHaveBeenCalledWith({ collapsedBoardSections: ['project'] });
+  });
+
+  describe('a project group under Other projects', () => {
+    const toggle = () => host!.querySelector<HTMLButtonElement>('button[data-gallery-project-group="p2"]')!;
+
+    it('collapses on its own, saved through the gallery settings', async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p9'], showOtherProjectBoards: true }));
+
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+      expect(document.getElementById(toggle().getAttribute('aria-controls')!)?.textContent).toContain('Stripes');
+
+      await click(toggle());
+
+      expect(actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ collapsedProjectGroupIds: ['p9', 'p2'] });
+    });
+
+    it('shows no rows while collapsed, and expands again by keyboard', async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
+
+      expect(toggle().getAttribute('aria-expanded')).toBe('false');
+      expect(getRowsBySection()['Other projects']).toEqual([]);
+      // The section still says what it holds while its only group is closed.
+      expect(host?.textContent).toContain('Harbor Tower');
+
+      toggle().focus();
+      await userEvent.keyboard('{Enter}');
+      await userEvent.keyboard(' ');
+
+      expect(actions.updateSettings).toHaveBeenNthCalledWith(1, { collapsedProjectGroupIds: [] });
+      expect(actions.updateSettings).toHaveBeenNthCalledWith(2, { collapsedProjectGroupIds: [] });
+    });
+
+    it("shows a search's matches in a collapsed group without changing what is saved", async () => {
+      await renderPanel(createGallery({ collapsedProjectGroupIds: ['p2'], showOtherProjectBoards: true }));
+
+      await type(getSearchInput(), 'Strip');
+
+      expect(getRowsBySection()['Other projects']).toEqual(['Stripes']);
+      expect(toggle().getAttribute('aria-expanded')).toBe('true');
+
+      await click(toggle());
+
+      expect(actions.updateSettings).not.toHaveBeenCalled();
+    });
   });
 
   it('toggles every board group and the sort order from the one options menu', async () => {

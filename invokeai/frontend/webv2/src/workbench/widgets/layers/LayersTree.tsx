@@ -22,7 +22,7 @@ import {
   toggleLayerStackCollapsed,
 } from '@workbench/layerPanelState';
 import { useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { describeNamedRefusal, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
@@ -47,7 +47,7 @@ import {
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
 import { copyLayerToClipboard } from './layerExportActions';
-import { createAdjustmentId } from './layerOps';
+import { createAdjustmentId, createNoiseSeed } from './layerOps';
 import {
   flattenPanelRows,
   isHeaderKey,
@@ -504,9 +504,16 @@ export const LayersTree = ({
           event.preventDefault();
           const { engine: currentEngine } = latest.current;
           if (currentEngine) {
-            void copyLayerToClipboard(key, { exportLayer: currentEngine.exports.exportBakedLayerBlob })
-              .then((status) => status === 'ok' || Promise.reject(new Error(status)))
-              .catch(() => toaster.create({ title: t('widgets.layers.actions.copyFailed'), type: 'warning' }));
+            const copyFailed = (description?: string) =>
+              toaster.create({ description, title: t('widgets.layers.actions.copyFailed'), type: 'warning' });
+            void copyLayerToClipboard(key, { exportLayer: currentEngine.exports.exportBakedLayerBlob }).then(
+              (status) => {
+                if (status !== 'ok') {
+                  copyFailed(typeof status === 'object' ? describeNamedRefusal(status, t) : undefined);
+                }
+              },
+              () => copyFailed()
+            );
           }
           return;
         }
@@ -627,6 +634,7 @@ export const LayersTree = ({
       duplicateChild: (child) =>
         runChildStructural(t('widgets.layers.modifiers.duplicateAdjustment'), child, {
           newId: createAdjustmentId(),
+          newNoiseSeed: createNoiseSeed(),
           type: 'duplicate',
         }),
       moveChild: (child, direction) =>
@@ -665,7 +673,10 @@ export const LayersTree = ({
           updates: [{ id, isEnabled }],
         }),
       setHidden: (id, isHidden) =>
-        runStructural(t('widgets.layers.actions.toggleHidden'), { type: 'set-hidden', updates: [{ id, isHidden }] }),
+        runStructural(t(isHidden ? 'widgets.layers.actions.hideOnCanvas' : 'widgets.layers.actions.showOnCanvas'), {
+          type: 'set-hidden',
+          updates: [{ id, isHidden }],
+        }),
       setLocked: (id, isLocked) =>
         runStructural(t('widgets.layers.actions.toggleLock'), { type: 'set-locked', updates: [{ id, isLocked }] }),
       startRename: (id) => setRenamingId(id),
@@ -1310,7 +1321,6 @@ export const LayersTree = ({
       </Box>
       <LayerSurfaceHost
         commands={commands}
-        dispatch={dispatch}
         document={document}
         editingLocked={editingLocked}
         engine={engine}

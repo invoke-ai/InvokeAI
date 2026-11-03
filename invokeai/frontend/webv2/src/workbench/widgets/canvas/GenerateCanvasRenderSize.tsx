@@ -12,7 +12,7 @@ import type { Project } from '@workbench/projectContracts';
 import { Box, chakra, createListCollection, Grid, HStack, NumberInput, Text } from '@chakra-ui/react';
 import { resolveCanvasProcessingSize } from '@features/generation/canvasProcessingSize';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
-import { clampDimension, getGenerationDimensions } from '@features/generation/settings';
+import { clampDimension, getGenerationDimensions, isGenerateModelConfig } from '@features/generation/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { FieldLabel, Select, Tooltip } from '@platform/ui';
 import {
@@ -40,30 +40,19 @@ const scalingEqual = (a: CanvasScalingSettings, b: CanvasScalingSettings): boole
 const readSize = (value: unknown): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 
-/**
- * Use model base/type/variant and PiD mode matching compileCanvasGraph so displayed size follows identical
- * grid/area policy.
- */
+/** Use the stored model and PiD mode as compileCanvasGraph does, so the displayed size follows the same policy. */
 const selectProcessingContext = (project: Project) => {
   const generate = getProjectWidgetValues(project, 'generate') as {
     height?: unknown;
-    model?: { base?: string; type?: string; variant?: unknown } | null;
+    model?: unknown;
     pidMode?: PidMode;
     width?: unknown;
   };
-  const model = generate.model;
   return {
     bbox: project.canvas.document.bbox,
     committedFrame: { height: readSize(generate.height), width: readSize(generate.width) },
     lockedRatio: readLockedAspectRatio(generate),
-    model:
-      model && typeof model.base === 'string'
-        ? {
-            base: model.base,
-            type: model.type ?? 'main',
-            variant: typeof model.variant === 'string' ? model.variant : null,
-          }
-        : null,
+    model: isGenerateModelConfig(generate.model) ? generate.model : null,
     pidMode: generate.pidMode ?? 'off',
   };
 };
@@ -76,9 +65,7 @@ const processingContextEqual = (a: ProcessingContext, b: ProcessingContext): boo
   a.committedFrame.width === b.committedFrame.width &&
   a.committedFrame.height === b.committedFrame.height &&
   a.lockedRatio === b.lockedRatio &&
-  a.model?.base === b.model?.base &&
-  a.model?.type === b.model?.type &&
-  a.model?.variant === b.model?.variant &&
+  a.model === b.model &&
   a.pidMode === b.pidMode;
 
 export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizeProps) => {
@@ -99,7 +86,7 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
     useCallback(() => {
-      const model = context.model as Parameters<typeof resolveCanvasProcessingSize>[0] | null;
+      const { model } = context;
       return {
         dimensions: getGenerationDimensions(model ?? undefined, context.pidMode),
         processingSize: model

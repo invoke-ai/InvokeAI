@@ -35,7 +35,7 @@ from invokeai.app.services.model_install.model_install_common import (
     InstallRecoveryRequiredError,
     ModelInstallJob,
 )
-from invokeai.app.services.model_load.model_load_common import load_settings_changed
+from invokeai.app.services.model_load.model_load_common import distinct_caches
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -48,7 +48,7 @@ from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.architectures import ArchitectureCapabilities, architecture_capabilities
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
-from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SD1_Config,
     Main_Checkpoint_SD2_Config,
@@ -57,10 +57,12 @@ from invokeai.backend.model_manager.configs.main import (
 )
 from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
-from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
-from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
-from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.model_manager.metadata.metadata_base import (
+    ModelMetadataWithFiles,
+    ModelRevisionUnavailableError,
+    UnknownMetadataException,
+)
 from invokeai.backend.model_manager.search import ModelSearch, ModelSearchCancelled
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
@@ -473,59 +475,11 @@ def reidentify_model(
     """Attempt to reidentify a model by re-probing its weights file."""
     try:
         with _claim_model_key(key):
-            return _reidentify_model(key)
+            return ApiDependencies.invoker.services.model_manager.reidentify_model(key)
     except UnknownModelException as e:
         raise HTTPException(status_code=404, detail=str(e))
     except InvalidModelException as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-def _reidentify_model(key: str) -> AnyModelConfig:
-    """Re-probe one model and rewrite its record. Callers must hold the key claim."""
-    config = ApiDependencies.invoker.services.model_manager.store.get_model(key)
-    models_path = ApiDependencies.invoker.services.configuration.models_path
-    if pathlib.Path(config.path).is_relative_to(models_path):
-        model_path = pathlib.Path(config.path)
-    else:
-        model_path = models_path / config.path
-    mod = ModelOnDisk(model_path)
-    # The install source is evidence identification reads: for a model whose weights cannot name its
-    # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
-    # folder has also lost the folder it came from, so without the source a re-probe refiles it under
-    # the default.
-    override_fields = {"source": config.source, "source_type": config.source_type}
-    if encoder_id := getattr(config, "image_encoder_model_id", None):
-        override_fields["image_encoder_model_id"] = encoder_id
-    result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
-    if result.config is None:
-        raise InvalidModelException("Unable to identify model format")
-
-    # Retain user-editable fields from the original config
-    result.config.path = config.path
-    result.config.key = config.key
-    result.config.name = config.name
-    result.config.description = config.description
-    result.config.cover_image = config.cover_image
-    if hasattr(result.config, "trigger_phrases") and hasattr(config, "trigger_phrases"):
-        result.config.trigger_phrases = config.trigger_phrases
-    result.config.source = config.source
-    result.config.source_type = config.source_type
-    if hasattr(config, "cpu_only") and hasattr(result.config, "cpu_only"):
-        result.config.cpu_only = config.cpu_only
-    previous_settings = getattr(config, "default_settings", None)
-    updated_settings = getattr(result.config, "default_settings", None)
-    if previous_settings is not None and updated_settings is not None:
-        updated_settings = deepcopy(updated_settings)
-        result.config.default_settings = updated_settings
-        for field in ("cpu_only", "fp8_storage"):
-            if hasattr(previous_settings, field) and hasattr(updated_settings, field):
-                setattr(updated_settings, field, getattr(previous_settings, field))
-
-    # The probe can reset load-affecting settings (cpu_only, default_settings), so in-flight loads must re-check.
-    with ApiDependencies.invoker.services.model_manager.load.record_edit(config.key) as edit:
-        updated = ApiDependencies.invoker.services.model_manager.store.replace_model(config.key, result.config)
-        edit.load_affecting = _invalidate_model_load_caches(config.key, config, updated)
-    return updated
 
 
 class FoundModel(BaseModel):
@@ -648,26 +602,19 @@ def get_hugging_face_models(
 
 
 def _update_model_record(key: str, changes: ModelRecordChanges) -> AnyModelConfig:
-    """Update a model record and invalidate any cache affected by the change.
+    """Update a model record under its key claim, and prepare the response.
 
-    Keep the complete claim and synchronous service work in one worker-thread operation. This
-    route needs to await cache invalidation, but that must not leave the database read/write and
-    response preparation on the event loop before and after that await.
+    The claim, the service's record write and cache invalidation, and the response preparation are synchronous;
+    they run as one worker-thread operation so none of them is left on the event loop.
     """
     logger = ApiDependencies.invoker.services.logger
-    record_store = ApiDependencies.invoker.services.model_manager.store
 
     # Claimed for the whole update: a conversion running on this key carries a snapshot of the
     # record taken before it started and writes it into the replacement, so an edit accepted
     # meanwhile would be reported as saved and then silently dropped.
-    with _claim_model_key(key), ApiDependencies.invoker.services.model_manager.load.record_edit(key) as edit:
+    with _claim_model_key(key):
         try:
-            previous_config = record_store.get_model(key)
-            config = record_store.update_model(key, changes=changes, allow_class_change=True)
-            # Settings that change how the model loads (e.g. fp8_storage, cpu_only) are baked into the cached
-            # nn.Module at load time, so toggling them on a cached model is otherwise silently a no-op until
-            # the entry is evicted. Drop any unlocked cached entries for this model so the next load rebuilds.
-            edit.load_affecting = _invalidate_model_load_caches(key, previous_config, config)
+            config = ApiDependencies.invoker.services.model_manager.update_model_record(key, changes)
             config = prepare_model_config_for_response(config, ApiDependencies)
             logger.info(f"Updated model: {key}")
         except UnknownModelException as e:
@@ -702,25 +649,11 @@ async def update_model_record(
     # does post the record back whole, so an unchanged echo is expected and accepted - but a *different* key is
     # written into the stored config while the row id keeps the old one, which leaves a record that answers to a
     # key nothing can look it up by: `replace_model` (and so reidentify) raises `UnknownModelException` forever
-    # after, and the UI caches the model under the new key so every later request for it 404s.
+    # after, and the UI caches the model under the new key so every later request for it 404s. The record store
+    # refuses such a change too; checked here first so it is a 422 before any claim or record lookup can answer.
     if "key" in changes.model_fields_set and changes.key != key:
         raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
-
-
-def _invalidate_model_load_caches(key: str, previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
-    """Drop cached instances when a record change affects how the model is loaded; return whether it did."""
-    if not load_settings_changed(previous, updated):
-        return False
-    services = ApiDependencies.invoker.services
-    # Prevent a concurrent load from re-registering state built from the previous model identity.
-    with MODEL_LOAD_LOCK.write_lock():
-        dropped = sum(cache.drop_model(key) for cache in services.model_manager.load.ram_caches.values())
-    if dropped:
-        services.logger.info(
-            f"Dropped {dropped} cached entr{'y' if dropped == 1 else 'ies'} for model {key} after settings change."
-        )
-    return True
 
 
 @model_manager_router.get(
@@ -951,7 +884,7 @@ def bulk_reidentify_models(
             # carry its own copy of the retain-these-fields logic, which is one edit away from the
             # two disagreeing about what a reidentification preserves.
             with _claim_model_key(key):
-                _reidentify_model(key)
+                ApiDependencies.invoker.services.model_manager.reidentify_model(key)
             succeeded.append(key)
             logger.info(f"Reidentified model: {key}")
         except HTTPException as e:
@@ -1333,7 +1266,7 @@ def resume_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.resume_job(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1359,7 +1292,7 @@ def restart_failed_model_install_job(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_failed(job)
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1387,7 +1320,7 @@ def restart_model_install_file(
         raise HTTPException(status_code=415, detail=str(e))
     try:
         installer.restart_file(job, str(file_source))
-    except (InstallCancellationConflictError, InstallDownloadConflictError) as e:
+    except (InstallCancellationConflictError, InstallDownloadConflictError, ModelRevisionUnavailableError) as e:
         raise HTTPException(status_code=409, detail=str(e)) from e
     return job
 
@@ -1395,15 +1328,16 @@ def restart_model_install_file(
 @model_manager_router.delete(
     "/install",
     operation_id="prune_model_install_jobs",
+    response_model=list[int],
+    status_code=200,
     responses={
-        204: {"description": "All completed and errored jobs have been pruned"},
+        200: {"description": "IDs of completed and errored jobs that were pruned"},
         400: {"description": "Bad request"},
     },
 )
-def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> Response:
+def prune_model_install_jobs(current_admin: AdminUserOrDefault) -> list[int]:
     """Prune all completed and errored jobs from the install job list."""
-    ApiDependencies.invoker.services.model_manager.install.prune_jobs()
-    return Response(status_code=204)
+    return ApiDependencies.invoker.services.model_manager.install.prune_jobs()
 
 
 @model_manager_router.put(
@@ -1636,12 +1570,7 @@ def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     one cache per generation device; their statistics are aggregated. Will return null if no models
     have been loaded."""
     stats_list: list[CacheStats] = []
-    seen_cache_ids: set[int] = set()
-    # ram_caches can map several device keys to the same cache object; count each cache once.
-    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
-        if id(cache) in seen_cache_ids:
-            continue
-        seen_cache_ids.add(id(cache))
+    for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         if cache.stats is not None:
             stats_list.append(cache.stats)
 
@@ -1682,14 +1611,7 @@ def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheRespo
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
     models_cleared = 0
     bytes_freed = 0
-    seen_cache_ids: set[int] = set()
-    # ram_caches can map several device keys to the same cache object; clearing one twice would
-    # report the second (empty) pass and double-count nothing, but the id() guard keeps the totals
-    # honest and matches get_stats above.
-    for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
-        if id(cache) in seen_cache_ids:
-            continue
-        seen_cache_ids.add(id(cache))
+    for cache in distinct_caches(ApiDependencies.invoker.services.model_manager.load.ram_caches.values()):
         result = cache.make_room(1000 * 2**30)
         models_cleared += result.models_cleared
         bytes_freed += result.bytes_freed

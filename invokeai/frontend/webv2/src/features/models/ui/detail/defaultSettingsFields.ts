@@ -1,47 +1,18 @@
 import type { AnyModelDefaultSettings, ModelConfig, ModelTaxonomyType } from '@features/models/core/types';
+import type { ModelSchedulerPolicy, SchedulerChoice } from '@features/models/ui/ModelsUiContext';
 import type { TFunction } from 'i18next';
 
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
 
-export type DefaultSettingsModel = Pick<ModelConfig, 'base' | 'default_settings' | 'format' | 'key' | 'type'>;
+export type DefaultSettingsModel = Pick<
+  ModelConfig,
+  'base' | 'default_settings' | 'format' | 'key' | 'type' | 'variant'
+>;
 
 const CONTROL_ADAPTER_TYPES = new Set(['controlnet', 't2i_adapter', 'control_lora']);
 
 export const supportsDefaultSettings = (model: Pick<ModelConfig, 'type'>): boolean =>
   model.type === 'main' || model.type === 'lora' || CONTROL_ADAPTER_TYPES.has(model.type);
-
-const SCHEDULERS = [
-  'ddim',
-  'ddpm',
-  'deis',
-  'deis_k',
-  'dpmpp_2s',
-  'dpmpp_2s_k',
-  'dpmpp_2m',
-  'dpmpp_2m_k',
-  'dpmpp_2m_sde',
-  'dpmpp_2m_sde_k',
-  'dpmpp_3m',
-  'dpmpp_3m_k',
-  'dpmpp_sde',
-  'dpmpp_sde_k',
-  'euler',
-  'euler_k',
-  'euler_a',
-  'heun',
-  'heun_k',
-  'kdpm_2',
-  'kdpm_2_k',
-  'kdpm_2_a',
-  'kdpm_2_a_k',
-  'lcm',
-  'lms',
-  'lms_k',
-  'pndm',
-  'tcd',
-  'unipc',
-  'unipc_k',
-];
 
 const PREPROCESSORS = [
   'canny_edge_detection',
@@ -63,7 +34,7 @@ const PREPROCESSORS = [
 export type DefaultSettingsControl =
   | { kind: 'number'; max?: number; min?: number; step?: number }
   | { kind: 'select'; options: readonly string[] }
-  | { kind: 'combobox'; options: readonly string[] }
+  | { kind: 'combobox'; options: readonly SchedulerChoice[] }
   | {
       kind: 'model';
       modelTypes: readonly ModelTaxonomyType[];
@@ -85,7 +56,12 @@ export interface FieldSpec {
   defaultValue: unknown;
   /** Translation key for what applies while the toggle is off. */
   inheritLabelKey: string;
+  /** The rules this row's choices come from are still loading or failed: it shows, disabled, without them. */
+  pending?: 'loading' | 'unavailable';
 }
+
+/** Generate's rules for a main model's scheduler, or why they are not here yet. */
+export type SchedulerFieldRules = ModelSchedulerPolicy | 'loading' | 'unavailable';
 
 /**
  * Only fp8_storage=true changes backend behavior; the row toggle covers it without a redundant body switch. Mirror
@@ -98,23 +74,18 @@ const FP8_STORAGE_FIELD: FieldSpec = {
   labelKey: 'models.defaultFields.fp8Storage',
 };
 
+const VAE_FIELD: FieldSpec = {
+  control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
+  // The backend sentinel for "the compatible default VAE" — what legacy
+  // writes when the toggle is on but no specific model is picked.
+  defaultValue: 'default',
+  inheritLabelKey: 'models.defaultFieldInherited.vae',
+  key: 'vae',
+  labelKey: 'models.defaultFields.vae',
+};
+
+/** Main-model fields after the VAE and scheduler rows. */
 const MAIN_FIELDS: FieldSpec[] = [
-  {
-    control: { kind: 'model', modelTypes: ['vae'], placeholderKey: 'models.defaultVae', sameBase: true },
-    // The backend sentinel for "the compatible default VAE" — what legacy
-    // writes when the toggle is on but no specific model is picked.
-    defaultValue: 'default',
-    inheritLabelKey: 'models.defaultFieldInherited.vae',
-    key: 'vae',
-    labelKey: 'models.defaultFields.vae',
-  },
-  {
-    control: { kind: 'combobox', options: SCHEDULERS },
-    defaultValue: 'euler_a',
-    inheritLabelKey: 'models.defaultFieldInherited.scheduler',
-    key: 'scheduler',
-    labelKey: 'models.defaultFields.scheduler',
-  },
   {
     control: { kind: 'number', max: 10000, min: 1 },
     defaultValue: 30,
@@ -166,6 +137,24 @@ const MAIN_FIELDS: FieldSpec[] = [
   },
 ];
 
+const SCHEDULER_FIELD = {
+  inheritLabelKey: 'models.defaultFieldInherited.scheduler',
+  key: 'scheduler',
+  labelKey: 'models.defaultFields.scheduler',
+} as const;
+
+/** Generate's options and default for the base; see {@link getFieldsForModel}. */
+const getSchedulerField = (rules: SchedulerFieldRules, stored: string | null): FieldSpec =>
+  typeof rules === 'string'
+    ? {
+        ...SCHEDULER_FIELD,
+        // Without the rules, only a stored value can be named; it stays visible.
+        control: { kind: 'combobox', options: stored === null ? [] : [{ label: stored, value: stored }] },
+        defaultValue: stored,
+        pending: rules,
+      }
+    : { ...SCHEDULER_FIELD, control: { kind: 'combobox', options: rules.options }, defaultValue: rules.defaultValue };
+
 const LORA_FIELDS: FieldSpec[] = [
   {
     control: { kind: 'number', max: 10, min: -10, step: 0.05 },
@@ -205,12 +194,26 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
  * here. It used to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for
  * 19 of the 52 loader keys that ignore it: the answer also depends on the model's format, and on
  * whether its loader implements the cast at all — neither of which this module can see.
+ *
+ * `schedulerRules` is Generate's rule set for a main model's base. Where the base's graph ignores the
+ * scheduler the row is left out, as Generate hides it, unless a stored value needs a row to be cleared. While the
+ * rules load or after they fail the row shows disabled, so it neither jumps in later nor silently disappears.
  */
-export const getFieldsForModel = (model: Pick<ModelConfig, 'type'>, fp8StorageSupported: boolean): FieldSpec[] => {
+export const getFieldsForModel = (
+  model: Pick<ModelConfig, 'default_settings' | 'type'>,
+  fp8StorageSupported: boolean,
+  schedulerRules: SchedulerFieldRules | null
+): FieldSpec[] => {
   const fp8Fields = fp8StorageSupported ? [FP8_STORAGE_FIELD] : [];
 
   if (model.type === 'main') {
-    return [...MAIN_FIELDS, ...fp8Fields];
+    const storedScheduler = model.default_settings?.scheduler ?? null;
+    const schedulerFields =
+      schedulerRules &&
+      (typeof schedulerRules === 'string' || schedulerRules.appliesToGraph || storedScheduler !== null)
+        ? [getSchedulerField(schedulerRules, storedScheduler)]
+        : [];
+    return [VAE_FIELD, ...schedulerFields, ...MAIN_FIELDS, ...fp8Fields];
   }
 
   if (model.type === 'lora') {

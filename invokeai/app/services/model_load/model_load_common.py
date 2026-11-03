@@ -1,8 +1,8 @@
-"""Shared rules for when a model record change invalidates loaded instances of that model."""
+"""Shared rules for when a model record change invalidates loaded instances of that model, and for visiting the
+per-device caches that hold them."""
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional, TypeVar
 
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 
@@ -59,10 +59,14 @@ def load_settings_changed(
     return _model_load_fingerprint(previous, models_path) != _model_load_fingerprint(updated, models_path)
 
 
-@dataclass
-class RecordEdit:
-    """One bracketed write of a model record (see `ModelLoadServiceBase.record_edit`)."""
+_Cache = TypeVar("_Cache")
 
-    # Whether the write changed how the model loads. A writer that has compared the record before and after
-    # clears it; left set, as when the write fails partway, loads that overlapped it are re-checked.
-    load_affecting: bool = True
+
+def distinct_caches(caches: Iterable[_Cache]) -> list[_Cache]:
+    """Each cache once, in first-seen order.
+
+    `ModelLoadServiceBase.ram_caches` can map several device keys to one cache (the default cache is filed under its
+    own device key, which another key can also name), so a pass over every cache that counts, clears or drops must
+    visit each once.
+    """
+    return list(dict.fromkeys(caches))

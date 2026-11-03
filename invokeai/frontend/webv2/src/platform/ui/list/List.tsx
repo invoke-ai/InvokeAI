@@ -11,13 +11,27 @@ import type { ListDensity } from './ListItem';
 import type { ListRow } from './listRows';
 
 import { IN_SLOT_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
-import { LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET as INSET } from './listLayout';
+import { type ListInset, LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET } from './listLayout';
 import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionHeader';
 import { extractRangeKeepingPinned, getPinnedHeaderShift, lastHeaderAtOrBefore } from './virtualSections';
 
 const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40, snug: 48 };
+const getItemPitch = (density: ListDensity, estimatedRowHeight?: number) =>
+  (estimatedRowHeight ?? ITEM_HEIGHT_PX[density]) + ROW_GAP_PX;
+
+/**
+ * Total height of a fixed-height list's rows, for callers that size the list to its content up to a cap instead
+ * of giving it a fixed box.
+ */
+export const getListContentHeight = (rows: readonly Pick<ListRow<unknown>, 'kind'>[], density: ListDensity): number =>
+  rows.reduce(
+    (total, row) => total + (row.kind === 'header' ? LIST_SECTION_HEADER_HEIGHT_PX : getItemPitch(density)),
+    0
+  );
 const OVERSCAN_ROWS = 8;
 const PRIMARY_SELECTOR = '[data-list-primary]';
+// Set on the list root from `inset`; row and header wrappers pad by it and in-slot dividers offset from it.
+const INSET = 'var(--list-row-inset)';
 
 // Rows are fixed-height slots: content that outgrows its density clips instead of overlapping the next row.
 const ITEM_WRAPPER_STYLE: CSSProperties = {
@@ -99,6 +113,8 @@ export interface ListProps<T> {
   surface?: ListSurface;
   /** Hairlines between rows of a section, inset from the edges. */
   dividers?: boolean;
+  /** `none` runs rows and section headers to the list's edges, for a container that already pads them. */
+  inset?: ListInset;
   initialScrollOffset?: number;
   /**
    * Without an initial offset, open with the active row at the top: for lists reopened after a selection was made
@@ -134,6 +150,7 @@ export const List = <T,>({
   errorState,
   estimatedRowHeight,
   initialScrollOffset,
+  inset = 'row',
   isBusy = false,
   label,
   renderItem,
@@ -151,9 +168,7 @@ export const List = <T,>({
   const listOwnsFocus = useRef(false);
   const lastScrollOffset = useRef(initialScrollOffset ?? 0);
   const [focusKey, setFocusKey] = useState<string | null>(null);
-  const itemPitch =
-    (rowHeight === 'measured' && estimatedRowHeight !== undefined ? estimatedRowHeight : ITEM_HEIGHT_PX[density]) +
-    ROW_GAP_PX;
+  const itemPitch = getItemPitch(density, rowHeight === 'measured' ? estimatedRowHeight : undefined);
 
   const layout = useMemo(() => {
     const headerIndexes: number[] = [];
@@ -232,8 +247,8 @@ export const List = <T,>({
     overscan: OVERSCAN_ROWS,
     rangeExtractor,
     scrollPaddingStart: hasHeaders ? LIST_SECTION_HEADER_HEIGHT_PX : 0,
-    // Scrollable's phantom-scrollbar heal dispatches a scroll event from a mount effect, where flushSync is a
-    // React error; useSyncExternalStore already commits scroll snapshots synchronously.
+    // useSyncExternalStore already commits scroll snapshots synchronously; flushSync would only add a React error
+    // for any scroll event dispatched while React is rendering or flushing effects.
     useFlushSync: false,
   });
   const { scrollToIndex, virtualItems } = virtualizer;
@@ -364,7 +379,10 @@ export const List = <T,>({
 
   useMountEffect(() => () => onScrollOffsetPersist?.(lastScrollOffset.current));
 
-  const rootCss = useMemo(() => ({ '--list-surface': `colors.${surface}` }), [surface]);
+  const rootCss = useMemo(
+    () => ({ '--list-row-inset': inset === 'none' ? '0px' : LIST_ROW_INSET, '--list-surface': `colors.${surface}` }),
+    [inset, surface]
+  );
   const containerStyle = useMemo<CSSProperties>(
     () => ({ height: virtualizer.totalSize, position: 'relative', width: '100%' }),
     [virtualizer.totalSize]

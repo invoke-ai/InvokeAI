@@ -3,12 +3,15 @@ import type { Ref, UIEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
 import { PROMPT_ATTENTION_TARGET_PROPS } from '@features/generation/ui/promptFields/promptAttentionHotkeys';
+import { getTextareaWrapWidth } from '@features/generation/ui/promptFields/promptCaret';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
 import { PROMPT_FONT_SIZE } from '@theme/scale';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
+/** Layout moves in 1/64 px steps; a smaller difference in the parsed width is not a resize. */
+const WRAP_WIDTH_EPSILON_PX = 0.01;
 // Use literal lengths; fractional Chakra spacing variables fail inside calc.
 const PROMPT_TEXTAREA_PX = '0.625rem';
 const PROMPT_TEXTAREA_PY = '0.5rem';
@@ -75,7 +78,7 @@ export const PromptTextarea = ({
 }: PromptTextareaProps) => {
   const localTextareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [scroll, setScroll] = useState({ left: 0, top: 0 });
-  const [textareaClientWidth, setTextareaClientWidth] = useState<number | null>(null);
+  const [textareaWrapWidth, setTextareaWrapWidth] = useState<number | null>(null);
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   const highlightsSyntax = showSyntaxHighlighting && (attentionSyntax !== 'none' || highlightDynamicPrompts);
   // Template chunk emphasis is independent of the syntax-highlighting preference.
@@ -99,20 +102,25 @@ export const PromptTextarea = ({
     }
 
     const textarea = localTextareaRef.current;
-    const syncClientWidth = () => {
-      const nextWidth = textarea.clientWidth;
+    // Live: it reflects later layout, so one lookup serves every measurement of this run.
+    const computed = window.getComputedStyle(textarea);
+    // Re-run on value: typing can add or remove a vertical scrollbar, which narrows the wrap box.
+    const syncWrapWidth = () => {
+      const nextWidth = getTextareaWrapWidth(textarea, computed);
 
-      setTextareaClientWidth((currentWidth) => (currentWidth === nextWidth ? currentWidth : nextWidth));
+      setTextareaWrapWidth((currentWidth) =>
+        currentWidth !== null && Math.abs(currentWidth - nextWidth) < WRAP_WIDTH_EPSILON_PX ? currentWidth : nextWidth
+      );
     };
-    const resizeObserver = new ResizeObserver(syncClientWidth);
+    const resizeObserver = new ResizeObserver(syncWrapWidth);
 
-    syncClientWidth();
+    syncWrapWidth();
     resizeObserver.observe(textarea);
-    window.addEventListener('resize', syncClientWidth);
+    window.addEventListener('resize', syncWrapWidth);
 
     return () => {
       resizeObserver.disconnect();
-      window.removeEventListener('resize', syncClientWidth);
+      window.removeEventListener('resize', syncWrapWidth);
     };
   }, [needsMirror, value]);
 
@@ -134,15 +142,15 @@ export const PromptTextarea = ({
 
   const lineNumberMetrics = useMemo(
     () => ({
-      clientWidth: textareaClientWidth,
       fontFamily,
       fontSize: effectiveFontSize,
       lineHeight: effectiveLineHeight,
       paddingBlock: PROMPT_TEXTAREA_PY,
       paddingInline: PROMPT_TEXTAREA_PX,
       scrollTop: scroll.top,
+      wrapWidth: textareaWrapWidth,
     }),
-    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaClientWidth]
+    [effectiveFontSize, effectiveLineHeight, fontFamily, scroll.top, textareaWrapWidth]
   );
 
   const highlightUnderlay = useMemo(
@@ -174,7 +182,7 @@ export const PromptTextarea = ({
             paddingInlineStart={paddingInlineStart}
             transform={`translate(${-scroll.left}px, ${-scroll.top}px)`}
             whiteSpace="pre-wrap"
-            w={textareaClientWidth ? `${textareaClientWidth}px` : '100%'}
+            w={textareaWrapWidth ? `${textareaWrapWidth}px` : '100%'}
           >
             {templateChunks ? (
               <>
@@ -208,7 +216,7 @@ export const PromptTextarea = ({
       scroll.top,
       shouldHighlight,
       templateChunks,
-      textareaClientWidth,
+      textareaWrapWidth,
       value,
     ]
   );

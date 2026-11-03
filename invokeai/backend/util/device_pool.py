@@ -75,7 +75,10 @@ class _GenerationDevicePool:
             self._on_release = listener
 
     def set_generation_devices(self, devices: list[torch.device]) -> None:
-        """Register the full set of generation devices (called once at processor startup).
+        """Register the full set of generation devices, replacing those registered before (a borrow in flight is
+        dropped). The session processor's `register_generation_devices` calls it once: from the composition root
+        (`ApiDependencies.initialize`) before the invoker starts any service, or from the processor's `start` when
+        nothing did.
 
         Only GPU devices participate in idle-offload; others are ignored.
         """

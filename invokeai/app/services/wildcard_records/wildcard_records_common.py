@@ -107,6 +107,10 @@ class WildcardRecordDTO(WildcardWithoutId):
 WildcardRecordDTOValidator = TypeAdapter(WildcardRecordDTO)
 
 
+class DeleteWildcardsResult(BaseModel):
+    deleted_ids: list[str] = Field(description="The ids of the wildcards that were deleted.")
+
+
 def build_wildcard_manager(wildcards: list[WildcardRecordDTO]) -> "WildcardManager":
     """Builds the manager that resolves `__name__` against a user's wildcards.
 

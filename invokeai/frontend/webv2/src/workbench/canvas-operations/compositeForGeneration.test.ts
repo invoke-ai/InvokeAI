@@ -10,9 +10,17 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
 import type { Rect } from '@workbench/canvas-operations/generationContracts';
 
+import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
-import { planComposites, planControlComposites } from '@workbench/canvas-operations/generationCompositePlan';
+import { RasterCompositeOverBudgetError } from '@workbench/canvas-engine/render/rasterComposite';
+import { MEASURED_NOISY_TEXT } from '@workbench/canvas-engine/render/rasterComposite.testing';
+import {
+  planComposites,
+  planControlComposites,
+  planRegionalMaskComposites,
+} from '@workbench/canvas-operations/generationCompositePlan';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ExecuteCompositePlanDeps } from './compositeForGeneration';
@@ -22,6 +30,7 @@ import {
   executeCompositePlan,
   executeControlComposite,
   executeMaskComposite,
+  executeRegionalMaskComposite,
   toGrayscaleMaskPixels,
 } from './compositeForGeneration';
 
@@ -195,6 +204,23 @@ describe('executeCompositePlan — mode geometry', () => {
     expect(result.bboxFullyCovered).toBe(false);
   });
 
+  it('reports whether any composited pixel is visible, cached with the plan key', async () => {
+    const empty = makeHarness(() => uniformImageData(100, 100, 0));
+    const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
+    expect(await executeCompositePlan(plan, empty.deps)).toMatchObject({
+      bboxFullyCovered: false,
+      bboxHasContent: false,
+    });
+    // The second run reuses the cached entry and still knows the frame is empty.
+    expect(await executeCompositePlan(plan, empty.deps)).toMatchObject({ bboxHasContent: false });
+
+    const faint = makeHarness(() => uniformImageData(100, 100, 1));
+    expect(await executeCompositePlan(plan, faint.deps)).toMatchObject({
+      bboxFullyCovered: false,
+      bboxHasContent: true,
+    });
+  });
+
   it('computes contentBounds as the union of layer bounds in document space', async () => {
     const harness = makeHarness(() => uniformImageData(100, 100, 255));
     const doc = makeDoc([
@@ -233,9 +259,9 @@ describe('executeCompositePlan — upload + dedupe', () => {
     harness.deps.reserve = () => ({ availableBytes: 0, requestedBytes: 80_000, status: 'over-budget' });
     const plan = planComposites(makeDoc([rasterLayer('a')]), BBOX);
 
-    await expect(executeCompositePlan(plan, harness.deps)).rejects.toThrow(
-      'The canvas composite exceeds the available raster memory budget'
-    );
+    const refused = executeCompositePlan(plan, harness.deps);
+    await expect(refused).rejects.toBeInstanceOf(RasterCompositeOverBudgetError);
+    await expect(refused).rejects.toThrow('The canvas composite exceeds the available raster memory budget.');
     expect(harness.createdTargets).toHaveLength(0);
   });
 
@@ -300,6 +326,63 @@ describe('executeControlComposite', () => {
     expect(target.callLog).toContainEqual({ args: [0, 0, 100, 100], op: 'fillRect' });
     expect(readImageData).not.toHaveBeenCalled();
     expect(harness.encodeSurface).toHaveBeenCalledWith(target);
+  });
+});
+
+describe('executeRegionalMaskComposite', () => {
+  const regionalLayer: CanvasLayerContract = {
+    autoNegative: false,
+    blendMode: 'normal',
+    id: 'region',
+    isEnabled: true,
+    isLocked: false,
+    mask: { bitmap: imageRef('region-bmp'), fill: { color: '#00ff00', style: 'solid' } },
+    name: 'Region',
+    negativePrompt: null,
+    opacity: 0.5,
+    positivePrompt: 'a sign',
+    referenceImages: [],
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'regional_guidance',
+  };
+  const regionalEntry = () => planRegionalMaskComposites(makeDoc([regionalLayer]), BBOX)[0]!.entry;
+
+  /** A transparent scan with one faint pixel at each opposite corner of a box. */
+  const boxImageData = (width: number, height: number): ImageData => {
+    const image = uniformImageData(width, height, 0);
+    image.data[(12 * width + 10) * 4 + 3] = 1;
+    image.data[(40 * width + 29) * 4 + 3] = 255;
+    return image;
+  };
+
+  it('measures the alpha bounds on the coverage readback it already takes', async () => {
+    const readImageData = vi.fn(() => boxImageData(100, 100));
+    const harness = makeHarness(readImageData);
+
+    const result = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(result).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, imageName: 'uploaded-1' });
+    expect(readImageData).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the cached bounds with the cached upload', async () => {
+    const readImageData = vi.fn(() => boxImageData(100, 100));
+    const harness = makeHarness(readImageData);
+
+    await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+    const second = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(second).toMatchObject({ bounds: { height: 29, width: 20, x: 10, y: 12 }, reusedUpload: true });
+    expect(readImageData).toHaveBeenCalledTimes(1);
+    expect(harness.encodeSurface).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports empty bounds for a mask with no pixels in the bbox', async () => {
+    const harness = makeHarness(() => uniformImageData(100, 100, 0));
+
+    const result = await executeRegionalMaskComposite(regionalEntry(), harness.deps);
+
+    expect(result.bounds).toEqual({ height: 0, width: 0, x: 0, y: 0 });
   });
 });
 
@@ -439,5 +522,82 @@ describe('executeCompositePlan — raster adjustments baked into generation pixe
     ]);
     await executeCompositePlan(planComposites(adjustedDoc, BBOX), harness.deps);
     expect(writeImageData).toHaveBeenCalledTimes(1);
+  });
+
+  const grain = {
+    amount: 0.2,
+    distribution: 'gaussian',
+    id: 'grain',
+    isEnabled: true,
+    grain: 'color',
+    response: 'flat',
+    size: 1,
+    seed: 77,
+    type: 'noise',
+  } as const;
+  const midGray = (width: number, height: number): ImageData => {
+    const image = uniformImageData(width, height, 255);
+    for (let i = 0; i < image.data.length; i += 4) {
+      image.data.fill(128, i, i + 3);
+    }
+    return image;
+  };
+
+  // A noisy stack always adjusts the layer-local region the bbox samples (plus one pixel of resampling margin) at
+  // its layer-local origin, before resampling, even where a color-only stack would adjust the output instead.
+  it.each([
+    // The sampled region (22×12) exceeds the 20×10 output.
+    { bbox: { height: 10, width: 20, x: 10, y: 5 }, origin: { x: 2, y: 1 }, scale: 1, size: [22, 12] },
+    { bbox: { height: 100, width: 100, x: 20, y: 10 }, origin: { x: 12, y: 6 }, scale: 1, size: [52, 42] },
+    // Downscaled 2×: output x 0–20 samples layer x 6–46, y 0–10 samples layer y 4–24.
+    { bbox: { height: 10, width: 20, x: 10, y: 5 }, origin: { x: 5, y: 3 }, scale: 0.5, size: [42, 22] },
+  ])('adjusts noise layer-local at $origin.x,$origin.y for bbox $bbox.x,$bbox.y at scale $scale', async (testCase) => {
+    const written: ImageData[] = [];
+    const harness = makeHarness((_surface, rect) => midGray(rect.width, rect.height));
+    harness.deps.writeImageData = (_surface, imageData) => {
+      written.push(imageData);
+    };
+    const reserve = vi.fn((_bytes: number) => ({ lease: { release: () => undefined }, status: 'ok' as const }));
+    harness.deps.reserve = reserve;
+    const doc = makeDoc([
+      rasterLayer('n', {
+        adjustments: [grain],
+        transform: { rotation: 0, scaleX: testCase.scale, scaleY: testCase.scale, x: 7, y: 3 },
+      }),
+    ]);
+
+    await executeCompositePlan(planComposites(doc, testCase.bbox), harness.deps);
+
+    const [width, height] = testCase.size as [number, number];
+    const expected = midGray(width, height);
+    applyAdjustments(expected, [grain], testCase.origin);
+    expect(written).toHaveLength(1);
+    expect(Array.from(written[0]!.data)).toEqual(Array.from(expected.data));
+    // Output and scan buffers, plus the layer-local scratch surface and its ImageData, which can exceed the output.
+    const outputPixels = testCase.bbox.width * testCase.bbox.height;
+    expect(reserve).toHaveBeenCalledWith((outputPixels * 2 + Math.max(outputPixels, width * height) * 2) * 4);
+  });
+
+  it('refuses a measured text scratch past its reservation and releases everything', async () => {
+    const { bbox, layer, measured, plannedScratchPixels } = MEASURED_NOISY_TEXT;
+    const harness = makeHarness();
+    const layerSurface = createTestStubRasterBackend().createSurface(measured.width, measured.height);
+    const releaseLayer = vi.fn();
+    harness.deps.getLayerSurface = () =>
+      Promise.resolve({ rect: measured, release: releaseLayer, surface: layerSurface });
+    // Output and scan buffers, plus the planned scratch surface and its ImageData: no room for the measured excess.
+    const memory = new RasterMemoryBudgetController({
+      budgetBytes: (bbox.width * bbox.height * 2 + plannedScratchPixels * 2) * 4,
+    });
+    harness.deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'invocation-composite' });
+
+    await expect(executeCompositePlan(planComposites(makeDoc([layer]), bbox), harness.deps)).rejects.toBeInstanceOf(
+      RasterCompositeOverBudgetError
+    );
+
+    expect(harness.createdTargets.map(({ height, width }) => [width, height])).toEqual([[bbox.width, bbox.height]]);
+    expect(releaseLayer).toHaveBeenCalledOnce();
+    expect(memory.snapshot().reservedBytes).toBe(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
   });
 });

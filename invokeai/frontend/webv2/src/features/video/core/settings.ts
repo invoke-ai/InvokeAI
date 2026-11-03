@@ -1,6 +1,7 @@
-import type { GenerateLora, ImageWithDims } from '@features/generation/contracts';
+import type { DynamicPromptsSettings, GenerateLora, ImageWithDims } from '@features/generation/contracts';
 
 import {
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
   DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX,
   DEFAULT_POSITIVE_PROMPT_HEIGHT_PX,
   isLoraModelConfig,
@@ -11,6 +12,7 @@ import {
   MAX_POSITIVE_PROMPT_HEIGHT_PX,
   MIN_NEGATIVE_PROMPT_HEIGHT_PX,
   MIN_POSITIVE_PROMPT_HEIGHT_PX,
+  normalizeDynamicPromptsSettings,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { isSeedMode } from '@platform/core/seed';
@@ -303,6 +305,22 @@ export const resolveVideoMode = (
   return settings.lastFrameImage ? 'last-frame' : 'txt2vid';
 };
 
+/** Each video costs far more than an image, so a new Video panel expands to fewer prompts than Generate. */
+export const VIDEO_DYNAMIC_PROMPTS_DEFAULTS: Readonly<DynamicPromptsSettings> = {
+  ...DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  dynamicPromptsMaxPrompts: 10,
+};
+
+/**
+ * A panel saved before Video expanded prompts keeps running its prompt as typed until the user turns expansion on.
+ * Every seeded panel stores `positivePromptHeightPx`; an unseeded record (a new panel, a partial Send to Video
+ * payload) lacks it and takes the new-panel defaults.
+ */
+const SAVED_VIDEO_DYNAMIC_PROMPTS_DEFAULTS: Readonly<DynamicPromptsSettings> = {
+  ...VIDEO_DYNAMIC_PROMPTS_DEFAULTS,
+  dynamicPromptsEnabled: false,
+};
+
 /** Panel arrangement fields are UI state rather than generation parameters. */
 export const VIDEO_UI_STATE_KEYS = {
   batchCount: true,
@@ -431,6 +449,12 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
         ? 'fixed'
         : 'random',
     conditioningClip,
+    ...normalizeDynamicPromptsSettings(
+      values,
+      hasFiniteNumber(values, 'positivePromptHeightPx')
+        ? SAVED_VIDEO_DYNAMIC_PROMPTS_DEFAULTS
+        : VIDEO_DYNAMIC_PROMPTS_DEFAULTS
+    ),
     sourceVideo,
     steps: hasFiniteNumber(values, 'steps') ? (values.steps as number) : SETTINGS_FALLBACKS.steps,
     targetResolution: isVideoTargetResolution(values.targetResolution)
@@ -493,7 +517,13 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
     (values.ltx2DurationHeadModel === null || isModelIdentifierConfig(values.ltx2DurationHeadModel)) &&
     // Same invariant normalize enforces: there is no auto duration without a head to decide it.
     (values.autoDuration === false || (values.autoDuration === true && values.ltx2DurationHeadModel !== null)) &&
-    hasFiniteNumber(values, 'h3HybridStartBlock')
+    hasFiniteNumber(values, 'h3HybridStartBlock') &&
+    typeof values.dynamicPromptsCombinatorial === 'boolean' &&
+    typeof values.dynamicPromptsEnabled === 'boolean' &&
+    typeof values.dynamicPromptsResample === 'boolean' &&
+    values.dynamicPromptsMaxPrompts === normalized.dynamicPromptsMaxPrompts &&
+    values.dynamicPromptsSampleSeed === normalized.dynamicPromptsSampleSeed &&
+    values.dynamicPromptsSeedBehaviour === normalized.dynamicPromptsSeedBehaviour
   );
 };
 
@@ -723,11 +753,10 @@ export const createVideoReferenceEntry = (item: {
 };
 
 /**
- * Default the first image to max detail and later images to generation-matched detail to limit repeatedly attended
- * reference rows; users may override each.
+ * New image references match the generation size, which limits the reference rows the model attends to; users may
+ * raise each to max. Stored references keep their own detail, and recall restores the recorded one.
  */
-export const getDefaultReferenceImageDetail = (references: VideoReferenceItem[]): VideoReferenceImageDetail =>
-  references.some((entry) => entry.kind === 'image') ? 'match' : 'max';
+export const DEFAULT_REFERENCE_IMAGE_DETAIL: VideoReferenceImageDetail = 'match';
 
 /** The minimum frames a trim must keep — video_concat's crossfade consumes a 2-frame tail. */
 export const MIN_VIDEO_TRIM_FRAMES = 2;

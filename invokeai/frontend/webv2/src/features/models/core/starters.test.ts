@@ -21,8 +21,21 @@ const catalog: StarterModel[] = [
 ];
 
 describe('filterStarterModels', () => {
-  it('keeps catalog order under the default sort', () => {
-    expect(filterStarterModels(catalog, DEFAULT_STARTER_MODEL_FILTERS, '').map((m) => m.name)).toEqual([
+  it('sorts by name, ignoring case, unless the user picks another order', () => {
+    const mixedCase = [...catalog, createStarter({ name: 'bright LoRA', type: 'lora' })];
+
+    expect(filterStarterModels(mixedCase, DEFAULT_STARTER_MODEL_FILTERS, '').map((m) => m.name)).toEqual([
+      'Alpha FLUX',
+      'bright LoRA',
+      'Detail Tweaker',
+      'Juggernaut XL',
+    ]);
+  });
+
+  it('keeps catalog order under the catalog sort', () => {
+    const catalogOrder = { ...DEFAULT_STARTER_MODEL_FILTERS, sortField: 'default' as const };
+
+    expect(filterStarterModels(catalog, catalogOrder, '').map((m) => m.name)).toEqual([
       'Juggernaut XL',
       'Alpha FLUX',
       'Detail Tweaker',

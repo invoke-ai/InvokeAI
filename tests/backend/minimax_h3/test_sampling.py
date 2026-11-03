@@ -1,5 +1,8 @@
 """Tests for the MiniMax H3 packed-sequence math and denoise-state construction."""
 
+import dataclasses
+from collections.abc import Iterator
+
 import pytest
 import torch
 
@@ -10,7 +13,16 @@ from invokeai.backend.minimax_h3.packing import (
     video_latent_num_frames,
 )
 from invokeai.backend.minimax_h3.presets import MINIMAX_H3_VIDEO_FRAME_CHOICES, resolve_lowres_canvas_size
-from invokeai.backend.minimax_h3.sampling import build_denoise_state, validate_canvas, validate_num_frames
+from invokeai.backend.minimax_h3.sampling import (
+    MiniMaxH3DenoiseState,
+    MiniMaxH3EncodedReference,
+    build_denoise_state,
+    build_ref2va_denoise_state,
+    validate_canvas,
+    validate_num_frames,
+)
+from invokeai.backend.minimax_h3.scheduling_minimax_h3 import MiniMaxH3Scheduler
+from invokeai.backend.minimax_h3.transformer_minimax_h3 import MiniMaxH3RotaryPosEmbed
 
 
 class TestCanvas:
@@ -135,7 +147,7 @@ class TestLowresCanvasResolution:
                 fn(9, 1)
 
 
-def _build_state(seed: int, with_keyframe: bool = False):
+def _build_state(seed: int, with_keyframe: bool = False, device: str = "cpu"):
     kwargs = {}
     if with_keyframe:
         # One keyframe -> rows_per_frame = (4//2) * (4//2) = 4 condition rows of width 96.
@@ -151,7 +163,7 @@ def _build_state(seed: int, with_keyframe: bool = False):
         num_audio_latents=8,
         num_inference_steps=4,
         seed=seed,
-        device=torch.device("cpu"),
+        device=torch.device(device),
         **kwargs,
     )
 
@@ -222,3 +234,73 @@ class TestDenoiseState:
                 keyframe_anchors=("first",),
                 clean_condition_rows=None,
             )
+
+
+def _build_ref2va_state(device: str) -> MiniMaxH3DenoiseState:
+    # One image reference whose (1, 6, 2) latent packs into 3 condition rows at the micro geometry.
+    return build_ref2va_denoise_state(
+        text_token_tags=torch.tensor([1, 1, 0], dtype=torch.long),
+        references=[MiniMaxH3EncodedReference(kind="image", video_rows=torch.zeros(3, 96), latent_shape=(1, 6, 2))],
+        num_latent_frames=2,
+        latent_height=4,
+        latent_width=4,
+        num_audio_latents=8,
+        num_inference_steps=4,
+        seed=0,
+        device=torch.device(device),
+    )
+
+
+_STATE_BUILDERS = {
+    "fl2va": lambda device: _build_state(seed=0, with_keyframe=True, device=device),
+    "ref2va": _build_ref2va_state,
+}
+
+_CUDA = pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires CUDA device"))
+_MPS = pytest.param(
+    "mps", marks=pytest.mark.skipif(not torch.backends.mps.is_available(), reason="requires MPS device")
+)
+
+
+def _device_tensors(state: MiniMaxH3DenoiseState) -> Iterator[tuple[str, torch.Tensor]]:
+    """Every tensor the denoise loop receives. The layout stays on CPU in float64 by design and is skipped."""
+
+    def walk(value: object, path: str) -> Iterator[tuple[str, torch.Tensor]]:
+        if isinstance(value, torch.Tensor):
+            yield path, value
+        elif isinstance(value, (list, tuple)):
+            for index, item in enumerate(value):
+                yield from walk(item, f"{path}[{index}]")
+        elif isinstance(value, MiniMaxH3Scheduler):
+            for name, item in vars(value).items():
+                yield from walk(item, f"{path}.{name}")
+
+    for field in dataclasses.fields(state):
+        if field.name != "layout":
+            yield from walk(getattr(state, field.name), field.name)
+
+
+class TestDevicePortableState:
+    @pytest.mark.parametrize("device", ["cpu", _CUDA, _MPS])
+    @pytest.mark.parametrize("builder", sorted(_STATE_BUILDERS))
+    def test_no_float64_tensor_reaches_the_device(self, builder: str, device: str):
+        # MPS has no float64: any float64 tensor in the state fails the request on Apple Silicon.
+        state = _STATE_BUILDERS[builder](device)
+        tensors = dict(_device_tensors(state))
+
+        assert {"position_ids", "row_timestep_plan[0][0]", "scheduler.sigmas"} <= tensors.keys()
+        assert state.layout.position_ids.dtype == torch.float64
+        assert [path for path, tensor in tensors.items() if tensor.dtype == torch.float64] == []
+        assert state.position_ids.dtype == torch.float32
+        assert state.position_ids.device.type == device
+
+    @pytest.mark.parametrize("device", [_MPS])
+    @pytest.mark.parametrize("builder", sorted(_STATE_BUILDERS))
+    def test_rope_runs_on_the_state(self, builder: str, device: str):
+        state = _STATE_BUILDERS[builder](device)
+        rope = MiniMaxH3RotaryPosEmbed().to(device)
+
+        cos, sin = rope(state.position_ids)
+
+        assert cos.shape == sin.shape == (state.layout.sequence_length, 6 * rope.rope_freq_dim)
+        assert torch.isfinite(cos).all() and torch.isfinite(sin).all()

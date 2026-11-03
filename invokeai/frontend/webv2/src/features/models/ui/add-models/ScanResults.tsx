@@ -9,7 +9,7 @@ import {
 } from '@features/models/ui/shared/InstallSourceMenu';
 import { InstallPathRow } from '@features/models/ui/shared/InstallSourceRow';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
-import { useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
+import { findInstalledLocalPathKey, useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
 import { sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { IconButton } from '@platform/ui';
 import { ListStack } from '@platform/ui/list/ListStack';
@@ -50,9 +50,10 @@ export const ScanResults = ({
   // Live library state: `is_installed` is a scan-time snapshot, so a model
   // installed from this list would otherwise keep offering Install forever.
   const installedSourceKeys = useInstalledSourceKeys();
-  const isRowInstalled = (result: FoundModel) => result.is_installed || installedSourceKeys.has(result.path);
+  const installedKeyOf = (result: FoundModel) => findInstalledLocalPathKey(result.path, installedSourceKeys);
+  const isRowInstalled = (result: FoundModel) => result.is_installed || installedKeyOf(result) !== null;
   const statusOf = (result: FoundModel): InstallSourceStatus => ({
-    installedModelKey: installedSourceKeys.get(result.path) ?? null,
+    installedModelKey: installedKeyOf(result),
     isInstalled: isRowInstalled(result),
     isPending: pendingSources.has(result.path),
   });

@@ -2,7 +2,7 @@ import type { QueueCounts } from '@features/queue/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { getFilterCount, matchesFilter } from './queueFilters';
+import { getFilterCount, matchesFilter, QUEUE_FILTERS } from './queueFilters';
 
 const counts: QueueCounts = {
   canceled: 1,
@@ -18,17 +18,8 @@ const counts: QueueCounts = {
 };
 
 describe('queue filters', () => {
-  it('uses personal counts for active work and global counts for history', () => {
-    expect(getFilterCount(counts, 'active')).toBe(3);
-    expect(getFilterCount(counts, 'all')).toBe(19);
-    expect(getFilterCount(counts, 'completed')).toBe(2);
-  });
-
-  it('treats waiting workflow items as active', () => {
+  it('counts every tab the way its list filters: the same items, waiting ones among the active', () => {
+    expect(QUEUE_FILTERS.map(({ id }) => getFilterCount(counts, id))).toEqual([19, 13, 2, 3, 1]);
     expect(matchesFilter('waiting', 'active')).toBe(true);
-  });
-
-  it('falls back to global active counts in single-user responses', () => {
-    expect(getFilterCount({ ...counts, userInProgress: null, userPending: null }, 'active')).toBe(12);
   });
 });

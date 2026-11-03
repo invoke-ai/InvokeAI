@@ -27,6 +27,11 @@ const translations: Record<string, string> = {
   'launchpad.browserIssues.canvasReadbackIntegrity.title': 'Canvas protection may corrupt painted strokes',
   'launchpad.browserIssues.copyFailed': 'Could not copy browser setting',
   'launchpad.browserIssues.copySetting': 'Copy browser setting',
+  'common.copyUnavailable': 'Copying needs HTTPS or localhost',
+  'launchpad.browserIssues.dismiss': 'Dismiss',
+  'launchpad.browserIssues.plainHttpLimits.description': 'Invoke is open over plain HTTP from a network address.',
+  'launchpad.browserIssues.plainHttpLimits.title': 'Some features are limited on this address',
+  'launchpad.browserIssues.plainHttpLimits.workaround': 'Open Invoke at localhost, or serve it over HTTPS.',
   'launchpad.browserIssues.settingCopied': 'Browser setting copied',
 };
 
@@ -38,7 +43,7 @@ vi.mock('react-i18next', () => ({
 
 import { KnownBrowserIssuesAlert } from './KnownBrowserIssuesAlert';
 
-const [CANVAS_ISSUE] = KNOWN_BROWSER_ISSUES;
+const [CANVAS_ISSUE, PLAIN_HTTP_ISSUE] = KNOWN_BROWSER_ISSUES;
 
 const createDetectedIssue = (...workaroundIds: readonly string[]): DetectedBrowserIssue => {
   const { detect: _detect, ...issue } = CANVAS_ISSUE;
@@ -47,6 +52,23 @@ const createDetectedIssue = (...workaroundIds: readonly string[]): DetectedBrows
     ...issue,
     workarounds: issue.workarounds.filter((workaround) => workaroundIds.includes(workaround.id)),
   };
+};
+
+const createPlainHttpIssue = (): DetectedBrowserIssue => {
+  const { detect: _detect, ...issue } = PLAIN_HTTP_ISSUE;
+
+  return issue;
+};
+
+const DISMISSED_KEY = 'invokeai:v7:webv2:browser-issue-dismissed:plain-http-limits';
+
+const findButton = (name: string): HTMLButtonElement | null =>
+  host?.querySelector<HTMLButtonElement>(`button[aria-label="${name}"]`) ?? null;
+
+const remount = async (): Promise<void> => {
+  await act(() => root?.unmount());
+  root = createRoot(host!);
+  await renderAlert();
 };
 
 let host: HTMLDivElement | null = null;
@@ -65,6 +87,7 @@ const renderAlert = async (): Promise<void> => {
 };
 
 beforeEach(() => {
+  window.localStorage.removeItem(DISMISSED_KEY);
   detectKnownBrowserIssuesMock.mockReset();
   detectKnownBrowserIssuesMock.mockReturnValue([]);
   originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
@@ -95,7 +118,7 @@ describe('known browser issues alert', () => {
     await renderAlert();
 
     expect(detectKnownBrowserIssuesMock).toHaveBeenCalledOnce();
-    expect(host?.querySelector('[role="alert"]')).toBeNull();
+    expect(host?.querySelector('[role="status"]')).toBeNull();
     expect(document.body.childElementCount).toBe(bodyChildCount);
   });
 
@@ -104,7 +127,7 @@ describe('known browser issues alert', () => {
 
     await renderAlert();
 
-    const alert = host?.querySelector('[role="alert"]');
+    const alert = host?.querySelector('[role="status"]');
     const copyButton = host?.querySelector<HTMLButtonElement>('button[aria-label="Copy browser setting"]');
 
     expect(alert).not.toBeNull();
@@ -112,7 +135,8 @@ describe('known browser issues alert', () => {
     expect(alert?.textContent).toContain('disable “[Helium Noise] Canvas pixel noising”');
     expect(alert?.textContent).toContain('canvas-protection extension');
     expect(alert?.textContent).toContain('helium://flags/#helium-noise-canvas');
-    expect(copyButton?.title).toBe('Copy browser setting');
+    expect(copyButton?.hasAttribute('title')).toBe(false);
+    // The readback alert stays until the browser is fixed: no dismiss control.
     expect(host?.querySelectorAll('button')).toHaveLength(1);
   });
 
@@ -121,7 +145,7 @@ describe('known browser issues alert', () => {
 
     await renderAlert();
 
-    const alert = host?.querySelector('[role="alert"]');
+    const alert = host?.querySelector('[role="status"]');
 
     expect(alert?.textContent).toContain('turn Shields off for this site');
     expect(alert?.textContent).not.toContain('Helium');
@@ -143,5 +167,74 @@ describe('known browser issues alert', () => {
     await act(() => userEvent.click(copyButton!));
 
     expect(writeText).toHaveBeenCalledWith('helium://flags/#helium-noise-canvas');
+  });
+
+  it('remembers a dismissed plain-HTTP notice across reloads and moves focus to the page heading', async () => {
+    const heading = document.createElement('h1');
+    heading.textContent = 'Welcome to Invoke';
+    host!.before(heading);
+    detectKnownBrowserIssuesMock.mockReturnValue([createPlainHttpIssue()]);
+
+    try {
+      await renderAlert();
+      expect(host?.textContent).toContain('Some features are limited on this address');
+
+      await act(() => userEvent.click(findButton('Dismiss')!));
+
+      expect(host?.querySelector('[role="status"]')).toBeNull();
+      expect(document.activeElement).toBe(heading);
+      expect(window.localStorage.getItem(DISMISSED_KEY)).toBe('true');
+
+      await remount();
+      expect(host?.querySelector('[role="status"]')).toBeNull();
+    } finally {
+      heading.remove();
+    }
+  });
+
+  it('moves focus to the next alert when one of several is dismissed', async () => {
+    detectKnownBrowserIssuesMock.mockReturnValue([createPlainHttpIssue(), createDetectedIssue('other-browser')]);
+
+    await renderAlert();
+    await act(() => userEvent.click(findButton('Dismiss')!));
+
+    expect(host?.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(document.activeElement?.getAttribute('data-browser-issue')).toBe('canvas-readback-integrity');
+  });
+
+  it('hides the notice for this page and shows it again next time when storage throws', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage disabled', 'SecurityError');
+    });
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage disabled', 'SecurityError');
+    });
+    detectKnownBrowserIssuesMock.mockReturnValue([createPlainHttpIssue()]);
+
+    try {
+      await renderAlert();
+      await act(() => userEvent.click(findButton('Dismiss')!));
+      expect(host?.querySelector('[role="status"]')).toBeNull();
+
+      await remount();
+      expect(host?.querySelector('[role="status"]')).not.toBeNull();
+    } finally {
+      getItem.mockRestore();
+      setItem.mockRestore();
+    }
+  });
+
+  it('keeps the copy control, disabled with its reason, when the clipboard is unavailable', async () => {
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: undefined });
+    detectKnownBrowserIssuesMock.mockReturnValue([createDetectedIssue('helium')]);
+
+    await renderAlert();
+    const copyButton = findButton('Copy browser setting');
+
+    expect(copyButton?.getAttribute('aria-disabled')).toBe('true');
+    // Pointer tooling refuses aria-disabled targets; a click still reaches the element and must do nothing.
+    await act(() => copyButton!.click());
+    await act(() => userEvent.hover(copyButton!));
+    await vi.waitFor(() => expect(document.body.textContent).toContain('Copying needs HTTPS or localhost'));
   });
 });

@@ -3,12 +3,16 @@ import type { ModelTaxonomyType } from '@features/models/core/types';
 import type { ModelFilterSortOption } from '@features/models/ui/shared/ModelFilterMenu';
 
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { ModelFilterMenu, SORT_FIELD_OPTIONS } from '@features/models/ui/shared/ModelFilterMenu';
+import { ModelFilterMenu } from '@features/models/ui/shared/ModelFilterMenu';
 import { useTranslation } from 'react-i18next';
 
-const STARTER_SORT_FIELDS = SORT_FIELD_OPTIONS.filter(
-  (option): option is ModelFilterSortOption<StarterSortField> => option.field !== 'size'
-);
+/** Name is the starter list's default, so the catalog's own order is named for what it is, not "Default". */
+const STARTER_SORT_FIELDS: readonly ModelFilterSortOption<StarterSortField>[] = [
+  { field: 'default', labelKey: 'models.sort.catalog' },
+  { field: 'name', labelKey: 'models.sort.name' },
+  { field: 'base', labelKey: 'models.sort.base' },
+  { field: 'format', labelKey: 'models.sort.format' },
+];
 
 const isFiltering = (filters: StarterModelFilters): boolean =>
   filters.typeFilter !== null || filters.baseFilter !== null;

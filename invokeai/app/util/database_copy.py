@@ -2,7 +2,6 @@
 into a new SQLite file."""
 
 import argparse
-import os
 import shutil
 import sys
 import tempfile
@@ -28,6 +27,7 @@ from invokeai.app.services.shared.database.startup import (
     open_migrated_database,
     redacted_database_url,
 )
+from invokeai.app.util.no_replace import publish_noreplace
 from invokeai.backend.util.logging import InvokeAILogger
 
 _START_AGAIN = (
@@ -286,17 +286,11 @@ def _copy_to_sqlite(source: Database, target_path: Path, logger: Logger) -> int:
 def _move_into_place(work_path: Path, target_path: Path) -> bool:
     """Moves the copy to `target_path` unless a file is there; whether it did."""
     try:
-        # A link, unlike a rename, refuses a path that exists, without a moment between checking and moving.
-        os.link(work_path, target_path)
+        publish_noreplace(work_path, target_path)
     except FileExistsError:
         return False
-    except OSError:
-        # A file system without hard links (FAT, some network shares): check, then move.
-        if target_path.exists() or target_path.is_symlink():
-            return False
-        os.replace(work_path, target_path)
-        return True
-    # The work file's other name goes with its directory, which the caller deletes.
+    # Where the copy was linked or copied rather than renamed, the work file goes with its directory, which the caller
+    # deletes.
     return True
 
 

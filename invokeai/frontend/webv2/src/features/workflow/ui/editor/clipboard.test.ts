@@ -1,4 +1,9 @@
-import type { ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from '@features/workflow/contracts';
+import type {
+  ProjectGraphState,
+  WorkflowConnectorNode,
+  WorkflowEdge,
+  WorkflowInvocationNode,
+} from '@features/workflow/contracts';
 
 import { createProjectGraph } from '@features/workflow/utility';
 import { describe, expect, it } from 'vitest';
@@ -28,6 +33,22 @@ const createEdge = (id: string, source: string, target: string): WorkflowEdge =>
   sourceHandle: 'value',
   target,
   targetHandle: 'a',
+  type: 'default',
+});
+
+const createConnector = (id: string): WorkflowConnectorNode => ({
+  data: { label: '' },
+  id,
+  position: { x: 50, y: 0 },
+  type: 'connector',
+});
+
+const connectorEdge = (id: string, source: string, target: string): WorkflowEdge => ({
+  id,
+  source,
+  sourceHandle: source.startsWith('connector') ? 'out' : 'value',
+  target,
+  targetHandle: target.startsWith('connector') ? 'in' : 'a',
   type: 'default',
 });
 
@@ -73,12 +94,88 @@ describe('workflow clipboard', () => {
   it('anchors the pasted group on an explicit position, preserving relative layout', () => {
     copyNodesToClipboard(createDoc(), ['node-a', 'node-b']);
 
-    const { nodes } = buildPasteElements({ x: 500, y: 500 });
+    const { nodes } = buildPasteElements({ placement: { align: 'top-left', point: { x: 500, y: 500 } } });
 
     expect(nodes.map((node) => node.position)).toEqual([
       { x: 500, y: 500 },
       { x: 600, y: 550 },
     ]);
+  });
+
+  it("centers the group's node positions on a point, preserving relative layout", () => {
+    copyNodesToClipboard(createDoc(), ['node-a', 'node-b']);
+
+    const { nodes } = buildPasteElements({ placement: { align: 'center', point: { x: 500, y: 500 } } });
+
+    // Positions span (0,0)–(100,50); their middle (50,25) lands on the point.
+    expect(nodes.map((node) => node.position)).toEqual([
+      { x: 450, y: 475 },
+      { x: 550, y: 525 },
+    ]);
+  });
+
+  it('keeps edges from outside nodes only when pasting with connections', () => {
+    copyNodesToClipboard(createDoc(), ['node-a']);
+
+    expect(buildPasteElements().edges).toEqual([]);
+
+    const { edges, nodes } = buildPasteElements({ withConnections: true });
+
+    expect(edges).toHaveLength(1);
+    expect(edges[0]).toMatchObject({ source: 'node-outside', target: nodes[0]?.id });
+    expect(edges[0]?.id).not.toBe('edge-2');
+  });
+
+  it('never carries a loop linkage into a pasted copy', () => {
+    copyNodesToClipboard(
+      {
+        ...createDoc(),
+        edges: [
+          { ...createEdge('linkage', 'node-outside', 'node-a'), targetHandle: 'loop_linkage', type: 'loop_linkage' },
+          { ...createEdge('aliased-linkage', 'node-outside', 'node-a'), targetHandle: 'loop_linkage' },
+        ],
+      },
+      ['node-a']
+    );
+
+    expect(buildPasteElements({ withConnections: true }).edges).toEqual([]);
+  });
+
+  it('copies an unselected connector that bridges two copied nodes', () => {
+    const doc: ProjectGraphState = {
+      ...createProjectGraph('clipboard-connector-test'),
+      edges: [
+        connectorEdge('a-to-c1', 'node-a', 'connector-1'),
+        connectorEdge('c1-to-c2', 'connector-1', 'connector-2'),
+        connectorEdge('c2-to-b', 'connector-2', 'node-b'),
+        connectorEdge('outside-to-c3', 'node-outside', 'connector-3'),
+        connectorEdge('c3-to-b', 'connector-3', 'node-b'),
+        connectorEdge('a-to-c4', 'node-a', 'connector-4'),
+        connectorEdge('c4-to-outside', 'connector-4', 'node-outside'),
+      ],
+      nodes: [
+        createNode('node-a', 0, 0),
+        createNode('node-b', 100, 50),
+        createNode('node-outside', -200, 0),
+        createConnector('connector-1'),
+        createConnector('connector-2'),
+        createConnector('connector-3'),
+        createConnector('connector-4'),
+      ],
+    };
+
+    expect(copyNodesToClipboard(doc, ['node-a', 'node-b'])).toBe(2);
+
+    const { edges, nodes } = buildPasteElements();
+    const originalIdByPastedId = new Map(
+      nodes.map((node, index) => [node.id, ['node-a', 'node-b', 'connector-1', 'connector-2'][index]])
+    );
+
+    // Connectors 3 (fed from outside) and 4 (leading outside) do not bridge the copy.
+    expect(nodes.map((node) => node.type)).toEqual(['invocation', 'invocation', 'connector', 'connector']);
+    expect(
+      edges.map((edge) => `${originalIdByPastedId.get(edge.source)}->${originalIdByPastedId.get(edge.target)}`)
+    ).toEqual(['node-a->connector-1', 'connector-1->connector-2', 'connector-2->node-b']);
   });
 
   it('duplicates in place without touching the clipboard', () => {

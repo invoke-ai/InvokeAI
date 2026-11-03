@@ -3,7 +3,7 @@ import type { StarterModelBundle } from '@features/models/core/types';
 import type { ReactNode } from 'react';
 
 import { Badge, Box, HStack, Icon } from '@chakra-ui/react';
-import { Button } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { CheckIcon, FolderIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -38,7 +38,8 @@ export const BundleChips = ({
           orientation="horizontal"
           variant="hover"
         >
-          <HStack gap="1.5">
+          {/* The overlay scrollbar gets its own gutter (its size plus margins) so it never covers chips or badges. */}
+          <HStack gap="1.5" pb="var(--scrollbar-click-area)">
             <BundleChip
               isSelected={selectedName === null}
               label={t('common.all')}

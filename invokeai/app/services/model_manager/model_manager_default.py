@@ -1,5 +1,7 @@
 """Implementation of ModelManagerServiceBase."""
 
+from copy import deepcopy
+from pathlib import Path
 from typing import Optional
 
 import torch
@@ -12,13 +14,20 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.model_install.model_install_base import ModelInstallServiceBase
 from invokeai.app.services.model_install.model_install_default import ModelInstallService
 from invokeai.app.services.model_load.model_load_base import ModelLoadServiceBase
+from invokeai.app.services.model_load.model_load_common import distinct_caches
 from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_manager.model_manager_base import ModelManagerServiceBase
-from invokeai.app.services.model_records.model_records_base import ModelRecordServiceBase
+from invokeai.app.services.model_records.model_records_base import (
+    InvalidModelException,
+    ModelRecordChanges,
+    ModelRecordServiceBase,
+)
+from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
 from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -55,6 +64,56 @@ class ModelManagerService(ModelManagerServiceBase):
     def load(self) -> ModelLoadServiceBase:
         return self._load
 
+    def update_model_record(self, key: str, changes: ModelRecordChanges) -> AnyModelConfig:
+        return self._load.apply_record_change(
+            key, lambda: self._store.update_model(key, changes=changes, allow_class_change=True)
+        )
+
+    def reidentify_model(self, key: str) -> AnyModelConfig:
+        config = self._store.get_model(key)
+        models_path = self._install.app_config.models_path
+        if Path(config.path).is_relative_to(models_path):
+            model_path = Path(config.path)
+        else:
+            model_path = models_path / config.path
+        mod = ModelOnDisk(model_path)
+        # The install source is evidence identification reads: for a model whose weights cannot name its
+        # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
+        # folder has also lost the folder it came from, so without the source a re-probe refiles it under
+        # the default.
+        override_fields = {"source": config.source, "source_type": config.source_type}
+        if encoder_id := getattr(config, "image_encoder_model_id", None):
+            override_fields["image_encoder_model_id"] = encoder_id
+        result = ModelConfigFactory.from_model_on_disk(mod, override_fields)
+        if result.config is None:
+            raise InvalidModelException("Unable to identify model format")
+
+        # Retain user-editable fields from the original config
+        identified = result.config
+        identified.path = config.path
+        identified.key = config.key
+        identified.name = config.name
+        identified.description = config.description
+        identified.cover_image = config.cover_image
+        if hasattr(identified, "trigger_phrases") and hasattr(config, "trigger_phrases"):
+            identified.trigger_phrases = config.trigger_phrases
+        identified.source = config.source
+        identified.source_type = config.source_type
+        if hasattr(config, "cpu_only") and hasattr(identified, "cpu_only"):
+            identified.cpu_only = config.cpu_only
+        previous_settings = getattr(config, "default_settings", None)
+        updated_settings = getattr(identified, "default_settings", None)
+        if previous_settings is not None and updated_settings is not None:
+            # The probe may hand back an architecture's shared defaults object; copy it before writing to it.
+            updated_settings = deepcopy(updated_settings)
+            identified.default_settings = updated_settings
+            for field in ("cpu_only", "fp8_storage"):
+                if hasattr(previous_settings, field) and hasattr(updated_settings, field):
+                    setattr(updated_settings, field, getattr(previous_settings, field))
+
+        # The probe can change the config class or reset load-affecting settings.
+        return self._load.apply_record_change(config.key, lambda: self._store.replace_model(config.key, identified))
+
     def start(self, invoker: Invoker) -> None:
         for service in [self._store, self._install, self._load]:
             if hasattr(service, "start"):
@@ -63,7 +122,7 @@ class ModelManagerService(ModelManagerServiceBase):
     def stop(self, invoker: Invoker) -> None:
         # Shutdown every per-device model cache to cancel any pending keep-alive timers.
         if hasattr(self._load, "ram_caches"):
-            for cache in self._load.ram_caches.values():
+            for cache in distinct_caches(self._load.ram_caches.values()):
                 cache.shutdown()
 
         for service in [self._store, self._install, self._load]:
@@ -130,14 +189,14 @@ class ModelManagerService(ModelManagerServiceBase):
         # leave nothing for the OS, causing swap thrashing. The clamp leaves real headroom; shared-weight
         # dedup means the true footprint usually stays well under the cap regardless.
         gb = 2**30
-        distinct_caches = list(dict.fromkeys(ram_caches.values()))
+        device_caches = distinct_caches(ram_caches.values())
         # Cross-device weight adoption (and its per-model meta-shell capture) only pays off with more
         # than one device cache; disable the capture cost otherwise.
-        shared_store.enable_shell_capture = len(distinct_caches) > 1
+        shared_store.enable_shell_capture = len(device_caches) > 1
         if app_config.max_cache_ram_gb is not None:
             global_ram_budget_bytes = int(app_config.max_cache_ram_gb * gb)
         else:
-            summed_cache_bytes = sum(c.local_ram_cache_size_bytes for c in distinct_caches)
+            summed_cache_bytes = sum(c.local_ram_cache_size_bytes for c in device_caches)
             system_ram_headroom_bytes = ModelCache.calc_system_ram_headroom_bytes()
             global_ram_budget_bytes = min(summed_cache_bytes, system_ram_headroom_bytes)
             if global_ram_budget_bytes < summed_cache_bytes:
@@ -146,11 +205,11 @@ class ModelManagerService(ModelManagerServiceBase):
                     f"headroom (sum of per-device caches was {summed_cache_bytes / gb:.2f} GB)."
                 )
         ram_budget = RamBudget(max_bytes=global_ram_budget_bytes, shared_store=shared_store)
-        for cache in distinct_caches:
+        for cache in device_caches:
             cache.set_ram_budget(ram_budget)
         logger.info(
             f"Model cache global RAM budget: {global_ram_budget_bytes / gb:.2f} GB "
-            f"across {len(distinct_caches)} device cache(s)."
+            f"across {len(device_caches)} device cache(s)."
         )
 
         loader = ModelLoadService(

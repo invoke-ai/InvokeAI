@@ -192,3 +192,16 @@ def test_one_users_wildcards_do_not_resolve_for_another(store: WildcardRecordsSt
     )
 
     assert other.error == "No values found for wildcard(s): colors"
+
+
+def test_delete_many_deletes_only_the_owners_wildcards_across_query_chunks(store: WildcardRecordsStorage) -> None:
+    # More ids than one IN list binds, with the other account's ids in both chunks.
+    mine = [store.create(WildcardWithoutId(name=f"mine-{i}", values=["x"]), user_id="user-1").id for i in range(600)]
+    theirs = [store.create(WildcardWithoutId(name=f"theirs-{i}", values=["x"]), user_id="user-2").id for i in range(4)]
+    requested = [theirs[0], *mine[:300], theirs[1], *mine[300:], theirs[2], "missing", theirs[3]]
+
+    deleted = store.delete_many("user-1", requested)
+
+    assert sorted(deleted) == sorted(mine)
+    assert store.get_many("user-1") == []
+    assert sorted(w.id for w in store.get_many("user-2")) == sorted(theirs)

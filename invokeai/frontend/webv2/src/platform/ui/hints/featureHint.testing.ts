@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
 const FRAME_MS = 16;
@@ -11,9 +12,25 @@ const nextFrame = (): Promise<void> =>
     });
   });
 
+let pointerTargets = 0;
+
+/**
+ * A momentary 2px target on top of everything: the real pointer can only be moved by hovering an element. Hovering
+ * hands the browser a selector, which is positional unless the element has an id; a hint card's portal unmounting
+ * between the two would shift a positional one off the target, and the hover would wait on nothing.
+ */
+const createPointerTarget = (): HTMLDivElement => {
+  const target = document.createElement('div');
+
+  pointerTargets += 1;
+  target.id = `feature-hint-pointer-target-${pointerTargets}`;
+
+  return target;
+};
+
 /** Move the real pointer to the page corner, so the next hover enters its trigger afresh and emits pointerenter. */
 export const parkPointer = async (): Promise<void> => {
-  const parking = document.createElement('div');
+  const parking = createPointerTarget();
 
   parking.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;z-index:2147483647';
   document.body.append(parking);
@@ -54,8 +71,32 @@ export const openHintCard = async (trigger: Element, timeoutMs = 5000): Promise<
 type Point = { x: number; y: number };
 
 /**
+ * The probe sits on top of everything, so hovering it is also a leave from whatever lies beneath (the card, say). The
+ * browser recomputes hover in the next frame and re-enters that element; wait for it, or a close the leave scheduled
+ * can fire first. Bounded by a second frame: by then the recomputation has run, and a step that never put the
+ * pointer over the probe has nothing to re-enter.
+ */
+const pointerUncovered = (): Promise<void> =>
+  new Promise<void>((resolve) => {
+    let frame = 0;
+    const done = () => {
+      document.removeEventListener('pointerover', done, true);
+      cancelAnimationFrame(frame);
+      resolve();
+    };
+
+    document.addEventListener('pointerover', done, true);
+    frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(done);
+    });
+  });
+
+/**
  * Walk the real pointer from `from` to `to` in straight steps, one pointermove per step: a single hover jumps, which
  * never crosses the space between a label and its card.
+ *
+ * Under fake timers each step advances the clock by exactly `stepDelayMs`, so the walk's timing no longer depends on
+ * how long the browser takes to move the pointer.
  */
 export const movePointerAlong = async (
   from: Point,
@@ -65,17 +106,25 @@ export const movePointerAlong = async (
   for (let step = 0; step <= steps; step += 1) {
     const x = from.x + ((to.x - from.x) * step) / steps;
     const y = from.y + ((to.y - from.y) * step) / steps;
-    // A momentary 2px target under the point: the real pointer can only be moved by hovering an element.
-    const probe = document.createElement('div');
+    const probe = createPointerTarget();
 
     probe.style.cssText = `position:fixed;left:${x - 1}px;top:${y - 1}px;width:2px;height:2px;z-index:2147483647`;
     document.body.append(probe);
     await act(() => userEvent.hover(probe));
+
     probe.remove();
-    await act(async () => {
-      await new Promise<void>((resolve) => {
-        globalThis.setTimeout(resolve, stepDelayMs);
+    await act(() => pointerUncovered());
+
+    if (vi.isFakeTimers()) {
+      await act(() => {
+        vi.advanceTimersByTime(stepDelayMs);
       });
-    });
+    } else {
+      await act(async () => {
+        await new Promise<void>((resolve) => {
+          globalThis.setTimeout(resolve, stepDelayMs);
+        });
+      });
+    }
   }
 };

@@ -8,8 +8,9 @@ import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 import { clampZoom } from '@workbench/canvas-engine/math/snapping';
 import {
   panBy as calculatePanBy,
-  wheelZoomAtPoint as calculateWheelZoomAtPoint,
+  snapWheelZoom,
   zoomAtPoint as calculateZoomAtPoint,
+  type WheelZoomSnap,
 } from '@workbench/panZoom';
 
 export { WHEEL_ZOOM_STEP } from '@workbench/panZoom';
@@ -47,7 +48,10 @@ export interface Viewport {
   documentToScreen(p: Vec2): Vec2;
   /** Sets zoom while keeping the document point under `screenAnchor` fixed. */
   zoomAtPoint(newZoom: number, screenAnchor: Vec2): void;
-  /** Exponential wheel zoom about `screenAnchor`. Continuous — never snaps to a preset. */
+  /**
+   * Exponential wheel zoom about `screenAnchor` that rests on the wheel snap points (`snapWheelZoom`): sticky across
+   * consecutive wheel steps; any other zoom change starts the next wheel step afresh.
+   */
   wheelZoom(deltaY: number, screenAnchor: Vec2): void;
   /** Pans by a CSS-pixel screen delta. */
   panBy(screenDelta: Vec2): void;
@@ -68,6 +72,8 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   let zoom = clampZoom(initial?.zoom ?? 1);
   let size: Size = { height: 0, width: 0 };
   let dpr = 1;
+  /** Wheel zoom's snap memory; only `wheelZoom` keeps it, every other zoom change drops it. */
+  let wheelSnap: WheelZoomSnap | null = null;
 
   const listeners = new Set<() => void>();
 
@@ -87,6 +93,7 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
     zoom === 0 ? { x: 0, y: 0 } : { x: (p.x - pan.x) / zoom, y: (p.y - pan.y) / zoom };
 
   const zoomAtPoint = (newZoom: number, screenAnchor: Vec2): void => {
+    wheelSnap = null;
     const next = calculateZoomAtPoint({ pan, zoom }, newZoom, screenAnchor, clampZoom);
     zoom = next.zoom;
     pan = next.pan;
@@ -94,7 +101,8 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
   };
 
   const wheelZoom = (deltaY: number, screenAnchor: Vec2): void => {
-    const next = calculateWheelZoomAtPoint({ pan, zoom }, deltaY, screenAnchor, { constrainZoom: clampZoom });
+    wheelSnap = snapWheelZoom(wheelSnap, zoom, deltaY, { constrainZoom: clampZoom, now: performance.now() });
+    const next = calculateZoomAtPoint({ pan, zoom }, wheelSnap.zoom, screenAnchor, clampZoom);
     zoom = next.zoom;
     pan = next.pan;
     emit();
@@ -113,6 +121,7 @@ export const createViewport = (initial?: Partial<ViewState>): Viewport => {
       return;
     }
     const fitZoom = clampZoom(Math.min(availWidth / documentRect.width, availHeight / documentRect.height));
+    wheelSnap = null;
     const docCenter: Vec2 = {
       x: documentRect.x + documentRect.width / 2,
       y: documentRect.y + documentRect.height / 2,

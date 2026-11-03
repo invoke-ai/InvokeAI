@@ -1,22 +1,61 @@
-"""Tests for the Krea-2 and MiniMax H3 starter-model bundles.
+"""Tests for the starter-model bundles and the LTX-2 GGUF transformers.
 
 A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
 bundle exists, exposes the diffusers, GGUF and nvfp4 options, and that each transformer-only entry declares the
-two standalone dependencies so installing it also pulls the pieces needed to run it.
+two standalone dependencies so installing it also pulls the pieces needed to run it. The FLUX.2 bundle installs from
+one click on the Launchpad, so it must stay free of gated or non-commercial weights and still run on its own.
 """
 
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
     StarterModel,
+    StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     Krea2VariantType,
+    LTX2VariantType,
     ModelFormat,
     ModelType,
 )
+
+
+def _hf_repo(source: str) -> str:
+    """The Hugging Face repo a starter source downloads from: `org/repo`, `org/repo::subpath` or a resolve URL."""
+    hf_url_prefix = "https://huggingface.co/"
+    if source.startswith(hf_url_prefix):
+        return "/".join(source.removeprefix(hf_url_prefix).split("/")[:2])
+    return source.split("::")[0]
+
+
+def _flux2_bundle_installs() -> list[StarterModelWithoutDependencies]:
+    """Everything installing the FLUX.2 bundle downloads: its members and each member's dependencies."""
+    installs: list[StarterModelWithoutDependencies] = []
+    for model in STARTER_BUNDLES[BaseModelType.Flux2].models:
+        installs.append(model)
+        installs.extend(model.dependencies or [])
+    return installs
+
+
+def test_flux2_bundle_installs_nothing_gated_or_non_commercial() -> None:
+    # Deliberately strict: Klein 4B is the only Apache 2.0, ungated FLUX.2 model, so anything else added to the
+    # bundle needs a license review before this allow-list grows.
+    offending = [m.name for m in _flux2_bundle_installs() if "klein-4b" not in _hf_repo(m.source).lower()]
+    assert offending == [], f"FLUX.2 bundle installs models from outside the Klein 4B repositories: {offending}"
+
+
+def test_flux2_bundle_runs_klein_4b_on_its_own() -> None:
+    installs = _flux2_bundle_installs()
+
+    assert any(
+        m.type is ModelType.Main and m.base is BaseModelType.Flux2 and "klein-4b" in m.source.lower() for m in installs
+    )
+    assert any(m.type is ModelType.VAE and m.base is BaseModelType.Flux2 for m in installs)
+    assert "black-forest-labs/FLUX.2-klein-4B::text_encoder+tokenizer" in {
+        m.source for m in installs if m.type is ModelType.Qwen3Encoder
+    }
 
 
 def _krea2_bundle_by_source() -> dict[str, StarterModel]:
@@ -110,3 +149,23 @@ def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
         assert model.source in starter_sources, f"{model.name} is not registered in STARTER_MODELS"
         for dep in model.dependencies or []:
             assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_the_ltx2_gguf_transformers_pull_the_components_and_the_encoder() -> None:
+    """A GGUF build holds only the transformer, as the int8 single files do: installing one has to pull the component
+    folder and the Gemma-4 encoder it cannot run without, both installable starters themselves."""
+    gguf = [
+        m
+        for m in STARTER_MODELS
+        if m.base is BaseModelType.LTX2 and m.type is ModelType.Main and m.format is ModelFormat.GGUFQuantized
+    ]
+    starter_sources = {m.source for m in STARTER_MODELS}
+
+    assert {m.variant for m in gguf} == {LTX2VariantType.Dev, LTX2VariantType.Distilled}
+    for model in gguf:
+        dependencies = model.dependencies or []
+        assert {(dep.type, dep.format) for dep in dependencies} >= {
+            (ModelType.Main, ModelFormat.Diffusers),
+            (ModelType.Gemma4Encoder, ModelFormat.Gemma4Encoder),
+        }, model.name
+        assert all(dep.source in starter_sources for dep in dependencies), model.name

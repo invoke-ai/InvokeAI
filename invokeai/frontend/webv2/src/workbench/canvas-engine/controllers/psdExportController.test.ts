@@ -466,3 +466,83 @@ describe('PsdExportController — raster tree', () => {
     ]);
   });
 });
+
+describe('PsdExportController — spatial adjustments', () => {
+  const leaf: CanvasRasterLayerContractV2 = {
+    adjustments: [{ amount: 30, id: 'texture', isEnabled: true, size: 4, type: 'texture' }],
+    blendMode: 'normal',
+    id: 'leaf',
+    isEnabled: true,
+    isLocked: false,
+    name: 'Leaf',
+    opacity: 1,
+    source: { image: { height: 20, imageName: 'leaf.png', width: 20 }, type: 'image' },
+    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+    type: 'raster',
+  };
+  const CLARITY = [{ amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' as const }];
+  const spatialDocument: CanvasDocumentContractV3 = {
+    ...document,
+    stacks: stacksFrom([
+      groupContract('outer', [groupContract('inner', [leaf], { adjustments: CLARITY, name: 'Inner' })], {
+        adjustments: [{ amount: 20, id: 'dehaze', isEnabled: true, type: 'dehaze' }],
+        name: 'Outer',
+      }),
+    ]),
+  };
+  const controllerFor = (options: Partial<ConstructorParameters<typeof PsdExportController>[0]>) => {
+    const backend = createTestStubRasterBackend();
+    const snapshot: CanvasDocumentSnapshot = { canvas: canvasWithDocument(spatialDocument), documentGeneration: 1 };
+    return new PsdExportController({
+      backend,
+      captureDocumentSnapshot: () => snapshot,
+      captureRasterSnapshot: () =>
+        Promise.resolve({
+          snapshot: {
+            ...snapshot,
+            emptyLayerIds: new Set<string>(),
+            layerSurfaces: new Map([
+              ['leaf', { rect: { height: 20, width: 20, x: 0, y: 0 }, surface: backend.createSurface(20, 20) }],
+            ]),
+            release: vi.fn(),
+          },
+          status: 'ok' as const,
+        }),
+      getAvailableBytes: () => 10_000_000,
+      isDocumentSnapshotCurrent: () => true,
+      reserve: () => ({ lease: { release: vi.fn() }, status: 'ok' }),
+      ...options,
+    });
+  };
+
+  it('bakes enclosing group stacks into each leaf, innermost first, named by group', async () => {
+    let planned: PsdExportPlan | null = null;
+    const execute = vi.fn((plan: PsdExportPlan) => {
+      planned = plan;
+      return Promise.resolve();
+    });
+
+    await expect(controllerFor({ execute }).export('layers.psd')).resolves.toBe('exported');
+
+    const plan = planned as PsdExportPlan | null;
+    expect(plan?.status === 'ok' && plan.layers[0]!.groupStacks?.map((stack) => stack.id)).toEqual(['inner', 'outer']);
+  });
+
+  it("refuses with the group's name when its spatial stack cannot run on a leaf", async () => {
+    // The leaf's own Texture runs; the inner group's Clarity cannot.
+    const runSpatial = vi
+      .fn()
+      .mockImplementationOnce((request: { pixels: Uint8ClampedArray }) =>
+        Promise.resolve({ pixels: request.pixels, status: 'ok' })
+      )
+      .mockResolvedValue({ status: 'too-large' });
+
+    await expect(controllerFor({ runSpatial }).export('layers.psd')).resolves.toEqual({
+      ownerId: 'inner',
+      ownerName: 'Inner',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    });
+    expect(runSpatial).toHaveBeenCalledTimes(2);
+  });
+});

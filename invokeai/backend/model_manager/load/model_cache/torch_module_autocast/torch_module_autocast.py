@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomConv2d,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_dequantizing_linear import (
+    CustomInt4ConvrotLinear,
     CustomInt8ConvrotLinear,
     CustomNVFP4Linear,
 )
@@ -35,7 +36,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
-from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.quantization.bnb_import import record_bnb_import_failure
+from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
@@ -48,6 +50,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     FluxRMSNorm: CustomFluxRMSNorm,
     DiffusersRMSNorm: CustomDiffusersRMSNorm,
     Int8ConvrotLinear: CustomInt8ConvrotLinear,
+    Int4ConvrotLinear: CustomInt4ConvrotLinear,
     NVFP4Linear: CustomNVFP4Linear,
 }
 
@@ -64,8 +67,8 @@ try:
 
     AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinear8bitLt] = CustomInvokeLinear8bitLt
     AUTOCAST_MODULE_TYPE_MAPPING[InvokeLinearNF4] = CustomInvokeLinearNF4
-except ImportError:
-    pass
+except (ImportError, OSError, RuntimeError) as e:  # bnb may import and then fail loading its native library
+    record_bnb_import_failure(e)
 
 
 AUTOCAST_MODULE_TYPE_MAPPING_INVERSE = {v: k for k, v in AUTOCAST_MODULE_TYPE_MAPPING.items()}

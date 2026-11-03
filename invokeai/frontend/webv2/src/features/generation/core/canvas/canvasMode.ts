@@ -13,6 +13,11 @@ export interface CanvasModeInput {
   contentBounds: Rect | null;
   /** Opaque coverage is alpha-scanned and contains no holes. */
   bboxFullyCovered: boolean;
+  /**
+   * Some composited pixel in the bbox is not fully transparent. Local modes ignore it: content whose bounds overlap
+   * the frame keeps it an outpaint, as before. A hosted model's strategy reads it instead.
+   */
+  bboxHasContent: boolean;
   /** True when an active mask contains inpaint content. */
   hasActiveInpaintMask: boolean;
 }

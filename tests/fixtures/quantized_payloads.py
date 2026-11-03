@@ -15,6 +15,7 @@ import json
 from collections.abc import Mapping
 from typing import Any, NamedTuple
 
+import numpy as np
 import torch
 
 from invokeai.backend.quantization.block_scale_tiles import check_tile_layout
@@ -27,6 +28,9 @@ FP8_E4M3_MAX = 448.0
 # int8 is quantized against 127, not 128: the exporters keep the range symmetric and leave -128
 # unused, so a scale derived from 128 is off by one level on every weight.
 INT8_LEVELS = 127.0
+
+# int4 likewise: symmetric against 7, leaving -8 unused.
+INT4_LEVELS = 7
 
 # The two nvfp4 codes worth +1.0 and -1.0 in E2M1. Paired with a block scale and a global scale they
 # give a weight whose exact value is known without depending on the rest of the E2M1 table.
@@ -78,6 +82,61 @@ def quantize_convrot(weight: torch.Tensor, *, group_size: int = CONVROT_GROUP_SI
 
     restored = (codes.float() * scale).view(out_features, in_features // group_size, group_size) @ hadamard
     return Int8ConvrotPayload(codes, scale.to(torch.float32), restored.view(out_features, in_features))
+
+
+class Int4ConvrotPayload(NamedTuple):
+    """What a packed int4 + convrot layer stores -- ``convrot_w4a4``, ``int4_tensorwise`` and ComfyUI-GGUF's
+    ``Q4_CR`` all store the same bytes -- and the round trip it must come back as."""
+
+    packed: torch.Tensor
+    scale: torch.Tensor
+    dequantized: torch.Tensor
+
+
+def quantize_convrot_int4(weight: torch.Tensor, *, group_size: int = CONVROT_GROUP_SIZE) -> Int4ConvrotPayload:
+    """Mirror of comfy-kitchen's eager ``quantize_convrot_w4a4_weight``: the int8 recipe's rotation, then per-row
+    symmetric int4 against 7 levels, two codes per byte with element ``2j`` in the LOW nibble.
+
+    The packing is written out in unsigned arithmetic rather than shared with any decoder, so a decoder that reads
+    the nibbles in nvfp4's order -- high first -- disagrees with it instead of agreeing by construction.
+    """
+    out_features, in_features = weight.shape
+    hadamard = build_regular_hadamard(group_size, dtype=torch.float32)
+    grouped = weight.float().view(out_features, in_features // group_size, group_size)
+    rotated = (grouped @ hadamard.T).view(out_features, in_features)
+
+    scale = rotated.abs().amax(dim=1, keepdim=True).clamp(min=1e-10) / INT4_LEVELS
+    codes = torch.clamp(torch.round(rotated / scale), -INT4_LEVELS, INT4_LEVELS).to(torch.int8)
+    nibbles = codes.view(torch.uint8) & 0x0F
+    packed = (nibbles[:, 0::2] | (nibbles[:, 1::2] << 4)).view(torch.int8)
+
+    restored = (codes.float() * scale).view(out_features, in_features // group_size, group_size) @ hadamard
+    return Int4ConvrotPayload(packed, scale, restored.view(out_features, in_features))
+
+
+def convrot_w4a4_marker(*, group_size: int = CONVROT_GROUP_SIZE) -> dict[str, Any]:
+    """comfy-kitchen's released int4 layout as the Starnodes converter names it: always rotated, so no ``convrot``
+    flag, and the kernel's activation group size beside it."""
+    return {"format": "convrot_w4a4", "convrot_groupsize": group_size, "quant_group_size": 64}
+
+
+def int4_tensorwise_marker(*, group_size: int = CONVROT_GROUP_SIZE, convrot: bool = True) -> dict[str, Any]:
+    """The same bytes under comfy-kitchen's unreleased ``int4_tensorwise`` name (comfy-quants' int4 exporter)."""
+    return {"format": "int4_tensorwise", "convrot": convrot, "convrot_groupsize": group_size}
+
+
+def q4_cr_marker(rows: int, columns: int, *, group_size: int = CONVROT_GROUP_SIZE, **overrides: Any) -> dict[str, Any]:
+    """The JSON ComfyUI-GGUF's converter stores per ``Q4_CR`` weight (``Q4_CR_W4A4`` in its ``tools/convert.py``):
+    the packed codes are written as ``I8`` ``[rows, columns / 2]``, so the unpacked shape travels in the JSON."""
+    return {
+        "format": "int4_cr",
+        "backing": "w4a4",
+        "convrot_groupsize": group_size,
+        "quant_group_size": 64,
+        "sym": True,
+        "orig_shape": [rows, columns],
+        **overrides,
+    }
 
 
 class ScaledFp8Payload(NamedTuple):
@@ -218,6 +277,25 @@ def q8_cr_marker(*, group_size: int = CONVROT_GROUP_SIZE, **overrides: Any) -> d
     }
 
 
+# gguf-py can read K-quants but not write them. A super-block's bytes are all valid codes, so random ones with sane
+# fp16 super-scales make a real Q4_K tensor; what it means comes from gguf-py's reference reader, not from us.
+_Q4_K_BLOCK_BYTES = 144  # d (fp16), dmin (fp16), 12 bytes of 6-bit scales and mins, 128 bytes of 4-bit codes
+_Q4_K_SUPER_SCALE = np.float16(1e-3).tobytes()
+
+
+def random_q4_k(shape: tuple[int, ...], rng: np.random.Generator) -> np.ndarray:
+    """A packed ``Q4_K`` tensor of logical ``shape`` (rows, cols), cols a multiple of 256.
+
+    The super-scales are set in *every* block -- the 3-D view guarantees it -- since a random one decodes to
+    inf or NaN, which an equality check then skips silently.
+    """
+    rows, cols = shape
+    blocks = rng.integers(0, 256, size=(rows, cols // 256, _Q4_K_BLOCK_BYTES), dtype=np.uint8)
+    blocks[..., 0:2] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
+    blocks[..., 2:4] = np.frombuffer(_Q4_K_SUPER_SCALE, dtype=np.uint8)
+    return blocks.reshape(rows, -1)
+
+
 def write_gguf(
     path: Any,
     tensors: Mapping[str, torch.Tensor],
@@ -225,13 +303,15 @@ def write_gguf(
     quant: Mapping[str, Mapping[str, Any] | str] | None = None,
     q8_0: Mapping[str, torch.Tensor] | None = None,
     architecture: str = "krea2",
+    metadata: Mapping[str, str] | None = None,
 ) -> None:
     """Write a GGUF the way ComfyUI-GGUF lays out a ``Q8_CR`` file.
 
     ``tensors`` are stored by dtype: int8 as GGML ``I8`` (how the converter stores Q8_CR codes), float32
     as ``F32``, float16 as ``F16``. ``quant`` maps a weight name to its JSON, written as the string
     ``comfy.gguf.quant.<weight name>`` (a string is written as it is, for malformed metadata). ``q8_0`` tensors are GGML-quantized, which is what the converter's
-    target-size plans put beside Q8_CR layers in the same file.
+    target-size plans put beside Q8_CR layers in the same file. ``metadata`` adds string keys, such as the
+    ``model_version`` some converters carry over from the source file's header.
     """
     import gguf
 
@@ -241,6 +321,8 @@ def write_gguf(
         torch.float16: gguf.GGMLQuantizationType.F16,
     }
     writer = gguf.GGUFWriter(str(path), architecture)
+    for key, value in (metadata or {}).items():
+        writer.add_string(key, value)
     for name, marker in (quant or {}).items():
         writer.add_string(f"comfy.gguf.quant.{name}", marker if isinstance(marker, str) else json.dumps(dict(marker)))
     for name, tensor in tensors.items():

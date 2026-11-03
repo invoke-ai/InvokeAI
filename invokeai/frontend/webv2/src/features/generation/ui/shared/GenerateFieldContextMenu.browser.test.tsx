@@ -1,7 +1,9 @@
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
@@ -18,24 +20,43 @@ afterEach(async () => {
   root = null;
 });
 
+const i18n = createInstance();
+void i18n.use(initReactI18next).init({
+  initAsync: false,
+  lng: 'en',
+  resources: { en: { translation: { widgets: { generate: { resetFieldNamed: '{{reset}}: {{field}}' } } } } },
+});
+
 const FIELDS = ['Steps', 'CFG'].map((name) => ({ copyValue: () => name, name }));
 const onReset = vi.fn();
 
 /** Two stacked fields, like Steps over CFG; each menu names its field so the open one is identifiable. */
-const renderFields = async () => {
+const renderFields = async (isAtDefault = false) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
-        {FIELDS.map(({ copyValue, name }) => (
-          <GenerateFieldContextMenu key={name} copyValue={copyValue} resetLabel={`Reset ${name}`} onReset={onReset}>
-            <Box data-field={name} h="7" w="40rem">
-              {name}
-            </Box>
-          </GenerateFieldContextMenu>
-        ))}
+        <I18nextProvider i18n={i18n}>
+          <button data-testid="before" type="button">
+            Before
+          </button>
+          {FIELDS.map(({ copyValue, name }) => (
+            <GenerateFieldContextMenu
+              key={name}
+              copyValue={copyValue}
+              fieldLabel={name}
+              isAtDefault={isAtDefault}
+              resetLabel={`Reset ${name}`}
+              onReset={onReset}
+            >
+              <Box as="button" data-field={name} h="7" w="40rem">
+                {name}
+              </Box>
+            </GenerateFieldContextMenu>
+          ))}
+        </I18nextProvider>
       </ChakraProvider>
     )
   );
@@ -80,5 +101,47 @@ describe('GenerateFieldContextMenu', () => {
     await settle();
     expect(openMenus()).toHaveLength(1);
     expect(openMenus()[0]?.textContent).toContain('Reset CFG');
+  });
+
+  it('marks a changed field with a dot named for it, reached by Tab first, that resets and refocuses the field', async () => {
+    onReset.mockClear();
+    await renderFields();
+    const dot = host!.querySelector<HTMLButtonElement>('button[aria-label="Reset Steps: Steps"]')!;
+    const rect = dot.getBoundingClientRect();
+
+    expect(rect.width).toBeGreaterThanOrEqual(16);
+    expect(rect.height).toBeGreaterThanOrEqual(16);
+
+    host!.querySelector<HTMLElement>('[data-testid="before"]')!.focus();
+    await act(() => userEvent.keyboard('{Tab}'));
+    expect(document.activeElement).toBe(dot);
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    expect(onReset).toHaveBeenCalledOnce();
+    await expect.poll(() => document.activeElement).toBe(field('Steps'));
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await renderFields(true);
+    expect(host!.querySelector('[data-modified-dot]')).toBeNull();
+  });
+
+  it('opens from the keyboard menu key under the focused field and returns focus on close', async () => {
+    await renderFields();
+    const cfg = field('CFG');
+    cfg.focus();
+
+    await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
+    await expect.poll(() => openMenus()[0]?.textContent).toContain('Reset CFG');
+    await settle();
+    const menuRect = openMenus()[0]!.getBoundingClientRect();
+    const fieldRect = cfg.getBoundingClientRect();
+
+    expect(Math.abs(menuRect.left - fieldRect.left)).toBeLessThan(24);
+    expect(menuRect.top).toBeGreaterThanOrEqual(fieldRect.bottom - 2);
+
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => openMenus()).toHaveLength(0);
+    expect(document.activeElement).toBe(cfg);
   });
 });

@@ -11,7 +11,7 @@ import type {
 } from '@workbench/layoutContracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
-import { BUILT_IN_LAYOUT_PRESET_LABELS } from '@workbench/launchpad/intents';
+import { BUILT_IN_LAYOUT_PRESET_LABEL_KEYS, BUILT_IN_LAYOUT_PRESET_LABELS } from '@workbench/launchpad/intents';
 
 // Notifications read as ambient status, not a tool: they live on the right.
 const defaultBottomAlignEndInstanceIds: WidgetInstanceId[] = ['shortcuts', 'notifications'];
@@ -29,7 +29,6 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   'autosave-status': 'autosave-status',
   canvas: 'canvas',
   diagnostics: 'diagnostics',
-  'diagnostics:bottom': 'diagnostics',
   gallery: 'gallery',
   'gallery:bottom': 'gallery',
   'gallery:center': 'gallery',
@@ -40,7 +39,6 @@ const defaultInstanceTypes: Record<WidgetInstanceId, WidgetTypeId> = {
   layers: 'layers',
   notifications: 'notifications',
   preview: 'preview',
-  project: 'project',
   queue: 'queue',
   'queue-status': 'queue-status',
   'server-status': 'server-status',
@@ -146,6 +144,7 @@ const createPresetDescriptor = ({
     id,
     isBuiltIn: true,
     label,
+    labelKey: BUILT_IN_LAYOUT_PRESET_LABEL_KEYS[id],
     snapshot: createSnapshot({ centerViewId, panels, presetId: id, widgetRegions }),
   },
 });
@@ -311,6 +310,12 @@ export const resolveLayoutPresetId = (presetId: string): string => legacyLayoutP
 
 export const getLayoutPreset = (presetId: string): BuiltInLayoutPreset =>
   layoutPresets.find((preset) => preset.id === resolveLayoutPresetId(presetId)) ?? defaultLayoutPreset;
+
+/** What a preset is called in the UI: a built-in one the account has not renamed in the current language. */
+export const getLayoutPresetLabel = (
+  preset: Pick<LayoutPreset, 'label' | 'labelKey'>,
+  t: (key: string) => string
+): string => (preset.labelKey ? t(preset.labelKey) : preset.label);
 
 export const isBuiltInLayoutPresetId = (presetId: string): presetId is BuiltInLayoutPresetId =>
   layoutPresets.some((preset) => preset.id === presetId);

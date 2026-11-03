@@ -1,7 +1,7 @@
 import type { DragEndEvent } from '@dnd-kit/core';
 import type { GalleryItem, GalleryItemKind, GalleryItemRef } from '@features/gallery/core/items';
 
-import { Box, HStack, Icon, Image, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Image, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useDndMonitor } from '@dnd-kit/core';
 import { classifyGalleryUpload, getGalleryUploadAccept } from '@features/gallery/core/items';
 import { getGalleryItemByRef } from '@features/gallery/data/backend';
@@ -291,7 +291,8 @@ export const GalleryMediaSlot = ({
             as="button"
             aria-busy={isBusy || undefined}
             aria-disabled={isInert || undefined}
-            aria-label={value ? labels.replace : labels.choose}
+            // Only the bare thumbnail tile needs a label; every other face names itself with its visible text.
+            aria-label={isTile && value ? labels.replace : undefined}
             aspectRatio={isTile ? 1 : undefined}
             cursor={disabled ? 'not-allowed' : undefined}
             // Busy stays focusable (`aria-disabled`): Remove hands focus here while the action runs.
@@ -355,7 +356,11 @@ export const GalleryMediaSlot = ({
             ) : (
               <Stack align="center" color="fg.muted" gap="1.5" justify="center" minH="20" px="4">
                 {isBusy ? (
-                  <Spinner size="lg" />
+                  <>
+                    {/* The spinner replaces the label on screen; the face's name keeps it ahead of "Working…". */}
+                    <VisuallyHidden>{labels.choose}</VisuallyHidden>
+                    <Spinner size="lg" />
+                  </>
                 ) : (
                   <HStack color="fg" fontWeight="600" gap="1.5">
                     <Icon as={ImagePlusIcon} boxSize="4" />

@@ -1,5 +1,7 @@
 /** Inject current time so relative captions remain deterministic. */
 
+import { useState } from 'react';
+
 const DIVISIONS: readonly { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
   { amount: 60, unit: 'second' },
   { amount: 60, unit: 'minute' },
@@ -31,4 +33,21 @@ export const formatRelativeTime = (timestamp: string, now: Date): string => {
   }
 
   return '';
+};
+
+/**
+ * Past-event captions clamp server clock skew to "now". Use `formatRelativeTime` where future times are meaningful.
+ */
+export const formatTimeSince = (timestamp: string, snapshot: Date): string =>
+  formatRelativeTime(timestamp, new Date(Math.max(snapshot.getTime(), Date.parse(timestamp))));
+
+/** Data refreshes advance the clock without resetting the view's other local state. */
+export const useDataTimeSnapshot = (data: object | null | undefined): Date => {
+  const [snapshot, setSnapshot] = useState(() => ({ data, now: new Date() }));
+
+  if (snapshot.data !== data) {
+    setSnapshot(() => ({ data, now: new Date() }));
+  }
+
+  return snapshot.now;
 };

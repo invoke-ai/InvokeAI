@@ -127,6 +127,11 @@ class ModelRecordServiceSQL(ModelRecordServiceBase):
             raise UnknownModelException("model not found")
 
     def update_model(self, key: str, changes: ModelRecordChanges, allow_class_change: bool = False) -> AnyModelConfig:
+        # Every set field is copied into the stored config, so a different key would be written into the blob while
+        # the row keeps the old one: a record nothing can look up by the key it reports.
+        if "key" in changes.model_fields_set and changes.key != key:
+            raise ValueError("A model's key cannot be changed")
+
         def apply(q: Queries) -> str:
             # Locked, so that a concurrent update applies its changes to this one's result, not beside it.
             stored = q.models.lock(key)

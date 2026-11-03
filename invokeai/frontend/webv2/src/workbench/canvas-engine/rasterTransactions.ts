@@ -1,5 +1,7 @@
 import type { LayerExportGuard } from './capabilities';
 import type { CanvasStateContractV3 } from './contracts';
+import type { LayerUnreadable } from './layerExportGuards';
+import type { SpatialRunner } from './render/exactAdjustments';
 import type { RasterSurface } from './render/raster';
 import type { Rect } from './types';
 
@@ -15,7 +17,16 @@ export interface RasterReadLease {
   release(): void;
 }
 
+export interface CaptureRasterSnapshotOptions {
+  signal?: AbortSignal;
+  includeDisabled?: boolean;
+  /** Document-space output region. Rotated/scaled layers and spatial stacks retain their full source context. */
+  region?: Rect;
+}
+
 export interface CanvasDetachedLayerSurface {
+  /** Whole source extent before optional region capture; authoritative for content bounds. */
+  readonly sourceRect?: Rect;
   readonly rect: Rect;
   readonly surface: RasterSurface;
 }
@@ -28,9 +39,11 @@ export interface CanvasRasterSnapshot {
   release(): void;
 }
 
+/** {@link LayerUnreadable}: a required layer's pixels could not be read (its image is gone or does not decode). */
 export type CaptureRasterSnapshotResult =
   | { status: 'ok'; snapshot: CanvasRasterSnapshot }
-  | { status: 'stale' | 'aborted' | 'not-ready' | 'over-budget' };
+  | { status: 'stale' | 'aborted' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable;
 
 export interface CanvasCompositeExecutorDeps {
   backend: {
@@ -43,4 +56,6 @@ export interface CanvasCompositeExecutorDeps {
     | { status: 'ok'; lease: { release(): void } }
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
   uploadImage(blob: Blob): Promise<{ imageName: string; width: number; height: number }>;
+  /** Evaluates spatial adjustment runs exactly for the composites (`SpatialAdjustmentService.run`). */
+  runSpatial?: SpatialRunner;
 }
