@@ -35,4 +35,24 @@ describe('getCurrentBatchItems', () => {
 
     expect(getCurrentBatchItems({ current: null, items, next }).map((item) => item.id)).toEqual([5, 6]);
   });
+
+  it('keeps concurrently running items from another batch out of recent history', () => {
+    const current = createItem(10, 'batch-local', 'in_progress');
+    const remoteRunning = createItem(11, 'batch-remote', 'in_progress');
+    const unrelatedPending = createItem(12, 'batch-remote', 'pending');
+
+    expect(
+      getCurrentBatchItems({
+        current,
+        items: [remoteRunning, unrelatedPending],
+        next: null,
+      }).map((item) => item.id)
+    ).toEqual([10, 11]);
+  });
+
+  it('shows running items even when the backend has no single current or next item', () => {
+    const running = createItem(20, 'batch-remote', 'in_progress');
+
+    expect(getCurrentBatchItems({ current: null, items: [running], next: null }).map((item) => item.id)).toEqual([20]);
+  });
 });

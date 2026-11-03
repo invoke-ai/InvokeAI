@@ -87,7 +87,10 @@ const RouterError = ({ error, reset }: ErrorComponentProps) => {
   );
 };
 
-const rootRoute = createRootRoute({ component: Outlet, errorComponent: RouterError });
+const rootRoute = createRootRoute({
+  component: Outlet,
+  errorComponent: RouterError,
+});
 
 const SCHEDULER_RULES_LOADING: SchedulerPolicyState = { status: 'loading' };
 const SCHEDULER_RULES_UNAVAILABLE: SchedulerPolicyState = { status: 'unavailable' };
