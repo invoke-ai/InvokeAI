@@ -10,6 +10,7 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { LayerRasterizationOutcome } from '@workbench/canvas-engine/layerRasterizer';
 import type { RasterReadLease } from '@workbench/canvas-engine/rasterTransactions';
 import type { CanvasTextSource } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -17,6 +18,7 @@ import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/rend
 
 import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
+import { layerUnreadable, type LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { hasSpatialAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
@@ -27,9 +29,17 @@ import {
   type SpatialRunner,
 } from '@workbench/canvas-engine/render/exactAdjustments';
 
+/**
+ * `not-ready`: the pixels are still loading, moved while they were read, or their image could not be fetched for now,
+ * so trying again can succeed. {@link LayerUnreadable}: rasterizing the layer's current source failed (an image that is
+ * gone or does not decode), so trying again cannot succeed until the source changes.
+ */
 export type ExportLayerPixelsResult =
   | ({ status: 'ok' } & RasterReadLease)
-  | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted' }
+  | {
+      status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted';
+    }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export interface RasterExportControllerOptions {
@@ -40,7 +50,7 @@ export interface RasterExportControllerOptions {
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3,
     signal?: AbortSignal
-  ) => Promise<'published' | 'stale' | 'error' | 'aborted'>;
+  ) => Promise<LayerRasterizationOutcome>;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   readonly isRasterizing: (layer: CanvasLayerContract) => boolean;
   readonly isSupportedSource: (source: CanvasLayerSourceContract) => boolean;
@@ -205,6 +215,9 @@ export class RasterExportController {
     let leased = false;
     try {
       const rasterized = await this.options.getOrStartRasterization(layer, document, options.signal);
+      if (rasterized === 'error') {
+        return layerUnreadable(this.options.getDocument() ?? document, layerId);
+      }
       if (rasterized !== 'published') {
         return { status: rasterized === 'aborted' ? 'aborted' : 'not-ready' };
       }

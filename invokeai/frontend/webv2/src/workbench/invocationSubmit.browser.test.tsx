@@ -108,6 +108,7 @@ const submitGenerate = () => {
     commands,
     formatControlLayerError: ({ code, layerName }) => `${layerName}: ${code}`,
     formatUpscaleMetadataFailure: (name) => name,
+    scopedDefaults: {},
     models: undefined,
     owner: captureAccountScope(),
     prepareCanvasInvocation: vi.fn(),

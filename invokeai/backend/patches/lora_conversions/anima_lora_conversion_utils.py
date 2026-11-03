@@ -65,6 +65,18 @@ _KOHYA_UNET_KEY_REPLACEMENTS = [
     ("mlp_layer2", "mlp.layer2"),
 ]
 
+# Anima's six trainable linear modules outside the DiT and LLM-adapter blocks. These need exact
+# mappings because their leaf names contain underscores (for example ``linear_1``), so they cannot
+# be recovered safely by splitting every underscore into a period.
+_KOHYA_UNET_NON_BLOCK_KEY_MAP = {
+    "final_layer_linear": "final_layer.linear",
+    "final_layer_adaln_modulation_1": "final_layer.adaln_modulation.1",
+    "final_layer_adaln_modulation_2": "final_layer.adaln_modulation.2",
+    "t_embedder_1_linear_1": "t_embedder.1.linear_1",
+    "t_embedder_1_linear_2": "t_embedder.1.linear_2",
+    "x_embedder_proj_1": "x_embedder.proj.1",
+}
+
 # Mapping for Qwen3 text encoder Kohya keys.
 _KOHYA_TE_KEY_REPLACEMENTS = [
     ("self_attn_k_proj", "self_attn.k_proj"),
@@ -82,10 +94,14 @@ def _convert_kohya_unet_key(kohya_layer_name: str) -> str:
 
     Example: lora_unet_blocks_0_cross_attn_k_proj -> blocks.0.cross_attn.k_proj
     Example: lora_unet_llm_adapter_blocks_0_cross_attn_k_proj -> llm_adapter.blocks.0.cross_attn.k_proj
+    Example: lora_unet_final_layer_linear -> final_layer.linear
     """
     key = kohya_layer_name
     if key.startswith("lora_unet_"):
         key = key[len("lora_unet_") :]
+
+    if non_block_key := _KOHYA_UNET_NON_BLOCK_KEY_MAP.get(key):
+        return non_block_key
 
     # Handle llm_adapter prefix: strip it, run the standard block conversion, then re-add with dot
     llm_adapter_prefix = ""
@@ -167,6 +183,48 @@ _PEFT_EXTRA_SUFFIXES = [
     ".lokr_w2_a",
     ".lokr_w2_b",
 ]
+
+
+_DIFFUSERS_NON_BLOCK_KEY_MAP = {
+    "patch_embed.proj": "x_embedder.proj.1",
+    "time_embed.t_embedder.linear_1": "t_embedder.1.linear_1",
+    "time_embed.t_embedder.linear_2": "t_embedder.1.linear_2",
+    "norm_out.linear_1": "final_layer.adaln_modulation.1",
+    "norm_out.linear_2": "final_layer.adaln_modulation.2",
+    "proj_out": "final_layer.linear",
+}
+
+_DIFFUSERS_BLOCK_KEY_MAP = {
+    "attn1.to_q": "self_attn.q_proj",
+    "attn1.to_k": "self_attn.k_proj",
+    "attn1.to_v": "self_attn.v_proj",
+    "attn1.to_out.0": "self_attn.output_proj",
+    "attn2.to_q": "cross_attn.q_proj",
+    "attn2.to_k": "cross_attn.k_proj",
+    "attn2.to_v": "cross_attn.v_proj",
+    "attn2.to_out.0": "cross_attn.output_proj",
+    "ff.net.0.proj": "mlp.layer1",
+    "ff.net.2": "mlp.layer2",
+    "norm1.linear_1": "adaln_modulation_self_attn.1",
+    "norm1.linear_2": "adaln_modulation_self_attn.2",
+    "norm2.linear_1": "adaln_modulation_cross_attn.1",
+    "norm2.linear_2": "adaln_modulation_cross_attn.2",
+    "norm3.linear_1": "adaln_modulation_mlp.1",
+    "norm3.linear_2": "adaln_modulation_mlp.2",
+}
+
+_DIFFUSERS_BLOCK_KEY_RE = re.compile(r"^transformer_blocks\.(\d+)\.(.+)$")
+
+
+def _convert_diffusers_transformer_key(key: str) -> str:
+    if mapped := _DIFFUSERS_NON_BLOCK_KEY_MAP.get(key):
+        return mapped
+    if match := _DIFFUSERS_BLOCK_KEY_RE.match(key):
+        block, suffix = match.groups()
+        if mapped := _DIFFUSERS_BLOCK_KEY_MAP.get(suffix):
+            return f"blocks.{block}.{mapped}"
+        raise ValueError(f"Unsupported diffusers Anima LoRA layer: {key}")
+    return key
 
 
 def _group_keys_by_layer(
@@ -283,6 +341,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if not is_text_encoder:
                 for prefix in [
                     "base_model.model.transformer.",
+                    "base_model.model.",
                     "transformer.",
                     "diffusion_model.",
                 ]:
@@ -293,7 +352,7 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             if is_text_encoder:
                 final_key = f"{ANIMA_LORA_QWEN3_PREFIX}{clean_key}"
             else:
-                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{clean_key}"
+                final_key = f"{ANIMA_LORA_TRANSFORMER_PREFIX}{_convert_diffusers_transformer_key(clean_key)}"
 
             layer = _make_layer_patch(values)
             layers[final_key] = layer

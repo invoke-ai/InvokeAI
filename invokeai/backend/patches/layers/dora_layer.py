@@ -13,15 +13,16 @@ class DoRALayer(LoRALayerBase):
     Two mutually-incompatible magnitude conventions exist in the wild, and they differ in *which axis* of the
     ``(out_features, in_features)`` weight the magnitude vector indexes:
 
-    - **LyCORIS / kohya / OneTrainer** (``.dora_scale``): one entry per **input** column, i.e. the direction
-      norm is taken across the output dim. Shape ``(1, in_features)``.
-    - **PEFT / Diffusers / ai-toolkit** (``.lora_magnitude_vector.weight`` / ``.magnitude``): one entry per
-      **output** row, i.e. the direction norm is taken across the input dim (``torch.linalg.norm(w, dim=1)``).
-      Shape ``(out_features,)``.
+    - **Input axis**: one entry per **input** column, i.e. the direction norm is taken across the output dim.
+      Shape ``(1, in_features)``. This is LyCORIS' ``.dora_scale`` with ``wd_on_out=False``.
+    - **Output axis**: one entry per **output** row, i.e. the direction norm is taken across the input dim
+      (``torch.linalg.norm(w, dim=1)``). PEFT / Diffusers / ai-toolkit (``.lora_magnitude_vector.weight`` /
+      ``.magnitude``, shape ``(out_features,)``), and the ``.dora_scale`` that LyCORIS writes by default
+      (``wd_on_out=True``) and OneTrainer writes with "DoRA on output axis": shape ``(out_features, 1)``.
 
-    Applying one convention's magnitude with the other's math silently produces wrong weights on square layers
-    and raises a broadcast error on non-square ones, so the orientation is carried explicitly rather than
-    guessed from the tensor shape.
+    Applying one convention's magnitude with the other's math silently produces wrong weights, so the orientation
+    is carried explicitly. A ``.dora_scale`` can hold either, and its stored shape tells which (see
+    ``_dora_scale_is_out_dim``).
     """
 
     def __init__(
@@ -48,12 +49,17 @@ class DoRALayer(LoRALayerBase):
             values.get("bias_indices", None), values.get("bias_values", None), values.get("bias_size", None)
         )
 
-        # ``dora_magnitude`` is the PEFT/ai-toolkit out-dim magnitude; ``dora_scale`` is the LyCORIS in-dim one.
-        magnitude_is_out_dim = "dora_magnitude" in values
-        dora_scale = values["dora_magnitude"] if magnitude_is_out_dim else values["dora_scale"]
+        up = values["lora_up.weight"]
+        # ``dora_magnitude`` is the PEFT/ai-toolkit out-dim magnitude. ``dora_scale`` can index either axis.
+        if "dora_magnitude" in values:
+            dora_scale = values["dora_magnitude"]
+            magnitude_is_out_dim = True
+        else:
+            dora_scale = values["dora_scale"]
+            magnitude_is_out_dim = cls._dora_scale_is_out_dim(dora_scale, out_features=up.shape[0])
 
         layer = cls(
-            up=values["lora_up.weight"],
+            up=up,
             down=values["lora_down.weight"],
             dora_scale=dora_scale,
             alpha=alpha,
@@ -78,6 +84,21 @@ class DoRALayer(LoRALayerBase):
         )
 
         return layer
+
+    @staticmethod
+    def _dora_scale_is_out_dim(dora_scale: torch.Tensor, out_features: int) -> bool:
+        """Whether a ``.dora_scale`` holds one entry per output row.
+
+        LyCORIS stores ``(out_features, 1)``, or ``(out_features, 1, 1, 1)`` for a conv layer, with
+        ``wd_on_out=True`` (its default) and ``(1, in_features[, 1, 1])`` with ``wd_on_out=False``. The two
+        shapes only coincide when ``out_features == in_features == 1``, where both conventions give the same
+        weight. A 1-D scale has no axis to tell from, so it keeps the input-axis reading.
+        """
+        return (
+            dora_scale.dim() >= 2
+            and dora_scale.shape[0] == out_features
+            and all(size == 1 for size in dora_scale.shape[1:])
+        )
 
     def _rank(self) -> int:
         return self.down.shape[0]

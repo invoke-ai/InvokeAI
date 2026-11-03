@@ -3,6 +3,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { LayerUnreadable } from '@workbench/canvas-engine/layerExportGuards';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { AdjustmentRefusal } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
@@ -43,11 +44,13 @@ export type ConvertLayerToControlResult =
   | SubsetOf<CanvasCommandRefusal, 'missing' | 'locked' | 'unsupported'>
   | LayerEditRefusal
   | 'failed'
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 type BakedExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 export type DuplicateLayerRasterPlan =
@@ -64,7 +67,8 @@ export type DuplicateLayerRasterPlan =
 
 type DuplicateRasterPreparationResult =
   | { readonly status: 'ready'; readonly layer: CanvasLayerContract }
-  | { readonly status: 'not-ready' | 'over-budget' };
+  | { readonly status: 'not-ready' | 'over-budget' }
+  | LayerUnreadable;
 
 export interface LayerMutationControllerOptions {
   readonly ctx: Pick<
@@ -88,8 +92,8 @@ export interface LayerMutationControllerOptions {
   readonly backend: RasterBackend;
   /** A layer's pixels with its own adjustments and transform baked in, disabled layers included. */
   readonly exportBaked: (layerId: string) => Promise<BakedExportResult>;
-  /** The main model's base and its default control model, for a converted control layer's adapter. */
-  readonly getControlModel: () => { readonly base: string | null; readonly model: string | null };
+  /** The main model's base, for a converted control layer's adapter kind and defaults. */
+  readonly getMainModelBase: () => string | null;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   /** Copies a layer's live cache; `admit` accounts its bytes first and refuses the copy as `over-budget`. */
   readonly captureCache: (
@@ -169,6 +173,9 @@ export class LayerMutationController {
           return { status: 'not-ready' };
         }
         const prepared = await o.prepareDuplicateRasterSource(source.id);
+        if (prepared.status === 'unreadable') {
+          return prepared;
+        }
         if (prepared.status !== 'ready') {
           return { status: prepared.status };
         }
@@ -495,12 +502,12 @@ export class LayerMutationController {
       return 'locked';
     }
     const baked = await o.exportBaked(current.id);
-    if (baked.status === 'adjustment-refused') {
+    if (baked.status === 'adjustment-refused' || baked.status === 'unreadable') {
       return baked;
     }
     if (baked.status === 'empty') {
       const plain = createControlLayerFrom(current, {
-        ...o.getControlModel(),
+        base: o.getMainModelBase(),
         content: { source: current.source },
         id: current.id,
         name: current.name,
@@ -543,7 +550,7 @@ export class LayerMutationController {
         const pixels = o.backend.createSurface(baked.rect.width, baked.rect.height);
         pixels.ctx.drawImage(baked.surface.canvas, 0, 0);
         const after = createControlLayerFrom(current, {
-          ...o.getControlModel(),
+          base: o.getMainModelBase(),
           content: { rect: baked.rect },
           id: current.id,
           name: current.name,

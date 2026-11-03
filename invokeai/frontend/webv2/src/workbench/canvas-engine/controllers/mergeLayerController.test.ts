@@ -3,12 +3,16 @@ import type {
   CanvasDocumentContractV3,
   CanvasLayerContract,
 } from '@workbench/canvas-engine/contracts';
-import type { SpatialRunner } from '@workbench/canvas-engine/render/exactAdjustments';
+import type { AdjustmentRefusal, SpatialRunner } from '@workbench/canvas-engine/render/exactAdjustments';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentIndex, getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,7 +72,7 @@ const createHarness = (
     ctx: h.ctx,
     exportBaked: () => Promise.reject(new Error('merge down reads live caches')),
     hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
-    isCacheReady: () => true,
+    cacheReadiness: () => 'ready',
     layers: h.layers,
     needsPixelPersistence: () => true,
     peekAdjustedSurface: () => displayed,
@@ -250,7 +254,7 @@ describe('MergeLayerController: merge down', () => {
 });
 
 describe('MergeLayerController: merge visible with a spatial group stack', () => {
-  const scene = (runSpatial?: SpatialRunner) => {
+  const scene = (runSpatial?: SpatialRunner, exportRefusal?: AdjustmentRefusal) => {
     const first = { ...paintLayer('first'), name: 'First' };
     const second = { ...paintLayer('second'), name: 'Second' };
     const document: CanvasDocumentContractV3 = {
@@ -273,21 +277,25 @@ describe('MergeLayerController: merge visible with a spatial group stack', () =>
       backend: h.backend,
       ctx: h.ctx,
       exportBaked: (layerId) =>
-        Promise.resolve({
-          guard: {
-            cacheVersion: 1,
-            documentGeneration: 1,
-            layer: getDocumentLayer(h.document(), layerId)!,
-            layerId,
-            projectId: 'p',
-          },
-          rect: rects[layerId]!,
-          release: () => undefined,
-          status: 'ok',
-          surface: h.backend.createSurface(rects[layerId]!.width, rects[layerId]!.height),
-        }),
+        Promise.resolve(
+          exportRefusal?.ownerId === layerId
+            ? exportRefusal
+            : {
+                guard: {
+                  cacheVersion: 1,
+                  documentGeneration: 1,
+                  layer: getDocumentLayer(h.document(), layerId)!,
+                  layerId,
+                  projectId: 'p',
+                },
+                rect: rects[layerId]!,
+                release: () => undefined,
+                status: 'ok',
+                surface: h.backend.createSurface(rects[layerId]!.width, rects[layerId]!.height),
+              }
+        ),
       hasExportableContent: () => true,
-      isCacheReady: () => true,
+      cacheReadiness: () => 'ready',
       layers: h.layers,
       needsPixelPersistence: () => false,
       peekAdjustedSurface: () => null,
@@ -296,6 +304,23 @@ describe('MergeLayerController: merge visible with a spatial group stack', () =>
     });
     return { ...h, controller };
   };
+
+  it('preserves a selected layer export refusal with its owner and reason, merging nothing', async () => {
+    const refusal: AdjustmentRefusal = {
+      ownerId: 'second',
+      ownerName: 'Second',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    };
+    const h = scene(undefined, refusal);
+    const original = h.document();
+
+    expect(await h.controller.mergeSelected(['first', 'second'])).toEqual(refusal);
+    expect(h.document()).toBe(original);
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.reservedBytes()).toBe(0);
+  });
 
   it("evaluates the group's spatial stack on the merged members", async () => {
     const runSpatial = vi.fn<SpatialRunner>((request) => Promise.resolve({ pixels: request.pixels, status: 'ok' }));
@@ -321,6 +346,164 @@ describe('MergeLayerController: merge visible with a spatial group stack', () =>
       reason: 'too-large',
       status: 'adjustment-refused',
     });
+    expect(h.history.canUndo()).toBe(false);
+  });
+});
+
+describe('MergeLayerController: merge masks', () => {
+  const RECTS: Record<string, Rect> = {
+    bottom: { height: 10, width: 10, x: 30, y: 30 },
+    middle: { height: 10, width: 10, x: 10, y: 10 },
+    top: { height: 10, width: 10, x: 0, y: 0 },
+  };
+
+  const createMaskHarness = (
+    options: { bottomNoiseLevel?: number; historyBytes?: number; onExport?: () => void } = {}
+  ) => {
+    // Generation settings every source shares, so the merge may carry them over the whole union.
+    const settings = (noiseLevel = 0.2) => ({
+      denoise: { isEnabled: true, limit: 0.4 },
+      noise: { isEnabled: true, level: noiseLevel },
+    });
+    const top = layerContract('top', 'inpaint_mask', {
+      ...settings(),
+      mask: { bitmap: null, fill: { color: '#123456', style: 'grid' } },
+      opacity: 0.5,
+    } as Partial<CanvasLayerContract>);
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 100, width: 100, x: 0, y: 0 },
+      height: 100,
+      selectedLayerId: 'middle',
+      stacks: stacksFrom([
+        groupContract('first', [layerContract('other', 'inpaint_mask'), top]),
+        groupContract('second', [layerContract('middle', 'inpaint_mask', settings() as Partial<CanvasLayerContract>)]),
+        layerContract('bottom', 'inpaint_mask', {
+          ...settings(options.bottomNoiseLevel),
+          mask: { bitmap: null, fill: { color: '#abcdef', style: 'solid' } },
+        } as Partial<CanvasLayerContract>),
+      ]),
+      version: 3,
+      width: 100,
+    };
+    const h = createLayerOperationHarness(document, { historyBytes: options.historyBytes });
+    for (const [id, rect] of Object.entries({ ...RECTS, other: { height: 4, width: 4, x: 0, y: 0 } })) {
+      h.layers.getOrCreateRect(id, rect).stale = false;
+    }
+    const released: string[] = [];
+    const selections: [string | null, readonly string[]][] = [];
+    const controller = new MergeLayerController({
+      backend: h.backend,
+      ctx: h.ctx,
+      exportBaked: (layerId) => {
+        options.onExport?.();
+        const entry = h.layers.get(layerId)!;
+        return Promise.resolve({
+          guard: { layer: getDocumentLayer(h.document(), layerId) } as never,
+          rect: { ...entry.rect },
+          release: () => released.push(layerId),
+          status: 'ok' as const,
+          surface: entry.surface,
+        });
+      },
+      hasExportableContent: (layerId) => (h.layers.get(layerId)?.rect.width ?? 0) > 0,
+      cacheReadiness: () => 'ready',
+      layers: h.layers,
+      needsPixelPersistence: () => true,
+      peekAdjustedSurface: () => null,
+      publishSelectedLayerIds: (primary, ids) => selections.push([primary, ids]),
+    });
+    return { ...h, controller, original: h.document(), released, selections };
+  };
+
+  const structure = (document: CanvasDocumentContractV3) =>
+    [...getDocumentIndex(document).byId.values()].map((entry) => [entry.node.id, entry.parentId, entry.siblingIndex]);
+
+  it('unions masks from different groups into one mask above the topmost, with its fill, as one step', async () => {
+    const h = createMaskHarness();
+
+    const result = await h.controller.mergeInpaintMasks(['bottom', 'top', 'middle']);
+    expect(result).toEqual({ layerId: 'new-1', status: 'merged' });
+
+    const merged = getDocumentLayer(h.document(), 'new-1');
+    expect(merged).toEqual({
+      blendMode: 'normal',
+      denoise: { isEnabled: true, limit: 0.4 },
+      id: 'new-1',
+      isEnabled: true,
+      isLocked: false,
+      mask: { bitmap: null, fill: { color: '#123456', style: 'grid' }, offset: { x: 0, y: 0 } },
+      name: 'top merged',
+      noise: { isEnabled: true, level: 0.2 },
+      opacity: 1,
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'inpaint_mask',
+    });
+    // The union of the three sources' extents, in place of the topmost source; the others are gone.
+    expect(h.layers.get('new-1')?.rect).toEqual({ height: 40, width: 40, x: 0, y: 0 });
+    expect(getDocumentIndex(h.document()).byId.get('new-1')).toMatchObject({ parentId: 'first', siblingIndex: 1 });
+    expect(leafIds(h.document())).toEqual(['other', 'new-1']);
+    expect(h.document().selectedLayerId).toBe('new-1');
+    expect(h.history.entries().past).toEqual(['Merge masks']);
+    expect(h.released.sort()).toEqual(['bottom', 'middle', 'top']);
+    expect(h.reservedBytes()).toBe(0);
+
+    await expect(h.history.undo()).resolves.toEqual({ status: 'applied' });
+    expect(structure(h.document())).toEqual(structure(h.original));
+    for (const id of ['top', 'middle', 'bottom']) {
+      expect(getDocumentLayer(h.document(), id)).toBe(getDocumentLayer(h.original, id));
+      expect(h.layers.get(id)?.rect).toEqual(RECTS[id]);
+    }
+    expect(h.document().selectedLayerId).toBe('middle');
+
+    await expect(h.history.redo()).resolves.toEqual({ status: 'applied' });
+    expect(leafIds(h.document())).toEqual(['other', 'new-1']);
+  });
+
+  it.each([
+    ['one mask', ['top'], 'ineligible'],
+    ['a regional or raster leaf', ['top', 'first'], 'ineligible'],
+    ['a missing id', ['top', 'gone'], 'missing'],
+  ] as const)('refuses %s without reading pixels', async (_, ids, status) => {
+    const h = createMaskHarness({ onExport: () => expect.fail('read pixels') });
+
+    await expect(h.controller.mergeInpaintMasks(ids)).resolves.toEqual({ status });
+    expect(h.dispatched).toEqual([]);
+  });
+
+  it('refuses masks whose noise or denoise settings differ without reading pixels', async () => {
+    const h = createMaskHarness({ bottomNoiseLevel: 0.7, onExport: () => expect.fail('read pixels') });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'bottom'])).resolves.toEqual({ status: 'settings-differ' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('refuses a merge it could never undo with nothing changed', async () => {
+    const h = createMaskHarness({ historyBytes: 1024 });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'middle'])).resolves.toEqual({ status: 'over-budget' });
+    expect(h.document()).toBe(h.original);
+    expect(h.dispatched).toEqual([]);
+    expect(h.reservedBytes()).toBe(0);
+  });
+
+  it('refuses when a source changes while its pixels are read', async () => {
+    let edited = false;
+    const h = createMaskHarness({
+      onExport: () => {
+        if (!edited) {
+          edited = true;
+          h.ctx.applyStep({
+            accepted: (document) => getDocumentLayer(document, 'middle')?.name === 'Renamed',
+            mutation: { id: 'middle', patch: { name: 'Renamed' }, type: 'updateCanvasLayer' },
+          });
+        }
+      },
+    });
+
+    await expect(h.controller.mergeInpaintMasks(['top', 'middle'])).resolves.toEqual({ status: 'not-ready' });
+    expect(h.dispatched.map((mutation) => mutation.type)).toEqual(['updateCanvasLayer']);
     expect(h.history.canUndo()).toBe(false);
   });
 });

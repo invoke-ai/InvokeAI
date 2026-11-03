@@ -178,6 +178,7 @@ const FAILURE_KEYS: Record<
   'not-ready': 'widgets.layers.runWorkflow.notReady',
   'over-budget': 'widgets.layers.runWorkflow.overBudget',
   stale: 'widgets.layers.runWorkflow.stale',
+  unreadable: 'widgets.layers.runWorkflow.unreadable',
   unsupported: 'widgets.layers.runWorkflow.unsupported',
 };
 

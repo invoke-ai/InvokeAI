@@ -55,6 +55,7 @@ from invokeai.app.services.project_records.project_records_default import Projec
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
+    refuse_while_an_abandoned_worker_runs,
 )
 from invokeai.app.services.session_queue.session_queue_default import SessionQueue
 from invokeai.app.services.shared.database.database import Database
@@ -70,6 +71,10 @@ from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
+    WorkingMemoryCalibrationService,
+)
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
 from invokeai.backend.architectures import conditioning_safe_globals
 from invokeai.backend.architectures import validate as validate_architectures
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
@@ -117,6 +122,10 @@ class ApiDependencies:
         # lazily inside this function for the same reason, one step earlier: it is what fills the
         # registry, and importing this module is all `scripts/generate_openapi_schema.py` does.
         validate_architectures()
+        # A worker the previous invoker's stop gave up on still holds its GPU, and the session processor would refuse
+        # to start beside it. Refused here, before the database opens (and migrates), so a refused restart leaves
+        # nothing open behind it.
+        refuse_while_an_abandoned_worker_runs()
 
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
@@ -216,6 +225,10 @@ class ApiDependencies:
         image_index_records = ImageIndexRecords(database)
         image_index = ImageIndexService()
         intermediates = IntermediatesService(records=IntermediatesRecords(database), logger=logger)
+        # Machine data next to the database rather than in it: see working_memory_calibration_store.
+        working_memory_calibration = WorkingMemoryCalibrationService(
+            CalibrationStore(configuration.db_path.parent / "working_memory")
+        )
         fonts = FontService(
             database,
             fonts_dir=configuration.fonts_path,
@@ -273,7 +286,12 @@ class ApiDependencies:
             fonts=fonts,
             intermediates=intermediates,
             gallery_maintenance=gallery_maintenance,
+            working_memory_calibration=working_memory_calibration,
         )
+
+        # Before the Invoker starts any service: work outside the session queue, such as the image index's backfill,
+        # borrows idle GPUs from the generation device pool as soon as its service starts.
+        session_processor.register_generation_devices(configuration)
 
         # Constructing the Invoker starts every service, including the session
         # processor thread (which may immediately resume queue items that were

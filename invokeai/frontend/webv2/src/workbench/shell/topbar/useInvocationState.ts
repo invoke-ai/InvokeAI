@@ -6,6 +6,9 @@ import type { WidgetTypeId } from '@workbench/widgetContracts';
 import { useDynamicPrompts } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import {
+  describeDynamicPromptsFailure,
+  describeGenerationIssue,
+  getDynamicPromptsConfig,
   getEffectivePrompts,
   normalizeGenerateSettings,
   sanitizeBatchCount,
@@ -13,6 +16,7 @@ import {
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { isUpscaleBatchCountFixed } from '@features/upscale';
+import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -26,6 +30,7 @@ import {
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { useIsInvocationPreparing } from '@workbench/invocationPreparation';
+import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import {
   useActiveProjectSelector,
   useWorkbenchCommands,
@@ -35,34 +40,46 @@ import {
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { getInvocationIssueTarget, type InvocationIssue } from './invokeIssueTargets';
+
+export type { InvocationIssue, InvocationIssueTarget } from './invokeIssueTargets';
+
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 /**
- * Include capability and template snapshots in route selection so either load independently clears its readiness
- * gate.
+ * Include capability, template and remembered control-model snapshots in route selection so each change
+ * independently re-evaluates its readiness gate.
  */
 const subscribeRouteSources = (listener: () => void): (() => void) => {
   const unsubscribeCapabilities = subscribeArchitectureCapabilities(listener);
   const unsubscribeTemplates = subscribeInvocationTemplates(listener);
+  const unsubscribePreferences = subscribeWorkbenchPreferences(listener);
 
   return () => {
     unsubscribeCapabilities();
     unsubscribeTemplates();
+    unsubscribePreferences();
   };
 };
 
 let routeSources: {
   capabilities: ReturnType<typeof getArchitectureCapabilitiesSnapshot>;
+  controlModelMemory: ReturnType<typeof getWorkbenchPreferences>['controlModelMemory'];
   templates: ReturnType<typeof getInvocationTemplatesSnapshot>;
 } | null = null;
 
-/** Referentially stable until one of the two stores publishes a new snapshot. */
+/** Referentially stable until one of the stores publishes a new snapshot. */
 const getRouteSourcesSnapshot = () => {
   const capabilities = getArchitectureCapabilitiesSnapshot();
+  const controlModelMemory = getWorkbenchPreferences().controlModelMemory;
   const templates = getInvocationTemplatesSnapshot();
 
-  if (routeSources?.capabilities !== capabilities || routeSources.templates !== templates) {
-    routeSources = { capabilities, templates };
+  if (
+    routeSources?.capabilities !== capabilities ||
+    routeSources.controlModelMemory !== controlModelMemory ||
+    routeSources.templates !== templates
+  ) {
+    routeSources = { capabilities, controlModelMemory, templates };
   }
 
   return routeSources;
@@ -73,6 +90,7 @@ const areTypeIdSetsEqual = (left: ReadonlySet<WidgetTypeId>, right: ReadonlySet<
 
 const readDynamicPromptsConfig = (values: Record<string, unknown>) => ({
   combinatorial: values.dynamicPromptsCombinatorial,
+  enabled: values.dynamicPromptsEnabled,
   maxPrompts: values.dynamicPromptsMaxPrompts,
   resample: values.dynamicPromptsResample,
   sampleSeed: values.dynamicPromptsSampleSeed,
@@ -93,7 +111,8 @@ export const getBatchCount = (sourceId: InvocationRoute['sourceId'], values: Rec
 
 export interface InvocationState {
   batchCount: number;
-  blockingReasons: string[];
+  /** Every reason Invoke cannot run right now, in the order the tooltip lists them. */
+  issues: InvocationIssue[];
   invocation: InvocationRoute;
   /** Sessions one workflow run produces through batch nodes; absent without batch nodes, null while unresolved. */
   workflowBatchSize?: number | null;
@@ -151,25 +170,40 @@ export const useInvocationState = (): InvocationState => {
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
+  // Video reads its own normalized values, so the count follows what its submission expands.
+  const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
   const promptExpansion = useDynamicPrompts(
-    readEffectivePositivePrompt(routeInput.generateValues),
-    invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
-      ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
-      : null
+    videoValues ? videoValues.positivePrompt : readEffectivePositivePrompt(routeInput.generateValues),
+    videoValues
+      ? getDynamicPromptsConfig(videoValues)
+      : invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
+        ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
+        : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
-  // rule.
-  const expansionReason = promptExpansion.isError
-    ? 'The prompt could not be expanded.'
-    : (promptExpansion.error ?? null);
+  // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
+  const expansionFailure = describeDynamicPromptsFailure(promptExpansion);
+  const expansionReason = expansionFailure ? describeGenerationIssue(t, expansionFailure) : null;
 
-  const blockingReasons = useMemo(
-    () => [
-      ...(isConnected ? [] : ['The backend is disconnected.']),
-      ...(expansionReason === null ? [] : [expansionReason]),
-      ...resolvedRoute.validationReasons.map((reason) => localizeInvocationValidationReason(reason, t)),
+  const issues = useMemo(
+    (): InvocationIssue[] => [
+      ...(isConnected
+        ? []
+        : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
+      ...(expansionReason === null
+        ? []
+        : [
+            {
+              message: expansionReason,
+              target: { kind: 'prompt', widgetId: invocation.sourceId === 'video' ? 'video' : 'generate' },
+            } as const,
+          ]),
+      ...resolvedRoute.validationReasons.map((reason) => ({
+        message: localizeInvocationValidationReason(reason, t),
+        target: getInvocationIssueTarget(reason, invocation.sourceId),
+      })),
     ],
-    [expansionReason, isConnected, resolvedRoute.validationReasons, t]
+    [expansionReason, invocation.sourceId, isConnected, resolvedRoute.validationReasons, t]
   );
   const isValid = isInvocationRouteValid(resolvedRoute) && isConnected && expansionReason === null;
 
@@ -189,9 +223,9 @@ export const useInvocationState = (): InvocationState => {
 
   return {
     batchCount: getBatchCount(invocation.sourceId, sourceValues),
-    blockingReasons,
     invocation,
     invoke,
+    issues,
     isPreparing,
     isValid,
     placedTypeIds,

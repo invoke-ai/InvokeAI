@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from torch.nn.attention import SDPBackend
 
 import invokeai.app.util.startup_utils as startup_utils
 from invokeai.app.util.startup_utils import log_attention_backends, probe_attention_backends
@@ -18,9 +19,9 @@ from invokeai.app.util.startup_utils import log_attention_backends, probe_attent
 @pytest.fixture(autouse=True)
 def _forget_logged_devices():
     """The log is once per device per process, so a leftover entry would silently pass the next test."""
-    startup_utils._logged_attention_backends.clear()
+    startup_utils._probed_attention_devices.clear()
     yield
-    startup_utils._logged_attention_backends.clear()
+    startup_utils._probed_attention_devices.clear()
 
 
 class TestProbe:
@@ -84,8 +85,18 @@ class TestLogLine:
             log_attention_backends(logger, torch.device("cpu"))
         assert caplog.records == []
 
-    def test_the_line_names_every_backend_and_its_answer(self, caplog):
+    def test_the_line_names_every_backend_and_its_answer(self, caplog, preserve_sdpa_priority_order):
         logger = logging.getLogger("test_probe_line")
+        # An order neither torch nor InvokeAI uses, so the line can only have read it from torch.
+        torch._C._set_sdp_priority_order(
+            [
+                int(SDPBackend.MATH),
+                int(SDPBackend.CUDNN_ATTENTION),
+                int(SDPBackend.FLASH_ATTENTION),
+                int(SDPBackend.EFFICIENT_ATTENTION),
+                int(SDPBackend.OVERRIDEABLE),
+            ]
+        )
         with patch(
             "invokeai.app.util.startup_utils.probe_attention_backends",
             return_value={"cudnn": True, "flash": False, "efficient": True, "math": True},
@@ -102,6 +113,35 @@ class TestLogLine:
         assert "head_dim 128" in message
         # And the caveat that keeps it from being read as a dispatch table.
         assert "no mask" in message
+        # Which of the available kernels a call gets is decided by the order, so the line states the one
+        # in force.
+        assert "priority MATH > CUDNN_ATTENTION > FLASH_ATTENTION > EFFICIENT_ATTENTION > OVERRIDEABLE" in message
+
+    def test_a_backend_the_order_repeats_is_named_once_where_it_first_appears(
+        self, caplog, preserve_sdpa_priority_order
+    ):
+        """torch 2.7's order has a fifth slot it never fills, so MATH appears twice. The repeat is never
+        reached; naming it would read as a kernel tried twice."""
+        logger = logging.getLogger("test_probe_repeat")
+        torch._C._set_sdp_priority_order(
+            [
+                int(SDPBackend.FLASH_ATTENTION),
+                int(SDPBackend.CUDNN_ATTENTION),
+                int(SDPBackend.EFFICIENT_ATTENTION),
+                int(SDPBackend.MATH),
+                int(SDPBackend.MATH),
+            ]
+        )
+        with patch(
+            "invokeai.app.util.startup_utils.probe_attention_backends",
+            return_value={"cudnn": True, "flash": False, "efficient": True, "math": True},
+        ):
+            with caplog.at_level(logging.INFO, logger=logger.name):
+                log_attention_backends(logger, torch.device("cuda"))
+
+        assert caplog.records[0].message.endswith(
+            "priority FLASH_ATTENTION > CUDNN_ATTENTION > EFFICIENT_ATTENTION > MATH"
+        )
 
     def test_it_is_logged_once_per_device(self, caplog):
         """The probe allocates, which creates that device's CUDA context. Repeating it per generation
@@ -120,12 +160,13 @@ class TestLogLine:
             "SDPA attention backends on cuda:1",
         ]
 
-    def test_a_device_that_could_not_be_probed_is_not_remembered(self):
-        """Answering None is not an answer. Remembering it would suppress the line for good on a
-        device whose first probe happened to land before the driver was ready."""
+    def test_a_device_whose_probe_failed_is_not_probed_again(self):
+        """Every claimed item asks. A probe allocates and ends with `empty_cache()`, and on a multi-GPU
+        box that flush is deferred to a busy peer's step boundary -- retrying a failed probe would pay
+        that on every item for a line that does not come."""
         logger = logging.getLogger("test_probe_retry")
-        probe = MagicMock(side_effect=[None, {"cudnn": True, "flash": True, "efficient": True, "math": True}])
+        probe = MagicMock(return_value=None)
         with patch("invokeai.app.util.startup_utils.probe_attention_backends", probe):
             log_attention_backends(logger, torch.device("cuda:0"))
             log_attention_backends(logger, torch.device("cuda:0"))
-        assert probe.call_count == 2
+        assert probe.call_count == 1

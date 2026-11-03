@@ -42,6 +42,7 @@ export type RunLayerWorkflowResult =
         | 'unsupported'
         | 'empty'
         | 'not-ready'
+        | 'unreadable'
         | 'over-budget'
         | 'locked'
         | 'stale'

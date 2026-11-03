@@ -175,19 +175,11 @@ export const GenerateProviderOptionsSection = ({
           </Field>
         ) : null}
         {optionKeys.includes('geminiTemperature') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.geminiTemperature')}
+          <GenerateToggleSwitch
+            checked={settings.geminiTemperature !== null}
             helpText={t('widgets.generate.providerOptions.geminiTemperatureHelp')}
-            labelEnd={
-              <GenerateToggleSwitch
-                checked={settings.geminiTemperature !== null}
-                label={t('widgets.generate.override')}
-                labelVisible
-                onCheckedChange={(checked) =>
-                  onCommit({ geminiTemperature: checked ? DEFAULT_GEMINI_TEMPERATURE : null })
-                }
-              />
-            }
+            label={t('widgets.generate.providerOptions.geminiTemperature')}
+            onCheckedChange={(checked) => onCommit({ geminiTemperature: checked ? DEFAULT_GEMINI_TEMPERATURE : null })}
           >
             {settings.geminiTemperature === null ? null : (
               <ScrubberField
@@ -207,7 +199,7 @@ export const GenerateProviderOptionsSection = ({
                 }}
               />
             )}
-          </Field>
+          </GenerateToggleSwitch>
         ) : null}
         {optionKeys.includes('geminiThinkingLevel') ? (
           <Field
@@ -231,28 +223,20 @@ export const GenerateProviderOptionsSection = ({
           </Field>
         ) : null}
         {optionKeys.includes('seedreamWatermark') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.seedreamWatermark')}
+          <GenerateToggleSwitch
+            checked={settings.seedreamWatermark}
             helpText={t('widgets.generate.providerOptions.seedreamWatermarkHelp')}
-          >
-            <GenerateToggleSwitch
-              checked={settings.seedreamWatermark}
-              label={t('widgets.generate.providerOptions.seedreamWatermark')}
-              onCheckedChange={(checked) => onCommit({ seedreamWatermark: checked })}
-            />
-          </Field>
+            label={t('widgets.generate.providerOptions.seedreamWatermark')}
+            onCheckedChange={(checked) => onCommit({ seedreamWatermark: checked })}
+          />
         ) : null}
         {optionKeys.includes('seedreamOptimizePrompt') ? (
-          <Field
-            label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
+          <GenerateToggleSwitch
+            checked={settings.seedreamOptimizePrompt}
             helpText={t('widgets.generate.providerOptions.seedreamOptimizePromptHelp')}
-          >
-            <GenerateToggleSwitch
-              checked={settings.seedreamOptimizePrompt}
-              label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
-              onCheckedChange={(checked) => onCommit({ seedreamOptimizePrompt: checked })}
-            />
-          </Field>
+            label={t('widgets.generate.providerOptions.seedreamOptimizePrompt')}
+            onCheckedChange={(checked) => onCommit({ seedreamOptimizePrompt: checked })}
+          />
         ) : null}
       </Stack>
     </GenerateCollapsibleSection>

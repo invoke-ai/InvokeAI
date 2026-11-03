@@ -128,7 +128,9 @@ def test_only_the_quantized_linears_stay_packed(monkeypatch, tmp_path) -> None:
 
 
 def test_the_load_reserves_the_model_as_it_will_be_held(monkeypatch, tmp_path) -> None:
-    """One absolute reservation, since `make_room` does not add to the framework's file-size one."""
+    """One absolute reservation, since `make_room` does not add to the framework's file-size one: every weight as
+    the model ends up holding it, plus the packed original of the tensor being replaced, which lives until its
+    unpacked result lands. Only unquantized tensors are unpacked here."""
     model, _, run = _load(monkeypatch, tmp_path, gguf.GGMLQuantizationType.Q8_0)
     held = {
         name: param.data.quantized_data.nbytes
@@ -136,8 +138,11 @@ def test_the_load_reserves_the_model_as_it_will_be_held(monkeypatch, tmp_path) -
         else param.numel() * param.element_size()
         for name, param in model.named_parameters()
     }
-    largest_unpacked = max(
-        size for name, size in held.items() if not isinstance(model.get_parameter(name).data, GGMLTensor)
+    unquantized = {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
+    largest_original = max(
+        int(tensor.n_bytes)
+        for tensor in gguf.GGUFReader(tmp_path / "ernie-image-turbo-Q8_0.gguf").tensors
+        if tensor.tensor_type in unquantized
     )
 
-    assert run.reserved == [sum(held.values()) + largest_unpacked]
+    assert run.reserved == [sum(held.values()) + largest_original]

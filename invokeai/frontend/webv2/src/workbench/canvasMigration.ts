@@ -8,20 +8,27 @@ import type {
   CanvasSnapshotContract,
   CanvasStackForests,
   CanvasStagingAreaContractV2,
+  CanvasStagingCandidateContract,
   CanvasStateContractV3,
   LayerStackKind,
 } from '@workbench/canvas-engine/api';
 
-import { getControlAdapterMinWeight } from '@features/generation/graph';
 import { createItemId } from '@platform/browser/randomUuid';
-import { CANVAS_MAX_NODE_COUNT, CANVAS_MAX_NODE_DEPTH, LAYER_STACK_ORDER } from '@workbench/canvas-engine/api';
+import {
+  CANVAS_MAX_NODE_COUNT,
+  CANVAS_MAX_NODE_DEPTH,
+  CANVAS_REGIONAL_LAYOUT_KINDS,
+  CONTROL_TYPES,
+  LAYER_STACK_ORDER,
+} from '@workbench/canvas-engine/api';
+import { repairControlDerivationRecord } from '@workbench/canvas-engine/document/controlDerivation';
 import { repairSelectedLayerId } from '@workbench/canvas-engine/document/selectionRepair';
 import { z } from 'zod';
 
 import type { CanvasLoadDiagnostic, CanvasLoadResult, CanvasVersionScope } from './canvasLoadContracts';
 
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION, MIN_SUPPORTED_CANVAS_SCHEMA_VERSION } from './canvasSchemaVersion';
-import { normalizeControlAdapter } from './controlAdapters';
+import { isStorableControlStepRange, isStorableControlWeight, normalizeControlAdapter } from './controlAdapters';
 
 export const DEFAULT_CANVAS_DOCUMENT_WIDTH = 1024;
 export const DEFAULT_CANVAS_DOCUMENT_HEIGHT = 1024;
@@ -42,6 +49,8 @@ const zPaintSource = z.object({
   offset: zCoordinate.optional(),
   type: z.literal('paint'),
 });
+const zImageSource = z.object({ image: zImageRef, type: z.literal('image') });
+const zPixelSource = z.discriminatedUnion('type', [zPaintSource, zImageSource]);
 const zTextFontRef = z.object({
   contentHash: z.string().regex(/^[a-f0-9]{64}$/u),
   family: z.string(),
@@ -50,7 +59,7 @@ const zTextFontRef = z.object({
 });
 const zLayerSource = z.discriminatedUnion('type', [
   zPaintSource,
-  z.object({ image: zImageRef, type: z.literal('image') }),
+  zImageSource,
   z.object({
     align: z.enum(['left', 'center', 'right']),
     color: z.string(),
@@ -156,11 +165,10 @@ const zControlAdapter = z
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })
-  .refine(({ beginEndStepPct }) => {
-    const [begin, end] = beginEndStepPct;
-    return begin >= 0 && end <= 1 && begin < end;
-  })
-  .refine(({ kind, weight }) => weight >= getControlAdapterMinWeight(kind) && weight <= 2);
+  // The same bounds for every kind: the stored kind is advisory (the resolved kind governs in the panel, readiness
+  // validation and the graph), and a refusal here would reject the whole document.
+  .refine(({ beginEndStepPct }) => isStorableControlStepRange(beginEndStepPct))
+  .refine(({ weight }) => isStorableControlWeight(weight));
 const zMaskFill = z.object({
   color: z.string(),
   style: z.enum(['solid', 'grid', 'crosshatch', 'diagonal', 'horizontal', 'vertical']),
@@ -255,7 +263,12 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   }),
   zLayerBase.extend({
     adapter: zControlAdapter,
+    // An unknown type refuses the document like an unknown adapter kind; detector strings stay open.
+    controlType: z.enum(CONTROL_TYPES).optional(),
+    detection: zFilter.nullable().optional(),
     filter: zFilter.optional(),
+    original: zPixelSource.optional(),
+    originalTransform: zTransform.optional(),
     // Missing display-only visibility means visible for older documents; only overlay types carry it.
     isHidden: z.boolean().optional(),
     source: zLayerSource,
@@ -265,6 +278,13 @@ const zCanvasLayer = z.discriminatedUnion('type', [
   zLayerBase.extend({
     autoNegative: z.boolean(),
     isHidden: z.boolean().optional(),
+    // A structurally broken layout role drops (the region reads as an object). A role this build does not know
+    // refuses the canvas instead: rewriting it as an object would replace the user's choice on the next autosave.
+    layout: z
+      .object({ kind: z.string(), text: z.string().optional() })
+      .optional()
+      .catch(undefined)
+      .pipe(z.object({ kind: z.enum(CANVAS_REGIONAL_LAYOUT_KINDS), text: z.string().optional() }).optional()),
     mask: zMask,
     negativePrompt: z.string().nullable(),
     positivePrompt: z.string().nullable(),
@@ -351,7 +371,11 @@ const createInitialInpaintMaskLayer = (): CanvasInpaintMaskLayerContract => ({
   type: 'inpaint_mask',
 });
 
-/** A fresh canvas state for a newly created project: an empty document with one selected empty inpaint mask. */
+/**
+ * A fresh canvas state for a newly created project: an empty document with one empty inpaint mask, ready for
+ * inpainting. Nothing is selected, so the first brush stroke lands on a new paint layer, as the empty Layers panel
+ * says; selecting the mask paints the area to inpaint.
+ */
 export const createNewCanvasState = (
   width = DEFAULT_CANVAS_DOCUMENT_WIDTH,
   height = DEFAULT_CANVAS_DOCUMENT_HEIGHT
@@ -360,7 +384,7 @@ export const createNewCanvasState = (
   const mask = createInitialInpaintMaskLayer();
   return {
     ...base,
-    document: { ...base.document, selectedLayerId: mask.id, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
+    document: { ...base.document, stacks: { ...base.document.stacks, inpaint_mask: [mask] } },
   };
 };
 
@@ -404,21 +428,37 @@ const hasV5Adjustment = (node: Record<string, unknown>): boolean =>
   Array.isArray(node.adjustments) &&
   node.adjustments.some((entry) => isRecord(entry) && V5_ADJUSTMENT_TYPES.has(entry.type));
 
-/** v4: custom-font typography. v5: a noise or spatial adjustment, enabled or not, which a v4 reader would drop. */
-const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
-  if (!isRecord(node)) {
-    return 3;
+/** The control derivation fields a v5 reader would strip on load, losing the kept original on its next save. */
+const CONTROL_DERIVATION_KEYS = ['controlType', 'detection', 'original', 'originalTransform'] as const;
+
+const controlLayerRequiresV6 = (node: Record<string, unknown>): boolean =>
+  node.type === 'control' && CONTROL_DERIVATION_KEYS.some((key) => node[key] !== undefined);
+
+const ownSchemaRequirement = (node: Record<string, unknown>): CanvasSchemaVersion => {
+  if (controlLayerRequiresV6(node)) {
+    return 6;
   }
   if (hasV5Adjustment(node)) {
     return 5;
   }
-  let required: CanvasSchemaVersion = textSourceRequiresV4(node.source) ? 4 : 3;
+  return textSourceRequiresV4(node.source) ? 4 : 3;
+};
+
+/**
+ * The newest schema a node or any descendant needs. v4: custom-font typography. v5: a noise or spatial adjustment,
+ * enabled or not, which a v4 reader would drop. v6: a control layer carrying any derivation field.
+ */
+const nodeSchemaRequirement = (node: unknown): CanvasSchemaVersion => {
+  if (!isRecord(node)) {
+    return 3;
+  }
+  let required = ownSchemaRequirement(node);
   if (Array.isArray(node.children)) {
     for (const child of node.children) {
-      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
       if (required === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
         break;
       }
+      required = Math.max(required, nodeSchemaRequirement(child)) as CanvasSchemaVersion;
     }
   }
   return required;
@@ -498,15 +538,7 @@ type LoadStep<T> = Extract<CanvasLoadResult<T>, { status: 'loaded' }> | Refusal;
 type DeclaredVersion = { kind: 'current' } | { kind: 'other'; version: number } | { kind: 'malformed' };
 
 const classifyVersion = (value: unknown): DeclaredVersion => {
-  if (value === MAX_SUPPORTED_CANVAS_SCHEMA_VERSION) {
-    return { kind: 'current' };
-  }
-  if (
-    typeof value === 'number' &&
-    Number.isInteger(value) &&
-    value >= MIN_SUPPORTED_CANVAS_SCHEMA_VERSION &&
-    value < MAX_SUPPORTED_CANVAS_SCHEMA_VERSION
-  ) {
+  if (isSupportedCanvasSchemaVersion(value)) {
     return { kind: 'current' };
   }
   if (typeof value === 'number' && Number.isInteger(value) && value >= 1) {
@@ -576,11 +608,11 @@ interface ParseContext {
 const parseLeaf = (value: Record<string, unknown>, path: string, context: ParseContext): CanvasLayerContract | null => {
   let candidate: Record<string, unknown> = value;
   if (value.type === 'control') {
-    candidate = {
+    candidate = repairControlDerivationRecord({
       ...value,
       adapter: normalizeControlAdapter(value.adapter),
       withTransparencyEffect: value.withTransparencyEffect === undefined ? true : value.withTransparencyEffect,
-    };
+    });
   } else if (value.type === 'regional_guidance') {
     candidate = {
       ...value,
@@ -743,6 +775,14 @@ const loadCanvasDocument = (
   };
 };
 
+const isStagedImageRecord = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.imageName === 'string' &&
+  value.imageName.length > 0 &&
+  typeof value.sourceQueueItemId === 'string' &&
+  Number.isFinite(value.width) &&
+  Number.isFinite(value.height);
+
 const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapshotContract> => {
   if (!isRecord(value)) {
     return invalid('snapshot', [{ message: 'snapshot is not an object', path }]);
@@ -755,13 +795,27 @@ const loadCanvasSnapshot = (value: unknown, path: string): LoadStep<CanvasSnapsh
     );
   }
   const document = loadCanvasDocument(value.document, 'snapshot', `${path}.document`);
-  return document.status === 'loaded'
-    ? {
-        diagnostics: document.diagnostics,
-        status: 'loaded',
-        value: { ...value, document: document.value } as CanvasSnapshotContract,
-      }
-    : document;
+  if (document.status !== 'loaded') {
+    return document;
+  }
+  // Restore points from before kinds and staged results existed restore the document alone, as they always did.
+  const kind = value.kind === 'clear-canvas' || value.kind === 'discard-results' ? value.kind : undefined;
+  // Results the point keeps, minus any entry that could never be staged again (no image, size or source batch).
+  const stagedImages = Array.isArray(value.stagedImages)
+    ? (value.stagedImages.filter(isStagedImageRecord) as CanvasStagingCandidateContract[])
+    : undefined;
+  return {
+    diagnostics: document.diagnostics,
+    status: 'loaded',
+    value: {
+      createdAt: value.createdAt as string,
+      document: document.value,
+      id: value.id as string,
+      name: value.name as string,
+      ...(kind ? { kind } : {}),
+      ...(stagedImages && stagedImages.length > 0 ? { stagedImages } : {}),
+    },
+  };
 };
 
 const loadCanvasStateStep = (canvas: unknown): LoadStep<CanvasStateContractV3> => {

@@ -3,6 +3,7 @@ from typing import Any, Dict
 import torch
 
 from invokeai.backend.flux.model import FluxParams
+from invokeai.backend.model_manager.qwen_image_controlnet_keys import is_qwen_image_instantx_controlnet
 
 
 def is_state_dict_xlabs_controlnet(sd: dict[str | int, Any]) -> bool:
@@ -26,7 +27,7 @@ def is_state_dict_xlabs_controlnet(sd: dict[str | int, Any]) -> bool:
 
 
 def is_state_dict_instantx_controlnet(sd: dict[str | int, Any]) -> bool:
-    """Is the state dict for an InstantX ControlNet model?
+    """Is the state dict for an InstantX FLUX ControlNet model?
 
     This is intended to be a reasonably high-precision detector, but it is not guaranteed to have perfect precision.
     """
@@ -38,9 +39,11 @@ def is_state_dict_instantx_controlnet(sd: dict[str | int, Any]) -> bool:
         "controlnet_x_embedder.weight",
     }
 
-    if expected_keys.issubset(sd.keys()):
-        return True
-    return False
+    if not expected_keys.issubset(sd.keys()):
+        return False
+    # InstantX's Qwen-Image ControlNets use the same names over Qwen-Image's own blocks. ComfyUI tells the two apart
+    # the same way, before its FLUX fallback.
+    return not is_qwen_image_instantx_controlnet(sd)
 
 
 def _fuse_weights(*t: torch.Tensor) -> torch.Tensor:

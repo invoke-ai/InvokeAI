@@ -61,6 +61,9 @@ import { StatusBar } from '@workbench/shell/StatusBar';
 
 import { ShortcutGuide } from './ShortcutGuide';
 
+/** The chip is named by its content: only the guide's name, never the preview hints. */
+const SHORTCUTS_CHIP = { exact: true, name: 'Shortcuts' };
+
 const widgetWidths = createExternalStore<Record<string, number>>({});
 
 vi.mock('@workbench/widget-frame', async (importOriginal) => ({
@@ -114,6 +117,7 @@ const Harness = ({ width = 900, withCanvasSource = true }: { width?: number; wit
   return (
     <>
       <WorkbenchHotkeyRuntime />
+      <div data-testid="left" {...useFocusRegionProps('left')} />
       <div {...useFocusRegionProps('center')}>
         <div
           data-hotkey-widget-instance-id="canvas"
@@ -156,6 +160,12 @@ const render = async (width = 900, withCanvasSource = true) => {
     )
   );
 };
+
+/** The center canvas holds focus until the user goes elsewhere: Generate, on the left, adds no hints of its own. */
+const leaveCanvas = () =>
+  act(() =>
+    host!.querySelector('[data-testid="left"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+  );
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 beforeAll(async () => {
@@ -210,8 +220,11 @@ describe('contextual status-bar guide', () => {
     await act(() => root!.unmount());
     root = createRoot(host!);
     await render();
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    await leaveCanvas();
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     expect(guide.element().textContent).toContain('Invoke');
+    // The preview hints stay out of the name, so a voice command for a hint cannot land on the chip.
+    await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(guide.element().textContent).not.toContain('Cancel generation');
     expect(guide.element().textContent).not.toContain('Command palette');
     const parts = [...guide.element().querySelectorAll('[data-shortcut-guide] > :last-child kbd')].map(
@@ -236,7 +249,8 @@ describe('contextual status-bar guide', () => {
     await act(() => root!.unmount());
     root = createRoot(host!);
     await render();
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    await leaveCanvas();
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     await guide.click();
     await expect
       .poll(() => page.getByRole('dialog').element().textContent)
@@ -263,6 +277,7 @@ describe('contextual status-bar guide', () => {
     expect(runtime.releases).toBe(1);
   });
   it('fits remaining footer space after other widgets and keeps Notifications visible when their labels grow', async () => {
+    await leaveCanvas();
     await act(() =>
       widgetWidths.setSnapshot({
         'server-status': 220,
@@ -275,7 +290,7 @@ describe('contextual status-bar guide', () => {
     await page.viewport(700, 600);
     await render(700);
     const footer = host!.querySelector('footer')!;
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     const notification = host!.querySelector('[data-status-bar-widget="notifications"]')!;
     await expect.poll(() => footer.scrollWidth).toBeLessThanOrEqual(footer.clientWidth);
     await expect.poll(() => notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
@@ -283,7 +298,9 @@ describe('contextual status-bar guide', () => {
     await act(() => widgetWidths.setSnapshot({ ...widgetWidths.getSnapshot(), 'server-status': 250 }));
     await render(700);
     await expect.poll(() => guide.element().getBoundingClientRect().width).toBeLessThanOrEqual(24);
-    expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.textContent).toBe('');
+    // Icon only: the visible label is gone, and its hidden copy keeps the chip's name.
+    expect(guide.element().querySelector('[data-shortcut-guide]')?.lastElementChild?.querySelector('p')).toBeNull();
+    await expect.element(guide).toHaveAccessibleName('Shortcuts');
     expect(notification.getBoundingClientRect().right).toBeLessThanOrEqual(700);
     await guide.click();
     await expect.element(page.getByRole('dialog')).toBeVisible();
@@ -301,10 +318,12 @@ describe('contextual status-bar guide', () => {
     await expect.poll(() => host!.textContent).toContain('Brush');
     await page.viewport(220, 600);
     await render(220);
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     await expect
       .poll(() => host!.querySelector('[data-hint-measurements]')?.nextElementSibling?.textContent)
       .toBe('Shortcuts');
+    // The visible fallback label is the whole name, not repeated by the hidden one.
+    await expect.element(guide).toHaveAccessibleName('Shortcuts');
     await guide.click();
     const popup = page.getByRole('dialog');
     await expect.element(popup).toBeVisible();
@@ -332,7 +351,7 @@ describe('contextual status-bar guide', () => {
 
   it('labels properties guidance, keeps it through editable focus, hides beneath modals and forgets a switched project', async () => {
     await page.getByRole('textbox', { name: 'Property field' }).click();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await page.getByRole('button', SHORTCUTS_CHIP).click();
     await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('On Canvas · Brush');
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('textbox', { name: 'Property field' })).toHaveFocus();
@@ -340,13 +359,13 @@ describe('contextual status-bar guide', () => {
       releaseModal = registerModalPresence();
     });
     await expect.poll(() => host!.querySelector('[data-status-bar-widget="shortcuts"]')).toBeNull();
-    await expect.element(page.getByRole('button', { name: 'Shortcuts', exact: true })).not.toBeInTheDocument();
+    await expect.element(page.getByRole('button', SHORTCUTS_CHIP)).not.toBeInTheDocument();
     await act(() => {
       releaseModal!();
       releaseModal = null;
     });
-    await expect.element(page.getByRole('button', { name: 'Shortcuts', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await expect.element(page.getByRole('button', SHORTCUTS_CHIP)).toBeVisible();
+    await page.getByRole('button', SHORTCUTS_CHIP).click();
     await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('On Canvas · Brush');
     await userEvent.keyboard('{Escape}');
     await expect.element(page.getByRole('textbox', { name: 'Property field' })).toHaveFocus();
@@ -355,8 +374,12 @@ describe('contextual status-bar guide', () => {
     await expect.poll(() => host!.textContent).not.toContain('On Canvas');
   });
 
+  it('describes the center canvas before the user presses or focuses anything', async () => {
+    await expect.poll(() => host!.textContent).toContain('Apply transform');
+  });
+
   it('shows custom global bindings and omits background tool hints outside their owning surface', async () => {
-    // The default view has no focus owner until the user enters a widget.
+    await leaveCanvas();
     await expect.poll(() => host!.textContent).toContain('Invoke');
     await expect.poll(() => host!.querySelector('kbd')?.textContent).toBe('ctrl');
     expect(host!.textContent).toContain('Cancel generation');
@@ -368,6 +391,7 @@ describe('contextual status-bar guide', () => {
     field.setAttribute('aria-label', 'Page field');
     document.body.append(field);
     try {
+      await leaveCanvas();
       await expect.poll(() => host!.textContent).toContain('Cancel generation');
       await act(() => field.focus());
       // Invoke stays usable from text fields; Cancel generation is not, so the guide must judge the focused field.
@@ -386,7 +410,7 @@ describe('contextual status-bar guide', () => {
     await page.getByRole('textbox', { name: 'Canvas field' }).click();
     await act(() => (document.activeElement as HTMLElement).blur());
     expect(document.activeElement).toBe(document.body);
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     await act(() => (guide.element() as HTMLElement).focus());
     await userEvent.keyboard('{Enter}');
     await expect.element(page.getByRole('dialog')).toBeVisible();
@@ -400,19 +424,19 @@ describe('contextual status-bar guide', () => {
     root = createRoot(host!);
     await render(900, false);
     await page.getByRole('textbox', { name: 'Canvas field' }).click();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await page.getByRole('button', SHORTCUTS_CHIP).click();
     const popup = page.getByRole('dialog');
     await expect.poll(() => popup.element().textContent).toContain('Workbench');
     expect(popup.element().textContent).not.toContain('On Canvas');
     await userEvent.keyboard('{Escape}');
     await page.getByRole('textbox', { name: 'Property field' }).click();
-    await page.getByRole('button', { name: 'Shortcuts', exact: true }).click();
+    await page.getByRole('button', SHORTCUTS_CHIP).click();
     await expect.poll(() => page.getByRole('dialog').element().textContent).toContain('Workbench');
     expect(page.getByRole('dialog').element().textContent).not.toContain('On Canvas');
   });
 
   it('runs configured global shortcuts from the compact chip and its popover without activating the chip for modified Enter', async () => {
-    const guide = page.getByRole('button', { name: 'Shortcuts', exact: true });
+    const guide = page.getByRole('button', SHORTCUTS_CHIP);
     await act(() => (guide.element() as HTMLElement).focus());
     await userEvent.keyboard('{Control>}{Shift>}j{/Shift}{/Control}');
     await expect.poll(() => executed).toEqual(['app.invoke']);

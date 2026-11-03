@@ -1,33 +1,25 @@
 import { expect, it } from 'vitest';
-import { userEvent } from 'vitest/browser';
 
 /*
- * Guards scripts/browser-test-viewport.ts. The two tests run in order: the first leaves the runner's outer page
- * scrolled, as any scrollIntoView or focus() in a test can, and the second needs the reset before it to reach an
- * element at the iframe's top edge. Without the reset the hover times out, as FeatureHint's suite did on CI.
+ * Playwright judges hover and click targets against the runner's outer page. If that page can scroll, a
+ * scrollIntoView or focus() in one test leaves it offset for later files, and their pointer actions on elements at
+ * the iframe's top edge time out (FeatureHint's suite fails this way). The runner keeps that page unscrollable by
+ * laying the test iframe out as a block exactly filling it; an inline iframe leaves a few pixels of overflow below.
  */
 
-it('scrolls the outer page from inside the test iframe', () => {
-  const below = document.createElement('div');
+it('keeps the outer page unscrolled when the test iframe scrolls', () => {
+  const below = document.createElement('input');
 
-  below.style.cssText = 'position:absolute;left:0;top:1200px;width:10px;height:10px';
+  below.style.cssText = 'position:absolute;left:0;top:5000px';
   document.body.append(below);
-  below.scrollIntoView();
-  below.remove();
-  window.scrollTo(0, 0);
-
-  expect(window.parent.scrollY).toBeGreaterThan(0);
-});
-
-it('starts the next test with an element at the iframe corner reachable', async () => {
-  const corner = document.createElement('div');
-
-  corner.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;z-index:2147483647';
-  document.body.append(corner);
 
   try {
-    await userEvent.hover(corner, { timeout: 2000 });
+    below.scrollIntoView();
+    below.focus();
+    expect(window.scrollY).toBeGreaterThan(0);
+    expect(window.parent.scrollY).toBe(0);
   } finally {
-    corner.remove();
+    below.remove();
+    window.scrollTo(0, 0);
   }
 });

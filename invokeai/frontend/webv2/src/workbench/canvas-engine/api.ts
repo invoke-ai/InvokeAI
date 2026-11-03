@@ -6,3 +6,12 @@
  * the core dependency direction.
  */
 export * from './capabilities';
+export { CONTROL_TYPES } from './contracts';
+export {
+  controlDetectionInputKey,
+  getControlDetectionInput,
+  isControlMapCurrent,
+  needsControlDetection,
+  restoreControlOriginal,
+} from './document/controlDerivation';
+export { createControlLayer, type CreateControlLayerInput, nextControlLayerName } from './document/layerFactories';

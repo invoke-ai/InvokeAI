@@ -1,7 +1,5 @@
 import type { CanvasDocumentContractV3, LayerStackKind } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { Dispatch } from 'react';
 
 import { getDocumentNode } from '@workbench/canvas-engine/api';
 import { useCallback, useMemo } from 'react';
@@ -26,7 +24,6 @@ export type LayerSurfaceRequest =
 
 interface LayerSurfaceHostProps {
   commands: LayerRowCommands;
-  dispatch: Dispatch<CanvasProjectMutation>;
   document: CanvasDocumentContractV3;
   editingLocked: boolean;
   engine: LayerSurfaceEngine | null;
@@ -41,7 +38,6 @@ interface LayerSurfaceHostProps {
  */
 export const LayerSurfaceHost = ({
   commands,
-  dispatch,
   document,
   editingLocked,
   engine,
@@ -110,7 +106,7 @@ export const LayerSurfaceHost = ({
   }
   return (
     <>
-      <CanvasLayerContextMenu dispatch={dispatch} engine={engine} target={menuTarget} onClose={handleMenuClose} />
+      <CanvasLayerContextMenu engine={engine} target={menuTarget} onClose={handleMenuClose} />
       {surface?.kind === 'menu' && node?.type === 'group' && engine ? (
         <LayerGroupContextMenu
           key={node.id}

@@ -54,6 +54,10 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useActiveProjectId: () => PROJECT_ID,
   useActiveProjectName: () => 'Surface project',
   useActiveProjectSelector: (selector: (project: Project) => unknown) => selector(mocks.project),
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
+    selector(
+      Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === widgetId)?.state.values ?? {}
+    ),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useWorkbenchCommands: () => mocks.commands,
 }));
@@ -119,7 +123,6 @@ const Harness = ({ ref }: { ref: Ref<OpenSurface> }) => {
   return (
     <LayerSurfaceHost
       commands={rowCommands}
-      dispatch={() => true}
       document={mocks.project.canvas.document}
       editingLocked={false}
       engine={engine}

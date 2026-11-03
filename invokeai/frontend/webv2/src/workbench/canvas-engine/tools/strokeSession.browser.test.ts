@@ -332,3 +332,27 @@ describe('dense stylus trace', () => {
     await annotate(`dense stroke ms: every batch ${everyBatch.ms}, per frame ${perFrame.ms}`);
   });
 });
+
+describe('two-point seed (Shift-click line)', () => {
+  const alphaAt = ({ pixels, rect }: { pixels: Uint8ClampedArray; rect: Rect }, x: number, y: number): number => {
+    if (x < rect.x || y < rect.y || x >= rect.x + rect.width || y >= rect.y + rect.height) {
+      return 0;
+    }
+    return pixels[((y - rect.y) * rect.width + (x - rect.x)) * 4 + 3]!;
+  };
+
+  it('rasterizes a capsule between two seeded points past the tap threshold, not a dab', () => {
+    const options = { opacity: 1, size: 6, thinning: 0 };
+    const line = paint([pointer(10, 20), pointer(60, 20)], 2, options);
+    const dab = paint([pointer(10, 20)], 1, options);
+
+    // Covered along the whole segment and at both ends, but not beyond the brush radius.
+    for (const x of [10, 25, 35, 45, 60]) {
+      expect(alphaAt(line, x, 20)).toBe(255);
+    }
+    expect(alphaAt(line, 35, 26)).toBe(0);
+    expect(alphaAt(line, 66, 20)).toBe(0);
+    expect(alphaAt(dab, 10, 20)).toBe(255);
+    expect(alphaAt(dab, 25, 20)).toBe(0);
+  });
+});

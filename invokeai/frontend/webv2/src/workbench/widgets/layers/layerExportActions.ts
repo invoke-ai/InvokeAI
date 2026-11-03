@@ -1,5 +1,5 @@
 import type { QueryClient } from '@tanstack/react-query';
-import type { AdjustmentRefusal, ExportBakedLayerBlobResult } from '@workbench/canvas-engine/api';
+import type { AdjustmentRefusal, ExportBakedLayerBlobResult, LayerUnreadable } from '@workbench/canvas-engine/api';
 
 import { canOnBoard } from '@features/gallery/contracts';
 import {
@@ -17,10 +17,14 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 
-type LayerAssetExportFailureStatus = Exclude<ExportBakedLayerBlobResult['status'], 'ok' | 'adjustment-refused'>;
+type LayerAssetExportFailureStatus = Exclude<
+  ExportBakedLayerBlobResult['status'],
+  'ok' | 'adjustment-refused' | 'unreadable'
+>;
 type LayerAssetExportResult =
   | { status: 'ok'; blob: Blob }
   | { status: LayerAssetExportFailureStatus }
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 interface CopyLayerToClipboardDeps extends ClipboardAccess {
@@ -31,9 +35,9 @@ interface CopyLayerToClipboardDeps extends ClipboardAccess {
 export const copyLayerToClipboard = async (
   layerId: string,
   { exportLayer, ...clipboard }: CopyLayerToClipboardDeps
-): Promise<'ok' | LayerAssetExportFailureStatus | AdjustmentRefusal> => {
+): Promise<'ok' | LayerAssetExportFailureStatus | LayerUnreadable | AdjustmentRefusal> => {
   const result = await exportLayer(layerId, { includeDisabled: true });
-  if (result.status === 'adjustment-refused') {
+  if (result.status === 'adjustment-refused' || result.status === 'unreadable') {
     return result;
   }
   if (result.status !== 'ok') {
@@ -58,6 +62,7 @@ export type SaveLayerToBoardResult =
   | 'board-view-only'
   | 'board-unavailable'
   | LayerAssetExportFailureStatus
+  | LayerUnreadable
   | AdjustmentRefusal;
 
 /**
@@ -92,7 +97,7 @@ export const saveLayerToBoard = async (
     const result = await exportLayer(layerId, { includeDisabled: true, signal: owner.signal });
 
     assertAccountScopeCurrent(owner);
-    if (result.status === 'adjustment-refused') {
+    if (result.status === 'adjustment-refused' || result.status === 'unreadable') {
       return result;
     }
     if (result.status !== 'ok') {

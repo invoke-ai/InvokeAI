@@ -88,7 +88,10 @@ vi.mock('@features/generation/components', async (importOriginal) => ({
   NegativePromptField: () => null,
   PositivePromptField: () => null,
 }));
-vi.mock('@platform/ui/toaster', () => ({ toaster: { create: () => undefined } }));
+vi.mock('@platform/ui/toaster', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  toaster: { create: () => undefined },
+}));
 vi.mock('@workbench/settings/store', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useWorkbenchPreferenceSelector: () => false,
@@ -98,6 +101,7 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: ()
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectSelector: (selector: (project: Project) => unknown) =>
     selector(useSyncExternalStore(store.subscribe, store.getSnapshot).activeProject),
+  useOptionalWorkbenchCommands: () => store.commands,
   useWorkbenchCommands: () => store.commands,
   useWorkbenchQueries: () => store.queries,
 }));

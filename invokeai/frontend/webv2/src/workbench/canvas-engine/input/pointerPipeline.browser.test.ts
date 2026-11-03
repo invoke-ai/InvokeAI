@@ -35,7 +35,7 @@ const createInputHarness = () => {
   const events: string[] = [];
   const deactivations: string[] = [];
   const tools = Object.fromEntries(
-    (['brush', 'view', 'transform', 'bbox', 'eraser'] as const).map((id): [ToolId, Tool] => [
+    (['brush', 'view', 'transform', 'bbox', 'eraser', 'colorPicker'] as const).map((id): [ToolId, Tool] => [
       id,
       {
         id,
@@ -59,7 +59,6 @@ const createInputHarness = () => {
     getToolContext: () => ctx,
     initialToolId: 'brush',
     invalidateOverlay: () => undefined,
-    isLocked: () => false,
     publishActiveTool: () => undefined,
     stepBrushSize: () => undefined,
     updateCursor: () => undefined,
@@ -231,5 +230,45 @@ describe('pointer pipeline in Chromium: tool switches during a hold', () => {
     h.interaction.setTool('brush');
     await userEvent.keyboard('{/Space}');
     expect(h.interaction.getActiveToolId()).toBe('brush');
+  });
+});
+
+describe('pointer pipeline in Chromium: Alt eyedropper', () => {
+  it('prevents a real Alt tap on the focused canvas, keydown and keyup alike', async () => {
+    const h = createInputHarness();
+    h.pipeline.onPointerEnter();
+    h.surface.focus();
+
+    await userEvent.keyboard('{Alt}');
+    expect(h.observed).toEqual([
+      { defaultPrevented: true, type: 'keydown' },
+      { defaultPrevented: true, type: 'keyup' },
+    ]);
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+  });
+
+  it('leaves a real Alt tap in a text field to the browser', async () => {
+    const h = createInputHarness();
+    const input = document.createElement('input');
+    document.body.append(input);
+    cleanups.push(() => input.remove());
+    h.pipeline.onPointerEnter();
+    input.focus();
+
+    await userEvent.keyboard('{Alt}');
+    expect(h.observed.map((event) => event.defaultPrevented)).toEqual([false, false]);
+  });
+
+  it('begins the picker when the pointer enters with Alt already held on the focused canvas', async () => {
+    const h = createInputHarness();
+    h.surface.focus();
+
+    await userEvent.keyboard('{Alt>}');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+    h.pipeline.onPointerEnter(new PointerEvent('pointerenter', { altKey: true }));
+    expect(h.interaction.getActiveToolId()).toBe('colorPicker');
+    await userEvent.keyboard('{/Alt}');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+    expect(h.observed.every((event) => event.defaultPrevented)).toBe(true);
   });
 });

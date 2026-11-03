@@ -85,7 +85,7 @@ const FormatTrigger = ({
 
   return (
     <IconButton
-      aria-label={t('common.colorPicker.format')}
+      aria-label={t('common.colorPicker.format', { format: format.toUpperCase() })}
       flexShrink="0"
       fontSize="xs"
       fontWeight="medium"

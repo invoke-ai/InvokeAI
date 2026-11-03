@@ -216,6 +216,15 @@ SYSTEM_USER_ID = "system"  # Default user_id for system-generated queue items
 QUEUE_ITEM_STATUS = Literal["pending", "in_progress", "waiting", "completed", "failed", "canceled"]
 
 
+class QueueItemLineage(NamedTuple):
+    """An item's status and origin, and the item it retried: a retry of a retry names the first item as well."""
+
+    item_id: int
+    status: QUEUE_ITEM_STATUS
+    origin: Optional[str]
+    retried_from_item_id: Optional[int]
+
+
 class ItemIdsResult(BaseModel):
     """Response containing ordered item ids with metadata for optimistic updates."""
 

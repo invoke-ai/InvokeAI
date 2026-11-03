@@ -4,7 +4,11 @@
  * StrokeCommittedEvent} for downstream history/persistence.
  */
 
-import type { StructuralCommitResult } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasEditRefusal,
+  ColorSamplePhase,
+  StructuralCommitResult,
+} from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
@@ -77,6 +81,13 @@ export interface LayerTransformOverride {
   rotation?: number;
 }
 
+/** Where the last committed brush or eraser stroke ended, per layer id, in that layer's local space. */
+export interface PaintLineEnds {
+  get(layerId: string): Vec2 | undefined;
+  set(layerId: string, point: Vec2): void;
+  clear(): void;
+}
+
 /** Everything a tool is allowed to reach, injected by the engine. */
 export interface ToolContext {
   /** The pan/zoom viewport. */
@@ -135,20 +146,20 @@ export interface ToolContext {
   /** Shows or hides the color picker's loupe, which follows the pointer while shown; optional in test harnesses. */
   showColorLoupe?(shown: boolean): void;
   /**
-   * Route samples to one-shot claim, then persistent workbench target. Return whether consumed; otherwise picker
-   * falls back to brush color. Optional in test harnesses.
+   * Routes a pick's samples to the one-shot claim, else the persistent workbench target: `preview` per sample, then
+   * one `commit` (pointer up only, so a structural commit in the requester's continuation is not refused as
+   * `gesture-active`) or `cancel`. Returns whether consumed; a declined preview falls back to brush color. Optional
+   * in test harnesses.
    */
-  resolveColorSample?(hex: string): boolean;
+  resolveColorSample?(hex: string, phase: ColorSamplePhase): boolean;
   /** Compositor providers that make sampling WYSIWYG; absent ⇒ raw cached pixels. */
   sampleProviders?: Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
   /**
-   * Settles a pending one-shot sample with the gesture's stashed color. Called
-   * on pointer up only, so a structural commit in the requester's continuation
-   * is not refused as `gesture-active`.
+   * Where the last committed brush or eraser stroke ended on each layer, layer-local so moving or transforming the
+   * layer carries it; shared by both tools for Shift-click lines. The engine owns it and forgets entries on replay,
+   * document replacement and layer removal.
    */
-  commitColorSample?(): void;
-  /** Drops the stashed sample (gesture cancel, fresh press) without settling the request. */
-  discardColorSample?(): void;
+  paintLineEnds?: PaintLineEnds;
   /**
    * Refresh the input element cursor when tool state changes; ordinary pointermove does not automatically
    * reevaluate it.
@@ -156,6 +167,8 @@ export interface ToolContext {
   updateCursor(): void;
   /** Admits a live pixel edit on a paint layer; null when refused (the engine reports why). */
   beginStrokeEdit(initialBytes?: number): StrokeEdit | null;
+  /** Reports a press the tool refused itself (a locked or hidden layer) through `tools.onEditRefused`. */
+  reportEditRefusal?(refusal: CanvasEditRefusal): void;
   /** Bumps a layer's cache version (without marking it stale) after a direct paint, and recomposites. */
   notifyLayerPainted(layerId: string): void;
   commitSelection?(commit: SelectionCommit): void;
@@ -220,8 +233,8 @@ export interface Tool {
   /** The CSS cursor to show while this tool is active. */
   cursor?(ctx: ToolContext): string;
   /**
-   * Alt is one of this tool's gesture modifiers (selection ops), so the pointer
-   * pipeline must not turn an alt-hold into the temporary color picker.
+   * Alt is one of this tool's gesture modifiers (selection ops, grid bypass, scaling about the centre), so the
+   * pointer pipeline must not turn an alt-hold into the temporary color picker.
    */
   readonly usesAltKey?: boolean;
 }

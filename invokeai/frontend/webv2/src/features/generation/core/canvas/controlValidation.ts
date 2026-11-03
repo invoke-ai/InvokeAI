@@ -19,6 +19,11 @@ export type ControlAdapterKind = (typeof CONTROL_ADAPTER_KINDS)[number];
 export const CONTROL_VALIDATION_REASONS = [
   'capabilities_unavailable',
   'missing_model',
+  'missing_type',
+  'choose_model',
+  'no_model_for_type',
+  'no_control_models',
+  'models_unavailable',
   'switch_adapter_kind',
   'unsupported_adapter',
   'incompatible_base',
@@ -118,6 +123,8 @@ export const getControlValidationReason = (params: {
   flux2ControlIndex?: number;
   /** An earlier contributing Anima LLLite layer already applies this model; the denoiser applies each once. */
   lliteModelInUse?: boolean;
+  /** Why model resolution found no model, reported in place of `missing_model`. */
+  unresolvedModel?: ControlValidationReason | null;
 }): ControlValidationReason | null => {
   const {
     adapterModel,
@@ -129,6 +136,7 @@ export const getControlValidationReason = (params: {
     mainBase,
     mainVariant,
     qwenImageControlIndex = 0,
+    unresolvedModel,
     weight,
     zImageControlIndex = 0,
   } = params;
@@ -147,7 +155,7 @@ export const getControlValidationReason = (params: {
     return 'invalid_adapter_values';
   }
   if (!adapterModel) {
-    return 'missing_model';
+    return unresolvedModel ?? 'missing_model';
   }
   // Unavailable capability data is distinct from unsupported adapters.
   if (!capabilitiesLoaded) {
@@ -179,7 +187,7 @@ export const getControlValidationReason = (params: {
     return 'flux_fill_control_lora';
   }
   if (kind === 'qwen_image_control' && mainBase === 'qwen-image' && mainVariant === 'edit') {
-    // The Fun-ControlNet branch was trained beside the generation transformer; `qwen_image_denoise` refuses it on
+    // Both ControlNet designs were trained beside the generation transformer; `qwen_image_denoise` refuses either on
     // an Edit transformer.
     return 'qwen_image_edit_control';
   }
@@ -203,6 +211,7 @@ export const createControlValidationSequence = (main: { base: string; variant?: 
     beginEndStepPct: [number, number];
     kind: ControlAdapterKind;
     weight: number;
+    unresolvedModel?: ControlValidationReason | null;
   }): ControlValidationReason | null => {
     const { adapterModel, kind } = layer;
     const reason = getControlValidationReason({
@@ -215,6 +224,7 @@ export const createControlValidationSequence = (main: { base: string; variant?: 
       mainBase: main.base,
       mainVariant: main.variant ?? undefined,
       qwenImageControlIndex: kind === 'qwen_image_control' ? qwenImageControlCount : 0,
+      unresolvedModel: layer.unresolvedModel,
       weight: layer.weight,
       zImageControlIndex: kind === 'z_image_control' ? zImageControlCount : 0,
     });

@@ -8,6 +8,7 @@ have not already allowed.
 """
 
 import re
+from pathlib import PureWindowsPath
 from typing import Any
 
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
@@ -29,16 +30,39 @@ def name_components(mod: ModelOnDisk, override_fields: dict[str, Any]) -> tuple[
     first and was registered as FLUX although the file itself says sd3. Matching component by
     component and taking the first that names exactly one backbone lets the more specific name win.
 
-    A local install contributes no source: the model manager sets `source` to the file's own path
-    when there is no remote one (`ModelConfigFactory.build_common_fields`), so trusting it would mean
-    matching against arbitrary ancestor directories of wherever the user keeps their models. Nothing
-    is lost by dropping it — `install_path` identifies a local file *before* it moves it, so the
-    filename and parent directory are still the originals.
+    A local install's source is the path the file was installed from
+    (`ModelConfigFactory.build_common_fields`). Only its file and folder name count, never the whole
+    path: that would mean matching against arbitrary ancestor directories of wherever the user keeps
+    their models. An install identifies a local file at that path, before moving it into a folder
+    named for its key, so these are the names the install read; re-identifying the moved file reads
+    them again. `folder_names` says which of the components are folder names.
     """
     components = [mod.path.name, mod.path.parent.name]
-    if override_fields.get("source_type") != ModelSourceType.Path:
+    local_source = _local_source(override_fields)
+    if local_source is not None:
+        components += [local_source.name, local_source.parent.name]
+    else:
         components.append(str(override_fields.get("source") or ""))
     return tuple(c for c in components if c)
+
+
+def folder_names(mod: ModelOnDisk, override_fields: dict[str, Any]) -> frozenset[str]:
+    """The components of `name_components` that name a folder rather than a file: the file's own folder and, for a
+    local install, the folder it was installed from."""
+    local_source = _local_source(override_fields)
+    folders = {mod.path.parent.name, "" if local_source is None else local_source.parent.name}
+    return frozenset(f for f in folders if f)
+
+
+def _local_source(override_fields: dict[str, Any]) -> PureWindowsPath | None:
+    """The path a local install came from, or None for a remote source.
+
+    Parsed as a Windows path, which splits on both separators, so a source recorded on either OS yields the same file
+    and folder name wherever the model is re-identified.
+    """
+    if override_fields.get("source_type") != ModelSourceType.Path:
+        return None
+    return PureWindowsPath(str(override_fields.get("source") or ""))
 
 
 # Ordered so that a more specific spelling is consumed before a more general one that it contains:

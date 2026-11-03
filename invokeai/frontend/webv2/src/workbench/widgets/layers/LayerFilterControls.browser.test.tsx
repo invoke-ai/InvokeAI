@@ -28,7 +28,15 @@ const settle = (run: () => void = () => undefined) =>
     });
   });
 
-const render = async () => {
+const render = async ({
+  enumPresentation,
+  filterType = 'canny_edge_detection',
+  settings = SETTINGS,
+}: {
+  enumPresentation?: 'select' | 'segmented';
+  filterType?: string;
+  settings?: Record<string, unknown>;
+} = {}) => {
   const onSettingsChange = vi.fn();
   host = document.createElement('div');
   host.style.width = '260px';
@@ -40,10 +48,11 @@ const render = async () => {
         <ChakraProvider value={system}>
           <LayerFilterControls
             disabled={false}
-            filterType="canny_edge_detection"
+            enumPresentation={enumPresentation}
+            filterType={filterType}
             focusFilter={false}
             parts="params"
-            settings={SETTINGS}
+            settings={settings}
             onFilterTypeChange={ignoreFilterTypeChange}
             onSettingsChange={onSettingsChange}
           />
@@ -112,5 +121,45 @@ describe('LayerFilterControls number parameters', () => {
 
     expect(onSettingsChange).toHaveBeenCalledTimes(1);
     expect(onSettingsChange).toHaveBeenCalledWith({ ...SETTINGS, low_threshold: 121 });
+  });
+});
+
+describe('LayerFilterControls enum parameters', () => {
+  const DEPTH_SETTINGS = { model_size: 'small_v2' };
+  const modelSize = () => page.getByRole('radiogroup', { name: 'model_size' });
+
+  it('shows a short enum as a labelled segmented row and reports clicks and arrow keys', async () => {
+    const onSettingsChange = await render({
+      enumPresentation: 'segmented',
+      filterType: 'depth_anything_depth_estimation',
+      settings: DEPTH_SETTINGS,
+    });
+
+    await expect.element(modelSize()).toBeVisible();
+    expect(modelSize().getByRole('radio').all()).toHaveLength(4);
+    await expect.element(modelSize().getByRole('radio', { name: 'small_v2' })).toBeChecked();
+
+    await act(() => userEvent.click(modelSize().getByText('base', { exact: true })));
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ model_size: 'base' });
+
+    // Arrow keys move from the checked segment, which a rerender would keep at small_v2.
+    onSettingsChange.mockClear();
+    await act(async () => {
+      (modelSize().getByRole('radio', { name: 'small_v2' }).element() as HTMLElement).focus();
+      await userEvent.keyboard('{ArrowLeft}');
+    });
+    expect(onSettingsChange).toHaveBeenLastCalledWith({ model_size: 'small' });
+  });
+
+  it('keeps a select for the default presentation and for enums too long to segment', async () => {
+    await render({ filterType: 'depth_anything_depth_estimation', settings: DEPTH_SETTINGS });
+    expect(document.querySelector('[role="radiogroup"]')).toBeNull();
+    expect(document.querySelector('[data-scope="select"][data-part="trigger"]')).not.toBeNull();
+    await act(() => root?.unmount());
+    host?.remove();
+
+    await render({ enumPresentation: 'segmented', filterType: 'adjust_image', settings: {} });
+    expect(document.querySelector('[role="radiogroup"]')).toBeNull();
+    expect(document.querySelector('[data-scope="select"][data-part="trigger"]')).not.toBeNull();
   });
 });

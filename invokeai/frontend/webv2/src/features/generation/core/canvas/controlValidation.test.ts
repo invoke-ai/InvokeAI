@@ -282,6 +282,31 @@ describe('Anima ControlNet-LLLite validation', () => {
   });
 });
 
+describe('unresolved control models', () => {
+  it('reports why resolution found no model in place of missing_model, after kind and value checks', () => {
+    expect(getControlValidationReason({ ...valid, adapterModel: null, unresolvedModel: 'choose_model' })).toBe(
+      'choose_model'
+    );
+    expect(getControlValidationReason({ ...valid, adapterModel: null, unresolvedModel: null })).toBe('missing_model');
+    expect(
+      getControlValidationReason({ ...valid, adapterModel: null, unresolvedModel: 'no_model_for_type', weight: 5 })
+    ).toBe('invalid_adapter_values');
+    expect(getControlValidationReason({ ...valid, unresolvedModel: 'no_control_models' })).toBeNull();
+  });
+
+  it('carries the reason through the sequence without claiming a slot', () => {
+    const validate = createControlValidationSequence({ base: 'flux' });
+    const controlLora = {
+      adapterModel: { base: 'flux', key: 'lora', type: 'control_lora' },
+      beginEndStepPct: [0, 1] as [number, number],
+      kind: 'control_lora' as const,
+      weight: 1,
+    };
+    expect(validate({ ...controlLora, adapterModel: null, unresolvedModel: 'missing_type' })).toBe('missing_type');
+    expect(validate(controlLora)).toBeNull();
+  });
+});
+
 describe('createControlValidationSequence', () => {
   const anima = (key: string, cond_in_channels: number | null = 3) => ({
     adapterModel: { base: 'anima', cond_in_channels, key, type: 'controlnet' },

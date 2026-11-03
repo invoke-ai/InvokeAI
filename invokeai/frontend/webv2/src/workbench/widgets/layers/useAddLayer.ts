@@ -1,7 +1,11 @@
 import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
-import { useModelsSelector } from '@features/models';
-import { getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import {
+  createControlLayer,
+  getDocumentIndex,
+  getDocumentLeaves,
+  nextControlLayerName,
+} from '@workbench/canvas-engine/api';
 import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -13,19 +17,17 @@ import { useTranslation } from 'react-i18next';
 import type { AddLayerItemId } from './addLayerMenu';
 
 import { isAddLayerItemAvailable } from './addLayerMenu';
-import { resolveDefaultControlModelForBase } from './controlModelOptions';
 import {
-  createControlLayer,
   createEmptyPaintLayer,
   createInpaintMaskLayer,
   createLayerId,
   createRegionalGuidanceLayer,
   createRegionalGuidanceLayerWithRefImage,
-  nextControlLayerName,
   nextGroupName,
   nextInpaintMaskName,
   nextRegionalGuidanceName,
 } from './layerOps';
+import { requestLayerProperties } from './layerPropertiesRequestStore';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /**
@@ -38,7 +40,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
   const projectId = useActiveProjectId();
   const commitPrepared = usePreparedCommit(engine);
   const base = useSelectedModelBase();
-  const models = useModelsSelector((snapshot) => snapshot.models);
   const layerNames = useActiveProjectSelector(
     (project) => getDocumentIndex(project.canvas.document).nodes.map((entry) => entry.node.name),
     (left, right) => left.length === right.length && left.every((name, index) => name === right[index])
@@ -52,11 +53,10 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
       if (!isAddLayerItemAvailable(id, base)) {
         return;
       }
-      const add = (label: string, node: CanvasNodeContract): void => {
+      const add = (label: string, node: CanvasNodeContract) =>
         commitPrepared(label, (model) =>
           model.prepare({ aboveId: model.document.selectedLayerId, nodes: [node], type: 'insert' })
         );
-      };
       switch (id) {
         case 'group': {
           // An empty group has no stack of its own: it joins the selected node's stack, else raster.
@@ -91,13 +91,11 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
           return;
         }
         case 'control': {
-          const layer = createControlLayer(
-            nextControlLayerName(layerNames),
-            undefined,
-            base,
-            resolveDefaultControlModelForBase(models, base)
-          );
-          add(t('widgets.layers.actions.addControlLayer'), layer);
+          const layer = createControlLayer({ base, id: createLayerId(), name: nextControlLayerName(layerNames) });
+          // A new control layer starts untyped: its Properties ask what it should control.
+          if (add(t('widgets.layers.actions.addControlLayer'), layer).status === 'committed') {
+            requestLayerProperties(layer.id);
+          }
           return;
         }
         case 'inpaint_mask': {
@@ -121,6 +119,6 @@ export const useAddLayer = (): ((id: AddLayerItemId) => void) => {
         }
       }
     },
-    [base, commitPrepared, layerNames, models, projectId, regionalGuidanceCount, t]
+    [base, commitPrepared, layerNames, projectId, regionalGuidanceCount, t]
   );
 };

@@ -14,12 +14,12 @@ import pytest
 import torch
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer
-from invokeai.backend.model_manager.load.model_loaders.anima import (
+from invokeai.backend.anima.checkpoint_layout import (
     ANIMA_TRANSFORMER_CONFIG,
-    _filter_non_model_keys,
-    _strip_anima_bundle_prefix,
     anima_transformer_config,
     count_anima_dit_blocks,
+    filter_non_model_keys,
+    strip_anima_bundle_prefix,
 )
 from tests.backend.model_manager.load.state_dicts.anima_2_9b_keys import ANIMA_2_9B_NUM_BLOCKS
 from tests.backend.model_manager.load.state_dicts.anima_2_9b_keys import state_dict_keys as anima_2_9b_keys
@@ -46,7 +46,7 @@ def _full_depth_meta_state_dict(fixture: dict[str, list[int]], num_blocks: int) 
 
 def _prepare(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     """The two key passes the loader runs before it builds the model."""
-    return _filter_non_model_keys(_strip_anima_bundle_prefix(sd))
+    return filter_non_model_keys(strip_anima_bundle_prefix(sd))
 
 
 class TestCountAnimaDitBlocks:

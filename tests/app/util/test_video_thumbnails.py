@@ -146,6 +146,7 @@ def hanging_worker(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(video_thumbnails, "_worker_command", _hang_command)
 
 
+@pytest.mark.ffmpeg
 class TestHappyPathThroughSubprocess:
     def test_probe_returns_metadata(self, synthetic_mp4: Path) -> None:
         width, height, duration, fps = probe_video(synthetic_mp4)
@@ -162,6 +163,7 @@ class TestHappyPathThroughSubprocess:
         assert decoder_frame_count(synthetic_mp4) == FRAMES
 
 
+@pytest.mark.ffmpeg
 class TestUnreadableInput:
     def test_probe_rejects_garbage_bytes(self, tmp_path: Path) -> None:
         bogus = tmp_path / "junk.mp4"
@@ -206,6 +208,7 @@ class TestHungDecoderIsBounded:
 
 
 class TestStreamedDecoderIsBounded:
+    @pytest.mark.ffmpeg
     def test_streams_real_frames_through_worker(self, synthetic_mp4: Path) -> None:
         frames = list(iter_video_frames(synthetic_mp4))
         assert len(frames) == FRAMES
@@ -619,6 +622,7 @@ class TestWorkerDecodeBounds:
         worker._assert_decodable_dims(Path("fake.mp4"))  # must not raise
 
 
+@pytest.mark.ffmpeg
 class TestStreamBackendFallback:
     """_stream must fall back to cv2 like probe/frame/count do (JPPhoto review
     2026-07-21) — a file accepted at upload via the cv2 fallback previously worked in
@@ -1073,6 +1077,7 @@ class TestRepresentativeThumbnailFrame:
         assert frame is dark
         assert timeouts == [10.0, 5.0]
 
+    @pytest.mark.ffmpeg
     def test_walks_past_a_black_lead_in_through_the_worker(self, ladder_mp4: Path) -> None:
         """End to end: the opening rung and the first deeper rung both decode to black and are
         rejected; the search continues to the lit frame instead of settling."""
@@ -1083,6 +1088,7 @@ class TestRepresentativeThumbnailFrame:
         assert FrameScore.measure(frame).informative
         assert np.asarray(frame).mean() > 60
 
+    @pytest.mark.ffmpeg
     def test_falls_back_to_frame_zero_when_metadata_overstates(self, synthetic_mp4: Path) -> None:
         """Container metadata is untrusted: fps/duration claiming frames that don't exist
         (indices 100+ of a 12-frame clip) must still produce a thumbnail (frame 0), not a
@@ -1093,6 +1099,7 @@ class TestRepresentativeThumbnailFrame:
         assert abs(value - 32) <= 8  # frame 0
 
 
+@pytest.mark.ffmpeg
 class TestFrameCountOffTheFfmpegBackend:
     """OpenCV without its FFmpeg backend (Media Foundation, in the Windows ARM64 wheel) derives the
     frame count from the container duration, which a soundtrack outlasting the video stretches."""

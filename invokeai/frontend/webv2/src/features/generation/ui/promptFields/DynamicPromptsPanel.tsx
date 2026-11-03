@@ -1,15 +1,18 @@
 import type { DynamicPromptsConfig } from '@features/generation/core/dynamicPrompts';
 import type { DynamicPromptsExpansion } from '@features/generation/ui/useDynamicPrompts';
 
-import { Badge, HStack, Menu, NumberInput, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { Badge, HStack, Menu, NumberInput, Portal, Stack, Text } from '@chakra-ui/react';
 import {
   createDynamicPromptsSampleSeed,
+  describeDynamicPromptsFailure,
   DYNAMIC_PROMPTS_MAX_PROMPTS,
   DYNAMIC_PROMPTS_MIN_PROMPTS,
   sanitizeMaxPrompts,
 } from '@features/generation/core/dynamicPrompts';
+import { describeGenerationIssue } from '@features/generation/core/generationIssues';
 import { HighlightedPrompt } from '@features/generation/ui/promptFields/PromptHighlight';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from '@features/generation/ui/promptFields/PromptPanelHeader';
+import { GenerateToggleSwitch } from '@features/generation/ui/shared/GenerateToggleSwitch';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Field } from '@platform/ui/Field';
 import { MenuContent } from '@platform/ui/Menu';
@@ -29,7 +32,6 @@ const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.hover' } as const;
 const DISABLED_PROMPT_ROW_PROPS = { cursor: 'default', opacity: 1 } as const;
 const NO_HOVER_PROPS = { bg: 'transparent' } as const;
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
-const SWITCH_CHECKED = { bg: 'accent.solid' } as const;
 
 export interface DynamicPromptsFieldConfig extends DynamicPromptsConfig {
   /** A fixed seed applies to every image, so per-image sharing has nothing left to decide. */
@@ -52,20 +54,11 @@ export const DynamicPromptsPanel = ({
 }) => {
   const { t } = useTranslation();
   const { onChange } = config;
-  // Explicit sibling input IDs prevent labels from targeting the wrong control.
-  const seedSwitchId = useId();
-  const resampleSwitchId = useId();
   const modeFieldId = useId();
   const modeTriggerId = useId();
   // aria-labelledby combines the field label and value for the composite trigger's accessible name.
   const modeLabelledBy = `${modeFieldId}-label ${modeTriggerId}`;
   const modeMenuIds = useMemo(() => ({ trigger: modeTriggerId }), [modeTriggerId]);
-  const seedSwitchIds = useMemo(() => ({ hiddenInput: seedSwitchId, label: `${seedSwitchId}-label` }), [seedSwitchId]);
-  const resampleSwitchIds = useMemo(
-    () => ({ hiddenInput: resampleSwitchId, label: `${resampleSwitchId}-label` }),
-    [resampleSwitchId]
-  );
-  const seedHeldNoteId = `${seedSwitchId}-held`;
   const visiblePrompts = expansion.prompts.slice(0, MAX_PREVIEW_ROWS);
   const hiddenPromptCount = expansion.prompts.length - visiblePrompts.length;
 
@@ -82,13 +75,13 @@ export const DynamicPromptsPanel = ({
     [onChange]
   );
   const handleSeedBehaviourChange = useCallback(
-    (event: { checked: boolean }) => onChange({ seedBehaviour: event.checked ? 'per-image' : 'per-iteration' }),
+    (checked: boolean) => onChange({ seedBehaviour: checked ? 'per-image' : 'per-iteration' }),
     [onChange]
   );
-  const handleResampleChange = useCallback(
-    (event: { checked: boolean }) => onChange({ resample: event.checked }),
-    [onChange]
-  );
+  const handleResampleChange = useCallback((resample: boolean) => onChange({ resample }), [onChange]);
+  const handleEnabledChange = useCallback((enabled: boolean) => onChange({ enabled }), [onChange]);
+  // The same words the notice under the prompt and the Invoke button use.
+  const failure = describeDynamicPromptsFailure(expansion);
   const handleShuffle = useCallback(() => onChange({ sampleSeed: createDynamicPromptsSampleSeed() }), [onChange]);
 
   const modeItems = useMemo(
@@ -103,6 +96,28 @@ export const DynamicPromptsPanel = ({
   const maxPromptsLabel = config.combinatorial
     ? t('widgets.generate.dynamicPrompts.maxPrompts')
     : t('widgets.generate.dynamicPrompts.numberOfPrompts');
+
+  const enabledSwitch = (
+    <GenerateToggleSwitch
+      checked={config.enabled}
+      helpText={
+        config.enabled
+          ? t('widgets.generate.dynamicPrompts.enabledHelp')
+          : t('widgets.generate.dynamicPrompts.disabledHelp')
+      }
+      label={t('widgets.generate.dynamicPrompts.enabled')}
+      onCheckedChange={handleEnabledChange}
+    />
+  );
+
+  if (!config.enabled) {
+    return (
+      <Stack gap="2.5">
+        <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.title')} />
+        {enabledSwitch}
+      </Stack>
+    );
+  }
 
   return (
     <Stack gap="2.5">
@@ -127,6 +142,8 @@ export const DynamicPromptsPanel = ({
               })}
         </Badge>
       </PromptPanelHeader>
+
+      {enabledSwitch}
 
       <HStack align="end" gap="2">
         <Field id={modeFieldId} label={t('widgets.generate.dynamicPrompts.mode')}>
@@ -189,47 +206,39 @@ export const DynamicPromptsPanel = ({
       </HStack>
 
       {config.combinatorial ? null : (
-        <Switch.Root checked={config.resample} ids={resampleSwitchIds} onCheckedChange={handleResampleChange}>
-          <Switch.HiddenInput />
-          <Switch.Control _checked={SWITCH_CHECKED}>
-            <Switch.Thumb />
-          </Switch.Control>
-          <Switch.Label color="fg.muted" fontSize="xs">
-            {t('widgets.generate.dynamicPrompts.newSampleEveryInvoke')}
-          </Switch.Label>
-        </Switch.Root>
+        <GenerateToggleSwitch
+          checked={config.resample}
+          label={t('widgets.generate.dynamicPrompts.newSampleEveryInvoke')}
+          onCheckedChange={handleResampleChange}
+        />
       )}
 
-      <Switch.Root
+      <GenerateToggleSwitch
         checked={config.seedBehaviour === 'per-image'}
         disabled={config.isSeedFixed}
-        ids={seedSwitchIds}
+        helpText={config.isSeedFixed ? t('widgets.generate.dynamicPrompts.seedHeldForEveryImage') : undefined}
+        label={t('widgets.generate.dynamicPrompts.newSeedPerImage')}
         onCheckedChange={handleSeedBehaviourChange}
-      >
-        <Switch.HiddenInput aria-describedby={config.isSeedFixed ? seedHeldNoteId : undefined} />
-        <Switch.Control _checked={SWITCH_CHECKED}>
-          <Switch.Thumb />
-        </Switch.Control>
-        <Switch.Label color="fg.muted" fontSize="xs">
-          {t('widgets.generate.dynamicPrompts.newSeedPerImage')}
-        </Switch.Label>
-      </Switch.Root>
-      {config.isSeedFixed ? (
-        <Text color="fg.subtle" fontSize="xs" id={seedHeldNoteId} mt="-1">
-          {t('widgets.generate.dynamicPrompts.seedHeldForEveryImage')}
-        </Text>
+      />
+
+      {failure ? (
+        <HStack alignItems="flex-start" gap="1.5" justify="space-between">
+          <Text color="fg.error" fontSize="xs" textWrap="pretty" wordBreak="break-word">
+            {describeGenerationIssue(t, failure)}
+          </Text>
+          {expansion.isError ? (
+            <Button flexShrink={0} loading={expansion.isRetrying} size="xs" variant="outline" onClick={expansion.retry}>
+              {t('common.retry')}
+            </Button>
+          ) : null}
+        </HStack>
       ) : null}
 
-      {expansion.isError ? (
-        <Text color="fg.error" fontSize="xs">
-          {t('widgets.generate.dynamicPrompts.problemGeneratingPrompts')}
-        </Text>
-      ) : expansion.error ? (
-        <Text color="fg.error" fontSize="xs" wordBreak="break-word">
-          {expansion.error}
+      {expansion.prompts.length > 1 ? (
+        <Text color="fg.subtle" fontSize="xs">
+          {t('widgets.generate.dynamicPrompts.selectToUse')}
         </Text>
       ) : null}
-
       <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.promptsPreview')}>
         <Stack gap="0">
           {visiblePrompts.map((prompt, index) => (
@@ -267,7 +276,6 @@ const DynamicPromptRow = ({
   showSyntaxHighlighting: boolean;
   onUsePrompt: (prompt: string) => void;
 }) => {
-  const { t } = useTranslation();
   const handleClick = useCallback(() => onUsePrompt(prompt), [onUsePrompt, prompt]);
 
   return (
@@ -283,7 +291,6 @@ const DynamicPromptRow = ({
       px="2"
       py="1.5"
       textStyle="md"
-      title={isDisabled ? undefined : t('widgets.generate.dynamicPrompts.usePrompt')}
       whiteSpace="nowrap"
       _disabled={DISABLED_PROMPT_ROW_PROPS}
       _hover={isDisabled ? NO_HOVER_PROPS : PROMPT_ROW_HOVER_PROPS}

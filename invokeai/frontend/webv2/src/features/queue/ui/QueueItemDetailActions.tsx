@@ -2,6 +2,7 @@ import type { QueueItemReadModel } from '@features/queue/core/types';
 
 import { Icon } from '@chakra-ui/react';
 import { queueCommands } from '@features/queue/publicApi';
+import { noteQueueCancelRequested } from '@features/queue/runtime/cancelRequests';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button } from '@platform/ui/Button';
@@ -27,6 +28,7 @@ export const QueueItemDetailActions = ({ item }: { item: QueueItemReadModel }) =
     setBusy(true);
 
     try {
+      noteQueueCancelRequested({ batchId: item.batchId, kind: 'batch' });
       const canceled = await queueCommands.cancelBatch(item.batchId);
       if (!isAccountScopeCurrent(owner)) {
         return;
@@ -55,6 +57,7 @@ export const QueueItemDetailActions = ({ item }: { item: QueueItemReadModel }) =
   const onCancelBatch = useCallback(() => {
     requestQueueConfirmation({
       body: t('widgets.queue.cancelBatchConfirmationBody'),
+      cancelLabel: t('widgets.queue.keepRunning'),
       confirmLabel: t('widgets.queue.cancelBatch'),
       onConfirm: cancelBatch,
       title: t('widgets.queue.cancelBatchTitle'),

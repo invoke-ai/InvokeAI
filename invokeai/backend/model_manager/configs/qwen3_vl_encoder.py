@@ -13,8 +13,13 @@ from invokeai.backend.model_manager.configs.identification_utils import (
     raise_if_not_dir,
     raise_if_not_file,
 )
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import has_qwen3_5_linear_attention
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
+from invokeai.backend.model_manager.util.qwen3_vl import drop_qwen3vl_unloaded_keys
+from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX, parse_quantization_metadata
+from invokeai.backend.quantization.int8_convrot import read_comfy_quant_markers
+from invokeai.backend.quantization.nvfp4 import find_nvfp4_layers
 
 # The two Qwen3-VL encoders v7 can build, by language-model width. Both have 36 layers, so the
 # width alone identifies the variant. Anything else -- including MiniMax H3's truncated
@@ -94,6 +99,27 @@ def _variant_from_checkpoint_shape(state_dict: dict[str | int, Any]) -> Qwen3VLV
     return variant
 
 
+def _raise_for_undecodable_nvfp4_layers(mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+    """Refuse at install time an nvfp4 layer the loader would refuse at the first generation.
+
+    The loader's own check, over the tensors the loader reads -- so a visual tower or LM head it drops cannot
+    get a file refused. It turns away AWQ builds, packed weights without nvfp4's per-tensor global scale,
+    malformed layers, and layers neither a ComfyUI ``.comfy_quant`` marker nor the safetensors header names as
+    nvfp4 (ModelOpt-style exports among them). Identification holds meta tensors, whose markers have no bytes to
+    parse, so those are read from the file -- whenever a kept key is a marker, which is when the check consults
+    them -- and passed beside the header rather than over it: as at load, either one naming a layer nvfp4 is
+    enough.
+    """
+    consumed = drop_qwen3vl_unloaded_keys(state_dict)
+    markers = None
+    if any(isinstance(key, str) and key.endswith(COMFY_QUANT_SUFFIX) for key in consumed):
+        markers = read_comfy_quant_markers(mod.path)
+    try:
+        find_nvfp4_layers(consumed, header_layers=parse_quantization_metadata(mod.metadata()), markers=markers)
+    except ValueError as e:
+        raise InvalidMatchError(f"this Qwen3-VL encoder cannot be loaded: {e}") from e
+
+
 class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
     """Configuration for standalone Qwen3-VL text encoder models (diffusers-like directory format).
 
@@ -171,8 +197,12 @@ def _is_qwen3_vl_encoder_state_dict(state_dict: dict[str | int, Any]) -> bool:
     """True for a single-file Qwen3-VL encoder: a Qwen3 text decoder PLUS a visual tower.
 
     The visual tower (``visual.*`` / ``model.visual.*``) distinguishes Qwen3-VL from the text-only
-    ``Qwen3Encoder`` (Z-Image / FLUX.2 Klein), which has ``model.layers.*`` but no visual tower.
+    ``Qwen3Encoder`` (Z-Image / FLUX.2 Klein), which has ``model.layers.*`` but no visual tower. Gated
+    DeltaNet (``linear_attn``) layers distinguish it from a multimodal Qwen3.5 export (MOSS-Image's
+    encoder), which has a ``language_model.layers.*`` decoder and a visual tower as well.
     """
+    if has_qwen3_5_linear_attention(state_dict):
+        return False
     str_keys = [k for k in state_dict if isinstance(k, str)]
     has_text_decoder = any(".layers." in k and ("model." in k or k.startswith("layers.")) for k in str_keys)
     has_visual_tower = any(k.startswith(("visual.", "model.visual.")) or ".visual." in k for k in str_keys)
@@ -210,6 +240,9 @@ class Qwen3VLEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
         state_dict = mod.load_state_dict()
         if not _is_qwen3_vl_encoder_state_dict(state_dict):
             raise NotAMatchError("state dict does not look like a single-file Qwen3-VL encoder")
+        # Ahead of the variant, whose width is read off the embedding: an undecodable repack that packs the
+        # embedding too would fail there instead, and register as an unknown model with the reason only in the log.
+        _raise_for_undecodable_nvfp4_layers(mod, state_dict)
         variant = override_fields.pop("variant", None) or _variant_from_checkpoint_shape(state_dict)
 
         return cls(**override_fields, variant=variant)
@@ -235,8 +268,9 @@ def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
         return
     raise InvalidMatchError(
         "this is the Qwen3-VL visual tower ('mmproj'), not a text encoder. Install the language tower "
-        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'); Krea-2 and Ideogram 4 condition on text only "
-        "and never use the visual tower."
+        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'). GGUF encoders read text only; Krea-2 edit "
+        "reference images need a Qwen3-VL encoder with its vision weights, such as the Krea-2 Diffusers "
+        "model's encoder or a single-file Qwen3-VL checkpoint."
     )
 
 
@@ -282,9 +316,10 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for a single-file GGUF Qwen3-VL encoder (llama.cpp, e.g.
     ``Qwen3VL-4B-Instruct-Q4_K_M.gguf``).
 
-    llama.cpp splits Qwen3-VL across two files: the language tower -- all Krea-2 and Ideogram 4
-    condition on -- and a companion ``mmproj-*.gguf`` holding the visual tower. Only the language
-    tower is accepted here; the ``mmproj`` file is turned away with its own reason.
+    llama.cpp splits Qwen3-VL across two files: the language tower -- all a text prompt needs -- and a
+    companion ``mmproj-*.gguf`` holding the visual tower, which reads Krea-2 edit reference images.
+    Only the language tower is accepted here; the ``mmproj`` file is turned away with its own reason,
+    so a GGUF encoder encodes text only.
 
     Identified by the ``general.architecture`` metadata, which is the only honest discriminator: a
     Qwen3-VL language tower is structurally indistinguishable from a text-only Qwen3 of the same
@@ -311,7 +346,7 @@ class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
         if mod.path.suffix.lower() != ".gguf":
             raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
 
-        # `mod.metadata()` reads and caches every GGUF string field, and identification probes many
+        # `mod.metadata()` reads and caches every scalar GGUF field, and identification probes many
         # configs against the same ModelOnDisk -- so this costs one shared read rather than a second
         # mmap plus the full GC that closing a reader forces.
         architecture = mod.metadata().get("general.architecture")

@@ -1,10 +1,5 @@
 import type { CommitRasterFilterOptions, CommitRasterFilterResult } from '@workbench/canvas-engine/capabilities';
-import type {
-  CanvasControlLayerContract,
-  CanvasImageRef,
-  CanvasLayerContract,
-  CanvasRasterLayerContractV2,
-} from '@workbench/canvas-engine/contracts';
+import type { CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { LayerMutationControllerOptions } from '@workbench/canvas-engine/controllers/layerMutationController';
 import type { DecodeImageResult } from '@workbench/canvas-engine/controllers/rasterController';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
@@ -60,7 +55,6 @@ export interface FilterResultControllerOptions {
     }
   ) => Promise<DecodeImageResult>;
   readonly discardPersisted: (layerId: string) => void;
-  readonly getDefaultControlModel: (base: string | null) => string | null;
   readonly getMainModelBase: () => string | null;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
 }
@@ -108,14 +102,16 @@ export class FilterResultController {
       if (liveLayer.isLocked) {
         return { status: 'locked' };
       }
-      if (liveLayer.type !== 'raster' && liveLayer.type !== 'control') {
-        return { status: 'unsupported' };
-      }
       if (!o.ctx.isPermitCurrent(permit) || o.ctx.isGestureActive()) {
         return { status: 'busy' };
       }
+      // A source that changed type since the guard was taken is stale, not unsupported.
       if (!o.ctx.isGuardCurrent(options.guard)) {
         return { status: 'stale' };
+      }
+      // Filter reads raster pixels only; a control layer's map comes from detection.
+      if (liveLayer.type !== 'raster') {
+        return { status: 'unsupported' };
       }
       if (options.signal?.aborted) {
         return { status: 'aborted' };
@@ -141,13 +137,12 @@ export class FilterResultController {
             return { status: 'stale' };
           }
           const before = structuredClone(liveLayer);
-          const after: CanvasLayerContract =
-            liveLayer.type === 'raster'
-              ? (() => {
-                  const { adjustments: _adjustments, ...base } = liveLayer;
-                  return structuredClone({ ...base, filter: options.filter, source: paintSource });
-                })()
-              : structuredClone({ ...liveLayer, filter: options.filter, source: paintSource });
+          const { adjustments: _adjustments, ...unadjusted } = liveLayer;
+          const after: CanvasLayerContract = structuredClone({
+            ...unadjusted,
+            filter: options.filter,
+            source: paintSource,
+          });
           const discard = (): void => o.discardPersisted(liveLayer.id);
           const prepared = o.ctx.preparePixels(liveLayer.id, rect, pixels);
           const interrupted = this.interrupted(options);
@@ -181,39 +176,21 @@ export class FilterResultController {
         const layerId = o.ctx.createLayerId();
         let copy: CanvasLayerContract;
         if (options.target === 'control') {
-          const buildControlBase = (): CanvasControlLayerContract => {
-            const mainBase = o.getMainModelBase();
-            return createControlLayer(
-              `${liveLayer.name} filtered`,
-              layerId,
-              mainBase,
-              o.getDefaultControlModel(mainBase)
-            );
-          };
-          const base = liveLayer.type === 'control' ? structuredClone(liveLayer) : buildControlBase();
+          // A typed copy is a map used as-is; an untyped one waits for the user to choose its type.
+          const controlType = options.controlCopy?.controlType ?? null;
           copy = {
-            ...base,
+            ...createControlLayer({
+              base: o.getMainModelBase(),
+              id: layerId,
+              name: `${liveLayer.name} filtered`,
+              source: paintSource,
+            }),
+            ...(controlType === null ? {} : { controlType, detection: null }),
             filter: options.filter,
-            id: layerId,
-            name: `${liveLayer.name} filtered`,
-            source: paintSource,
             transform: structuredClone(liveLayer.transform),
-          };
-        } else if (options.target === 'raster' && liveLayer.type === 'control') {
-          copy = {
-            blendMode: liveLayer.blendMode,
-            filter: options.filter,
-            id: layerId,
-            isEnabled: true,
-            isLocked: false,
-            name: `${liveLayer.name} filtered`,
-            opacity: liveLayer.opacity,
-            source: paintSource,
-            transform: structuredClone(liveLayer.transform),
-            type: 'raster',
           };
         } else {
-          const { adjustments: _adjustments, ...base } = structuredClone(liveLayer as CanvasRasterLayerContractV2);
+          const { adjustments: _adjustments, ...base } = structuredClone(liveLayer);
           copy = {
             ...base,
             filter: options.filter,

@@ -12,7 +12,9 @@ import pytest
 from invokeai.backend.model_manager.taxonomy import Qwen3VLVariantType
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import (
     _CONFIG_BY_VARIANT,
+    build_qwen3_vl_processor,
     load_bundled_qwen3_vl_config_dict,
+    load_bundled_qwen3_vl_preprocessor_config_dict,
     load_bundled_qwen3_vl_tokenizer,
 )
 
@@ -120,3 +122,62 @@ def test_an_unregistered_variant_is_refused_by_name() -> None:
 
     with pytest.raises(NotImplementedError, match="qwen3vl_99b"):
         load_bundled_qwen3_vl_config_dict(_Unknown())  # type: ignore[arg-type]
+
+
+def test_bundled_preprocessor_config_is_the_released_one() -> None:
+    """The values a reference image is cut into patches by. Qwen3-VL's vision tower takes 16px patches with
+    0.5/0.5 normalization; transformers' class defaults are Qwen2-VL's 14px and CLIP mean/std, which run
+    without error and feed the tower off-distribution pixels."""
+    config = load_bundled_qwen3_vl_preprocessor_config_dict()
+
+    assert config["patch_size"] == 16
+    assert config["merge_size"] == 2
+    assert config["temporal_patch_size"] == 2
+    assert config["image_mean"] == [0.5, 0.5, 0.5]
+    assert config["image_std"] == [0.5, 0.5, 0.5]
+    assert config["size"] == {"longest_edge": 16777216, "shortest_edge": 65536}
+
+
+def test_bundled_processor_expands_one_pad_per_merged_patch() -> None:
+    """Built without any processor files, it turns one ``<|image_pad|>`` into the image's token grid, one pad
+    per 2x2 merged 16px patches, and marks those pads as image tokens for the 3-D M-RoPE."""
+    import torch
+
+    processor = build_qwen3_vl_processor(load_bundled_qwen3_vl_tokenizer())
+    # 384x256 is already a multiple of the 32px merged patch, so the grid is 12 x 8 merged patches.
+    image = torch.rand(3, 256, 384)
+
+    inputs = processor(
+        text=["<|vision_start|><|image_pad|><|vision_end|>a cat"], images=[image], return_tensors="pt", do_rescale=False
+    )
+
+    assert inputs["image_grid_thw"].tolist() == [[1, 16, 24]]
+    pad_id = processor.tokenizer.convert_tokens_to_ids("<|image_pad|>")
+    pads = inputs["input_ids"] == pad_id
+    assert int(pads.sum()) == 16 * 24 // 4
+    assert torch.equal(inputs["mm_token_type_ids"].bool(), pads)
+    assert inputs["pixel_values"].shape == (16 * 24, 3 * 2 * 16 * 16)
+
+
+def test_bundled_processor_normalizes_with_the_release_mean_and_std() -> None:
+    """Mean and std 0.5: a uniform mid-grey reference must come out as zeros. CLIP's statistics (the class
+    defaults) would shift and scale it into values the tower never saw."""
+    import torch
+
+    processor = build_qwen3_vl_processor(load_bundled_qwen3_vl_tokenizer())
+
+    inputs = processor.image_processor(images=[torch.full((3, 256, 256), 0.5)], return_tensors="pt", do_rescale=False)
+
+    torch.testing.assert_close(inputs["pixel_values"], torch.zeros_like(inputs["pixel_values"]), atol=1e-6, rtol=0)
+
+
+def test_bundled_processor_raises_a_small_reference_to_the_pixel_floor() -> None:
+    """The release's 65,536 px floor: a 100x100 reference is resized up to 256x256, an 8x8 merged grid."""
+    import torch
+
+    processor = build_qwen3_vl_processor(load_bundled_qwen3_vl_tokenizer())
+
+    inputs = processor.image_processor(images=[torch.rand(3, 100, 100)], return_tensors="pt", do_rescale=False)
+
+    assert inputs["image_grid_thw"].tolist() == [[1, 16, 16]]
+    assert int(inputs["image_grid_thw"].prod()) // processor.image_processor.merge_size**2 == 8 * 8

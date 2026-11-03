@@ -1,33 +1,39 @@
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
-import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasLayerContract, CanvasRegionalGuidanceLayerContract } from '@workbench/canvas-engine/api';
 import type {
+  DynamicPromptsExpansionSource,
   InvocationMode,
   InvocationRoute,
   InvocationValidationReason,
   InvocationSourceId,
+  RouteIssue,
   ResolvedInvocationRoute,
   ResultDestination,
 } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetId } from '@workbench/widgetContracts';
 
+import { getLayoutDraftRejectionReason, getLayoutPromptRejectionReason } from '@features/generation/graph';
 import {
   describeExternalCanvasRefusal,
-  getGenerationModelAvailabilityReasons,
-  getGenerationValidationReasons,
+  describeGenerationIssue,
+  expandsDynamicPrompts,
+  getEffectivePrompts,
+  getGenerateInvocationIssues,
   isExternalTextOnlyCanvasModel,
   isGenerateModelConfig,
   isSupportedGenerateModel,
+  NO_GENERATE_MODEL_ISSUE,
+  normalizeGenerateSettings,
   normalizeGenerateWidgetValues,
-  resolveExternalCanvasRequestSize,
   sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { localizeForLoopValidationReason } from '@features/workflow/utility';
+import { localizeWorkflowReadinessReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import {
   compileContributingLayers,
@@ -38,9 +44,60 @@ import {
 } from '@workbench/canvas-engine/api';
 import { isCompositableControlLayer, isCompositableRegionalGuidanceLayer } from '@workbench/canvasLayerContent';
 
-import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
+import {
+  createControlLayerCheckContext,
+  describeControlLayerIssue,
+  getBlockingControlLayerIssues,
+} from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
+import { getWorkbenchPreferences } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
+
+/**
+ * What the route's positive prompt expands from, with the sample seed to draw with, or null when the route sends its
+ * prompt as typed: Upscale and workflows never expand, and dynamic prompts may be off or the prompt plain. Canvas
+ * expands Generate's prompt.
+ */
+export const getDynamicPromptsExpansionSource = (
+  project: Project,
+  sourceId: InvocationSourceId
+): (DynamicPromptsExpansionSource & { sampleSeed: number }) | null => {
+  if (sourceId === 'upscale' || sourceId === 'workflow') {
+    return null;
+  }
+
+  const settings =
+    sourceId === 'video'
+      ? normalizeVideoWidgetValues(getProjectWidgetValues(project, 'video'))
+      : normalizeGenerateSettings(getProjectWidgetValues(project, 'generate'));
+
+  if (!settings) {
+    return null;
+  }
+
+  const positivePrompt =
+    'promptTemplate' in settings ? getEffectivePrompts(settings).positivePrompt : settings.positivePrompt;
+
+  return expandsDynamicPrompts(positivePrompt, settings.dynamicPromptsEnabled)
+    ? {
+        combinatorial: settings.dynamicPromptsCombinatorial,
+        maxPrompts: settings.dynamicPromptsMaxPrompts,
+        positivePrompt,
+        sampleSeed: settings.dynamicPromptsSampleSeed,
+      }
+    : null;
+};
+
+/** Whether a submission prepared from `prepared` (null: not expanded) still describes what `current` compiles. */
+export const isSameDynamicPromptsExpansionSource = (
+  prepared: DynamicPromptsExpansionSource | null,
+  current: DynamicPromptsExpansionSource | null
+): boolean =>
+  prepared === null || current === null
+    ? prepared === current
+    : prepared.positivePrompt === current.positivePrompt &&
+      prepared.combinatorial === current.combinatorial &&
+      prepared.maxPrompts === current.maxPrompts;
 
 export interface InvocationSourceMeta {
   id: InvocationSourceId;
@@ -77,6 +134,9 @@ export const isInvocationSourceAvailable = (id: InvocationSourceId): boolean =>
 
 export const getDestinationLabel = (id: ResultDestination): string => destinationLabels.get(id) ?? 'Canvas';
 
+/** Locking routing pins both halves; either one locked reads as a locked route. */
+export const isRoutingLocked = (route: InvocationRoute): boolean => route.sourceLocked || route.destinationLocked;
+
 export const formatRoute = (route: InvocationRoute): string =>
   `${getSourceLabel(route.sourceId)} → ${getDestinationLabel(route.destination)}`;
 
@@ -112,9 +172,15 @@ export interface InvocationRouteInput {
   canvasLayers: readonly CanvasLayerContract[];
   /**
    * Whether a visible raster layer's bounds overlap the frame, so a text-only hosted model is blocked before invoke
-   * without reading pixels. Measured only for a Canvas route with such a model; false otherwise.
+   * without reading pixels. Measured only with such a model, whatever the selected source; false otherwise.
    */
   canvasRasterInFrame: boolean;
+  /**
+   * The enabled, painted regional guidance layers whose mask bounds overlap the frame (identity-stable), which a
+   * layout base places around the global prompt. Measured whatever the model: which bases read them is capability
+   * data that can arrive after the project, so readiness decides that when it runs.
+   */
+  canvasRegionalLayersInFrame: readonly CanvasRegionalGuidanceLayerContract[];
 }
 
 const getMountedWidgetIds = (project: Project): WidgetId[] => {
@@ -141,6 +207,15 @@ const getMountedWidgetIds = (project: Project): WidgetId[] => {
 
   return Array.from(mountedWidgetIds).sort();
 };
+
+type FrameRect = Project['canvas']['document']['bbox'];
+
+/** Whether document-space bounds overlap the frame's interior; touching its edge does not. */
+const overlapsFrame = (bounds: FrameRect, frame: FrameRect): boolean =>
+  bounds.x < frame.x + frame.width &&
+  frame.x < bounds.x + bounds.width &&
+  bounds.y < frame.y + frame.height &&
+  frame.y < bounds.y + bounds.height;
 
 /**
  * Whether a raster layer the generation composite draws overlaps the frame's interior with its own bounds. Invoke
@@ -169,31 +244,52 @@ const hasRasterContentInFrame = (document: Project['canvas']['document']): boole
       return false;
     }
 
-    const bounds = getSourceBounds(layer, document);
-
-    return (
-      bounds.x < bbox.x + bbox.width &&
-      bbox.x < bounds.x + bounds.width &&
-      bounds.y < bbox.y + bbox.height &&
-      bbox.y < bounds.y + bounds.height
-    );
+    return overlapsFrame(getSourceBounds(layer, document), bbox);
   });
+};
+
+const NO_REGIONAL_LAYERS: readonly CanvasRegionalGuidanceLayerContract[] = [];
+
+/**
+ * The compositable regional guidance layers whose mask bounds, offset and transform included, overlap the frame's
+ * interior: the regions a layout base can place. The one remaining approximation is a mask bitmap that reaches into
+ * the frame with transparent pixels only (a legacy document-sized mask, say), which still counts here although the
+ * canvas compiler, reading the uploaded mask's pixels, leaves it out.
+ */
+const getRegionalLayersInFrame = (
+  document: Project['canvas']['document'],
+  layers: readonly CanvasLayerContract[]
+): readonly CanvasRegionalGuidanceLayerContract[] => {
+  const { bbox } = document;
+
+  if (bbox.width <= 0 || bbox.height <= 0) {
+    return NO_REGIONAL_LAYERS;
+  }
+
+  const inFrame = layers.filter(
+    (layer): layer is CanvasRegionalGuidanceLayerContract =>
+      isCompositableRegionalGuidanceLayer(layer) && overlapsFrame(getSourceBounds(layer, document), bbox)
+  );
+
+  return inFrame.length > 0 ? inFrame : NO_REGIONAL_LAYERS;
 };
 
 export const getInvocationRouteInput = (project: Project): InvocationRouteInput => {
   const generateValues = getProjectWidgetValues(project, 'generate');
-  // This runs on every project change, so only a Canvas route with the model it gates measures layers.
+  // Canvas facts are measured whatever source is selected: a graph preview resolves the Canvas route from this same
+  // input while another source is. This runs on every project change, over leaves the document index caches; raster
+  // layers are measured only for the model they gate.
   const measuresRaster =
-    project.invocation.sourceId === 'canvas' &&
-    isGenerateModelConfig(generateValues.model) &&
-    isExternalTextOnlyCanvasModel(generateValues.model);
+    isGenerateModelConfig(generateValues.model) && isExternalTextOnlyCanvasModel(generateValues.model);
+  const canvasLayers = compileContributingLayers(project.canvas.document);
 
   return {
     canvasBbox: {
       height: project.canvas.document.bbox.height,
       width: project.canvas.document.bbox.width,
     },
-    canvasLayers: compileContributingLayers(project.canvas.document),
+    canvasLayers,
+    canvasRegionalLayersInFrame: getRegionalLayersInFrame(project.canvas.document, canvasLayers),
     canvasRasterInFrame: measuresRaster && hasRasterContentInFrame(project.canvas.document),
     generateValues,
     upscaleValues: getProjectWidgetValues(project, 'upscale'),
@@ -218,6 +314,7 @@ export const areInvocationRouteInputsEqual = (left: InvocationRouteInput, right:
   left.canvasBbox.height === right.canvasBbox.height &&
   left.canvasLayers === right.canvasLayers &&
   left.canvasRasterInFrame === right.canvasRasterInFrame &&
+  areArraysEqual(left.canvasRegionalLayersInFrame, right.canvasRegionalLayersInFrame) &&
   areArraysEqual(left.mountedWidgetIds, right.mountedWidgetIds);
 
 export const createInvocationRouteInputSelector = () =>
@@ -230,31 +327,26 @@ const getGenerateSnapshotValidationReasons = (
   generateValues: Record<string, unknown>,
   models?: readonly ModelConfig[],
   canvasBbox?: InvocationRouteInput['canvasBbox']
-): string[] => {
+): InvocationValidationReason[] => {
   const values = normalizeGenerateWidgetValues(generateValues);
 
   if (!values || !isSupportedGenerateModel(values.model)) {
-    return ['Generate needs a supported model before it can be invoked.'];
+    return [{ generationIssue: NO_GENERATE_MODEL_ISSUE }];
   }
 
-  // Canvas discovers the mode from pixel coverage during preparation and asks a provider for its size nearest the
-  // bbox, so readiness validates that size and permits an advertised whole-image mode; the compiler validates the
-  // captured one. Generate itself remains strictly text-to-image.
-  const providerModes =
-    canvasBbox !== undefined && values.model.type === 'external_image_generator'
-      ? (values.model.capabilities?.modes ?? ['txt2img'])
-      : null;
-  const mode = providerModes !== null && !providerModes.includes('txt2img') ? 'img2img' : 'txt2img';
+  const layoutDraftReason = getLayoutDraftRejectionReason({
+    base: values.model.base,
+    positivePrompt: values.positivePrompt,
+    promptTemplate: values.promptTemplate,
+  });
 
+  // Generate itself stays text to image; the Canvas source checks the provider at the size its frame asks for.
   return [
-    ...getGenerationValidationReasons(
-      values.model,
-      providerModes !== null && canvasBbox
-        ? { ...values, ...resolveExternalCanvasRequestSize(values.model, canvasBbox) }
-        : values,
-      mode
-    ),
-    ...(models ? getGenerationModelAvailabilityReasons(values.model, values, models) : []),
+    ...getGenerateInvocationIssues(values, {
+      ...(canvasBbox ? { canvasFrame: canvasBbox } : {}),
+      ...(models ? { models } : {}),
+    }).map((generationIssue) => ({ generationIssue })),
+    ...(layoutDraftReason === null ? [] : [layoutDraftReason]),
   ];
 };
 
@@ -287,7 +379,7 @@ export const resolveInvocationRouteInput = (
   const sourceId = route.sourceId;
   const destination = route.destination;
   const sourceWidgetId = sourceWidgetIds[sourceId];
-  // Route-rendering surfaces subscribe to templates because readiness reads them imperatively.
+  // Route-rendering surfaces subscribe to templates and preferences because readiness reads them imperatively.
   const projectGraphReadiness =
     sourceId === 'workflow'
       ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
@@ -299,7 +391,7 @@ export const resolveInvocationRouteInput = (
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
   } else if (sourceWidgetId && !isWidgetMounted(input, sourceWidgetId)) {
-    validationReasons.push(`The ${getSourceLabel(sourceId)} widget is not mounted in this project.`);
+    validationReasons.push({ routeIssue: { kind: 'sourceNotMounted', sourceId } });
   }
 
   if (sourceId === 'generate') {
@@ -327,7 +419,7 @@ export const resolveInvocationRouteInput = (
     validationReasons.push(...getGenerateSnapshotValidationReasons(input.generateValues, models, input.canvasBbox));
 
     if (input.canvasBbox.width <= 0 || input.canvasBbox.height <= 0) {
-      validationReasons.push('Canvas generation frame must have a positive area.');
+      validationReasons.push({ routeIssue: { kind: 'emptyCanvasFrame' } });
     }
 
     const values = normalizeGenerateWidgetValues(input.generateValues);
@@ -348,16 +440,26 @@ export const resolveInvocationRouteInput = (
           );
         }
       }
-    } else if (models) {
+    } else if (values && isSupportedGenerateModel(values.model)) {
       // Wait for models before validating local adapters to avoid false missing-model errors.
-      if (values && isSupportedGenerateModel(values.model)) {
+      if (models) {
         validationReasons.push(
           ...getBlockingControlLayerIssues({
+            context: createControlLayerCheckContext(values.model.base, getWorkbenchPreferences().controlModelMemory),
             layers: input.canvasLayers,
             mainModel: values.model,
             models,
           }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
+      }
+      // Before anything uploads, so only the regions whose mask bounds reach into the frame count.
+      const layoutPromptReason = getLayoutPromptRejectionReason({
+        base: values.model.base,
+        prompt: getEffectivePrompts(values).positivePrompt,
+        regions: input.canvasRegionalLayersInFrame,
+      });
+      if (layoutPromptReason) {
+        validationReasons.push(layoutPromptReason);
       }
     }
   }
@@ -375,7 +477,7 @@ export const resolveInvocationRouteInput = (
   if (!destinationAvailable) {
     validationReasons.push(`${getDestinationLabel(destination)} is not an available result destination.`);
   } else if (!destinationCompatible) {
-    validationReasons.push('Video results can only be sent to the Gallery. Switch the destination to Gallery.');
+    validationReasons.push({ routeIssue: { kind: 'videoNeedsGallery' } });
   }
 
   return {
@@ -394,11 +496,31 @@ export const resolveInvocationRouteInput = (
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
 
-/** Words any route validation reason for display; control-layer issues come from the locale. */
+/** What each source and destination is called in the UI: the widget that runs or receives the work. */
+export const ROUTE_LABEL_KEYS: Record<InvocationSourceId | ResultDestination, string> = {
+  canvas: 'widgets.labels.canvas',
+  gallery: 'widgets.labels.gallery',
+  generate: 'widgets.labels.generate',
+  upscale: 'widgets.labels.upscale',
+  video: 'widgets.labels.video',
+  workflow: 'widgets.labels.workflow',
+};
+
+const describeRouteIssue = (issue: RouteIssue, t: (key: string, options?: Record<string, unknown>) => string): string =>
+  t(
+    `topbar.invoke.routeIssues.${issue.kind}`,
+    issue.kind === 'sourceNotMounted' ? { source: t(ROUTE_LABEL_KEYS[issue.sourceId]) } : undefined
+  );
+
+/** Words any route validation reason for display; every structured reason comes from the locale. */
 export const localizeInvocationValidationReason = (
   reason: InvocationValidationReason,
   t: (key: string, options?: Record<string, unknown>) => string
 ): string =>
   typeof reason === 'object' && 'controlLayerIssue' in reason
     ? describeControlLayerIssue(t, reason.controlLayerIssue)
-    : localizeForLoopValidationReason(reason, t);
+    : typeof reason === 'object' && 'generationIssue' in reason
+      ? describeGenerationIssue(t, reason.generationIssue)
+      : typeof reason === 'object' && 'routeIssue' in reason
+        ? describeRouteIssue(reason.routeIssue, t)
+        : localizeWorkflowReadinessReason(reason, t);

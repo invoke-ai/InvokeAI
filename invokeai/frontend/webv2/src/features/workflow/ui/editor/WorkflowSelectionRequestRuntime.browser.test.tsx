@@ -13,7 +13,7 @@ import {
   workflowFitViewRequestStore,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
-import { requestNodeSelection, workflowSelectionStore } from './selectionStore';
+import { requestNodeSelection, revealWorkflowNode, workflowSelectionStore } from './selectionStore';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 
 const templates = vi.hoisted(() => ({
@@ -79,7 +79,7 @@ describe('WorkflowSelectionRequestRuntime', () => {
     const fitView = vi.fn(() => Promise.resolve(true));
     const flowInstance = { fitView } as unknown as WorkflowFlowInstance;
     const selectNodes = vi.fn();
-    requestNodeSelection(['pending-node']);
+    revealWorkflowNode('pending-node');
 
     await act(() => {
       root?.render(

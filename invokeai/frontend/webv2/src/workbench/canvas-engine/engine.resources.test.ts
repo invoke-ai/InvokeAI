@@ -110,7 +110,20 @@ const offscreenDocument = () =>
 
 const createFramedEngine = (pendingLayerIds: ReadonlySet<string>) => {
   const document = offscreenDocument();
-  const canvas = { document, documentRevision: 0, snapshots: [], version: 3 };
+  const canvas = {
+    document,
+    documentRevision: 0,
+    snapshots: [],
+    stagingArea: {
+      areThumbnailsVisible: false,
+      autoSwitchMode: 'off' as const,
+      isVisible: false,
+      pendingImageIds: [],
+      pendingImages: [],
+      selectedImageIndex: 0,
+    },
+    version: 3,
+  };
   const store = {
     discardLayer: vi.fn(),
     dispose: vi.fn(),

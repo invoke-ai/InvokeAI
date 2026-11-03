@@ -31,7 +31,7 @@ import { PropertiesSection } from './PropertiesSection';
 
 type LayerSectionEngine = Pick<
   CanvasEngineHandle,
-  'document' | 'exports' | 'interaction' | 'layers' | 'projectId' | 'tools'
+  'document' | 'exports' | 'interaction' | 'layers' | 'lifecycle' | 'projectId' | 'tools'
 >;
 
 // Reference equality is exact: the document index hands back the same node
@@ -162,7 +162,7 @@ const LayerTypeSettings = ({
     case 'regional_guidance':
       return <RegionalGuidanceSettings key={layer.id} engine={engine} layer={layer} />;
     case 'control':
-      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} onOperationStarted={noop} />;
+      return <ControlLayerSettings key={layer.id} engine={engine} layer={layer} />;
     case 'raster':
       return (
         <RasterLayerSettings

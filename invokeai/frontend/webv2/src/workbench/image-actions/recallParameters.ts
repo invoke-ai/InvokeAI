@@ -10,6 +10,7 @@ import type {
   IPAdapterMethod,
   VaeModelConfig,
 } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import {
   cloneGenerateWidgetValues,
@@ -18,7 +19,6 @@ import {
   getCompatibleReferenceImages,
   getDefaultGenerateSettings,
   getDefaultLoraWeight,
-  getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
   getGenerationUiPolicy,
   getMaxReferenceImages,
@@ -39,6 +39,7 @@ import {
   MIN_REFINER_CFG_SCALE,
   MIN_REFINER_START,
   MIN_REFINER_STEPS,
+  withAddedReferenceImages,
 } from '@features/generation/settings';
 
 import {
@@ -587,6 +588,8 @@ export const buildRecallParametersSettings = ({
       }
     }
 
+    const recalledImages: GenerateReferenceImageAsset[] = [];
+
     for (const entry of referenceImages ?? []) {
       const image = isRecord(entry) ? toReferenceAsset(entry.image) : null;
 
@@ -595,10 +598,12 @@ export const buildRecallParametersSettings = ({
         continue;
       }
 
-      recalled.push(toReferenceImage(getDefaultReferenceImageConfig(values.model, models, image)));
+      recalledImages.push(image);
     }
 
-    if (recalled.length > 0 && !isReferenceImageSupported(values.model)) {
+    const isSupported = isReferenceImageSupported(values.model);
+
+    if (recalled.length + recalledImages.length > 0 && !isSupported) {
       if (ipAdapters?.length) {
         skip('ip_adapters', 'incompatible', values.model.name);
       }
@@ -607,16 +612,31 @@ export const buildRecallParametersSettings = ({
       }
     }
 
-    const compatible = getCompatibleReferenceImages(recalled, values.model, models);
-    let next = append ? [...values.referenceImages, ...compatible] : compatible;
+    const kept = append ? values.referenceImages : [];
+    // Adapters recorded for another family are re-targeted beside the list they join; the images are then added as any
+    // new reference is, typed beside both, so a Krea-2 recall of several images is an edit set.
+    const withAdapters = isSupported
+      ? getCompatibleReferenceImages([...kept, ...recalled], values.model, models)
+      : kept;
+    const addedImages = isSupported ? recalledImages : [];
+    const recalledCount = withAdapters.length + addedImages.length - kept.length;
     const limit = getMaxReferenceImages(values.model);
 
-    if (next.length > limit) {
+    if (withAdapters.length + addedImages.length > limit) {
       skip('reference_images', 'limit', String(limit));
-      next = next.slice(0, limit);
     }
 
-    if (!append || compatible.length > 0) {
+    // Images past the limit are cut before they are added, so one that never lands cannot turn a style card to Edit.
+    const next = withAddedReferenceImages(
+      values.model,
+      models,
+      withAdapters,
+      addedImages
+        .slice(0, Math.max(0, limit - withAdapters.length))
+        .map((image) => ({ id: createReferenceImageId(), image }))
+    ).slice(0, limit);
+
+    if (!append || recalledCount > 0) {
       values = { ...values, referenceImages: next };
       fields.add('referenceImages');
     }
@@ -625,19 +645,17 @@ export const buildRecallParametersSettings = ({
   return { fields: [...fields], retainedReferenceImages, skipped, values };
 };
 
-const SKIP_REASON_LABELS: Record<RecallParameterSkipReason, string> = {
-  incompatible: 'incompatible with the current model',
-  invalid: 'invalid value',
-  limit: 'over the reference image limit',
-  unresolved: 'not found',
-  unsupported: 'not supported by the Generate panel',
-};
-
 /** One line naming every parameter that was not applied and why, for the notice. */
-export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[]): string =>
+export const getRecallParametersSkipMessage = (skipped: readonly RecallParameterSkip[], t: TFunction): string =>
   skipped
-    .map(({ detail, key, reason }) => `${key}: ${SKIP_REASON_LABELS[reason]}${detail ? ` (${detail})` : ''}`)
+    .map(({ detail, key, reason: skipReason }) => {
+      const reason = t(`widgets.gallery.itemActions.recall.parameters.skipReasons.${skipReason}`);
+
+      return detail
+        ? t('widgets.gallery.itemActions.recall.parameters.skippedWithDetail', { detail, key, reason })
+        : t('widgets.gallery.itemActions.recall.parameters.skipped', { key, reason });
+    })
     .join('; ');
 
-export const getRecallParametersMessage = (fields: readonly RecallParameterField[]): string =>
-  `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
+export const getRecallParametersMessage = (fields: readonly RecallParameterField[], t: TFunction): string =>
+  t('widgets.gallery.itemActions.recall.fieldsApplied', { count: fields.length });
