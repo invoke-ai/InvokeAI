@@ -130,6 +130,7 @@ const CANVAS_EDIT_CONFIDENCE = {
   replaceCanvasLayers: 'high',
   resizeCanvasDocument: 'high',
   restoreCanvasSnapshot: 'none',
+  restoreStagedImages: 'none',
   rollbackStagedImageCommit: 'none',
   saveCanvasSnapshot: 'none',
   setCanvasBbox: 'high',

@@ -38,6 +38,19 @@ export const removePromptHistoryItem = (
   item: PromptHistoryItem
 ): PromptHistoryItem[] => history.filter((entry) => !isSamePromptHistoryItem(entry, item));
 
+/**
+ * Puts cleared entries back behind any added since, in their order, skipping ones already listed again, within the cap.
+ * What the Undo of a clear restores.
+ */
+export const restorePromptHistoryItems = (
+  history: readonly PromptHistoryItem[],
+  restored: readonly PromptHistoryItem[]
+): PromptHistoryItem[] =>
+  [...history, ...restored.filter((item) => !history.some((entry) => isSamePromptHistoryItem(entry, item)))].slice(
+    0,
+    MAX_PROMPT_HISTORY
+  );
+
 /** A history entry has no name — it is its two prompts. */
 const getPromptHistoryProse = (item: PromptHistoryItem): readonly string[] => [
   item.positivePrompt,

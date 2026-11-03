@@ -460,7 +460,7 @@ def test_a_run_recorded_before_model_identities_existed_bundles_once_its_runner_
     assert (bundled.status, bundled.case_models) == (status, {})
     assert "## Models" not in summary
     assert f"run {shown}" in report
-    assert f"The run is {shown}; cases it did not reach show as INVALID." in report
+    assert f"The run is {shown}; cases it did not finish show as INCOMPLETE." in report
 
 
 @pytest.mark.parametrize("tool_commit", ["0123456789abcdef", None])

@@ -1,10 +1,12 @@
 /**
- * Sync only for Canvas sources. Bbox edits retain the exact footprint and derive model-grid processing dimensions;
- * Generate edits resize the bbox at its top-left. Position-only changes do not participate. The Custom render size
- * follows the ratio the Size section holds, whether a chosen preset, the lock button, or a size action such as recall
- * or a reference image's "use size" set it: those write a preset label, which the Size section reads as a lock. The one
- * exception is a free frame drag, whose derived label does not carry the Custom size unless the person's own lock is
- * on. Capability changes retrigger reconciliation; update the expected snapshot before dispatch and guard re-entry.
+ * Sync only for Canvas sources: then the canvas frame and Generate's size are one frame-size model. Bbox edits keep
+ * the exact footprint and derive model-grid processing dimensions; Generate edits resize the frame around its centre,
+ * the anchor every size path uses. The aspect lock is Generate's own (`aspectRatioIsLocked`), and the Frame tool
+ * follows it: a frame edit under the lock keeps the locked ratio, one that changes the ratio carries the lock to the
+ * new ratio, and a free edit leaves the ratio free (it never reads as a preset the person did not pick).
+ * A frame resize this sync makes goes through the canvas's undo history when a canvas engine is open, so undoing it
+ * restores both sides; otherwise it is a `system` write. The Custom render size follows the locked ratio. Capability
+ * changes retrigger reconciliation; update the expected snapshot before dispatch and guard re-entry.
  */
 
 import type { AspectRatioId, CanvasScaleMethod, GenerateModelConfig, PidMode } from '@features/generation/contracts';
@@ -16,7 +18,7 @@ import { clampDimension, deriveAspectRatioId, getGenerationDimensions } from '@f
 
 import type { WorkbenchCommands } from './workbenchStore';
 
-import { resolveModelGrid } from './widgets/canvas/bboxGrid';
+import { resizeBboxAroundCentre, resolveModelGrid } from './widgets/canvas/bboxGrid';
 import {
   CANVAS_SCALING_KEYS,
   fitCanvasScalingToRatio,
@@ -36,11 +38,25 @@ export interface CanvasDimsSnapshot {
   grid: number;
 }
 
+/** Generate's aspect fields: the one aspect lock the frame and the Size section share. */
+export interface CanvasDimsAspect {
+  aspectRatioId: AspectRatioId;
+  aspectRatioIsLocked: boolean;
+  aspectRatioValue: number;
+}
+
+const FREE_ASPECT: CanvasDimsAspect = { aspectRatioId: 'Free', aspectRatioIsLocked: false, aspectRatioValue: 1 };
+
+/** How far a frame's ratio may drift from the locked one (whole-pixel rounding) and still hold the lock as it is. */
+const RATIO_TOLERANCE = 0.01;
+
 export interface CanvasDimsReconcileInput {
   /** The current generation frame, or `null` when the sync should stay inert (no canvas mode). */
   bbox: Bbox | null;
   /** The current committed generate width/height. */
   dims: { width: number; height: number };
+  /** The current aspect lock; free when absent. */
+  aspect?: CanvasDimsAspect;
   /** The bbox/generate snapping grid (model-derived; identical on both sides). */
   grid: number;
   /** The last snapshot this sync wrote/observed, or `null` on first run / after a reset. */
@@ -50,19 +66,33 @@ export interface CanvasDimsReconcileInput {
 export type CanvasDimsReconcileResult =
   | { kind: 'none' }
   /**
-   * Bbox authority overrides locked aspect presets; derive both aspect values from the exact bbox while snapping
-   * processing dimensions.
+   * The frame decides: snapped processing dimensions, plus the aspect fields when the frame's ratio is not the locked
+   * one (a locked frame of another ratio moves the lock to it; an unlocked one stays free).
    */
-  | { kind: 'patch-dims'; width: number; height: number; aspectRatioId: AspectRatioId; aspectRatioValue: number }
-  /** Resize the bbox to the (grid-snapped) generate dims, keeping its top-left position. */
+  | ({ kind: 'patch-dims'; width: number; height: number } & Partial<CanvasDimsAspect>)
+  /** Resize the bbox to the (grid-snapped) generate dims around its centre. */
   | { kind: 'set-bbox'; bbox: Bbox };
 
-const getDimsPatch = (width: number, height: number, aspectWidth = width, aspectHeight = height) => ({
-  aspectRatioId: deriveAspectRatioId(aspectWidth, aspectHeight),
-  aspectRatioValue: aspectHeight > 0 ? aspectWidth / aspectHeight : 1,
-  height,
-  width,
-});
+/**
+ * The aspect fields a frame of `width`×`height` leaves Generate with; none when they already describe it. Only the
+ * person's own lock (a chosen preset or the lock button, `aspectRatioIsLocked`) holds on the canvas: a preset label a
+ * size alone implied (a new project's 1:1, a recalled size) would otherwise lock the frame nobody locked.
+ */
+const aspectForFrame = (aspect: CanvasDimsAspect, width: number, height: number): Partial<CanvasDimsAspect> => {
+  const ratio = height > 0 ? width / height : 1;
+  if (!aspect.aspectRatioIsLocked) {
+    return aspect.aspectRatioId === 'Free' && aspect.aspectRatioIsLocked === false && aspect.aspectRatioValue === ratio
+      ? {}
+      : { ...FREE_ASPECT, aspectRatioValue: ratio };
+  }
+  if (
+    aspect.aspectRatioValue > 0 &&
+    Math.abs(ratio - aspect.aspectRatioValue) / aspect.aspectRatioValue <= RATIO_TOLERANCE
+  ) {
+    return {};
+  }
+  return { aspectRatioId: deriveAspectRatioId(width, height), aspectRatioIsLocked: true, aspectRatioValue: ratio };
+};
 
 const createSnapshot = (
   bbox: Pick<Bbox, 'width' | 'height'>,
@@ -81,6 +111,7 @@ const createSnapshot = (
  * changing its exact footprint, and skip already-consistent state.
  */
 export const reconcileCanvasDims = ({
+  aspect = FREE_ASPECT,
   bbox,
   dims,
   grid,
@@ -103,7 +134,7 @@ export const reconcileCanvasDims = ({
     const width = clampDimension(bbox.width, grid);
     const height = clampDimension(bbox.height, grid);
 
-    return { ...getDimsPatch(width, height, bbox.width, bbox.height), kind: 'patch-dims' };
+    return { ...aspectForFrame(aspect, bbox.width, bbox.height), height, kind: 'patch-dims', width };
   }
 
   const dimsChanged = prev!.dimsWidth !== dims.width || prev!.dimsHeight !== dims.height;
@@ -116,52 +147,10 @@ export const reconcileCanvasDims = ({
       return { kind: 'none' };
     }
 
-    return { bbox: { height, width, x: bbox.x, y: bbox.y }, kind: 'set-bbox' };
+    return { bbox: resizeBboxAroundCentre(bbox, { height, width }), kind: 'set-bbox' };
   }
 
   return { kind: 'none' };
-};
-
-/** The frame resized to `size` around its centre; the position rounds to whole pixels. */
-export const resizeBboxAroundCentre = (bbox: Bbox, size: Pick<Bbox, 'height' | 'width'>): Bbox => ({
-  height: size.height,
-  width: size.width,
-  // `+ 0` folds the -0 that rounding a small negative offset yields.
-  x: Math.round(bbox.x + (bbox.width - size.width) / 2) + 0,
-  y: Math.round(bbox.y + (bbox.height - size.height) / 2) + 0,
-});
-
-/**
- * Applies a Generate size reset. On a project generating into the canvas, the frame then keeps its centre rather than
- * its top-left: the patch lands first, the sync resizes the frame at its top-left as for any size edit, and the centred
- * frame replaces that in the same turn. The patch is a person's edit like any other; the frame writes are `system`, so
- * canvas history records none of them.
- */
-export const resetGenerateDims = (
-  store: Pick<CanvasDimsSyncStore, 'commands' | 'getState'>,
-  values: Parameters<WorkbenchCommands['generation']['patchSettings']>[0],
-  projectId?: string
-): void => {
-  const findProject = () => {
-    const state = store.getState();
-    const targetId = projectId ?? state.activeProjectId;
-    return state.projects.find((candidate) => candidate.id === targetId);
-  };
-  const before = findProject();
-  const anchor = before?.invocation.sourceId === 'canvas' ? before.canvas.document.bbox : null;
-
-  store.commands.generation.patchSettings(values, projectId);
-
-  const after = findProject();
-  if (!anchor || !after || after.invocation.sourceId !== 'canvas') {
-    return;
-  }
-  // The sync has snapped the frame to the model grid; centre that size rather than the raw values.
-  const current = after.canvas.document.bbox;
-  const centred = resizeBboxAroundCentre(anchor, current);
-  if (centred.x !== current.x || centred.y !== current.y) {
-    store.commands.canvas.apply(after.id, { bbox: centred, type: 'setCanvasBbox' }, 'system');
-  }
 };
 
 /** The minimal workbench store surface the sync depends on. */
@@ -178,6 +167,12 @@ export interface CanvasDimsSyncStore {
 export interface CanvasDimsSync {
   dispose(): void;
 }
+
+/**
+ * Records a frame resize as an undoable canvas step when the project's canvas engine is open (true), so canvas undo
+ * puts the frame, and through this sync Generate's size, back; false leaves it to a `system` write.
+ */
+export type CanvasFrameCommit = (projectId: string, from: Bbox, to: Bbox) => boolean;
 
 const readFiniteDimension = (values: Record<string, unknown>, key: 'width' | 'height'): number | null => {
   const raw = values[key];
@@ -207,7 +202,10 @@ const readModelType = (values: Record<string, unknown>): GenerateModelConfig['ty
     : 'main';
 };
 
-export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync => {
+export const createCanvasDimsSync = (
+  store: CanvasDimsSyncStore,
+  commitFrame: CanvasFrameCommit = () => false
+): CanvasDimsSync => {
   let prev: CanvasDimsSnapshot | null = null;
   let lastProjectId: string | null = null;
   /** What the render size last saw of the active canvas project; null until it has seen one. */
@@ -219,15 +217,15 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
   } | null = null;
   let isSyncing = false;
 
-  /** Reconcile the frame; true when it wrote dimensions (and a derived ratio label) from a bbox edit. */
-  const syncFrame = (): boolean => {
+  /** Reconcile the frame with Generate's size. */
+  const syncFrame = (): void => {
     const state = store.getState();
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
     if (!project) {
       prev = null;
       lastProjectId = null;
-      return false;
+      return;
     }
 
     if (project.id !== lastProjectId) {
@@ -237,7 +235,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
 
     if (project.invocation.sourceId !== 'canvas') {
       prev = null;
-      return false;
+      return;
     }
 
     const generateValues = getProjectWidgetValues(project, 'generate');
@@ -246,7 +244,7 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
 
     if (width === null || height === null) {
       prev = null;
-      return false;
+      return;
     }
 
     const bbox = project.canvas.document.bbox;
@@ -256,37 +254,56 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
     // architecture.
     if (grid === null) {
       prev = null;
-      return false;
+      return;
     }
 
-    const result = reconcileCanvasDims({ bbox, dims: { height, width }, grid, prev });
+    const aspect: CanvasDimsAspect = {
+      aspectRatioId:
+        typeof generateValues.aspectRatioId === 'string' ? (generateValues.aspectRatioId as AspectRatioId) : 'Free',
+      aspectRatioIsLocked: generateValues.aspectRatioIsLocked === true,
+      aspectRatioValue:
+        typeof generateValues.aspectRatioValue === 'number' && Number.isFinite(generateValues.aspectRatioValue)
+          ? generateValues.aspectRatioValue
+          : 1,
+    };
+    const result = reconcileCanvasDims({ aspect, bbox, dims: { height, width }, grid, prev });
     const projectId = project.id;
 
     switch (result.kind) {
       case 'none': {
         prev = createSnapshot(bbox, { height, width }, grid);
-        return false;
+        return;
       }
       case 'patch-dims': {
         const { kind: _, ...patch } = result;
         prev = createSnapshot(bbox, result, grid);
         store.commands.generation.patchSettings(patch, projectId, 'system');
-        return true;
+        return;
       }
       case 'set-bbox': {
         const nextBbox = result.bbox;
         prev = createSnapshot(nextBbox, nextBbox, grid);
-        store.commands.canvas.apply(projectId, { bbox: nextBbox, type: 'setCanvasBbox' }, 'system');
-        if (width !== nextBbox.width || height !== nextBbox.height) {
-          store.commands.generation.patchSettings(getDimsPatch(nextBbox.width, nextBbox.height), projectId, 'system');
+        if (!commitFrame(projectId, bbox, nextBbox)) {
+          store.commands.canvas.apply(projectId, { bbox: nextBbox, type: 'setCanvasBbox' }, 'system');
         }
-        return false;
+        if (width !== nextBbox.width || height !== nextBbox.height) {
+          store.commands.generation.patchSettings(
+            {
+              ...aspectForFrame(aspect, nextBbox.width, nextBbox.height),
+              height: nextBbox.height,
+              width: nextBbox.width,
+            },
+            projectId,
+            'system'
+          );
+        }
+        return;
       }
     }
   };
 
   // Acts only on a new locked ratio or on entering Custom, never on a size being typed: the Size section links those.
-  const syncRenderSize = (isBboxDerived: boolean): void => {
+  const syncRenderSize = (): void => {
     const state = store.getState();
     const project = state.projects.find((candidate) => candidate.id === state.activeProjectId);
 
@@ -314,9 +331,6 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
       !previous ||
       ratio === null ||
       scaling.method !== 'manual' ||
-      // The frame labels a bbox that lands on a preset with that preset, which reads as locked; only the person's own
-      // lock (a chosen preset or the lock button both set it) carries the render size along with a bbox edit.
-      (isBboxDerived && !isExplicitlyLocked) ||
       // Locking a ratio the frame only labelled is a new lock, even though the ratio itself is unchanged.
       (previous.ratio === ratio &&
         previous.method === 'manual' &&
@@ -355,7 +369,8 @@ export const createCanvasDimsSync = (store: CanvasDimsSyncStore): CanvasDimsSync
     isSyncing = true;
     try {
       // After the frame, so a ratio a bbox edit just wrote reaches the render size in the same pass.
-      syncRenderSize(syncFrame());
+      syncFrame();
+      syncRenderSize();
     } finally {
       isSyncing = false;
     }

@@ -6,7 +6,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
-import { MenuActionItem, MenuIconItem, MenuItem } from './Menu';
+import { MenuActionItem, MenuHeadingGroup, MenuIconItem, MenuItem } from './Menu';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -133,5 +133,59 @@ describe('unavailable menu items', () => {
     await act(() => userEvent.click(item('rename')));
     expect(actions.rename).toHaveBeenCalledOnce();
     expect(actions.rootSelect).toHaveBeenCalledWith({ value: 'rename' });
+  });
+});
+
+describe('menu heading groups', () => {
+  const LONG_NAME = 'A preset name far too long for the menu to show whole';
+
+  it('title the menu at group-label height, truncating the name beside its state, without a focusable row', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(async () => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <Menu.Root open>
+            <Menu.Positioner>
+              <Menu.Content w="12rem">
+                <MenuHeadingGroup label={LONG_NAME} trailing="Unsaved changes">
+                  <Menu.Item value="save">Save changes</Menu.Item>
+                </MenuHeadingGroup>
+                <Menu.ItemGroup>
+                  <Menu.ItemGroupLabel data-testid="group-label">Group</Menu.ItemGroupLabel>
+                  <Menu.Item value="other">Other</Menu.Item>
+                </Menu.ItemGroup>
+              </Menu.Content>
+            </Menu.Positioner>
+          </Menu.Root>
+        </ChakraProvider>
+      );
+      await Promise.resolve();
+    });
+
+    const group = page.getByRole('group', { name: `${LONG_NAME} Unsaved changes` });
+    await expect.element(group).toBeVisible();
+    const heading = group.element().querySelector<HTMLElement>('[data-part="item-group-label"]')!;
+    const groupLabel = document.querySelector<HTMLElement>('[data-testid="group-label"]')!;
+    const headingRect = heading.getBoundingClientRect();
+    // The oversized title band this replaced stood a third taller than a group label.
+    expect(headingRect.height).toBeLessThanOrEqual(groupLabel.getBoundingClientRect().height + 0.5);
+
+    const nameHead = heading.querySelector<HTMLElement>('[data-full-text] > span')!;
+    const state = Array.from(heading.children).at(-1) as HTMLElement;
+    expect(state.textContent).toBe('Unsaved changes');
+    // The name gives way; the state keeps its whole width on the heading's row.
+    expect(nameHead.clientWidth).toBeLessThan(nameHead.scrollWidth);
+    expect(state.getBoundingClientRect().right).toBeLessThanOrEqual(headingRect.right);
+    expect(state.getBoundingClientRect().top).toBeGreaterThanOrEqual(headingRect.top);
+    expect(state.getBoundingClientRect().bottom).toBeLessThanOrEqual(headingRect.bottom);
+
+    expect(
+      page
+        .getByRole('menuitem')
+        .elements()
+        .map((element) => element.textContent)
+    ).toEqual(['Save changes', 'Other']);
   });
 });

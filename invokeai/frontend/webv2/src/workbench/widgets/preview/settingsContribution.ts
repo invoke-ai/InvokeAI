@@ -8,14 +8,14 @@ export const previewSettingsContribution: SettingsContribution = {
       id: 'filmstripVisible',
       kind: 'boolean',
       label: (t) => t('widgets.preview.showFilmstrip'),
-      scope: 'instance',
+      scope: 'project',
       keywords: 'thumbnails gallery',
     },
     {
       id: 'comparisonMode',
       kind: 'select',
       label: (t) => t('settingsDialog.fields.comparisonMode'),
-      scope: 'instance',
+      scope: 'project',
       options: [
         { label: (t) => t('widgets.preview.slider'), value: 'slider' },
         { label: (t) => t('widgets.preview.sideBySide'), value: 'side-by-side' },

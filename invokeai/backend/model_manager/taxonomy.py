@@ -48,6 +48,9 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with FLUX.1 model architecture, including FLUX Dev, Schnell and Fill."""
     Flux2 = "flux2"
     """Indicates the model is associated with FLUX.2 model architecture, including FLUX.2 Klein and FLUX.2 [dev]."""
+    Flux3 = "flux3"
+    """Indicates the model is associated with the FLUX.3 Image architecture, including FLUX.3 Image Klein and its
+    Base model."""
     CogView4 = "cogview4"
     """Indicates the model is associated with CogView 4 model architecture."""
     ZImage = "z-image"
@@ -114,6 +117,7 @@ class ModelType(str, Enum):
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
     LTX2DurationHead = "ltx2_duration_head"
+    TinyAutoencoder = "tiny_autoencoder"
     Unknown = "unknown"
 
 
@@ -186,7 +190,22 @@ class Flux2VariantType(str, Enum):
     """Flux2 Klein 9B Base variant - undistilled foundation model using Qwen3 8B text encoder."""
 
     Dev = "dev"
-    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.1 text encoder (guidance-distilled)."""
+    """FLUX.2 [dev] - 32B rectified flow transformer using Mistral Small 3.2 text encoder (guidance-distilled)."""
+
+
+class Flux3VariantType(str, Enum):
+    """FLUX.3 Image variants, by how the transformer is sampled.
+
+    The values carry a ``flux3_`` prefix: variant strings are resolved without their base, and ``klein_*``
+    already belongs to FLUX.2."""
+
+    Klein = "flux3_klein"
+    """FLUX.3 Image Klein, the step-distilled checkpoint. Its transformer is a flow map: every step is also told
+    the timestep it jumps to, it samples in 16 steps and takes no classifier-free guidance."""
+
+    KleinBase = "flux3_klein_base"
+    """FLUX.3 Image Klein Base, the undistilled checkpoint: 50 steps with classifier-free guidance and a negative
+    prompt. Black Forest Labs publishes it for fine-tuning and LoRA training."""
 
 
 class ZImageVariantType(str, Enum):
@@ -365,7 +384,7 @@ class MistralVariantType(str, Enum):
     """Mistral text encoder variants used by FLUX.2 [dev] and ERNIE-Image."""
 
     Cow = "cow_mistral3_small"
-    """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120).
+    """The "cow-mistral3-small" build: the first 30 of Mistral Small 3's 40 layers (hidden_size=5120).
     Hidden states are sampled at indices (10, 20, 30) which on a 30-layer model
     hit 1/3, 2/3, and the final layer. ComfyUI's reference implementation
     drops the final RMSNorm for this variant (``final_norm=False``), so the
@@ -373,12 +392,11 @@ class MistralVariantType(str, Enum):
 
     Mistral24B = "mistral3_24b"
     """The 40-layer Mistral Small 3 (24B, hidden_size=5120) text encoder BFL
-    ships in the canonical ``black-forest-labs/FLUX.2-dev/text_encoder``. Same
-    extraction indices (10, 20, 30), final RMSNorm kept enabled. Architecturally
-    identical to upstream ``mistralai/Mistral-Small-3.1/3.2`` — installing one
-    of those instead of BFL's release will load fine but produces visibly
-    weaker prompt adherence than the cow distillation, so the cow variants
-    remain the recommended default."""
+    ships in ``black-forest-labs/FLUX.2-dev/text_encoder``. Same extraction
+    indices (10, 20, 30), final RMSNorm kept enabled. Its weights are bit-identical
+    in BF16 to upstream ``mistralai/Mistral-Small-3.2-24B-Instruct-2506``, so
+    upstream builds of that model, GGUFs included, are the same encoder. Mistral
+    Small 3.0 and 3.1 have the same shape but different weights."""
 
     Ministral3B = "ministral3_3b"
     """The 26-layer Ministral 3B (hidden_size=3072) ERNIE-Image encodes its
@@ -491,6 +509,7 @@ AnyVariant: TypeAlias = Union[
     ClipVariantType,
     FluxVariantType,
     Flux2VariantType,
+    Flux3VariantType,
     ZImageVariantType,
     QwenImageVariantType,
     WanVariantType,
@@ -511,6 +530,7 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType
@@ -530,6 +550,7 @@ variant_type_adapter = TypeAdapter[
     | ClipVariantType
     | FluxVariantType
     | Flux2VariantType
+    | Flux3VariantType
     | ZImageVariantType
     | QwenImageVariantType
     | WanVariantType

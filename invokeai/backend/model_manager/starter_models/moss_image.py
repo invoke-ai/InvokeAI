@@ -33,3 +33,15 @@ moss_image_sft = StarterModel(
     ),
     type=ModelType.Main,
 )
+
+moss_image_prompt_enhancer = StarterModel(
+    name="Gemma 4 E4B (Prompt Enhancer)",
+    base=BaseModelType.Any,
+    source="google/gemma-4-E4B-it",
+    description=(
+        "The recommended Expand Prompt model for MOSS-Image. Pair it with the seeded MOSS-Image Prompt Enhancer "
+        "system prompt, which turns a short idea into a detailed caption or, for posters and other images with "
+        "visible text, a layout. Optional. (~16 GB)"
+    ),
+    type=ModelType.TextLLM,
+)

@@ -31,6 +31,7 @@ import { page, userEvent } from 'vitest/browser';
 
 const windowMocks = vi.hoisted(() => ({
   actionsRegion: null as string | null,
+  closeFloating: vi.fn(),
   extensions: null as unknown as ExtensionRegistry,
   dockFloating: vi.fn(),
   flushWorkbenchDrafts: vi.fn(),
@@ -65,6 +66,9 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
     getProject: (projectId: string) => (projectId === project.id ? project : null),
+    getSnapshot: () => ({
+      activeProject: { ...project, layout: { panels: { isBottomOpen: true, isLeftOpen: true, isRightOpen: true } } },
+    }),
     isActiveProject: (projectId: string) => projectId === project.id,
   }),
   useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
@@ -195,6 +199,8 @@ await i18n.use(initReactI18next).init({
       translation: {
         widgets: {
           floating: {
+            close: 'Close window',
+            closeNamed: 'Close {{label}} window',
             destinations: { right: 'right panel' },
             dockTo: 'Dock to {{destination}}',
             maximize: 'Maximize',
@@ -222,7 +228,8 @@ let testController = createTestFocusController();
 const renderWindow = async (
   floatingState: FloatingWidgetState = state,
   controller: WorkbenchFocusController = testController,
-  showUnavailablePanel = false
+  showUnavailablePanel = false,
+  showWindow = true
 ) => {
   await act(async () => {
     root?.render(
@@ -233,7 +240,9 @@ const renderWindow = async (
             {showUnavailablePanel ? (
               <MissingWidgetFrame instanceId="image-map-instance" label="Image Map" region="right" typeId="image-map" />
             ) : null}
-            <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+            {showWindow ? (
+              <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+            ) : null}
           </FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -260,6 +269,7 @@ beforeEach(async () => {
   windowMocks.flushWorkbenchDrafts.mockClear();
   windowMocks.setFloatingMode.mockClear();
   windowMocks.dockFloating.mockClear();
+  windowMocks.closeFloating.mockClear();
   windowMocks.raiseFloating.mockClear();
   windowMocks.setFloatingGeometry.mockClear();
   host = document.createElement('div');
@@ -514,7 +524,7 @@ describe('FloatingWidgetWindow chrome', () => {
     const controls = host!.querySelector('[data-floating-controls]')!.getBoundingClientRect();
 
     expect(frame.width).toBe(280);
-    for (const name of ['Shade', 'Maximize', 'Dock to right panel']) {
+    for (const name of ['Shade', 'Maximize', 'Dock to right panel', 'Close Image Map window']) {
       const button = host!.querySelector(`button[aria-label="${name}"]`)!.getBoundingClientRect();
 
       expect(button.width).toBeGreaterThan(0);
@@ -635,7 +645,7 @@ describe('FloatingWidgetWindow focus', () => {
       floatingWindow().dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
     });
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 
@@ -647,7 +657,7 @@ describe('FloatingWidgetWindow focus', () => {
     await act(() => floatingWindow().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
     await act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!.focus());
 
-    expect(controller.getTarget()).toBeNull();
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'center' });
     expect(windowMocks.raiseFloating).not.toHaveBeenCalled();
   });
 
@@ -685,6 +695,32 @@ describe('FloatingWidgetWindow focus', () => {
     });
 
     expect(focusRegion).toHaveBeenCalledWith('right', 'image-map');
+  });
+
+  // Close takes the window out of the layout; focus goes to the panel its rail shows, saving drafts first.
+  // Close takes the window out of the layout, its drafts saved first, and focus lands in the panel it returns to.
+  it('closes from the title bar and leaves focus in the panel the window returns to', async () => {
+    windowMocks.useMissingWidget = true;
+    const controller = createTestFocusController();
+    await renderWindow(state, controller, true);
+    const close = host!.querySelector<HTMLButtonElement>(
+      '[data-floating-window="image-map-instance"] button[aria-label^="Close "][aria-label$=" window"]'
+    )!;
+
+    await act(() => close.click());
+    expect(windowMocks.closeFloating).toHaveBeenCalledWith('image-map-instance');
+    // The layout as the store leaves it: the window gone, its panel in place.
+    await renderWindow(state, controller, true, false);
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+    expect(windowMocks.flushWorkbenchDrafts).toHaveBeenCalled();
+    expect(host!.querySelector('[data-floating-window="image-map-instance"]')).toBeNull();
+    expect(document.activeElement).toBe(host!.querySelector('[data-focus-region="right"]'));
   });
 
   it('moves focus to the unavailable-widget panel when its floating window docks', async () => {

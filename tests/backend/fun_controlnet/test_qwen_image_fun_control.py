@@ -5,6 +5,8 @@ the base's, and an explicit loop over the base blocks adding each hint after its
 the hooks beyond the modules' own forwards. Everything runs in float32 on the CPU.
 """
 
+import weakref
+
 import accelerate
 import pytest
 import torch
@@ -144,6 +146,30 @@ def test_scale_zero_and_an_inactive_handle_leave_the_forward_untouched(
         hooks.active = False
         # Nothing of the active forward is left for the inactive one.
         assert torch.equal(_forward(model, inputs), plain)
+
+
+@torch.no_grad()
+def test_the_projected_context_is_released_before_the_last_control_block(
+    tiny_qwen_image_transformer, tiny_branch, inputs, control_context
+) -> None:
+    """The chain owns its input: the projected context is freed once block 0 has joined it with the image stream, not
+    held through every block -- an image-length hidden state more than the hint reservation allows for."""
+    projected: list[weakref.ref] = []
+    alive_at_last_block: list[bool] = []
+    taps = [
+        tiny_branch.control_img_in.register_forward_hook(lambda _m, _a, out: projected.append(weakref.ref(out))),
+        tiny_branch.control_blocks[-1].register_forward_pre_hook(
+            lambda *_args: alive_at_last_block.append(projected[-1]() is not None)
+        ),
+    ]
+    try:
+        with install_fun_control(tiny_qwen_image_transformer, tiny_branch, control_context, scale=SCALE):
+            _forward(tiny_qwen_image_transformer, inputs)
+    finally:
+        for tap in taps:
+            tap.remove()
+
+    assert alive_at_last_block == [False]
 
 
 @torch.no_grad()

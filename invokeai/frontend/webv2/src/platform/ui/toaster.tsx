@@ -15,6 +15,7 @@ import {
   createToaster,
 } from '@chakra-ui/react';
 import { useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export const toaster = createToaster({
   offsets: { bottom: '1rem', left: '1rem', right: '1rem', top: '1rem' },
@@ -30,14 +31,48 @@ export interface ToastAction {
 
 type ChakraToastOptions = Parameters<typeof toaster.create>[0];
 
+/** Actionable toasts stay long enough to reach the button; hovering or focusing them pauses the timer. */
+export const ACTION_TOAST_DURATION_MS = 8000;
+
 /** Toast options with buttons. Chakra's own options name at most one action and type `meta` loosely. */
-export type ActionToastOptions = Omit<ChakraToastOptions, 'action' | 'meta'> & { actions: readonly ToastAction[] };
+export type ActionToastOptions = Omit<ChakraToastOptions, 'action' | 'meta'> & {
+  actions: readonly ToastAction[];
+  /**
+   * Dismisses the toast when aborted, so buttons never outlive the scope they act for (an account, an editor). A
+   * `duration` of `Infinity` keeps the toast until this fires or the user closes it.
+   */
+  signal?: AbortSignal;
+};
 
 const ACTIONS_META_KEY = 'platformToastActions';
 
-/** Show a toast with buttons; the only writer of the actions `AppToaster` reads back. */
-export const createActionToast = ({ actions, ...options }: ActionToastOptions): string =>
-  toaster.create({ ...options, meta: { [ACTIONS_META_KEY]: actions } });
+/** Show a toast with buttons; the only writer of the actions `AppToaster` reads back. Null when `signal` has ended. */
+export const createActionToast = ({ actions, signal, ...options }: ActionToastOptions): string | null => {
+  if (signal?.aborted) {
+    return null;
+  }
+
+  if (!signal) {
+    return toaster.create({ ...options, meta: { [ACTIONS_META_KEY]: actions } });
+  }
+
+  const shown = new AbortController();
+  const { onStatusChange } = options;
+  const id = toaster.create({
+    ...options,
+    meta: { [ACTIONS_META_KEY]: actions },
+    onStatusChange: (details) => {
+      if (details.status === 'unmounted') {
+        shown.abort();
+      }
+      onStatusChange?.(details);
+    },
+  });
+
+  signal.addEventListener('abort', () => toaster.dismiss(id), { once: true, signal: shown.signal });
+
+  return id;
+};
 
 const getToastActions = (meta: Record<string, unknown> | undefined): readonly ToastAction[] =>
   (meta?.[ACTIONS_META_KEY] as readonly ToastAction[] | undefined) ?? [];
@@ -103,39 +138,45 @@ const ToastActionButton = ({
   );
 };
 
-export const AppToaster = () => (
-  <Portal>
-    <ChakraToaster toaster={toaster}>
-      {(toast) => {
-        const actions = getToastActions(toast.meta);
+export const AppToaster = () => {
+  // Mounted beside the router at the app root, outside any Suspense boundary: loading a catalog must not suspend it.
+  const { t } = useTranslation(undefined, { useSuspense: false });
+  const closeLabel = t('common.dismissNotification');
 
-        return (
-          <ToastRoot maxW="calc(100vw - 2rem)" w="24rem">
-            {/* Unbroken model names, paths, and URLs wrap only once the flex chain may shrink below them. */}
-            <HStack align="start" gap="3" minW="0" w="full">
-              <ToastIndicator />
-              <Stack flex="1" gap="1" minW="0">
-                {toast.title ? <ToastTitle>{toast.title}</ToastTitle> : null}
-                {toast.description ? <ToastDescription>{toast.description}</ToastDescription> : null}
-                {actions.length > 0 ? (
-                  <HStack flexWrap="wrap" gap="1.5" pt="1">
-                    {actions.map((action, index) => (
-                      <ToastActionButton
-                        key={action.label}
-                        action={action}
-                        isPrimary={index === 0}
-                        toastId={toast.id}
-                      />
-                    ))}
-                  </HStack>
-                ) : null}
-              </Stack>
-              <ToastCloseTrigger />
-            </HStack>
-            <Box display="none" />
-          </ToastRoot>
-        );
-      }}
-    </ChakraToaster>
-  </Portal>
-);
+  return (
+    <Portal>
+      <ChakraToaster toaster={toaster}>
+        {(toast) => {
+          const actions = getToastActions(toast.meta);
+
+          return (
+            <ToastRoot maxW="calc(100vw - 2rem)" w="24rem">
+              {/* Unbroken model names, paths, and URLs wrap only once the flex chain may shrink below them. */}
+              <HStack align="start" gap="3" minW="0" w="full">
+                <ToastIndicator />
+                <Stack flex="1" gap="1" minW="0">
+                  {toast.title ? <ToastTitle>{toast.title}</ToastTitle> : null}
+                  {toast.description ? <ToastDescription>{toast.description}</ToastDescription> : null}
+                  {actions.length > 0 ? (
+                    <HStack flexWrap="wrap" gap="1.5" pt="1">
+                      {actions.map((action, index) => (
+                        <ToastActionButton
+                          key={action.label}
+                          action={action}
+                          isPrimary={index === 0}
+                          toastId={toast.id}
+                        />
+                      ))}
+                    </HStack>
+                  ) : null}
+                </Stack>
+                <ToastCloseTrigger aria-label={closeLabel} />
+              </HStack>
+              <Box display="none" />
+            </ToastRoot>
+          );
+        }}
+      </ChakraToaster>
+    </Portal>
+  );
+};

@@ -9,7 +9,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getProjectCanvasSchemaRequirement } from '@workbench/canvasSchemaVersion';
-import { isViewerAutoSwitchMode } from '@workbench/settings/store';
+import { isViewerAutoSwitchMode } from '@workbench/settings/projectSettings';
 
 import type { ProjectTransferIssues } from './invk/transfer';
 import type { ProjectDocumentV3 } from './projectDocument';

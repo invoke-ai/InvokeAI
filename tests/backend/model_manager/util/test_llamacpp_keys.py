@@ -1,7 +1,7 @@
 """Tests for the shared llama.cpp decoder GGUF key converter.
 
 Used by three encoder GGUF loaders: text-only Qwen3 (Z-Image / FLUX.2 Klein), the Qwen3-VL language
-tower (Krea-2 / Ideogram 4) and Mistral / Ministral 3 (FLUX.2 [dev]). A key that maps to *nothing*
+tower (Krea-2 / Ideogram 4) and Mistral Small 3 (FLUX.2 [dev]). A key that maps to *nothing*
 fails loudly — the loaders sweep for leftover meta tensors afterwards and name the offending ones.
 What this table has to protect against is the silent case: a key mapped to a different but
 shape-compatible module. `attn_q`/`attn_k` and `ffn_gate`/`ffn_up` are same-shaped pairs, so
@@ -9,10 +9,12 @@ transposing either pair would load cleanly and produce wrong conditioning with n
 """
 
 import pytest
+import torch
 
 from invokeai.backend.model_manager.util.llamacpp_keys import (
     convert_llamacpp_decoder_keys,
     is_llamacpp_decoder_state_dict,
+    undo_llamacpp_qk_permutation,
 )
 
 
@@ -122,3 +124,51 @@ def test_a_component_is_matched_by_position_not_by_containment() -> None:
         "model.layers.0.cross_attn_q.weight": "cross_q",
         "model.layers.0.some.attn_v.weight": "nested_v",
     }
+
+
+def _llamacpp_permute(weights: torch.Tensor, n_head: int, n_head_kv: int | None) -> torch.Tensor:
+    """llama.cpp's ``LlamaModel.permute``, verbatim.
+
+    https://github.com/ggml-org/llama.cpp/blob/339f3242c761f16c27e5ffcde1d35dcc31933a55/conversion/llama.py#L176-L182
+    """
+    if n_head_kv is not None and n_head != n_head_kv:
+        n_head = n_head_kv
+    return (
+        weights.reshape(n_head, 2, weights.shape[0] // n_head // 2, *weights.shape[1:])
+        .swapaxes(1, 2)
+        .reshape(weights.shape)
+    )
+
+
+def test_undoing_the_permutation_restores_query_and_key_rows_of_every_layer() -> None:
+    """Weights and biases, queries regrouped by the query heads and keys by the key/value heads --
+    the counts differ under grouped-query attention, which is what makes the second one checkable.
+    Every row is its own index, so any misplaced row shows."""
+    n_head, n_head_kv, head_dim = 4, 2, 8
+    hf = {}
+    for layer in (0, 11):
+        prefix = f"model.layers.{layer}.self_attn"
+        for projection, heads in (("q_proj", n_head), ("k_proj", n_head_kv)):
+            rows = torch.arange(heads * head_dim, dtype=torch.float32) + 1000 * layer
+            hf[f"{prefix}.{projection}.weight"] = rows[:, None].expand(-1, 3).clone()
+            hf[f"{prefix}.{projection}.bias"] = rows.clone()
+    gguf = {
+        key: _llamacpp_permute(value, n_head, n_head if ".q_proj." in key else n_head_kv) for key, value in hf.items()
+    }
+    untouched = torch.arange(n_head_kv * head_dim, dtype=torch.float32)
+    sd = {**gguf, "model.layers.0.self_attn.v_proj.weight": untouched}
+
+    undo_llamacpp_qk_permutation(sd, n_head, n_head_kv)
+
+    assert sd.keys() == {*hf, "model.layers.0.self_attn.v_proj.weight"}
+    for key, value in hf.items():
+        assert torch.equal(sd[key], value), key
+    assert sd["model.layers.0.self_attn.v_proj.weight"] is untouched
+
+
+def test_rows_that_do_not_form_whole_heads_of_rotary_pairs_are_refused() -> None:
+    """Head counts from a header that disagrees with the tensor would regroup across head boundaries."""
+    sd = {"model.layers.0.self_attn.k_proj.weight": torch.zeros(12, 4)}
+
+    with pytest.raises(ValueError, match="k_proj.weight has 12 rows"):
+        undo_llamacpp_qk_permutation(sd, n_head=8, n_head_kv=4)
