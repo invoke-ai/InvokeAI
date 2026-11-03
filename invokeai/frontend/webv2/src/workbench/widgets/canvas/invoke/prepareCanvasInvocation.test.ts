@@ -390,7 +390,11 @@ describe('prepareCanvasInvocation generation-device boundary', () => {
     await prepareCanvasInvocation({
       commands: harness.deps.commands,
       destination: harness.deps.destination,
-      expansion: { positivePrompts: ['a green cat'], positivePromptsSampleSeed: 7 },
+      expansion: {
+        expandedFrom: { combinatorial: false, maxPrompts: 100, positivePrompt: 'a {red|green} cat' },
+        positivePrompts: ['a green cat'],
+        positivePromptsSampleSeed: 7,
+      },
       formatControlLayerError: harness.deps.formatControlLayerError,
       generateValues: harness.deps.generateValues,
       models: harness.deps.models,

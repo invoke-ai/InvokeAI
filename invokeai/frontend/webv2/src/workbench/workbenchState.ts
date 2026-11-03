@@ -1,6 +1,6 @@
 import type { GenerateWidgetValues, ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
-import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
+import type { QueueCompiledSubmission, QueueHistoryItemStatus, QueueRunErrorCode } from '@features/queue/contracts';
 import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { WorkflowSubmissionPlan } from '@features/workflow/graph';
 import type { LogNamespace } from '@platform/logging/contracts';
@@ -156,6 +156,7 @@ import {
   removePromptHistoryItem,
   restorePromptHistoryItems,
   sanitizeBatchCount,
+  sanitizeSampleSeed,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
 import { getQueueSourceResultSelection, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
@@ -225,7 +226,9 @@ import {
 import { getSourceIdForWidgetTypeId } from './graphWidgets';
 import {
   defaultInvocationRoute,
+  getDynamicPromptsExpansionSource,
   isInvocationRouteValid,
+  isSameDynamicPromptsExpansionSource,
   isInvocationSourceAvailable,
   isResultDestinationAvailable,
   resolveInvocationRoute,
@@ -467,8 +470,8 @@ type WorkbenchReducerAction =
       error?: string;
       /** The backend items whose failure ended the run; its failure notice offers to show and retry them. */
       failedBackendItemIds?: readonly number[];
-      /** `error` is a stand-in: the backend gave no reason, or the item vanished from its queue. */
-      errorCode?: 'removed' | 'unexplained';
+      /** Set when the notice words the failure itself, in the user's language; `error` stays as English detail. */
+      errorCode?: QueueRunErrorCode;
       notify?: boolean;
     }
   | {
@@ -791,12 +794,56 @@ const withRunLabel = (
   return label ? describe(label) : unlabeled;
 };
 
-/** Why a run failed, in words: the backend's own error verbatim, or a translated stand-in when it gave none. */
+type CodedRunFailure = Exclude<QueueRunErrorCode, 'removed' | 'unexplained'>;
+
+/**
+ * Failures the queue runtime words itself, as translation keys with their English. `key` is the message for a run
+ * with a prompt or workflow name, `${key}Unlabeled` the one without; `reason` is the server's or validator's text.
+ */
+const CODED_RUN_FAILURES: Record<
+  CodedRunFailure,
+  { key: string; labeled: (label: string, reason: string) => string; unlabeled: (reason: string) => string }
+> = {
+  'invalid-submission': {
+    key: 'notifications.runOutcome.invalidSubmissionMessage',
+    labeled: (label, reason) => `“${label}” could not be submitted because its queued request is invalid: ${reason}`,
+    unlabeled: (reason) => `The run could not be submitted because its queued request is invalid: ${reason}`,
+  },
+  'not-accepted': {
+    key: 'notifications.runOutcome.notAcceptedMessage',
+    labeled: (label) => `The server queue did not accept “${label}”. The queue may be full.`,
+    unlabeled: () => 'The server queue did not accept the run. The queue may be full.',
+  },
+  'project-not-saved': {
+    key: 'notifications.runOutcome.projectNotSavedMessage',
+    labeled: (label) => `“${label}” was not submitted because its project cannot be saved.`,
+    unlabeled: () => 'The run was not submitted because its project cannot be saved.',
+  },
+  'server-error': {
+    key: 'notifications.runOutcome.serverErrorMessage',
+    labeled: (label, reason) => `The server kept failing to queue “${label}”: ${reason}`,
+    unlabeled: (reason) => `The server kept failing to queue the run: ${reason}`,
+  },
+};
+
+/**
+ * Why a run failed, in words: a translated message for failures the runtime words itself (quoting the server's or
+ * validator's text where it has one), the backend's own error verbatim, or a translated stand-in when it gave none.
+ */
 const describeRunFailure = (
   queueItem: QueueItem | undefined,
   reason: string,
-  errorCode: 'removed' | 'unexplained' | undefined
+  errorCode: QueueRunErrorCode | undefined
 ): NotificationText => {
+  if (errorCode && errorCode !== 'removed' && errorCode !== 'unexplained') {
+    const { key, labeled, unlabeled } = CODED_RUN_FAILURES[errorCode];
+    return withRunLabel(
+      queueItem,
+      (label) => ({ message: labeled(label, reason), messageKey: key, messageValues: { label, reason } }),
+      { message: unlabeled(reason), messageKey: `${key}Unlabeled`, messageValues: { reason } }
+    );
+  }
+
   if (errorCode === 'removed') {
     return withRunLabel(
       queueItem,
@@ -851,7 +898,7 @@ const createRunOutcomeNotification = (
     status,
   }: {
     error?: string;
-    errorCode?: 'removed' | 'unexplained';
+    errorCode?: QueueRunErrorCode;
     failedBackendItemIds?: readonly number[];
     status: 'cancelled' | 'failed';
   }
@@ -3934,16 +3981,13 @@ const enqueueCompiledSnapshot = (
   const videoSettings = route.sourceId === 'video' ? normalizeVideoWidgetValues(widgetStates.video.values) : null;
   const backendGraph = graph.backendGraph;
   const canvasGenerateSettings = route.sourceId === 'canvas' ? normalizeGenerateSettings(generate?.values) : null;
-  // Upscale and Video have no dynamic prompts switch: their prompts always run as typed.
-  const nonExpandingSettings = upscaleSettings ?? videoSettings;
+  // Upscale has no dynamic prompts switch: its prompt always runs as typed.
   const sourceGenerateSettings =
     route.sourceId === 'canvas'
       ? canvasGenerateSettings
       : route.sourceId === 'generate'
         ? generateSettings
-        : nonExpandingSettings
-          ? { ...nonExpandingSettings, dynamicPromptsEnabled: false }
-          : null;
+        : (videoSettings ?? (upscaleSettings ? { ...upscaleSettings, dynamicPromptsEnabled: false } : null));
   // Resolve template-merged prompts and seeds here, where Generate, Canvas, Upscale and Video submissions converge; the
   // planner decides whether the expansion counts.
   const submissionPlan = sourceGenerateSettings
@@ -4013,6 +4057,7 @@ const enqueueCompiledSnapshot = (
     route.sourceId === 'canvas'
       ? Object.values(backendGraph?.nodes ?? {}).find((node) => node.type === 'core_metadata')?.canvas_v3_metadata
       : undefined;
+  const recalledSampleSeed = expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed };
   const recall = generateRecallValues
     ? {
         ...(recordedCanvas && typeof recordedCanvas === 'object' && !Array.isArray(recordedCanvas)
@@ -4020,11 +4065,11 @@ const enqueueCompiledSnapshot = (
           : {}),
         generateValues: {
           ...cloneGenerateWidgetValues(generateRecallValues),
-          ...(expansionSampleSeed === null ? {} : { dynamicPromptsSampleSeed: expansionSampleSeed }),
+          ...recalledSampleSeed,
         },
       }
     : videoSettings
-      ? { videoValues: cloneVideoWidgetValues(videoSettings) }
+      ? { videoValues: { ...cloneVideoWidgetValues(videoSettings), ...recalledSampleSeed } }
       : undefined;
   const queueItem: QueueItem = {
     cancellable: backendSupportsCancellation,
@@ -4083,7 +4128,7 @@ const enqueueCompiledSnapshot = (
         ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
   // The queued item carries the previewed draw; rotating afterward makes the preview show the next one.
-  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings;
+  const dynamicPromptsSettings = canvasGenerateSettings ?? generateSettings ?? videoSettings;
   // Fencing on the expansion's seed keeps a submission that drew an already-rotated sample from rotating again.
   const resampledProject =
     expansionSampleSeed !== null &&
@@ -4094,7 +4139,9 @@ const enqueueCompiledSnapshot = (
           advancedProject,
           route.sourceId === 'canvas' ? 'generate' : route.sourceId,
           (values) =>
-            values.dynamicPromptsSampleSeed === expansionSampleSeed && values.dynamicPromptsCombinatorial === false
+            // Sanitized as the expansion read it: a record saved without the field drew sample seed 0.
+            sanitizeSampleSeed(values.dynamicPromptsSampleSeed) === expansionSampleSeed &&
+            values.dynamicPromptsCombinatorial === false
               ? { ...values, dynamicPromptsSampleSeed: createDynamicPromptsSampleSeed() }
               : values
         )
@@ -5462,6 +5509,27 @@ const reduceWorkbenchAction = (
             projectId: target.id,
             title: 'Workflow not queued',
             titleKey: 'widgets.workflow.submitRemovedTitle',
+          })
+        );
+      }
+
+      // The prompt or its expansion settings changed while the prompt was being expanded. The reducer compiles the
+      // project as it is now, so neither the stale expansion nor the new prompt as typed may run in its place.
+      if (
+        target &&
+        !isSameDynamicPromptsExpansionSource(
+          action.expandedFrom ?? null,
+          getDynamicPromptsExpansionSource(target, action.route.sourceId)
+        )
+      ) {
+        return addNotification(
+          state,
+          createNotification({
+            category: 'enqueue',
+            kind: 'error',
+            projectId: target.id,
+            title: 'The prompt changed while it was being expanded, so nothing was queued. Invoke again.',
+            titleKey: 'topbar.invoke.expansionStale',
           })
         );
       }
