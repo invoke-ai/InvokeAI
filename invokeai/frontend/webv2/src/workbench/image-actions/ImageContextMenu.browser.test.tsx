@@ -315,7 +315,9 @@ describe('ImageContextMenu deletion delegation', () => {
 
     await interact(() => getMenuItem('widgets.gallery.itemMenu.deleteImage').click());
 
-    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }], {
+      returnFocus: undefined,
+    });
     expect(getOpenAlertDialog()).toBeNull();
   });
 });

@@ -2,6 +2,8 @@
 import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
 import type { InvocationProgressEvent, QueueItem, QueueItemStatusChangedEvent } from '@features/queue/contracts';
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import type { ImageActions } from '@workbench/image-actions';
+import type * as ImageContextMenuModule from '@workbench/image-actions/ImageContextMenu';
 import type * as DeletionConfirmationModule from '@workbench/image-actions/useDeletionConfirmation';
 import type * as projectsApi from '@workbench/projects/api';
 import type { WidgetContributionSource, WidgetViewProps } from '@workbench/widgetContracts';
@@ -17,11 +19,12 @@ import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
+import { EMPTY_IMAGE_RECALL_CAPABILITIES } from '@workbench/image-actions/imageRecall';
 import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import i18next from 'i18next';
-import { act, useCallback } from 'react';
+import { act, useCallback, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -162,6 +165,11 @@ const mocks = vi.hoisted(() => {
     galleryItemNames: [] as Array<{ kind: 'image' | 'video'; name: string }>,
     galleryItemNamesGate: null as Promise<void> | null,
     galleryItemNamesOptionCalls: 0,
+    // Widget values as an external store: `publishGalleryValues` re-renders its subscribers, as the workbench does.
+    widgetValues: { listeners: new Set<() => void>(), version: 0 },
+    // Set by a test that drives the real item menu: the actions the view hands it, in place of the empty stand-in.
+    imageActions: null as ImageActions | null,
+    realImageContextMenu: null as typeof ImageContextMenuModule.ImageContextMenu | null,
     imageActionOptions: null as null | {
       getItemActionContext?: () => {
         getItemSelectionPage?: (item: GalleryImageItem | GalleryVideoItem) => number;
@@ -190,13 +198,22 @@ vi.mock('@workbench/useOpenWorkbenchWidget', () => ({
   useOpenWorkbenchWidget: () => mocks.openWidget,
 }));
 
+const subscribeWidgetValues = (listener: () => void) => {
+  mocks.widgetValues.listeners.add(listener);
+  return () => mocks.widgetValues.listeners.delete(listener);
+};
+const getWidgetValuesVersion = () => mocks.widgetValues.version;
+
 vi.mock('@workbench/WorkbenchContext', () => ({
   useActiveProjectId: () => 'project-1',
+  useActiveProjectName: () => 'Project 1',
   useActiveProjectSelector: (selector: (project: typeof mocks.project) => unknown) => selector(mocks.project),
   useOptionalWorkbenchCommands: () => mocks.commands,
   useOptionalWorkbenchExtensions: () => mocks.extensions,
-  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) =>
-    selector(
+  useWidgetValuesSelector: (widgetId: string, selector: (values: Record<string, unknown>) => unknown) => {
+    useSyncExternalStore(subscribeWidgetValues, getWidgetValuesVersion);
+
+    return selector(
       widgetId === 'gallery' || widgetId === 'preview'
         ? ((
             Object.values(mocks.project.widgetInstances).find((instance) => instance.typeId === widgetId) as
@@ -204,7 +221,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
               | undefined
           )?.state?.values ?? {})
         : {}
-    ),
+    );
+  },
   useWorkbenchCommands: () => mocks.commands,
   useWorkbenchExtensions: () => mocks.extensions,
   // Imported beside the focus provider; only the workbench runtime component, not rendered here, reads it.
@@ -256,6 +274,21 @@ vi.mock('@workbench/projects/api', async (importOriginal) => ({
 vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 
 vi.mock('@features/gallery/queries', () => ({
+  // The item menu's reads: recorded metadata, which these images have none of, and whether one embeds a workflow.
+  galleryImageMetadataOptions: (_owner: unknown, imageName: string) => ({
+    queryFn: () => null,
+    queryKey: ['test-image-metadata', imageName],
+    staleTime: Infinity,
+  }),
+  galleryKeys: {
+    imageHasWorkflow: (_owner: unknown, imageName: string) => ['test-image-has-workflow', imageName],
+    videoHasWorkflow: (_owner: unknown, videoName: string) => ['test-video-has-workflow', videoName],
+  },
+  galleryVideoMetadataOptions: (_owner: unknown, videoName: string) => ({
+    queryFn: () => null,
+    queryKey: ['test-video-metadata', videoName],
+    staleTime: Infinity,
+  }),
   GALLERY_MAX_ROWS: 600,
   GALLERY_PAGE_SIZE: 60,
   isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
@@ -432,9 +465,13 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
 
 vi.mock('@workbench/image-actions', async () => ({
   EMPTY_IMAGE_RECALL_CAPABILITIES: {},
-  ImageContextMenu: (props: { target: unknown; variant?: string }) => {
+  ImageContextMenu: (props: Parameters<typeof ImageContextMenuModule.ImageContextMenu>[0]) => {
+    const { realImageContextMenu: RealImageContextMenu } = mocks;
+
     contextMenuProps.current = props;
-    return null;
+    return mocks.imageActions && RealImageContextMenu ? (
+      <RealImageContextMenu {...props} actions={mocks.imageActions} />
+    ) : null;
   },
   ImageContinueGroup: () => null,
   ImageUseGroups: () => null,
@@ -453,7 +490,7 @@ vi.mock('@workbench/image-actions', async () => ({
   ).useDeletionConfirmation,
   useImageActions: (options: typeof mocks.imageActionOptions) => {
     mocks.imageActionOptions = options;
-    return {};
+    return mocks.imageActions ?? {};
   },
 }));
 
@@ -469,6 +506,11 @@ vi.mock('@features/generation/react', () => ({
 }));
 
 import { PreviewWidgetView } from './PreviewWidgetView';
+
+// Loaded after the mocks, so the real menu reads the same mocked workbench as the view.
+mocks.realImageContextMenu = (
+  await vi.importActual<typeof ImageContextMenuModule>('@workbench/image-actions/ImageContextMenu')
+).ImageContextMenu;
 
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
@@ -569,6 +611,18 @@ const HeaderPositionProbe = () => {
   return <span ref={ref} />;
 };
 
+// Off unless a test renders it: the header's ⋮ as the chrome shows it, only while Preview publishes an item to act on.
+let showsHeaderMenuButton = false;
+const HeaderMenuButton = () => {
+  const { actionItem, openItemMenu } = usePreviewHeaderContext();
+
+  return actionItem && openItemMenu ? (
+    <button aria-label="Item actions" type="button" onClick={() => openItemMenu(10, 10, 'housekeeping')}>
+      ⋮
+    </button>
+  ) : null;
+};
+
 // The shell's sensors, so touch on the preview arbitrates between swipe and drag as it does in the app.
 const ShellDndContext = ({ children }: Pick<DndContextProps, 'children'>) => {
   const sensors = useSensors(
@@ -615,6 +669,7 @@ const renderTree = async (client: QueryClient) => {
                 <LivePreviewFollowProvider>
                   <FollowProbe />
                   <HeaderPositionProbe />
+                  {showsHeaderMenuButton ? <HeaderMenuButton /> : null}
                   <CenterRegion>
                     <PreviewWidgetView instance={instance} manifest={manifest} region="center" runtime={runtime} />
                   </CenterRegion>
@@ -658,6 +713,14 @@ const setGalleryValues = (patch: Record<string, unknown>) => {
   const state = mocks.project.widgetInstances.gallery.state as { values: Record<string, unknown> };
 
   state.values = { ...state.values, ...patch };
+};
+
+// Gallery values republished as the workbench store publishes them: subscribers re-render at once, within the event
+// that changed them.
+const publishGalleryValues = (patch: Record<string, unknown>) => {
+  setGalleryValues(patch);
+  mocks.widgetValues.version += 1;
+  mocks.widgetValues.listeners.forEach((listener) => listener());
 };
 
 // Apply mocked selection results back to Gallery values so subsequent navigation starts from the newly selected
@@ -808,6 +871,7 @@ beforeEach(() => {
   mocks.commands.gallery.selectItem.mockClear();
   mocks.commands.gallery.clearSelection.mockReset();
   showsHeaderLabel = false;
+  showsHeaderMenuButton = false;
   vi.mocked(requestGalleryItemReveal).mockClear();
   mocks.project.queue.items = [];
   mocks.project.settings.viewerAutoSwitch = 'off';
@@ -838,6 +902,7 @@ beforeEach(() => {
   mocks.galleryItemNamesGate = null;
   mocks.galleryItemNamesOptionCalls = 0;
   mocks.imageActionOptions = null;
+  mocks.imageActions = null;
   mocks.galleryItemPages = [
     {
       items: mocks.recentImages.map((image) => ({
@@ -3846,6 +3911,191 @@ describe('preview deletion confirmation', () => {
       expect(frame.text).toBe(confirmation);
     }
     await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+  });
+});
+
+describe('preview item menu focus', () => {
+  const successor = { ...mocks.recentImages[1], boardId: 'none' };
+  let confirmDeletion: (() => void) | null = null;
+  // Deleting the shown item as the shared actions do: it leaves the selection at once (the optimistic removal), and
+  // the item after it is selected once the server confirms.
+  const deleteShownItem = () => {
+    publishGalleryValues({ selectedImage: null, selectedImageName: null });
+
+    return new Promise<void>((resolve) => {
+      confirmDeletion = () => {
+        publishGalleryValues({ selectedImage: successor, selectedImageName: successor.imageName });
+        resolve();
+      };
+    });
+  };
+  const createItemMenuActions = (overrides: Partial<ImageActions>): ImageActions => ({
+    canUseAsConditioningClip: { audio: false, video: false },
+    canUseAsReferenceImage: false,
+    canUseAsReferenceVideo: false,
+    copyImage: vi.fn(() => Promise.resolve()),
+    createCanvasFromImages: vi.fn(() => Promise.resolve()),
+    deleteItems: vi.fn(() => Promise.resolve()),
+    deleteImages: vi.fn(() => Promise.resolve()),
+    deriveImageRecallCapabilities: vi.fn(() => EMPTY_IMAGE_RECALL_CAPABILITIES),
+    downloadItem: vi.fn(() => Promise.resolve()),
+    downloadItems: vi.fn(() => Promise.resolve()),
+    downloadImage: vi.fn(() => Promise.resolve()),
+    downloadImages: vi.fn(() => Promise.resolve()),
+    generatePbrMaps: vi.fn(() => Promise.resolve()),
+    loadImageWorkflow: vi.fn(() => Promise.resolve()),
+    moveItemsToBoard: vi.fn(() => Promise.resolve()),
+    moveImagesToBoard: vi.fn(() => Promise.resolve()),
+    openItemInNewTab: vi.fn(),
+    openItemInPreview: vi.fn(),
+    openImageInPreview: vi.fn(),
+    recallImageData: vi.fn(() => Promise.resolve()),
+    loadVideoWorkflow: vi.fn(() => Promise.resolve()),
+    recallVideoData: vi.fn(() => Promise.resolve()),
+    selectForCompare: vi.fn(),
+    sendToCanvas: vi.fn(() => Promise.resolve()),
+    sendImageAsControl: vi.fn(() => Promise.resolve()),
+    setItemsStarred: vi.fn(() => Promise.resolve()),
+    setImagesStarred: vi.fn(() => Promise.resolve()),
+    savePromptAsTemplate: vi.fn(),
+    sendToInitialVideo: vi.fn(),
+    useAsReferenceImage: vi.fn(),
+    useAsConditioningClip: vi.fn(),
+    useAsReferenceVideo: vi.fn(),
+    ...overrides,
+  });
+  /** Renders Preview with the real item menu, whose Delete asks first unless the user chose not to be asked. */
+  const renderWithItemMenu = async ({ asks = true, ...overrides }: Partial<ImageActions> & { asks?: boolean } = {}) => {
+    const deleteItems = vi.fn<ImageActions['deleteItems']>((items, options) =>
+      asks
+        ? mocks.imageActionOptions!.requestDeletionConfirmation!(items, deleteShownItem, {
+            canSkipFutureConfirmations: true,
+            returnFocus: options?.returnFocus,
+          })
+        : deleteShownItem()
+    );
+
+    confirmDeletion = null;
+    mocks.imageActions = createItemMenuActions({ deleteItems, ...overrides });
+    await render();
+    return deleteItems;
+  };
+  const findByText = (selector: string, text: string) =>
+    vi.waitFor(() => {
+      const element = [...document.querySelectorAll<HTMLElement>(selector)].find((candidate) =>
+        candidate.textContent?.includes(text)
+      );
+
+      expect(element).toBeDefined();
+      return element!;
+    });
+  /** The context menu event on `target`: a right-click, or the menu key on whatever holds focus. */
+  const openMenuOn = (target: Element) =>
+    act(async () => {
+      target.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 40, clientY: 40 })
+      );
+      await Promise.resolve();
+    });
+  const chooseMenuItem = async (label: string) => {
+    const item = await findByText('[role="menuitem"]', label);
+
+    await act(() => userEvent.click(item));
+  };
+  /** Deletes through the open menu, confirming when asked, until the next item is shown and every overlay is gone. */
+  const deleteThroughMenu = async (asks: boolean) => {
+    await chooseMenuItem('widgets.gallery.itemMenu.deleteImage');
+
+    if (asks) {
+      const confirm = await findByText('[role="alertdialog"] button', 'widgets.gallery.deleteConfirmLabel');
+      await act(() => userEvent.click(confirm));
+    }
+
+    await vi.waitFor(() => expect(confirmDeletion).not.toBeNull());
+    await act(async () => {
+      confirmDeletion!();
+      await Promise.resolve();
+    });
+    expect(host?.querySelector(`img[alt="${successor.imageName}"]`)).not.toBeNull();
+    await expect.poll(() => document.querySelector('[role="alertdialog"]')).toBeNull();
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+  };
+  const stageImage = () => host!.querySelector(`[${PREVIEW_NAV_ATTRIBUTE}]`)!.parentElement!.querySelector('img')!;
+  const shownThumb = () => host!.querySelector<HTMLButtonElement>('button[aria-current]')!;
+
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])('closes for good after Delete on the stage, and leaves focus with Preview ($preference)', async ({ asks }) => {
+    const deleteItems = await renderWithItemMenu({ asks });
+
+    await openMenuOn(stageImage());
+    await deleteThroughMenu(asks);
+
+    // The menu opened on the deleted item does not come back with the next one.
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'newest' }], expect.anything());
+    // Nothing had focus before the menu, which has no trigger: Preview takes it, so its keys still work.
+    expect(document.activeElement).toBe(getBoundary());
+  });
+
+  it('gives focus to Preview after a confirmed Delete takes away the filmstrip thumb the menu opened from', async () => {
+    await renderWithItemMenu();
+    const thumb = shownThumb();
+
+    thumb.focus();
+    await openMenuOn(thumb);
+    await deleteThroughMenu(true);
+
+    expect(thumb.isConnected).toBe(false);
+    expect(document.activeElement).toBe(getBoundary());
+  });
+
+  it("gives focus to Preview after a confirmed Delete from the header's ⋮, which remounts with the next item", async () => {
+    showsHeaderMenuButton = true;
+    await renderWithItemMenu();
+    const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
+
+    await act(() => userEvent.click(menuButton));
+    await deleteThroughMenu(true);
+
+    expect(menuButton.isConnected).toBe(false);
+    expect(host!.querySelector('button[aria-label="Item actions"]')).not.toBeNull();
+    expect(document.activeElement).toBe(getBoundary());
+  });
+
+  it('gives focus back to the thumb the menu opened from when closing leaves it in place', async () => {
+    await renderWithItemMenu();
+    const thumb = shownThumb();
+
+    thumb.focus();
+    await openMenuOn(thumb);
+    await findByText('[role="menuitem"]', 'widgets.gallery.itemMenu.deleteImage');
+    // The menu takes focus, so closing it has focus to give back.
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+
+    expect(document.activeElement).toBe(thumb);
+  });
+
+  it('leaves focus where the chosen action moved it', async () => {
+    const elsewhere = document.createElement('input');
+    document.body.append(elsewhere);
+
+    try {
+      await renderWithItemMenu({ selectForCompare: vi.fn(() => elsewhere.focus()) });
+      const thumb = shownThumb();
+
+      thumb.focus();
+      await openMenuOn(thumb);
+      await chooseMenuItem('widgets.preview.selectForCompare');
+      await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+
+      expect(document.activeElement).toBe(elsewhere);
+    } finally {
+      elsewhere.remove();
+    }
   });
 });
 

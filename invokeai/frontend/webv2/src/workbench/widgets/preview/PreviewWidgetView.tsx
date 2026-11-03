@@ -182,6 +182,12 @@ const FLOATING_RAIL_SX: SystemStyleObject = {
   zIndex: 3,
 };
 
+const getFocusedElement = (): HTMLElement | null => {
+  const { activeElement } = document;
+
+  return activeElement instanceof HTMLElement && activeElement !== document.body ? activeElement : null;
+};
+
 /** A focused video seeks with the arrows; keep them from the workbench hotkeys, which would step to another item. */
 const keepVideoArrowKeys = (event: KeyboardEvent<HTMLElement>) => {
   if (
@@ -466,10 +472,26 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [boardItems, gallery, notifications, selectedItem]
   );
   useDndMonitor({ onDragEnd: handleCompareDrop });
-  const openFilmstripItemContextMenu = useCallback((item: GalleryItem, x: number, y: number) => {
-    setContextMenuVariant('full');
-    setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y });
+  // The menu opens at a point, with no trigger to hand focus back to: Preview remembers what had focus instead.
+  const contextMenuOpenerRef = useRef<HTMLElement | null>(null);
+  const showContextMenu = useCallback((target: ImageContextMenuTarget, variant: ImageContextMenuVariant) => {
+    contextMenuOpenerRef.current = getFocusedElement();
+    setContextMenuVariant(variant);
+    setContextMenuTarget(target);
   }, []);
+  // Resolved when focus returns, from the menu or from a deletion confirmation it opened: the opener while it is still
+  // there, else Preview itself, so its keys keep working. A deletion can take the opener with it (the deleted item's
+  // filmstrip thumb; the header's ⋮, which remounts once the next item is selected), and a point opening had none.
+  const getContextMenuReturnFocus = useCallback((): HTMLElement | null => {
+    const opener = contextMenuOpenerRef.current;
+
+    return opener?.isConnected ? opener : navigationBoundaryRef.current;
+  }, []);
+  const openFilmstripItemContextMenu = useCallback(
+    (item: GalleryItem, x: number, y: number) =>
+      showContextMenu({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }, 'full'),
+    [showContextMenu]
+  );
   const { selectForCompare } = imageActions;
   const compareFilmstripItem = useCallback(
     (item: GalleryItem) => {
@@ -482,18 +504,20 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const openItemContextMenu = useCallback(
     (x: number, y: number, variant: ImageContextMenuVariant = 'full') => {
       if (contextMenuItem) {
-        setContextMenuVariant(variant);
-        setContextMenuTarget({
-          itemRefs: [toGalleryItemRef(contextMenuItem)],
-          items: [contextMenuItem],
-          x,
-          y,
-        });
+        showContextMenu({ itemRefs: [toGalleryItemRef(contextMenuItem)], items: [contextMenuItem], x, y }, variant);
       }
     },
-    [contextMenuItem]
+    [contextMenuItem, showContextMenu]
   );
-  const closeContextMenu = useCallback(() => setContextMenuTarget(null), []);
+  const closeContextMenu = useCallback(() => {
+    setContextMenuTarget(null);
+
+    // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps
+    // it there.
+    if (document.activeElement?.closest('[role="menu"]')) {
+      getContextMenuReturnFocus()?.focus({ preventScroll: true });
+    }
+  }, [getContextMenuReturnFocus]);
   const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
 
   // Publish selection/actions to hoisted chrome through an external store; clear on unmount to prevent stale
@@ -670,52 +694,54 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
             shouldAntialiasProgressImage={antialiasProgressImages}
           />
         ) : selectedItem ? (
-          <>
-            {isComparing && compareImage && selectedItem.kind === 'image' ? (
-              <PreviewCompare
-                baseImage={galleryImageItemToGalleryImage(selectedItem)}
-                compareImage={compareImage}
-                mode={comparisonMode}
-                runtime={runtime}
-                onExit={exitCompare}
-                onModeChange={setComparisonMode}
-                onSwap={swapCompareImages}
-              />
-            ) : selectedItem.kind === 'image' ? (
-              <SelectedImagePreview
-                density={density}
-                filmstrip={filmstrip}
-                isItemCurrent={isItemCurrent}
-                item={selectedItem}
-                loupeControlsRef={loupeControlsRef}
-                shouldAntialiasProgressImage={antialiasProgressImages}
-                swipe={swipeNavigation}
-                onContextMenu={openItemContextMenu}
-              />
-            ) : (
-              <SelectedVideoPreview
-                density={density}
-                filmstrip={filmstrip}
-                isItemCurrent={isItemCurrent}
-                item={selectedItem}
-                swipe={swipeNavigation}
-                videoControllerRef={videoControllerRef}
-                onContextMenu={openItemContextMenu}
-                onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
-              />
-            )}
-            <ImageContextMenu
-              actions={imageActions}
-              boards={boards}
-              previewVideoActions={previewVideoContextActions}
-              target={contextMenuTarget}
-              variant={contextMenuVariant}
-              onClose={closeContextMenu}
+          isComparing && compareImage && selectedItem.kind === 'image' ? (
+            <PreviewCompare
+              baseImage={galleryImageItemToGalleryImage(selectedItem)}
+              compareImage={compareImage}
+              mode={comparisonMode}
+              runtime={runtime}
+              onExit={exitCompare}
+              onModeChange={setComparisonMode}
+              onSwap={swapCompareImages}
             />
-          </>
+          ) : selectedItem.kind === 'image' ? (
+            <SelectedImagePreview
+              density={density}
+              filmstrip={filmstrip}
+              isItemCurrent={isItemCurrent}
+              item={selectedItem}
+              loupeControlsRef={loupeControlsRef}
+              shouldAntialiasProgressImage={antialiasProgressImages}
+              swipe={swipeNavigation}
+              onContextMenu={openItemContextMenu}
+            />
+          ) : (
+            <SelectedVideoPreview
+              density={density}
+              filmstrip={filmstrip}
+              isItemCurrent={isItemCurrent}
+              item={selectedItem}
+              swipe={swipeNavigation}
+              videoControllerRef={videoControllerRef}
+              onContextMenu={openItemContextMenu}
+              onCopyAvailabilityChange={handleVideoCopyAvailabilityChange}
+            />
+          )
         ) : (
           <EmptyPreview />
         )}
+        {/* Outside the branches: the menu's open state is the target, which only the menu's own close clears. A
+            branch swap would unmount the menu without that close (deleting the shown item clears the selection
+            before the menu hears the click), and the leftover target would reopen it on the next item. */}
+        <ImageContextMenu
+          actions={imageActions}
+          boards={boards}
+          previewVideoActions={previewVideoContextActions}
+          returnFocus={getContextMenuReturnFocus}
+          target={contextMenuTarget}
+          variant={contextMenuVariant}
+          onClose={closeContextMenu}
+        />
         {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
             confirmation, nor cut its exit animation short. */}
         {deletionConfirmationDialog}
