@@ -28,7 +28,6 @@ export interface HotkeyDefinition {
   /** Claim the key only while the press targets an element matching this selector; elsewhere it keeps its meaning. */
   targetSelector?: string;
   unavailableReason?: string;
-  implemented?: boolean;
   source?: WidgetContributionSource;
 }
 

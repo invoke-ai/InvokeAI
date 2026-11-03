@@ -92,6 +92,8 @@ export const VideoConceptsSection = memo(
               {loras.map((lora) => (
                 <ConceptRow
                   key={lora.model.key}
+                  // As in Generate: a concept the model cannot load stays listed, badged and off, for the next model.
+                  isCompatible={Boolean(model && isLoraCompatibleWithModel(lora.model, model))}
                   models={conceptModels}
                   lora={lora}
                   onRemove={removeLora}

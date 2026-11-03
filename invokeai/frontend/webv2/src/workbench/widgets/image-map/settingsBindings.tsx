@@ -2,9 +2,11 @@ import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
 import { SettingControl } from '@platform/ui/settings/SettingControl';
 import { getImageMapClickSelectsCluster, getImageMapShowClusterLabels } from '@workbench/image-map/imageMapSettings';
-import { useWidgetSettingsTarget } from '@workbench/settings/useWidgetSettingsTarget';
+import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { ClusterStrengthField } from '@workbench/widgets/image-map/ClusterStrengthField';
 import { useCallback } from 'react';
+
+const EMPTY = {};
 
 export const Field = (props: SettingFieldProps) => {
   // Its empty state means "derive it", which no shared control expresses.
@@ -16,24 +18,19 @@ export const Field = (props: SettingFieldProps) => {
 };
 
 const BooleanField = ({ field, surface, target }: SettingFieldProps) => {
-  const { disabled, patch, value } = useWidgetSettingsTarget(
-    'image-map',
-    target,
-    field.id === 'clickSelectsCluster' ? getImageMapClickSelectsCluster : getImageMapShowClusterLabels
-  );
+  const read = field.id === 'clickSelectsCluster' ? getImageMapClickSelectsCluster : getImageMapShowClusterLabels;
+  const { disabled, layer, set, value } = useLayeredSetting('image-map', field.id, target, read, read(EMPTY), field);
   const onChange = useCallback(
     (next: boolean | string | number) => {
       if (typeof next === 'boolean' && (field.id === 'clickSelectsCluster' || field.id === 'showClusterLabels')) {
-        patch({ [field.id]: next });
+        set(next);
       }
     },
-    [field.id, patch]
+    [field.id, set]
   );
-  const defaultValue =
-    field.id === 'clickSelectsCluster' ? getImageMapClickSelectsCluster({}) : getImageMapShowClusterLabels({});
   return (
     <SettingControl
-      isModified={value !== defaultValue}
+      layer={layer}
       disabled={disabled}
       field={field}
       surface={surface}

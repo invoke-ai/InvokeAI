@@ -1418,7 +1418,10 @@ describe('createCanvasEngine', () => {
     expect(firstSignal?.aborted).toBe(true);
 
     engine.lifecycle.activate();
-    engine.previews.setStagedPreview({ imageName: 'candidate.png' });
+    engine.previews.setStagedPreview({
+      imageName: 'candidate.png',
+      placement: { height: 8, opacity: 1, width: 8, x: 0, y: 0 },
+    });
     await vi.waitFor(() => expect(imageResolver).toHaveBeenCalledTimes(2));
 
     engine.lifecycle.dispose();
@@ -2525,7 +2528,7 @@ describe('createCanvasEngine', () => {
     });
     expect(getDocumentLayer(cropped, 'locked')).toEqual(getDocumentLayer(before, 'locked'));
     expect(cropped.stacks.inpaint_mask.map((node) => node.id)).toEqual(['masks']);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: ['Crop all layers to frame'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: ['Crop all layers to frame'] });
 
     await engine.history.undo();
     expect(engine.document.getDocument()).toEqual(before);
@@ -2934,28 +2937,6 @@ describe('createCanvasEngine', () => {
     // Setting the same tool again is a no-op.
     engine.tools.setTool('brush');
     expect(listener).toHaveBeenCalledTimes(1);
-    engine.lifecycle.dispose();
-  });
-
-  it('interaction lock forces view and refuses non-view tools until unlocked', () => {
-    const { engine } = createEngine();
-
-    engine.tools.setTool('brush');
-    expect(engine.stores.activeTool.get()).toBe('brush');
-
-    engine.tools.setInteractionLocked(true);
-    expect(engine.stores.activeTool.get()).toBe('view');
-
-    engine.tools.setTool('bbox');
-    expect(engine.stores.activeTool.get()).toBe('view');
-
-    engine.tools.setTool('colorPicker');
-    expect(engine.stores.activeTool.get()).toBe('view');
-
-    engine.tools.setInteractionLocked(false);
-    engine.tools.setTool('bbox');
-    expect(engine.stores.activeTool.get()).toBe('bbox');
-
     engine.lifecycle.dispose();
   });
 
@@ -9696,6 +9677,7 @@ describe('setStagedPreview', () => {
     surface.callLog.filter((entry) => entry.op === 'drawImage' && entry.args.length === 5).map((entry) => entry.args);
 
   const dataUrl = (tag: string) => `data:image/png;base64,${tag}`;
+  const at = (x: number, y: number, width: number, height: number) => ({ height, opacity: 1, width, x, y });
 
   it('draws the newest decode and discards a stale one that resolves later (version race)', async () => {
     const raf = createControllableRaf();
@@ -9717,8 +9699,8 @@ describe('setStagedPreview', () => {
     screen.surface.callLog.length = 0;
 
     // Two rapid selections; the second supersedes the first.
-    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), height: 10, width: 10 }); // decode #0
-    engine.previews.setStagedPreview({ dataUrl: dataUrl('BBBB'), height: 20, width: 20 });
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), placement: at(0, 0, 10, 10) }); // decode #0
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('BBBB'), placement: at(0, 0, 20, 20) });
     bitmaps.resolveBitmap(1);
     await flushMicrotasks();
     expect(raf.pendingCount()).toBeGreaterThan(0);
@@ -9755,7 +9737,7 @@ describe('setStagedPreview', () => {
     const screen = createFakeCanvas();
     engine.surface.attach(screen.element, createFakeCanvas().element);
 
-    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), height: 10, width: 10 });
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), placement: at(0, 0, 10, 10) });
     bitmaps.resolveBitmap(0);
     await flushMicrotasks();
     raf.flush();
@@ -9769,7 +9751,36 @@ describe('setStagedPreview', () => {
     engine.lifecycle.dispose();
   });
 
-  it('follows the current bbox origin, not the bbox at set time', async () => {
+  it('keeps the preview across a surface remount, which republishes nothing', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+
+    const bitmaps = createDeferredBitmapBackend();
+    const { store } = createReactiveStore(emptyDoc());
+    const engine = createCanvasEngine({
+      backend: bitmaps.backend,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    engine.surface.attach(createFakeCanvas().element, createFakeCanvas().element);
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), placement: at(4, 6, 10, 10) });
+    bitmaps.resolveBitmap(0);
+    await flushMicrotasks();
+    raf.flush();
+
+    // A layout change remounts the surface while the widget, which owns the preview, stays.
+    engine.surface.detach();
+    const screen = createFakeCanvas();
+    engine.surface.attach(screen.element, createFakeCanvas().element);
+    raf.flush();
+    expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([4, 6, 10, 10]);
+
+    engine.lifecycle.dispose();
+  });
+
+  it('keeps a progress frame at its submitted rect while the bbox moves', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -9785,47 +9796,23 @@ describe('setStagedPreview', () => {
     const screen = createFakeCanvas();
     engine.surface.attach(screen.element, createFakeCanvas().element);
 
-    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), height: 10, width: 10 });
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('AAAA'), placement: at(0, 0, 10, 10) });
     bitmaps.resolveBitmap(0);
     await flushMicrotasks();
     raf.flush();
     expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([0, 0, 10, 10]);
 
-    // Move the bbox (an ordinary edit, same document revision — not a replacement).
+    // Move the bbox mid-run (an ordinary edit, same document revision): only the overlay redraws.
     screen.surface.callLog.length = 0;
     setDocument(emptyDoc({ height: 10, width: 10, x: 30, y: 40 }));
     raf.flush();
-    expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([30, 40, 10, 10]);
-
-    engine.lifecycle.dispose();
-  });
-
-  it('decodes an imageName candidate through the resolver and draws it at the bbox', async () => {
-    const raf = createControllableRaf();
-    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
-    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
-
-    const { store } = createReactiveStore(emptyDoc({ height: 100, width: 100, x: 5, y: 7 }));
-    const resolver = vi.fn(() => Promise.resolve(new Blob()));
-    const engine = createCanvasEngine({
-      backend: {
-        ...createTestStubRasterBackend(),
-        createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 17, width: 23 } as unknown as ImageBitmap),
-      },
-      imageResolver: resolver,
-      projectId: 'p1',
-      store,
-    });
-    const screen = createFakeCanvas();
-    engine.surface.attach(screen.element, createFakeCanvas().element);
-
-    engine.previews.setStagedPreview({ imageName: 'staged-candidate' });
+    expect(stagedDraws(screen.surface)).toHaveLength(0);
+    // The next frame that does recomposite still lands the progress frame where its run was submitted.
+    engine.previews.setStagedPreview({ dataUrl: dataUrl('BBBB'), placement: at(0, 0, 10, 10) });
+    bitmaps.resolveBitmap(1);
     await flushMicrotasks();
     raf.flush();
-
-    expect(resolver).toHaveBeenCalledWith('staged-candidate', expect.any(AbortSignal));
-    // The decoded surface is drawn at the current bbox origin.
-    expect(stagedDraws(screen.surface).at(-1)!.slice(1, 3)).toEqual([5, 7]);
+    expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([0, 0, 10, 10]);
 
     engine.lifecycle.dispose();
   });
@@ -9841,9 +9828,10 @@ describe('setStagedPreview', () => {
       createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 17, width: 23 } as unknown as ImageBitmap),
     };
     const { setDocument, store } = createReactiveStore(emptyDoc({ height: 100, width: 100, x: 50, y: 60 }));
+    const resolver = vi.fn(() => Promise.resolve(new Blob()));
     const engine = createCanvasEngine({
       backend,
-      imageResolver: () => Promise.resolve(new Blob()),
+      imageResolver: resolver,
       projectId: 'p1',
       store,
     });
@@ -9857,6 +9845,7 @@ describe('setStagedPreview', () => {
     await flushMicrotasks();
     raf.flush();
 
+    expect(resolver).toHaveBeenCalledWith('placed-candidate', expect.any(AbortSignal));
     expect(stagedDraws(screen.surface).at(-1)!.slice(1)).toEqual([-8, 13, 46, 34]);
     const alphaSets = screen.surface.callLog
       .filter((entry) => entry.op === 'set' && entry.args[0] === 'globalAlpha')
@@ -13200,9 +13189,6 @@ describe('guarded filter previews', () => {
       setTimeout(resolve, FILTER_AUTO_PROCESS_DEBOUNCE_MS + 200);
     });
     expect(runGraph).not.toHaveBeenCalled();
-
-    engine.tools.setInteractionLocked(true);
-    expect(getCanvasOperations(engine).setFilterOperationAutoProcess(true)).toBe('blocked');
     engine.lifecycle.dispose();
   });
 
@@ -13322,57 +13308,6 @@ describe('guarded filter previews', () => {
       engine.lifecycle.dispose();
     }
   );
-
-  it('interaction lock blocks Filter and Select Object launches without creating sessions', async () => {
-    const layer = guardableLayer('locked-launch');
-    const { store } = createReactiveStore({ ...emptyDoc(), stacks: stacksFrom([layer]) });
-    const engine = createCanvasEngine({
-      backend: filterBitmapBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels(layer.id)).status).toBe('ok');
-
-    engine.tools.setInteractionLocked(true);
-
-    expect(getCanvasOperations(engine).startFilterOperation(layer.id)).toBe('locked');
-    expect(getCanvasOperations(engine).startSelectObject(layer.id)).toBe('locked');
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual({ status: 'idle' });
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
-    expect(getCanvasOperations(engine).stores.samSession.get()).toBeNull();
-    engine.lifecycle.dispose();
-  });
-
-  it('keeps an active Select Object operation available to cancel while interaction is locked', async () => {
-    const layer = guardableLayer('active-before-lock');
-    const { store } = createReactiveStore({ ...emptyDoc(), stacks: stacksFrom([layer]) });
-    const engine = createCanvasEngine({
-      backend: filterBitmapBackend(),
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId: 'p1',
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels(layer.id)).status).toBe('ok');
-    expect(getCanvasOperations(engine).startSelectObject(layer.id)).toBe('started');
-
-    engine.tools.setInteractionLocked(true);
-
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({
-      identity: { kind: 'select-object' },
-      status: 'active',
-    });
-    expect(getCanvasOperations(engine).stores.samSession.get()).not.toBeNull();
-    expect(engine.stores.activeTool.get()).toBe('view');
-
-    getCanvasOperations(engine).cancelSelectObjectSession();
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual({ status: 'idle' });
-    expect(getCanvasOperations(engine).stores.samSession.get()).toBeNull();
-
-    engine.tools.setInteractionLocked(false);
-    expect(engine.stores.activeTool.get()).toBe('view');
-    engine.lifecycle.dispose();
-  });
 
   /** A stub backend whose `createImageBitmap` is deferred, so decodes resolve on demand. */
   const createDeferredBitmapBackend = () => {
@@ -13525,94 +13460,6 @@ describe('guarded filter previews', () => {
     });
     return { document, engine, source };
   };
-
-  it('blocks Filter actions called directly after an external lock and still allows Cancel', async () => {
-    const { document, engine } = await createFilterFlowHarness();
-    const makeDurable = vi.fn(() => Promise.resolve());
-    const before = getCanvasOperations(engine).stores.filterSession.get();
-
-    engine.tools.setInteractionLocked(true);
-
-    expect(getCanvasOperations(engine).updateFilterOperation({ settings: { radius: 99 }, type: 'img_blur' })).toBe(
-      'blocked'
-    );
-    expect(getCanvasOperations(engine).resetFilterOperation({ radius: 0 })).toBe('blocked');
-    await expect(getCanvasOperations(engine).processFilterOperation()).resolves.toBe('blocked');
-    await expect(getCanvasOperations(engine).commitFilterOperation('apply', makeDurable)).resolves.toBe('blocked');
-    expect(makeDurable).not.toHaveBeenCalled();
-    expect(engine.document.getDocument()).toEqual(document);
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toEqual(before);
-
-    getCanvasOperations(engine).cancelFilterOperation();
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toEqual({ status: 'idle' });
-    engine.tools.setInteractionLocked(false);
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toBeNull();
-    expect(getCanvasOperations(engine).updateFilterOperation({ settings: {}, type: 'img_blur' })).toBe('stale');
-    expect(getCanvasOperations(engine).resetFilterOperation({})).toBe('stale');
-    engine.lifecycle.dispose();
-  });
-
-  it('blocks Filter mutation when an external lock begins during durability', async () => {
-    const { document, engine } = await createFilterFlowHarness();
-    const durable = createDeferred<void>();
-    const pending = getCanvasOperations(engine).commitFilterOperation('apply', () => durable.promise);
-    await vi.waitFor(() => expect(getCanvasOperations(engine).stores.filterSession.get()?.status).toBe('committing'));
-
-    engine.tools.setInteractionLocked(true);
-    durable.resolve();
-
-    await expect(pending).resolves.toBe('blocked');
-    expect(engine.document.getDocument()).toEqual(document);
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-      preview: { imageName: 'filtered.png' },
-      status: 'ready',
-    });
-    getCanvasOperations(engine).cancelFilterOperation();
-    engine.lifecycle.dispose();
-  });
-
-  it('interrupts Filter processing on an external lock without losing the draft or operation', async () => {
-    const source = filterFlowLayer();
-    const { projectId, store } = createReducerBackedStore({
-      ...emptyDoc(),
-      stacks: stacksFrom([source]),
-      selectedLayerId: source.id,
-    });
-    const graph = createDeferred<{ height: number; imageName: string; origin: string; output: {}; width: number }>();
-    const runGraph = vi.fn(() => graph.promise);
-    const engine = createCanvasEngine({
-      backend: filterBitmapBackend(),
-      bitmapStore: createSpyBitmapStore(),
-      filterDeps: {
-        runGraph,
-        uploadIntermediate: vi.fn(() => Promise.resolve({ imageName: 'filter-input.png' })),
-      },
-      imageResolver: () => Promise.resolve(new Blob()),
-      projectId,
-      store,
-    });
-    expect((await engine.exports.exportLayerPixels(source.id)).status).toBe('ok');
-    expect(getCanvasOperations(engine).startFilterOperation(source.id)).toBe('started');
-    expect(getCanvasOperations(engine).updateFilterOperation({ settings: { radius: 7 }, type: 'img_blur' })).toBe(
-      'updated'
-    );
-    const pending = getCanvasOperations(engine).processFilterOperation();
-    await vi.waitFor(() => expect(runGraph).toHaveBeenCalledOnce());
-
-    engine.tools.setInteractionLocked(true);
-    graph.resolve({ height: 10, imageName: 'late.png', origin: 'test', output: {}, width: 10 });
-
-    await expect(pending).resolves.toBe('stale');
-    expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-      draft: { settings: { radius: 7 }, type: 'img_blur' },
-      preview: null,
-      status: 'ready',
-    });
-    expect(getCanvasOperations(engine).controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
-    getCanvasOperations(engine).cancelFilterOperation();
-    engine.lifecycle.dispose();
-  });
 
   it.each([
     {
@@ -16067,7 +15914,7 @@ describe('overview: composites the fit-to-view extent', () => {
 // ---- transform session: param commit (image) + pixel bake (paint) ----------
 
 describe('masks while a result is staged', () => {
-  it('hides masks and region tints for the whole staging session, redrawing in full when it starts and ends', () => {
+  it('hides masks and region tints only under a shown preview, and shows them while a mask is being edited', async () => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -16082,14 +15929,17 @@ describe('masks while a result is staged', () => {
         return () => listeners.delete(listener);
       },
     };
-    const setCandidates = (pendingImages: CanvasStagingCandidateContract[]): void => {
-      canvas = { ...canvas, stagingArea: { ...canvas.stagingArea, isVisible: false, pendingImages } };
+    const update = (next: typeof canvas): void => {
+      canvas = next;
       for (const listener of listeners) {
         listener();
       }
     };
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: {
+        ...createTestStubRasterBackend(),
+        createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 20, width: 20 } as unknown as ImageBitmap),
+      },
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
@@ -16107,22 +15957,44 @@ describe('masks while a result is staged', () => {
     };
     expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
 
-    // A candidate whose preview is toggled off still hides the masks.
-    setCandidates([
-      {
-        height: 20,
-        imageName: 'staged.png',
-        imageUrl: '/staged.png',
-        placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
-        queuedAt: '2026-07-16T00:00:00.000Z',
-        sourceQueueItemId: 'queue',
-        thumbnailUrl: '/staged-thumb.png',
-        width: 20,
-      },
-    ]);
+    // A staged candidate whose preview is off hides nothing, so staging it repaints nothing either.
+    const candidate: CanvasStagingCandidateContract = {
+      height: 20,
+      imageName: 'staged.png',
+      imageUrl: '/staged.png',
+      placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
+      queuedAt: '2026-07-16T00:00:00.000Z',
+      sourceQueueItemId: 'queue',
+      thumbnailUrl: '/staged-thumb.png',
+      width: 20,
+    };
+    update({ ...canvas, stagingArea: { ...canvas.stagingArea, isVisible: false, pendingImages: [candidate] } });
+    expect(frame().drawn).toBeUndefined();
+
+    // Showing it hides masks and the region tint, so the result reads as it would be accepted.
+    engine.previews.setStagedPreview({ imageName: candidate.imageName, placement: candidate.placement });
+    await flushMicrotasks();
     expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
 
-    setCandidates([]);
+    // Selecting the mask to paint it shows the masks again, over the preview, in one full repaint.
+    update({ ...canvas, document: { ...canvas.document, selectedLayerId: 'm' } });
+    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
+    update({ ...canvas, document: { ...canvas.document, selectedLayerId: 'a' } });
+    expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
+
+    // Converting the selected raster to a mask in place (same id) turns it into mask editing: one full repaint too.
+    update({
+      ...canvas,
+      document: { ...canvas.document, stacks: stacksFrom([maskLayer('m'), maskLayer('a')]) },
+    });
+    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
+    update({
+      ...canvas,
+      document: { ...canvas.document, stacks: stacksFrom([maskLayer('m'), rasterLayer('a')]) },
+    });
+    expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
+
+    engine.previews.setStagedPreview(null);
     expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
     composite.mockRestore();
     engine.lifecycle.dispose();
@@ -16149,21 +16021,6 @@ describe('beginTransform', () => {
     });
     return { dispatch, engine };
   };
-
-  it('refuses as busy while interaction is locked, leaving the selection and tool unchanged', () => {
-    const { dispatch, engine } = setup([rasterLayer('a'), rasterLayer('b')], 'a');
-    engine.tools.setInteractionLocked(true);
-    // The lock itself parks the surface on the view tool.
-    const lockedTool = engine.stores.activeTool.get();
-    dispatch.mockClear();
-
-    expect(engine.layers.beginTransform('b')).toBe('busy');
-    expect(dispatch).not.toHaveBeenCalled();
-    expect(engine.document.getDocument()?.selectedLayerId).toBe('a');
-    expect(engine.stores.activeTool.get()).toBe(lockedTool);
-    expect(engine.stores.transformSession.get()).toBeNull();
-    engine.lifecycle.dispose();
-  });
 
   it('selects the layer and opens its session now, even with transform already active and no session', () => {
     const { engine } = setup([rasterLayer('a'), rasterLayer('b')], null);
@@ -16296,6 +16153,9 @@ describe('beginTransform', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       const h = strokeThenTransform({ uploadImage: () => Promise.reject(new Error('offline')) });
+      // Both waits share a wall-clock bound, not a step count: each hash settles off the fake clock, so on a loaded
+      // machine a step count can run out while a digest is still queued. It stays under the test timeout below.
+      const deadline = performance.now() + 20_000;
       // Advances the fake clock, then yields to real I/O: hashing the encoded pixels settles outside the clock.
       const advance = async (ms: number) => {
         await vi.advanceTimersByTimeAsync(ms);
@@ -16317,7 +16177,7 @@ describe('beginTransform', () => {
           .then(() => {
             flush.settled = true;
           });
-        for (let step = 0; step < 200 && !flush.settled; step += 1) {
+        while (!flush.settled && performance.now() < deadline) {
           await advance(250);
         }
         expect(flush.settled).toBe(true);
@@ -16328,7 +16188,7 @@ describe('beginTransform', () => {
       expect(h.refusals).toEqual([]);
 
       // The store retries on its own backoff until its consecutive-failure limit stops it.
-      for (let step = 0; step < 300 && h.engine.interaction.get('pendingTransformLayerId'); step += 1) {
+      while (h.engine.interaction.get('pendingTransformLayerId') && performance.now() < deadline) {
         await advance(1000);
       }
       expect(h.engine.interaction.get('pendingTransformLayerId')).toBeNull();
@@ -16337,7 +16197,7 @@ describe('beginTransform', () => {
     } finally {
       vi.useRealTimers();
     }
-  });
+  }, 30_000);
 });
 
 describe('transform session', () => {
@@ -16892,7 +16752,7 @@ describe('engine selection: select all / deselect / invert + hasSelection store'
     expect(engine.stores.hasSelection.get()).toBe(false);
     await engine.history.redo();
     expect(engine.stores.hasSelection.get()).toBe(true);
-    expect(engine.history.getEntries()).toEqual({ future: ['Deselect'], past: ['Select all'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: ['Deselect'], past: ['Select all'] });
     engine.lifecycle.dispose();
   });
 });
@@ -18686,100 +18546,6 @@ describe('Select Object canvas engine integration', () => {
     h.engine.lifecycle.dispose();
   });
 
-  it('blocks Select Object actions called directly after an external lock and still allows Cancel', async () => {
-    const h = await createCommittingSamHarness();
-    const makeDurable = vi.fn(() => Promise.resolve());
-    const before = getCanvasOperations(h.engine).stores.samSession.get();
-
-    h.engine.tools.setInteractionLocked(true);
-
-    expect(
-      getCanvasOperations(h.engine).updateSelectObjectSession({ input: { prompt: 'changed', type: 'prompt' } })
-    ).toBe('blocked');
-    expect(getCanvasOperations(h.engine).resetSelectObjectSession()).toBe('blocked');
-    await expect(getCanvasOperations(h.engine).processSelectObjectSession()).resolves.toBe('blocked');
-    await expect(getCanvasOperations(h.engine).applySelectObjectSession(makeDurable)).resolves.toEqual({
-      status: 'locked',
-    });
-    await expect(getCanvasOperations(h.engine).saveSelectObjectSession('raster', makeDurable)).resolves.toEqual({
-      status: 'locked',
-    });
-    expect(makeDurable).not.toHaveBeenCalled();
-    expect(h.engine.document.getDocument()).toEqual(h.document);
-    expect(getCanvasOperations(h.engine).stores.samSession.get()).toEqual(before);
-
-    getCanvasOperations(h.engine).cancelSelectObjectSession();
-    expect(getCanvasOperations(h.engine).stores.samSession.get()).toBeNull();
-    expect(getCanvasOperations(h.engine).controller.getSnapshot()).toEqual({ status: 'idle' });
-    h.engine.tools.setInteractionLocked(false);
-    expect(h.engine.stores.activeTool.get()).toBe('view');
-    expect(getCanvasOperations(h.engine).updateSelectObjectSession({ invert: false })).toBe('stale');
-    expect(getCanvasOperations(h.engine).resetSelectObjectSession()).toBe('stale');
-    h.engine.lifecycle.dispose();
-  });
-
-  it('blocks Select Object save mutation when an external lock begins during durability', async () => {
-    const h = await createCommittingSamHarness();
-    const durable = createDeferred<void>();
-    const pending = getCanvasOperations(h.engine).saveSelectObjectSession('raster', () => durable.promise);
-    await vi.waitFor(() => expect(getCanvasOperations(h.engine).stores.samSession.get()?.status).toBe('committing'));
-
-    h.engine.tools.setInteractionLocked(true);
-    durable.resolve();
-
-    await expect(pending).resolves.toEqual({ status: 'locked' });
-    expect(h.engine.document.getDocument()).toEqual(h.document);
-    expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
-    getCanvasOperations(h.engine).cancelSelectObjectSession();
-    h.engine.lifecycle.dispose();
-  });
-
-  it('blocks Select Object apply mutation when an external lock begins during final decode', async () => {
-    const finalDecode = createDeferred<Blob>();
-    let resolutions = 0;
-    const h = await createCommittingSamHarness(() => {
-      resolutions += 1;
-      return resolutions === 1 ? Promise.resolve(new Blob()) : finalDecode.promise;
-    });
-    const pending = getCanvasOperations(h.engine).applySelectObjectSession(() => Promise.resolve());
-    await vi.waitFor(() => expect(resolutions).toBe(2));
-
-    h.engine.tools.setInteractionLocked(true);
-    finalDecode.resolve(new Blob());
-
-    await expect(pending).resolves.not.toMatchObject({ status: 'committed' });
-    expect(h.engine.document.getDocument()).toEqual(h.document);
-    expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({ hasPreview: true, status: 'ready' });
-    getCanvasOperations(h.engine).cancelSelectObjectSession();
-    h.engine.lifecycle.dispose();
-  });
-
-  it('interrupts Select Object processing on an external lock without losing inputs or operation', async () => {
-    const graph = createDeferred<{ height: number; imageName: string; origin: string; width: number }>();
-    const runGraph = vi.fn(() => graph.promise);
-    const h = await createSamHarness({ runGraph });
-    expect(getCanvasOperations(h.engine).startSelectObject('source')).toBe('started');
-    const input = { prompt: 'keep this prompt', type: 'prompt' as const };
-    expect(getCanvasOperations(h.engine).updateSelectObjectSession({ input, invert: true })).toBe('updated');
-    const pending = getCanvasOperations(h.engine).processSelectObjectSession();
-    expect(getCanvasOperations(h.engine).stores.samSession.get()?.status).toBe('preparing-source');
-    await vi.waitFor(() => expect(runGraph).toHaveBeenCalledOnce());
-
-    h.engine.tools.setInteractionLocked(true);
-    graph.resolve({ height: 100, imageName: 'late.png', origin: 'test', width: 100 });
-
-    await expect(pending).resolves.toBe('stale');
-    expect(getCanvasOperations(h.engine).stores.samSession.get()).toMatchObject({
-      hasPreview: false,
-      input,
-      invert: true,
-      status: 'ready',
-    });
-    expect(getCanvasOperations(h.engine).controller.getSnapshot()).toMatchObject({ phase: 'ready', status: 'active' });
-    getCanvasOperations(h.engine).cancelSelectObjectSession();
-    h.engine.lifecycle.dispose();
-  });
-
   it.each(['input', 'reset', 'process'] as const)(
     'does not apply or close when %s invalidates ownership during final selection decode',
     async (kind) => {
@@ -19661,7 +19427,10 @@ describe('Select Object canvas engine integration', () => {
         rasterExport.guard
       )
     ).resolves.toBe('shown');
-    h.engine.previews.setStagedPreview({ imageName: 'staged.png' });
+    h.engine.previews.setStagedPreview({
+      imageName: 'staged.png',
+      placement: { height: 70, opacity: 1, width: 80, x: 10, y: 15 },
+    });
     await flushMicrotasks();
     expect(getCanvasOperations(h.engine).startSelectObject('raster')).toBe('started');
     getCanvasOperations(h.engine).updateSelectObjectSession({
@@ -19835,7 +19604,7 @@ describe('history entries and stepBy', () => {
     await flushMicrotasks();
     raf.flush();
 
-    expect(engine.history.getEntries()).toEqual({ future: [], past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: [] });
 
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(5, 5));
@@ -19847,11 +19616,11 @@ describe('history entries and stepBy', () => {
     expect(afterStroke.future).toHaveLength(0);
 
     await engine.history.stepBy(-1);
-    expect(engine.history.getEntries()).toEqual({ future: afterStroke.past, past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: afterStroke.past, past: [] });
 
     // Clamped: asking for more redos than exist replays what is there and stops.
     await engine.history.stepBy(5);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: afterStroke.past });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: afterStroke.past });
 
     engine.lifecycle.dispose();
   });
@@ -19917,7 +19686,7 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
 
     expect(await engine.history.undo()).toBe('applied');
     expect(imageResolver.mock.calls.length).toBeGreaterThan(fetchesBeforeUndo);
-    expect(engine.history.getEntries()).toEqual({ future: ['Brush stroke'], past: [] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: ['Brush stroke'], past: [] });
     engine.lifecycle.dispose();
   });
 
@@ -19928,7 +19697,7 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
     fail = true;
 
     await expectReplayFailure(engine.history.undo(), /could not be restored/);
-    expect(engine.history.getEntries()).toEqual({ future: [], past: ['Brush stroke'] });
+    expect(engine.history.getEntries()).toEqual({ evicted: 0, future: [], past: ['Brush stroke'] });
     expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
     engine.lifecycle.dispose();
   });
@@ -20042,6 +19811,97 @@ describe('floating selection lifecycle', () => {
     engine.lifecycle.dispose();
   });
 
+  it('applies an open transform session as its own step before an accepted result goes on top', () => {
+    const reducer = createReducerBackedStore(selectedImageDoc());
+    const candidate: CanvasStagingCandidateContract = {
+      height: 20,
+      imageName: 'staged.png',
+      imageUrl: '/staged.png',
+      placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
+      queuedAt: '2026-07-16T00:00:00.000Z',
+      sourceQueueItemId: 'queue',
+      thumbnailUrl: '/staged-thumb.png',
+      width: 20,
+    };
+    reducer.store.dispatch({ candidate, projectId: reducer.projectId, type: 'appendCanvasStagingCandidate' });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    engine.tools.setTool('transform');
+    engine.layers.updateTransformSession({ rotation: 0, scaleX: 2, scaleY: 2, x: 5, y: 6 });
+    expect(engine.stores.transformSession.get()).not.toBeNull();
+
+    expect(engine.layers.commitStagedImage({ candidate, selectedImageIndex: 0 }).status).toBe('committed');
+
+    expect(engine.stores.transformSession.get()).toBeNull();
+    expect(engine.history.getEntries().past.slice(-2)).toEqual(['Transform layer', 'Accept staged image']);
+    const { document } = reducer.store.getState().projects[0]!.canvas;
+    expect(document.stacks.raster.find((node) => node.id === 'a')).toMatchObject({
+      transform: { scaleX: 2, scaleY: 2, x: 5, y: 6 },
+    });
+    expect(document.stacks.raster[0]).toMatchObject({ source: { image: { imageName: 'staged.png' } } });
+    engine.lifecycle.dispose();
+  });
+
+  it('lands a live float as its own step before an accepted result goes on top of the stack', () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(paintDoc());
+    const candidate: CanvasStagingCandidateContract = {
+      height: 20,
+      imageName: 'staged.png',
+      imageUrl: '/staged.png',
+      placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
+      queuedAt: '2026-07-16T00:00:00.000Z',
+      sourceQueueItemId: 'queue',
+      thumbnailUrl: '/staged-thumb.png',
+      width: 20,
+    };
+    reducer.store.dispatch({ candidate, projectId: reducer.projectId, type: 'appendCanvasStagingCandidate' });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    // Painting and moving pixels while a result waits for review: nothing locks the canvas.
+    engine.tools.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    engine.selection.selectAll();
+    engine.tools.setTool('move');
+    overlay.fire('pointerdown', pointerAt(30, 30));
+    overlay.fire('pointermove', pointerAt(45, 35));
+    overlay.fire('pointerup', pointerAt(45, 35, { buttons: 0 }));
+    expect(engine.stores.hasFloatingSelection.get()).toBe(true);
+
+    expect(engine.layers.commitStagedImage({ candidate, selectedImageIndex: 0 }).status).toBe('committed');
+
+    expect(engine.stores.hasFloatingSelection.get()).toBe(false);
+    expect(engine.history.getEntries().past.slice(-2)).toEqual(['Move selection', 'Accept staged image']);
+    const { document } = reducer.store.getState().projects[0]!.canvas;
+    expect(document.stacks.raster[0]).toMatchObject({ source: { image: { imageName: 'staged.png' } } });
+    engine.lifecycle.dispose();
+  });
+
   it('drops a float without recording it when its layer is deleted', () => {
     const { bitmapStore, engine, setDocument } = liftFloat();
 
@@ -20062,9 +19922,7 @@ describe('layer quick-switch memory', () => {
       engine,
       dispatch: (mutation) => mutationPort.dispatch(mutation, 'user'),
       selectedLayerIds: document.selectedLayerId ? [document.selectedLayerId] : [],
-      hasStagingSlots: false,
-      hasSelectedStagedCandidate: false,
-      isInteractionLocked: false,
+      hasMultipleStagingSlots: false,
       copySelection: vi.fn(),
       cropAllLayers: vi.fn(),
       swapActiveColors: vi.fn(),
@@ -20419,5 +20277,79 @@ describe('control derivation composition', () => {
     });
     await expect(applicationHost.flushLayerUploads('control', {})).resolves.toBe('clean');
     engine.lifecycle.dispose();
+  });
+});
+
+describe('edit feedback on the surface', () => {
+  const attachEngine = (document: CanvasDocumentContractV3) => {
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const windowListeners = new Map<string, (event: unknown) => void>();
+    vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
+      windowListeners.set(type, listener)
+    );
+    vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
+    const { dispatch, projectId, store } = createReducerBackedStore(document);
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId,
+      store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    const refusals: CanvasEditRefusal[] = [];
+    engine.tools.onEditRefused((refusal) => refusals.push(refusal));
+    const key = (type: 'keydown' | 'keyup', code: string) =>
+      windowListeners.get(type)?.({ code, key: code, preventDefault: () => {}, target: null });
+    return { dispatch, engine, key, overlay, refusals };
+  };
+
+  it.each(['transform', 'bbox', 'move'] as const)(
+    'keeps %s when Alt is held before the drag, since Alt modifies its gesture',
+    (tool) => {
+      const h = attachEngine({ ...makeDoc(), selectedLayerId: 'a' });
+      h.engine.tools.setTool(tool);
+      h.overlay.fire('pointerenter', pointerAt(20, 20));
+      h.key('keydown', 'AltLeft');
+      expect(h.engine.stores.activeTool.get()).toBe(tool);
+      h.key('keyup', 'AltLeft');
+      // The picker still answers Alt where Alt means nothing else.
+      h.engine.tools.setTool('brush');
+      h.key('keydown', 'AltLeft');
+      expect(h.engine.stores.activeTool.get()).toBe('colorPicker');
+      h.key('keyup', 'AltLeft');
+      h.engine.lifecycle.dispose();
+    }
+  );
+
+  it('says why a stroke on a locked layer did nothing, and shows not-allowed until the layer is unlocked', () => {
+    const locked: CanvasLayerContract = {
+      ...(rasterLayer('paint') as CanvasRasterLayerContractV2),
+      isLocked: true,
+      name: 'Sky',
+      source: { bitmap: null, type: 'paint' },
+    };
+    const h = attachEngine({ ...makeDoc(), selectedLayerId: 'paint', stacks: stacksFrom([locked]) });
+    h.engine.tools.setTool('brush');
+    expect(h.engine.stores.cursor.get()).toBe('not-allowed');
+
+    h.overlay.fire('pointerenter', pointerAt(20, 20));
+    h.overlay.fire('pointerdown', pointerAt(20, 20));
+    h.overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+    expect(h.refusals).toEqual([{ layerId: 'paint', layerName: 'Sky', status: 'layer-locked' }]);
+    expect(getDocumentLeaves(h.engine.document.getDocument())).toHaveLength(1);
+
+    h.dispatch({ id: 'paint', patch: { isLocked: false }, type: 'updateCanvasLayer' });
+    expect(h.engine.stores.cursor.get()).toBe('crosshair');
+    h.engine.lifecycle.dispose();
   });
 });

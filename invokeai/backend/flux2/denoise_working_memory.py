@@ -62,7 +62,7 @@ The analytic terms:
 - The largest layer's stored weights, for a transformer the model cache may load partially: the weights it leaves in
   RAM are copied to the device per forward, one layer at a time, and the copy is alive during its layer's matmul
   alongside the activations. No point prices it: every point is a fully resident model. The size is read off the
-  transformer, the largest module's own parameters and buffers as stored (`calc_tensor_size`, as the cache counts
+  transformer, the largest module's own parameters and buffers as stored (`largest_module_bytes`, as the cache counts
   them): in bf16 the single-stream blocks' fused projection (`to_qkv_mlp_proj`, ``width x 9 width``), 679,477,248
   bytes for [dev]; for an fp8-stored or GGUF build its float8 or quantized bytes, whose widened copy is the fp8 cast or
   dequant transient's term. A real [dev] in bf16 with 15.0 of its 64.4 GB resident on the RTX 4090 (native
@@ -103,7 +103,7 @@ import torch
 
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
-from invokeai.backend.util.calc_tensor_size import calc_tensor_size
+from invokeai.backend.util.calc_tensor_size import largest_module_bytes
 from invokeai.backend.util.fp8 import peak_fp8_cast_transient_bytes
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
 from invokeai.backend.working_memory.fit import Line, off_line_reasons
@@ -191,17 +191,6 @@ def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) ->
     )
 
 
-def _largest_layer_bytes(transformer: torch.nn.Module) -> int:
-    """The largest module's own parameters and buffers as stored: what partial loading copies for one layer."""
-    return max(
-        (
-            sum(calc_tensor_size(t) for t in (*module.parameters(recurse=False), *module.buffers(recurse=False)))
-            for module in transformer.modules()
-        ),
-        default=0,
-    )
-
-
 def _padded_bias_bytes(mask: Optional[torch.Tensor], dtype: torch.dtype) -> int:
     """One sample's copy of the additive bias in `dtype`, its last dimension padded to `_BIAS_ALIGNMENT`; 0 without one."""
     if mask is None:
@@ -266,7 +255,7 @@ def estimate_flux2_denoise_working_memory(
         "has_attention_mask": has_attention_mask,
         "regional_bias_bytes": regional_attn_mask.numel() * dtype.itemsize if regional_attn_mask is not None else 0,
         "padded_bias_bytes": _padded_bias_bytes(regional_attn_mask, dtype) * batch_size,
-        "streamed_layer_bytes": 0 if weights_resident else _largest_layer_bytes(transformer),
+        "streamed_layer_bytes": 0 if weights_resident else largest_module_bytes(transformer),
         "score_matrix_bytes": sdpa_score_matrix_bytes(
             device=device,
             dtype=dtype,

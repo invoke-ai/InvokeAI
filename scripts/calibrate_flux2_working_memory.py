@@ -36,6 +36,7 @@ import torch.nn.functional as F
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+from invokeai.backend.util.sdpa_scope import install_default_sdpa_priority
 
 GIB = 1024**3
 
@@ -240,6 +241,9 @@ def main() -> None:
 
     if not torch.cuda.is_available():
         raise SystemExit("No CUDA/HIP device available.")
+    # The app ranks SDPA kernels by this order (`apply_monkeypatches`), and it decides the kernel `dispatch` reports.
+    # Every point, measured in this process or a child, runs under it.
+    install_default_sdpa_priority()
 
     if args.single:
         kind, rest = args.single[0], args.single[1:]

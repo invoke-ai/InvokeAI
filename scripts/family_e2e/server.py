@@ -52,6 +52,7 @@ TEMPLATE_PATHS: dict[str, str | None] = {
     "legacy_conf_dir": "configs",
     "fonts_dir": "fonts",
     "custom_nodes_dir": "nodes",
+    "prompt_files_dir": "prompt_files",
     "legacy_models_yaml_path": None,
 }
 # The client speaks plain HTTP to the root path.

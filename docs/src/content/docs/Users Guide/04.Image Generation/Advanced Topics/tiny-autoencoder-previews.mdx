@@ -37,14 +37,14 @@ always and is identical with the setting on or off.
 | TAESDXL (SDXL preview decoder) | SDXL, SDXL Refiner |
 | TAESD3 (SD3 preview decoder) | SD 3 |
 | TAEF1 (FLUX.1 preview decoder) | FLUX.1, Z-Image |
-| TAEF2 (FLUX.2 preview decoder) | FLUX.2, ERNIE-Image |
+| TAEF2 (FLUX.2 preview decoder) | FLUX.2, FLUX.3, ERNIE-Image |
 | TAEQI2.1 (Qwen-Image-2.1 preview decoder) | Qwen-Image-2.1 |
 
 A TAE serves every family that denoises in its latent space, so you need only one per row. To install a TAE file
 you already have, see [Preview decoders](/users-guide/models/model-format-support/#preview-decoders-tiny-autoencoders)
 for the files InvokeAI accepts.
 
-FLUX.1, FLUX.2 and ERNIE-Image preview the image the model predicts, so the preview is clean from the first step.
+FLUX.1, FLUX.2, FLUX.3 and ERNIE-Image preview the image the model predicts, so the preview is clean from the first step.
 Z-Image, SD 3 and Qwen-Image-2.1 preview the current noisy latent: early previews show sharp noise, which clears as
 denoising proceeds. SD 1.x/2.x and SDXL depend on the scheduler: DDIM, DDPM, Euler, Euler a, Heun, LMS, KDPM2,
 KDPM2 a and DPM++ SDE report their prediction and preview cleanly; DPM++ 2M, 2M SDE, 3M and 2S, UniPC, DEIS, PNDM,

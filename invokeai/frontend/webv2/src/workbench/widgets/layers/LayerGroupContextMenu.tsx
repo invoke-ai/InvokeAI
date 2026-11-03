@@ -25,6 +25,7 @@ import {
   CircleIcon,
   CircleOffIcon,
   CopyIcon,
+  EyeClosedIcon,
   EyeIcon,
   EyeOffIcon,
   FolderPlusIcon,
@@ -148,7 +149,7 @@ export const LayerGroupContextMenu = ({
     }
   }, [menuOpen, onClose]);
   const handleToggleEnabled = useCallback(
-    () => patch(t('widgets.layers.actions.toggleVisibility'), { isEnabled: !group.isEnabled }),
+    () => patch(t('widgets.layers.actions.toggleActive'), { isEnabled: !group.isEnabled }),
     [group.isEnabled, patch, t]
   );
   const handleToggleLock = useCallback(
@@ -157,8 +158,9 @@ export const LayerGroupContextMenu = ({
   );
   const handleToggleHidden = useCallback(
     () =>
-      commitPrepared(t('widgets.layers.actions.toggleHidden'), (model) =>
-        model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
+      commitPrepared(
+        t(group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'),
+        (model) => model.prepare({ type: 'set-hidden', updates: [{ id: group.id, isHidden: group.isHidden !== true }] })
       ),
     [commitPrepared, group.id, group.isHidden, t]
   );
@@ -315,16 +317,18 @@ export const LayerGroupContextMenu = ({
       <Menu.Separator borderColor="border.subtle" />
       <MenuActionItem
         disabled={locked}
-        icon={group.isEnabled ? CircleOffIcon : CircleIcon}
-        label={t(group.isEnabled ? 'widgets.layers.actions.disableGroup' : 'widgets.layers.actions.enableGroup')}
+        icon={group.isEnabled ? EyeOffIcon : EyeIcon}
+        label={t(group.isEnabled ? 'widgets.layers.actions.hideGroup' : 'widgets.layers.actions.showGroup')}
         value="enabled"
         onSelect={handleToggleEnabled}
       />
       {hideable ? (
         <MenuActionItem
           disabled={locked}
-          icon={group.isHidden ? EyeIcon : EyeOffIcon}
-          label={t('widgets.layers.actions.toggleHidden')}
+          icon={group.isHidden ? EyeIcon : EyeClosedIcon}
+          label={t(
+            group.isHidden ? 'widgets.layers.actions.showGroupOnCanvas' : 'widgets.layers.actions.hideGroupOnCanvas'
+          )}
           value="hidden"
           onSelect={handleToggleHidden}
         />

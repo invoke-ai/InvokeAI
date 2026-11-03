@@ -14,6 +14,10 @@ point is `in_fit` where it is a fit point and its estimator's line admits its fe
 forward with a term on top of the line, such as the score matrix a build's SDPA kernel materializes, measures that term
 rather than the line, as a check does.
 
+A measuring process that raises -- the operation's own error, or a synchronization or a peak reset that failed
+(`measurement.measure`) -- leaves without a result line. The driving process records that point as `failed`, with the
+last line of the process's stderr, keeps it out of the point file and goes on with the next point.
+
 Nothing here imports torch at import time: a measuring process has to configure the allocator first.
 """
 
@@ -57,16 +61,18 @@ def point_line(
     provenance: str,
     windows: Sequence["FreshWindow"],
     raw: Mapping[str, Any],
+    reasons: Sequence[str] = (),
 ) -> dict[str, Any]:
-    """The output line of a measured point: a `point`, or `invalid` with the reasons of its windows.
+    """The output line of a measured point: a `point`, or `invalid` with the reasons of its windows and `reasons`.
 
     `common` holds the `MeasuredPoint` fields the measurement does not decide: estimator, version, platform, features
-    and device. `windows` are the point's fresh windows, cold first; `raw` the point's other facts.
+    and device. `windows` are the point's fresh windows, cold first; `raw` the point's other facts; `reasons` why the
+    script's own checks void the point where its windows' readings do not.
     """
     from invokeai.backend.working_memory.measurement import measured_bytes_and_method, point_reasons
     from invokeai.backend.working_memory.spec import import_estimator_modules
 
-    reasons = point_reasons(windows)
+    reasons = [*point_reasons(windows), *reasons]
     line = {"status": "invalid" if reasons else "point", "fit": point.fit, "point": dataclasses.asdict(point), **common}
     raw = {**raw, **dict(zip(("cold", "warm"), map(dataclasses.asdict, windows), strict=False))}
     if reasons:
