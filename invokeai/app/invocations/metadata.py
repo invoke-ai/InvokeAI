@@ -116,6 +116,10 @@ class MetadataItemInvocation(BaseInvocation):
     label: str = InputField(description=FieldDescriptions.metadata_item_label)
     value: Any = InputField(description=FieldDescriptions.metadata_item_value, ui_type=UIType.Any)
 
+    def _validate_invoke_fields(self) -> None:
+        if self.label is None or self.value is not None:
+            super()._validate_invoke_fields()
+
     def invoke(self, context: InvocationContext) -> MetadataItemOutput:
         return MetadataItemOutput(item=MetadataItemField(label=self.label, value=unwrap_metadata_value(self.value)))
 
@@ -158,10 +162,10 @@ class MetadataInvocation(BaseInvocation):
     def invoke(self, context: InvocationContext) -> MetadataOutput:
         if isinstance(self.items, MetadataItemField):
             # single metadata item
-            data = {self.items.label: self.items.value}
+            data = {self.items.label: self.items.value} if self.items.value is not None else {}
         else:
             # collection of metadata items
-            data = {item.label: item.value for item in self.items}
+            data = {item.label: item.value for item in self.items if item.value is not None}
 
         # add app version
         data.update({"app_version": __version__, "metadata_version": CORE_METADATA_VERSION})

@@ -1853,3 +1853,19 @@ def test_metadata_item_linked_unwraps_submodel_fields_and_does_not_mutate_input(
     item_out = MetadataItemInvocation(label="qwen3_vl_encoder", value=qwen_dict).invoke(ctx)
     assert item_out.item.value["key"] == "qwen3-vl-key"
     assert unwrap_metadata_value({"image_name": "img.png"}) == {"image_name": "img.png"}
+
+    # 4. Optional upstream output port resolving to None (e.g. anima_model_loader.qwen3_5_encoder on Anima 2B)
+    none_node = MetadataItemLinkedInvocation.model_validate(
+        {
+            "id": "meta-optional-none",
+            "type": "metadata_item_linked",
+            "metadata": {"positive_prompt": "astronaut", "qwen3_encoder": enc_id.model_dump()},
+            "label": "qwen3_5_encoder",
+            "value": None,
+        }
+    )
+    none_node._validate_invoke_fields()
+    none_out = none_node.invoke(ctx)
+    assert none_out.metadata.root["positive_prompt"] == "astronaut"
+    assert none_out.metadata.root["qwen3_encoder"]["key"] == "qwen3-vl-key"
+    assert "qwen3_5_encoder" not in none_out.metadata.root

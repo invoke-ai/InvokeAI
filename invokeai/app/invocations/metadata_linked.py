@@ -479,12 +479,19 @@ class MetadataItemLinkedInvocation(BaseInvocation, WithMetadata):
 
     _validate_custom_label = model_validator(mode="after")(validate_custom_label)
 
-    def invoke(self, context: InvocationContext) -> MetadataOutput:
-        k = self.custom_label if self.label == CUSTOM_LABEL else self.label
-        v = unwrap_metadata_value(self.value)
+    def _validate_invoke_fields(self) -> None:
+        # Upstream optional output ports (e.g. anima_model_loader.qwen3_5_encoder or sd3_model_loader.t5_encoder)
+        # resolve to None when the selected model omits that submodel; allow value=None and skip it in invoke().
+        if self.value is not None:
+            super()._validate_invoke_fields()
 
+    def invoke(self, context: InvocationContext) -> MetadataOutput:
         data: Dict[str, Any] = {} if self.metadata is None else dict(self.metadata.root)
-        data.update({str(k): v})
+        if self.value is not None:
+            k = self.custom_label if self.label == CUSTOM_LABEL else self.label
+            v = unwrap_metadata_value(self.value)
+            if v is not None:
+                data.update({str(k): v})
         data.update({"app_version": __version__})
 
         return MetadataOutput(metadata=MetadataField.model_validate(data))
