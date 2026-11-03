@@ -106,6 +106,37 @@ def test_saved_image_is_cached_independently_of_the_callers_object(disk_storage:
     assert canvas.info == {"caller": "kept"}
 
 
+def test_saving_over_an_existing_name_returns_the_new_image(disk_storage: DiskImageFileStorage):
+    disk_storage.save(Image.new("RGB", (8, 8), (10, 20, 30)), "frame.png")
+    assert disk_storage.get("frame.png").getpixel((0, 0)) == (10, 20, 30)
+
+    disk_storage.save(Image.new("RGB", (8, 8), (200, 100, 50)), "frame.png")
+
+    assert disk_storage.get("frame.png").getpixel((0, 0)) == (200, 100, 50)
+
+
+def test_a_read_that_began_before_an_overwrite_cannot_cache_the_old_file_afterwards(
+    disk_storage: DiskImageFileStorage,
+):
+    """Reads of other images push the overwritten one out of the cache (eviction does not bump the generation);
+    only the overwrite's own bump keeps the late fill of the old pixels out."""
+    old = Image.new("RGB", (8, 8), (10, 20, 30))
+    disk_storage.save(old, "frame.png")
+    path = disk_storage.get_path("frame.png")
+    _, generation = disk_storage._DiskImageFileStorage__get_cache(path)  # type: ignore[attr-defined]
+
+    disk_storage.save(Image.new("RGB", (8, 8), (200, 100, 50)), "frame.png")
+    for index in range(10):
+        other = f"other-{index}.png"
+        Image.new("RGB", (8, 8)).save(disk_storage.get_path(other), format="PNG")
+        disk_storage.get(other)
+    cache = disk_storage._DiskImageFileStorage__cache  # type: ignore[attr-defined]
+    assert path not in cache
+    disk_storage._DiskImageFileStorage__set_cache(path, old, generation)  # type: ignore[attr-defined]
+
+    assert disk_storage.get("frame.png").getpixel((0, 0)) == (200, 100, 50)
+
+
 def test_directory_traversal_protection(tmp_path: Path, image_names: list[str]):
     """Test that the image file storage prevents directory traversal attacks.
 
