@@ -7,7 +7,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
-import { getDefaultVideoSettings } from '@features/video';
+import { getDefaultVideoSettings, normalizeVideoWidgetValues } from '@features/video';
 import { VideoWidgetView } from '@features/video/ui/VideoWidgetView';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -504,5 +504,49 @@ describe('video model field without a model', () => {
     await renderEmpty();
 
     expect(host.textContent).toContain('Select a Wan 2.2, LTX-2 or MiniMax H3 model.');
+  });
+});
+
+describe('the dynamic prompts decision on first mount', () => {
+  const mount = () =>
+    act(() =>
+      root.render(
+        <I18nextProvider i18n={i18n}>
+          <QueryClientProvider client={new QueryClient()}>
+            <ChakraProvider value={system}>
+              <GenerationUiProvider adapter={generationAdapter}>
+                <VideoUiAdapterProvider>
+                  <VideoWidgetView />
+                </VideoUiAdapterProvider>
+              </GenerationUiProvider>
+            </ChakraProvider>
+          </QueryClientProvider>
+        </I18nextProvider>
+      )
+    );
+
+  it('keeps a new panel expanding prompts when a partial edit lands before any model is installed', async () => {
+    modelStore.set([]);
+    await mount();
+
+    // A prompt resize: the first field a seeded panel stores, written alone.
+    store.commands.widgets.patchValues('video', { positivePromptHeightPx: 150 });
+
+    expect(normalizeVideoWidgetValues(stored())?.dynamicPromptsEnabled).toBe(true);
+  });
+
+  it('records a panel saved before Video expanded prompts as off', async () => {
+    const saved: Record<string, unknown> = {
+      ...getDefaultVideoSettings(ltxDev as never, catalog as never),
+      model: ltxDev,
+      modelKey: ltxDev.key,
+    };
+    for (const key of Object.keys(saved).filter((name) => name.startsWith('dynamicPrompts'))) {
+      delete saved[key];
+    }
+    store.commands.widgets.patchValues('video', saved);
+    await mount();
+
+    expect((stored() as unknown as Record<string, unknown>).dynamicPromptsEnabled).toBe(false);
   });
 });

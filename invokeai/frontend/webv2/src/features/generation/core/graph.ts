@@ -21,7 +21,7 @@ import {
   coerceSchedulerForGraph,
   getExternalModeReason,
   getExternalProviderNodeType,
-  getFlux2DiffusersComponentSource,
+  getFlux2ComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
   isStrengthOnlyIPAdapterBase,
@@ -31,6 +31,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
@@ -758,8 +759,8 @@ const buildFlux2Graph = (
   projectSettings: GenerationProjectSettings
 ): BackendGraphContract => {
   const isDev = model.variant === 'dev';
-  const sourceModel = getFlux2DiffusersComponentSource(model, settings);
-  const hasBundledComponents = isBundledMainForBase('flux2')(model) || sourceModel;
+  const sourceModel = getFlux2ComponentSource(model, settings);
+  const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
   const mistralEncoderModel =
     settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
       ? settings.mistralEncoderModel
@@ -773,7 +774,7 @@ const buildFlux2Graph = (
 
   if (!hasBundledComponents && (!vaeModel || !encoderModel)) {
     throw new Error(
-      `FLUX.2 non-Diffusers models require a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a compatible Diffusers component source.`
+      `This FLUX.2 model needs a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a FLUX.2 pipeline its loader can take them from.`
     );
   }
 
