@@ -20,7 +20,12 @@ export interface VideoFramePickerProps {
 
 const showPausedAt = (video: HTMLVideoElement, seconds: number) => {
   video.pause();
-  video.currentTime = seconds;
+
+  try {
+    video.currentTime = seconds;
+  } catch {
+    // Some browsers throw while nothing is seekable yet; the element keeps its position.
+  }
 };
 
 /**
