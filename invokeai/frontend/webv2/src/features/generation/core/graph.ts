@@ -2173,6 +2173,10 @@ export const GRAPH_BUILDERS = {
   wan: buildWanGraph,
 } satisfies Record<SupportedGenerateBase, GenerateGraphBuilder>;
 
+/** The builder for a base, or null. Own keys only: a base from the API must not reach `Object.prototype` members. */
+export const getFamilyGraphBuilder = (base: string): GenerateGraphBuilder | null =>
+  Object.hasOwn(GRAPH_BUILDERS, base) ? GRAPH_BUILDERS[base as SupportedGenerateBase] : null;
+
 export const compileGenerateGraph = (
   settings: GenerateSettings,
   model: GenerateModelConfig,
@@ -2193,7 +2197,7 @@ export const compileGenerateGraph = (
       return buildExternalGraph(settings, model, outputIsIntermediate, runtimeProjectSettings);
     }
 
-    const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+    const builder = getFamilyGraphBuilder(model.base);
 
     if (!builder) {
       const dimensionGrid = getGenerationDimensions(model).grid;

@@ -18,7 +18,7 @@ import {
   isExternalGenerationMode,
   isExternalTextOnlyCanvasModel,
 } from '@features/generation/core/externalProvider';
-import { buildExternalGraph, GRAPH_BUILDERS } from '@features/generation/core/graph';
+import { buildExternalGraph, getFamilyGraphBuilder } from '@features/generation/core/graph';
 import {
   addEdge,
   addNode,
@@ -1015,7 +1015,7 @@ export const compileCanvasGraph = (input: CompileCanvasGraphInput): CompiledCanv
     };
   }
 
-  const builder = GRAPH_BUILDERS[model.base as SupportedGenerateBase];
+  const builder = getFamilyGraphBuilder(model.base);
 
   if (!builder) {
     throw new Error(`Canvas generation is not supported for ${model.name}.`);

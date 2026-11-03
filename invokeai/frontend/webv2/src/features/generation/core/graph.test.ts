@@ -17,7 +17,7 @@ import {
   isSupportedGenerateModel,
   type SupportedGenerateBase,
 } from './baseGenerationPolicies';
-import { compileGenerateGraph, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
+import { compileGenerateGraph, getFamilyGraphBuilder, GRAPH_BUILDERS, resolveGenerateSeed } from './graph';
 import {
   fullyFilledSettingsFor,
   generateGraphCases,
@@ -1165,6 +1165,15 @@ describe('compileGenerateGraph', () => {
         ['denoise_latents', 'canvas_output'],
       ]);
     });
+  });
+});
+
+describe('getFamilyGraphBuilder', () => {
+  it('returns builders for supported bases only, never Object.prototype members', () => {
+    expect(getFamilyGraphBuilder('sdxl')).toBeTypeOf('function');
+    expect(getFamilyGraphBuilder('constructor')).toBeNull();
+    expect(getFamilyGraphBuilder('toString')).toBeNull();
+    expect(getFamilyGraphBuilder('__proto__')).toBeNull();
   });
 });
 
