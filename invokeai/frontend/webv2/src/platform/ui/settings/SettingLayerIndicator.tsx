@@ -43,9 +43,11 @@ export const SettingLayerIndicator = ({ label, layer }: { label: string; layer: 
   const handleResetClick = useCallback(
     (event: MouseEvent) => {
       event.preventDefault();
-      select(layer.onResetToBuiltIn!)();
+      if (layer.state === 'default' && layer.onResetToBuiltIn) {
+        select(layer.onResetToBuiltIn)();
+      }
     },
-    [layer.onResetToBuiltIn, select]
+    [layer, select]
   );
   const pinned = layer.state === 'pinned';
   // The tooltip sits beside the label, so it stays short; the accessible name says which setting it belongs to, and
