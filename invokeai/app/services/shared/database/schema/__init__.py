@@ -13,6 +13,7 @@ from invokeai.app.services.shared.database.schema import (  # noqa: F401
     fonts,
     image_index,
     image_moves,
+    image_precise_assets,
     images,
     intermediates,
     locks,
