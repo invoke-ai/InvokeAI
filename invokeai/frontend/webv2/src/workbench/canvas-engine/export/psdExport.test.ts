@@ -393,7 +393,7 @@ describe('executePsdExport — adjustments', () => {
       layer({
         adjustments: own,
         contentRect,
-        groupAdjustments: enclosing,
+        groupStacks: [{ adjustments: enclosing, id: 'g' }],
         transform: { rotation: 0, scaleX: 0.5, scaleY: 0.5, x: 9, y: 6 },
       }),
     ]);

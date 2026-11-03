@@ -52,6 +52,7 @@ from invokeai.app.api.routers import (
     virtual_boards,
     wildcards,
     workflows,
+    working_memory,
 )
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.config.config_default import get_config
@@ -786,6 +787,7 @@ app.include_router(auth.auth_router, prefix="/api")
 app.include_router(utilities.utilities_router, prefix="/api")
 app.include_router(fonts.fonts_router, prefix="/api")
 app.include_router(model_manager.model_manager_router, prefix="/api")
+app.include_router(working_memory.working_memory_router, prefix="/api")
 app.include_router(image_moves.image_moves_router, prefix="/api")
 app.include_router(images.images_router, prefix="/api")
 app.include_router(image_map.image_map_router, prefix="/api")

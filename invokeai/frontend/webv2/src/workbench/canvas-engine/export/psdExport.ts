@@ -16,8 +16,13 @@ import type { BlendMode, Layer as AgPsdLayer, Psd } from 'ag-psd';
 import { downloadBlob } from '@platform/browser/downloadBlob';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
-import { applyAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
+import {
+  adjustExactly,
+  AdjustmentRefusedError,
+  imageDataOf,
+  type SpatialRunner,
+} from '@workbench/canvas-engine/render/exactAdjustments';
 
 /** Cap exports at the legacy PSD 30000px side limit to bound unbounded-canvas allocations. */
 export const PSD_MAX_DIMENSION = 30000;
@@ -75,9 +80,15 @@ export interface PsdExportLayerInput {
   adjustments?: CanvasAdjustmentsContract;
   /**
    * Enclosing group stacks, innermost first, baked after the layer's own: PSD cannot represent them. They work in
-   * document pixels, as the groups do.
+   * document pixels, as the groups do, but on this layer's pixels alone: an approximation of the group composite.
    */
-  groupAdjustments?: CanvasAdjustmentsContract;
+  groupStacks?: readonly PsdGroupStack[];
+}
+
+/** One enclosing group's own stack, named for a refusal. */
+export interface PsdGroupStack {
+  readonly id: string;
+  readonly adjustments: CanvasAdjustmentsContract;
 }
 
 /** A raster group: a folder in the PSD, children top-first. */
@@ -127,7 +138,7 @@ export interface PsdPlanLayer {
   contributes: boolean;
   colorLabel?: CanvasColorLabel;
   adjustments?: CanvasAdjustmentsContract;
-  groupAdjustments?: CanvasAdjustmentsContract;
+  groupStacks?: readonly PsdGroupStack[];
 }
 
 /** A planned PSD folder; `children` are in ag-psd bottom-to-top order. */
@@ -239,7 +250,7 @@ export const planPsdExport = (
     const top = worldRect.y - canvasRect.y;
     const layer: PsdPlanLayer = {
       adjustments: input.adjustments,
-      groupAdjustments: input.groupAdjustments,
+      groupStacks: input.groupStacks,
       blendMode: mapped ?? 'normal',
       bottom: top + worldRect.height,
       colorLabel: input.colorLabel,
@@ -343,6 +354,11 @@ export interface ExecutePsdExportDeps {
   backend: { createSurface(width: number, height: number): RasterSurface };
   /** Cancels before the next background allocation or side effect. */
   signal?: AbortSignal;
+  /**
+   * Evaluates spatial adjustment runs; without it a spatial stack throws {@link AdjustmentRefusedError} rather than
+   * bake without its spatial entries.
+   */
+  runSpatial?: SpatialRunner;
   /** Returns rasterized pixels and local content bounds, using live paint caches when available. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
   /** Reads a surface region's pixels (default `getImageData`). */
@@ -366,11 +382,29 @@ const throwIfAborted = (signal?: AbortSignal): void => {
   }
 };
 
+/** The whole stack on `pixels` at `origin`; throws when `ownerId`'s stack cannot run or the export was aborted. */
+const evaluate = async (
+  pixels: ImageData,
+  adjustments: CanvasAdjustmentsContract,
+  origin: Rect,
+  ownerId: string,
+  deps: ExecutePsdExportDeps
+): Promise<ImageData> => {
+  const result = await adjustExactly(pixels, adjustments, origin, { run: deps.runSpatial, signal: deps.signal });
+  if (result.status === 'aborted') {
+    throw new DOMException('PSD export was aborted.', 'AbortError');
+  }
+  if (result.status !== 'ok') {
+    throw new AdjustmentRefusedError(ownerId, result.status);
+  }
+  return result.data === pixels.data ? pixels : imageDataOf(result.data, pixels.width, pixels.height);
+};
+
 /**
  * Bakes transformed pixels and adjustments into world-AABB bounds, returning surface and straight-alpha ImageData.
- * The layer's own stack adjusts layer-local pixels before the transform resamples them, as the display does; the
- * enclosing group stacks then adjust the world pixels, which are document pixels at scale 1. Opacity/blend remain
- * PSD properties.
+ * The layer's own stack adjusts all its layer-local pixels before the transform resamples them, as the display does,
+ * spatial entries included; the enclosing group stacks then adjust the world pixels, which are document pixels at
+ * scale 1. Opacity/blend remain PSD properties.
  */
 const bakeLayer = async (
   planLayer: PsdPlanLayer,
@@ -395,8 +429,7 @@ const bakeLayer = async (
     setTransform(source.ctx, { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
     source.ctx.drawImage(cache.canvas, 0, 0);
     const localPixels = read(source, { height: rect.height, width: rect.width, x: 0, y: 0 });
-    applyAdjustments(localPixels, planLayer.adjustments, rect);
-    write(source, localPixels, 0, 0);
+    write(source, await evaluate(localPixels, planLayer.adjustments, rect, planLayer.id, deps), 0, 0);
   }
   // local→world then shift into AABB-local (translation only affects e/f).
   const local = layerMatrix(planLayer.transform);
@@ -407,9 +440,11 @@ const bakeLayer = async (
   }
 
   const fullRect: Rect = { height, width, x: 0, y: 0 };
-  const imageData = read(surface, fullRect);
-  if (planLayer.groupAdjustments) {
-    applyAdjustments(imageData, planLayer.groupAdjustments, worldRect);
+  let imageData = read(surface, fullRect);
+  if (planLayer.groupStacks && planLayer.groupStacks.length > 0) {
+    for (const stack of planLayer.groupStacks) {
+      imageData = await evaluate(imageData, stack.adjustments, worldRect, stack.id, deps);
+    }
     // Write the adjusted pixels back so the flattened composite (below) reuses
     // this surface directly.
     write(surface, imageData, 0, 0);

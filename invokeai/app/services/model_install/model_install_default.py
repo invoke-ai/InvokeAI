@@ -1,6 +1,5 @@
 """Model installation class."""
 
-import ctypes
 import errno
 import filecmp
 import gc
@@ -8,7 +7,6 @@ import locale
 import os
 import re
 import ssl
-import sys
 import threading
 import time
 from copy import deepcopy
@@ -61,6 +59,7 @@ from invokeai.app.services.model_install.model_install_common import (
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+from invokeai.app.util.no_replace import rename_noreplace
 from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.ssrf import UnsafeDownloadURLException
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
@@ -510,14 +509,24 @@ class ModelInstallService(ModelInstallServiceBase):
             return self._single_hf_file_token(source)
         return source.access_token
 
+    def _download_token_for(
+        self, source: HFModelSource | URLModelSource, trusted_endpoint: Optional[str] = None
+    ) -> Callable[[str], Optional[str]]:
+        """The token a download of a URL of this source sends: `_download_access_token`, else the `remote_api_tokens`
+        entry that the download queue matches against that URL. Requests made to list a repository's files send it
+        too, so a gated repository that will serve the files also serves its index."""
+        return lambda url: self._download_access_token(source, trusted_endpoint) or self._configured_api_token(url)
+
     def _single_hf_file_token(self, source: URLModelSource) -> Optional[str]:
         """The token a download of this source's file sends: the source's own, else the configured `remote_api_tokens`
         entry matching the URL as the user gave it. The download URL names a commit instead, so the token is resolved
         here, once, and sent explicitly."""
-        if source.access_token:
-            return source.access_token
+        return source.access_token or self._configured_api_token(str(source.url))
+
+    def _configured_api_token(self, url: str) -> Optional[str]:
+        """The token of the first `remote_api_tokens` entry whose pattern matches `url`."""
         for pair in self._app_config.remote_api_tokens or []:
-            if re.search(pair.url_regex, str(source.url)):
+            if re.search(pair.url_regex, url):
                 return pair.token
         return None
 
@@ -918,45 +927,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 time.sleep(delay)
                 delay *= 2  # Exponential backoff
 
-    @staticmethod
-    def _rename_noreplace(src: Path, dst: Path) -> None:
-        """Atomically restore a path only if its destination is still absent."""
-        if sys.platform.startswith("linux"):
-            libc = ctypes.CDLL(None, use_errno=True)
-            renameat2 = getattr(libc, "renameat2", None)
-            if renameat2 is None:
-                raise OSError("atomic no-replace rename is unavailable")
-            renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
-            renameat2.restype = ctypes.c_int
-            result = renameat2(-100, os.fsencode(src), -100, os.fsencode(dst), 1)  # AT_FDCWD, RENAME_NOREPLACE
-            if result != 0:
-                error = ctypes.get_errno()
-                raise OSError(error, os.strerror(error), str(dst))
-            return
-        if sys.platform == "darwin":
-            libc = ctypes.CDLL(None, use_errno=True)
-            renamex_np = getattr(libc, "renamex_np", None)
-            if renamex_np is None:
-                raise OSError("atomic no-replace rename is unavailable")
-            renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
-            renamex_np.restype = ctypes.c_int
-            result = renamex_np(os.fsencode(src), os.fsencode(dst), 0x00000004)  # RENAME_EXCL
-            if result != 0:
-                error = ctypes.get_errno()
-                raise OSError(error, os.strerror(error), str(dst))
-            return
-        if os.name == "nt":
-            # Windows rename fails when the destination already exists.
-            os.rename(src, dst)
-            return
-        raise OSError("atomic no-replace rename is unavailable on this platform")
-
     @classmethod
     def _restore_moved_path(cls, src: Path, dst: Path) -> None:
         if dst.exists() or dst.is_symlink():
             raise FileExistsError(f"Refusing to overwrite recreated source {dst}")
         try:
-            cls._rename_noreplace(src, dst)
+            rename_noreplace(src, dst)
         except OSError as e:
             if e.errno != errno.EXDEV:
                 raise
@@ -973,7 +949,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     copy2(src, staged_path)
                 else:
                     raise OSError(f"Cannot restore unsupported filesystem object {src}")
-                cls._rename_noreplace(staged_path, dst)
+                rename_noreplace(staged_path, dst)
                 if src.is_dir() and not src.is_symlink():
                     rmtree(src)
                 else:
@@ -1652,6 +1628,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     subfolder=source.subfolder if len(subfolders) <= 1 else None,
                     subfolders=subfolders if len(subfolders) > 1 else None,
                     session=self._session,
+                    access_token_for=self._download_token_for(source, trusted_endpoint),
                 ),
                 metadata,
             )
@@ -1662,7 +1639,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 kwargs: dict[str, Any] = {"session": self._session}
                 metadata = fetcher(**kwargs).from_url(source.url, revision=revision, pin_to_commit=True)
                 assert isinstance(metadata, ModelMetadataWithFiles)
-                return metadata.download_urls(session=self._session), metadata
+                return (
+                    metadata.download_urls(
+                        session=self._session, access_token_for=self._download_token_for(source, trusted_endpoint)
+                    ),
+                    metadata,
+                )
             except ValueError:
                 pass
 

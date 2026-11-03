@@ -58,11 +58,11 @@ A module shared by eager and lazy code got its own chunk, or one owner imports i
 
 ### Route bytes grew
 
-Locale strings count: `en.json` is part of each route's `otherAssetRawBytes`. New strings need a reviewed re-record.
+Locale strings count in the browser gate: `en.json` is part of each route's `otherRawBytes` (locale plus `index.html`). The build gate's `otherAssetRawBytes` does not include it. New strings need a reviewed browser re-record.
 
 ### Finding a new startup request
 
-Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. Run `pnpm test:performance:browser:profile` to collect traces for passing routes. `dist/.vite/chunk-sources.json` maps chunks to sources; `vite build --minify false` keeps `//#region` module markers.
+Build `main` in a separate worktree; compare hash-stripped `dist/assets/*.js` names with the branch build. Names only in the branch build that also appear in the route trace (`artifacts/architecture-performance/traces/<fixture>-<profile>.zip`, `trace.network` URLs) are the extra requests. Run `pnpm test:performance:browser:profile` to collect traces for passing routes. `dist/.vite/chunk-sources.json` maps each chunk to its source modules and packages; diff it between the two builds to see which modules moved between chunks. Unminified builds no longer carry `//#region` module markers.
 
 ## Remediation tickets
 

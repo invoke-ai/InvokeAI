@@ -4,8 +4,10 @@ import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import i18next from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page } from 'vitest/browser';
 
@@ -65,11 +67,17 @@ const models = vi.hoisted(() => {
         return () => listeners.delete(listener);
       },
     },
+    canManageAppConfig: true,
     canManageModels: true,
     ensureStartersLoaded: vi.fn(),
     openAddModelsSearch: vi.fn(),
   };
 });
+
+vi.mock('@features/identity', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useCapabilities: () => ({ canManageAppConfig: models.canManageAppConfig, canManageModels: models.canManageModels }),
+}));
 
 vi.mock('@features/models', async (importOriginal) => {
   const { useSyncExternalStore } = await import('react');
@@ -131,6 +139,13 @@ import {
 } from '@workbench/image-map/imageMapStore';
 
 import { ImageMapWidgetView } from './ImageMapWidgetView';
+
+// The components read the global instance; give it the English catalog.
+await i18next.use(initReactI18next).init({
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -220,6 +235,7 @@ beforeEach(() => {
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
+  models.canManageAppConfig = true;
   models.canManageModels = true;
   host = document.createElement('div');
   document.body.append(host);
@@ -267,6 +283,17 @@ describe('Image Map unavailable states', () => {
       expect(buttonLabels()).toEqual(['Retry']);
     }
   );
+});
+
+describe('Image Map for a session that cannot change the server', () => {
+  it('says whom to ask instead of naming a configuration file', async () => {
+    models.canManageAppConfig = false;
+    await renderState('disabled');
+
+    expect(host?.textContent).toContain('Image indexing is off');
+    expect(host?.textContent).toContain('Ask an administrator to turn it on.');
+    expect(host?.textContent).not.toContain('image_index_enabled');
+  });
 });
 
 describe('Image Map media filter', () => {
@@ -403,8 +430,9 @@ describe('Image Map missing-model link', () => {
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
     expect(host?.textContent).toContain(
-      'install the image encoder model DFN2B-CLIP-ViT-L-14-39B from the Model Manager'
+      'Image indexing needs the image encoder model DFN2B-CLIP-ViT-L-14-39B. Ask an administrator to install it.'
     );
+    expect(host?.textContent).not.toContain('Model Manager');
     expect(buttonLabels()).toEqual(['Check again']);
   });
 

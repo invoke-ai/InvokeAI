@@ -16,7 +16,11 @@ from typing import Any, Literal, Self
 
 from pydantic import Field
 
-from invokeai.backend.model_manager.configs.backbone_names import backbone_from_components, name_components
+from invokeai.backend.model_manager.configs.backbone_names import (
+    backbone_from_components,
+    folder_names,
+    name_components,
+)
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     InvalidMatchError,
@@ -223,7 +227,7 @@ def _variant_from_components(
     return _SINGLE_VARIANT_BACKBONES.get(base, PiDDecoderVariantType.Res2k_Sr4x)
 
 
-def _raise_if_named_undistilled(components: tuple[str, ...], folder_name: str) -> None:
+def _raise_if_named_undistilled(components: tuple[str, ...], folders: frozenset[str]) -> None:
     """Reject a v1.5 decoder whose name marks it as NVIDIA's undistilled teacher.
 
     NVIDIA published each v1.5 decoder twice: the 4-step distilled student the decode nodes sample, and the
@@ -233,12 +237,12 @@ def _raise_if_named_undistilled(components: tuple[str, ...], folder_name: str) -
     neither is accepted.
 
     Comfy-Org's spelling marks the teacher by what its file name lacks, so it is only read off file names — the
-    last segment of the file's own name or of its install source — never off ``folder_name``, the folder a local
-    install is identified in, which a user may well have named `pid_1.5_decoders`.
+    last segment of the file's own name or of its install source — never off ``folders``, the folder a local
+    install is identified in and the one it was installed from, which a user may well have named `pid_1.5_decoders`.
     """
     for component in components:
         n = component.lower()
-        file_name = "" if component == folder_name else n.replace("\\", "/").rsplit("/", 1)[-1]
+        file_name = "" if component in folders else n.replace("\\", "/").rsplit("/", 1)[-1]
         if "undistilled" in n or (file_name.startswith("pid_1.5_") and "4step" not in file_name):
             raise InvalidMatchError(
                 f"PiD v1.5 checkpoint {component!r} is named as an undistilled (teacher) decoder. InvokeAI samples "
@@ -373,7 +377,7 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         latent_channels = shapes[_LATENT_PROJ_KEY][1]  # type: ignore[index]
         components = name_components(mod, override_fields)
         if version is PiDVersion.V1_5:
-            _raise_if_named_undistilled(components, mod.path.parent.name)
+            _raise_if_named_undistilled(components, folder_names(mod, override_fields))
 
         cls._validate_base(
             latent_channels=latent_channels,

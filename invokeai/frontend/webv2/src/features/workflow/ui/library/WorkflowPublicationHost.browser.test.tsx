@@ -1,10 +1,14 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowRecordDTO } from '@features/workflow/data/api';
-import type { WorkflowReadPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
+import type {
+  WorkflowGraphPreviewPort,
+  WorkflowReadPort,
+  WorkflowUiAdapter,
+} from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowLibraryWriteRefusedError } from '@features/workflow/data/api';
-import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { requestWorkflowPublication, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -14,6 +18,7 @@ import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { loadGraphPreview } from './libraryPreviewSource';
 import { WorkflowPublicationHost } from './WorkflowPublicationHost';
 
 /**
@@ -151,6 +156,13 @@ const LINKED_UNKNOWN: ProjectWorkflowEntry = {
 };
 const BUNDLED: ProjectWorkflowEntry = { ...UNLINKED, source: { libraryWorkflowId: 'default_alpha', revision: 1 } };
 const OTHER: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-2'), name: 'Beta' } };
+const GRAPH_PREVIEW: WorkflowGraphPreviewPort = {
+  focusSource: vi.fn(),
+  getRoute: () => null,
+  invoke: () => Promise.resolve(false),
+  openDocumentInNewProject: vi.fn(),
+  openWorkflowEditor: vi.fn(),
+};
 
 const projectSnapshot = (workflows: readonly ProjectWorkflowEntry[]) => ({
   activeWorkflow: workflows[0]!,
@@ -228,7 +240,9 @@ describe('WorkflowPublicationHost', () => {
           <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
             <ChakraProvider value={system}>
               <WorkflowUiProvider adapter={adapter}>
-                <WorkflowPublicationHost />
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowPublicationHost />
+                </WorkflowGraphPreviewProvider>
               </WorkflowUiProvider>
             </ChakraProvider>
           </QueryClientProvider>
@@ -633,6 +647,31 @@ describe('WorkflowPublicationHost', () => {
     );
     expect(notifications.success).toHaveBeenCalledWith('Workflow saved', 'Updated "Alpha" in the library.');
     expect(dialogs()).toHaveLength(0);
+  });
+
+  it('dates the revision against the arriving review record instead of the loading view mount', async () => {
+    await loadGraphPreview();
+    vi.useFakeTimers({ toFake: ['Date'] });
+
+    try {
+      vi.setSystemTime(new Date('2026-10-20T10:00:00Z'));
+      const pendingRecord = deferred<WorkflowRecordDTO>();
+      api.getLibraryWorkflowRecord.mockReturnValue(pendingRecord.promise);
+      await renderHost([LINKED_UNKNOWN]);
+      await request('update-source');
+      await click(choice('review'));
+      expect(reviewDialog()?.textContent).toContain('Loading the current template…');
+
+      vi.setSystemTime(new Date('2026-10-20T12:00:00Z'));
+      await act(async () => {
+        pendingRecord.resolve(record({ revision: 5, updated_at: '2026-10-20T10:05:00Z' }));
+        await settleFrame();
+      });
+
+      expect(reviewDialog()?.textContent).toContain('Revision 5 · updated 2 hours ago');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('lets a conflict be resolved by saving as a new template instead', async () => {

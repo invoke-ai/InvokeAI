@@ -120,11 +120,11 @@ def is_flux_family_vae(vae: Any) -> bool:
     latent width, so the channel count alone does not separate them either.
 
     What does separate them is the normalisation, and that is also exactly what a caller of this
-    depends on: `pid_upscale` undoes `scale * (raw - shift)` with the constants from
-    `get_flux_ae_params()`, and a VAE that used different ones hands it a latent that means something
-    else. So the test is on the constants themselves -- Z-Image passes, because it is the same
-    autoencoder (`_name_or_path: "flux-dev"` in its published config); SD 3.5 does not, because its
-    `scaling_factor` is 1.5305.
+    depends on: `pid_upscale` hands the encoded latent to a PiD decoder trained on
+    `scale * (raw - shift)` with the constants from `get_flux_ae_params()`, and a VAE that used
+    different ones hands it a latent that means something else. So the test is on the constants
+    themselves -- Z-Image passes, because it is the same autoencoder (`_name_or_path: "flux-dev"` in
+    its published config); SD 3.5 does not, because its `scaling_factor` is 1.5305.
     """
     config = getattr(vae, "config", None)
     return config is not None and is_flux_family_vae_config(config)

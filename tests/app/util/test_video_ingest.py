@@ -79,6 +79,7 @@ def m4a_audio(fixture_dir: Path) -> Path:
     )
 
 
+@pytest.mark.ffmpeg
 def test_probe_reports_video_and_audio_codecs(h264_mov: Path, wav_audio: Path) -> None:
     probe = probe_media_streams(h264_mov)
     assert probe.video_codec == "h264"
@@ -89,6 +90,7 @@ def test_probe_reports_video_and_audio_codecs(h264_mov: Path, wav_audio: Path) -
     assert probe.audio_codec is not None
 
 
+@pytest.mark.ffmpeg
 def test_probe_rejects_unreadable_bytes(tmp_path: Path) -> None:
     garbage = tmp_path / "garbage.mov"
     garbage.write_bytes(b"this is not media" * 64)
@@ -104,6 +106,7 @@ def test_plan_covers_each_stream_layout() -> None:
         plan_ingest(MediaProbe(video_codec=None, audio_codec=None))
 
 
+@pytest.mark.ffmpeg
 def test_h264_foreign_container_is_remuxed(h264_mov: Path, tmp_path: Path) -> None:
     dst = tmp_path / "out.mp4"
     assert ingest_media_to_mp4(h264_mov, dst, max_output_bytes=GB) == "remux"
@@ -113,6 +116,7 @@ def test_h264_foreign_container_is_remuxed(h264_mov: Path, tmp_path: Path) -> No
     assert pcm is not None, "the AAC track must survive the remux"
 
 
+@pytest.mark.ffmpeg
 def test_foreign_codec_is_transcoded_to_h264(mpeg4_avi: Path, tmp_path: Path) -> None:
     dst = tmp_path / "out.mp4"
     assert ingest_media_to_mp4(mpeg4_avi, dst, max_output_bytes=GB) == "transcode"
@@ -120,6 +124,7 @@ def test_foreign_codec_is_transcoded_to_h264(mpeg4_avi: Path, tmp_path: Path) ->
     assert (width, height, codec) == (64, 48, "h264")
 
 
+@pytest.mark.ffmpeg
 def test_odd_dimensions_are_evened_for_yuv420p(fixture_dir: Path, tmp_path: Path) -> None:
     src = _make_media(
         fixture_dir / "odd.avi",
@@ -132,6 +137,7 @@ def test_odd_dimensions_are_evened_for_yuv420p(fixture_dir: Path, tmp_path: Path
     assert (width, height, codec) == (62, 46, "h264")
 
 
+@pytest.mark.ffmpeg
 @pytest.mark.parametrize("fixture_name", ["wav_audio", "m4a_audio"])
 def test_audio_only_uploads_are_wrapped_into_waveform_videos(
     fixture_name: str, tmp_path: Path, request: pytest.FixtureRequest
@@ -148,6 +154,7 @@ def test_audio_only_uploads_are_wrapped_into_waveform_videos(
     assert pcm is not None
 
 
+@pytest.mark.ffmpeg
 def test_album_art_does_not_make_an_audio_file_a_video(fixture_dir: Path, tmp_path: Path) -> None:
     """An m4a with embedded cover art carries a real (attached-pic) video stream; it must
     still be classified audio-only and wrapped, not 'transcoded' into a still image."""
@@ -181,6 +188,7 @@ def test_album_art_does_not_make_an_audio_file_a_video(fixture_dir: Path, tmp_pa
     assert ingest_media_to_mp4(src, dst, max_output_bytes=GB) == "audio_wrap"
 
 
+@pytest.mark.ffmpeg
 def test_unreadable_input_raises_user_safe_error(tmp_path: Path) -> None:
     garbage = tmp_path / "garbage.mp3"
     garbage.write_bytes(b"\x00" * 1024)
@@ -189,6 +197,7 @@ def test_unreadable_input_raises_user_safe_error(tmp_path: Path) -> None:
     assert not (tmp_path / "out.mp4").exists() or (tmp_path / "out.mp4").stat().st_size == 0
 
 
+@pytest.mark.ffmpeg
 def test_output_size_cap_is_enforced(h264_mov: Path, tmp_path: Path) -> None:
     with pytest.raises(VideoIngestError, match="maximum upload size"):
         ingest_media_to_mp4(h264_mov, tmp_path / "out.mp4", max_output_bytes=64)

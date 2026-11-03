@@ -10,8 +10,8 @@ Values are `(shape, dtype)`.
 A different design from the Fun branch: a trimmed copy of the Qwen-Image transformer itself (`img_in`,
 `txt_in` at Qwen2.5-VL's 3584 width, `txt_norm`, `time_text_embed`, `transformer_blocks.N`) with
 `controlnet_x_embedder` for the control latent and one `controlnet_blocks.N` output projection per block --
-the key family InstantX's FLUX ControlNets use. It has no `control_img_in`, which is what keeps it out of
-the Qwen-Image Fun config.
+the key family InstantX's FLUX ControlNets use, which is why the FLUX probe has to refuse it. The full file
+has five of each stack.
 """
 
 state_dict_keys: dict[str, tuple[list[int], str]] = {

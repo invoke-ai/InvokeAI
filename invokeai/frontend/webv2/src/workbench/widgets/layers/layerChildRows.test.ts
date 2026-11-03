@@ -340,6 +340,25 @@ describe('adjustment rows', () => {
     expect(layerChildRemoveLabelKey('adjustment-noise')).toBe('widgets.layers.modifiers.removeAdjustment');
   });
 
+  it('projects clarity, texture and dehaze entries with their signed amount as a plain strength', () => {
+    const rows = projectLayerChildRows(
+      rasterRow(
+        documentFrom([
+          rasterWith([
+            { amount: 35.4, id: 'c1', isEnabled: true, size: 40, type: 'clarity' },
+            { amount: -120, id: 't1', isEnabled: false, size: 8, type: 'texture' },
+            { amount: 0, id: 'd1', isEnabled: true, type: 'dehaze' },
+          ]),
+        ])
+      ).vm
+    );
+    expect(rows.map((row) => [row.kind, row.itemId, row.isEnabled, row.detail])).toEqual([
+      ['adjustment-clarity', 'c1', true, '+35'],
+      ['adjustment-texture', 't1', false, '-120'],
+      ['adjustment-dehaze', 'd1', true, '0'],
+    ]);
+  });
+
   it('renames an entry, clears the name with null, and refuses no-op renames and non-adjustment kinds', () => {
     const document = documentFrom([rasterWith(), regionalWith([referenceImage('ref1')])]);
     const named = layerChildRowCommand(document, { itemId: 'a1', layerId: 'r1' }, { name: 'Warm up', type: 'rename' });

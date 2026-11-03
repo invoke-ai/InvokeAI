@@ -256,7 +256,6 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         boardsState={data.boardsState}
         filter={data.filter}
         gallery={gallery}
-        isWindowTruncated={data.isWindowTruncated}
         listing={data.listing}
         loadedItems={loadedItems}
         projectId={projectId}
@@ -309,7 +308,6 @@ const GalleryWidgetContent = ({
   boardsState,
   filter,
   gallery,
-  isWindowTruncated,
   listing,
   loadedItems,
   pinRevealIndex,
@@ -327,7 +325,6 @@ const GalleryWidgetContent = ({
   boardsState: GalleryReadState;
   filter: GalleryItemsFilter;
   gallery: GalleryStateView;
-  isWindowTruncated: boolean;
   listing: GalleryListingState;
   loadedItems: GalleryItem[];
   pinRevealIndex: GalleryData['pinRevealIndex'];
@@ -357,7 +354,6 @@ const GalleryWidgetContent = ({
       boardsState,
       filter,
       gallery,
-      isWindowTruncated,
       itemActions,
       listing,
       loadedItems,
@@ -377,7 +373,6 @@ const GalleryWidgetContent = ({
       boardsState,
       filter,
       gallery,
-      isWindowTruncated,
       itemActions,
       listing,
       loadedItems,

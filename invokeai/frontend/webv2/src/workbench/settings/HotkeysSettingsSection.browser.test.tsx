@@ -67,7 +67,7 @@ describe('HotkeysSettingsSection conflicts', () => {
   // widget types; a Canvas binding on the same key meets neither.
   it('flags a binding that shares its key with a multi-widget shortcut on any of that shortcut’s widgets', async () => {
     await patchWorkbenchPreferences({
-      customHotkeys: { 'canvas.selectBrushTool': ['s'], 'gallery.toggleStarredOnly': ['s'] },
+      customHotkeys: { 'canvas.tool.brush': ['s'], 'gallery.toggleStarredOnly': ['s'] },
     });
     await render();
 
@@ -78,6 +78,27 @@ describe('HotkeysSettingsSection conflicts', () => {
     await act(() => search().fill('brush'));
     await expect.element(page.getByText('Select Brush Tool', { exact: true })).toBeVisible();
     await expect.element(conflictText('Recall Seed')).not.toBeInTheDocument();
+    await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
+  });
+
+  // Canvas binds T to its text tool, so a bare T toggles the left panel everywhere but the Canvas. Neither blocks the
+  // other; both rows say so.
+  it('notes on both rows when a widget key takes a global key while the widget has focus', async () => {
+    await render();
+
+    await act(() => search().fill('text tool'));
+    await expect
+      .element(
+        page.getByText(i18n.t('hotkeys.shadows', { scope: 'Canvas', title: 'Toggle Left Panel' }), { exact: true })
+      )
+      .toBeVisible();
+
+    await act(() => search().fill('toggle left panel'));
+    await expect
+      .element(
+        page.getByText(i18n.t('hotkeys.shadowedBy', { scope: 'Canvas', title: 'Select Text Tool' }), { exact: true })
+      )
+      .toBeVisible();
     await expect.element(page.getByText(/^Conflicts with /)).not.toBeInTheDocument();
   });
 

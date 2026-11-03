@@ -56,6 +56,7 @@ def _fake_mp4(path: Path, udta: bytes, *, moov_first: bool = True) -> Path:
     return path
 
 
+@pytest.mark.ffmpeg
 def test_round_trip_through_ffmpeg_preserves_every_special_character(tiny_mp4: Path, tmp_path: Path) -> None:
     metadata = json.dumps({"positive_prompt": "a=b;c#d\\e\nf", "seed": 7, "nested": {"k": [1, 2]}})
     graph = json.dumps({"nodes": {}, "edges": []})
@@ -77,6 +78,7 @@ def test_round_trip_through_ffmpeg_preserves_every_special_character(tiny_mp4: P
     assert b"moov" in head
 
 
+@pytest.mark.ffmpeg
 def test_round_trip_of_a_payload_larger_than_a_megabyte(tiny_mp4: Path, tmp_path: Path) -> None:
     graph = json.dumps({"nodes": {"x": "y" * 1_500_000}, "edges": []})
     out = tmp_path / "big.mp4"
@@ -86,6 +88,7 @@ def test_round_trip_of_a_payload_larger_than_a_megabyte(tiny_mp4: Path, tmp_path
     assert read_mp4_tags(out, keys=["invokeai_graph"]) == {"invokeai_graph": graph}
 
 
+@pytest.mark.ffmpeg
 def test_keys_filter_returns_only_the_requested_tags(tiny_mp4: Path, tmp_path: Path) -> None:
     out = tmp_path / "filtered.mp4"
     write_mp4_tags(tiny_mp4, out, {"invokeai_metadata": "{}", "invokeai_workflow": "{}"})
@@ -94,6 +97,7 @@ def test_keys_filter_returns_only_the_requested_tags(tiny_mp4: Path, tmp_path: P
     assert read_mp4_tags(out, keys=["absent"]) == {}
 
 
+@pytest.mark.ffmpeg
 def test_untagged_mp4_and_non_mp4_read_as_no_tags(tiny_mp4: Path, tmp_path: Path) -> None:
     assert read_mp4_tags(tiny_mp4) == {}
     garbage = tmp_path / "garbage.mp4"
@@ -143,6 +147,7 @@ def test_non_utf8_data_atom_is_skipped(tmp_path: Path) -> None:
     assert read_mp4_tags(path) == {}
 
 
+@pytest.mark.ffmpeg
 def test_carriage_returns_round_trip(tiny_mp4: Path, tmp_path: Path) -> None:
     # CRLF-formatted JSON from an API client reaches the writer verbatim.
     value = '{\r\n  "seed": 1\r\n}'
@@ -156,6 +161,7 @@ def test_carriage_returns_round_trip(tiny_mp4: Path, tmp_path: Path) -> None:
     }
 
 
+@pytest.mark.ffmpeg
 def test_an_empty_mapping_strips_existing_tags(tiny_mp4: Path, tmp_path: Path) -> None:
     tagged = tmp_path / "tagged.mp4"
     write_mp4_tags(tiny_mp4, tagged, {"invokeai_workflow": "{}"})
@@ -165,6 +171,7 @@ def test_an_empty_mapping_strips_existing_tags(tiny_mp4: Path, tmp_path: Path) -
     assert read_mp4_tags(tmp_path / "stripped.mp4", keys=["invokeai_workflow"]) == {}
 
 
+@pytest.mark.ffmpeg
 def test_write_rejects_tags_the_ffmetadata_grammar_cannot_carry(tiny_mp4: Path, tmp_path: Path) -> None:
     # ffmpeg reads a backslash before the line break as a continuation even when escaped, so a
     # value ending in one would swallow the following tag.
@@ -192,6 +199,7 @@ def test_top_level_walk_is_bounded(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     assert read_mp4_tags(path) == {}
 
 
+@pytest.mark.ffmpeg
 def test_write_raises_on_an_undecodable_source(tmp_path: Path) -> None:
     garbage = tmp_path / "garbage.mp4"
     garbage.write_bytes(b"\x00\x00\x00\x18ftypmp42 not a real mp4")
@@ -200,6 +208,7 @@ def test_write_raises_on_an_undecodable_source(tmp_path: Path) -> None:
         write_mp4_tags(garbage, tmp_path / "out.mp4", {"invokeai_metadata": "{}"})
 
 
+@pytest.mark.ffmpeg
 def test_read_ftyp_major_brand(tiny_mp4: Path, tmp_path: Path) -> None:
     assert read_ftyp_major_brand(tiny_mp4) == b"isom"
     qt = tmp_path / "qt.mov"

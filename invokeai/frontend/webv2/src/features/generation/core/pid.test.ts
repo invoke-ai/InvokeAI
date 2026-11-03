@@ -26,6 +26,10 @@ describe('getPidDecoderBaseForMainBase', () => {
     expect(getPidDecoderBaseForMainBase('z-image')).toBe('flux');
   });
 
+  it('maps MOSS-Image to the FLUX.2 decoder, whose latent layout it denoises in', () => {
+    expect(getPidDecoderBaseForMainBase('moss-image')).toBe('flux2');
+  });
+
   it('returns null for bases with no PiD support', () => {
     expect(getPidDecoderBaseForMainBase('krea-2')).toBeNull();
     expect(getPidDecoderBaseForMainBase('wan')).toBeNull();

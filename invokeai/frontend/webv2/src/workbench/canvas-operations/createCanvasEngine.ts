@@ -6,16 +6,24 @@ import type { CanvasUtilityGraphResult } from '@workbench/canvas-operations/cont
 import type { GenerationCompositeHost } from '@workbench/canvas-operations/generationComposite';
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
-import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import { galleryDurability } from '@features/gallery';
+import {
+  assertAccountScopeCurrent,
+  captureAccountScope,
+  isAccountScopeCurrent,
+} from '@platform/state/accountLifecycle';
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import { isUploadProjectNotFound } from '@workbench/canvas-operations/backend/canvasImages';
 import { createBoundedCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
+import { createControlDetectionCoordinator } from '@workbench/canvas-operations/ControlDetectionCoordinator';
 import { composeForGeneration } from '@workbench/canvas-operations/generationComposite';
+import { controlTypeForDetector } from '@workbench/controlTypes';
 
 import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
 
 import { attachCanvasOperations } from './operationAccess';
+import { bindCanvasToolMemory, type CanvasToolMemoryPort } from './toolMemory';
 
 export interface CanvasEngineOptions extends Omit<
   CoreCanvasEngineOptions,
@@ -27,6 +35,10 @@ export interface CanvasEngineOptions extends Omit<
    */
   ensureProjectOnServer(): Promise<void>;
   getMainModelBase?: () => string | null;
+  /** The account's Select Object Auto Process preference; the widget layer injects the settings read. */
+  readSelectObjectAutoProcess?: () => boolean;
+  /** Where the account keeps brush, eraser, shape and text options; the engine starts from them and saves changes. */
+  toolMemory?: CanvasToolMemoryPort;
   selectObjectDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ height: number; imageName: string; width: number }>;
     runGraph(options: {
@@ -34,6 +46,10 @@ export interface CanvasEngineOptions extends Omit<
       outputNodeId?: string;
       signal?: AbortSignal;
     }): Promise<CanvasUtilityGraphResult>;
+  };
+  controlDetectionDeps?: {
+    /** Adopts a detected map as canvas-owned pixels; the gallery's canvas-asset transition by default. */
+    makeDurable(imageName: string): Promise<void>;
   };
   filterDeps?: {
     uploadIntermediate(blob: Blob, signal?: AbortSignal): Promise<{ imageName: string }>;
@@ -63,7 +79,15 @@ export type CanvasEngine = CoreCanvasEngineImplementation;
 
 /** Application composition root: owns SAM/filter sessions, queues, uploads, and their core capability adapters. */
 export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine => {
-  const { ensureProjectOnServer, filterDeps, selectObjectDeps, ...coreOptions } = options;
+  const {
+    controlDetectionDeps,
+    ensureProjectOnServer,
+    filterDeps,
+    readSelectObjectAutoProcess,
+    selectObjectDeps,
+    toolMemory,
+    ...coreOptions
+  } = options;
   const owner = captureAccountScope();
   const uploadLifetime = new AbortController();
   let projectMissingAt = -Infinity;
@@ -120,6 +144,14 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     edits: core.edits,
     isGuardCurrent: host.isGuardCurrent,
   });
+  const runFilterGraph = async (runOptions: {
+    graph: BackendGraphContract;
+    outputNodeId?: string;
+    signal?: AbortSignal;
+  }): Promise<CanvasUtilityGraphResult> => {
+    const output = await (filterDeps?.runGraph(runOptions) ?? canvasApplicationPort.runGraph(runOptions));
+    return { height: output.height, imageName: output.imageName, width: output.width };
+  };
 
   let filterCoordinator!: ReturnType<typeof canvasApplicationPort.createFilterCoordinator>;
   const selectObjectCoordinator = canvasApplicationPort.createSelectObjectCoordinator({
@@ -160,10 +192,10 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       );
     },
     isGuardCurrent: host.isGuardCurrent,
-    isInteractionLocked: host.isInteractionLocked,
     isSamToolActive: host.isSamToolActive,
     prepareStart: host.prepareSelectObjectStart,
     projectId: options.projectId,
+    readAutoProcessPreference: readSelectObjectAutoProcess,
     publishPreview: (preview) => host.publishSamPreview(preview),
     replaceSelection: (preview, signal) => host.replaceSelection(preview.guard, preview.image, preview.rect, signal),
     replaceTemporaryRestoreTool: host.replaceTemporaryRestoreTool,
@@ -198,11 +230,9 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     encodeSurface: host.encodeSurface,
     getDocument: host.getDocument,
     getSessionDeps: (layerId) => ({
-      commit: ({ draft, guard, image, rect, signal, target }) => {
-        if (host.isInteractionLocked()) {
-          return Promise.resolve({ status: 'locked' });
-        }
-        return host.commitFilter({
+      commit: ({ draft, guard, image, rect, signal, target }) =>
+        host.commitFilter({
+          ...(target === 'control' ? { controlCopy: { controlType: controlTypeForDetector(draft) } } : {}),
           filter: draft,
           guard,
           image,
@@ -211,18 +241,13 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
           requireExactImageDimensions: true,
           signal,
           target,
-        });
-      },
+        }),
       exportPixels: () => host.exportLayerPixels(layerId, { applyAdjustments: true, includeDisabled: true }),
       isGuardCurrent: host.isGuardCurrent,
       publishPreview: (imageName, rect, guard, filterType) =>
         host.publishFilterPreview(guard.layerId, imageName, rect, guard, filterType),
     }),
-    isInteractionLocked: host.isInteractionLocked,
-    runFilterGraph: async (runOptions) => {
-      const output = await (filterDeps?.runGraph(runOptions) ?? canvasApplicationPort.runGraph(runOptions));
-      return { height: output.height, imageName: output.imageName, width: output.width };
-    },
+    runFilterGraph,
     selectLayer: host.selectLayer,
     setViewTool: host.setViewTool,
     stores,
@@ -232,6 +257,32 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       return { imageName: uploaded.imageName };
     },
   });
+
+  // Any of these may be what refused a detection commit; each release lets a waiting result retry.
+  const lockStores = [
+    core.stores.documentEditingLocked,
+    core.stores.transformSession,
+    core.stores.textEditSession,
+    core.stores.documentEpoch,
+  ];
+  const controlDetection = createControlDetectionCoordinator({
+    derivation: host,
+    flushLayerUploads: host.flushLayerUploads,
+    getDocument: host.getDocument,
+    makeDurable: controlDetectionDeps?.makeDurable ?? galleryDurability.makeCanvasAsset,
+    projectId: options.projectId,
+    runFilterGraph,
+    subscribeLockChanges: (listener) => {
+      const unsubscribers = lockStores.map((store) => store.subscribe(listener));
+      return () => {
+        for (const unsubscribe of unsubscribers) {
+          unsubscribe();
+        }
+      };
+    },
+  });
+  // Statuses follow the document (deleted layers, undo past a failure); it never schedules detection.
+  const unsubscribeControlReconcile = core.stores.documentEpoch.subscribe(controlDetection.reconcileWithDocument);
 
   const syncEditingLock = (): void => {
     const operation = controller.getSnapshot();
@@ -281,12 +332,14 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   };
 
   const operations: CanvasOperationImplementation = {
+    applyControlLayerIntent: controlDetection.applyIntent,
     applySelectObjectSession: selectObjectCoordinator.apply,
     cancelFilterOperation: filterCoordinator.cancel,
     cancelSelectObjectSession: selectObjectCoordinator.cancel,
     commitFilterOperation: filterCoordinator.commit,
     composeForGeneration: (composeOptions) => composeForGeneration(generationCompositeHost, composeOptions),
     controller,
+    getControlDetectionStatus: controlDetection.getStatus,
     getFilterSessionState: stores.filterSession.get,
     getOperationState: controller.getSnapshot,
     getSamSessionState: stores.samSession.get,
@@ -294,11 +347,13 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     processSelectObjectSession: selectObjectCoordinator.process,
     resetFilterOperation: filterCoordinator.reset,
     resetSelectObjectSession: selectObjectCoordinator.reset,
+    retryControlDetection: controlDetection.retry,
     saveSelectObjectSession: selectObjectCoordinator.save,
     setFilterOperationAutoProcess: filterCoordinator.setAutoProcess,
     startFilterOperation: filterCoordinator.start,
     startSelectObject: selectObjectCoordinator.start,
     stores,
+    subscribeControlDetectionStatus: controlDetection.subscribeStatus,
     subscribeFilterSession: stores.filterSession.subscribe,
     subscribeOperation: controller.subscribe,
     subscribeSamSession: stores.samSession.subscribe,
@@ -319,20 +374,18 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   };
 
-  const coreSetInteractionLocked = core.tools.setInteractionLocked;
-  const tools = {
-    ...core.tools,
-    setInteractionLocked: (locked: boolean) => {
-      if (locked) {
-        selectObjectCoordinator.interruptAndBlock();
-        filterCoordinator.interruptAndBlock();
-      }
-      coreSetInteractionLocked(locked);
-      if (!locked && selectObjectCoordinator.isActive()) {
-        host.setSamTool();
-      }
-    },
-  };
+  // Saves are dropped once the account changed: the engine outlives it only until the registry disposes it.
+  const toolMemoryBinding = toolMemory
+    ? bindCanvasToolMemory(core.stores, {
+        read: () => toolMemory.read(),
+        ...(toolMemory.subscribe ? { subscribe: toolMemory.subscribe } : {}),
+        write: (changed) => {
+          if (isAccountScopeCurrent(owner)) {
+            toolMemory.write(changed);
+          }
+        },
+      })
+    : null;
 
   let disposed = false;
   const disposeOperations = (): void => {
@@ -340,12 +393,15 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
       return;
     }
     disposed = true;
+    toolMemoryBinding?.dispose();
     uploadLifetime.abort();
     host.setSamInputHandler(null);
     host.setEscapeHandler(null);
     unsubscribeToolChanges();
     unsubscribeSamInteraction();
     unsubscribeEditingLock();
+    unsubscribeControlReconcile();
+    controlDetection.dispose();
     filterCoordinator.dispose();
     selectObjectCoordinator.dispose();
     controller.dispose();
@@ -355,9 +411,16 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   };
   const lifecycle = {
     ...core.lifecycle,
+    activate: () => {
+      core.lifecycle.activate();
+      if (!disposed) {
+        controlDetection.resume();
+      }
+    },
     beginCooldown: () => {
       filterCoordinator.cancel();
       selectObjectCoordinator.cancel();
+      controlDetection.suspend();
       controller.invalidateDocument(options.projectId);
       return core.lifecycle.beginCooldown();
     },
@@ -375,7 +438,7 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
     },
   };
 
-  const engine: CanvasEngine = { ...core, diagnostics, lifecycle, tools };
+  const engine: CanvasEngine = { ...core, diagnostics, lifecycle };
   attachCanvasOperations(engine, operations);
   return engine;
 };

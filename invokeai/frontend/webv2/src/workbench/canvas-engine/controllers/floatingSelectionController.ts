@@ -74,7 +74,7 @@ const commitHistoryBytes = (
 };
 
 type PublishedStatus = EditPublishResult['status'];
-const isRefusal = (status: PublishedStatus): status is CanvasEditRefusal =>
+const isRefusal = (status: PublishedStatus): status is Extract<CanvasEditRefusal, string> =>
   status === 'busy' || status === 'gesture-active' || status === 'not-ready' || status === 'over-budget';
 
 /**

@@ -1,5 +1,7 @@
 import type { CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { AdjustedSurfaceStatus } from '@workbench/canvas-engine/render/spatialDisplay';
 
 import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
 import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
@@ -30,7 +32,13 @@ const image = layerContract('image', 'raster', {
 /** The controller over a real reducer, mutation context and history. */
 const createHarness = (
   layer: CanvasLayerContract,
-  options: { byteBudget?: number; gestureActive?: boolean; notifyPainted?: () => void } = {}
+  options: {
+    byteBudget?: number;
+    gestureActive?: boolean;
+    notifyPainted?: () => void;
+    exactAdjustedSurface?: () => RasterSurface | null;
+    adjustmentStatus?: AdjustedSurfaceStatus;
+  } = {}
 ) => {
   let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
     document: documentFrom([layer], layer.id),
@@ -81,8 +89,10 @@ const createHarness = (
     deleteDerived: vi.fn(),
     getActiveProjectId: () => project.id,
     getAdjustedSurface: () => null,
+    getAdjustmentStatus: () => options.adjustmentStatus,
     getDocument: () => project.canvas.document,
     getTransformSession: () => null,
+    peekAdjustedSurface: options.exactAdjustedSurface ?? (() => null),
     installPrepared: calls.installPrepared,
     invalidate: vi.fn(),
     isCacheReady: () => true,
@@ -171,6 +181,38 @@ describe('PixelEditController', () => {
     expect(await h.history.undo()).toMatchObject({ status: 'failed' });
     expect(h.history.entries().past).toEqual(['Erase']);
     expect(h.calls.installPrepared).not.toHaveBeenCalled();
+  });
+
+  const clarity = { amount: 50, id: 'c', isEnabled: true, size: 40, type: 'clarity' } as const;
+  const adjusted = { ...image, adjustments: [clarity], name: 'Sky' } as CanvasLayerContract;
+
+  it('refuses to materialize a spatially adjusted image as not-ready until its display copy is exact', () => {
+    const pending = createHarness(adjusted, { adjustmentStatus: 'computing' });
+    const surface = pending.layers.get('image')!.surface;
+
+    expect(pending.controller.begin('image')).toBeNull();
+    expect(pending.calls.reportRefusal).toHaveBeenCalledWith('not-ready');
+    expect(pending.layers.get('image')!.surface).toBe(surface);
+    expect(pending.calls.suspendLayer).not.toHaveBeenCalled();
+
+    const exact = createHarness(adjusted, { exactAdjustedSurface: () => surface });
+    expect(exact.controller.begin('image')).not.toBeNull();
+    expect(exact.calls.reportRefusal).not.toHaveBeenCalled();
+  });
+
+  it('names the layer and cause when its spatial adjustments cannot run, since waiting will not help', () => {
+    const h = createHarness(adjusted, { adjustmentStatus: 'too-large' });
+    const surface = h.layers.get('image')!.surface;
+
+    expect(h.controller.begin('image')).toBeNull();
+    expect(h.calls.reportRefusal).toHaveBeenCalledWith({
+      ownerId: 'image',
+      ownerName: 'Sky',
+      reason: 'too-large',
+      status: 'adjustment-refused',
+    });
+    expect(h.layers.get('image')!.surface).toBe(surface);
+    expect(h.calls.suspendLayer).not.toHaveBeenCalled();
   });
 
   it('refuses a materialization too large to undo before baking anything', () => {

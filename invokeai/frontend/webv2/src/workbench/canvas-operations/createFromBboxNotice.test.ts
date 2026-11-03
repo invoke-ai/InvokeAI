@@ -26,4 +26,17 @@ describe('getCreateFromBboxNotice', () => {
   ] as const)('maps %s to a %s notice', (status, kind, titleKey) => {
     expect(getCreateFromBboxNotice({ status })).toEqual({ kind, titleKey });
   });
+
+  it('names the layer that could not be read', () => {
+    expect(getCreateFromBboxNotice({ layerId: 'layer-7', layerName: 'Sky', status: 'unreadable' })).toEqual({
+      kind: 'error',
+      options: { name: 'Sky' },
+      titleKey: 'widgets.canvas.contextMenu.unreadable',
+    });
+  });
+
+  it('passes an adjustment refusal on as an error for the view to word', () => {
+    const refusal = { ownerId: 'g', ownerName: 'Sky', reason: 'too-large', status: 'adjustment-refused' } as const;
+    expect(getCreateFromBboxNotice(refusal)).toEqual({ kind: 'error', refusal });
+  });
 });

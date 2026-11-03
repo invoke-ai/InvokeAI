@@ -13,8 +13,9 @@ from unittest.mock import MagicMock
 import pytest
 from PIL import Image
 
-from invokeai.app.services.video_files.video_files_common import VideoFileSaveException
+from invokeai.app.services.video_files.video_files_common import VideoFileNotFoundException, VideoFileSaveException
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
+from invokeai.app.util.mp4_metadata import read_mp4_tags
 
 VIDEO_NAME = "abc123.mp4"
 
@@ -264,6 +265,7 @@ def _sidecars(storage: DiskVideoFileStorage) -> list[Path]:
     return [p for p in _all_files(storage.get_path(VIDEO_NAME).parent) if p.suffix == ".json"]
 
 
+@pytest.mark.ffmpeg
 def test_save_embeds_metadata_workflow_and_graph_in_the_mp4_and_writes_no_sidecar(
     storage: DiskVideoFileStorage, real_source: Path
 ):
@@ -290,6 +292,7 @@ def test_save_embeds_metadata_workflow_and_graph_in_the_mp4_and_writes_no_sideca
     assert storage.get_path(VIDEO_NAME, thumbnail=True).exists()
 
 
+@pytest.mark.ffmpeg
 def test_save_without_any_metadata_leaves_the_file_byte_identical(storage: DiskVideoFileStorage, real_source: Path):
     original = real_source.read_bytes()
 
@@ -299,6 +302,7 @@ def test_save_without_any_metadata_leaves_the_file_byte_identical(storage: DiskV
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_save_falls_back_to_a_sidecar_when_embedding_fails(
     storage: DiskVideoFileStorage, real_source: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -321,6 +325,7 @@ def test_save_falls_back_to_a_sidecar_when_embedding_fails(
     assert [p.name for p in _all_files(storage.get_path(VIDEO_NAME).parent) if p.name.startswith(".embed_")] == []
 
 
+@pytest.mark.ffmpeg
 def test_legacy_sidecar_is_still_read_for_an_untagged_video(storage: DiskVideoFileStorage, real_source: Path):
     storage.save(source_path=real_source, video_name=VIDEO_NAME)
     sidecar_dir = storage.get_path(VIDEO_NAME).parent / "sidecars"
@@ -333,6 +338,7 @@ def test_legacy_sidecar_is_still_read_for_an_untagged_video(storage: DiskVideoFi
     assert storage.get_graph(VIDEO_NAME) is None
 
 
+@pytest.mark.ffmpeg
 def test_embedded_tags_win_over_a_stale_sidecar(storage: DiskVideoFileStorage, real_source: Path):
     storage.save(source_path=real_source, video_name=VIDEO_NAME, workflow='{"name": "embedded"}')
     sidecar_dir = storage.get_path(VIDEO_NAME).parent / "sidecars"
@@ -342,6 +348,7 @@ def test_embedded_tags_win_over_a_stale_sidecar(storage: DiskVideoFileStorage, r
     assert storage.get_workflow(VIDEO_NAME) == '{"name": "embedded"}'
 
 
+@pytest.mark.ffmpeg
 def test_save_of_an_already_tagged_file_skips_the_rewrite(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ):
@@ -366,6 +373,7 @@ def test_save_of_an_already_tagged_file_skips_the_rewrite(
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_crlf_metadata_is_embedded_not_rejected(storage: DiskVideoFileStorage, real_source: Path):
     """CRLF-formatted JSON from an API client must neither fail the save nor lose the record."""
     from invokeai.app.util.mp4_metadata import read_mp4_tags
@@ -378,6 +386,7 @@ def test_crlf_metadata_is_embedded_not_rejected(storage: DiskVideoFileStorage, r
     assert _sidecars(storage) == []
 
 
+@pytest.mark.ffmpeg
 def test_a_tag_the_writer_refuses_falls_back_to_a_sidecar_without_leaking(
     storage: DiskVideoFileStorage, real_source: Path
 ):
@@ -401,6 +410,7 @@ def test_start_sweeps_remux_temp_files_left_by_a_crash(tmp_path: Path):
     assert not stale.exists()
 
 
+@pytest.mark.ffmpeg
 def test_a_file_carrying_a_tag_the_caller_dropped_is_rewritten_without_it(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path
 ):
@@ -424,6 +434,7 @@ def test_a_file_carrying_a_tag_the_caller_dropped_is_rewritten_without_it(
     assert storage.get_graph(VIDEO_NAME) == "{}"
 
 
+@pytest.mark.ffmpeg
 def test_a_file_whose_only_tag_was_rejected_is_stored_without_it(
     storage: DiskVideoFileStorage, real_source: Path, tmp_path: Path
 ):
@@ -439,3 +450,39 @@ def test_a_file_whose_only_tag_was_rejected_is_stored_without_it(
     assert "invokeai_workflow" not in read_mp4_tags(storage.get_path(VIDEO_NAME))
     assert storage.get_workflow(VIDEO_NAME) is None
     assert _sidecars(storage) == []
+
+
+def _store_untagged_video(storage: DiskVideoFileStorage) -> None:
+    path = storage.get_path(VIDEO_NAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(b"\x00\x00\x00\x18ftypmp42 not a real mp4")
+
+
+def test_unreadable_video_tags_are_not_reported_as_a_missing_file(
+    storage: DiskVideoFileStorage, monkeypatch: pytest.MonkeyPatch
+):
+    """An I/O fault on a file that exists must not read as "file gone": the workflow route answers 404 for that."""
+    _store_untagged_video(storage)
+
+    def unreadable(*args, **kwargs):
+        raise PermissionError("permission denied")
+
+    monkeypatch.setattr("invokeai.app.services.video_files.video_files_disk.read_mp4_tags", unreadable)
+
+    with pytest.raises(PermissionError):
+        storage.get_workflow(VIDEO_NAME)
+
+
+def test_video_deleted_before_its_tags_are_read_is_reported_missing(
+    storage: DiskVideoFileStorage, monkeypatch: pytest.MonkeyPatch
+):
+    _store_untagged_video(storage)
+
+    def deleted_after_exists_check(path, *args, **kwargs):
+        path.unlink()
+        return read_mp4_tags(path, *args, **kwargs)
+
+    monkeypatch.setattr("invokeai.app.services.video_files.video_files_disk.read_mp4_tags", deleted_after_exists_check)
+
+    with pytest.raises(VideoFileNotFoundException):
+        storage.get_graph(VIDEO_NAME)

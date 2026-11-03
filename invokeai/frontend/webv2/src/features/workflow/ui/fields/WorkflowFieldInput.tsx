@@ -128,16 +128,17 @@ import {
 import { useTranslation } from 'react-i18next';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
-const MODEL_SELECT_FALLBACK = (
-  <Button disabled w="full">
-    Loading models…
-  </Button>
-);
-const RECORD_PICKER_FALLBACK = (
-  <Button disabled w="full">
-    Loading…
-  </Button>
-);
+const LoadingFallback = ({ labelKey }: { labelKey: string }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Button disabled w="full">
+      {t(labelKey)}
+    </Button>
+  );
+};
+const MODEL_SELECT_FALLBACK = <LoadingFallback labelKey="models.loadingModels" />;
+const RECORD_PICKER_FALLBACK = <LoadingFallback labelKey="common.loading" />;
 // Generator settings load with their node; a plain workflow never pays for them.
 const GeneratorFieldInput = lazy(() =>
   import('./GeneratorFieldInput').then((module) => ({ default: module.GeneratorFieldInput }))
@@ -972,7 +973,6 @@ const ImageCollectionInput = ({
           // The empty state keeps the drop target tall enough to hit and doubles as the picker trigger.
           <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
             <chakra.button
-              aria-label={pickerLabel}
               className="nodrag"
               display="block"
               h="20"
@@ -1003,7 +1003,7 @@ const ImageCollectionInput = ({
             </chakra.button>
           </GalleryPickerPopover>
         )}
-        <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label="Drop images" />
+        <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={t('nodes.dropImages')} />
       </Box>
       <HStack gap="1.5" mt="1" w="full">
         <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
@@ -1028,7 +1028,7 @@ const ImageCollectionInput = ({
         <input
           ref={fileInputRef}
           accept={MEDIA_FIELD_CONFIG.image.fileAccept}
-          aria-label="Upload image files"
+          aria-label={t('nodes.uploadImageFiles')}
           multiple
           style={HIDDEN_FILE_INPUT_STYLE}
           type="file"
@@ -1106,7 +1106,8 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
       <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
-            aria-label={pickerLabel}
+            // A chosen item shows only its thumbnail; the empty face names itself with its visible text.
+            aria-label={mediaName ? pickerLabel : undefined}
             className="nodrag"
             display="block"
             h="full"
@@ -1126,21 +1127,22 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 w="full"
                 {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
-                {failedThumbnail !== mediaName ? (
-                  <Image
-                    alt=""
-                    maxH="full"
-                    maxW="full"
-                    objectFit="contain"
-                    src={config.getThumbnailUrl(mediaName)}
-                    title={mediaName}
-                    onError={onThumbnailError}
-                  />
-                ) : (
-                  <Box title={mediaName}>
-                    <Icon as={FallbackIcon} boxSize="10" color="fg.subtle" />
-                  </Box>
-                )}
+                <Tooltip content={mediaName}>
+                  {failedThumbnail !== mediaName ? (
+                    <Image
+                      alt=""
+                      maxH="full"
+                      maxW="full"
+                      objectFit="contain"
+                      src={config.getThumbnailUrl(mediaName)}
+                      onError={onThumbnailError}
+                    />
+                  ) : (
+                    <Box>
+                      <Icon as={FallbackIcon} boxSize="10" color="fg.subtle" />
+                    </Box>
+                  )}
+                </Tooltip>
               </Flex>
             ) : (
               <Flex
@@ -1244,6 +1246,7 @@ const COMPANION_VIDEO_FIELD_NAME = 'video';
  * when the companion video/rate cannot resolve.
  */
 const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
+  const { t } = useTranslation();
   const { nodeId, onChange, value } = props;
 
   // A connected `video` field keeps its stored value in the document, so the
@@ -1323,14 +1326,14 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
         <Flex borderStyle="dashed" borderWidth="1px" justifyContent="center" px="2" py="2" rounded="sm">
           <Text color="fg.subtle" fontSize="md" textAlign="center">
             {isVideoConnected
-              ? 'Frame preview unavailable while the video comes from a graph connection.'
+              ? t('nodes.framePreviewConnected')
               : videoName === null
-                ? "Set this node's Video field to preview frames."
+                ? t('nodes.framePreviewNoVideo')
                 : isError
-                  ? 'Frame preview unavailable — the video could not be loaded (it may have been deleted).'
+                  ? t('nodes.framePreviewLoadFailed')
                   : video === null
-                    ? 'Loading frame preview…'
-                    : 'Frame preview unavailable — the video has no probed frame rate.'}
+                    ? t('nodes.framePreviewLoading')
+                    : t('nodes.framePreviewNoFrameRate')}
           </Text>
         </Flex>
       )}
@@ -1497,7 +1500,9 @@ const LoRACollectionRow = ({
   onRemove: (index: number) => void;
   onWeightChange: (index: number, weight: number | null) => void;
 }) => {
-  const label = entry ? entry.lora.name : 'Unreadable entry';
+  const { t } = useTranslation();
+  const label = entry ? entry.lora.name : t('nodes.loraEntryUnreadable');
+  const removeLabel = t('nodes.loraEntryRemove', { name: label });
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
   // The shared numeric control commits as typed; a cleared or out-of-range weight stays on screen and blocks
   // invoking through the field's own reason instead of being clamped.
@@ -1508,13 +1513,13 @@ const LoRACollectionRow = ({
 
   return (
     <HStack gap="1" minW="0" w="full">
-      <Tooltip content={entry ? label : 'This entry is not a readable LoRA and will block invoking.'}>
+      <Tooltip content={entry ? label : t('nodes.loraEntryUnreadableHint')}>
         <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="xs" minW="0" text={label} />
       </Tooltip>
       {entry ? (
         <Field.Root flexShrink="0" invalid={!isLoraFieldWeightValid(entry.weight)} w="16">
           <NumericInput
-            ariaLabel={`${label} weight`}
+            ariaLabel={t('nodes.loraEntryWeight', { name: label })}
             id={id ? `${id}-lora-${index}` : undefined}
             invalid={!isLoraFieldWeightValid(entry.weight)}
             step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
@@ -1525,11 +1530,12 @@ const LoRACollectionRow = ({
         </Field.Root>
       ) : null}
       <IconButton
-        aria-label={`Remove ${label}`}
+        aria-label={removeLabel}
         className="nodrag"
         color="fg.muted"
         flexShrink="0"
         size="sm"
+        tooltip={removeLabel}
         variant="ghost"
         onClick={onRemoveClick}
       >
@@ -1689,11 +1695,16 @@ const ScalarCollectionRow = ({
   );
 };
 
-const CONNECTION_ONLY_FALLBACK = (
-  <Text color="fg.subtle" fontSize="xs">
-    Connection only
-  </Text>
-);
+const ConnectionOnlyFallback = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Text color="fg.subtle" fontSize="xs">
+      {t('nodes.inputModes.connection')}
+    </Text>
+  );
+};
+const CONNECTION_ONLY_FALLBACK = <ConnectionOnlyFallback />;
 
 const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowFieldInputProps) => {
   const { t } = useTranslation();

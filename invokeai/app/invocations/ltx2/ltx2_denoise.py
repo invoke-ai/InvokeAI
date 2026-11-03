@@ -544,9 +544,9 @@ class LTX2DenoiseInvocation(BaseInvocation):
         # that while holding this one is the deadlock `apply_smart_model_patches` documents. It also
         # has to happen before the reservation below, which is sized from these patches.
         lora_patch_specs = self._materialize_lora_patches(context)
-        # Resolved from the unlocked model, like the dequant transient below: only a build whose
-        # weights are buffers rather than parameters takes the sidecar path, and only that path
-        # leaves patch tensors on the device.
+        # Resolved from the unlocked model, like the dequant transient below: only a quantized build
+        # (GGUF, or weights held as buffers rather than parameters) takes the sidecar path, and only
+        # that path leaves patch tensors on the device.
         # Walks the whole 22B module tree, so it is only asked when there is something to patch.
         force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
             transformer_info.model, transformer_config.format
@@ -564,9 +564,9 @@ class LTX2DenoiseInvocation(BaseInvocation):
             # distilled accelerator (8.3 GiB) would cost a rank-16 style LoRA the same.
             sum(spec[0].calc_size() for spec in lora_patch_specs) if force_sidecar else 0,
         )
-        # An int8-convrot build materializes each linear's dequantized weight inside the forward,
-        # which the model's resident size does not account for. Read from the unlocked model, before
-        # the VRAM lock the reservation applies to; zero on a bf16 build.
+        # An int8-convrot, nvfp4 or GGUF build materializes each linear's dequantized weight inside the
+        # forward, which the model's resident size does not account for. Read from the unlocked model,
+        # before the VRAM lock the reservation applies to; zero on a bf16 build.
         estimated_working_memory += peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
 
         with (
@@ -586,8 +586,8 @@ class LTX2DenoiseInvocation(BaseInvocation):
                     cached_weights=cached_weights,
                     # An int8-convrot / nvfp4 build keeps its weights as buffers rather than
                     # parameters, so the patcher's own fp8 and CPU fallbacks would answer "not
-                    # quantized" and merge the delta into a weight that is never read. This is the
-                    # only reliable signal.
+                    # quantized" and merge the delta into a weight that is never read; a GGUF
+                    # weight stays packed. This is the only reliable signal.
                     force_sidecar_patching=force_sidecar,
                 )
                 if lora_patch_specs

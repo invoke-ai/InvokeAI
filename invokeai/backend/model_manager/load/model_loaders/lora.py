@@ -12,6 +12,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
+from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.omi.omi import convert_from_omi
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -21,6 +22,8 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import lora_model_from_anima_state_dict
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
+from invokeai.backend.patches.lora_conversions.flux3_lora_conversion_utils import lora_model_from_flux3_state_dict
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
     lora_model_from_flux_aitoolkit_state_dict,
@@ -64,6 +67,9 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_conversion_utils 
     lora_model_from_minimax_h3_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
+from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_conversion_utils import (
+    lora_model_from_qwen_image_21_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
@@ -129,6 +135,13 @@ class LoRALoader(ModelLoader):
             state_dict = convert_sdxl_keys_to_diffusers_format(state_dict)
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
         elif self._model_base in (BaseModelType.Flux, BaseModelType.Flux2):
+            if has_flux3_lora_keys(state_dict):
+                # Versions without FLUX.3 LoRA support registered these as FLUX.1 LoRAs, whose conversion would map
+                # their layers onto nothing or onto the wrong modules.
+                raise ValueError(
+                    f"LoRA '{config.name}' is a FLUX.3 LoRA, registered as a {self._model_base.value} LoRA by an earlier "
+                    "version of InvokeAI. Use Re-identify model in the Model Manager to register it as a FLUX.3 LoRA."
+                )
             if config.format is ModelFormat.OMI:
                 # HACK(ryand): We set alpha=None for diffusers PEFT format models. These models are typically
                 # distributed as a single file without the associated metadata containing the alpha value. We chose
@@ -170,6 +183,12 @@ class LoRALoader(ModelLoader):
                     raise ValueError("LoRA model is in unsupported FLUX format")
             else:
                 raise ValueError(f"LoRA model is in unsupported FLUX format: {config.format}")
+        elif self._model_base == BaseModelType.Flux3:
+            # diffusers/PEFT, BFL-native (ai-toolkit, ComfyUI) or raw PEFT keys, mapped onto the diffusers transformer;
+            # the header holds a diffusers file's PEFT config, which sets its scale.
+            model = lora_model_from_flux3_state_dict(
+                state_dict=state_dict, name=config.name, metadata=ModelOnDisk(model_path).metadata()
+            )
         elif self._model_base in [BaseModelType.StableDiffusion1, BaseModelType.StableDiffusion2]:
             # Currently, we don't apply any conversions for SD1 and SD2 LoRA models.
             model = lora_model_from_sd_state_dict(state_dict=state_dict)
@@ -179,6 +198,9 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.QwenImage:
             model = lora_model_from_qwen_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.QwenImage21:
+            # ComfyUI, diffusers/PEFT or Kohya keys; ComfyUI's fused gate_up is split for diffusers.
+            model = lora_model_from_qwen_image_21_state_dict(state_dict=state_dict)
         elif self._model_base == BaseModelType.Krea2:
             # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
             # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).

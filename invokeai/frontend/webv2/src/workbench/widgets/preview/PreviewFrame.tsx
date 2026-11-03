@@ -67,6 +67,8 @@ interface PreviewFrameProps {
   frameWidth: number;
   /** Keep the last denoise frame until source decoding completes, then notify onSourceLoaded. */
   holdSource?: StreamingImageSource | null;
+  /** A settled image failed to load. */
+  onSourceError?: () => void;
   onSourceLoaded?: (src: string) => void;
   /** A small, usually cached rendition (the thumbnail) shown until a settled image's full pixels load. */
   placeholderSrc?: string;
@@ -124,6 +126,7 @@ const PreviewImageFrame = ({
   isLive,
   loupeControlsRef,
   onContextMenu,
+  onSourceError,
   onSourceLoaded,
   onZoomChange,
   padding,
@@ -265,6 +268,13 @@ const PreviewImageFrame = ({
     },
     [holdSource, onSourceLoaded, placeholderSrc]
   );
+  const handleSourceError = useCallback(
+    (event: SyntheticEvent<HTMLImageElement>) => {
+      handleSourceSettled(event);
+      onSourceError?.();
+    },
+    [handleSourceSettled, onSourceError]
+  );
   // A hold arriving after the image already decoded (a cached image, or the
   // element reused across a source swap) would never see a load event.
   useEffect(() => {
@@ -319,7 +329,7 @@ const PreviewImageFrame = ({
         src={source.src}
         style={isHolding ? heldImageStyle : imageStyle}
         width={frameWidth}
-        onError={handleSourceSettled}
+        onError={handleSourceError}
         onLoad={handleSourceSettled}
       />
       {/* The hidden finished image keeps the frame's geometry; the held frame

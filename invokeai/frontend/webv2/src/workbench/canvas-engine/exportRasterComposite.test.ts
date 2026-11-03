@@ -1,9 +1,14 @@
-import type { CanvasDocumentContractV3, CanvasImageRef, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasImageRef,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+} from '@workbench/canvas-engine/contracts';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { MEASURED_NOISY_TEXT } from '@workbench/canvas-engine/render/rasterComposite.testing';
 import { describe, expect, it, vi } from 'vitest';
@@ -48,7 +53,7 @@ const controlLayer = (id: string): CanvasLayerContract => ({
   withTransparencyEffect: false,
 });
 
-const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 => ({
+const makeDoc = (layers: Parameters<typeof stacksFrom>[0]): CanvasDocumentContractV3 => ({
   background: 'transparent',
   bbox: { height: 128, width: 128, x: 0, y: 0 },
   height: 128,
@@ -261,6 +266,102 @@ describe('exportRasterComposite', () => {
       expect(allocatedBytes()).toBe(bbox.width * bbox.height * 4);
       expect(releaseLayer).toHaveBeenCalledOnce();
       expect(memory.snapshot().reservedBytes).toBe(0);
+    });
+  });
+
+  describe('spatial adjustments', () => {
+    const CLARITY = [{ amount: 50, id: 'clarity', isEnabled: true, size: 10, type: 'clarity' as const }];
+    /** A 64×32 image layer at (-4, 8); a 4×4 bbox samples a sliver of it. */
+    const spatialLayer = (adjustments = CLARITY): CanvasLayerContract => ({
+      ...(rasterLayer('portrait') as CanvasRasterLayerContractV2),
+      adjustments,
+    });
+    const SLIVER: Rect = { height: 4, width: 4, x: 0, y: 10 };
+    const withReserve = (deps: ExportRasterCompositeDeps) => {
+      const reserve = vi.fn((_bytes: number) => ({ lease: { release: vi.fn() }, status: 'ok' as const }));
+      deps.reserve = reserve;
+      return reserve;
+    };
+
+    it("reserves a spatial layer's whole surface and its ImageData, whatever the bbox samples", async () => {
+      const { deps } = makeDeps(makeDoc([spatialLayer()]));
+      const reserve = withReserve(deps);
+      const runSpatial = vi.fn((request: { pixels: Uint8ClampedArray }) =>
+        Promise.resolve({ pixels: request.pixels, status: 'ok' as const })
+      );
+      deps.runSpatial = runSpatial;
+
+      await expect(exportRasterComposite({ bounds: 'rect', rect: SLIVER }, deps)).resolves.toMatchObject({
+        status: 'ok',
+      });
+
+      expect(reserve).toHaveBeenCalledExactlyOnceWith((4 * 4 + 64 * 32 * 2) * 4);
+      // The job reads all of the layer, not the sampled region.
+      expect(runSpatial).toHaveBeenCalledOnce();
+      expect(runSpatial.mock.calls[0]![0]).toMatchObject({ height: 32, priority: 'now', width: 64 });
+    });
+
+    it("reserves a spatial group's buffer over its members' bounds, not the bbox", async () => {
+      const layer = rasterLayer('member');
+      const { deps } = makeDeps(makeDoc([groupContract('group', [layer], { adjustments: CLARITY })]));
+      const reserve = withReserve(deps);
+      const runSpatial = vi.fn((request: { pixels: Uint8ClampedArray }) =>
+        Promise.resolve({ pixels: request.pixels, status: 'ok' as const })
+      );
+      deps.runSpatial = runSpatial;
+
+      await expect(exportRasterComposite({ bounds: 'rect', rect: SLIVER }, deps)).resolves.toMatchObject({
+        status: 'ok',
+      });
+
+      expect(reserve).toHaveBeenCalledExactlyOnceWith((4 * 4 + 64 * 32 * 2) * 4);
+      expect(runSpatial.mock.calls[0]![0]).toMatchObject({ height: 32, width: 64 });
+    });
+
+    it.each(['too-large', 'over-budget', 'error'] as const)(
+      'refuses %s with the name of the layer whose stack could not run',
+      async (reason) => {
+        const { deps, encodeSurface } = makeDeps(makeDoc([spatialLayer()]));
+        deps.runSpatial = () => Promise.resolve({ status: reason });
+
+        await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toEqual({
+          ownerId: 'portrait',
+          ownerName: 'portrait',
+          reason,
+          status: 'adjustment-refused',
+        });
+        expect(encodeSurface).not.toHaveBeenCalled();
+      }
+    );
+
+    it('names the group whose stack could not run', async () => {
+      const { deps } = makeDeps(
+        makeDoc([groupContract('group', [rasterLayer('member')], { adjustments: CLARITY, name: 'Sky' })])
+      );
+      deps.runSpatial = () => Promise.resolve({ status: 'too-large' });
+
+      await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toMatchObject({
+        ownerId: 'group',
+        ownerName: 'Sky',
+        status: 'adjustment-refused',
+      });
+    });
+
+    it('never exports a spatial stack without its spatial entries', async () => {
+      const { deps, encodeSurface } = makeDeps(makeDoc([spatialLayer()]));
+
+      await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toMatchObject({
+        reason: 'error',
+        status: 'adjustment-refused',
+      });
+      expect(encodeSurface).not.toHaveBeenCalled();
+    });
+
+    it('reports a job cancelled by cooldown or cache release as stale', async () => {
+      const { deps } = makeDeps(makeDoc([spatialLayer()]));
+      deps.runSpatial = () => Promise.resolve({ status: 'aborted' });
+
+      await expect(exportRasterComposite({ bounds: 'content' }, deps)).resolves.toEqual({ status: 'stale' });
     });
   });
 

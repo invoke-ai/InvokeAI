@@ -1,26 +1,43 @@
 import { MAX_WILDCARD_NAME_LENGTH } from '@features/generation/core/dynamicPrompts';
 
-let positivePromptElement: HTMLTextAreaElement | null = null;
+/** Which surface's positive prompt: Generate (shared with Upscale) and Video are mounted side by side. */
+export type PositivePromptOwner = 'generate' | 'video';
+
+const positivePromptElements = new Map<PositivePromptOwner, HTMLTextAreaElement>();
 
 export type PromptTextRange = { end: number; start: number };
 
-export const registerPositivePromptElement = (element: HTMLTextAreaElement | null): void => {
-  positivePromptElement = element;
+/** `previous` is the field's own element, so one field unmounting never unregisters another's. */
+export const registerPositivePromptElement = (
+  owner: PositivePromptOwner,
+  element: HTMLTextAreaElement | null,
+  previous: HTMLTextAreaElement | null
+): void => {
+  if (element) {
+    positivePromptElements.set(owner, element);
+  } else if (positivePromptElements.get(owner) === previous) {
+    positivePromptElements.delete(owner);
+  }
 };
 
-export const focusPositivePrompt = (): boolean => {
-  if (!positivePromptElement) {
+export const focusPositivePrompt = (owner: PositivePromptOwner = 'generate'): boolean => {
+  const element = positivePromptElements.get(owner);
+
+  if (!element) {
     return false;
   }
 
-  positivePromptElement.focus();
-  positivePromptElement.select();
+  element.focus();
+  element.select();
 
   return true;
 };
 
-export const isPositivePromptFocused = (): boolean =>
-  positivePromptElement !== null && document.activeElement === positivePromptElement;
+export const isPositivePromptFocused = (owner: PositivePromptOwner = 'generate'): boolean => {
+  const element = positivePromptElements.get(owner);
+
+  return element !== undefined && document.activeElement === element;
+};
 
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
 
@@ -38,6 +55,58 @@ export const insertTextAtRange = (
   return { caret: start + text.length, value: nextValue };
 };
 
+const POPOVER_CONTENT_SELECTOR = '[data-scope="popover"][data-part="content"]';
+
+/** A field the user types into, outside every popover: one they moved on to while a result was on its way. */
+export const isOtherTextEntry = (element: Element | null, prompt: HTMLTextAreaElement | null): element is HTMLElement =>
+  element instanceof HTMLElement &&
+  element !== prompt &&
+  (element instanceof HTMLTextAreaElement ||
+    (element instanceof HTMLInputElement && !['button', 'checkbox', 'radio', 'submit'].includes(element.type)) ||
+    element.isContentEditable) &&
+  element.closest(POPOVER_CONTENT_SELECTOR) === null;
+
+/**
+ * Replaces `range` (all of it by default) through the browser's own editing, so the change joins the textarea's undo
+ * history (Ctrl+Z) and reaches the controlled field as an ordinary input event. The textarea takes focus, as typing
+ * would. False when it cannot take the edit, and the caller then writes the value itself: the textarea is gone,
+ * read-only or disabled; the browser has no `insertText`; the user is typing in another field (taking focus would
+ * break their typing, an IME composition included); or focus cannot land on it (a hidden view, a modal's focus trap),
+ * where `insertText` would type into whatever holds focus instead.
+ */
+export const editTextareaText = (
+  textarea: HTMLTextAreaElement | null,
+  text: string,
+  range: PromptTextRange = { end: textarea?.value.length ?? 0, start: 0 }
+): boolean => {
+  if (!textarea?.isConnected || textarea.readOnly || textarea.disabled || typeof document.execCommand !== 'function') {
+    return false;
+  }
+
+  const start = clamp(Math.min(range.start, range.end), 0, textarea.value.length);
+  const end = clamp(Math.max(range.start, range.end), 0, textarea.value.length);
+
+  if (textarea.value.slice(start, end) === text) {
+    return true;
+  }
+
+  if (isOtherTextEntry(document.activeElement, textarea)) {
+    return false;
+  }
+
+  textarea.focus({ preventScroll: true });
+
+  if (document.activeElement !== textarea) {
+    return false;
+  }
+
+  textarea.setSelectionRange(start, end);
+
+  // An empty insert is a deletion, which `insertText` does not perform in every browser.
+  return text === '' ? document.execCommand('delete') : document.execCommand('insertText', false, text);
+};
+
+/** Inserts at `range`, else at the caret, keeping the insert undoable where the browser allows it. */
 export const insertPromptText = ({
   onChange,
   range,
@@ -52,27 +121,20 @@ export const insertPromptText = ({
   value: string;
 }): void => {
   const caret = textarea?.selectionStart ?? value.length;
-  const { caret: nextCaret, value: nextValue } = insertTextAtRange(value, text, range, caret);
+  const insertionRange = range ?? { end: caret, start: caret };
+  const { caret: nextCaret, value: nextValue } = insertTextAtRange(value, text, insertionRange, caret);
 
-  onChange(nextValue);
+  // A textarea showing other text than `value` (a stale draft) takes the value instead, so nothing typed is lost.
+  if (textarea?.value !== value || !editTextareaText(textarea, text, insertionRange)) {
+    onChange(nextValue);
+  }
 
+  // Popovers that inserted the text hand focus back on close; land on the caret after it.
   window.requestAnimationFrame(() => {
     textarea?.focus();
     textarea?.setSelectionRange(nextCaret, nextCaret);
   });
 };
-
-export const insertPositivePromptText = ({
-  onChange,
-  range,
-  text,
-  value,
-}: {
-  onChange: (value: string) => void;
-  range?: PromptTextRange;
-  text: string;
-  value: string;
-}): void => insertPromptText({ onChange, range, textarea: positivePromptElement, text, value });
 
 export type PromptTriggerKey = '<' | '_';
 

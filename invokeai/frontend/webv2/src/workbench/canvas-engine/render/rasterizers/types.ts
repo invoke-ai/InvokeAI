@@ -4,7 +4,12 @@ import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-/** Resolves persisted image names to decode blobs; application networking stays behind this injectable seam. */
+/**
+ * Resolves persisted image names to decode blobs; application networking stays behind this injectable seam. A resolver
+ * throws {@link CanvasImageMissingError} when the image is missing or not readable by this user, so the layer reads
+ * as unreadable until its source changes. Any other failure (network, server, an expired session) is taken as
+ * transient: operations report `not-ready`, and asking again or the display after its backoff tries again.
+ */
 export type ImageResolver = (imageName: string, signal?: AbortSignal) => Promise<Blob>;
 
 /** A text source whose family may be replaced by an injected custom-font alias. */

@@ -1,7 +1,7 @@
 import type { CreateFromBboxDestination } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { MenuContent } from '@platform/ui';
+import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
 import { ChevronRightIcon, ImagePlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -15,30 +15,47 @@ const CREATE_FROM_BBOX_ITEMS: readonly { destination: CreateFromBboxDestination;
   { destination: 'raster', labelKey: 'widgets.canvas.contextMenu.newRasterLayer' },
 ];
 
+/**
+ * What a frame snapshot can become, in the order every host lists them: the canvas context menu's Create from frame
+ * submenu and the header's Frame menu.
+ */
+export const CreateFromBboxMenuItems = ({
+  disabled,
+  onCreate,
+  unavailableReason,
+}: {
+  disabled: boolean;
+  onCreate: (destination: CreateFromBboxDestination) => void;
+  unavailableReason?: string;
+}) => {
+  const { t } = useTranslation();
+
+  return CREATE_FROM_BBOX_ITEMS.map((item) => (
+    <CreateFromBboxMenuItem
+      key={item.destination}
+      destination={item.destination}
+      disabled={disabled}
+      label={t(item.labelKey)}
+      unavailableReason={unavailableReason}
+      onCreate={onCreate}
+    />
+  ));
+};
+
 const CreateFromBboxMenuItem = ({
   destination,
-  disabled,
-  labelKey,
   onCreate,
+  ...item
 }: {
   destination: CreateFromBboxDestination;
   disabled: boolean;
-  labelKey: string;
+  label: string;
   onCreate: (destination: CreateFromBboxDestination) => void;
+  unavailableReason: string | undefined;
 }) => {
-  const { t } = useTranslation();
   const onSelect = useCallback(() => onCreate(destination), [destination, onCreate]);
 
-  return (
-    <Menu.Item disabled={disabled} value={destination} onSelect={onSelect}>
-      <HStack gap="2" minW="0" w="full">
-        <Icon as={ImagePlusIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flex="1" fontSize="md">
-          {t(labelKey)}
-        </Text>
-      </HStack>
-    </Menu.Item>
-  );
+  return <MenuActionItem {...item} icon={ImagePlusIcon} value={destination} onSelect={onSelect} />;
 };
 
 export const CanvasCreateFromBboxSubmenu = ({
@@ -66,15 +83,7 @@ export const CanvasCreateFromBboxSubmenu = ({
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="13rem" py="1">
-            {CREATE_FROM_BBOX_ITEMS.map((item) => (
-              <CreateFromBboxMenuItem
-                key={item.destination}
-                destination={item.destination}
-                disabled={disabled}
-                labelKey={item.labelKey}
-                onCreate={onCreate}
-              />
-            ))}
+            <CreateFromBboxMenuItems disabled={disabled} onCreate={onCreate} />
           </MenuContent>
         </Menu.Positioner>
       </Portal>

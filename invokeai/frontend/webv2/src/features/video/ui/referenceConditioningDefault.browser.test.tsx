@@ -56,6 +56,7 @@ const videoItem = (mediaOrigin?: string): GalleryVideoItem => ({
 const adapter = {
   findInGallery: () => undefined,
   getUploadBoardId: () => Promise.resolve('none'),
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: (_values: Partial<VideoWidgetValues>) => undefined,
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',

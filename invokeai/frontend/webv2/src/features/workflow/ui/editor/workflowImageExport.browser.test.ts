@@ -114,7 +114,7 @@ const captureDownloads = () => {
   const downloadedBlob = () => {
     const blob = createObjectURL.mock.calls.at(-1)?.[0];
     if (!(blob instanceof Blob)) {
-      throw new Error('Workflow export did not download a Blob.');
+      throw new TypeError('Workflow export did not download a Blob.');
     }
     return blob;
   };

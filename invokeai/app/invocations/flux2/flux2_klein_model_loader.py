@@ -39,7 +39,7 @@ from invokeai.backend.model_manager.taxonomy import (
 # Variants sharing a Qwen3 entry (`klein_9b` and `klein_9b_base`) are valid encoder sources for
 # each other. [dev] is deliberately absent: it uses a Mistral encoder, so it can never satisfy a
 # Klein transformer, and `.get()` returning None is what makes the guards below fail closed.
-_KLEIN_TO_QWEN3_VARIANT: dict[Flux2VariantType, Qwen3VariantType] = {
+KLEIN_TO_QWEN3_VARIANT: dict[Flux2VariantType, Qwen3VariantType] = {
     Flux2VariantType.Klein4B: Qwen3VariantType.Qwen3_4B,
     Flux2VariantType.Klein4BBase: Qwen3VariantType.Qwen3_4B,
     Flux2VariantType.Klein9B: Qwen3VariantType.Qwen3_8B,
@@ -236,7 +236,7 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
         """
         config = self._validate_diffusers_format(context, model, model_name)
         source_variant = getattr(config, "variant", None)
-        source_qwen3 = _KLEIN_TO_QWEN3_VARIANT.get(source_variant)
+        source_qwen3 = KLEIN_TO_QWEN3_VARIANT.get(source_variant)
 
         # An allowlist, not "reject [dev]": a future third FLUX.2 variant has to fail closed here
         # the way the [dev] loader's guard already makes it, rather than being silently accepted.
@@ -249,7 +249,7 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
                 "(Its VAE is compatible - this only blocks encoder extraction.)"
             )
 
-        required_qwen3 = _KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
+        required_qwen3 = KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
         if required_qwen3 is not None and source_qwen3 != required_qwen3:
             raise ValueError(
                 f"Qwen3 encoder variant mismatch: FLUX.2 Klein {main_config.variant.value} requires a "
@@ -274,7 +274,7 @@ class Flux2KleinModelLoaderInvocation(BaseInvocation):
         if qwen3_variant is None:
             return
 
-        expected_qwen3_variant = _KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
+        expected_qwen3_variant = KLEIN_TO_QWEN3_VARIANT.get(getattr(main_config, "variant", None))
         if expected_qwen3_variant is not None and qwen3_variant != expected_qwen3_variant:
             raise ValueError(
                 f"Qwen3 encoder variant mismatch: FLUX.2 Klein {main_config.variant.value} requires "

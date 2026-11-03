@@ -439,6 +439,25 @@ describe('enqueueWorkflow', () => {
   });
 });
 
+describe('enqueueUtility', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ enqueued: 1, item_ids: [4] });
+  });
+
+  it('appends by default and prepends only when the request asks for the front of the queue', async () => {
+    const { enqueueUtility } = await import('./submissionApi');
+    const request = { graph: { edges: [], id: 'pbr', nodes: {} }, origin: 'webv2:util:1' };
+
+    await expect(enqueueUtility(request)).resolves.toEqual({ enqueued: 1, itemIds: [4] });
+    expect(getSubmittedBody()).toMatchObject({ batch: { origin: 'webv2:util:1', runs: 1 }, prepend: false });
+
+    mocks.apiFetchJson.mockClear();
+    await enqueueUtility({ ...request, prepend: true });
+    expect(getSubmittedBody()).toMatchObject({ prepend: true });
+  });
+});
+
 describe('getResultImages', () => {
   beforeEach(() => {
     accountLifecycle.activate('test-account');

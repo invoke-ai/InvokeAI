@@ -21,6 +21,9 @@ import { DicesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { AdjustmentStatusEngine } from './AdjustmentStatusIcon';
+
+import { AdjustmentStatusNotice } from './AdjustmentStatusIcon';
 import {
   CURVE_PADDING,
   CURVE_SIZE,
@@ -29,14 +32,20 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
-import { createNoiseSeed, DEFAULT_NOISE_AMOUNT, DEFAULT_NOISE_SIZE } from './layerOps';
+import {
+  createNoiseSeed,
+  DEFAULT_CLARITY_SIZE,
+  DEFAULT_NOISE_AMOUNT,
+  DEFAULT_NOISE_SIZE,
+  DEFAULT_TEXTURE_SIZE,
+} from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
  * enable/remove/reorder.
  */
 
-export type AdjustmentsEngine = CanvasStructuralEngine & CanvasPreparedEngine;
+export type AdjustmentsEngine = CanvasStructuralEngine & CanvasPreparedEngine & AdjustmentStatusEngine;
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const;
 
@@ -169,6 +178,10 @@ const AdjustmentEntryEditor = ({
     (patch: Partial<NoiseEntry>) => commitEntry(t('widgets.layers.adjustments.noise'), patch),
     [commitEntry, t]
   );
+  const handleSpatialCommit = useCallback(
+    (patch: Partial<SpatialEntry>) => commitEntry(t(`widgets.layers.adjustments.${entry.type}`), patch),
+    [commitEntry, entry.type, t]
+  );
   const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
   const handleCurvesCommit = useCallback(
     (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
@@ -225,6 +238,19 @@ const AdjustmentEntryEditor = ({
       );
     case 'noise':
       return <NoiseEditor disabled={engine === null} entry={entry} onCommit={handleNoiseCommit} onLive={patchLive} />;
+    case 'clarity':
+    case 'texture':
+    case 'dehaze':
+      return (
+        <SpatialEditor
+          engine={engine}
+          entry={entry}
+          ownerId={layer.id}
+          ownerType={layer.type}
+          onCommit={handleSpatialCommit}
+          onLive={patchLive}
+        />
+      );
     case 'curves':
       return (
         <CurvesEditor
@@ -240,6 +266,7 @@ const AdjustmentEntryEditor = ({
 type ScalarField = 'brightness' | 'contrast' | 'saturation' | 'rotation' | 'stops';
 type LevelsEntry = Extract<CanvasAdjustmentEntry, { type: 'levels' }>;
 type NoiseEntry = Extract<CanvasAdjustmentEntry, { type: 'noise' }>;
+type SpatialEntry = Extract<CanvasAdjustmentEntry, { type: 'clarity' | 'texture' | 'dehaze' }>;
 
 const formatSigned = (value: number): string => `${value > 0 ? '+' : ''}${value}`;
 const formatDegrees = (value: number): string => `${Math.round(value)}°`;
@@ -599,6 +626,81 @@ const NoiseEditor = ({
         </Tooltip>
       </HStack>
     </Stack>
+  );
+};
+
+/** The spatial amount's range, as on the backend nodes; 0 is identity. */
+const SPATIAL_AMOUNT_LIMIT = 200;
+/** Feature-size ranges in owner pixels, as on the backend nodes; Dehaze has none (it follows the content's size). */
+const SPATIAL_SIZES = {
+  clarity: { defaultValue: DEFAULT_CLARITY_SIZE, max: 1000, min: 4 },
+  texture: { defaultValue: DEFAULT_TEXTURE_SIZE, max: 100, min: 1 },
+} as const;
+
+const formatWholePixels = (value: number): string => `${Math.round(value)} px`;
+
+/** Clarity, Texture and Dehaze: a signed amount, a feature size for the first two, and why the canvas skips them. */
+const SpatialEditor = ({
+  engine,
+  entry,
+  onCommit,
+  onLive,
+  ownerId,
+  ownerType,
+}: {
+  engine: AdjustmentStatusEngine | null;
+  entry: SpatialEntry;
+  ownerId: string;
+  ownerType: AdjustmentOwner['type'];
+  onLive: (patch: Partial<SpatialEntry>) => void;
+  onCommit: (patch: Partial<SpatialEntry>) => void;
+}) => {
+  const { t } = useTranslation();
+  const handleAmountChange = useCallback((amount: number) => onLive({ amount }), [onLive]);
+  const handleAmountCommit = useCallback((amount: number) => onCommit({ amount }), [onCommit]);
+  // Whole pixels: a typed fraction would show one size and store another.
+  const handleSizeChange = useCallback((size: number) => onLive({ size: Math.round(size) }), [onLive]);
+  const handleSizeCommit = useCallback((size: number) => onCommit({ size: Math.round(size) }), [onCommit]);
+  const size = entry.type === 'dehaze' ? null : { ...SPATIAL_SIZES[entry.type], value: entry.size };
+
+  return (
+    <chakra.div>
+      <AdjustmentStatusNotice engine={engine} ownerId={ownerId} />
+      <Stack gap="3">
+        <ScrubberField
+          defaultValue={0}
+          formatValue={formatSigned}
+          helpText={entry.type === 'dehaze' ? t('widgets.layers.adjustments.dehazeHint') : undefined}
+          label={t('widgets.layers.adjustments.amount')}
+          max={SPATIAL_AMOUNT_LIMIT}
+          min={-SPATIAL_AMOUNT_LIMIT}
+          step={1}
+          value={Math.round(entry.amount)}
+          onChange={handleAmountChange}
+          onChangeEnd={handleAmountCommit}
+        />
+        {size ? (
+          <ScrubberField
+            defaultValue={size.defaultValue}
+            formatValue={formatWholePixels}
+            helpText={t(
+              ownerType === 'group'
+                ? 'widgets.layers.adjustments.sizeHintGroup'
+                : 'widgets.layers.adjustments.sizeHintLayer'
+            )}
+            label={t('widgets.layers.adjustments.size')}
+            max={size.max}
+            min={size.min}
+            // Equal travel per ratio: the small sizes that matter most would otherwise share a sliver of the track.
+            scale="log"
+            step={1}
+            value={size.value}
+            onChange={handleSizeChange}
+            onChangeEnd={handleSizeCommit}
+          />
+        ) : null}
+      </Stack>
+    </chakra.div>
   );
 };
 

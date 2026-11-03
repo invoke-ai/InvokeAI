@@ -1,4 +1,4 @@
-import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
+import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { CanvasOperationCapability } from '@workbench/canvas-operations/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
@@ -20,7 +20,7 @@ export type LayerFilterOperationEngine = Pick<CanvasEngineHandle, 'exports' | 'i
 
 interface LayerFilterOperationButtonProps {
   engine: LayerFilterOperationEngine | null;
-  layer: CanvasRasterLayerContractV2 | CanvasControlLayerContract;
+  layer: CanvasRasterLayerContractV2;
   onOperationStarted(): void;
   operations: Pick<CanvasOperationCapability, 'startFilterOperation'> | null;
 }

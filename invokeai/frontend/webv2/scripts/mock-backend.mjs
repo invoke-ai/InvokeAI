@@ -14,6 +14,7 @@ import {
   MOCK_BACKEND_FIXED_EPOCH,
   MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
+import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
@@ -79,12 +80,139 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * multiuser-admin, until POST /__reset; independent of workload profile. `user` and `multiuser-admin` also turn on
  * multi-user auth, with a non-admin or an admin session: sign in with any email and password (or reload a page that
  * already holds the token). `sharedBoards: true` adds boards other accounts own (`SHARED_BOARD_FIXTURES`), which the
- * caller sees through general access, a membership, or admin rights.
+ * caller sees through general access, a membership, or admin rights. `user` also makes the admin-only image storage
+ * routes answer 403. `imageMoves` seeds the image move journal: `idle` (the
+ * default), `needs-recovery` (an interrupted job that only Recover can finish), `failed` (a job that ended in error,
+ * which counts as finished) or `instant` (a move so small it commits before the POST answers, so `is_running` is
+ * already false). Like the real service, Start Move is refused while any queue item is pending or in progress (the
+ * representative profile seeds some; clear the queue first). While a move runs or a job awaits recovery, image files,
+ * media mutations and enqueueing answer 409 like the real maintenance guard; listings stay readable.
+ * `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main model key>` gives that model an
+ * attempt Stop aborted, `runningCalibration: <main model key>` one still running, which holds the GPU,
+ * `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
+ * mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
+const IMAGE_MOVE_FAULTS = new Set(['idle', 'needs-recovery', 'failed', 'instant']);
+const IMAGE_MOVE_MAINTENANCE_DETAIL = 'Image storage maintenance is active';
+/** The job states the real service counts as finished; any other journaled job still needs recovery. */
+const FINISHED_IMAGE_MOVE_JOB_STATES = new Set(['committed', 'error']);
+const IMAGE_STORAGE_LAYOUTS = new Set(['flat', 'date', 'type', 'hash']);
+/** Status reads a running move or recovery takes to finish, so polling clients observe it in progress. */
+const IMAGE_MOVE_TICKS = 2;
 
-const createFaults = () => ({ capabilities: 'ok', intermediatesCaller: 'admin' });
+const createFaults = () => ({
+  capabilities: 'ok',
+  imageMoves: 'idle',
+  intermediatesCaller: 'admin',
+  workingMemory: 'ok',
+});
+
+/**
+ * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout
+ * differs from the one the last committed move left the files in.
+ */
+const createImageStorage = () => ({
+  layout: 'flat',
+  storedLayout: 'flat',
+  job: null,
+  lastError: null,
+  nextJobId: 1,
+  running: null,
+});
+
+const imageMoveStatus = (state) => {
+  const storage = state.imageStorage;
+
+  return {
+    active_job_id:
+      storage.job !== null && !FINISHED_IMAGE_MOVE_JOB_STATES.has(storage.job.state) ? storage.job.id : null,
+    is_running: storage.running !== null,
+    last_error: storage.lastError,
+    latest_job: storage.job === null ? null : { ...storage.job },
+    needs_move_count: storage.layout === storage.storedLayout ? 0 : state.images.size,
+    operation: storage.running?.operation ?? null,
+  };
+};
+
+const seedInterruptedImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  storage.job = { error_message: null, id: storage.nextJobId, state: 'moving' };
+  storage.nextJobId += 1;
+  storage.lastError = 'Server stopped during an image move';
+};
+
+const seedFailedImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  storage.job = { error_message: 'Disk full while moving images', id: storage.nextJobId, state: 'error' };
+  storage.nextJobId += 1;
+  storage.lastError = 'Disk full while moving images';
+};
+
+const commitImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  if (storage.running.operation === 'move_all') {
+    storage.storedLayout = storage.layout;
+  }
+  if (storage.job !== null) {
+    storage.job = { ...storage.job, state: 'committed' };
+  }
+  storage.running = null;
+};
+
+/** An `instant` move commits before the POST answers, as a tiny library does on the real server. */
+const startImageMoveOperation = (state, operation, { instant = false } = {}) => {
+  const storage = state.imageStorage;
+
+  if (operation === 'move_all') {
+    storage.job = { error_message: null, id: storage.nextJobId, state: 'moving' };
+    storage.nextJobId += 1;
+  }
+  storage.lastError = null;
+  storage.running = { operation, ticks: IMAGE_MOVE_TICKS };
+  if (instant) {
+    commitImageMove(state);
+  }
+};
+
+/** Each status read advances a running operation; it commits on the last tick. */
+const tickImageMove = (state) => {
+  const storage = state.imageStorage;
+
+  if (storage.running === null) {
+    return;
+  }
+  storage.running.ticks -= 1;
+  if (storage.running.ticks === 0) {
+    commitImageMove(state);
+  }
+};
+
+/** Mirrors `is_maintenance_active`: a running operation, or a journaled job that has not finished. */
+const isImageMoveMaintenanceActive = (state) =>
+  state.imageStorage.running !== null || imageMoveStatus(state).active_job_id !== null;
+
+/** Mirrors `has_active_queue_work`, which gates Start Move: any queue item pending or in progress. */
+const hasActiveQueueWork = (state) =>
+  [...state.queueItems.values()].some((item) => item.status === 'pending' || item.status === 'in_progress');
+
+/**
+ * The real maintenance guard covers image uploads, deletions, edits, star changes, copies, downloads, image files
+ * and board-image membership, plus deleting a board with its images; listings and DTO reads stay open.
+ */
+const isImageMoveMaintenanceRoute = (method, path, url) => {
+  if (path.startsWith('/api/v1/board_images')) {
+    return true;
+  }
+  if (path.startsWith('/api/v1/images')) {
+    return method !== 'GET' || /^\/api\/v1\/images\/i\/[^/]+\/(full|thumbnail|workflow)$/.test(path);
+  }
+  return method === 'DELETE' && path.startsWith('/api/v1/boards/') && url.searchParams.get('include_images') === 'true';
+};
 
 const isAdminCaller = (faults) => faults.intermediatesCaller !== 'user';
 const isMultiuserCaller = (faults) => faults.intermediatesCaller !== 'admin';
@@ -331,8 +459,10 @@ const sortedWildcards = (state) =>
 const wildcardNameTaken = (state, name, exceptId = null) =>
   [...state.wildcards.values()].some((wildcard) => wildcard.name === name && wildcard.id !== exceptId);
 
-const createState = (profile) => {
+/** `clock` is the working-memory mock's time source (see mock-working-memory.mjs). */
+const createState = (profile, clock) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
+  const models = new Map(fixture.models.map((model) => [model.key, clone(model)]));
 
   return {
     boardMembers: new Map(),
@@ -346,7 +476,8 @@ const createState = (profile) => {
     ]),
     externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
-    models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    imageStorage: createImageStorage(),
+    models,
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
     modelProbes: new Map(),
     mutationClock: 0,
@@ -368,6 +499,7 @@ const createState = (profile) => {
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     wildcards: createWildcards(profile === 'empty' ? 0 : SEEDED_WILDCARD_NAMES.length),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
+    workingMemory: createWorkingMemoryMock(fixture.models, { clock, currentModel: (key) => models.get(key) }),
     nextWorkflowNumber: fixture.workflows.length + 1,
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
     workflowThumbnails: new Map(),
@@ -1029,9 +1161,9 @@ const parseByteRange = (value, size) => {
     : null;
 };
 
-export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
+export const startMockBackend = async (port, { clock = Date.now, profile = 'empty' } = {}) => {
   const initialProfile = assertMockBackendProfileName(profile);
-  let state = createState(initialProfile);
+  let state = createState(initialProfile, clock);
   let faults = createFaults();
 
   const server = createServer(async (request, response) => {
@@ -1050,7 +1182,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const requestedProfile = url.searchParams.get('profile') ?? body.profile ?? initialProfile;
 
         try {
-          state = createState(assertMockBackendProfileName(requestedProfile));
+          state = createState(assertMockBackendProfileName(requestedProfile), clock);
         } catch (error) {
           return json(400, { detail: error instanceof Error ? error.message : String(error) });
         }
@@ -1111,6 +1243,8 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const body = await readJsonBody(request);
           const requested = url.searchParams.get('capabilities') ?? body.capabilities;
           const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
+          const workingMemory = url.searchParams.get('workingMemory') ?? body.workingMemory;
+          const imageMoves = url.searchParams.get('imageMoves') ?? body.imageMoves;
 
           if (body.sharedBoards === true && !state.boards.has(SHARED_BOARD_FIXTURES[0].board_id)) {
             seedSharedBoards(state);
@@ -1130,6 +1264,50 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             }
 
             faults.intermediatesCaller = caller;
+          }
+
+          if (workingMemory !== undefined && workingMemory !== null) {
+            if (!WORKING_MEMORY_SCENARIOS.has(workingMemory)) {
+              return json(400, { detail: `Unknown working-memory scenario: ${String(workingMemory)}` });
+            }
+
+            faults.workingMemory = workingMemory;
+          }
+
+          if (
+            body.modelChangedCalibration !== undefined &&
+            !state.workingMemory.seedModelChanged(body.modelChangedCalibration)
+          ) {
+            return json(400, {
+              detail: `No main model to seed a changed-model calibration on: ${String(body.modelChangedCalibration)}`,
+            });
+          }
+
+          if (body.runningCalibration !== undefined && !state.workingMemory.seedRunning(body.runningCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a running calibration on: ${String(body.runningCalibration)}`,
+            });
+          }
+
+          if (body.stoppedCalibration !== undefined && !state.workingMemory.seedStopped(body.stoppedCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a stopped calibration on: ${String(body.stoppedCalibration)}`,
+            });
+          }
+
+          if (imageMoves !== undefined && imageMoves !== null) {
+            if (!IMAGE_MOVE_FAULTS.has(imageMoves)) {
+              return json(400, { detail: `Unknown image moves fault: ${String(imageMoves)}` });
+            }
+
+            faults.imageMoves = imageMoves;
+            state.imageStorage = createImageStorage();
+            if (imageMoves === 'needs-recovery') {
+              seedInterruptedImageMove(state);
+            }
+            if (imageMoves === 'failed') {
+              seedFailedImageMove(state);
+            }
           }
         }
 
@@ -1256,24 +1434,83 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (path === '/api/v1/app/runtime_config') {
-        if (method === 'PATCH') {
-          const changes = await readJsonBody(request);
+        const runtimeConfig = () => ({
+          config: { ...state.runtimeConfig, image_subfolder_strategy: state.imageStorage.layout },
+          set_fields: state.imageStorage.layout === 'flat' ? [] : ['image_subfolder_strategy'],
+        });
 
-          if ('generation_devices' in changes) {
-            state.runtimeConfig.generation_devices = changes.generation_devices;
+        if (method === 'GET') {
+          return json(200, runtimeConfig());
+        }
+        if (method === 'PATCH') {
+          if (!isAdminCaller(faults)) {
+            return json(403, { detail: 'Admin privileges required' });
           }
-          if ('max_queue_history' in changes) {
-            const value = changes.max_queue_history;
+
+          const body = await readJsonBody(request);
+
+          if ('max_queue_history' in body) {
+            const value = body.max_queue_history;
 
             if (value !== null && !(Number.isInteger(value) && value >= 0)) {
               return json(422, { detail: 'max_queue_history must be a non-negative integer or null' });
             }
-            state.runtimeConfig.max_queue_history = value;
           }
+          if ('image_subfolder_strategy' in body) {
+            if (!IMAGE_STORAGE_LAYOUTS.has(body.image_subfolder_strategy)) {
+              return json(422, { detail: 'image_subfolder_strategy must be one of flat, date, type, hash' });
+            }
+
+            state.imageStorage.layout = body.image_subfolder_strategy;
+          }
+          if ('generation_devices' in body) {
+            state.runtimeConfig.generation_devices = body.generation_devices;
+          }
+          if ('max_queue_history' in body) {
+            state.runtimeConfig.max_queue_history = body.max_queue_history;
+          }
+
+          return json(200, runtimeConfig());
         }
-        if (method === 'GET' || method === 'PATCH') {
-          return json(200, { config: { ...state.runtimeConfig }, set_fields: [] });
+      }
+
+      if (path.startsWith('/api/v1/image_moves/')) {
+        if (!isAdminCaller(faults)) {
+          return json(403, { detail: 'Admin privileges required' });
         }
+
+        const storage = state.imageStorage;
+
+        if (method === 'GET' && path === '/api/v1/image_moves/status') {
+          tickImageMove(state);
+          return json(200, imageMoveStatus(state));
+        }
+        if (method === 'POST' && path === '/api/v1/image_moves/start') {
+          if (storage.running !== null) {
+            return json(409, { detail: 'An image move job is already running' });
+          }
+          if (imageMoveStatus(state).active_job_id !== null) {
+            return json(409, { detail: 'An image move job is already active' });
+          }
+          if (hasActiveQueueWork(state)) {
+            return json(409, { detail: 'Cannot start image move while queue work is active' });
+          }
+
+          startImageMoveOperation(state, 'move_all', { instant: faults.imageMoves === 'instant' });
+          return json(202, imageMoveStatus(state));
+        }
+        if (method === 'POST' && path === '/api/v1/image_moves/recover') {
+          if (storage.running !== null) {
+            return json(409, { detail: 'An image move job is already running' });
+          }
+
+          startImageMoveOperation(state, 'recovery', { instant: faults.imageMoves === 'instant' });
+          return json(202, imageMoveStatus(state));
+        }
+      }
+
+      if (isImageMoveMaintenanceActive(state) && isImageMoveMaintenanceRoute(method, path, url)) {
+        return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
       }
 
       if (path.startsWith('/api/v1/app/invocation_cache')) {
@@ -1734,6 +1971,55 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
       if (queueMatch) {
         const action = queueMatch[1];
+
+        if (action === 'enqueue_batch' && method === 'POST') {
+          if (isImageMoveMaintenanceActive(state)) {
+            return json(409, { detail: IMAGE_MOVE_MAINTENANCE_DETAIL });
+          }
+
+          const { batch = {} } = await readJsonBody(request);
+          const runs = Number.isInteger(batch.runs) && batch.runs > 0 ? batch.runs : 1;
+          const now = timestamp(state);
+          const batchId = `mock-batch-${String(state.mutationClock)}`;
+          const itemIds = [];
+
+          // Items stay pending: the mock has no processor and no socket, so nothing ever completes them.
+          for (let run = 0; run < runs; run += 1) {
+            const itemId = Math.max(0, ...state.queueItems.keys()) + 1;
+
+            itemIds.push(itemId);
+            state.queueItems.set(itemId, {
+              batch_id: batchId,
+              completed_at: null,
+              created_at: now,
+              destination: batch.destination ?? null,
+              error_message: null,
+              error_traceback: null,
+              error_type: null,
+              field_values: null,
+              item_id: itemId,
+              origin: batch.origin ?? null,
+              retried_from_item_id: null,
+              session: { prepared_source_mapping: {}, results: {} },
+              session_id: `mock-session-${String(itemId)}`,
+              started_at: null,
+              status: 'pending',
+              updated_at: now,
+              user_display_name: 'Fixture User',
+              user_email: 'fixture@example.test',
+              user_id: MOCK_USER_ID,
+            });
+          }
+
+          return json(201, {
+            batch: { ...batch, batch_id: batchId },
+            enqueued: itemIds.length,
+            item_ids: itemIds,
+            priority: 0,
+            queue_id: 'default',
+          });
+        }
+
         const scopedItems = queueItemsForScope(state, url);
 
         if (action === 'status') {
@@ -1810,6 +2096,23 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const returned = limit === null ? itemIds : itemIds.slice(0, Number(limit));
 
           return json(200, { item_ids: returned, total_count: returned.length });
+        }
+        if (action === 'cancel_all' && method === 'PUT') {
+          const originPrefix = url.searchParams.get('origin_prefix');
+
+          // Calibration items live with the working-memory mock; see mock-working-memory.mjs.
+          if (originPrefix !== null && state.workingMemory.isCalibrationPrefix(originPrefix)) {
+            return json(200, { canceled: state.workingMemory.cancelByOrigin(originPrefix) });
+          }
+
+          let canceled = 0;
+          for (const item of scopedItems) {
+            if (item.status === 'pending' || item.status === 'in_progress') {
+              item.status = 'canceled';
+              canceled += 1;
+            }
+          }
+          return json(200, { canceled });
         }
         if (action === 'clear' && method === 'PUT') {
           state.queueItems.clear();
@@ -1894,6 +2197,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, null);
       }
 
+      if (path.startsWith('/api/v2/models/') && path.includes('working_memory')) {
+        const body = method === 'POST' ? await readJsonBody(request) : null;
+        const answer = state.workingMemory.handle({ body, method, path, scenario: faults.workingMemory });
+
+        if (answer) {
+          return json(answer.status, answer.body);
+        }
+      }
+
       if (method === 'GET' && path === '/api/v2/models/stats') {
         return json(200, null);
       }
@@ -1940,18 +2252,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       if (modelMatch) {
         const key = decodeURIComponent(modelMatch[1]);
         const model = state.models.get(key);
-
         if (!model) {
           return json(404, { detail: 'Model not found' });
         }
         if (method === 'PATCH') {
-          // Mirrors ModelRecordService.update_model: each submitted field replaces the stored one wholesale.
-          const changes = await readJsonBody(request);
-          const updated = { ...model, ...changes };
+          // Mirrors ModelRecordService.update_model: submitted fields replace stored ones wholesale; the key stays.
+          const updated = { ...model, ...(await readJsonBody(request)), key };
           state.models.set(key, updated);
-          return json(200, updated);
+          return json(200, clone(updated));
         }
-
         return json(200, model);
       }
 

@@ -2,12 +2,14 @@
  * Normalizes DOM events into tool input with capture, coalesced samples and default mouse pressure 0.5. Middle
  * mouse pans independently. Space, Alt and held C temporarily select view, picker and bbox; release restores the
  * tool, while quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
- * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. Enter acts only while the keyboard root owns
- * focus. Hold keys and the Escape ladder also act after a control was merely clicked, but never over an editable
- * field, a keyboard-navigated control, an open overlay or beneath a modal dialog. Key releases are always observed and
- * never consumed. DOM access is injected.
+ * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. No key acts over an editable field, a
+ * keyboard-navigated control, an open overlay or beneath a modal dialog; past that, the host's key-owner judge decides:
+ * Enter needs the surface itself, the Escape ladder and C also accept a companion widget, and Space and Alt act over
+ * the hovered canvas whatever the owner. Owned Space and Alt are prevented, and so is the release of an Alt the
+ * pipeline acted on; other releases are observed, never consumed. DOM access is injected.
  */
 
+import type { CanvasKeyOwner } from '@workbench/canvas-engine/capabilities';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, ToolId, Vec2 } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
@@ -30,6 +32,12 @@ export interface PointerPipelineDeps {
   getInputElement(): (HTMLElement & Partial<Pick<HTMLElement, 'setPointerCapture' | 'releasePointerCapture'>>) | null;
   /** The focusable element whose focus gives the canvas its session keys. */
   getKeyboardRoot(): Pick<HTMLElement, 'contains'> | null;
+  /**
+   * The host's judge of which region owns a keydown; asked only on keydown, after the pipeline's own refusals. Absent
+   * (tests, detached engines), focus alone decides: the keyboard root or no focus is the surface, and a control the
+   * pointer last clicked lends its keys like a companion.
+   */
+  getKeyOwnerResolver?(): ((event: KeyboardEvent) => CanvasKeyOwner) | null;
   getActiveTool(): Tool | undefined;
   getActiveToolId(): ToolId;
   getToolContext(): ToolContext;
@@ -60,7 +68,8 @@ export interface PointerPipeline {
   onPointerMove(event: PointerEvent): void;
   onPointerUp(event: PointerEvent): void;
   onPointerCancel(event: PointerEvent): void;
-  onPointerEnter(): void;
+  /** The canvas gained hover; an Alt still held consumes a pending Alt hold. */
+  onPointerEnter(event?: Pick<PointerEvent, 'altKey'>): void;
   onPointerLeave(): void;
   onKeyDown(event: KeyboardEvent): void;
   onKeyUp(event: KeyboardEvent): void;
@@ -85,6 +94,8 @@ export interface PointerPipeline {
   endForToolSwitch(): void;
   /** Replaces a matching tool id that a currently-held temporary tool would restore on release. */
   replaceTemporaryRestoreTool(current: ToolId, replacement: ToolId): void;
+  /** The tool a held temporary switch restores on release, i.e. the tool the user is really on; null without one. */
+  heldRestoreToolId(): ToolId | null;
   /** Clears hover/gesture/temp-tool state, cancelling any in-flight gesture (called on detach/blur). */
   reset(): void;
 }
@@ -186,6 +197,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   // The control focus last landed on by pointer; keyboard navigation (`:focus-visible` on arrival) clears it.
   // Held weakly: a focused row may be removed (virtualized) without another focusin.
   let pointerFocused: WeakRef<EventTarget> | null = null;
+  // Alt went down while the surface owned it but the pointer was elsewhere: the next hover or press with Alt still
+  // held begins the picker hold, so a pen that lands without hovering samples on contact.
+  let altPending = false;
+  // This pipeline began or armed a hold for the Alt now down; its release is prevented too.
+  let altClaimed = false;
 
   /**
    * Reads the input element's viewport offset. Hoisted out of
@@ -217,33 +233,53 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     return [buildPointerInput(event, origin)];
   };
 
-  /**
-   * Enter belongs to the canvas only when focus is on its keyboard root (or nowhere), no control claims it and no modal
-   * dialog is open: focus can rest on the document body beneath one.
-   */
-  const ownsKeyboard = (event: KeyboardEvent): boolean => {
-    if (event.defaultPrevented || isModalPresent(event) || isInteractiveTarget(event.target)) {
-      return false;
-    }
-    return isDocumentRootTarget(event.target) || deps.getKeyboardRoot()?.contains(event.target as Node) === true;
-  };
+  /** Enter belongs to the canvas only when focus is on its keyboard root (or nowhere) and no control claims it. */
+  const focusOnSurface = (event: KeyboardEvent): boolean =>
+    !isInteractiveTarget(event.target) &&
+    (isDocumentRootTarget(event.target) || deps.getKeyboardRoot()?.contains(event.target as Node) === true);
 
   /**
-   * Hold keys and Escape also reach the canvas after a pointer click left focus on a control (a tool button, a layer
-   * row), but not over an editable field, a control reached by keyboard or an open overlay.
+   * Who owns a keydown the canvas might act on, or null when it is refused outright: already handled, under a modal
+   * dialog (focus can rest on the body beneath one), over an editable field or an open overlay, or on a control
+   * reached by keyboard, whose own activation must win.
    */
-  const ownsCanvasKey = (event: KeyboardEvent): boolean => {
-    if (event.defaultPrevented || isModalPresent(event) || isEditableTarget(event.target)) {
-      return false;
+  const keyOwner = (event: KeyboardEvent): CanvasKeyOwner | null => {
+    const target = event.target as KeyTarget;
+    if (
+      event.defaultPrevented ||
+      isModalPresent(event) ||
+      isEditableTarget(event.target) ||
+      target?.closest?.(OVERLAY_SELECTOR)
+    ) {
+      return null;
     }
-    if (ownsKeyboard(event)) {
-      return true;
+    const clicked = event.target !== null && event.target === pointerFocused?.deref();
+    if (isInteractiveTarget(event.target) && !clicked) {
+      return null;
     }
-    return (
-      event.target !== null &&
-      event.target === pointerFocused?.deref() &&
-      !(event.target as KeyTarget)?.closest?.(OVERLAY_SELECTOR)
-    );
+    const resolve = deps.getKeyOwnerResolver?.();
+    if (resolve) {
+      return resolve(event);
+    }
+    if (focusOnSurface(event)) {
+      return 'surface';
+    }
+    return clicked ? 'companion' : null;
+  };
+
+  /** Enter applies only from the surface itself, with focus on its keyboard root or nowhere. */
+  const ownsEnter = (event: KeyboardEvent): boolean => focusOnSurface(event) && keyOwner(event) === 'surface';
+
+  /** The Escape ladder and C act from the surface or a companion widget. */
+  const ownsSessionKey = (event: KeyboardEvent): boolean => {
+    const owner = keyOwner(event);
+    return owner === 'surface' || owner === 'companion';
+  };
+
+  /** Space and Alt are pointer-led: any owner while the canvas is hovered, otherwise only the surface. */
+  const holdOwner = (event: KeyboardEvent): CanvasKeyOwner | null => {
+    const owner = keyOwner(event);
+    return owner !== null && (hovered || owner === 'surface') ? owner : null;
   };
 
   const releaseCapture = (pointerId: number): void => {
@@ -368,6 +404,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       cancelGesture();
     },
     endForToolSwitch: () => {
+      altPending = false;
       cancelGesture();
       if (tempHold) {
         endTempTool();
@@ -379,7 +416,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         // Escape may cancel a session but must preserve committed selection.
         const gestureWasActive = gestureActive;
         cancelGesture();
-        if (ownsCanvasKey(event)) {
+        if (ownsSessionKey(event)) {
           deps.handleEscape?.({ gestureWasActive });
         }
         return;
@@ -390,13 +427,13 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
       if (event.key === 'Enter') {
         // Enter applies a session-bearing tool's edit (transform). No-op otherwise.
-        if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ownsKeyboard(event)) {
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ownsEnter(event)) {
           deps.getActiveTool()?.onKeyCommand?.(deps.getToolContext(), 'apply');
         }
         return;
       }
       if (event.code === 'Space' && !event.repeat) {
-        if (event.ctrlKey || event.metaKey || event.altKey || !ownsCanvasKey(event)) {
+        if (event.ctrlKey || event.metaKey || event.altKey || holdOwner(event) === null) {
           return;
         }
         beginTempTool('space', SPACE_TEMP_TOOL);
@@ -406,15 +443,28 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       if (isAltKey(event) && !event.repeat) {
-        if (!deps.getActiveTool()?.usesAltKey && ownsCanvasKey(event)) {
+        if (holdOwner(event) === null) {
+          return;
+        }
+        // Firefox and Windows activate the menu bar on a lone Alt unless both its press and release are prevented.
+        event.preventDefault();
+        altClaimed = true;
+        // A tool that reads Alt as a gesture modifier keeps it; pointer events still carry `altKey`.
+        if (deps.getActiveTool()?.usesAltKey) {
+          return;
+        }
+        if (hovered) {
           beginTempTool('alt', ALT_TEMP_TOOL);
+        } else if (!tempHold && !gestureActive) {
+          altPending = true;
         }
         return;
       }
-      if (isBboxKey(event) && !event.repeat && ownsCanvasKey(event)) {
+      if (isBboxKey(event) && !event.repeat && ownsSessionKey(event)) {
         beginBboxTempTool();
       }
     },
+    heldRestoreToolId: () => (tempHold && tempSwitched ? priorToolId : null),
     hoverPoint: () => hoverPoint,
     isGestureActive: () => gestureActive,
     onFocusIn: (event) => {
@@ -423,8 +473,15 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     onKeyUp: (event) => {
       if (event.code === 'Space' && tempHold === 'space') {
         releaseTempTool();
-      } else if (isAltKey(event) && tempHold === 'alt') {
-        releaseTempTool();
+      } else if (isAltKey(event)) {
+        altPending = false;
+        if (altClaimed) {
+          altClaimed = false;
+          event.preventDefault();
+        }
+        if (tempHold === 'alt') {
+          releaseTempTool();
+        }
       } else if (isBboxKey(event) && tempHold === 'bbox') {
         releaseBboxTempTool();
       }
@@ -466,6 +523,14 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       cancelledPointerId = null;
+      if (altPending) {
+        // The press is over the canvas whether or not it hovered first; begin the hold so the pick routes it.
+        altPending = false;
+        hovered = true;
+        if (event.altKey) {
+          beginTempTool('alt', ALT_TEMP_TOOL);
+        }
+      }
       // Commit and consume modal text presses before gesture activation; prevent default focus/selection after
       // closing the session.
       if (deps.maybeCommitModalSession?.()) {
@@ -480,8 +545,14 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       deps.getActiveTool()?.onPointerDown?.(deps.getToolContext(), buildPointerInput(event));
       deps.updateCursor();
     },
-    onPointerEnter: () => {
+    onPointerEnter: (event) => {
       hovered = true;
+      if (altPending) {
+        altPending = false;
+        if (event?.altKey) {
+          beginTempTool('alt', ALT_TEMP_TOOL);
+        }
+      }
     },
     onPointerLeave: () => {
       hovered = false;
@@ -555,6 +626,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         endTempTool();
       }
       clearBboxTapTimer();
+      altPending = false;
+      altClaimed = false;
       hovered = false;
       hoverPoint = null;
       gestureActive = false;

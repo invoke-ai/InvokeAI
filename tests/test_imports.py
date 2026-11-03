@@ -1,4 +1,5 @@
 import importlib
+import importlib.util
 import pkgutil
 import subprocess
 import sys
@@ -29,6 +30,10 @@ if is_windows_arm64():
     # mediapipe has no Windows ARM64 build; this module is imported lazily by the face nodes. Everywhere
     # else mediapipe is installed, so this module failing to import is a real regression.
     KNOWN_IMPORT_ERRORS.add("invokeai.backend.image_util.mediapipe_face.mediapipe_face_common")
+if importlib.util.find_spec("triton") is None:
+    # The int8 compute kernels import Triton at the top and are loaded lazily, only where Triton is installed (not on
+    # macOS). Where it is installed, this module failing to import is a real regression.
+    KNOWN_IMPORT_ERRORS.add("invokeai.backend.quantization.int8_matmul_kernels")
 
 
 def test_invokeai_imports():

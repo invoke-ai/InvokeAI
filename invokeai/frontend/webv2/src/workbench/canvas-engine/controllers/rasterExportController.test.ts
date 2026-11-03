@@ -521,3 +521,99 @@ describe('RasterExportController budget', () => {
     expect(memory.snapshot().reservedBytes).toBe(0);
   });
 });
+
+describe('RasterExportController spatial adjustments', () => {
+  const spatialScene = (options: { isGuardCurrent?: () => boolean; displayed?: boolean } = {}) => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    const entry = layers.getOrCreate('layer', 40, 30);
+    entry.hasPublishedPixels = true;
+    entry.stale = false;
+    const layer = {
+      adjustments: [{ amount: 40, id: 'texture', isEnabled: true, size: 8, type: 'texture' as const }],
+      blendMode: 'normal' as const,
+      id: 'layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Fabric',
+      opacity: 1,
+      source: { image: { height: 30, imageName: 'layer.png', width: 40 }, type: 'image' as const },
+      transform: { rotation: 0, scaleX: 0.5, scaleY: 0.5, x: 3, y: 2 },
+      type: 'raster' as const,
+    };
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 100, width: 100, x: 0, y: 0 },
+      height: 100,
+      stacks: stacksFrom([layer]),
+      selectedLayerId: null,
+      version: 3,
+      width: 100,
+    };
+    const runSpatial = vi.fn((request: { pixels: Uint8ClampedArray }) =>
+      Promise.resolve({ pixels: request.pixels, status: 'ok' as const })
+    );
+    const display = backend.createSurface(40, 30);
+    const controller = new RasterExportController({
+      backend,
+      captureGuard: () => ({ cacheVersion: 1, documentGeneration: 1, layer, layerId: 'layer', projectId: 'p' }),
+      getDocument: () => document,
+      getOrStartRasterization: () => Promise.resolve('published'),
+      isGuardCurrent: options.isGuardCurrent ?? (() => true),
+      isRasterizing: () => false,
+      isSupportedSource: () => true,
+      layers,
+      peekAdjustedCacheSurface: () => (options.displayed ? display : null),
+      pin,
+      runSpatial,
+    });
+    return { controller, display, runSpatial };
+  };
+
+  it('evaluates the whole layer-local surface in the spatial service when the display has no exact copy', async () => {
+    const { controller, runSpatial } = spatialScene();
+
+    const baked = await controller.baked('layer');
+
+    expect(baked.status).toBe('ok');
+    expect(runSpatial).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        height: 30,
+        priority: 'now',
+        steps: [{ amount: 40, kind: 'texture', size: 8 }],
+        width: 40,
+      })
+    );
+  });
+
+  it("draws the display's exact copy instead of running a job", async () => {
+    const { controller, runSpatial } = spatialScene({ displayed: true });
+
+    await expect(controller.rasterize('layer', { applyAdjustments: true })).resolves.toMatchObject({ status: 'ok' });
+    expect(runSpatial).not.toHaveBeenCalled();
+  });
+
+  it.each(['too-large', 'over-budget', 'error'] as const)(
+    'refuses %s with the layer name, for bakes and adjusted reads alike',
+    async (reason) => {
+      const { controller, runSpatial } = spatialScene();
+      runSpatial.mockResolvedValue({ status: reason } as never);
+      const refusal = { ownerId: 'layer', ownerName: 'Fabric', reason, status: 'adjustment-refused' };
+
+      await expect(controller.baked('layer')).resolves.toEqual(refusal);
+      await expect(controller.rasterize('layer', { applyAdjustments: true })).resolves.toEqual(refusal);
+      await expect(controller.blob('layer')).resolves.toEqual(refusal);
+    }
+  );
+
+  it('reports pixels replaced while the job ran as not ready', async () => {
+    let current = true;
+    const { controller, runSpatial } = spatialScene({ isGuardCurrent: () => current });
+    runSpatial.mockImplementation((request) => {
+      current = false;
+      return Promise.resolve({ pixels: request.pixels, status: 'ok' as const });
+    });
+
+    await expect(controller.rasterize('layer', { applyAdjustments: true })).resolves.toEqual({ status: 'not-ready' });
+  });
+});

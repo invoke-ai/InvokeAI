@@ -30,7 +30,10 @@ export type LayerChildRowKind =
   | 'adjustment-hsl'
   | 'adjustment-hue'
   | 'adjustment-invert'
-  | 'adjustment-noise';
+  | 'adjustment-noise'
+  | 'adjustment-clarity'
+  | 'adjustment-texture'
+  | 'adjustment-dehaze';
 
 type AdjustmentChildKind = Extract<LayerChildRowKind, `adjustment-${string}`>;
 
@@ -40,24 +43,30 @@ export const adjustmentChildKind = (type: CanvasAdjustmentEntry['type']): Adjust
 
 const ADJUSTMENT_KIND_OF: Record<CanvasAdjustmentEntry['type'], AdjustmentChildKind> = {
   'brightness-contrast': 'adjustment-brightness-contrast',
+  clarity: 'adjustment-clarity',
   curves: 'adjustment-curves',
+  dehaze: 'adjustment-dehaze',
   exposure: 'adjustment-exposure',
   hsl: 'adjustment-hsl',
   hue: 'adjustment-hue',
   invert: 'adjustment-invert',
   levels: 'adjustment-levels',
   noise: 'adjustment-noise',
+  texture: 'adjustment-texture',
 };
 
 const CHILD_ROW_NAME_KEYS: Record<Exclude<LayerChildRowKind, 'reference-image'>, string> = {
   'adjustment-brightness-contrast': 'widgets.layers.modifiers.brightnessContrast',
+  'adjustment-clarity': 'widgets.layers.adjustments.clarity',
   'adjustment-curves': 'widgets.layers.adjustments.curves',
+  'adjustment-dehaze': 'widgets.layers.adjustments.dehaze',
   'adjustment-exposure': 'widgets.layers.adjustments.exposure',
   'adjustment-hsl': 'widgets.layers.adjustments.saturation',
   'adjustment-hue': 'widgets.layers.adjustments.hue',
   'adjustment-invert': 'widgets.layers.adjustments.invert',
   'adjustment-levels': 'widgets.layers.adjustments.levels',
   'adjustment-noise': 'widgets.layers.adjustments.noise',
+  'adjustment-texture': 'widgets.layers.adjustments.texture',
   'layer-region': 'widgets.layers.modifiers.regenerateRegion',
   'mask-denoise': 'widgets.layers.modifiers.denoise',
   'mask-noise': 'widgets.layers.modifiers.noise',
@@ -84,6 +93,13 @@ const adjustmentDetail = (entry: CanvasAdjustmentEntry): string | null => {
       return entry.channel && entry.channel !== 'rgb' ? entry.channel.toUpperCase() : null;
     case 'noise':
       return `${Math.round(entry.amount * 100)}%`;
+    case 'clarity':
+    case 'texture':
+    case 'dehaze': {
+      // A signed strength, as on the backend nodes; it is not a percentage of any visible change.
+      const amount = Math.round(entry.amount);
+      return `${amount > 0 ? '+' : ''}${amount}`;
+    }
     case 'brightness-contrast':
     case 'curves':
     case 'invert':
@@ -349,6 +365,9 @@ export const layerChildRemoveLabelKey = (kind: LayerChildRowKind): string => {
     case 'adjustment-hue':
     case 'adjustment-invert':
     case 'adjustment-noise':
+    case 'adjustment-clarity':
+    case 'adjustment-texture':
+    case 'adjustment-dehaze':
       return 'widgets.layers.modifiers.removeAdjustment';
   }
 };

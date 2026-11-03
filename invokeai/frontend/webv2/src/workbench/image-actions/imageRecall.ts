@@ -8,6 +8,7 @@ import type {
   MainModelConfig,
   VaeModelConfig,
 } from '@features/generation/contracts';
+import type { TFunction } from 'i18next';
 
 import {
   clampAnimaInpaintAdapterWeight,
@@ -41,6 +42,7 @@ import {
   isFluxDypePreset,
   isQwenImageEncoderQuantization,
   isValidKrea2RebalanceWeights,
+  isValidMossImageSkipLayers,
   MAX_FLUX_DYPE_EXPONENT,
   MAX_FLUX_DYPE_SCALE,
   MAX_HIDIFFUSION_RATIO,
@@ -56,9 +58,12 @@ import {
   MIN_REFINER_STEPS,
   MIN_TIMESTEP_SHIFT,
   MIN_ZIMAGE_SEED_VARIANCE_RANDOMIZE_PERCENT,
+  normalizeMossImageSkipLayers,
   normalizeReferenceImages,
 } from '@features/generation/settings';
 import { SEED_MAX } from '@platform/core/seed';
+
+import { resolveRecordedModel, toRecordedModelRef, type RecordedModelPolicy } from './recordedModel';
 
 export type ImageRecallKind = 'all' | 'remix' | 'prompts' | 'seed' | 'dimensions' | 'clipSkip';
 
@@ -102,6 +107,7 @@ type RecalledField =
   | 'externalProvider'
   | 'refiner'
   | 'krea2SeedVariance'
+  | 'mossImageSkipLayers'
   | 'modelTuning'
   | 'animaInpaintAdapterWeight';
 
@@ -321,10 +327,13 @@ export const getMetadataSize = (
   };
 };
 
+/** Image recall restores only the exact weights that ran, and only a model the record names unambiguously. */
+const IMAGE_RECORDED_MODEL_POLICY: RecordedModelPolicy = { ambiguous: 'refuse', hashMiss: 'refuse' };
+
 /** The installed model a recorded reference names, or null when none (or more than one) does. */
 const resolveMetadataModel = <T extends ComponentModelConfig>(value: unknown, models: readonly T[]): T | null => {
   const ref = toRecordedModelRef(value);
-  const resolved = ref ? resolveRecordedModel(ref, models) : null;
+  const resolved = ref ? resolveRecordedModel(ref, models, IMAGE_RECORDED_MODEL_POLICY) : null;
 
   return resolved === 'ambiguous' ? null : resolved;
 };
@@ -472,6 +481,26 @@ const hasKrea2SeedVariance = (metadata: unknown, model: GenerateModelConfig | un
   Object.keys(getMetadataKrea2SeedVariance(metadata, model)).length > 0;
 
 /**
+ * MOSS-Image's negative-branch skip layers; an empty list is a recorded choice, skipping none. A list naming a block
+ * MOSS-Image lacks keeps the current setting: applying it would block every generation until edited.
+ */
+const getMetadataMossImageSkipLayers = (
+  metadata: unknown,
+  model: GenerateModelConfig | undefined
+): Partial<GenerateWidgetValues> => {
+  if (model?.base !== 'moss-image' || !isRecord(metadata)) {
+    return {};
+  }
+
+  const layers = normalizeMossImageSkipLayers(metadata.moss_image_uncond_skip_layers);
+
+  return layers !== null && isValidMossImageSkipLayers(layers) ? { mossImageUncondSkipLayers: layers } : {};
+};
+
+const hasMossImageSkipLayers = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
+  Object.keys(getMetadataMossImageSkipLayers(metadata, model)).length > 0;
+
+/**
  * Generation graphs stamp `generation_mode` and record what ran, so on such a record a missing list or switch means
  * none or the node default. Other records that name a model, such as canvas saves, never record concepts or tuning.
  */
@@ -570,6 +599,14 @@ const getMetadataModelTuning = (
       ...(shift === undefined ? {} : { qwenImageShift: shift }),
       ...(quantization === undefined ? {} : { qwenImageEncoderQuantization: quantization }),
     };
+  }
+
+  if (model.base === 'krea-2') {
+    // Recorded only when the switch was sent: with edit references and a LoRA. A record without it says nothing
+    // about the switch, so the user's setting stays.
+    const referenceKvCache = getBoolean(metadata, 'krea2_reference_kv_cache');
+
+    return referenceKvCache === null ? {} : { krea2ReferenceKvCache: referenceKvCache };
   }
 
   return {};
@@ -816,67 +853,6 @@ const getComponentPatch = (
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
   Object.keys(getComponentPatch(metadata, models)).length > 0;
 
-/**
- * A recorded `ModelIdentifierField` — `{ key, hash, name, base, type }` — with every field optional on read. Records
- * from before identifier fields named the model as `{ model_name, base_model, model_type }`.
- */
-interface RecordedModelRef {
-  base: string | null;
-  hash: string | null;
-  key: string | null;
-  name: string | null;
-  type: string | null;
-}
-
-const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
-  if (!isRecord(value)) {
-    return null;
-  }
-
-  const ref = {
-    base: getString(value, 'base') ?? getString(value, 'base_model'),
-    hash: getString(value, 'hash'),
-    key: getString(value, 'key'),
-    name: getString(value, 'name') ?? getString(value, 'model_name'),
-    type: getString(value, 'type') ?? getString(value, 'model_type'),
-  };
-
-  return ref.key || ref.hash || (ref.name && ref.base) ? ref : null;
-};
-
-/**
- * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
- * name and base (and type, when recorded). A portable identifier counts only when exactly one installed model matches
- * it.
- *
- * By default a recorded hash never falls back to a same-named file, so the main model, VAE, components and concepts
- * restore only the exact weights that ran. `hashMiss: 'matchName'` lets a hash that matches nothing fall through to
- * name and base, as legacy web does for reference-image adapters after a reinstall changes their hash.
- */
-const resolveRecordedModel = <T extends ComponentModelConfig>(
-  ref: RecordedModelRef,
-  models: readonly T[],
-  hashMiss: 'refuse' | 'matchName' = 'refuse'
-): T | 'ambiguous' | null => {
-  const byKey = ref.key ? models.find((model) => model.key === ref.key) : undefined;
-
-  if (byKey) {
-    return byKey;
-  }
-
-  const byHash = ref.hash ? models.filter((model) => model.hash === ref.hash) : [];
-  const matches =
-    byHash.length > 0 || (ref.hash && hashMiss === 'refuse')
-      ? byHash
-      : ref.name && ref.base
-        ? models.filter(
-            (model) => model.name === ref.name && model.base === ref.base && (!ref.type || model.type === ref.type)
-          )
-        : [];
-
-  return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
-};
-
 type RefinerPatch = Partial<
   Pick<
     GenerateWidgetValues,
@@ -939,7 +915,9 @@ const getRefinerRecall = (
   }
 
   if ('refiner_model' in metadata) {
-    const refiner = ref ? resolveRecordedModel(ref, models.filter(isInstalledRefiner)) : null;
+    const refiner = ref
+      ? resolveRecordedModel(ref, models.filter(isInstalledRefiner), IMAGE_RECORDED_MODEL_POLICY)
+      : null;
 
     if (metadata.refiner_model === null) {
       patch.refinerModel = null;
@@ -1048,7 +1026,7 @@ const getMetadataConcepts = (
       continue;
     }
 
-    const installed = resolveRecordedModel(ref, loraModels);
+    const installed = resolveRecordedModel(ref, loraModels, IMAGE_RECORDED_MODEL_POLICY);
 
     if (installed === null || installed === 'ambiguous') {
       skipped.push({
@@ -1128,7 +1106,7 @@ const resolveReferenceImageModels = (
       ? resolveRecordedModel(
           ref,
           models.filter((model) => model.type === recordedType),
-          'matchName'
+          { ...IMAGE_RECORDED_MODEL_POLICY, hashMiss: 'matchName' }
         )
       : null;
 
@@ -1196,6 +1174,7 @@ export const getImageRecallCapabilities = ({
   const hasModel = supportedMetadataModel !== null;
   const hasProviderOptions = hasExternalProvider(metadata, clipSkipModel);
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel) || hasKrea2SeedVariance(metadata, clipSkipModel);
+  const hasSkipLayers = hasMossImageSkipLayers(metadata, clipSkipModel);
   const hasTuning = hasModelTuning(metadata, clipSkipModel);
   const hasRefiner =
     Object.keys(getRefinerRecall(metadata, clipSkipModel, models, supportedMetadataModel).patch).length > 0;
@@ -1217,6 +1196,7 @@ export const getImageRecallCapabilities = ({
     hasRebalance ||
     hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
     hasAdapterSettings;
   const hasNonSeedMetadata =
@@ -1233,6 +1213,7 @@ export const getImageRecallCapabilities = ({
     hasRebalance ||
     hasProviderOptions ||
     hasRefiner ||
+    hasSkipLayers ||
     hasTuning ||
     hasAdapterSettings;
 
@@ -1322,6 +1303,13 @@ export const buildImageRecallSettings = ({
     if (Object.keys(seedVariancePatch).length > 0) {
       values = { ...values, ...seedVariancePatch };
       fields.push('krea2SeedVariance');
+    }
+
+    const skipLayersPatch = getMetadataMossImageSkipLayers(metadata, values.model);
+
+    if (Object.keys(skipLayersPatch).length > 0) {
+      values = { ...values, ...skipLayersPatch };
+      fields.push('mossImageSkipLayers');
     }
 
     const tuningPatch = getMetadataModelTuning(metadata, values.model);
@@ -1503,22 +1491,8 @@ export const buildImageRecallSettings = ({
   return fields.length > 0 || skipped.length > 0 ? { fields, skipped, values } : null;
 };
 
-export const getImageRecallTitle = (kind: ImageRecallKind): string => {
-  switch (kind) {
-    case 'all':
-      return 'Recalled image metadata';
-    case 'remix':
-      return 'Recalled remix settings';
-    case 'prompts':
-      return 'Recalled prompts';
-    case 'seed':
-      return 'Recalled seed';
-    case 'dimensions':
-      return 'Recalled image size';
-    case 'clipSkip':
-      return 'Recalled CLIP skip';
-  }
-};
+export const getImageRecallTitle = (kind: ImageRecallKind, t: TFunction): string =>
+  t(`widgets.gallery.itemActions.recall.imageTitles.${kind}`);
 
-export const getImageRecallMessage = (fields: RecalledField[]): string =>
-  `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
+export const getImageRecallMessage = (fields: readonly RecalledField[], t: TFunction): string =>
+  t('widgets.gallery.itemActions.recall.fieldsApplied', { count: fields.length });

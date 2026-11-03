@@ -30,6 +30,7 @@ from invokeai.app.services.model_install.model_install_common import (
     URLModelSource,
 )
 from invokeai.app.services.model_records import ModelRecordChanges
+from invokeai.app.util import no_replace
 from invokeai.backend.util.logging import InvokeAILogger
 
 SOURCE = "https://example.com/weights.safetensors"
@@ -56,6 +57,16 @@ def models_path(tmp_path: Path) -> Path:
 @pytest.fixture
 def ledger(models_path: Path) -> InstallStagingLedger:
     return InstallStagingLedger(models_path, InvokeAILogger.get_logger("InstallStagingLedgerTest"))
+
+
+@pytest.fixture
+def without_hard_links(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Refuse hard links the way exFAT does on Linux."""
+
+    def refuse_link(src: Path, dst: Path) -> None:
+        raise PermissionError(errno.EPERM, "Operation not permitted", str(dst))
+
+    monkeypatch.setattr(no_replace.os, "link", refuse_link)
 
 
 def _claim_path(root: Path) -> Path:
@@ -537,6 +548,33 @@ def test_a_second_claim_on_staging_is_refused_and_recorded(ledger: InstallStagin
     contender.release_claim()
 
 
+def test_without_hard_links_a_claim_is_taken_and_a_second_claim_conflicts(
+    ledger: InstallStagingLedger, models_path: Path, without_hard_links: None
+) -> None:
+    tmpdir = _staging_dir(models_path, "no-hard-links")
+    owner = InstallStaging(ledger, tmpdir)
+    owner.claim()
+    contender = InstallStaging(ledger, tmpdir)
+
+    with pytest.raises(InstallCancellationConflictError, match="another install or orphan cleanup"):
+        contender.claim()
+
+    assert len(_claim_path(tmpdir).read_text(encoding="ascii").split()) >= 2
+    assert sorted(path.name for path in models_path.iterdir()) == sorted([tmpdir.name, _claim_path(tmpdir).name])
+    owner.release_claim()
+    assert not _claim_path(tmpdir).exists()
+
+
+def test_without_hard_links_startup_cleanup_removes_dangling_staging(
+    ledger: InstallStagingLedger, models_path: Path, without_hard_links: None
+) -> None:
+    _staging_dir(models_path, "failed-install")
+
+    ledger.remove_dangling_staging([])
+
+    assert list(models_path.iterdir()) == []
+
+
 @pytest.mark.parametrize("root_kind", ["staging", "source"])
 def test_release_drops_claims_before_it_clears_recovery_marks(
     ledger: InstallStagingLedger, models_path: Path, monkeypatch: pytest.MonkeyPatch, root_kind: str
@@ -899,12 +937,12 @@ def test_claim_publication_survives_temporary_unlink_failure(
     root.mkdir()
     claim = _claim_path(root)
     temp_paths: list[Path] = []
-    real_link = os.link
+    real_publish = install_staging_ledger.publish_noreplace
     real_unlink = Path.unlink
 
     def publish(temp_path: Path, claim_path: Path) -> None:
         temp_paths.append(Path(temp_path))
-        real_link(temp_path, claim_path)
+        real_publish(temp_path, claim_path)
 
     def fail_temp_unlink(path: Path, *args: Any, **kwargs: Any) -> None:
         if temp_paths and path == temp_paths[0]:
@@ -913,7 +951,7 @@ def test_claim_publication_survives_temporary_unlink_failure(
 
     try:
         with monkeypatch.context() as patch:
-            patch.setattr(install_staging_ledger.os, "link", publish)
+            patch.setattr(install_staging_ledger, "publish_noreplace", publish)
             patch.setattr(Path, "unlink", fail_temp_unlink)
             held = ledger.claim(root)
         assert claim.exists()

@@ -595,7 +595,7 @@ describe('preset switch keep-alive', () => {
     await setActiveInstanceId(undefined);
 
     expect(centerWidget('canvas')).toBeNull();
-    expect(host?.textContent).toContain('Center widget unavailable');
+    expect(host?.textContent).toContain('common.widgetViewUnavailable');
   });
 
   it('keeps chrome on the live region rather than on the kept widget', async () => {

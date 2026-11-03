@@ -2,7 +2,10 @@ import type {
   CanvasControlLayerContract,
   CanvasImageRef,
   CanvasInpaintMaskLayerContract,
+  CanvasLayerBaseContract,
+  CanvasLayerSourceContract,
   CanvasMaskFillContract,
+  CanvasPixelSourceContract,
   CanvasRegionalGuidanceLayerContract,
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -88,23 +91,55 @@ export const createRegionalGuidanceFromImage = (
   type: 'regional_guidance',
 });
 
-export const createControlLayer = (
-  name: string,
-  id: string,
-  base?: string | null,
-  model?: string | null
-): CanvasControlLayerContract => {
-  return {
-    adapter: createDefaultControlAdapter(base, model ?? null),
-    blendMode: 'normal',
-    id,
-    isEnabled: true,
-    isLocked: false,
-    name,
-    opacity: 1,
-    source: { bitmap: null, type: 'paint' },
-    transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-    type: 'control',
-    withTransparencyEffect: true,
-  };
-};
+export interface CreateControlLayerInput {
+  name: string;
+  id: string;
+  /** Main model base whose adapter kind and defaults the layer starts on. */
+  base?: string | null;
+  /** Defaults to an empty paint source. */
+  source?: CanvasPixelSourceContract;
+}
+
+/** The one control-layer factory: untyped, with no model, so generation resolves the model from the type. */
+export const createControlLayer = ({
+  base,
+  id,
+  name,
+  source,
+}: CreateControlLayerInput): CanvasControlLayerContract => ({
+  adapter: createDefaultControlAdapter(base, null),
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name,
+  opacity: 1,
+  source: source ?? { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: true,
+});
+
+/**
+ * An untyped, model-less control layer made from another layer, keeping its appearance and flags. `content` either
+ * places baked pixels at `rect` under an identity transform, or reuses a source and transform as they are.
+ */
+export const createControlLayerFrom = (
+  from: CanvasLayerBaseContract,
+  options: {
+    id: string;
+    name: string;
+    base: string | null;
+    content: { readonly rect: Rect } | { readonly source: CanvasLayerSourceContract };
+  }
+): CanvasControlLayerContract => ({
+  ...createControlLayer({ base: options.base, id: options.id, name: options.name }),
+  blendMode: from.blendMode,
+  ...(from.colorLabel ? { colorLabel: from.colorLabel } : {}),
+  isEnabled: from.isEnabled,
+  isLocked: from.isLocked,
+  opacity: from.opacity,
+  ...('rect' in options.content
+    ? { source: { bitmap: null, offset: { x: options.content.rect.x, y: options.content.rect.y }, type: 'paint' } }
+    : { source: structuredClone(options.content.source), transform: { ...from.transform } }),
+});

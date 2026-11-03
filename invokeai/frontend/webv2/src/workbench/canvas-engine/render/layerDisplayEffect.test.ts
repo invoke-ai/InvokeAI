@@ -108,6 +108,11 @@ describe('renderLayerDisplayEffect', () => {
     expect(renderLayerDisplayEffect(backend, controlLayer(true), backend.createSurface(0, 0), ORIGIN)).toBeNull();
   });
 
+  it("previews only a raster stack's per-pixel part: a spatial-only stack needs no copy", () => {
+    const spatialOnly = rasterLayer([{ amount: 60, id: 'c', isEnabled: true, size: 40, type: 'clarity' }]);
+    expect(renderLayerDisplayEffect(backend, spatialOnly, backend.createSurface(4, 4), ORIGIN)).toBeNull();
+  });
+
   it('returns a copy for a raster layer with adjustments', () => {
     const out = renderLayerDisplayEffect(
       backend,
