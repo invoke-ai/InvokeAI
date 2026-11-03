@@ -359,13 +359,15 @@ def _magnitude_fits(layer: Mapping[str, Any], out_features: int, in_features: in
 
 def misshapen_flux3_layers(state_dict: Mapping[str | int, Any], keys: Flux3LoRAKeys) -> dict[str, str]:
     """Each key of a layer whose update does not have the shape of the weight it changes in the released transformer,
-    or whose DoRA magnitude does not fit that weight, with why (`WRONG_SHAPE`)."""
+    or whose DoRA magnitude does not fit that weight, or whose alpha holds more than one value, with why (`WRONG_SHAPE`)."""
     misshapen: dict[str, str] = {}
     for module, sources in keys.layers.items():
         weight_shape = _weight_shape(module)
         assert weight_shape is not None  # `read_flux3_lora_keys` resolved it to a Linear
         values = {value_key: state_dict[key] for value_key, key in sources.items()}
-        if _update_shape(values) != weight_shape or not _magnitude_fits(values, *weight_shape):
+        # Loading reads alpha with `.item()`, which only a single value survives.
+        alpha_is_scalar = "alpha" not in values or math.prod(_shape(values["alpha"])) == 1
+        if _update_shape(values) != weight_shape or not _magnitude_fits(values, *weight_shape) or not alpha_is_scalar:
             misshapen.update(dict.fromkeys(sources.values(), WRONG_SHAPE))
     return misshapen
 

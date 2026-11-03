@@ -112,6 +112,7 @@ def test_every_layer_kind_is_accepted_at_the_released_shape(kind: str, tmp_path:
 _MISSHAPEN = {
     "low-rank": _LOW_RANK["lora_A/lora_B"] | {"lora_B.weight": (OUT // 2, R)},
     "low-rank-whose-ranks-differ": _LOW_RANK["lora_A/lora_B"] | {"lora_B.weight": (OUT, R + 1)},
+    "multi-value-alpha": _LOW_RANK["lora_A/lora_B"] | {"alpha": (R,)},
     "peft-dora-on-the-input-axis": _LOW_RANK["lora_A/lora_B"] | {"lora_magnitude_vector": (IN,)},
     "lycoris-dora-on-neither-axis": _LOW_RANK["lora_down/lora_up"] | {"dora_scale": (1, OUT)},
     "lokr": _LOKR_W1["whole"] | {"lokr_w2": (OUT // 4, IN // 16)},
