@@ -122,6 +122,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('openaiQuality') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiQuality')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiQualityHelp')}
           >
             <Select
@@ -139,6 +140,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('openaiBackground') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiBackground')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiBackgroundHelp')}
           >
             <Select
@@ -156,6 +158,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('openaiInputFidelity') ? (
           <Field
             label={t('widgets.generate.providerOptions.openaiInputFidelity')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.openaiInputFidelityHelp')}
           >
             <Select
@@ -204,6 +207,7 @@ export const GenerateProviderOptionsSection = ({
         {optionKeys.includes('geminiThinkingLevel') ? (
           <Field
             label={t('widgets.generate.providerOptions.geminiThinkingLevel')}
+            labelPlacement="inside"
             helpText={t('widgets.generate.providerOptions.geminiThinkingLevelHelp')}
           >
             <Select

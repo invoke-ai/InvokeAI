@@ -109,7 +109,7 @@ const ComponentPicker = ({
   const selectedValue = value && (!isIncompatible || slot.incompatibleMessage) ? value.key : null;
 
   return (
-    <Field label={slot.label} helpText={slot.helpText} error={error}>
+    <Field label={slot.label} labelPlacement="inside" helpText={slot.helpText} error={error}>
       <ModelSelect
         filter={slot.filter ? filter : undefined}
         invalid={Boolean(error)}

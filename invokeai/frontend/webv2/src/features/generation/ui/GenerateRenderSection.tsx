@@ -151,7 +151,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
 
   return (
     <>
-      <Field label={t('widgets.generate.ideogram4SamplerPreset')}>
+      <Field label={t('widgets.generate.ideogram4SamplerPreset')} labelPlacement="inside">
         <Select
           aria-label={t('widgets.generate.ideogram4SamplerPreset')}
           collection={IDEOGRAM4_PRESET_COLLECTION}
@@ -457,7 +457,7 @@ const FluxDypeFields = ({ onCommit, settings }: RenderFieldsProps) => {
 
   return (
     <>
-      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')}>
+      <Field hint="dypePreset" label={t('widgets.generate.dypePreset')} labelPlacement="inside">
         <Select
           aria-label={t('widgets.generate.dypePreset')}
           collection={presetCollection}
@@ -714,7 +714,7 @@ export const GenerateRenderSection = ({
           isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
           onReset={modelDefaults ? () => onCommit({ scheduler: modelDefaults.scheduler }) : undefined}
         >
-          <Field hint="scheduler" label={t('widgets.generate.scheduler')}>
+          <Field hint="scheduler" label={t('widgets.generate.scheduler')} labelPlacement="inside">
             <Combobox
               aria-label={t('widgets.generate.scheduler')}
               options={getSchedulerOptions(selectedModel, settings.scheduler)}

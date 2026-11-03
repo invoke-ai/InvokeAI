@@ -27,7 +27,7 @@ import { formatBytes } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, CloseButton, IconButton, PopoverContent, Tooltip } from '@platform/ui';
-import { useFieldLabelId } from '@platform/ui/Field';
+import { FieldInsideLabel, INSIDE_LABEL_INSET, useFieldLabelId, useInsideFieldLabel } from '@platform/ui/Field';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Picker } from '@platform/ui/Picker';
 import { Link } from '@tanstack/react-router';
@@ -142,7 +142,8 @@ export const ModelSelect = ({
   // Like Select, an enclosing Field names the trigger and supplies its description, invalid and disabled states.
   const field = useFieldContext();
   const fieldControlProps = field?.getInputProps();
-  const fieldLabelId = useFieldLabelId();
+  const insideLabel = useInsideFieldLabel();
+  const fieldLabelId = useFieldLabelId() ?? insideLabel?.id ?? null;
   const valueTextId = useId();
   const isDisabled = Boolean(disabled || field?.disabled);
   const isInvalid = Boolean(invalid || field?.invalid);
@@ -297,10 +298,12 @@ export const ModelSelect = ({
               borderColor={isInvalid ? undefined : isOpen ? 'accent.solid' : 'border'}
               colorPalette={isInvalid ? 'red' : 'gray'}
               disabled={isInert}
+              // Under an inside label the value reads at Select's and Combobox's regular weight; the label sets its own.
+              fontWeight={insideLabel ? 'normal' : undefined}
               justifyContent="space-between"
               minW="0"
               pe={canClear ? '7' : '2'}
-              ps="2"
+              ps={insideLabel ? INSIDE_LABEL_INSET : '2'}
               size={size}
               transitionDuration="fast"
               transitionProperty="border-color, background"
@@ -311,10 +314,19 @@ export const ModelSelect = ({
                 borderColor: isInvalid ? undefined : isOpen ? 'accent.solid' : 'border.emphasized',
               }}
             >
+              {insideLabel ? <FieldInsideLabel label={insideLabel} /> : null}
               {selectedModel ? (
-                <ModelButtonContent id={valueTextId} model={selectedModel} />
+                <ModelButtonContent id={valueTextId} isEndAligned={Boolean(insideLabel)} model={selectedModel} />
               ) : (
-                <Text as="span" id={valueTextId} color="fg.muted" minW="0" truncate>
+                <Text
+                  as="span"
+                  id={valueTextId}
+                  color="fg.muted"
+                  flex={insideLabel ? '1' : undefined}
+                  minW="0"
+                  textAlign={insideLabel ? 'end' : undefined}
+                  truncate
+                >
                   {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
@@ -524,8 +536,8 @@ const BaseChip = ({
   </Badge>
 );
 
-const ModelButtonContent = ({ id, model }: { id: string; model: ModelConfig }) => (
-  <HStack as="span" id={id} flex="1" gap="2" minW="0">
+const ModelButtonContent = ({ id, isEndAligned, model }: { id: string; isEndAligned: boolean; model: ModelConfig }) => (
+  <HStack as="span" id={id} flex="1" gap="2" justify={isEndAligned ? 'flex-end' : undefined} minW="0">
     <MiddleTruncate as="span" minW="0" text={model.name} />
     <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}

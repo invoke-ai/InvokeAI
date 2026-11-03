@@ -10,6 +10,7 @@ import type {
 
 import { Box, chakra, Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { INSIDE_LABEL_INSET } from '@platform/ui/Field';
 import { FEATURE_HINT_FIELD_PROPS, FeatureHint } from '@platform/ui/hints';
 import { fieldLabelRecipe, scrubberInteraction } from '@theme/recipes';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
@@ -174,7 +175,7 @@ const ROOT_CSS = {
     flexShrink: 1,
     minW: '0',
     overflow: 'hidden',
-    ps: '3',
+    ps: INSIDE_LABEL_INSET,
     position: 'relative',
     textOverflow: 'ellipsis',
     textShadow: SCRUBBER_TEXT_SHADOW,

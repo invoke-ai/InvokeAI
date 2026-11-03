@@ -5,11 +5,13 @@ import type {
   CollectionItem,
 } from '@chakra-ui/react';
 
-import { Combobox as ChakraCombobox, createListCollection, Portal } from '@chakra-ui/react';
+import { Combobox as ChakraCombobox, createListCollection, Portal, useFieldContext } from '@chakra-ui/react';
+import { inputShellInteraction } from '@theme/recipes';
 import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type UIEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { FieldInsideLabel, INSIDE_LABEL_INSET, useInsideFieldLabel } from './Field';
 import { Scrollable } from './Scrollable';
 
 const COMBOBOX_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
@@ -17,6 +19,42 @@ const COMBOBOX_POSITIONING = { placement: 'bottom-start', sameWidth: true } as c
 // Zag scrolls its content element by default; the Scrollable viewport is the scroll container here.
 const scrollHighlightedIntoView = ({ getElement }: { getElement: () => HTMLElement | null }) =>
   getElement()?.scrollIntoView({ block: 'nearest' });
+
+/**
+ * Under an inside label the control is the box, as InputShell is: it carries the input's border, focus, open, invalid
+ * and disabled states around both the label and the input.
+ */
+const INSIDE_CONTROL_CSS = {
+  ...inputShellInteraction,
+  alignItems: 'center',
+  borderColor: 'border',
+  borderRadius: 'l2',
+  borderWidth: '1px',
+  display: 'flex',
+  // The label carries the inset and the gap before the value as its own padding, full height, so a click anywhere left
+  // of the input lands on the label and opens the input like the rest of the box.
+  '& > label': {
+    alignSelf: 'stretch',
+    lineHeight: 'calc(var(--combobox-input-height) - 2px)',
+    pe: '2',
+    ps: INSIDE_LABEL_INSET,
+  },
+  _open: { borderColor: 'accent.solid' },
+  // The box dims once; its input and chevron would otherwise dim again inside it.
+  _disabled: { layerStyle: 'disabled', '& [data-part=input], & [data-part=indicator-group]': { opacity: 1 } },
+} as const;
+
+/** The selected label sits at the end of the box, after the inside label; typing filters as usual. */
+const INSIDE_INPUT_CSS = {
+  bg: 'transparent',
+  borderWidth: '0',
+  flex: '1',
+  minW: '0',
+  minH: 'calc(var(--combobox-input-height) - 2px)',
+  ps: '0',
+  textAlign: 'end',
+  textOverflow: 'ellipsis',
+} as const;
 
 export interface ComboboxOption extends CollectionItem {
   disabled?: boolean;
@@ -64,6 +102,14 @@ export const Combobox = ({
   ...rootProps
 }: ComboboxProps) => {
   const { t } = useTranslation();
+  const field = useFieldContext();
+  const insideLabel = useInsideFieldLabel();
+  // Ark's input takes only the helper text from Field; an invalid field's error describes it too.
+  const fieldInputProps = field?.getInputProps();
+  const describedBy =
+    [fieldInputProps?.['aria-describedby'], fieldInputProps?.['aria-errormessage'], inputProps?.['aria-describedby']]
+      .filter(Boolean)
+      .join(' ') || undefined;
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const lastNotifiedInputValue = useRef('');
@@ -181,9 +227,13 @@ export const Combobox = ({
       onSelect={onItemReselect ? handleSelect : undefined}
       onValueChange={handleValueChange}
     >
-      <ChakraCombobox.Control>
+      <ChakraCombobox.Control css={insideLabel ? INSIDE_CONTROL_CSS : undefined}>
+        {insideLabel && field ? <FieldInsideLabel htmlFor={field.ids.control} label={insideLabel} /> : null}
         <ChakraCombobox.Input
+          css={insideLabel ? INSIDE_INPUT_CSS : undefined}
           {...inputProps}
+          aria-describedby={describedBy}
+          aria-errormessage={inputProps?.['aria-errormessage'] ?? fieldInputProps?.['aria-errormessage']}
           aria-label={inputProps?.['aria-label'] ?? ariaLabel}
           placeholder={searchPlaceholder ?? t('common.searchOptions')}
         />

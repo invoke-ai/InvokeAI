@@ -12,6 +12,7 @@ import type { Key, ReactNode } from 'react';
 import { Portal, Select as ChakraSelect, Separator, useFieldContext } from '@chakra-ui/react';
 import { Fragment, useCallback, useRef } from 'react';
 
+import { FieldInsideLabel, INSIDE_LABEL_INSET, useInsideFieldLabel } from './Field';
 import { Scrollable } from './Scrollable';
 
 const getDefaultItemKey = <T extends CollectionItem>(item: T, index: number): Key => {
@@ -44,6 +45,26 @@ const partitionByGroup = <T,>(
   return runs;
 };
 
+/**
+ * With the chevron in the trigger's flow (an inside label, or a trigger sized to its value) the value fills the room
+ * left before it, end-aligned and truncating on one line; rich value text (an icon and a name) aligns as one inline box
+ * that can still shrink.
+ */
+const IN_FLOW_VALUE_TEXT_CSS = {
+  display: 'block',
+  flex: '1',
+  maxW: 'none',
+  minW: '0',
+  overflow: 'hidden',
+  textAlign: 'end',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  '& > *': { display: 'inline-flex', maxW: 'full', verticalAlign: 'middle' },
+} as const;
+
+/** The trigger already dims when disabled; the chevron inside it keeps its resting colour rather than dimming twice. */
+const IN_TRIGGER_INDICATOR_CSS = { _disabled: { color: 'fg.muted' } } as const;
+
 /** Fits the anchor's available space with the same headroom the settings selects use. */
 const DEFAULT_ITEMS_MAX_H = 'min(20rem, calc(var(--available-height) - 0.5rem))';
 
@@ -64,6 +85,11 @@ export interface SelectProps<T extends CollectionItem> extends Omit<SelectRootPr
   getItemKey?: (item: T, index: number) => Key;
   indicatorGroupProps?: SelectIndicatorGroupProps;
   itemIndicator?: boolean;
+  /**
+   * Sizes the select to its value instead of its container's width, for a select trailing its label in a row; cap it
+   * with `maxW`. The chevron joins the trigger's flow, so a truncated value stops before it.
+   */
+  fitContent?: boolean;
   portalled?: boolean;
   positionerProps?: SelectPositionerProps;
   renderItem?: (item: T) => ReactNode;
@@ -82,6 +108,7 @@ export const Select = <T extends CollectionItem>({
   indicatorGroupProps,
   itemsMaxH = DEFAULT_ITEMS_MAX_H,
   itemIndicator = true,
+  fitContent = false,
   portalled = true,
   positionerProps,
   renderGroupLabel,
@@ -93,6 +120,20 @@ export const Select = <T extends CollectionItem>({
 }: SelectProps<T>) => {
   // Inside Field, reuse its label ID; rendering another Label would duplicate it.
   const field = useFieldContext();
+  const insideLabel = useInsideFieldLabel();
+  // An inside label or a content-sized trigger keeps the chevron in the trigger's flow, so the value truncates
+  // before it (or the trigger grows to hold it) instead of running under it.
+  const isIndicatorInTrigger = insideLabel !== null || fitContent;
+  // Zag names the trigger by the field's label but leaves its help and error text to the hidden select.
+  const fieldControlProps = field?.getInputProps();
+  const describedBy =
+    [
+      fieldControlProps?.['aria-describedby'],
+      fieldControlProps?.['aria-errormessage'],
+      triggerProps?.['aria-describedby'],
+    ]
+      .filter(Boolean)
+      .join(' ') || undefined;
   const itemsRef = useRef<HTMLDivElement>(null);
   const scrollToIndexFn = useCallback(({ index }: { index: number }) => {
     const options = itemsRef.current?.querySelectorAll('[role="option"]');
@@ -103,22 +144,35 @@ export const Select = <T extends CollectionItem>({
     <ChakraSelect.Root
       collection={collection}
       lazyMount
+      minW={fitContent ? '0' : undefined}
       scrollToIndexFn={itemsMaxH ? scrollToIndexFn : undefined}
       unmountOnExit
+      w={fitContent ? 'auto' : undefined}
       {...rootProps}
       // An empty list is nothing to choose from: the trigger disables instead of opening a blank menu.
-      disabled={rootProps.disabled || collection.items.length === 0}
+      // An explicit prop would otherwise override the enclosing Field's disabled state.
+      disabled={rootProps.disabled || field?.disabled || collection.items.length === 0}
     >
       {/* Materialize the trigger's aria-labelledby target; aria-label on Root would name a generic div instead. */}
       {ariaLabel && !field ? <ChakraSelect.Label srOnly>{ariaLabel}</ChakraSelect.Label> : null}
       <ChakraSelect.HiddenSelect />
       <ChakraSelect.Control>
-        <ChakraSelect.Trigger {...triggerProps}>
-          <ChakraSelect.ValueText {...valueTextProps}>{valueText}</ChakraSelect.ValueText>
+        <ChakraSelect.Trigger
+          ps={insideLabel ? INSIDE_LABEL_INSET : undefined}
+          {...triggerProps}
+          aria-describedby={describedBy}
+        >
+          {insideLabel ? <FieldInsideLabel label={insideLabel} /> : null}
+          <ChakraSelect.ValueText css={isIndicatorInTrigger ? IN_FLOW_VALUE_TEXT_CSS : undefined} {...valueTextProps}>
+            {valueText}
+          </ChakraSelect.ValueText>
+          {isIndicatorInTrigger ? <ChakraSelect.Indicator css={IN_TRIGGER_INDICATOR_CSS} /> : null}
         </ChakraSelect.Trigger>
-        <ChakraSelect.IndicatorGroup {...indicatorGroupProps}>
-          <ChakraSelect.Indicator />
-        </ChakraSelect.IndicatorGroup>
+        {isIndicatorInTrigger ? null : (
+          <ChakraSelect.IndicatorGroup {...indicatorGroupProps}>
+            <ChakraSelect.Indicator />
+          </ChakraSelect.IndicatorGroup>
+        )}
       </ChakraSelect.Control>
       <Portal disabled={!portalled}>
         <ChakraSelect.Positioner {...positionerProps}>

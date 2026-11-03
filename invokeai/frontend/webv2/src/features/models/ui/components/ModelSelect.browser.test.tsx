@@ -6,6 +6,7 @@ import { ModelsUiProvider, NO_SCHEDULER_POLICY } from '@features/models/ui/Model
 import { getModelsUiSnapshotForTests } from '@features/models/ui/uiStore';
 import { auditAccessibility, contrastOffenderTexts } from '@platform/browser/auditAccessibility.testing';
 import { Field } from '@platform/ui/Field';
+import { ScrubberField } from '@platform/ui/ScrubberField';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -482,6 +483,97 @@ describe('ModelSelect loading states', () => {
       await userEvent.keyboard('{Escape}');
       await expect.poll(() => document.activeElement).toBe(trigger());
       expect(onChange).toHaveBeenCalledOnce();
+    });
+
+    describe('with the label inside', () => {
+      const renderInside = (field: { error?: string; helpText?: string }, onChange = vi.fn()) =>
+        act(() => {
+          root.render(
+            <ChakraProvider value={system}>
+              <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+                <Field label="VAE" labelPlacement="inside" {...field}>
+                  <ModelSelect
+                    isClearable
+                    modelTypes={MAIN_MODEL_TYPES}
+                    showManagerButton={false}
+                    value="sdxl-main"
+                    onChange={onChange}
+                  />
+                </Field>
+              </ModelsUiProvider>
+            </ChakraProvider>
+          );
+        });
+      const insideLabel = () => trigger().querySelector<HTMLElement>('span[id]')!;
+
+      it('shows the label in the trigger, before the end-aligned model, and keeps its name and description', async () => {
+        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+        await renderInside({ helpText: 'Using the bundled VAE' });
+
+        // A span, not a <label>, because it sits inside the trigger button.
+        expect(host.querySelector('label')).toBeNull();
+        expect(insideLabel().textContent).toBe('VAE');
+        const value = insideLabel().nextElementSibling!;
+        expect(value.textContent).toBe('SDXL MainSDXL');
+        expect(insideLabel().getBoundingClientRect().right).toBeLessThanOrEqual(value.getBoundingClientRect().left);
+        expect(getComputedStyle(value).justifyContent).toBe('flex-end');
+        await expect
+          .element(page.getByRole('button', { exact: true, name: 'VAE SDXL Main SDXL' }))
+          .toHaveAccessibleDescription('Using the bundled VAE');
+      });
+
+      it('opens from a click on the label and still clears from its clear button', async () => {
+        const onChange = vi.fn();
+        setModelsSnapshotForTests({ error: null, models: [model, secondSdxlModel], status: 'loaded' });
+        await renderInside({}, onChange);
+
+        await userEvent.click(insideLabel());
+        await expect.poll(() => document.querySelector('input[role="combobox"]')).not.toBeNull();
+        await userEvent.keyboard('{Escape}');
+        await expect.poll(() => document.querySelector('input[role="combobox"]')).toBeNull();
+
+        await userEvent.click(page.getByRole('button', { exact: true, name: 'models.clearSelectedModel' }));
+        expect(onChange).toHaveBeenLastCalledWith(null);
+      });
+
+      it('lines its label up with a stacked ScrubberField and shows the model at regular weight', async () => {
+        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+        await act(() => {
+          root.render(
+            <ChakraProvider value={system}>
+              <ModelsUiProvider adapter={MODELS_UI_ADAPTER}>
+                <ScrubberField label="Steps" max={100} min={1} step={1} value={30} onChange={vi.fn()} />
+                <Field label="VAE" labelPlacement="inside">
+                  <ModelSelect
+                    modelTypes={MAIN_MODEL_TYPES}
+                    showManagerButton={false}
+                    value="sdxl-main"
+                    onChange={vi.fn()}
+                  />
+                </Field>
+              </ModelsUiProvider>
+            </ChakraProvider>
+          );
+        });
+        const textLeft = (element: Element) => {
+          const range = document.createRange();
+          range.selectNodeContents(element);
+          return range.getBoundingClientRect().left;
+        };
+        const scrubberLabel = host.querySelector<HTMLElement>('[data-part="label"]')!;
+
+        expect(textLeft(insideLabel())).toBeCloseTo(textLeft(scrubberLabel), 0);
+        expect(getComputedStyle(insideLabel()).fontWeight).toBe(getComputedStyle(scrubberLabel).fontWeight);
+        expect(getComputedStyle(insideLabel().nextElementSibling!).fontWeight).toBe('400');
+      });
+
+      it('marks the trigger invalid and describes it with the field error', async () => {
+        setModelsSnapshotForTests({ error: null, models: [model], status: 'loaded' });
+        await renderInside({ error: 'Pick a compatible VAE' });
+
+        expect(trigger().getAttribute('aria-invalid')).toBe('true');
+        await expect.poll(describedText).toBe('Pick a compatible VAE');
+      });
     });
   });
 });

@@ -20,6 +20,9 @@ const DIALOG_DIRECTION = { base: 'column', md: 'row' } as const;
 const DIALOG_ALIGNMENT = { base: 'stretch', md: 'center' } as const;
 const DIALOG_CONTROL_WIDTH = { base: 'full', md: '52' } as const;
 const SELECT_POSITIONING = { strategy: 'fixed', sameWidth: true, hideWhenDetached: true } as const;
+// The quick select is only as wide as its value, so its menu opens from its end at a width of its own.
+const QUICK_SELECT_POSITIONING = { placement: 'bottom-end', strategy: 'fixed', hideWhenDetached: true } as const;
+const QUICK_SELECT_CONTENT_PROPS = { minW: '10rem' } as const;
 
 /** Presentation only. Normalization, persistence and side effects belong to the binding. */
 export const SettingControl = ({ field, surface, value, onChange, disabled, layer }: SettingControlProps) => {
@@ -99,6 +102,40 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, laye
     );
   }
 
+  if (field.kind === 'select' && surface === 'quick') {
+    // Laid out like the switch rows it sits among: the label leads, the select trails it at the row's end.
+    return (
+      <Field.Root
+        data-setting-control=""
+        disabled={disabled}
+        display="flex"
+        flexDirection="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap="4"
+      >
+        <HStack gap="2" minW="0">
+          {/* Names the hidden select, which hands a click's focus on to the trigger as a native label would. */}
+          <Field.Label fontSize="md" fontWeight="500">
+            {label}
+          </Field.Label>
+          {layer ? <SettingLayerIndicator label={label} layer={layer} /> : null}
+        </HStack>
+        <Select
+          collection={collection}
+          contentProps={QUICK_SELECT_CONTENT_PROPS}
+          value={selectValue}
+          fitContent
+          maxW="60%"
+          portalled={false}
+          // Fixed positioning escapes scrolling/clipped surfaces; staying inline preserves modal focus and ARIA.
+          positioning={QUICK_SELECT_POSITIONING}
+          onValueChange={handleSelectChange}
+        />
+      </Field.Root>
+    );
+  }
+
   return (
     <Field.Root
       data-setting-control=""
@@ -123,8 +160,8 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, laye
           collection={collection}
           value={selectValue}
           disabled={disabled}
-          size={surface === 'quick' ? 'md' : 'lg'}
-          w={surface === 'quick' ? 'full' : DIALOG_CONTROL_WIDTH}
+          size="lg"
+          w={DIALOG_CONTROL_WIDTH}
           flexShrink={0}
           portalled={false}
           // Fixed positioning escapes scrolling/clipped surfaces; staying inline preserves modal focus and ARIA.

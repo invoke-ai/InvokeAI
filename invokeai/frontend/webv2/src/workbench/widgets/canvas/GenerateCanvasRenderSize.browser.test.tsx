@@ -262,7 +262,9 @@ describe('Size section in canvas mode', () => {
     // SD 1.5 is optimal at 512x512, so Auto grows this frame.
     await renderSizeSection(createProject({ frame: { height: 384, width: 384 }, model: SD1_MODEL }));
 
-    await expect.element(renderAt()).toHaveTextContent('Optimal for model');
+    await expect
+      .element(renderAt().element().querySelector<HTMLElement>('[data-part="value-text"]'))
+      .toHaveTextContent('Optimal for model');
     // People who knew the setting by its legacy name find it in the select's description, tooltip open or not.
     await expect.element(renderAt()).toHaveAccessibleDescription(/^Scale before processing/);
     expect(badgeText()).toBe('384×384 → 512×512');
@@ -270,12 +272,13 @@ describe('Size section in canvas mode', () => {
     // The stage fits the larger render size: 88px of preview spans 512px.
     expect(ghostSize()).toEqual([88, 88]);
 
-    // The visible label is a pointer target for the select.
-    await userEvent.click(page.elementLocator(host?.querySelector('label[aria-hidden]') as HTMLElement));
-    await expect.element(renderAt()).toHaveFocus();
-    await expect.element(renderAt()).toHaveAttribute('aria-expanded', 'false');
-
-    await chooseRenderAt('Frame size');
+    // The label sits inside the select's box, so a click on it opens the select like the rest of the box.
+    const label = document.getElementById(renderAt().element().getAttribute('aria-labelledby')!)!;
+    expect(renderAt().element().contains(label)).toBe(true);
+    expect(label.textContent).toBe('Render at');
+    await userEvent.click(page.elementLocator(label));
+    await expect.element(renderAt()).toHaveAttribute('aria-expanded', 'true');
+    await userEvent.click(page.getByRole('option', { name: 'Frame size' }));
 
     expect(canvasValues().scaleMethod).toBe('none');
     expect(badgeText()).toBe('384×384');
