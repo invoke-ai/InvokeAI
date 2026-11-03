@@ -5,6 +5,7 @@
 export type {
   QueueHistoryItemStatus,
   QueueItem,
+  QueueRunErrorCode,
   QueueState,
   QueueSubmissionSnapshot,
   RunRecord,

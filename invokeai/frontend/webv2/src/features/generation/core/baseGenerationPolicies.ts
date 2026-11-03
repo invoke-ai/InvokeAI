@@ -56,7 +56,7 @@ import {
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
-import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
+import { DEFAULT_DYNAMIC_PROMPTS_SETTINGS } from './dynamicPrompts';
 import {
   getExternalAspectRatioSizes,
   getExternalReferenceImages,
@@ -532,12 +532,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     hiDiffusionWindowAttentionEnabled: true,
     hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO,
     hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO,
-    dynamicPromptsCombinatorial: true,
-    dynamicPromptsEnabled: true,
-    dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
-    dynamicPromptsSampleSeed: 0,
-    dynamicPromptsResample: true,
-    dynamicPromptsSeedBehaviour: 'per-iteration',
+    ...DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
     clipEmbedModel: null,
     clipGEmbedModel: null,
     clipLEmbedModel: null,
