@@ -63,6 +63,7 @@ from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevisio
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
     LoRA_Diffusers_Flux2_Config,
+    LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
@@ -70,6 +71,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
     LoRA_LyCORIS_Flux2_Config,
+    LoRA_LyCORIS_Flux3_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
@@ -554,6 +556,9 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage21_Config, LoRA_LyCORIS_QwenImage21_Config.get_tag()],
+        # FLUX.3 names modules FLUX.1/FLUX.2 lack; `flux_format_from_state_dict` keeps their probes off its files
+        # (locked in by ``test_flux3_lora_probe_independence.py``).
+        Annotated[LoRA_LyCORIS_Flux3_Config, LoRA_LyCORIS_Flux3_Config.get_tag()],
         # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
         # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
         # is mutually exclusive with Wan/Anima regardless of order (locked in by
@@ -579,6 +584,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
+        Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
