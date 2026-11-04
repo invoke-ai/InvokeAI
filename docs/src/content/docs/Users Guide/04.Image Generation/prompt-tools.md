@@ -2,7 +2,7 @@
 title: Prompt Tools
 sidebar:
   order: 4
-lastUpdated: 2026-10-28
+lastUpdated: 2026-11-02
 ---
 
 The prompt toolbar holds tools that help you write prompts. **Expand Prompt** and **Image to Prompt** use local language models to write or rewrite a prompt for you; if no compatible model is installed, the tool's popover says so and offers an **Open Model Manager** button. **Prompt triggers** insert the trigger phrases, embeddings and wildcards your models need.
@@ -40,7 +40,7 @@ Install by pasting the HuggingFace ID into the Model Manager. The model is autom
 
 LTX-2.5 was trained on long, single-paragraph audio-visual captions, and its own text encoder is not trained to write them. Lightricks pairs the model with a small dedicated enhancer, and InvokeAI offers the same pairing through Expand Prompt:
 
-* Install **LTX-2.5 Prompt Enhancer (Gemma-4 E2B)** from the starter models (`google/gemma-4-E2B-it`, ~10 GB). It is optional and not part of the LTX-2.5 bundle.
+* Install **LTX-2.5 Prompt Enhancer (Gemma-4 E2B)** from the starter models (`google/gemma-4-E2B-it`, ~10 GB). It is optional and not part of the LTX 2.5 bundle.
 * Two system prompts ship with InvokeAI: **LTX-2.5 Text-to-Video** and **LTX-2.5 Image-to-Video**, the release's own texts.
 
 In the Video panel with an LTX-2 model selected, Expand Prompt preselects the matching system prompt. For the model, a pick in the open popover comes first, then the model saved for the project, then the enhancer when it was installed from the starter models or as `google/gemma-4-E2B-it`, then the first available model. When the enhancer is installed but another model is selected, the popover shows **Recommended for this model** with a **Use it** button, which saves it like any other pick; when it is not installed, the popover points you to the starter models. With a **first frame** set it shows the frame with **Describe from the first frame** ticked and uses the Image-to-Video prompt, so the caption begins from what the image shows. Untick it, or pick a model that cannot read images (the popover says so), and it uses the Text-to-Video prompt instead. A model or system prompt you pick in the open popover overrides the suggestion.
