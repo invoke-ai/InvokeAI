@@ -4,7 +4,7 @@
 family has to be exclusive at the per-config level. ERNIE-Image is the case that used to go wrong -- its LoRAs keep
 the transformer blocks under ``layers.N`` behind ``diffusion_model.`` / ``transformer.``, exactly like Z-Image's,
 so the Z-Image probe claimed them. What tells the two apart is ERNIE's block naming (``self_attention``,
-``mlp.gate_proj``), against Z-Image's ``attention`` / ``feed_forward``.
+``mlp.linear_fc2``) and top-level modules, against Z-Image's ``attention`` / ``feed_forward``.
 """
 
 import atexit
@@ -216,3 +216,110 @@ def test_an_ernie_image_transformer_checkpoint_is_not_taken_for_a_lora() -> None
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_ErnieImage_Config.from_model_on_disk(mod, overrides)
+
+
+_BASE = ernie_image_lora_aitoolkit_format.state_dict_keys
+_Q = "diffusion_model.layers.5.self_attention.to_q"
+_K = "diffusion_model.layers.5.self_attention.to_k"
+
+
+def _with(extra: dict[str, list[int]], base: dict[str, list[int]] = _BASE) -> dict[str, list[int]]:
+    return {**base, **extra}
+
+
+_UNAPPLICABLE_FILES = {
+    "lora_A without lora_B": ({f"{_Q}.lora_A.weight": [4, 4096]}, "low-rank pair"),
+    "orphan alpha": ({f"{_K}.alpha": []}, "incomplete or inconsistent"),
+    "orphan lora_mid": ({f"{_K}.lora_mid.weight": [4, 4, 1, 1]}, "incomplete or inconsistent"),
+    "hada_w1_a only": ({f"{_Q}.hada_w1_a": [4096, 4]}, "incomplete or inconsistent"),
+    "lokr_w1 only": ({f"{_Q}.lokr_w1": [8, 8]}, "incomplete or inconsistent"),
+    "lokr_w2 only": ({f"{_Q}.lokr_w2": [512, 512]}, "incomplete or inconsistent"),
+    "block beyond the model's 36": (
+        {
+            "diffusion_model.layers.99.self_attention.to_q.lora_A.weight": [32, 4096],
+            "diffusion_model.layers.99.self_attention.to_q.lora_B.weight": [4096, 32],
+        },
+        "beyond the model's 36",
+    ),
+    "wrong input width": (
+        {f"{_Q}.lora_A.weight": [32, 3072], f"{_Q}.lora_B.weight": [4096, 32]},
+        "shape",
+    ),
+    "wrong output width": (
+        {f"{_Q}.lora_A.weight": [32, 4096], f"{_Q}.lora_B.weight": [12288, 32]},
+        "shape",
+    ),
+    "LoKR whose Kronecker product is too small": (
+        {f"{_Q}.lokr_w1": [8, 8], f"{_Q}.lokr_w2": [256, 256]},
+        "shape",
+    ),
+    "the Conv2d patch embedding": (
+        {
+            "diffusion_model.x_embedder.proj.lora_A.weight": [32, 128],
+            "diffusion_model.x_embedder.proj.lora_B.weight": [4096, 32],
+        },
+        "x_embedder.proj",
+    ),
+}
+
+
+@pytest.mark.parametrize("case", list(_UNAPPLICABLE_FILES))
+def test_an_ernie_image_lora_that_conversion_or_patching_would_fail_on_is_refused_at_install(case: str) -> None:
+    """Each of these used to identify as ERNIE-Image and then fail (or drop a layer with a log line) at generation."""
+    extra, message = _UNAPPLICABLE_FILES[case]
+    sd = _state_dict(_with(extra))
+    mod, overrides = _mod(sd, "ernie-defect")
+
+    with pytest.raises(InvalidMatchError, match=message):
+        LoRA_LyCORIS_ErnieImage_Config.from_model_on_disk(mod, overrides)
+    assert _accepting_lora_configs(sd, "ernie-defect") == []
+
+
+def test_complete_loha_and_lokr_layers_of_the_right_shape_are_accepted() -> None:
+    keys = _with(
+        {
+            f"{_Q}.hada_w1_a": [4096, 4],
+            f"{_Q}.hada_w1_b": [4, 4096],
+            f"{_Q}.hada_w2_a": [4096, 4],
+            f"{_Q}.hada_w2_b": [4, 4096],
+            f"{_K}.lokr_w1_a": [8, 2],
+            f"{_K}.lokr_w1_b": [2, 8],
+            f"{_K}.lokr_w2": [512, 512],
+        }
+    )
+
+    assert _accepting_lora_configs(_state_dict(keys), "ernie-complete") == ["LoRA_LyCORIS_ErnieImage_Config"]
+
+
+def test_a_file_touching_only_the_mlp_and_the_modulation_is_an_ernie_image_lora_not_a_z_image_lora() -> None:
+    """No `self_attention` or `linear_fc2` key to identify it: the top-level `adaLN_modulation.1` does."""
+    keys = {
+        "transformer.layers.0.mlp.gate_proj.lora_A.weight": [16, 4096],
+        "transformer.layers.0.mlp.gate_proj.lora_B.weight": [12288, 16],
+        "transformer.adaLN_modulation.1.lora_A.weight": [16, 4096],
+        "transformer.adaLN_modulation.1.lora_B.weight": [24576, 16],
+    }
+
+    assert _accepting_lora_configs(_state_dict(keys), "ernie-mlp-only") == ["LoRA_LyCORIS_ErnieImage_Config"]
+
+
+def test_the_weight_shape_table_matches_the_released_transformer() -> None:
+    """The refusal compares updates against this table, so it has to be the model's own geometry."""
+    from diffusers import ErnieImageTransformer2DModel
+
+    from invokeai.backend.model_manager.load.model_loaders.ernie_image import ERNIE_IMAGE_TRANSFORMER_CONFIG
+    from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import (
+        ERNIE_IMAGE_NUM_LAYERS,
+        ernie_image_weight_shape,
+    )
+
+    with torch.device("meta"):
+        model = ErnieImageTransformer2DModel(**ERNIE_IMAGE_TRANSFORMER_CONFIG)
+
+    assert ERNIE_IMAGE_NUM_LAYERS == len(model.layers)
+    linears = {name: m for name, m in model.named_modules() if isinstance(m, torch.nn.Linear)}
+    assert {name: tuple(m.weight.shape) for name, m in linears.items()} == {
+        name: ernie_image_weight_shape(name) for name in linears
+    }
+    # The one Conv2d is deliberately outside the table (and the module regex): no sidecar pricing exists for it.
+    assert ernie_image_weight_shape("x_embedder.proj") is None

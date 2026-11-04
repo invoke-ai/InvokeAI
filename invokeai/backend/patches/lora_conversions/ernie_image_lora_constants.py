@@ -33,21 +33,57 @@ ERNIE_IMAGE_LORA_KEY_PREFIXES = (
 # admit a key it would then map onto a module path the transformer does not have.
 _PREFIX_RE = r"^(?:" + "|".join(re.escape(p) for p in ERNIE_IMAGE_LORA_KEY_PREFIXES) + r")?"
 
-# Block submodules that only ERNIE-Image has among the supported transformers. Z-Image keeps its blocks under
-# ``layers.N`` too, but names them ``attention`` and ``feed_forward``; Ideogram 4 uses ``attention.qkv`` and
-# ``feed_forward.w1..3``. ``mlp.gate_proj`` / ``up_proj`` are deliberately not markers: Qwen3 and other LLM
-# layers use the same names, so they only count once a marker has identified the file.
+# Module paths that only ERNIE-Image has among the supported transformers, anchored to the key start behind a
+# container prefix. Z-Image keeps its blocks under ``layers.N`` too, but names them ``attention`` and
+# ``feed_forward``; Ideogram 4 uses ``attention.qkv`` and ``feed_forward.w1..3``. The transformer's top-level
+# modules ``adaLN_modulation.1`` and ``final_norm.linear`` exist in no other one either (``time_embedding`` and
+# ``text_proj`` are not markers: SD UNets have them), which identifies a file that touches only those and the MLP. ``mlp.gate_proj`` / ``up_proj`` alone are deliberately not markers: a PEFT LoRA over a
+# Qwen3-style LLM uses the same names under the same ``base_model.model.`` prefix, so they only count once a
+# marker has identified the file.
 _ERNIE_IMAGE_MARKER_RE = re.compile(
-    _PREFIX_RE + r"layers\.\d+\.(?:self_attention\.(?:to_q|to_k|to_v|to_out\.0)|mlp\.linear_fc2)\."
+    _PREFIX_RE
+    + r"(?:layers\.\d+\.(?:self_attention\.(?:to_q|to_k|to_v|to_out\.0)|mlp\.linear_fc2)\."
+    + r"|(?:adaLN_modulation\.1|final_norm\.linear)\.)"
 )
 
-# Every module of ``ErnieImageTransformer2DModel`` a LoRA can patch (its Linear and Conv2d layers). A layer
-# outside this set would be skipped at generation with only a log warning, so the probe refuses the file.
+# Every Linear of ``ErnieImageTransformer2DModel`` a LoRA can patch. ``x_embedder.proj`` is its only Conv2d: no
+# published file touches it and the working-memory estimate prices Linears only, so it counts as unplaceable.
+# A layer outside this set would be skipped at generation with only a log warning, so the probe refuses the file.
 _ERNIE_IMAGE_MODULE_RE = re.compile(
     _PREFIX_RE
     + r"(?:layers\.\d+\.(?:self_attention\.(?:to_q|to_k|to_v|to_out\.0)|mlp\.(?:gate_proj|up_proj|linear_fc2))"
-    + r"|adaLN_modulation\.1|final_linear|final_norm\.linear|text_proj|time_embedding\.linear_[12]|x_embedder\.proj)$"
+    + r"|adaLN_modulation\.1|final_linear|final_norm\.linear|text_proj|time_embedding\.linear_[12])$"
 )
+
+# The released transformer's geometry (``ERNIE_IMAGE_TRANSFORMER_CONFIG`` in the model loader, which this file
+# cannot import): its block count and the (out, in) shape of each patchable weight.
+ERNIE_IMAGE_NUM_LAYERS = 36
+_LAYER_INDEX_RE = re.compile(_PREFIX_RE + r"layers\.(\d+)\.")
+_BLOCK_WEIGHT_SHAPES = {
+    "self_attention.to_q": (4096, 4096),
+    "self_attention.to_k": (4096, 4096),
+    "self_attention.to_v": (4096, 4096),
+    "self_attention.to_out.0": (4096, 4096),
+    "mlp.gate_proj": (12288, 4096),
+    "mlp.up_proj": (12288, 4096),
+    "mlp.linear_fc2": (4096, 12288),
+}
+_TOP_WEIGHT_SHAPES = {
+    "adaLN_modulation.1": (24576, 4096),
+    "final_linear": (128, 4096),
+    "final_norm.linear": (8192, 4096),
+    "text_proj": (4096, 3072),
+    "time_embedding.linear_1": (4096, 4096),
+    "time_embedding.linear_2": (4096, 4096),
+}
+
+
+def ernie_image_weight_shape(module: str) -> tuple[int, int] | None:
+    """The (out, in) shape of the transformer weight at ``module`` (container prefix stripped), or ``None``."""
+    if block := re.fullmatch(r"layers\.(\d+)\.(.+)", module):
+        return _BLOCK_WEIGHT_SHAPES.get(block.group(2)) if int(block.group(1)) < ERNIE_IMAGE_NUM_LAYERS else None
+    return _TOP_WEIGHT_SHAPES.get(module)
+
 
 # Any of these means a different architecture; an ERNIE-Image LoRA never carries them.
 _NON_ERNIE_IMAGE_ANTI_RES = (
@@ -111,10 +147,9 @@ def unsupported_ernie_image_lora_keys(str_keys: list[str]) -> list[str]:
 
 
 def ernie_image_lora_refusal(str_keys: list[str]) -> str | None:
-    """Why an ERNIE-Image LoRA cannot be applied, or ``None`` if every tensor converts.
+    """Why an ERNIE-Image LoRA cannot be applied from its key names alone, or ``None``.
 
-    The probe refuses the install with this message and the conversion raises it, so a file is never accepted and
-    then half-applied.
+    Tensor-level defects (incomplete layers, shapes) are found by ``ernie_image_lora_defect``, which starts here.
     """
     unsupported = unsupported_ernie_image_lora_keys(str_keys)
     if unsupported:
@@ -126,4 +161,11 @@ def ernie_image_lora_refusal(str_keys: list[str]) -> str | None:
     unknown = sorted(path for path in layer_paths if not _ERNIE_IMAGE_MODULE_RE.search(path))
     if unknown:
         return f"{len(unknown)} layer(s) target no ERNIE-Image transformer module, e.g. {unknown[0]!r}."
+    beyond = sorted(
+        path
+        for path in layer_paths
+        if (block := _LAYER_INDEX_RE.search(path)) and int(block.group(1)) >= ERNIE_IMAGE_NUM_LAYERS
+    )
+    if beyond:
+        return f"{len(beyond)} layer(s) target a block beyond the model's {ERNIE_IMAGE_NUM_LAYERS}, e.g. {beyond[0]!r}."
     return None

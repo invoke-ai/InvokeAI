@@ -21,8 +21,10 @@ from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import
     ERNIE_IMAGE_LORA_KEY_PREFIXES,
     ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX,
     ernie_image_lora_refusal,
+    ernie_image_weight_shape,
     split_ernie_image_lora_key,
 )
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import _update_shape
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -30,19 +32,58 @@ def lora_model_from_ernie_image_state_dict(state_dict: Dict[str, torch.Tensor]) 
     """Convert an ERNIE-Image LoRA state dict into a ``ModelPatchRaw``.
 
     Layer keys in the returned patch are the transformer's module paths, prefixed with
-    ``ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX``.
+    ``ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX``. Raises ``ValueError`` for a file ``ernie_image_lora_defect`` refuses.
     """
-    # The probe refuses these at install; this covers a state dict that reaches the conversion another way.
     refusal = ernie_image_lora_refusal([k for k in state_dict.keys() if isinstance(k, str)])
     if refusal is not None:
         raise ValueError(f"ERNIE-Image LoRA cannot be applied: {refusal}")
 
     layers: dict[str, BaseLayerPatch] = {}
     for layer_path, values in _group_by_layer(state_dict).items():
-        layers[f"{ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX}{layer_path}"] = any_lora_layer_from_state_dict(
-            _normalize_lora_param_names(values)
-        )
+        layers[f"{ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX}{layer_path}"] = _build_layer(layer_path, values)
     return ModelPatchRaw(layers=layers)
+
+
+def ernie_image_lora_defect(state_dict: Dict[str, torch.Tensor]) -> str | None:
+    """Why this file cannot be applied, or ``None`` if every layer converts and fits its module.
+
+    The install probe refuses with this message, so a file is never accepted and then fails (or is half-applied)
+    at generation. It runs the conversion's own grouping and layer construction, then checks that each update has
+    the shape of the weight it patches.
+    """
+    refusal = ernie_image_lora_refusal([k for k in state_dict.keys() if isinstance(k, str)])
+    if refusal is not None:
+        return refusal
+    try:
+        for layer_path, values in _group_by_layer(state_dict).items():
+            _build_layer(layer_path, values)
+            _check_update_shape(layer_path, values)
+    except ValueError as e:
+        return str(e)
+    return None
+
+
+def _build_layer(layer_path: str, values: dict[str, torch.Tensor]) -> BaseLayerPatch:
+    """Build one layer; the layer factories signal a missing or inconsistent tensor with assorted exceptions."""
+    try:
+        return any_lora_layer_from_state_dict(_normalize_lora_param_names(values))
+    except (ValueError, KeyError, AssertionError, TypeError, RuntimeError) as e:
+        raise ValueError(
+            f"ERNIE-Image LoRA layer {layer_path!r} is incomplete or inconsistent "
+            f"(has {sorted(values)}): {type(e).__name__} {e}"
+        ) from None
+
+
+def _check_update_shape(layer_path: str, values: dict[str, torch.Tensor]) -> None:
+    weight_shape = ernie_image_weight_shape(layer_path)
+    if weight_shape is None or "lora_mid.weight" in values:
+        return  # Placement was settled by the key check; a Tucker mid has no plain product to compare.
+    update_shape = _update_shape(_normalize_lora_param_names(values))
+    if update_shape != weight_shape:
+        raise ValueError(
+            f"ERNIE-Image LoRA layer {layer_path!r} updates a weight of shape {update_shape}, "
+            f"but the module's weight is {weight_shape}."
+        )
 
 
 def _strip_prefix(layer_path: str) -> str:

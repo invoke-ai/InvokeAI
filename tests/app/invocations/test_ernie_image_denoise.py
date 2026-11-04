@@ -93,6 +93,18 @@ class _StopBeforeLoad(Exception):
 
 
 _GIB = 1024**3
+# The node's default 1024x1024 image is a 64x64 token grid at the VAE's 16x downscale; the prompt adds these.
+_TEXT_TOKENS = 10
+_ROWS = 64 * 64 + _TEXT_TOKENS
+
+
+def _lora_room(layers: list[tuple[int, int]], itemsize: int) -> int:
+    """The room low-rank layers `(elements, rank)` on a Linear(64 -> 128) need, worked out by hand: each forward adds
+    an update of `_ROWS x (128 + rank)`. Sidecar builds keep every layer's tensors on the device, other builds one
+    module's worth (the layers on that module, here the only one)."""
+    elements = sum(e for e, _ in layers)
+    update = _ROWS * (128 + max(r for _, r in layers))
+    return (elements + update) * itemsize
 
 
 def _gguf_transformer(
@@ -158,7 +170,9 @@ def _run_node(monkeypatch, model: torch.nn.Module, model_format, loras=(), *, fl
 
         transformer_info.model_on_device = MagicMock(side_effect=on_device)
         model.config = SimpleNamespace(text_in_dim=8, in_channels=128)
-        monkeypatch.setattr(ernie_image_denoise, "sampling_utils", SimpleNamespace(pad_text=pad_text))
+        monkeypatch.setattr(
+            ernie_image_denoise, "sampling_utils", SimpleNamespace(pad_text=pad_text, VAE_SCALE_FACTOR=16)
+        )
 
     loaded = {"transformer": transformer_info, **{field.lora.key: info for field, info in loras}}
     context = MagicMock()
@@ -172,7 +186,9 @@ def _run_node(monkeypatch, model: torch.nn.Module, model_format, loras=(), *, fl
         guidance_scale=1.0,
     )
     monkeypatch.setattr(
-        ErnieImageDenoiseInvocation, "_load_conditioning", lambda *args, **kwargs: SimpleNamespace(prompt_embeds=None)
+        ErnieImageDenoiseInvocation,
+        "_load_conditioning",
+        lambda *args, **kwargs: SimpleNamespace(prompt_embeds=torch.zeros(_TEXT_TOKENS, 8)),
     )
 
     with pytest.raises(_StopBeforeLoad):
@@ -190,6 +206,12 @@ def _dequant_transient(model: torch.nn.Module) -> int:
 
     dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
     return peak_dequant_transient_bytes(model, dtype)
+
+
+def _compute_itemsize() -> int:
+    from invokeai.backend.util.devices import TorchDevice
+
+    return TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device()).itemsize
 
 
 def test_a_gguf_transformer_without_loras_reserves_only_its_dequant_transient(monkeypatch) -> None:
@@ -213,11 +235,12 @@ def test_sidecar_loras_are_reserved_on_top_of_the_floor(monkeypatch, floor_gb: f
 
     loras = [_lora("a"), _lora("b", up=torch.zeros(128, 32), down=torch.zeros(32, 64))]
     model = _gguf_transformer()
-    lora_bytes = sum(info.model.calc_size() for _, info in loras)
 
     requested = _requested_working_memory(monkeypatch, model, ModelFormat.GGUFQuantized, loras, floor_gb=floor_gb)
 
-    assert requested == max(_dequant_transient(model), int(floor_gb * _GIB)) + lora_bytes + _GIB
+    # Both layers sit on the one Linear: their tensors, and one update beside the larger rank.
+    expected_room = _lora_room([(128 * 16 + 16 * 64, 16), (128 * 32 + 32 * 64, 32)], _compute_itemsize())
+    assert requested == max(_dequant_transient(model), int(floor_gb * _GIB)) + expected_room
 
 
 def test_fp8_weights_reserve_the_lora_patches(monkeypatch) -> None:
@@ -230,16 +253,29 @@ def test_fp8_weights_reserve_the_lora_patches(monkeypatch) -> None:
 
     requested = _requested_working_memory(monkeypatch, model, ModelFormat.Diffusers, [(field, info)])
 
-    assert requested == 3 * _GIB + info.model.calc_size() + _GIB
+    assert requested == 3 * _GIB + _lora_room([(128 * 16 + 16 * 64, 16)], _compute_itemsize())
 
 
-def test_a_directly_patched_transformer_reserves_nothing_for_its_loras(monkeypatch) -> None:
-    """Direct patching merges the LoRA into the weights and returns its tensors to RAM as it goes."""
+def test_a_plain_transformer_reserves_one_modules_worth_for_layers_partial_loading_turns_into_sidecars(
+    monkeypatch,
+) -> None:
+    """Direct patching merges a LoRA into the weights, but a layer partial loading leaves on the CPU runs as a
+    sidecar; which ones is unknown before the lock, so one module's tensors and update are reserved."""
     from invokeai.backend.model_manager.taxonomy import ModelFormat
 
     model = torch.nn.Sequential(torch.nn.Linear(64, 128, bias=False))
 
-    assert _requested_working_memory(monkeypatch, model, ModelFormat.Diffusers, [_lora("lora")]) == 0
+    requested = _requested_working_memory(monkeypatch, model, ModelFormat.Diffusers, [_lora("lora")])
+
+    assert requested == 3 * _GIB + _lora_room([(128 * 16 + 16 * 64, 16)], _compute_itemsize())
+
+
+def test_a_plain_transformer_without_loras_reserves_nothing_for_them(monkeypatch) -> None:
+    from invokeai.backend.model_manager.taxonomy import ModelFormat
+
+    model = torch.nn.Sequential(torch.nn.Linear(64, 128, bias=False))
+
+    assert _requested_working_memory(monkeypatch, model, ModelFormat.Diffusers) == 0
 
 
 @pytest.mark.parametrize("model_format", ["gguf", "diffusers"])

@@ -49,7 +49,6 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys_strict,
 )
 from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import (
-    ernie_image_lora_refusal,
     has_ernie_image_markers,
     is_ernie_image_lora,
     split_ernie_image_lora_key,
@@ -1661,13 +1660,19 @@ class LoRA_LyCORIS_ErnieImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
-        str_keys = [k for k in mod.load_state_dict().keys() if isinstance(k, str)]
+        # Imported here: the layer classes the conversion builds import the model manager's loader package.
+        from invokeai.backend.patches.lora_conversions.ernie_image_lora_conversion_utils import (
+            ernie_image_lora_defect,
+        )
+
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
         if not is_ernie_image_lora(str_keys):
             raise NotAMatchError("model does not match ERNIE-Image LoRA heuristics")
         # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
         if not any(split_ernie_image_lora_key(k) is not None for k in str_keys):
             raise NotAMatchError("model has ERNIE-Image module names but no LoRA tensors")
-        refusal = ernie_image_lora_refusal(str_keys)
+        refusal = ernie_image_lora_defect(state_dict)
         if refusal is not None:
             # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the
             # install instead.

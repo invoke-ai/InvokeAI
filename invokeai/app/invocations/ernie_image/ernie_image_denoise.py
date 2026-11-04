@@ -27,16 +27,16 @@ from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ErnieImageConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 
-# What one sidecar-patched layer holds while it computes its residual -- a second copy of the layer's output,
-# or for a LoKR/LoHA layer its full weight delta (at most ~0.2 GB here, `adaLN_modulation.1`). Same margin as
-# LTX-2 uses.
-_SIDECAR_TRANSIENT_BYTES = 1024**3
+# The Linears that read the timestep embedding: one row per sample, however long the sequence.
+_PER_SAMPLE_LINEARS = frozenset(
+    {"adaLN_modulation.1", "final_norm.linear", "time_embedding.linear_1", "time_embedding.linear_2"}
+)
 
 
 @invocation(
@@ -118,20 +118,24 @@ class ErnieImageDenoiseInvocation(BaseInvocation):
         force_sidecar = bool(lora_patch_specs) and requires_sidecar_patching(
             transformer_info.model, transformer_config.format
         )
-        # The patcher also picks the sidecar on its own for fp8 weights (FP8 Storage), which cannot be added to.
-        lora_on_device = force_sidecar or (
-            bool(lora_patch_specs) and any(p.dtype in FP8_STORAGE_DTYPES for p in transformer_info.model.parameters())
-        )
-
         # A GGUF build dequantizes each Linear per forward, a transient its resident size does not cover. This node
         # has no activation estimate, so the cache floors the request at `device_working_mem_gb`, which then stands
-        # in for the activations. Sidecar LoRA patches stay on the device for the whole run, so they come on top of
-        # that floor rather than out of it. A plain build patched directly merges them into its weights instead.
+        # in for the activations. The LoRAs' room (`lora_sidecar_bytes`) comes on top of that floor rather than out
+        # of it.
         working_mem_bytes = peak_dequant_transient_bytes(transformer_info.model, dtype)
-        if lora_on_device:
+        lora_bytes = lora_sidecar_bytes(
+            [spec[0] for spec in lora_patch_specs],
+            transformer_info.model,
+            transformer_config.format,
+            prefix=ERNIE_IMAGE_LORA_TRANSFORMER_PREFIX,
+            rows=(self.height // sampling_utils.VAE_SCALE_FACTOR) * (self.width // sampling_utils.VAE_SCALE_FACTOR)
+            + max(info.prompt_embeds.shape[0] for info in (pos_info, neg_info) if info is not None),
+            per_sample_rows=dict.fromkeys(_PER_SAMPLE_LINEARS, 1),
+            dtype=dtype,
+        )
+        if lora_bytes:
             floor = int(context.config.get().device_working_mem_gb * 2**30)
-            lora_bytes = sum(spec[0].calc_size() for spec in lora_patch_specs)
-            working_mem_bytes = max(working_mem_bytes, floor) + lora_bytes + _SIDECAR_TRANSIENT_BYTES
+            working_mem_bytes = max(working_mem_bytes, floor) + lora_bytes
 
         with ExitStack() as exit_stack:
             (cached_weights, transformer) = exit_stack.enter_context(
