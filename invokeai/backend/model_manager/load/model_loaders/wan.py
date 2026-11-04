@@ -689,7 +689,7 @@ class WanT5EncoderGGUFLoader(ModelLoader):
         with accelerate.init_empty_weights():
             model = UMT5EncoderModel(infer_t5_encoder_config(sd, UMT5Config))
 
-        # No model-declared skip patterns, unlike other GGUF loaders: UMT5 declares
+        # No model-declared skip patterns, unlike the transformer loaders: UMT5 declares
         # `_keep_in_fp32_modules = ["wo"]`, which would unpack every feed-forward output projection --
         # nearly a fifth of the encoder's weights. transformers keeps those in float32 only for a
         # float16 load, against an overflow this loader never computes in.

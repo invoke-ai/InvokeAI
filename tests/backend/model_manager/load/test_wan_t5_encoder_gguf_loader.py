@@ -130,7 +130,7 @@ def test_a_device_without_bfloat16_computes_in_float32_not_float16(written, monk
 def test_what_a_module_cannot_read_packed_is_unpacked_and_the_embedding_stays_tied(written, float32_on_cpu) -> None:
     """``nn.Embedding`` indexes its weight, so the token embedding and each block's own relative
     attention bias must be plain tensors; so are the norms. ``shared`` and ``encoder.embed_tokens``
-    stay one tensor, and the unpack is reserved with the cache first (at least the embedding)."""
+    stay one tensor, and the unpack reserves at least the embedding's size with the cache."""
     path, _ = written
     ram_cache = MagicMock()
     model = _loader(ram_cache)._load_model(_config(path), SubModelType.TextEncoder)
