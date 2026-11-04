@@ -532,6 +532,67 @@ describe('compileGenerateGraph', () => {
     expect(graph.nodes.model_loader?.vae_model).toBeUndefined();
   });
 
+  describe('FLUX.2 [dev] component sources', () => {
+    const sdnqKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'sdnq_quantized',
+      key: 'flux2-klein-9b-sdnq-source',
+      submodels: completeSdnqPipeline,
+    };
+    const diffusersKleinSource: MainModelConfig = {
+      ...flux2Klein9bModel,
+      format: 'diffusers',
+      key: 'flux2-klein-9b-diffusers-source',
+    };
+
+    it('never sends an SDNQ pipeline as the Mistral source', () => {
+      expect(() =>
+        compile(flux2DevGgufModel, { componentSourceModel: sdnqKleinSource, mistralEncoderModel: mistralEncoder })
+      ).toThrow('Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.');
+
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: sdnqKleinSource,
+        mistralEncoderModel: mistralEncoder,
+        vae: flux2Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: undefined,
+        vae_model: flux2Vae,
+      });
+    });
+
+    it('takes only the VAE from a Diffusers Klein pipeline', () => {
+      const graph = compile(flux2DevGgufModel, {
+        componentSourceModel: diffusersKleinSource,
+        mistralEncoderModel: mistralEncoder,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({
+        mistral_encoder_model: mistralEncoder,
+        mistral_source_model: diffusersKleinSource,
+        type: 'flux2_dev_model_loader',
+        vae_model: undefined,
+      });
+    });
+
+    it('sends a self-contained SDNQ [dev] main its standalone encoder and VAE', () => {
+      const sdnqDev: MainModelConfig = { ...flux2DevModel, format: 'sdnq_quantized', submodels: completeSdnqPipeline };
+
+      expect(() => compile(sdnqDev)).toThrow(
+        'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.'
+      );
+      expect(compile(sdnqDev, { mistralEncoderModel: mistralEncoder, vae: flux2Vae }).nodes.model_loader).toMatchObject(
+        {
+          mistral_encoder_model: mistralEncoder,
+          type: 'flux2_dev_model_loader',
+          vae_model: flux2Vae,
+        }
+      );
+    });
+  });
+
   it('uses a complete FLUX.2 SDNQ component source without standalone overrides', () => {
     const source: MainModelConfig = {
       ...flux2Klein9bModel,
@@ -557,7 +618,7 @@ describe('compileGenerateGraph', () => {
     };
 
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: source })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
@@ -578,7 +639,7 @@ describe('compileGenerateGraph', () => {
 
   it('rejects a stale incompatible FLUX.2 component source when Qwen3 is missing', () => {
     expect(() => compile(flux2Klein9bModel, { componentSourceModel: incompatibleFlux2Source, vae: flux2Vae })).toThrow(
-      'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.'
+      'Generate needs a Qwen3 8B Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.'
     );
   });
 
@@ -1524,6 +1585,18 @@ describe('FLUX.3 graphs', () => {
     expect(getNodeByType(klein, 'flux3_denoise')).toMatchObject({ cfg_scale: 1, steps: 16 });
     expect(getEdge(kleinBase, 'denoise_latents', 'negative_conditioning')?.source.node_id).toBe('neg_cond');
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
+  });
+
+  it('wires a variant-less FLUX.3 LoRA on Klein to the transformer alone', () => {
+    // FLUX.3 LoRAs carry no variant: Klein and Klein Base share the transformer they change.
+    const lora: LoraModelConfig = { base: 'flux3', key: 'flux3-lora', name: 'A LoRA', type: 'lora' };
+    const graph = compile(kleinModel, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+    const loader = getNodeByType(graph, 'flux3_lora_collection_loader');
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
   });
 
   it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {

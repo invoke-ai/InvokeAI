@@ -6,29 +6,33 @@ When saved, the adapter name is encoded in the weight key:
     Standard PEFT:           foo.bar.lora_A.weight
     Named-adapter PEFT:      foo.bar.lora_A.<adapter_name>.weight
 
+A DoRA adapter's magnitude carries the name the same way (`foo.bar.lora_magnitude_vector.<adapter_name>.weight`).
+
 The most common adapter name is "default", produced automatically by `model.add_adapter()`
 without an explicit name. Some training tools (e.g. Diffusers' PEFT integration with
 multi-adapter support, certain LoRA fine-tuning scripts) save in this format even with a
 single adapter.
 
 InvokeAI's downstream LoRA detection and conversion code expects the standard PEFT suffix
-(`lora_A.weight` / `lora_B.weight`). This module normalizes named-adapter state dicts to
-that form so the rest of the pipeline can handle them transparently.
+(`lora_A.weight` / `lora_B.weight` / `lora_magnitude_vector.weight`). This module normalizes named-adapter state
+dicts to that form so the rest of the pipeline can handle them transparently.
 """
 
 import re
 from typing import Any
 
-# Match a named-adapter PEFT key ending: .lora_A.<adapter_name>.weight or .lora_B.<adapter_name>.weight.
-# The adapter name is a single dot-free component (PEFT identifiers do not contain dots).
-_NAMED_ADAPTER_RE = re.compile(r"\.lora_([AB])\.([^.]+)\.weight$")
+# Match a named-adapter PEFT key ending: .lora_A.<adapter_name>.weight, .lora_B.<adapter_name>.weight or a DoRA
+# magnitude's .lora_magnitude_vector.<adapter_name>.weight. The adapter name is a single dot-free component (PEFT
+# identifiers do not contain dots).
+_NAMED_ADAPTER_RE = re.compile(r"\.(lora_A|lora_B|lora_magnitude_vector)\.([^.]+)\.weight$")
 
 
 def _extract_adapter_names(state_dict: dict[str | int, Any]) -> set[str]:
     """Return the set of distinct PEFT adapter names found in the state dict.
 
-    A "named adapter" key is one matching `.lora_A.<name>.weight` or `.lora_B.<name>.weight`.
-    Keys in the standard PEFT form (`.lora_A.weight` / `.lora_B.weight`) do not contribute.
+    A "named adapter" key is one matching `.lora_A.<name>.weight`, `.lora_B.<name>.weight` or
+    `.lora_magnitude_vector.<name>.weight`. Keys in the standard PEFT form (`.lora_A.weight` / `.lora_B.weight`) do
+    not contribute.
     """
     names: set[str] = set()
     for key in state_dict:
@@ -51,6 +55,7 @@ def normalize_peft_adapter_names(state_dict: dict[str | int, Any]) -> dict[str |
     Transforms:
         foo.bar.lora_A.<adapter_name>.weight  →  foo.bar.lora_A.weight
         foo.bar.lora_B.<adapter_name>.weight  →  foo.bar.lora_B.weight
+        foo.bar.lora_magnitude_vector.<adapter_name>.weight  →  foo.bar.lora_magnitude_vector.weight
 
     Only applied when the state dict contains exactly one distinct adapter name. If the
     file holds multiple adapters, the keys are left untouched (renaming would collide and
@@ -65,7 +70,7 @@ def normalize_peft_adapter_names(state_dict: dict[str | int, Any]) -> dict[str |
     normalized: dict[str | int, Any] = {}
     for key, value in state_dict.items():
         if isinstance(key, str):
-            new_key = _NAMED_ADAPTER_RE.sub(r".lora_\1.weight", key)
+            new_key = _NAMED_ADAPTER_RE.sub(r".\1.weight", key)
             normalized[new_key] = value
         else:
             normalized[key] = value
