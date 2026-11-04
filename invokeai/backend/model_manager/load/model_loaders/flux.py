@@ -736,6 +736,19 @@ class T5EncoderSingleFileLoader(ModelLoader):
             return 0
         return super().get_size_fs(config, model_path, submodel_type)
 
+    def _keeps_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        return should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        # Whether the Linear weights stay float8 depends on the device, and device caches share one canonical CPU
+        # copy per key: a device that cannot run float8 must not adopt it, nor a capable one the folded copy.
+        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3) and self._keeps_fp8(
+            config, submodel_type
+        ):
+            return "fp8"
+        return ""
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -777,7 +790,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
         }
         # Pops every scale and the `scaled_fp8` marker, so what is left loads into a model that knows no fp8.
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
-        keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+        keep_fp8 = self._keeps_fp8(config, submodel_type)
 
         with accelerate.init_empty_weights():
             model = T5EncoderModel(infer_t5_encoder_config(sd))
