@@ -4,6 +4,7 @@ from invokeai.app.invocations.baseinvocation import BaseInvocation, Classificati
 from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, LatentsField, WithBoard, WithMetadata
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, choose_tile_size, to_image, working_memory_bytes
 from invokeai.backend.util.devices import TorchDevice
@@ -62,6 +63,9 @@ class QwenImage21LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoar
             with torch.inference_mode(), patch_qwen_image_vae_tiling(vae, tile_size, SPATIAL_SCALE):
                 decoded = vae.decode(z, return_dict=False)[0][0, :, 0]
             image = to_image(decoded)
+            # The raster's channels follow the legacy RGB/RGBA decision, so the gallery PNG matches them.
+            rgba = image.mode == "RGBA"
+            raster = precise_signed_decode_raster(context, decoded[None] if rgba else decoded[None, :3], alpha=rgba)
 
         TorchDevice.empty_cache()
-        return ImageOutput.build(context.images.save(image=image))
+        return ImageOutput.build(save_decoded_image(context, image, raster))

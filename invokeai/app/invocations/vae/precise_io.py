@@ -14,11 +14,14 @@ from invokeai.backend.image_util.raster.precise_asset import PreciseAssetError, 
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     image_resized_to_grid_as_tensor,
+    raster_as_unit_tensor,
     raster_resized_to_grid_as_tensor,
 )
 
 
-def precise_decode_raster(context: InvocationContext, unit_image: torch.Tensor) -> RasterImage | None:
+def precise_decode_raster(
+    context: InvocationContext, unit_image: torch.Tensor, alpha: bool = False
+) -> RasterImage | None:
     """The raster a decode should save precisely, or None for the ordinary 8-bit save.
 
     None when precise storage is disabled, and (with a warning) when the first sample is not finite: such an output
@@ -27,7 +30,7 @@ def precise_decode_raster(context: InvocationContext, unit_image: torch.Tensor) 
     """
     if not context.images.precise_storage_enabled:
         return None
-    raster = decoded_unit_raster(unit_image)
+    raster = decoded_unit_raster(unit_image, alpha=alpha)
     if raster is None:
         context.logger.warning(
             "Precise image storage skipped: the VAE decoder output is not finite; saving the ordinary 8-bit image."
@@ -35,7 +38,9 @@ def precise_decode_raster(context: InvocationContext, unit_image: torch.Tensor) 
     return raster
 
 
-def precise_signed_decode_raster(context: InvocationContext, decoded: torch.Tensor) -> RasterImage | None:
+def precise_signed_decode_raster(
+    context: InvocationContext, decoded: torch.Tensor, alpha: bool = False
+) -> RasterImage | None:
     """`precise_decode_raster` for a decoder whose output is in [-1, 1]: the first sample mapped to unit range.
 
     The sample is copied to the host and widened there, so the precise path allocates no device memory and never
@@ -46,7 +51,7 @@ def precise_signed_decode_raster(context: InvocationContext, decoded: torch.Tens
         return None
     unit = decoded[0].to("cpu", torch.float32, copy=True)
     unit.add_(1.0).div_(2)
-    return precise_decode_raster(context, unit)
+    return precise_decode_raster(context, unit, alpha=alpha)
 
 
 def save_decoded_image(context: InvocationContext, legacy: PILImage, raster: RasterImage | None) -> ImageDTO:
@@ -61,6 +66,14 @@ def save_decoded_image(context: InvocationContext, legacy: PILImage, raster: Ras
         else:
             return context.images.save_raster(raster, display_image=legacy)
     return context.images.save(image=legacy)
+
+
+def load_precise_unit_tensor(context: InvocationContext, image_name: str, alpha: bool = False) -> torch.Tensor | None:
+    """CHW float32 unit-range tensor of an image's precise asset, or None when it has none (the caller then keeps its
+    unchanged 8-bit path)."""
+    if not context.images.has_precise_asset(image_name):
+        return None
+    return raster_as_unit_tensor(context.images.get_raster(image_name), alpha=alpha)
 
 
 def load_image_as_grid_tensor(

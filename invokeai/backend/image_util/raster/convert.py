@@ -137,19 +137,20 @@ def raster_from_torch(tensor_chw: torch.Tensor, descriptor: RasterDescriptor) ->
     return RasterImage.from_array(hwc, descriptor)
 
 
-def decoded_unit_raster(unit_chw: torch.Tensor) -> RasterImage | None:
-    """Owned sRGB unit-range RGB raster from the first sample of a decoder output in unit space (CHW or NCHW).
+def decoded_unit_raster(unit_chw: torch.Tensor, alpha: bool = False) -> RasterImage | None:
+    """Owned sRGB unit-range raster from the first sample of a decoder output in unit space (CHW or NCHW).
 
-    The values are not clamped: overshoot a gallery PNG would clip is kept. float16 and float32 keep their precision,
-    any other dtype (bfloat16) is widened to float32. Returns None when the sample has a non-finite value, which the
-    check finds on the tensor's own device before the host copy.
+    RGB, or with `alpha=True` RGBA with straight alpha for a 4-channel sample. The values are not clamped: overshoot
+    a gallery PNG would clip is kept. float16 and float32 keep their precision, any other dtype (bfloat16) is widened
+    to float32. Returns None when the sample has a non-finite value, which the check finds on the tensor's own device
+    before the host copy.
     """
     sample = unit_chw[0] if unit_chw.ndim == 4 else unit_chw
     if not torch.isfinite(sample).all().item():
         return None
     if sample.dtype not in (torch.float16, torch.float32):
         sample = sample.float()
-    return raster_from_torch(sample, _srgb_descriptor(RasterChannels.RGB, None))
+    return raster_from_torch(sample, _srgb_descriptor(RasterChannels.RGBA if alpha else RasterChannels.RGB, None))
 
 
 def raster_to_torch(raster: RasterImage, device: torch.device | str | None = None) -> torch.Tensor:

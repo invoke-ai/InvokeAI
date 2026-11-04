@@ -97,13 +97,12 @@ def image_resized_to_grid_as_tensor(image: PIL.Image.Image, normalize: bool = Tr
     return tensor
 
 
-def raster_resized_to_grid_as_tensor(raster: RasterImage, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
-    """`image_resized_to_grid_as_tensor` for a precise raster: float32 CHW RGB, never clamped.
+def raster_as_unit_tensor(raster: RasterImage, alpha: bool = False) -> torch.Tensor:
+    """Float32 CHW unit-range tensor of a precise raster, never clamped.
 
-    Alpha is dropped and gray replicated, as `PIL.Image.convert("RGB")` does. Sizes that are not a multiple of
-    `multiple_of` are trimmed like the PIL helper and then resized with antialiased bicubic interpolation (PIL's LANCZOS
-    cannot operate on floats); aligned sizes are not resampled. Only sRGB unit-range rasters with straight or no alpha
-    have a meaning here: linear, DATA, unbounded and premultiplied rasters raise RasterConversionError.
+    RGB by default: alpha is dropped and gray replicated, as `PIL.Image.convert("RGB")` does. With `alpha=True` RGBA:
+    the raster's straight alpha, or 1.0 where it has none. Only sRGB unit-range rasters with straight or no alpha have
+    a meaning here: linear, DATA, unbounded and premultiplied rasters raise RasterConversionError.
     """
     descriptor = raster.descriptor
     if (
@@ -118,15 +117,43 @@ def raster_resized_to_grid_as_tensor(raster: RasterImage, normalize: bool = True
         )
     unit = raster if raster.dtype == np.float32 else to_unit_float(raster, np.float32)
     pixels = unit.view()
+    has_alpha = descriptor.channels in (RasterChannels.LA, RasterChannels.RGBA)
+    height, width = pixels.shape[:2]
+    # One CHW array, filled channel by channel: no intermediate HWC copy.
+    result = np.empty((4 if alpha else 3, height, width), dtype=np.float32)
     if descriptor.channels in (RasterChannels.L, RasterChannels.LA):
-        pixels = np.repeat(pixels[:, :, :1], 3, axis=2)
+        result[:3] = pixels[:, :, 0]
     else:
-        pixels = pixels[:, :, :3]
-    tensor = torch.from_numpy(np.ascontiguousarray(pixels.transpose(2, 0, 1)))
+        result[:3] = pixels[:, :, :3].transpose(2, 0, 1)
+    if alpha:
+        result[3] = pixels[:, :, -1] if has_alpha else 1.0
+    return torch.from_numpy(result)
 
-    w, h = trim_to_multiple_of(raster.width, raster.height, multiple_of=multiple_of)
-    if (w, h) != (raster.width, raster.height):
-        tensor = F.interpolate(tensor[None], size=(h, w), mode="bicubic", align_corners=False, antialias=True)[0]
+
+def resize_unit_tensor(tensor: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """Resizes a float CHW tensor with antialiased bicubic interpolation, never clamping: the float stand-in for the
+    LANCZOS resize PIL applies to 8-bit images."""
+    return F.interpolate(tensor[None], size=(height, width), mode="bicubic", align_corners=False, antialias=True)[0]
+
+
+def trim_unit_tensor_to_grid(tensor: torch.Tensor, multiple_of: int = 8) -> torch.Tensor:
+    """Trims a float CHW tensor's sides down to multiples of `multiple_of` like `image_resized_to_grid_as_tensor`,
+    resampling (`resize_unit_tensor`) only when a side does not already fit."""
+    height, width = tensor.shape[-2:]
+    grid_width, grid_height = trim_to_multiple_of(width, height, multiple_of=multiple_of)
+    if (grid_height, grid_width) == (height, width):
+        return tensor
+    return resize_unit_tensor(tensor, grid_height, grid_width)
+
+
+def raster_resized_to_grid_as_tensor(raster: RasterImage, normalize: bool = True, multiple_of=8) -> torch.FloatTensor:
+    """`image_resized_to_grid_as_tensor` for a precise raster: float32 CHW RGB, never clamped.
+
+    Sizes that are not a multiple of `multiple_of` are trimmed like the PIL helper and then resized with antialiased
+    bicubic interpolation (PIL's LANCZOS cannot operate on floats); aligned sizes are not resampled. Refuses what
+    `raster_as_unit_tensor` refuses.
+    """
+    tensor = trim_unit_tensor_to_grid(raster_as_unit_tensor(raster), multiple_of=multiple_of)
     return tensor * 2.0 - 1.0 if normalize else tensor
 
 

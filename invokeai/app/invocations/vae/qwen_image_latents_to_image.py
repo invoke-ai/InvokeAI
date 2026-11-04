@@ -13,6 +13,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
@@ -138,12 +139,13 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
                     # Drop the temporal frame dimension: (B, C, 1, H, W) -> (B, C, H, W)
                     img = img[:, :, 0]
 
+                raster = precise_signed_decode_raster(context, img)
                 img = img.clamp(-1, 1)
                 img = rearrange(img[0], "c h w -> h w c")
                 img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
 
         TorchDevice.empty_cache()
 
-        image_dto = context.images.save(image=img_pil)
+        image_dto = save_decoded_image(context, img_pil, raster)
 
         return ImageOutput.build(image_dto)

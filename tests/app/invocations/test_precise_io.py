@@ -1,12 +1,14 @@
-"""`precise_signed_decode_raster`: the unit-range raster every [-1, 1] decoder node stores."""
+"""Shared precise-image policy of the VAE nodes: decode rasters and unit tensors of stored assets."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import numpy as np
+import pytest
 import torch
 
-from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster
+from invokeai.app.invocations.vae.precise_io import load_precise_unit_tensor, precise_signed_decode_raster
+from invokeai.backend.image_util.raster import AlphaMode, RasterChannels
 
 
 def _context(enabled: bool = True) -> SimpleNamespace:
@@ -39,3 +41,30 @@ def test_a_bf16_output_is_widened_before_it_is_mapped() -> None:
 def test_disabled_returns_none_without_reading_the_tensor() -> None:
     # A meta tensor cannot be copied to the host, so any work before the gate would raise.
     assert precise_signed_decode_raster(_context(enabled=False), torch.empty(1, 3, 2, 2, device="meta")) is None
+
+
+def test_alpha_maps_a_four_channel_sample_to_a_straight_rgba_raster() -> None:
+    decoded = torch.rand(1, 4, 3, 5, generator=torch.Generator().manual_seed(2)) * 3 - 1.5
+
+    raster = precise_signed_decode_raster(_context(), decoded, alpha=True)
+
+    expected = ((decoded[0].double() + 1.0) / 2).permute(1, 2, 0).numpy()
+    np.testing.assert_allclose(raster.view(), expected, rtol=0, atol=1e-6)
+    assert (raster.descriptor.channels, raster.descriptor.alpha) == (RasterChannels.RGBA, AlphaMode.STRAIGHT)
+
+
+def test_no_precise_asset_gives_no_unit_tensor(precise_world) -> None:
+    name = precise_world.store_png(np.zeros((8, 8, 3), np.uint8), "RGB")
+
+    assert load_precise_unit_tensor(precise_world.context, name) is None
+
+
+@pytest.mark.parametrize("alpha", [False, True])
+def test_a_precise_asset_gives_its_unclamped_unit_tensor(precise_world, alpha: bool) -> None:
+    array = np.random.default_rng(3).uniform(-0.4, 1.4, size=(8, 12, 4)).astype(np.float32)
+    name = precise_world.store_precise(array, RasterChannels.RGBA)
+
+    tensor = load_precise_unit_tensor(precise_world.context, name, alpha=alpha)
+
+    expected = array.transpose(2, 0, 1)
+    np.testing.assert_array_equal(tensor.numpy(), expected if alpha else expected[:3])

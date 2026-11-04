@@ -44,3 +44,27 @@ def test_a_sample_with_any_non_finite_value_gives_none(bad: float) -> None:
     other = _batch(torch.float32)
     other[1, 0, 0, 0] = bad
     assert decoded_unit_raster(other) is not None
+
+
+def test_alpha_keeps_a_four_channel_sample_as_straight_unclamped_rgba() -> None:
+    sample = torch.arange(4 * 3 * 5, dtype=torch.float32).reshape(4, 3, 5) / 20 - 0.5  # alpha channel exceeds 1.0
+
+    for tensor in (sample, sample[None]):
+        raster = decoded_unit_raster(tensor, alpha=True)
+
+        assert raster is not None
+        np.testing.assert_array_equal(raster.view(), sample.permute(1, 2, 0).numpy())
+        descriptor = raster.descriptor
+        assert (descriptor.channels, descriptor.color, descriptor.value_range, descriptor.alpha) == (
+            RasterChannels.RGBA,
+            ColorEncoding.SRGB,
+            ValueRange.UNIT,
+            AlphaMode.STRAIGHT,
+        )
+
+
+def test_alpha_with_a_non_finite_alpha_value_gives_none() -> None:
+    sample = torch.zeros(4, 2, 2)
+    sample[3, 1, 1] = float("nan")
+
+    assert decoded_unit_raster(sample, alpha=True) is None

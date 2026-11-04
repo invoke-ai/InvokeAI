@@ -19,6 +19,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.vae.minimax_h3_latents_to_video import decode_video_latents
+from invokeai.app.invocations.vae.precise_io import precise_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 
 
@@ -46,8 +47,11 @@ class MiniMaxH3LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         if self.frame_index >= num_frames:
             raise ValueError(f"frame_index {self.frame_index} is out of range for a {num_frames}-frame clip.")
 
-        frame = decoded[:, self.frame_index].permute(1, 2, 0)  # [H, W, C]
+        frame_chw = decoded[:, self.frame_index]
+        raster = precise_decode_raster(context, frame_chw)
+
+        frame = frame_chw.permute(1, 2, 0)  # [H, W, C]
         img_pil = Image.fromarray((255.0 * frame).round().clamp(0, 255).byte().cpu().numpy())
 
-        image_dto = context.images.save(image=img_pil)
+        image_dto = save_decoded_image(context, img_pil, raster)
         return ImageOutput.build(image_dto)
