@@ -90,7 +90,15 @@ export const syncVideoWidgetValuesWithModels = (
     registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
   const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
   const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
-  const override = Boolean(sameH3 && effectiveVariant !== detected);
+  // Keep the legacy marker until conflicting media is resolved, including across save and reload.
+  const unresolvedLegacyConflict = Boolean(
+    sameH3 &&
+    values.h3ModeOverride &&
+    !values.h3SelectedTask &&
+    values.references.length &&
+    (values.firstFrameImage || values.lastFrameImage)
+  );
+  const override = unresolvedLegacyConflict || Boolean(sameH3 && effectiveVariant !== detected);
   // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
   // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
   const candidate =
@@ -202,7 +210,7 @@ export const syncVideoWidgetValuesWithModels = (
     modelKey: model?.key ?? base.modelKey,
     h3ModeOverride: override,
     h3SelectedTask:
-      model?.base === 'minimax-h3' && model.format === 'checkpoint'
+      !unresolvedLegacyConflict && model?.base === 'minimax-h3' && model.format === 'checkpoint'
         ? model.variant === 'ref2va'
           ? 'ref2va'
           : 'fl2va'

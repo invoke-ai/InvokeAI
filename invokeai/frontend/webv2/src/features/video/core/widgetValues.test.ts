@@ -416,13 +416,29 @@ describe('H3 legacy migration', () => {
       references: [reference],
       firstFrameImage: image,
     };
-    const migrated = syncVideoWidgetValuesWithModels(values, [model]);
+    const normalized = normalizeVideoWidgetValues({ ...values, lastFrameImage: image })!;
+    expect(normalized.references).toEqual([reference]);
+    expect(normalized.firstFrameImage).toEqual(image);
+    expect(normalized.lastFrameImage).toEqual(image);
+    const migrated = syncVideoWidgetValuesWithModels(normalized, [model]);
     expect(migrated.references).toEqual([reference]);
     expect(migrated.firstFrameImage).toEqual(image);
+    expect(migrated.lastFrameImage).toEqual(image);
     expect(getVideoWidgetValidationReasons(migrated, [model])).toContain(
       'References cannot be combined with first/last frames. Clear one side.'
     );
-    expect(syncVideoWidgetValuesWithModels(migrated, [model]).references).toEqual([reference]);
+    const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(migrated)))!;
+    const resynced = syncVideoWidgetValuesWithModels(reloaded, [model]);
+    expect(resynced.references).toEqual([reference]);
+    expect(resynced.firstFrameImage).toEqual(image);
+    expect(resynced.lastFrameImage).toEqual(image);
+    expect(getVideoWidgetValidationReasons(resynced, [model])).toContain(
+      'References cannot be combined with first/last frames. Clear one side.'
+    );
+    const resolved = syncVideoWidgetValuesWithModels({ ...resynced, references: [] }, [model]);
+    expect(resolved.h3SelectedTask).toBe('fl2va');
+    expect(resolved.firstFrameImage).toEqual(image);
+    expect(resolved.lastFrameImage).toEqual(image);
   });
 
   it('honors explicit modern selection even when media suggests another task', () => {
