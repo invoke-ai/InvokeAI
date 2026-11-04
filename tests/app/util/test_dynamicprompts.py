@@ -102,12 +102,38 @@ def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_vari
         # An immediate value is sampled once, keeping only its first result.
         "${c=!{red|__nope__}} a ${c}",
         "${c=!{__nope__|x}} a {b|d}",
+        # The first result of a bare unknown wildcard is its wrapped name.
+        "${c=!__nope__ {a|b}} a ${c}",
+        # Allowing zero options makes the first result an empty string.
+        "${c=!{0-1$$__nope__|{__nope__}}} a ${c}",
     ],
 )
 def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
     assert find_missing_wildcards(prompt) == []
     result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
     assert result.error is None
+
+
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # Picking two distinct options from values that all sample to `__nope__` never finishes,
+        # so the immediate assignment hangs before its first result.
+        "${c=!{2$$__nope__|{__nope__}|red}} a ${c}",
+        # A `{__wildcard__}` variant of an unknown wildcard has no options, so the first result
+        # never comes and the sampler raises instead.
+        "${c=!{__nope__}} a ${c}",
+        # The same, reached through the first option, a variable default and an overwritten assignment.
+        "${c=!{{2$$__nope__|{__nope__}}|red}} a ${c}",
+        "${c=!x ${d:{__nope__}}} a ${c}",
+        "${c=!{__nope__}} ${c=red} a ${c}",
+    ],
+)
+def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_result(prompt: str) -> None:
+    assert find_missing_wildcards(prompt) == ["nope"]
+    result = expand_dynamic_prompt(prompt, max_prompts=1, combinatorial=True)
+    assert result.error is not None
 
 
 def test_immediate_assignment_keeps_only_the_first_result() -> None:

@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from dynamicprompts.commands import (
     Command,
     LiteralCommand,
+    SamplingMethod,
     SequenceCommand,
     VariantCommand,
     WildcardCommand,
@@ -25,19 +26,37 @@ def _collect_wildcard_names(command: Command) -> list[str]:
     """Return the statically-known wildcard names that sampling `command` would evaluate, in order.
 
     Variables are tracked the way `SamplingContext` resolves them, so a wildcard is only reported when
-    it can actually run: a lazy assignment's value counts where the variable is read, a variable
-    default counts only while the variable is unset, and an immediate assignment's value never
-    counts. `SamplingContext.process_variable_assignment` keeps only the first result of an
-    immediate value, so an unresolvable wildcard there can neither hang nor collapse the prompt.
+    it can actually run: a lazy assignment's value counts where the variable is read and a variable
+    default counts only while the variable is unset.
+
+    An immediate assignment's value is sampled once, where it is assigned, and only its first result
+    is kept (`SamplingContext.process_variable_assignment`), so it is walked in "first result" mode
+    (see `first_only` below) and the variable is bound to a literal placeholder.
 
     A command is walked at most once per variable scope, so an expression that many references
     share is not walked again for each of them.
     """
     names: dict[str, None] = {}
-    visited: set[tuple[int, frozenset[tuple[str, int]]]] = set()
+    visited: set[tuple[int, frozenset[tuple[str, int]], bool]] = set()
 
-    def visit(command: Command, scope: Mapping[str, Command], scope_key: frozenset[tuple[str, int]]) -> None:
-        key = (id(command), scope_key)
+    def visit(
+        command: Command,
+        scope: Mapping[str, Command],
+        scope_key: frozenset[tuple[str, int]],
+        first_only: bool = False,
+    ) -> None:
+        """Record the wildcards in `command`.
+
+        With `first_only`, only wildcards that can stop the combinatorial sampler from producing its
+        *first* result are recorded. A bare unresolvable wildcard is harmless there, because its
+        not-found fallback yields the wrapped name straight away. A plain variant whose smallest pick
+        is one option first samples only its first option, and one whose smallest pick is zero
+        options first yields an empty string. Anything else (a variant that picks several distinct
+        options, a `{__wildcard__}` variant, or a non-combinatorial variant) is walked in full,
+        because the deduplication there can loop forever, or end without a result, before yielding
+        anything.
+        """
+        key = (id(command), scope_key, first_only)
         if key in visited:
             # Already walked in this scope (or being walked, for a recursive reference that the
             # sampler rejects with its own RecursionError), so it cannot add a new name.
@@ -46,7 +65,7 @@ def _collect_wildcard_names(command: Command) -> list[str]:
         if isinstance(command, WildcardCommand):
             # The wildcard name may itself be a dynamic Command (e.g. `__${var}__`). Only plain string
             # names can be validated ahead of time, so the dynamic case is intentionally skipped.
-            if isinstance(command.wildcard, str):
+            if isinstance(command.wildcard, str) and not first_only:
                 names.setdefault(command.wildcard)
         elif isinstance(command, SequenceCommand):
             # Mirrors `SamplingContext.process_variable_assignments`: every assignment in the sequence
@@ -59,6 +78,9 @@ def _collect_wildcard_names(command: Command) -> list[str]:
                 if not token.overwrite and token.name in scope:
                     assigned[token.name] = scope[token.name]
                 elif token.immediate:
+                    # Sampled right here against the enclosing scope, even if a later assignment
+                    # replaces it, and only the first result is kept.
+                    visit(token.value, scope, scope_key, first_only=True)
                     assigned[token.name] = _SAMPLED_VALUE
                 else:
                     assigned[token.name] = token.value
@@ -67,19 +89,29 @@ def _collect_wildcard_names(command: Command) -> list[str]:
                 scope_key = frozenset((name, id(value)) for name, value in scope.items())
             for token in command.tokens:
                 if not isinstance(token, VariableAssignmentCommand):
-                    visit(token, scope, scope_key)
+                    visit(token, scope, scope_key, first_only)
         elif isinstance(command, VariantCommand):
-            for value in command.values:
-                visit(value, scope, scope_key)
+            is_wildcard_variant = len(command.values) == 1 and isinstance(command.values[0], WildcardCommand)
+            if (
+                first_only
+                and not is_wildcard_variant
+                and command.sampling_method in (None, SamplingMethod.COMBINATORIAL)
+                and min(command.min_bound, len(command.values)) <= 1
+            ):
+                if command.min_bound >= 1 and command.values:
+                    visit(command.values[0], scope, scope_key, first_only)
+            else:
+                for value in command.values:
+                    visit(value, scope, scope_key)
         elif isinstance(command, WrapCommand):
-            visit(command.wrapper, scope, scope_key)
-            visit(command.inner, scope, scope_key)
+            visit(command.wrapper, scope, scope_key, first_only)
+            visit(command.inner, scope, scope_key, first_only)
         elif isinstance(command, VariableAccessCommand):
             # `${c}` samples the value bound to `c`, and `${c:{__nope__|x}}` falls back to its default
             # only when `c` is unset.
             target = scope.get(command.name, command.default)
             if target is not None:
-                visit(target, scope, scope_key)
+                visit(target, scope, scope_key, first_only)
         # LiteralCommand references no wildcards.
 
     visit(command, {}, frozenset())
