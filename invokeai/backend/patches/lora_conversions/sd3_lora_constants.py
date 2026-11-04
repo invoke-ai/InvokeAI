@@ -138,7 +138,8 @@ def split_sd3_lora_key(key: str) -> tuple[str, str] | None:
 def resolve_sd3_transformer_module(layer_path: str) -> str | None:
     """The diffusers module path a transformer layer path names, or ``None``.
 
-    Handles the dotted container prefixes and SimpleTuner's flattened `lycoris_` spelling. kohya's MMDiT names are not
+    Handles the dotted container prefixes and the flattened spellings: SimpleTuner's `lycoris_` and kohya-style
+    trainers' `lora_unet_` with diffusers' module names. kohya's MMDiT names are not
     module paths of this model and are mapped by the conversion.
     """
     for prefix in SD3_LORA_TRANSFORMER_KEY_PREFIXES:
@@ -310,6 +311,25 @@ def is_sd3_lora(state_dict: dict[str | int, Any]) -> bool:
     if any(anti.search(k) for k in str_keys for anti in _NON_SD3_ANTI_RES):
         return False
     return _attention_width(group_sd3_lora_layers(state_dict)) in SD3_WIDTHS
+
+
+def is_sd3_named_without_width(state_dict: dict[str | int, Any]) -> bool:
+    """True if every tensor names an SD 3 transformer module but no complete attention layer says
+    what width it is trained at: an MLP- or modulation-only file, or half of an attention layer. Only transformer
+    modules count; a file with anything else in it is left to the other families.
+
+    Such a file cannot be told from Qwen-Image's or others' by width, so it is refused instead of installed.
+    """
+    str_keys = [k for k in state_dict if isinstance(k, str)]
+    if not str_keys or any(anti.search(k) for k in str_keys for anti in _NON_SD3_ANTI_RES):
+        return False
+    grouped = group_sd3_lora_layers(state_dict)
+    if not grouped or any(split_sd3_lora_key(k) is None for k in str_keys):
+        return False
+    # Text encoders are no evidence: SD 1 and SDXL LoRAs name theirs the same way.
+    if not all(resolve_sd3_transformer_module(path) is not None for path in grouped):
+        return False
+    return _attention_width(grouped) is None
 
 
 def sd3_lora_variant(state_dict: dict[str | int, Any]) -> SD3VariantType | None:

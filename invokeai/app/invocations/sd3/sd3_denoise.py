@@ -28,10 +28,13 @@ from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fraction
 from invokeai.backend.model_manager.taxonomy import BaseModelType, SD3VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
+from invokeai.backend.patches.layers.full_layer import FullLayer
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
-from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
     SD3_LORA_TRANSFORMER_PREFIX,
+    layer_delta_shape,
     sd3_variant_from_width,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -53,15 +56,23 @@ _SIDECAR_TRANSIENT_BYTES = 1024**3
 def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
     """Whether the layer's weight delta can be applied to `weight`.
 
-    Low-rank layers are compared by their factors' dimensions. Every other layer type (LoKR, LoHA, full, ...) builds a
-    delta that the patcher reshapes to the target's shape, so it fits only when it has as many elements.
+    Low-rank layers are compared by their factors' dimensions. A LoKR or LoHA delta is not built here (that costs a
+    CPU matmul per layer on every run): its shape follows from its factors' shapes, and the patcher reshapes a delta
+    to the target's shape, so it fits when it has as many elements. Other layer kinds are not checked.
     """
     if isinstance(layer, LoRALayer):
         return layer.up.shape[0] == weight.shape[0] and layer.down.shape[1] == weight.shape[1]
-    if isinstance(layer, LoRALayerBase):
-        with torch.no_grad():
-            return layer.get_weight(weight).numel() == weight.numel()
-    return True
+    if isinstance(layer, FullLayer):
+        return layer.weight.numel() == weight.numel()
+    if isinstance(layer, LoKRLayer):
+        names = ("w1", "w1_a", "w1_b", "w2", "w2_a", "w2_b")
+        values = {f"lokr_{n}": getattr(layer, n) for n in names if getattr(layer, n) is not None}
+    elif isinstance(layer, LoHALayer):
+        values = {f"hada_{n}": getattr(layer, n) for n in ("w1_a", "w1_b", "w2_a", "w2_b")}
+    else:
+        return True
+    shape = layer_delta_shape(values)
+    return shape is None or shape[0] * shape[1] == weight.numel()
 
 
 @invocation(

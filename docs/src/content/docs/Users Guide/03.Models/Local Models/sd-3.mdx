@@ -89,9 +89,11 @@ reference images and regional guidance are **not** available for SD3.
 
 SD 3 and SD 3.5 LoRAs are supported in the layouts trainers publish them in: the diffusers DreamBooth script (a folder
 with `pytorch_lora_weights.safetensors`, or the file itself), ai-toolkit, PEFT adapters, SimpleTuner's LyCORIS files
-(LoKR) and kohya sd-scripts (`lora_unet_joint_blocks_…`). A LoRA that also trains the CLIP-L and CLIP-G text encoders
+(LoKR) and kohya sd-scripts (`lora_unet_joint_blocks_…`, or `lora_unet_transformer_blocks_…` for trainers that keep
+diffusers' module names). A LoRA that also trains the CLIP-L and CLIP-G text encoders
 applies to them too; T5 layers in a LoRA are skipped with a warning, because the T5 encoder takes no LoRA. DoRA files,
-and files with layers that match no SD 3 module, are refused when you install them, as are files that mix SD 3 Medium and Large widths or name blocks beyond the model's depth.
+and files with layers that match no SD 3 module, are refused when you install them, as are files that mix SD 3 Medium and Large widths, name blocks beyond the model's
+depth, or name only SD 3 modules without one complete attention layer to tell the size by.
 
 - **Medium and Large.** A LoRA is trained for one size: SD 3 Medium and SD 3.5 Medium share one, SD 3.5 Large (and
   Large Turbo) the other. Invoke records the size of LoRAs and of SD 3 models when you install them, and the concept

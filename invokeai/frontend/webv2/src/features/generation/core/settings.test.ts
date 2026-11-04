@@ -705,6 +705,9 @@ describe('LoRA settings helpers', () => {
     expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
     expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
     expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
+    const large: MainModelConfig = { ...medium, key: 'sd35l', name: 'SD 3.5 Large', variant: 'sd3_large' };
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_medium' }, large)).toBe(false);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, large)).toBe(true);
   });
 });
 

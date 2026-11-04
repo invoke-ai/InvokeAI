@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SD3VariantType
+from invokeai.backend.patches.layers.loha_layer import LoHALayer
 from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import SD3_LORA_TRANSFORMER_PREFIX
@@ -136,6 +137,26 @@ def test_a_mismatched_lokr_is_refused_instead_of_failing_at_the_first_forward(
 
     with pytest.raises(ValueError, match=r"does not fit this SD 3 model: `transformer_blocks.0.norm1.linear` is"):
         _fit_check(sd35_medium, patch, None)
+
+
+def test_the_fit_check_reads_factor_shapes_and_never_builds_a_delta(
+    sd35_medium: SD3Transformer2DModel, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Building a LoHA or split LoKR delta is a CPU matmul per layer, on every run; the shapes are enough."""
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("the delta was built")
+
+    monkeypatch.setattr(LoKRLayer, "get_weight", forbidden)
+    monkeypatch.setattr(LoHALayer, "get_weight", forbidden)
+    z = torch.zeros
+    split_lokr = LoKRLayer(None, z(6, 2), z(2, 1), None, z(1536, 2), z(2, 1536), None, None, None)  # 9216 x 1536
+    loha = LoHALayer(z(1536, 4), z(4, 1536), z(1536, 4), z(4, 1536), None, None, None, None)
+
+    _fit_check(sd35_medium, _patch({"transformer_blocks.13.norm1.linear": split_lokr}), None)
+    _fit_check(sd35_medium, _patch({"transformer_blocks.0.attn2.to_q": loha}), None)
+    with pytest.raises(ValueError, match="does not fit"):
+        _fit_check(sd35_medium, _patch({"transformer_blocks.0.attn2.to_k": split_lokr}), None)
 
 
 def test_a_medium_lora_that_does_not_fit_a_medium_model_is_not_blamed_on_the_size(

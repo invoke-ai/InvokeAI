@@ -75,6 +75,7 @@ from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants imp
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
     group_sd3_lora_layers,
     is_sd3_lora,
+    is_sd3_named_without_width,
     layer_delta_shape,
     sd3_lora_refusal,
     sd3_lora_variant,
@@ -922,7 +923,7 @@ def _is_not_a_qwen_image_lora(state_dict: dict[str | int, Any]) -> str | None:
     """
     for layer_path, values in group_sd3_lora_layers(state_dict).items():
         if _SD3_ONLY_MODULE_RE.search(layer_path):
-            return f"layer {layer_path!r} names a module only SD 3 has"
+            return f"layer {layer_path!r} names a module Qwen-Image does not have"
         if _ATTENTION_PROJECTION_RE.search(layer_path):
             shape = layer_delta_shape(values)
             if shape is None:
@@ -1732,6 +1733,11 @@ class LoRA_LyCORIS_SD3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
 def _validate_sd3_lora_state_dict(state_dict: dict[str | int, Any]) -> None:
     if not is_sd3_lora(state_dict):
+        if is_sd3_named_without_width(state_dict):
+            raise InvalidMatchError(
+                "SD 3 LoRA cannot be identified: it names only SD 3 modules but has no complete attention layer, "
+                "so its size (Medium or Large) is unknown."
+            )
         raise NotAMatchError("model does not match SD 3 LoRA heuristics")
     refusal = sd3_lora_refusal(state_dict)
     if refusal is not None:
