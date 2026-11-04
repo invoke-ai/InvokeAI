@@ -177,6 +177,8 @@ from invokeai.backend.model_manager.starter_models.flux3 import (
     flux3_klein_int8,
     flux3_klein_nvfp4,
     flux3_klein_single_file,
+    flux3_prompt_upsampler,
+    flux3_prompt_upsampler_int8,
 )
 from invokeai.backend.model_manager.starter_models.ideogram_4 import (
     ideogram_4_fp8,
@@ -560,6 +562,8 @@ STARTER_MODELS: list[StarterModel] = [
     flux3_klein_base_nvfp4,
     flux3_klein_gguf_q4_k_m,
     flux3_klein_gguf_q8_0,
+    flux3_prompt_upsampler,
+    flux3_prompt_upsampler_int8,
     qwen3_vl_encoder_4b,
     qwen_image_2_1_turbo,
     qwen_image_2_1,
