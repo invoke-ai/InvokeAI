@@ -64,7 +64,8 @@ def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
 
     Low-rank layers are compared by their factors' dimensions. A LoKR or LoHA delta is not built here (that costs a
     CPU matmul per layer on every run): its shape follows from its factors' shapes, and the patcher reshapes a delta
-    to the target's shape, so it fits when it has as many elements. Convolution factorizations (kernel dimensions or a Tucker core, which only `pos_embed.proj` has) and other
+    to the target's shape, so it fits when it has as many elements. Convolution factorizations (kernel dimensions or a Tucker core,
+    which only `pos_embed.proj` has) and other
     layer kinds are not checked.
     """
     if isinstance(layer, LoRALayer):

@@ -347,7 +347,7 @@ def sd3_lora_variant(state_dict: dict[str | int, Any]) -> SD3VariantType | None:
 
 
 def _width_or_depth_refusal(grouped: dict[str, dict[str, torch.Tensor]]) -> str | None:
-    """Why the transformer layers cannot all belong to one released model: attention at two widths, or a block index
+    """Why the transformer layers cannot all belong to one released model: layers at two widths, or a block index
     beyond the deepest model's (or beyond the depth of the size the attention width names)."""
     widths: set[int] = set()
     blocks: dict[int, str] = {}
@@ -358,10 +358,10 @@ def _width_or_depth_refusal(grouped: dict[str, dict[str, torch.Tensor]]) -> str 
         for path in paths:
             if match := _BLOCK_INDEX_RE.match(path):
                 blocks.setdefault(int(match.group(1)), layer_path)
-        if paths and ".attn" in paths[0] and (shape := layer_delta_shape(values)) is not None:
+        if paths and _reads_model_width(paths[0]) and (shape := layer_delta_shape(values)) is not None:
             widths.add(shape[1])
     if len(widths) > 1:
-        return f"its attention layers have different widths ({sorted(widths)}); SD 3 Medium and Large are not mixed."
+        return f"its layers have different widths ({sorted(widths)}); SD 3 Medium and Large are not mixed."
     depth = SD3_BLOCKS_BY_WIDTH.get(next(iter(widths), 0), max(SD3_BLOCKS_BY_WIDTH.values()))
     too_deep = [index for index in blocks if index >= depth]
     if too_deep:

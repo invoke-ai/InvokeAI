@@ -386,3 +386,18 @@ def test_an_mlp_only_lora_of_another_family_is_left_alone() -> None:
 
     with pytest.raises(NotAMatchError):
         LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides)
+
+
+def test_mlp_and_attention_layers_of_two_widths_are_refused() -> None:
+    keys = {
+        **_pair("transformer.transformer_blocks.0.ff.net.0.proj", 6144, 1536, peft=True),
+        **_pair("transformer.transformer_blocks.0.attn.to_q", 2432, 2432, peft=True),
+    }
+
+    assert "different widths" in _refusal(keys)
+
+
+def test_a_block_beyond_the_depth_is_refused_for_an_mlp_only_medium_file() -> None:
+    keys = _pair("transformer.transformer_blocks.30.ff.net.0.proj", 6144, 1536, peft=True)
+
+    assert "block 30" in _refusal(keys)
