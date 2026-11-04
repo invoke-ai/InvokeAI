@@ -740,6 +740,16 @@ describe('dimension helpers', () => {
     expect(calculateNewSize(1, 32 * 32)).toEqual({ height: 64, width: 64 });
     // 48² at 4:1 is 96×24; scaled so the short side is 64, then 256×64.
     expect(calculateNewSize(4, 48 * 48)).toEqual({ height: 64, width: 256 });
+    // 64:1 is the widest ratio both limits allow: 4096×64 exactly.
+    expect(calculateNewSize(64, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+  });
+
+  it('caps the long side and holds the short side at the minimum for a ratio past 64:1', () => {
+    // 2000:1 at 1024² would be about 45795×23; no in-range size has that ratio, so the result is the closest corner.
+    expect(calculateNewSize(2000, 1024 * 1024)).toEqual({ height: 64, width: 4096 });
+    expect(calculateNewSize(1 / 2000, 1024 * 1024)).toEqual({ height: 4096, width: 64 });
+    // A tiny area goes up the same way: the short side reaches 64 and the long side stops at 4096.
+    expect(calculateNewSize(2000, 16 * 16)).toEqual({ height: 64, width: 4096 });
   });
 
   it('moves a reference image one step through the stack, and no-ops at the ends', () => {

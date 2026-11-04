@@ -183,8 +183,9 @@ export const clampDimension = (value: number, grid = DIMENSION_GRID): number =>
 
 /**
  * Fit a width/height of the given ratio into approximately the given pixel area, snapped to the grid. At the dimension
- * limits both sides scale together (the larger side down to the maximum, else the smaller up to the minimum), so only
- * grid snapping moves the ratio.
+ * limits both sides scale together (the larger side down to the maximum, else the smaller up to the minimum), so for a
+ * ratio within MAX_DIMENSION / MIN_DIMENSION (64:1) only grid snapping moves it. A ratio past that cannot fit both
+ * limits: the long side is capped at the maximum and the short side held at the minimum.
  */
 export const calculateNewSize = (
   ratio: number,
