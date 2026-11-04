@@ -289,23 +289,32 @@ def sd3_variant_from_width(width: int | None) -> SD3VariantType | None:
     return {SD3_MEDIUM_WIDTH: SD3VariantType.Medium, SD3_LARGE_WIDTH: SD3VariantType.Large}.get(width or 0)
 
 
+# Modules whose input is the model's hidden state, so a layer on one states the transformer's width.
+_WIDTH_MODULE_SUFFIXES = ("ff.net.0.proj", "ff_context.net.0.proj", "norm1.linear", "norm1_context.linear")
+
+
+def _reads_model_width(module: str) -> bool:
+    return ".attn" in module or module.endswith(_WIDTH_MODULE_SUFFIXES)
+
+
 def _attention_width(grouped: dict[str, dict[str, torch.Tensor]]) -> int | None:
-    """The input width of the first attention projection a LoRA trains: the model's width, in either naming (kohya's
-    fused `qkv` included)."""
+    """The input width of the first attention, MLP-in or modulation layer a LoRA trains: the model's width, in either
+    naming (kohya's fused `qkv` included)."""
     for layer_path, values in grouped.items():
         module = resolve_sd3_transformer_module(layer_path)
         kohya = kohya_mmdit_targets(layer_path)
-        is_attention = (module is not None and ".attn" in module) or (kohya is not None and ".attn" in kohya[0])
-        if is_attention and (shape := layer_delta_shape(values)) is not None:
+        target = module if module is not None else (kohya[0] if kohya is not None else None)
+        if target is not None and _reads_model_width(target) and (shape := layer_delta_shape(values)) is not None:
             return shape[1]
     return None
 
 
 def is_sd3_lora(state_dict: dict[str | int, Any]) -> bool:
-    """True if the state dict trains an SD 3 attention projection at an SD 3 width, and nothing of another family.
+    """True if the state dict trains a layer that reads the hidden state (attention, MLP input, modulation) at an SD 3
+    width, and nothing of another family.
 
-    The width decides: diffusers' names are shared with Qwen-Image (3072 wide). A LoRA that trains no attention at all
-    is not recognized.
+    The width decides: diffusers' names are shared with Qwen-Image (3072 wide). A LoRA with no such layer is not
+    recognized.
     """
     str_keys = [k for k in state_dict if isinstance(k, str)]
     if any(anti.search(k) for k in str_keys for anti in _NON_SD3_ANTI_RES):
@@ -314,8 +323,8 @@ def is_sd3_lora(state_dict: dict[str | int, Any]) -> bool:
 
 
 def is_sd3_named_without_width(state_dict: dict[str | int, Any]) -> bool:
-    """True if every tensor names an SD 3 transformer module but no complete attention layer says
-    what width it is trained at: an MLP- or modulation-only file, or half of an attention layer. Only transformer
+    """True if every tensor names an SD 3 transformer module but no complete width-bearing layer says
+    what width it is trained at: half of a layer that reads the hidden state. Only transformer
     modules count; a file with anything else in it is left to the other families.
 
     Such a file cannot be told from Qwen-Image's or others' by width, so it is refused instead of installed.

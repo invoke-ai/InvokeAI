@@ -53,17 +53,26 @@ _SD3_SIZES = {SD3VariantType.Medium: "SD 3 / 3.5 Medium", SD3VariantType.Large: 
 _SIDECAR_TRANSIENT_BYTES = 1024**3
 
 
+def _is_conv_factorization(layer: LoKRLayer | LoHALayer) -> bool:
+    tensors = [v for v in vars(layer).values() if isinstance(v, torch.Tensor)]
+    has_core = getattr(layer, "t1", None) is not None or getattr(layer, "t2", None) is not None
+    return has_core or any(t.ndim > 2 for t in tensors)
+
+
 def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
     """Whether the layer's weight delta can be applied to `weight`.
 
     Low-rank layers are compared by their factors' dimensions. A LoKR or LoHA delta is not built here (that costs a
     CPU matmul per layer on every run): its shape follows from its factors' shapes, and the patcher reshapes a delta
-    to the target's shape, so it fits when it has as many elements. Other layer kinds are not checked.
+    to the target's shape, so it fits when it has as many elements. Convolution factorizations (kernel dimensions or a Tucker core, which only `pos_embed.proj` has) and other
+    layer kinds are not checked.
     """
     if isinstance(layer, LoRALayer):
         return layer.up.shape[0] == weight.shape[0] and layer.down.shape[1] == weight.shape[1]
     if isinstance(layer, FullLayer):
         return layer.weight.numel() == weight.numel()
+    if isinstance(layer, (LoKRLayer, LoHALayer)) and _is_conv_factorization(layer):
+        return True  # `pos_embed.proj`'s kernel: a factor with kernel dims or a Tucker core; no shape rule here
     if isinstance(layer, LoKRLayer):
         names = ("w1", "w1_a", "w1_b", "w2", "w2_a", "w2_b")
         values = {f"lokr_{n}": getattr(layer, n) for n in names if getattr(layer, n) is not None}

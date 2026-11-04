@@ -159,6 +159,28 @@ def test_the_fit_check_reads_factor_shapes_and_never_builds_a_delta(
         _fit_check(sd35_medium, _patch({"transformer_blocks.0.attn2.to_k": split_lokr}), None)
 
 
+def _conv_layers() -> dict[str, LoKRLayer | LoHALayer]:
+    """Factorizations of `pos_embed.proj`'s (1536, 16, 2, 2) kernel, each building exactly that delta."""
+    z = torch.zeros
+    return {
+        "lokr-4d-full-factor": LoKRLayer(z(2, 2), None, None, z(768, 8, 2, 2), None, None, None, None, None),
+        "lokr-tucker": LoKRLayer(z(2, 2), None, None, None, z(4, 768), z(4, 8), z(4, 4, 2, 2), None, None),
+        "loha-tucker": LoHALayer(z(4, 1536), z(4, 16), z(4, 1536), z(4, 16), z(4, 4, 2, 2), z(4, 4, 2, 2), None, None),
+        "loha-flat": LoHALayer(z(1536, 4), z(4, 64), z(1536, 4), z(4, 64), None, None, None, None),
+    }
+
+
+@pytest.mark.parametrize("name", list(_conv_layers()))
+def test_a_convolution_factorization_of_the_patch_embedding_passes(
+    sd35_medium: SD3Transformer2DModel, name: str
+) -> None:
+    layer = _conv_layers()[name]
+    weight = sd35_medium.get_submodule("pos_embed.proj").weight
+    assert layer.get_weight(weight).numel() == weight.numel()  # the layout is a valid one
+
+    _fit_check(sd35_medium, _patch({"pos_embed.proj": layer}), None)
+
+
 def test_a_medium_lora_that_does_not_fit_a_medium_model_is_not_blamed_on_the_size(
     sd35_medium: SD3Transformer2DModel,
 ) -> None:

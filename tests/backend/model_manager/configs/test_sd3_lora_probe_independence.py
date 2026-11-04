@@ -317,18 +317,16 @@ def test_a_file_with_sd3_module_names_or_widths_is_not_installed_as_qwen_image(l
 _NAMES_ONLY_SD3_HAS_WITHOUT_A_WIDTH = {
     "lone-half-of-an-attention-layer": {"transformer.transformer_blocks.0.attn.to_q.lora_A.weight": [4, 1536]},
     "lone-half-kohya-names": {"lora_unet_transformer_blocks_0_attn_to_q.lora_down.weight": [4, 1536]},
-    "mlp-only": _pair("transformer.transformer_blocks.0.ff.net.0.proj", 6144, 1536, peft=True),
-    "modulation-only": _pair("transformer.transformer_blocks.0.norm1.linear", 9216, 1536, peft=True),
 }
 
 
 @pytest.mark.parametrize("layout", list(_NAMES_ONLY_SD3_HAS_WITHOUT_A_WIDTH))
-def test_a_file_that_only_names_sd3_modules_without_an_attention_width_is_refused_with_a_reason(layout: str) -> None:
+def test_a_file_that_only_names_sd3_modules_without_a_width_is_refused_with_a_reason(layout: str) -> None:
     """Refused (InvalidMatchError, which the installer reports), not unidentified (which installs as unknown)."""
     sd = _state_dict(_NAMES_ONLY_SD3_HAS_WITHOUT_A_WIDTH[layout])
     mod, overrides = _mod(sd, layout)
 
-    with pytest.raises(InvalidMatchError, match="no complete attention layer"):
+    with pytest.raises(InvalidMatchError, match="no complete attention"):
         LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides)
     assert _accepting_lora_configs(sd, layout) == []
 
@@ -365,3 +363,26 @@ def test_one_dimensional_lokr_factors_get_a_variant_instead_of_failing_identific
     mod, overrides = _mod(_state_dict(keys), "lokr-1d")
 
     assert LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides).variant is SD3VariantType.Medium
+
+
+@pytest.mark.parametrize(
+    ("module", "rows", "width", "variant"),
+    [
+        ("ff.net.0.proj", 6144, 1536, SD3VariantType.Medium),
+        ("norm1.linear", 14592, 2432, SD3VariantType.Large),
+    ],
+)
+def test_an_mlp_or_modulation_only_lora_is_sized_by_its_input_width(module, rows, width, variant) -> None:
+    sd = _state_dict(_pair(f"transformer.transformer_blocks.0.{module}", rows, width, peft=True))
+
+    assert _accepting_lora_configs(sd, module) == ["LoRA_LyCORIS_SD3_Config"]
+    mod, overrides = _mod(sd, module)
+    assert LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides).variant is variant
+
+
+def test_an_mlp_only_lora_of_another_family_is_left_alone() -> None:
+    sd = _state_dict(_pair("transformer.transformer_blocks.0.ff.net.0.proj", 12288, 3072, peft=True))
+    mod, overrides = _mod(sd, "flux-mlp")
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides)

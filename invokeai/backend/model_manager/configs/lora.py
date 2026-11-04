@@ -1735,7 +1735,7 @@ def _validate_sd3_lora_state_dict(state_dict: dict[str | int, Any]) -> None:
     if not is_sd3_lora(state_dict):
         if is_sd3_named_without_width(state_dict):
             raise InvalidMatchError(
-                "SD 3 LoRA cannot be identified: it names only SD 3 modules but has no complete attention layer, "
+                "SD 3 LoRA cannot be identified: it names only SD 3 modules but has no complete attention, MLP-input or modulation layer, "
                 "so its size (Medium or Large) is unknown."
             )
         raise NotAMatchError("model does not match SD 3 LoRA heuristics")
