@@ -23,8 +23,9 @@ export interface AspectRatioPresetsPort {
   isFull: boolean;
   /** Adds a ratio under a new id and returns it; null when the list is full. */
   save(draft: AspectRatioPresetDraft): AspectRatioPreset | null;
+  /** Rewrites a saved ratio; does nothing once it is gone. */
   update(presetId: string, draft: AspectRatioPresetDraft): void;
-  /** Removes a ratio and reports it with Undo, which puts it back where it was. */
+  /** Removes a ratio and reports it with Undo, which puts it back where it was, or says why it cannot (a full list). */
   remove(presetId: string): void;
 }
 

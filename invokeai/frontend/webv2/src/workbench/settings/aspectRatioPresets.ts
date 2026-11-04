@@ -20,6 +20,10 @@ const writePresets = (aspectRatioPresets: StoredAspectRatioPreset[]): void => {
  * The account's saved aspect ratios, for Generate's Size section (through the Generation UI adapter) and the canvas
  * Frame tool alike. Reads are generation-normalized; writes edit the stored list, so an entry this build cannot use
  * (a newer build's) is kept.
+ *
+ * The cap counts every stored entry, listed or not: it bounds the synced blob, and an entry past it would be stored but
+ * never listed, so nothing could remove it. Settings already drops records without a usable shape or with a repeated
+ * id; what remains unlisted here is a ratio this build rejects, which a newer build may list.
  */
 export const useAspectRatioPresets = (): AspectRatioPresetsPort => {
   const { t } = useTranslation();
@@ -27,13 +31,19 @@ export const useAspectRatioPresets = (): AspectRatioPresetsPort => {
   const stored = useWorkbenchPreferenceSelector((preferences) => preferences.aspectRatioPresets);
 
   return useMemo<AspectRatioPresetsPort>(() => {
-    const presets = normalizeAspectRatioPresets(stored);
-    const isFull = presets.length >= MAX_ASPECT_RATIO_PRESETS;
     const read = () => getWorkbenchPreferences().aspectRatioPresets;
     const restore = (preset: StoredAspectRatioPreset, index: number) => {
       const current = read();
 
       if (current.some((candidate) => candidate.id === preset.id)) {
+        return;
+      }
+
+      if (current.length >= MAX_ASPECT_RATIO_PRESETS) {
+        notify.error(
+          t('widgets.generate.aspectRatioRestoreFailed', { name: preset.label.trim() }),
+          t('widgets.generate.aspectRatioListFullNotice')
+        );
         return;
       }
 
@@ -44,8 +54,8 @@ export const useAspectRatioPresets = (): AspectRatioPresetsPort => {
     };
 
     return {
-      isFull,
-      presets,
+      isFull: stored.length >= MAX_ASPECT_RATIO_PRESETS,
+      presets: normalizeAspectRatioPresets(stored),
       remove: (presetId) => {
         const current = read();
         const index = current.findIndex((candidate) => candidate.id === presetId);
@@ -61,17 +71,26 @@ export const useAspectRatioPresets = (): AspectRatioPresetsPort => {
         });
       },
       save: (draft) => {
-        if (normalizeAspectRatioPresets(read()).length >= MAX_ASPECT_RATIO_PRESETS) {
+        const current = read();
+
+        if (current.length >= MAX_ASPECT_RATIO_PRESETS) {
           return null;
         }
 
         const preset = { ...draft, id: createUuid() };
 
-        writePresets([...read(), preset]);
+        writePresets([...current, preset]);
         return preset;
       },
       update: (presetId, draft) => {
-        writePresets(read().map((preset) => (preset.id === presetId ? { ...preset, ...draft } : preset)));
+        const current = read();
+
+        // Deleted meanwhile (in another tab, say): writing would only send back a list read before that.
+        if (!current.some((preset) => preset.id === presetId)) {
+          return;
+        }
+
+        writePresets(current.map((preset) => (preset.id === presetId ? { ...preset, ...draft } : preset)));
       },
     };
   }, [notify, stored, t]);

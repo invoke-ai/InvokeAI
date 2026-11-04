@@ -1,4 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop */
+import type { AspectRatioPresetsPort } from '@features/generation/contracts';
 import type { StoredAspectRatioPreset } from '@workbench/settings/contracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -8,7 +9,7 @@ import { AppToaster, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import i18next from 'i18next';
-import { act } from 'react';
+import { act, createRef, type Ref, useImperativeHandle } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -59,15 +60,24 @@ const preset = (id: string, label: string, width: number, height: number): Store
   width,
 });
 
-const Picker = () => (
-  <AspectRatioPicker
-    currentSize={{ height: 640, width: 1536 }}
-    getSizeForRatio={() => ({ height: 640, width: 1536 })}
-    lockedRatio={null}
-    presets={useAspectRatioPresets()}
-    onChange={() => undefined}
-  />
-);
+/** The port the picker was last rendered with, for writes the picker cannot reach. */
+const port = createRef<AspectRatioPresetsPort>();
+
+const Picker = ({ portRef }: { portRef: Ref<AspectRatioPresetsPort> }) => {
+  const presets = useAspectRatioPresets();
+
+  useImperativeHandle(portRef, () => presets, [presets]);
+
+  return (
+    <AspectRatioPicker
+      currentSize={{ height: 640, width: 1536 }}
+      getSizeForRatio={() => ({ height: 640, width: 1536 })}
+      lockedRatio={null}
+      presets={presets}
+      onChange={() => undefined}
+    />
+  );
+};
 
 const render = async (stored: StoredAspectRatioPreset[]) => {
   await patchWorkbenchPreferences({ aspectRatioPresets: stored });
@@ -78,7 +88,7 @@ const render = async (stored: StoredAspectRatioPreset[]) => {
     root!.render(
       <I18nextProvider i18n={i18next}>
         <ChakraProvider value={system}>
-          <Picker />
+          <Picker portRef={port} />
           <AppToaster />
         </ChakraProvider>
       </I18nextProvider>
@@ -92,6 +102,9 @@ const rowNames = () =>
   [...document.querySelectorAll<HTMLButtonElement>('button[aria-label$="1536×640"]')].map(
     (row) => row.getAttribute('aria-label')?.split(',')[0]
   );
+
+const ratios = (count: number) =>
+  Array.from({ length: count }, (_, index) => preset(`p${index}`, `Ratio ${index}`, 2, 1));
 
 describe('useAspectRatioPresets', () => {
   it('deletes a saved ratio with an Undo that puts it back where it was', async () => {
@@ -130,9 +143,56 @@ describe('useAspectRatioPresets', () => {
   });
 
   it('offers no Add ratio once the list is full', async () => {
-    await render(Array.from({ length: 50 }, (_, index) => preset(`p${index}`, `Ratio ${index}`, 2, 1)));
+    await render(ratios(50));
 
     await expect.element(page.getByText('You can keep up to 50 ratios. Delete one to add another.')).toBeVisible();
     expect(page.getByRole('button', { name: 'Add ratio' }).elements()).toHaveLength(0);
+  });
+
+  it('counts stored ratios this build does not list toward the limit', async () => {
+    // A newer build's ratio is stored and synced like any other, so it takes a place in the list.
+    const wide = preset('wide', 'Panorama', 20, 1);
+    await render([...ratios(48), wide]);
+
+    await userEvent.click(page.getByRole('button', { name: 'Add ratio' }));
+    await userEvent.keyboard('Last{Enter}');
+
+    await expect.element(page.getByText('You can keep up to 50 ratios. Delete one to add another.')).toBeVisible();
+    expect(page.getByRole('button', { name: 'Add ratio' }).elements()).toHaveLength(0);
+    expect(rowNames()).toHaveLength(49);
+    expect(port.current!.save({ height: 1, label: 'More', width: 3 })).toBeNull();
+    expect(getWorkbenchPreferences().aspectRatioPresets).toHaveLength(50);
+    expect(getWorkbenchPreferences().aspectRatioPresets).toContainEqual(wide);
+  });
+
+  it('says why an Undo cannot bring a ratio back into a list that filled up again', async () => {
+    await render(ratios(50));
+
+    await userEvent.click(page.getByRole('button', { name: 'Delete ratio Ratio 0 (2:1)' }));
+    await userEvent.click(page.getByRole('button', { name: 'Add ratio' }));
+    await userEvent.keyboard('Refill{Enter}');
+    await expect.poll(() => getWorkbenchPreferences().aspectRatioPresets).toHaveLength(50);
+
+    await userEvent.click(page.getByRole('button', { name: 'Undo' }));
+
+    const notice = page.getByText("Couldn't bring back ratio Ratio 0");
+    await expect.element(notice).toBeVisible();
+    expect(notice.element().closest('[data-scope="toast"][data-part="root"]')?.textContent).toContain(
+      'Your ratios list is full.'
+    );
+    const kept = getWorkbenchPreferences().aspectRatioPresets;
+    expect(kept).toHaveLength(50);
+    expect(kept.map(({ id }) => id)).not.toContain('p0');
+  });
+
+  it('leaves the stored list alone when the ratio being edited is already gone', async () => {
+    await render([preset('a', 'Banner', 12, 5)]);
+    // Deleted in another tab while this one still held it.
+    await patchWorkbenchPreferences({ aspectRatioPresets: [] });
+    const before = getWorkbenchPreferences();
+
+    port.current!.update('a', { height: 5, label: 'Header', width: 12 });
+
+    expect(getWorkbenchPreferences()).toBe(before);
   });
 });
