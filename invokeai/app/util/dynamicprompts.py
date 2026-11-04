@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from itertools import islice
+from typing import cast
 
 from dynamicprompts.commands import (
     Command,
@@ -15,20 +17,97 @@ from dynamicprompts.commands import (
 from dynamicprompts.commands.variable_commands import VariableAccessCommand, VariableAssignmentCommand
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from dynamicprompts.parser.parse import parse
+from dynamicprompts.samplers.combinatorial import CombinatorialSampler
+from dynamicprompts.samplers.cycle import CyclicalSampler
+from dynamicprompts.samplers.random import RandomSampler
+from dynamicprompts.sampling_context import SamplingContext
+from dynamicprompts.types import ResultGen
 from dynamicprompts.wildcards import WildcardManager
 from pyparsing import ParseException
 
-# Stands in for an immediate `${c=!...}` value, which the sampler reduces to one literal string.
+# Stands in for an immediate `${c=!...}` value whose first result could not be worked out.
 _SAMPLED_VALUE = LiteralCommand("")
 
+# How many times the dry run of an immediate value may draw an unknown wildcard's not-found fallback
+# before it treats the value as hanging. The fallback repeats one string forever, so a value that
+# produces a result at all needs only a few draws.
+_FALLBACK_DRAW_LIMIT = 1000
 
-def _first_combination_is_distinct_literals(values: list[Command]) -> bool:
-    """Whether `values` are plain literals with pairwise different text."""
-    texts = [value.literal for value in values if isinstance(value, LiteralCommand)]
-    return len(texts) == len(values) and len(set(texts)) == len(texts)
+
+class _FallbackDrawLimitReached(Exception):
+    """Raised when the dry run keeps drawing an unknown wildcard's fallback without a result."""
 
 
-def _collect_wildcard_names(command: Command) -> list[str]:
+class _RecordingWildcardManager:
+    """Wraps a `WildcardManager` and records every wildcard it was asked for and could not resolve."""
+
+    def __init__(self, inner: WildcardManager) -> None:
+        self._inner = inner
+        self.missing: dict[str, None] = {}
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+    def get_values(self, wildcard: str) -> object:
+        values = self._inner.get_values(wildcard)
+        if not values:
+            self.missing.setdefault(wildcard)
+        return values
+
+
+class _BoundedCombinatorialSampler(CombinatorialSampler):
+    """The combinatorial sampler with a limit on draws from an unknown wildcard's fallback."""
+
+    def _get_wildcard(self, command: WildcardCommand, context: SamplingContext) -> ResultGen:
+        wildcard_path = next(iter(context.sample_prompts(command.wildcard, 1))).text
+        if context.wildcard_manager.get_values(wildcard_path):
+            yield from super()._get_wildcard(command, context)
+            return
+        yield from islice(super()._get_wildcard(command, context), _FALLBACK_DRAW_LIMIT)
+        raise _FallbackDrawLimitReached(wildcard_path)
+
+
+def _sample_first_result(
+    value: Command, scope: Mapping[str, Command], wildcard_manager: WildcardManager
+) -> tuple[str | None, list[str]]:
+    """Dry-run an immediate `${c=!...}` value the way `SamplingContext.process_variable_assignment` does.
+
+    The sampler keeps only the first result of an immediate value, so whether an unknown wildcard in it
+    matters depends on whether that wildcard has to run before the first result comes out. Rather than
+    predicting that from the parse tree, the value is sampled with the real combinatorial sampler,
+    with a limit on how often an unknown wildcard's endless fallback may be drawn.
+
+    Returns the first result, or `None` when there is none, together with the unknown wildcards that
+    were reached when there is no result (the sampler would hang or fail on them).
+    """
+    recorder = _RecordingWildcardManager(wildcard_manager)
+    context = SamplingContext(
+        default_sampling_method=SamplingMethod.COMBINATORIAL,
+        wildcard_manager=cast(WildcardManager, recorder),
+        samplers={
+            SamplingMethod.COMBINATORIAL: _BoundedCombinatorialSampler(),
+            SamplingMethod.CYCLICAL: CyclicalSampler(),
+            SamplingMethod.RANDOM: RandomSampler(),
+        },
+        variables=dict(scope),
+    )
+    try:
+        return str(next(iter(context.generator_from_command(value)))), []
+    except (_FallbackDrawLimitReached, StopIteration):
+        # No first result: either the fallback would be drawn forever, or the value has no results.
+        return None, list(recorder.missing)
+    except RuntimeError as e:
+        if isinstance(e.__cause__, StopIteration):
+            # A nested part with no results ends a generator early, which Python reports this way.
+            return None, list(recorder.missing)
+        return None, []
+    except Exception:
+        # Other failures (an unknown variable, a recursive one) are raised by the generator itself
+        # with their own message, so they are not reported as missing wildcards.
+        return None, []
+
+
+def _collect_wildcard_names(command: Command, wildcard_manager: WildcardManager) -> list[str]:
     """Return the statically-known wildcard names that sampling `command` would evaluate, in order.
 
     Variables are tracked the way `SamplingContext` resolves them, so a wildcard is only reported when
@@ -36,33 +115,16 @@ def _collect_wildcard_names(command: Command) -> list[str]:
     default counts only while the variable is unset.
 
     An immediate assignment's value is sampled once, where it is assigned, and only its first result
-    is kept (`SamplingContext.process_variable_assignment`), so it is walked in "first result" mode
-    (see `first_only` below) and the variable is bound to a literal placeholder.
+    is kept, so it is dry-run with `_sample_first_result` and the variable is bound to that result.
 
     A command is walked at most once per variable scope, so an expression that many references
     share is not walked again for each of them.
     """
     names: dict[str, None] = {}
-    visited: set[tuple[int, frozenset[tuple[str, int]], bool]] = set()
+    visited: set[tuple[int, frozenset[tuple[str, int]]]] = set()
 
-    def visit(
-        command: Command,
-        scope: Mapping[str, Command],
-        scope_key: frozenset[tuple[str, int]],
-        first_only: bool = False,
-    ) -> None:
-        """Record the wildcards in `command`.
-
-        With `first_only`, only wildcards that can stop the combinatorial sampler from producing its
-        *first* result are recorded. A bare unresolvable wildcard is harmless there, because its
-        not-found fallback yields the wrapped name straight away. A plain variant whose smallest pick
-        is one option first samples only its first option, and one whose smallest pick is zero
-        options first yields an empty string. Anything else (a variant that picks several distinct
-        options, a `{__wildcard__}` variant, or a non-combinatorial variant) is walked in full,
-        because the deduplication there can loop forever, or end without a result, before yielding
-        anything.
-        """
-        key = (id(command), scope_key, first_only)
+    def visit(command: Command, scope: Mapping[str, Command], scope_key: frozenset[tuple[str, int]]) -> None:
+        key = (id(command), scope_key)
         if key in visited:
             # Already walked in this scope (or being walked, for a recursive reference that the
             # sampler rejects with its own RecursionError), so it cannot add a new name.
@@ -71,7 +133,7 @@ def _collect_wildcard_names(command: Command) -> list[str]:
         if isinstance(command, WildcardCommand):
             # The wildcard name may itself be a dynamic Command (e.g. `__${var}__`). Only plain string
             # names can be validated ahead of time, so the dynamic case is intentionally skipped.
-            if isinstance(command.wildcard, str) and not first_only:
+            if isinstance(command.wildcard, str):
                 names.setdefault(command.wildcard)
         elif isinstance(command, SequenceCommand):
             # Mirrors `SamplingContext.process_variable_assignments`: every assignment in the sequence
@@ -86,8 +148,10 @@ def _collect_wildcard_names(command: Command) -> list[str]:
                 elif token.immediate:
                     # Sampled right here against the enclosing scope, even if a later assignment
                     # replaces it, and only the first result is kept.
-                    visit(token.value, scope, scope_key, first_only=True)
-                    assigned[token.name] = _SAMPLED_VALUE
+                    first_result, missing = _sample_first_result(token.value, scope, wildcard_manager)
+                    for name in missing:
+                        names.setdefault(name)
+                    assigned[token.name] = _SAMPLED_VALUE if first_result is None else LiteralCommand(first_result)
                 else:
                     assigned[token.name] = token.value
             if assigned:
@@ -95,35 +159,19 @@ def _collect_wildcard_names(command: Command) -> list[str]:
                 scope_key = frozenset((name, id(value)) for name, value in scope.items())
             for token in command.tokens:
                 if not isinstance(token, VariableAssignmentCommand):
-                    visit(token, scope, scope_key, first_only)
+                    visit(token, scope, scope_key)
         elif isinstance(command, VariantCommand):
-            is_wildcard_variant = len(command.values) == 1 and isinstance(command.values[0], WildcardCommand)
-            smallest_pick = min(command.min_bound, len(command.values))
-            first_only_variant = (
-                first_only
-                and not is_wildcard_variant
-                and command.sampling_method in (None, SamplingMethod.COMBINATORIAL)
-            )
-            if first_only_variant and smallest_pick <= 1:
-                if command.min_bound >= 1 and command.values:
-                    visit(command.values[0], scope, scope_key, first_only)
-            elif first_only_variant and _first_combination_is_distinct_literals(command.values[:smallest_pick]):
-                # The first combination the sampler tries is the first `smallest_pick` options in
-                # order. Distinct literals always survive deduplication, so that combination is the
-                # first result and no other option is ever sampled.
-                pass
-            else:
-                for value in command.values:
-                    visit(value, scope, scope_key)
+            for value in command.values:
+                visit(value, scope, scope_key)
         elif isinstance(command, WrapCommand):
-            visit(command.wrapper, scope, scope_key, first_only)
-            visit(command.inner, scope, scope_key, first_only)
+            visit(command.wrapper, scope, scope_key)
+            visit(command.inner, scope, scope_key)
         elif isinstance(command, VariableAccessCommand):
             # `${c}` samples the value bound to `c`, and `${c:{__nope__|x}}` falls back to its default
             # only when `c` is unset.
             target = scope.get(command.name, command.default)
             if target is not None:
-                visit(target, scope, scope_key, first_only)
+                visit(target, scope, scope_key)
         # LiteralCommand references no wildcards.
 
     visit(command, {}, frozenset())
@@ -158,7 +206,7 @@ def find_missing_wildcards(prompt: str, wildcard_manager: WildcardManager | None
         # Malformed prompts are surfaced separately by the generators; nothing to validate here.
         return []
 
-    return [name for name in _collect_wildcard_names(tree) if not wildcard_manager.get_values(name)]
+    return [name for name in _collect_wildcard_names(tree, wildcard_manager) if not wildcard_manager.get_values(name)]
 
 
 @dataclass(frozen=True)

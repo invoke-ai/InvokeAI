@@ -110,6 +110,11 @@ def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_vari
         # they are distinct literals.
         "${c=!{2$$red|blue|__nope__}} a ${c}",
         "${c=!{2-3$$red|blue|{__nope__}}} a ${c}",
+        # The same when the first option is itself a variant.
+        "${c=!{2$${red|green}|blue|__nope__}} a ${c}",
+        # Duplicate literals in the first combination are deduped away, but the next combination
+        # still produces a result before the `{__nope__}` option is reached.
+        "${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}",
     ],
 )
 def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
@@ -132,9 +137,8 @@ def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: s
         "${c=!{{2$$__nope__|{__nope__}}|red}} a ${c}",
         "${c=!x ${d:{__nope__}}} a ${c}",
         "${c=!{__nope__}} ${c=red} a ${c}",
-        # Duplicate literals in the first combination are deduped away, so later combinations
-        # with the unknown wildcard run.
-        "${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}",
+        # Every combination of two distinct options needs `{__nope__}` or a second `__nope__`.
+        "${c=!{2$$red|red|{__nope__}}} a ${c}",
     ],
 )
 def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_result(prompt: str) -> None:
@@ -153,6 +157,19 @@ def test_immediate_multi_pick_assignment_keeps_the_first_combination() -> None:
     result = expand_dynamic_prompt("${c=!{2$$red|blue|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
 
     assert result == ExpandedPrompts(prompts=[" a red,blue"])
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        ("${c=!{2$${red|green}|blue|__nope__}} a ${c}", " a red,blue"),
+        ("${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}", " a red,__nope__"),
+    ],
+)
+def test_immediate_multi_pick_assignment_matches_the_sampler(prompt: str, expected: str) -> None:
+    result = expand_dynamic_prompt(prompt, max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[expected])
 
 
 @pytest.mark.timeout(5)
