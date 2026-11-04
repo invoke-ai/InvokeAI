@@ -1,3 +1,4 @@
+import re
 from contextlib import ExitStack
 from typing import Literal, Optional
 
@@ -21,11 +22,11 @@ from invokeai.backend.ideogram4.sampler_configs import PRESETS
 from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN, unpatchify_and_denormalize
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.load.load_base import LoadedModel
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
-from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import IDEOGRAM4_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.patches.sidecar_working_memory import lora_sidecar_bytes
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
 from invokeai.backend.quantization.fp8_rowwise import Fp8Linear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
@@ -59,25 +60,8 @@ IDEOGRAM4_LEAVE_FREE_FOR_THE_SYSTEM_BYTES = 3 * 2**30
 _LORA_BRANCHES = ("unconditional", "conditional")
 
 
-def _sidecar_weight_transient_bytes(patch_specs: list[PatchSpec], model: torch.nn.Module) -> int:
-    """Peak bytes a sidecar materializes per forward for the LoRAs' weight-space layers.
-
-    A low-rank layer runs in activation space, and its extra output copy is within the per-token estimate. A LoKR
-    layer is applied in weight space instead: the patched module's weight is materialized (dequantized, for a GGUF
-    build), its delta built, and the two summed, in up to float32 -- three copies of that module's weight. On
-    `attention.qkv` that is ~0.75 GiB, which no activation estimate covers.
-    """
-    largest = 0
-    for spec in patch_specs:
-        for key, layer in spec[0].layers.items():
-            if isinstance(layer, LoRALayer):
-                continue
-            try:
-                module = model.get_submodule(key.removeprefix(IDEOGRAM4_LORA_TRANSFORMER_PREFIX))
-            except AttributeError:
-                continue  # skipped here as the patcher skips it, with its own warning
-            largest = max(largest, module.in_features * module.out_features)
-    return 3 * 4 * largest
+# The Linears that read the timestep embedding: it has one row per sample, however long the sequence.
+_PER_SAMPLE_LINEAR = re.compile(r"t_embedding\.mlp_(in|out)|adaln_proj|(layers\.\d+|final_layer)\.adaln_modulation")
 
 
 def _branch_weights(
@@ -227,7 +211,11 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
         with ExitStack() as stack:
             conditional, unconditional = self._load_branches(
-                context, stack, self._estimate_working_memory(int(llm_features.shape[0]))
+                context,
+                stack,
+                self._estimate_working_memory(int(llm_features.shape[0])),
+                lora_rows=int(llm_features.shape[0])
+                + (self.height // PIXELS_PER_IMAGE_TOKEN) * (self.width // PIXELS_PER_IMAGE_TOKEN),
             )
             packed = run_ideogram4_denoise(
                 conditional_transformer=conditional,
@@ -307,7 +295,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         return peak_dequant_transient_bytes(model, get_model_compute_dtype(model))
 
     def _load_branches(
-        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int
+        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int, lora_rows: int = 0
     ) -> tuple[Ideogram4Transformer, Ideogram4Transformer]:
         """Put both transformer branches on the device and keep them there for the whole loop.
 
@@ -362,16 +350,31 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         )
 
         # How each branch takes the LoRAs, decided before the locks: sidecar patches stay on the device for the whole
-        # loop, so the reservation has to include them. One patch object serves both branches; it is counted once.
-        sidecar = self._lora_sidecar_by_branch(context, conditional_info, unconditional_info)
-        if any(sidecar.values()):
-            patch_specs = self._materialize_lora_patches(context)
-            reservation += sum(spec[0].calc_size() for spec in patch_specs)
-            # The branches share their architecture, so either one answers for the module sizes.
-            branch_model = conditional_info.model
-            if isinstance(branch_model, Ideogram4TransformerPair):
-                branch_model = branch_model.conditional
-            reservation += _sidecar_weight_transient_bytes(patch_specs, branch_model)
+        # loop, and a layer that partial loading leaves on the CPU is copied over for every forward, so the
+        # reservation has to include them. One patch object serves both branches; each branch's own format decides
+        # what it costs, and the dearer one is reserved.
+        lora_branches = self._lora_branch_models(context, conditional_info, unconditional_info)
+        sidecar = {
+            branch: requires_sidecar_patching(model, model_format)
+            or any(p.dtype in FP8_STORAGE_DTYPES for p in model.parameters())
+            for branch, (model, model_format) in lora_branches.items()
+        }
+        if lora_branches:
+            patches = [spec[0] for spec in self._materialize_lora_patches(context)]
+            reservation += max(
+                lora_sidecar_bytes(
+                    patches,
+                    model,
+                    model_format,
+                    prefix=IDEOGRAM4_LORA_TRANSFORMER_PREFIX,
+                    rows=lora_rows,
+                    per_sample_rows={
+                        name: 1 for name, _module in model.named_modules() if _PER_SAMPLE_LINEAR.fullmatch(name)
+                    },
+                    dtype=compute_dtype_of(model.input_proj),
+                )
+                for model, model_format in lora_branches.values()
+            )
 
         primary_cached, primary = stack.enter_context(conditional_info.model_on_device(working_mem_bytes=reservation))
         if unconditional_info is None:
@@ -422,14 +425,13 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
             self._apply_loras(context, stack, model, cached_weights, use_sidecar)
         return primary, unconditional
 
-    def _lora_sidecar_by_branch(
+    def _lora_branch_models(
         self, context: InvocationContext, conditional_info: LoadedModel, unconditional_info: Optional[LoadedModel]
-    ) -> dict[str, bool]:
-        """For each branch the LoRAs go to, whether they are applied as a sidecar (and so stay on the device).
+    ) -> dict[str, tuple[torch.nn.Module, ModelFormat]]:
+        """For each branch the LoRAs go to, its unlocked model and format.
 
-        GGUF, int8 and the other dequantizing builds keep packed weights a patch cannot be added to; fp8 weights have
-        no add kernel, so the patcher picks the sidecar for them by itself. Read from the unlocked models. A branch
-        that is no Ideogram 4 transformer gets nothing here; the check after the locks refuses it with a message.
+        Read from the unlocked models. A branch that is no Ideogram 4 transformer gets nothing here; the check after
+        the locks refuses it with a message.
         """
         if not self.transformer.loras:
             return {}
@@ -452,11 +454,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
                 branch: (by_branch[branch][0], context.models.get_config(by_branch[branch][1]).format)
                 for branch in _LORA_BRANCHES
             }
-        return {
-            branch: requires_sidecar_patching(model, model_format)
-            or any(p.dtype in FP8_STORAGE_DTYPES for p in model.parameters())
-            for branch, (model, model_format) in branches.items()
-        }
+        return branches
 
     def _materialize_lora_patches(self, context: InvocationContext) -> list[PatchSpec]:
         """Load every LoRA on 'Transformer' into (patch, weight, cache-pin) specs.

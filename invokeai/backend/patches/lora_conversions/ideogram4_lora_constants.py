@@ -42,6 +42,15 @@ IDEOGRAM4_LORA_KEY_PREFIXES = (
 
 _PREFIX_RE = r"^(?:" + "|".join(re.escape(p) for p in IDEOGRAM4_LORA_KEY_PREFIXES) + r")?"
 
+# Kohya flattens a module path into one name: `lora_unet__layers_0_feed_forward_w1.lora_down.weight`.
+_KOHYA_FLAT_LAYER_RE = re.compile(
+    r"^lora_unet__layers_(\d+)_(?:attention_(qkv|o|to_q|to_k|to_v|to_out_0)|feed_forward_(w[123])|(adaln_modulation))$"
+)
+# The same names with a parameter after them, for the anti-pattern below.
+_KOHYA_FLAT_KEY_RE = (
+    r"_layers_\d+_(?:attention_(?:qkv|o|to_q|to_k|to_v|to_out_0)|feed_forward_w[123]|adaln_modulation)\."
+)
+
 _IDEOGRAM4_MODULE_RE = re.compile(
     _PREFIX_RE
     + r"(?:layers\.\d+\.(?:attention\.(?:qkv|o|to_q|to_k|to_v|to_out\.0)|feed_forward\.w[123]|adaln_modulation)"
@@ -55,7 +64,9 @@ _NON_IDEOGRAM4_ANTI_RES = (
     re.compile(r"(?:^|\.)(?:context_refiner|noise_refiner|x_embedder|cap_embedder|t_embedder)\."),  # Z-Image
     re.compile(r"(?:^|\.|_)(?:double_blocks|single_blocks|single_transformer_blocks|transformer_blocks)[\._]\d+"),
     re.compile(r"(?:^|\.)blocks\.\d+\."),  # Wan / Anima / MiniMax H3
-    re.compile(r"(?:^|_)lora_(?:unet|te\d?)_"),  # kohya-flattened keys
+    # Kohya-flattened keys, except those naming one of Ideogram 4's modules (see `_KOHYA_FLAT_LAYER_RE`); Z-Image's
+    # flattened `attention_to_*` keys pass here too, and the width check in `has_ideogram4_lora_keys` keeps them away.
+    re.compile(r"(?:^|_)lora_(?:unet|te\d?)_(?!" + _KOHYA_FLAT_KEY_RE + r")"),
 )
 
 # Low-rank and LoKR parameter names the conversion builds layers from. LoHA has not been seen for this family, and
@@ -119,23 +130,37 @@ def layer_delta_shape(values: dict[str, torch.Tensor]) -> tuple[int, int] | None
     return None
 
 
+def _unflatten_kohya_layer_path(layer_path: str) -> str:
+    """`lora_unet__layers_0_attention_to_out_0` as `layers.0.attention.to_out.0`; any other path unchanged."""
+    match = _KOHYA_FLAT_LAYER_RE.match(layer_path)
+    if match is None:
+        return layer_path
+    index, attention, feed_forward, modulation = match.groups()
+    if attention:
+        return f"layers.{index}.attention.{'to_out.0' if attention == 'to_out_0' else attention}"
+    if feed_forward:
+        return f"layers.{index}.feed_forward.{feed_forward}"
+    return f"layers.{index}.{modulation}"
+
+
 def group_ideogram4_lora_layers(state_dict: dict[str | int, Any]) -> dict[str, dict[str, torch.Tensor]]:
-    """The tensors of every supported key, grouped by layer path as written in the file (prefix included)."""
+    """The tensors of every supported key, grouped by layer path (prefix included, kohya-flattened names unflattened)."""
     grouped: dict[str, dict[str, torch.Tensor]] = {}
     for key, value in state_dict.items():
         if isinstance(key, str) and (split := split_ideogram4_lora_key(key)) is not None:
-            grouped.setdefault(split[0], {})[split[1]] = value
+            grouped.setdefault(_unflatten_kohya_layer_path(split[0]), {})[split[1]] = value
     return grouped
 
 
 def has_ideogram4_lora_keys(state_dict: dict[str | int, Any]) -> bool:
     """True if the state dict names Ideogram 4 modules and patches at least one of them at an Ideogram 4 width."""
     str_keys = [k for k in state_dict if isinstance(k, str)]
-    if not any(_IDEOGRAM4_MODULE_RE.search(k) for k in str_keys):
+    grouped = group_ideogram4_lora_layers(state_dict)
+    if not any(_IDEOGRAM4_MODULE_RE.search(path + ".") for path in grouped):
         return False
     if any(anti.search(k) for k in str_keys for anti in _NON_IDEOGRAM4_ANTI_RES):
         return False
-    for layer_path, values in group_ideogram4_lora_layers(state_dict).items():
+    for layer_path, values in grouped.items():
         if _IDEOGRAM4_MODULE_RE.search(layer_path + "."):
             shape = layer_delta_shape(values)
             if shape is not None and (shape[0] in IDEOGRAM4_WIDTHS or shape[1] in IDEOGRAM4_WIDTHS):
@@ -166,15 +191,17 @@ def ideogram4_lora_refusal(state_dict: dict[str | int, Any]) -> str | None:
             f"layer {incomplete[0]!r} is incomplete (has {sorted(grouped[incomplete[0]])}); the file is truncated or "
             "was edited."
         )
-    # The split projections are fused into `attention.qkv`, which would then replace a fused layer of the same block.
+    # Diffusers' split names land on the vendored transformer's fused `attention.qkv` and its `attention.o`; a file
+    # that trains both spellings of one module would have one replace the other.
     stripped = {strip_ideogram4_prefix(path) for path in grouped}
     collisions = sorted(
         path
         for path in stripped
-        if path.endswith(".attention.qkv") and any(f"{path[: -len('qkv')]}to_{p}" in stripped for p in "qkv")
+        if (path.endswith(".attention.qkv") and any(f"{path[: -len('qkv')]}to_{p}" in stripped for p in "qkv"))
+        or (path.endswith(".attention.o") and f"{path[: -len('.o')]}.to_out.0" in stripped)
     )
     if collisions:
-        return f"{collisions[0]!r} is trained both fused and as split q/k/v projections; only one can be applied."
+        return f"{collisions[0]!r} is trained both fused and as split projections; only one can be applied."
     split_non_low_rank = [
         path
         for path, values in grouped.items()

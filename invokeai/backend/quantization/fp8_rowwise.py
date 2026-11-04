@@ -39,9 +39,11 @@ class Fp8Linear(DequantizingLinear):
             self.bias = None
 
     def _dequantized_weight(self, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
-        # The cast always allocates (the weight is float8), so the scale can be applied in place: one weight-sized
-        # tensor instead of two. Same rounding as `weight.to(dtype) * scale.to(dtype)`.
-        weight = self.weight.to(device=device, dtype=dtype)
+        # `copy=True` makes the cast allocate whatever the stored dtype is (a float weight carrying a scale would
+        # otherwise be returned as is, and rescaled on every forward), so the scale can be applied in place: one
+        # weight-sized tensor instead of two. For a float8 weight the cast copies anyway. Same rounding as
+        # `weight.to(dtype) * scale.to(dtype)`.
+        weight = self.weight.to(device=device, dtype=dtype, copy=True)
         return weight.mul_(self.weight_scale.to(device=device, dtype=dtype).unsqueeze(1))
 
     def dequant_transient_bytes(self, compute_dtype: torch.dtype) -> int:

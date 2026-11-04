@@ -161,6 +161,13 @@ def test_a_native_lora_and_its_diffusers_conversion_patch_the_same_weights() -> 
             },
             "layers.0.attention.qkv.*both fused and as split",
         ),
+        (
+            {
+                "transformer.layers.0.attention.to_out.0.lora_A.weight": [4, 4608],
+                "transformer.layers.0.attention.to_out.0.lora_B.weight": [4608, 4],
+            },
+            "layers.0.attention.o.*both fused and as split",
+        ),
     ],
     ids=[
         "dora",
@@ -171,6 +178,7 @@ def test_a_native_lora_and_its_diffusers_conversion_patch_the_same_weights() -> 
         "orphan-alpha",
         "one-lokr-factor",
         "fused-and-split",
+        "fused-and-split-o",
     ],
 )
 def test_what_the_conversion_cannot_apply_is_refused(extra: dict[str, list[int]], match: str) -> None:
@@ -186,3 +194,22 @@ def test_half_of_a_low_rank_pair_is_named() -> None:
         lora_model_from_ideogram4_state_dict(
             {"diffusion_model.layers.0.feed_forward.w2.lora_A.weight": torch.zeros(16, 12288)}
         )
+
+
+def test_a_kohya_flattened_file_converts_like_the_same_layers_under_their_dotted_names() -> None:
+    dotted = _state_dict(ideogram4_lora_aitoolkit_format.state_dict_keys)
+    dotted["diffusion_model.layers.0.attention.o.lora_A.weight"] = torch.randn(4, 4608)
+    dotted["diffusion_model.layers.0.attention.o.lora_B.weight"] = torch.randn(4608, 4)
+    flattened = {}
+    for key, value in dotted.items():
+        module, _, param = key.removeprefix("diffusion_model.").rpartition(".lora_")
+        param = param.replace("A", "down").replace("B", "up")
+        flattened[f"lora_unet__{module.replace('.', '_')}.lora_{param}"] = value
+
+    from_dotted = lora_model_from_ideogram4_state_dict(dotted)
+    from_flattened = lora_model_from_ideogram4_state_dict(flattened)
+
+    assert from_flattened.layers.keys() == from_dotted.layers.keys()
+    for key in from_dotted.layers:
+        module = key.removeprefix(IDEOGRAM4_LORA_TRANSFORMER_PREFIX)
+        torch.testing.assert_close(_delta(from_flattened, module), _delta(from_dotted, module), msg=key)

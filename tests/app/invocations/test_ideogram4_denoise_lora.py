@@ -208,8 +208,12 @@ def _lokr_on_qkv() -> ModelPatchRaw:
     return ModelPatchRaw(layers={f"{IDEOGRAM4_LORA_TRANSFORMER_PREFIX}{QKV}": layer})
 
 
+ROWS = 10  # tokens of the sequence the LoRAs' output updates are sized for
+FLOAT32 = 4  # the tiny transformers compute in float32
+
+
 def _reservation(
-    model_format: ModelFormat, lora: ModelPatchRaw | None, *, pair: bool = False, fp8: bool = False
+    model_format: ModelFormat, lora: ModelPatchRaw | None, *, pair: bool = False, fp8: bool = False, rows: int = ROWS
 ) -> int:
     """The working memory the node locks its first record with, for two single files or one pair.
 
@@ -235,33 +239,56 @@ def _reservation(
         )
         context = _context(models, {"cond": model_format, "uncond": model_format, "lora": ModelFormat.LyCORIS}, calls)
     with ExitStack() as stack:
-        invocation._load_branches(context, stack, 4 * 1024**3)
+        invocation._load_branches(context, stack, 4 * 1024**3, lora_rows=rows)
     return calls[0][1]
+
+
+QKV_OUT = 3 * TINY.emb_dim
+# A rank-4 LoRA on `qkv`: its two factors, and one `ROWS x (out + rank)` update of the module's output per forward.
+QKV_LORA_BYTES = (QKV_OUT * 4 + 4 * TINY.emb_dim + ROWS * (QKV_OUT + 4)) * FLOAT32
 
 
 @pytest.mark.parametrize("pair", [False, True], ids=["single-files", "pair"])
 def test_sidecar_loras_are_reserved_once_for_both_branches(pair: bool) -> None:
-    """The patch object both branches share stays on the device for the loop, counted once. A low-rank layer adds
-    nothing beyond it: its residual is an activation-sized copy, inside the per-token estimate."""
+    """The patch object both branches share stays on the device for the loop, counted once, with the output update
+    each forward of the module adds."""
     patch, _delta = _qkv_lora(seed=1)
 
     extra = _reservation(ModelFormat.GGUFQuantized, patch, pair=pair) - _reservation(
         ModelFormat.GGUFQuantized, None, pair=pair
     )
 
-    assert extra == patch.calc_size()
+    assert extra == QKV_LORA_BYTES
 
 
 @pytest.mark.parametrize("pair", [False, True], ids=["single-files", "pair"])
 def test_a_lokr_layer_also_reserves_the_weight_it_materializes(pair: bool) -> None:
-    """A LoKR layer is applied in weight space: the module's weight, its delta and their sum, up to float32."""
+    """A LoKR layer is applied in weight space: the module's weight, its delta and their sum are formed per forward."""
     lokr = _lokr_on_qkv()
 
     extra = _reservation(ModelFormat.GGUFQuantized, lokr, pair=pair) - _reservation(
         ModelFormat.GGUFQuantized, None, pair=pair
     )
 
-    assert extra == lokr.calc_size() + 3 * 4 * (3 * TINY.emb_dim) * TINY.emb_dim
+    assert extra == (3 + TINY.emb_dim**2 + ROWS * QKV_OUT + 3 * QKV_OUT * TINY.emb_dim) * FLOAT32
+
+
+def test_several_lokr_layers_on_one_module_reserve_the_running_sum_too() -> None:
+    """Each further layer on a module adds its tensors, and the second one the sum of the first two."""
+    patches = [_lokr_on_qkv(), _lokr_on_qkv()]
+    models = {"cond": _transformer(0), "uncond": _transformer(1), "lora-0": patches[0], "lora-1": patches[1]}
+    invocation = Ideogram4DenoiseInvocation.model_construct(
+        transformer=_field("cond", [_lora("lora-0"), _lora("lora-1")]), unconditional_transformer=_field("uncond")
+    )
+    formats = dict.fromkeys(models, ModelFormat.GGUFQuantized)
+    calls: list[tuple[str, int]] = []
+    with ExitStack() as stack:
+        invocation._load_branches(_context(models, formats, calls), stack, 0, lora_rows=ROWS)
+
+    weight_copies = 3 + 1
+    assert (
+        calls[0][1] == (2 * (3 + TINY.emb_dim**2) + ROWS * QKV_OUT + weight_copies * QKV_OUT * TINY.emb_dim) * FLOAT32
+    )
 
 
 def test_fp8_weights_reserve_their_loras_too() -> None:
@@ -270,13 +297,31 @@ def test_fp8_weights_reserve_their_loras_too() -> None:
 
     extra = _reservation(ModelFormat.Checkpoint, patch, fp8=True) - _reservation(ModelFormat.Checkpoint, None, fp8=True)
 
-    assert extra == patch.calc_size()
+    assert extra == QKV_LORA_BYTES
 
 
-def test_a_directly_patched_pair_of_files_reserves_nothing_for_its_loras() -> None:
+def test_a_directly_patched_pair_of_files_still_reserves_a_modules_worth_for_layers_left_on_the_cpu() -> None:
+    """Partial loading leaves some layers on the CPU, where the patcher wraps them as sidecars that copy their tensors
+    to the device for each forward. Which ones is unknown before the lock, so one module's worth is reserved."""
     patch, _delta = _qkv_lora(seed=1)
 
-    assert _reservation(ModelFormat.Checkpoint, patch) == _reservation(ModelFormat.Checkpoint, None)
+    extra = _reservation(ModelFormat.Checkpoint, patch) - _reservation(ModelFormat.Checkpoint, None)
+
+    assert extra == QKV_LORA_BYTES
+
+
+def test_a_layer_on_a_timestep_linear_is_sized_for_one_row_not_the_sequence() -> None:
+    """`adaln_modulation` reads the timestep embedding, which has one row however long the sequence."""
+    layer = LoRALayer(
+        up=torch.ones(4 * TINY.emb_dim, 4), mid=None, down=torch.ones(4, TINY.adanln_dim), alpha=None, bias=None
+    )
+    patch = ModelPatchRaw(layers={f"{IDEOGRAM4_LORA_TRANSFORMER_PREFIX}layers.0.adaln_modulation": layer})
+
+    extra = _reservation(ModelFormat.GGUFQuantized, patch, rows=100_000) - _reservation(
+        ModelFormat.GGUFQuantized, None, rows=100_000
+    )
+
+    assert extra == (4 * TINY.emb_dim * 4 + 4 * TINY.adanln_dim + 1 * (4 * TINY.emb_dim + 4)) * FLOAT32
 
 
 def test_patches_take_the_dtype_the_branch_computes_in() -> None:

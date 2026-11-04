@@ -70,3 +70,21 @@ def test_the_cache_keeps_fp8_weights_on_the_device_when_it_offloads() -> None:
 
     assert model.fp8.weight.is_meta and model.fp8.weight_scale.is_meta
     assert not model.dense.weight.is_meta
+
+
+def test_a_float_weight_with_a_scale_is_not_rescaled_by_each_forward() -> None:
+    """The loader's guards let a float weight with a `.weight_scale` through. The dequantizing cast returns such a
+    weight as is, so applying the scale in place would compound it on every forward."""
+    generator = torch.Generator().manual_seed(0)
+    module = Fp8Linear(IN_FEATURES, OUT_FEATURES, bias=False, compute_dtype=torch.float32)
+    module.weight = torch.randn(OUT_FEATURES, IN_FEATURES, generator=generator)
+    module.weight_scale = torch.rand(OUT_FEATURES, generator=generator) + 0.5
+    stored = module.weight.clone()
+    x = torch.randn(2, IN_FEATURES, generator=generator)
+
+    first = module(x)
+    second = module(x)
+
+    torch.testing.assert_close(first, x @ (stored * module.weight_scale.unsqueeze(1)).T)
+    torch.testing.assert_close(second, first)
+    torch.testing.assert_close(module.weight, stored)

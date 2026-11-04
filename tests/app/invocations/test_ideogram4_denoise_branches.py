@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import Ideogram4ConditioningField
 from invokeai.app.invocations.ideogram4.ideogram4_denoise import Ideogram4DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
+from invokeai.backend.ideogram4.sampling_utils import PIXELS_PER_IMAGE_TOKEN
 from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
@@ -369,7 +370,7 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
     argument -- or passed a constant -- would leave them all green while the cache went back to
     filling VRAM with weights and leaving none for the activations.
     """
-    reserved: list[int] = []
+    reserved: list[tuple[int, int]] = []
     invocation = _invocation(
         transformer=_field("cond"),
         positive_conditioning=Ideogram4ConditioningField(conditioning_name="cond-1"),
@@ -382,8 +383,8 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
         seed=0,
     )
 
-    def load_branches(_context, _stack, working_mem_bytes: int):
-        reserved.append(working_mem_bytes)
+    def load_branches(_context, _stack, working_mem_bytes: int, lora_rows: int):
+        reserved.append((working_mem_bytes, lora_rows))
         raise _StopAfterLoad
 
     monkeypatch.setattr(invocation, "_load_branches", load_branches)
@@ -399,7 +400,8 @@ def test_invoke_passes_its_own_estimate_into_the_load(monkeypatch) -> None:
     with pytest.raises(_StopAfterLoad):
         invocation.invoke(context)
 
-    assert reserved == [invocation._estimate_working_memory(TEXT_TOKENS)]
+    image_tokens = (1024 // PIXELS_PER_IMAGE_TOKEN) ** 2
+    assert reserved == [(invocation._estimate_working_memory(TEXT_TOKENS), TEXT_TOKENS + image_tokens)]
 
 
 GIB = 1024**3

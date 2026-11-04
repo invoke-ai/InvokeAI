@@ -39,7 +39,10 @@ import {
   isAnimaQwen3Encoder,
   isClipVariant,
   isDiffusersMainForBase,
-  isFlux2DiffusersSourceForModel,
+  isBundledFlux2Main,
+  isFlux2EncoderSourceForModel,
+  isFlux2PipelineForModel,
+  KLEIN_TO_QWEN3_VARIANT,
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
@@ -48,13 +51,12 @@ import {
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
-  isSelfContainedSDNQPipeline,
   isVaeAcceptedByBase,
   isZImageQwen3Encoder,
   type GenerateComponentFilter,
 } from './componentCompatibility';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
-import { DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS } from './dynamicPrompts';
+import { DEFAULT_DYNAMIC_PROMPTS_SETTINGS } from './dynamicPrompts';
 import {
   getExternalAspectRatioSizes,
   getExternalReferenceImages,
@@ -530,12 +532,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     hiDiffusionWindowAttentionEnabled: true,
     hiDiffusionT1Ratio: DEFAULT_HIDIFFUSION_T1_RATIO,
     hiDiffusionT2Ratio: DEFAULT_HIDIFFUSION_T2_RATIO,
-    dynamicPromptsCombinatorial: true,
-    dynamicPromptsEnabled: true,
-    dynamicPromptsMaxPrompts: DYNAMIC_PROMPTS_DEFAULT_MAX_PROMPTS,
-    dynamicPromptsSampleSeed: 0,
-    dynamicPromptsResample: true,
-    dynamicPromptsSeedBehaviour: 'per-iteration',
+    ...DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
     clipEmbedModel: null,
     clipGEmbedModel: null,
     clipLEmbedModel: null,
@@ -945,27 +942,32 @@ type ComponentSourceCandidate = {
   variant?: unknown;
 };
 
-const isFlux2DiffusersSource = (source: ComponentSourceCandidate | null | undefined): source is MainModelConfig =>
-  Boolean(source && isBundledMainForBase('flux2')(source));
+const QWEN3_ENCODER_SIZE_LABELS: Partial<Record<string, string>> = { qwen3_4b: 'Qwen3 4B', qwen3_8b: 'Qwen3 8B' };
 
-const hasFlux2DiffusersVaeSource = (ctx: ComponentPolicyContext): boolean =>
-  ctx.model.type !== 'external_image_generator' &&
-  (isBundledMainForBase('flux2')(ctx.model) || isFlux2DiffusersSource(ctx.settings.componentSourceModel));
+const isFlux2SourceFor =
+  (model: GenerateModelConfig) =>
+  (source: ComponentSourceCandidate | null | undefined): source is MainModelConfig =>
+    Boolean(source && isFlux2PipelineForModel(model)(source));
 
-const hasFlux2DiffusersEncoderSource = (ctx: ComponentPolicyContext): boolean =>
+const hasFlux2VaeSource = (ctx: ComponentPolicyContext): boolean =>
   ctx.model.type !== 'external_image_generator' &&
-  (isBundledMainForBase('flux2')(ctx.model) ||
+  (isBundledFlux2Main(ctx.model) || isFlux2SourceFor(ctx.model)(ctx.settings.componentSourceModel));
+
+const hasFlux2EncoderSource = (ctx: ComponentPolicyContext): boolean =>
+  ctx.model.type !== 'external_image_generator' &&
+  (isBundledFlux2Main(ctx.model) ||
     Boolean(
-      ctx.settings.componentSourceModel && isFlux2DiffusersSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
+      ctx.settings.componentSourceModel && isFlux2EncoderSourceForModel(ctx.model)(ctx.settings.componentSourceModel)
     ));
 
-export const getFlux2DiffusersComponentSource = (
+/** The saved component source the FLUX.2 loader can use: its VAE always, its encoder unless a standalone one is set. */
+export const getFlux2ComponentSource = (
   model: MainModelConfig,
   settings: GenerateSettings
 ): MainModelConfig | undefined => {
   const source = settings.componentSourceModel;
 
-  if (!isFlux2DiffusersSource(source)) {
+  if (!isFlux2SourceFor(model)(source)) {
     return undefined;
   }
 
@@ -975,7 +977,7 @@ export const getFlux2DiffusersComponentSource = (
     return source;
   }
 
-  return isFlux2DiffusersSourceForModel(model)(source) ? source : undefined;
+  return isFlux2EncoderSourceForModel(model)(source) ? source : undefined;
 };
 
 export const getAutoFlux2ComponentSourceModel = (
@@ -989,18 +991,20 @@ export const getAutoFlux2ComponentSourceModel = (
 
   const encoderModel = model.variant === 'dev' ? settings.mistralEncoderModel : settings.qwen3EncoderModel;
 
-  if (isBundledMainForBase('flux2')(model) || (encoderModel && settings.vae)) {
+  if (isBundledFlux2Main(model) || (encoderModel && settings.vae)) {
     return null;
   }
 
-  const diffusersModels = models.filter(isFlux2DiffusersSource);
-  const variantMatch = diffusersModels.find(isFlux2DiffusersSourceForModel(model));
+  const pipelines = models.filter(isFlux2SourceFor(model));
+  const encoderSource = pipelines.find(isFlux2EncoderSourceForModel(model));
 
   if (!encoderModel && settings.vae) {
-    return variantMatch ?? null;
+    return encoderSource ?? null;
   }
 
-  return variantMatch ?? diffusersModels[0] ?? null;
+  // No VAE is set here. A pipeline that cannot give the encoder still gives the VAE; the encoder slot then asks for a
+  // standalone one, if none is set yet.
+  return encoderSource ?? pipelines[0] ?? null;
 };
 
 // Split/quantized families can satisfy required encoder/VAE slots from a bundled Diffusers source.
@@ -1071,31 +1075,48 @@ const getBaseComponentSectionPolicy = (
             : [],
       };
     case 'flux2': {
-      const encoderSlot: ComponentSlotPolicy =
-        model.variant === 'dev'
-          ? {
-              ...mistralEncoderSlot(
-                'Optional override; otherwise a compatible installed FLUX.2 [dev] Diffusers model is used.'
-              ),
-              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
-              missingMessage: 'Generate needs a Mistral Encoder for non-Diffusers FLUX.2 [dev] models.',
-            }
-          : {
-              ...qwen3EncoderSlot(
-                'Optional override; otherwise a compatible installed FLUX.2 Diffusers model is used.'
-              ),
-              filter: (candidate, ctx) =>
-                ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
-              required: (ctx) => !hasFlux2DiffusersEncoderSource(ctx),
-              missingMessage: 'Generate needs a Qwen3 Encoder for non-Diffusers FLUX.2 models.',
-            };
+      const isDev = model.variant === 'dev';
+      // A Klein of unknown size takes either encoder, so its copy names none.
+      const kleinQwen3 =
+        typeof model.variant === 'string'
+          ? QWEN3_ENCODER_SIZE_LABELS[KLEIN_TO_QWEN3_VARIANT[model.variant] ?? '']
+          : undefined;
+      const encoderSlot: ComponentSlotPolicy = isDev
+        ? {
+            ...mistralEncoderSlot(
+              'Optional override; otherwise taken from an installed FLUX.2 [dev] Diffusers pipeline.'
+            ),
+            required: (ctx) => !hasFlux2EncoderSource(ctx),
+            missingMessage:
+              'Generate needs a Mistral Encoder or a FLUX.2 [dev] Diffusers pipeline for this FLUX.2 [dev] model.',
+          }
+        : {
+            ...qwen3EncoderSlot(
+              kleinQwen3
+                ? `Optional ${kleinQwen3} override; otherwise taken from an installed FLUX.2 Klein Diffusers or SDNQ pipeline of the same size.`
+                : 'Optional override; otherwise taken from an installed FLUX.2 Klein Diffusers or SDNQ pipeline.'
+            ),
+            filter: (candidate, ctx) =>
+              ctx.model.type !== 'external_image_generator' && isFlux2Qwen3EncoderForModel(ctx.model)(candidate),
+            required: (ctx) => !hasFlux2EncoderSource(ctx),
+            missingMessage: kleinQwen3
+              ? `Generate needs a ${kleinQwen3} Encoder or a same-size FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.`
+              : 'Generate needs a Qwen3 Encoder or a FLUX.2 Klein Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
+          };
 
-      return createPolicy(!isSelfContainedSDNQPipeline(model) && model.format !== 'diffusers', [
+      return createPolicy(!isBundledFlux2Main(model), [
         encoderSlot,
         {
-          ...vaeSlot('Optional override; otherwise an installed FLUX.2 Diffusers model is used.', isAcceptedVae),
-          required: (ctx) => !hasFlux2DiffusersVaeSource(ctx),
-          missingMessage: 'Generate needs a VAE for non-Diffusers FLUX.2 models.',
+          ...vaeSlot(
+            isDev
+              ? 'Optional override; otherwise taken from an installed FLUX.2 Diffusers pipeline.'
+              : 'Optional override; otherwise taken from an installed FLUX.2 Diffusers or SDNQ pipeline.',
+            isAcceptedVae
+          ),
+          required: (ctx) => !hasFlux2VaeSource(ctx),
+          missingMessage: isDev
+            ? 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers pipeline for this FLUX.2 [dev] model.'
+            : 'Generate needs a FLUX.2 VAE or a FLUX.2 Diffusers or SDNQ pipeline for this FLUX.2 Klein model.',
         },
       ]);
     }
@@ -1417,7 +1438,7 @@ const isSelectedComponentCompatible = (
   }
 
   if (key === 'componentSourceModel' && model.type !== 'external_image_generator' && model.base === 'flux2') {
-    return Boolean(getFlux2DiffusersComponentSource(model, settings));
+    return Boolean(getFlux2ComponentSource(model, settings));
   }
 
   if (!slotPolicy) {
@@ -1458,6 +1479,7 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
   'anima',
   'flux',
   'flux2',
+  'flux3',
   'ideogram-4',
   'krea-2',
   'qwen-image',

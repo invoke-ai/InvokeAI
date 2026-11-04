@@ -48,6 +48,13 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
     has_cosmos_dit_peft_keys,
     has_cosmos_dit_peft_keys_strict,
 )
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import (
+    describe_refusal,
+    has_flux3_lora_keys,
+    misshapen_flux3_layers,
+    peft_scale,
+    read_flux3_lora_keys,
+)
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import (
     has_ideogram4_lora_keys,
@@ -877,6 +884,24 @@ class LoRA_LyCORIS_ZImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Z-Image LoRA")
 
 
+# ComfyUI's `diffusion_model.` and raw PEFT's `base_model.model.` also prefix other families' LoRAs, some of them on
+# `transformer_blocks.N` (LTX-2) or on Qwen-Image's attention names (FLUX in diffusers naming). Under these prefixes,
+# only low-rank weights on modules that Qwen-Image's dual-stream blocks alone have identify a Qwen-Image LoRA:
+# Qwen-Image-2.1 names its MLP `img_mlp.proj`, and the converter cannot group dotted LoKr keys.
+_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE = re.compile(
+    r"^(?:diffusion_model|base_model\.model)\.transformer_blocks\.\d+\.(?:img_mod|txt_mod|img_mlp\.net|txt_mlp)\."
+    r".*\.(?:lora_A|lora_B|lora_down|lora_up)\.weight$"
+)
+
+
+def _has_prefixed_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool:
+    keys = [key for key in state_dict if isinstance(key, str)]
+    # PEFT DoRA magnitudes are not mapped yet (#9558): the converter would fail on every generation.
+    if any(key.endswith(".lora_magnitude_vector") for key in keys):
+        return False
+    return any(_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in keys)
+
+
 class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
 
@@ -894,7 +919,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 "transformer.transformer_blocks.",
                 "lora_unet_transformer_blocks_",  # Kohya format
             },
-        )
+        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
         has_lora_suffix = state_dict_has_any_keys_ending_with(
             state_dict,
             {
@@ -950,7 +975,7 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         has_qwen_ie_keys = state_dict_has_any_keys_starting_with(
             state_dict,
             {"transformer_blocks.", "transformer.transformer_blocks.", "lora_unet_transformer_blocks_"},
-        )
+        ) or _has_prefixed_qwen_image_lora_keys(state_dict)
         has_z_image_keys = state_dict_has_any_keys_starting_with(state_dict, {"diffusion_model.layers."})
         has_krea2_keys = _has_krea2_lora_keys(state_dict)
         str_keys = [key for key in state_dict if isinstance(key, str)]
@@ -1300,6 +1325,47 @@ class LoRA_LyCORIS_QwenImage21_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like a Qwen-Image-2.1 LoRA")
 
 
+def _raise_unless_flux3_lora(state_dict: dict[str | int, Any], metadata: dict[str, str]) -> None:
+    """`NotAMatchError` for a file that is no FLUX.3 LoRA; `InvalidMatchError`, naming what does not apply, for one that
+    does not apply in full or whose header asks for a scaling this does not apply (`peft_scale`).
+
+    `InvalidMatchError` because the file is a FLUX.3 LoRA: the installer names the reason instead of registering an
+    unknown model, and a part that does not apply would install and then fail, or apply in part.
+    """
+    if not has_flux3_lora_keys(state_dict):
+        raise NotAMatchError("model does not look like a FLUX.3 LoRA")
+    keys = read_flux3_lora_keys(state_dict)
+    refused = {**keys.refused, **misshapen_flux3_layers(state_dict, keys)}
+    if refused:
+        raise InvalidMatchError(describe_refusal(refused))
+    try:
+        peft_scale(metadata)
+    except ValueError as e:
+        raise InvalidMatchError(str(e)) from None
+
+
+class LoRA_LyCORIS_Flux3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for FLUX.3 Image LoRA files: diffusers/PEFT, Black Forest Labs' native names (ai-toolkit, ComfyUI)
+    and raw PEFT, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers
+    header or one describing a PEFT LoRA (`peft_scale`). LyCORIS here is the single-file format: LyCORIS's own
+    flattened key names (`lycoris_...`) are none of these layouts and are not recognized.
+
+    No variant: Klein and Klein Base share the transformer, so a LoRA trained on either runs on both.
+    """
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        _raise_unless_flux3_lora(mod.load_state_dict(), mod.metadata())
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        if has_flux3_lora_keys(mod.load_state_dict()):
+            return BaseModelType.Flux3
+        raise NotAMatchError("model does not look like a FLUX.3 LoRA")
+
+
 class LoRA_LyCORIS_Anima_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Anima LoRA models in LyCORIS format."""
 
@@ -1581,6 +1647,19 @@ class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         raise NotAMatchError("model does not look like an LTX-2 LoRA")
 
 
+def _raise_unless_ideogram4_lora(state_dict: dict[str | int, Any]) -> None:
+    """`NotAMatchError` for a file that is no Ideogram 4 LoRA; `InvalidMatchError` for one that would fail, or silently
+    do less, once a generation applies it."""
+    if not has_ideogram4_lora_keys(state_dict):
+        raise NotAMatchError("model does not match Ideogram 4 LoRA heuristics")
+    # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
+    if not any(isinstance(k, str) and split_ideogram4_lora_key(k) is not None for k in state_dict):
+        raise NotAMatchError("model has Ideogram 4 module names but no LoRA tensors")
+    refusal = ideogram4_lora_refusal(state_dict)
+    if refusal is not None:
+        raise InvalidMatchError(f"Ideogram 4 LoRA cannot be applied: {refusal}")
+
+
 class LoRA_LyCORIS_Ideogram4_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Ideogram 4 LoRA models (single file; PEFT, kohya-style or LoKR tensors).
 
@@ -1594,17 +1673,7 @@ class LoRA_LyCORIS_Ideogram4_Config(LoRA_LyCORIS_Config_Base, Config_Base):
 
     @classmethod
     def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
-        state_dict = mod.load_state_dict()
-        if not has_ideogram4_lora_keys(state_dict):
-            raise NotAMatchError("model does not match Ideogram 4 LoRA heuristics")
-        # A transformer checkpoint carries the same module names, but only `.weight`/`.bias` tensors.
-        if not any(isinstance(k, str) and split_ideogram4_lora_key(k) is not None for k in state_dict):
-            raise NotAMatchError("model has Ideogram 4 module names but no LoRA tensors")
-        refusal = ideogram4_lora_refusal(state_dict)
-        if refusal is not None:
-            # Recognised, but it would fail -- or silently do less -- once a generation applies it; refuse the
-            # install instead.
-            raise InvalidMatchError(f"Ideogram 4 LoRA cannot be applied: {refusal}")
+        _raise_unless_ideogram4_lora(mod.load_state_dict())
 
     @classmethod
     def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
@@ -1749,6 +1818,37 @@ class LoRA_Diffusers_Flux2_Config(LoRA_Diffusers_Config_Base, Config_Base):
         if _is_flux2_lora_state_dict(state_dict):
             return BaseModelType.Flux2
         raise NotAMatchError("model is not a FLUX.2 Diffusers LoRA")
+
+
+class LoRA_Diffusers_Flux3_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for a FLUX.3 Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a
+    repository-id install of a diffusers trainer's output leaves it. The file is held to what
+    `LoRA_LyCORIS_Flux3_Config` holds a single file to."""
+
+    base: Literal[BaseModelType.Flux3] = Field(default=BaseModelType.Flux3)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        path_to_weight_file = cls._get_weight_file_or_raise(mod)
+        _raise_unless_flux3_lora(mod.load_state_dict(path_to_weight_file), mod.metadata(path_to_weight_file))
+        return cls(**override_fields)
+
+
+class LoRA_Diffusers_Ideogram4_Config(LoRA_Diffusers_Config_Base, Config_Base):
+    """Model config for an Ideogram 4 LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a
+    repository-id install of a diffusers trainer's output leaves it. The file is held to what
+    `LoRA_LyCORIS_Ideogram4_Config` holds a single file to."""
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+        _raise_unless_ideogram4_lora(mod.load_state_dict(cls._get_weight_file_or_raise(mod)))
+        return cls(**override_fields)
 
 
 class LoRA_Diffusers_ZImage_Config(LoRA_Diffusers_Config_Base, Config_Base):

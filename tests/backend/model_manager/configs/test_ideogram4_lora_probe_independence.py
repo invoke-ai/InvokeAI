@@ -17,7 +17,7 @@ import torch
 
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
-from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_Ideogram4_Config
+from invokeai.backend.model_manager.configs.lora import LoRA_Diffusers_Ideogram4_Config, LoRA_LyCORIS_Ideogram4_Config
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 from invokeai.backend.patches.lora_conversions.ideogram4_lora_constants import IDEOGRAM4_LORA_KEY_PREFIXES
 from tests.backend.patches.lora_conversions.lora_state_dicts import (
@@ -91,11 +91,21 @@ def _reprefixed(keys: dict, prefix: str) -> dict:
     return {prefix + key.removeprefix("diffusion_model."): value for key, value in keys.items()}
 
 
+def _kohya_flattened(keys: dict) -> dict:
+    """The same layers as kohya writes them: `lora_unet__layers_0_feed_forward_w1.lora_down.weight`."""
+    flattened = {}
+    for key, value in keys.items():
+        module, _, param = key.removeprefix("diffusion_model.").rpartition(".lora_")
+        flattened[f"lora_unet__{module.replace('.', '_')}.lora_{param.replace('A', 'down').replace('B', 'up')}"] = value
+    return flattened
+
+
 _IDEOGRAM4_LAYOUTS = {
     "ai-toolkit": ideogram4_lora_aitoolkit_format.state_dict_keys,
     "ai-toolkit-lokr": ideogram4_lokr_aitoolkit_format.state_dict_keys,
     "ai-toolkit-unconditional": ideogram4_lora_aitoolkit_unconditional_format.state_dict_keys,
     "diffusers": ideogram4_lora_diffusers_format.state_dict_keys,
+    "kohya-flattened": _kohya_flattened(ideogram4_lora_aitoolkit_format.state_dict_keys),
     # The other container prefixes the conversion strips, over the same modules.
     **{
         f"prefix={prefix or '<none>'}": _reprefixed(ideogram4_lora_aitoolkit_format.state_dict_keys, prefix)
@@ -208,3 +218,80 @@ def test_a_lora_on_the_block_modulation_alone_is_still_ideogram4() -> None:
     }
 
     assert _accepting_lora_configs(_state_dict(keys), "ideogram4-adaln") == ["LoRA_LyCORIS_Ideogram4_Config"]
+
+
+def _folder_mod(sd: dict[str, torch.Tensor], name: str) -> tuple[MagicMock, dict]:
+    """A diffusers folder holding the file, as a repository-id install of a diffusers trainer's output leaves it."""
+    path = Path(_TMP_DIR.name) / name
+    path.mkdir(exist_ok=True)
+    (path / "pytorch_lora_weights.safetensors").touch()
+    mod = MagicMock()
+    mod.path = path
+    mod.load_state_dict.return_value = sd
+    overrides = {
+        "hash": "test-hash",
+        "path": str(path),
+        "file_size": 0,
+        "name": name,
+        "source": str(path),
+        "source_type": "path",
+    }
+    return mod, overrides
+
+
+def _lora_configs_claiming_folder(sd: dict[str, torch.Tensor], name: str) -> list[str]:
+    accepting: list[str] = []
+    for cls in list(Config_Base.CONFIG_CLASSES):
+        if getattr(cls.model_fields.get("type", None), "default", None) != ModelType.LoRA:
+            continue
+        mod, overrides = _folder_mod(sd, name)
+        try:
+            cls.from_model_on_disk(mod, overrides)
+        except Exception:
+            continue
+        accepting.append(cls.__name__)
+    return accepting
+
+
+@pytest.mark.parametrize("layout", ["diffusers", "ai-toolkit", "ai-toolkit-lokr"])
+def test_an_ideogram4_lora_folder_is_claimed_by_the_diffusers_ideogram4_config_alone(layout: str) -> None:
+    sd = _state_dict(_IDEOGRAM4_LAYOUTS[layout])
+
+    assert _lora_configs_claiming_folder(sd, "ideogram4-folder") == ["LoRA_Diffusers_Ideogram4_Config"]
+    mod, overrides = _folder_mod(sd, "ideogram4-folder")
+    assert LoRA_Diffusers_Ideogram4_Config.from_model_on_disk(mod, overrides).base is BaseModelType.Ideogram4
+
+
+@pytest.mark.parametrize("family", ["z-image-aitoolkit", "flux-diffusers", "qwen-image-diffusers", "krea2-kohya"])
+def test_the_ideogram4_folder_probe_leaves_other_families_alone(family: str) -> None:
+    mod, overrides = _folder_mod(_state_dict(_OTHER_FAMILIES[family].state_dict_keys), f"folder-{family}")
+
+    with pytest.raises(NotAMatchError):
+        LoRA_Diffusers_Ideogram4_Config.from_model_on_disk(mod, overrides)
+
+
+def test_an_ideogram4_lora_folder_the_conversion_cannot_apply_is_refused() -> None:
+    keys = {
+        **ideogram4_lora_aitoolkit_format.state_dict_keys,
+        "diffusion_model.layers.0.attention.o.lora_magnitude_vector.weight": [4608],
+    }
+    mod, overrides = _folder_mod(_state_dict(keys), "ideogram4-folder-dora")
+
+    with pytest.raises(InvalidMatchError, match="lora_magnitude_vector"):
+        LoRA_Diffusers_Ideogram4_Config.from_model_on_disk(mod, overrides)
+
+
+def test_a_kohya_flattened_z_image_lora_is_still_z_image_alone() -> None:
+    """Z-Image's kohya files flatten the very same block names (`layers_0_feed_forward_w1`); only their width
+    (3840, against Ideogram 4's 4608) tells them apart."""
+    keys: dict[str, list[int]] = {}
+    for module, (rows, cols) in {
+        "layers_0_attention_to_k": (3840, 3840),
+        "layers_0_feed_forward_w1": (10240, 3840),
+        "context_refiner_0_feed_forward_w1": (10240, 3840),
+    }.items():
+        keys[f"lora_unet__{module}.lora_down.weight"] = [16, cols]
+        keys[f"lora_unet__{module}.lora_up.weight"] = [rows, 16]
+    sd = _state_dict(keys)
+
+    assert _accepting_lora_configs(sd, "z-image-kohya") == ["LoRA_LyCORIS_ZImage_Config"]
