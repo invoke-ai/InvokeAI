@@ -7,6 +7,7 @@ import type { ModelsSnapshot } from '@features/models/data/modelsStore';
 import { ChakraProvider } from '@chakra-ui/react';
 import { galleryKeys } from '@features/gallery/queries';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -240,14 +241,27 @@ const Harness = ({ actions, images }: { actions: ImageActions; images: GalleryIm
   return <ImageContextMenu actions={actions} boards={NO_BOARDS} target={target} onClose={() => setTarget(null)} />;
 };
 
-const renderMenu = async (actions: ImageActions, images: GalleryImage[]) => {
+/** Seeds the deployment config so bulk menus do not fetch it; tests pass `true` for a server with precise storage. */
+const createConfiguredQueryClient = (preciseImageStorage = false) => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+  client.setQueryData(['frontend-config'], { precise_image_storage: preciseImageStorage, show_donation_link: false });
+
+  return client;
+};
+
+const renderMenu = async (
+  actions: ImageActions,
+  images: GalleryImage[],
+  queryClient = createConfiguredQueryClient()
+) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
   await interact(() => {
     root?.render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
           <Harness actions={actions} images={images} />
         </ChakraProvider>
@@ -282,7 +296,7 @@ const renderItemMenu = async (
     onCopyCurrentFrame: () => void;
     onOpenDetails: () => void;
   },
-  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  queryClient = createConfiguredQueryClient()
 ) => {
   host = document.createElement('div');
   document.body.append(host);
@@ -393,6 +407,86 @@ describe('ImageContextMenu PBR maps', () => {
     await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
 
     expect(document.body.textContent).not.toContain(GENERATE_PBR_MAPS);
+  });
+});
+
+describe('ImageContextMenu bulk 16-bit PNG download', () => {
+  const BULK_PNG16 = 'widgets.gallery.downloadSelectionPng16';
+  const hasEntry = () => document.body.textContent?.includes(BULK_PNG16) === true;
+
+  it('downloads an image selection as 16-bit PNG when the server has precise image storage', async () => {
+    const actions = createActions(vi.fn());
+    await renderMenu(actions, [image('a.png'), image('b.png')], createConfiguredQueryClient(true));
+
+    await pickItem(BULK_PNG16);
+
+    expect(actions.downloadImages).toHaveBeenCalledExactlyOnceWith(['a.png', 'b.png'], { exportFormat: 'png16' });
+  });
+
+  it('keeps the entry out while the config is still loading', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    void client.prefetchQuery({ ...frontendConfigQueryOptions, queryFn: () => new Promise<never>(() => {}) });
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')], client);
+
+    expect(client.getQueryState(frontendConfigQueryOptions.queryKey)?.status).toBe('pending');
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when the config request failed', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await client.prefetchQuery({ ...frontendConfigQueryOptions, queryFn: () => Promise.reject(new Error('offline')) });
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')], client);
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when a selection holds only videos', async () => {
+    const actions = createActions(vi.fn());
+    await renderItemMenu(
+      actions,
+      {
+        itemRefs: [
+          { kind: 'video' as const, name: 'a.mp4' },
+          { kind: 'video' as const, name: 'b.mp4' },
+        ],
+        items: [item('video', 'a.mp4')],
+        x: 20,
+        y: 20,
+      },
+      undefined,
+      createConfiguredQueryClient(true)
+    );
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('keeps the entry out when precise storage is off', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(hasEntry()).toBe(false);
+    expect(document.body.textContent).toContain('widgets.gallery.downloadSelection');
+  });
+
+  it('downloads a mixed item selection as 16-bit PNG and leaves videos to the action', async () => {
+    const actions = createActions(vi.fn());
+    const loadedImage = item('image', 'still.png');
+    const refs = [
+      { kind: 'image' as const, name: loadedImage.name },
+      { kind: 'video' as const, name: 'clip.mp4' },
+    ];
+    await renderItemMenu(
+      actions,
+      { itemRefs: refs, items: [loadedImage], x: 20, y: 20 },
+      undefined,
+      createConfiguredQueryClient(true)
+    );
+
+    await pickItem(BULK_PNG16);
+
+    expect(actions.downloadItems).toHaveBeenCalledExactlyOnceWith(refs, [loadedImage], { exportFormat: 'png16' });
   });
 });
 

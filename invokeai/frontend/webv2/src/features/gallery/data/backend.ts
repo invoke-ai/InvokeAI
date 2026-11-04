@@ -1569,15 +1569,37 @@ export const moveGalleryVideoItemsToBoard = async (
 };
 
 const BULK_DOWNLOAD_POLL_INTERVAL_MS = 2000;
-const BULK_DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * The job is registered before the POST answers, so a 404 right after it is a race to retry briefly; later it means the
+ * server forgot the archive. While the server reports it is building (202) there is no bound: a 16-bit archive of a
+ * large board takes as long as its encodes, and only the user or an account change cancels the wait.
+ */
+const BULK_DOWNLOAD_NOT_FOUND_GRACE_MS = 10 * 1000;
+
+const readArchiveErrorDetail = async (response: Response): Promise<string> => {
+  try {
+    const body = (await response.json()) as { detail?: unknown };
+
+    if (typeof body.detail === 'string' && body.detail) {
+      return body.detail;
+    }
+  } catch {
+    // Not a JSON error body.
+  }
+
+  return `${response.status} ${response.statusText}`;
+};
 
 /** Poll the background bulk-download artifact until ready, then return its blob and filename. */
 export const downloadGalleryArchive = async ({
   boardId,
+  exportFormat,
   imageNames,
   signal,
 }: {
   boardId?: string;
+  /** `png16` zips the images that have precise data as 16-bit PNGs; the others keep their gallery file. */
+  exportFormat?: GalleryImageExportFormat;
   imageNames?: string[];
   signal?: AbortSignal;
 }): Promise<{ blob: Blob; fileName: string }> => {
@@ -1586,7 +1608,7 @@ export const downloadGalleryArchive = async ({
   const { bulk_download_item_name: fileName } = await apiFetchJson<{ bulk_download_item_name?: string | null }>(
     '/api/v1/images/download',
     {
-      body: JSON.stringify({ board_id: boardId, image_names: imageNames }),
+      body: JSON.stringify({ board_id: boardId, export_format: exportFormat, image_names: imageNames }),
       method: 'POST',
       signal: requestSignal,
     }
@@ -1600,14 +1622,14 @@ export const downloadGalleryArchive = async ({
 
   const startedAt = Date.now();
 
-  while (Date.now() - startedAt < BULK_DOWNLOAD_TIMEOUT_MS) {
+  for (;;) {
     const response = await apiFetchRaw(`/api/v1/images/download/${encodeURIComponent(fileName)}`, {
       signal: requestSignal,
     });
 
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
-    if (response.ok) {
+    if (response.ok && response.status !== 202) {
       const blob = await response.blob();
 
       assertAccountScopeCurrent(owner);
@@ -1615,16 +1637,17 @@ export const downloadGalleryArchive = async ({
       return { blob, fileName };
     }
 
-    if (response.status !== 404) {
-      throw new Error(`${response.status} ${response.statusText}`);
+    const isBuilding = response.status === 202;
+    const isRegistrationRace = response.status === 404 && Date.now() - startedAt < BULK_DOWNLOAD_NOT_FOUND_GRACE_MS;
+
+    if (!isBuilding && !isRegistrationRace) {
+      throw new Error(await readArchiveErrorDetail(response));
     }
 
     await sleep(BULK_DOWNLOAD_POLL_INTERVAL_MS, requestSignal);
     assertAccountScopeCurrent(owner);
     requestSignal.throwIfAborted();
   }
-
-  throw new Error('Timed out preparing the download archive.');
 };
 
 export const uploadGalleryImage = async (

@@ -45,11 +45,18 @@ def _non_admin_user() -> Mock:
 
 
 @pytest.mark.parametrize(
-    ("setting", "visible"), [("", True), ("show_donation_link: true", True), ("show_donation_link: false", False)]
+    ("setting", "visible", "precise"),
+    [
+        ("", True, False),
+        ("show_donation_link: true", True, False),
+        ("show_donation_link: false", False, False),
+        ("precise_image_storage: true", True, True),
+    ],
 )
 def test_frontend_config_exposes_only_presentation_settings_to_signed_in_users(
     setting: str,
     visible: bool,
+    precise: bool,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
@@ -76,7 +83,7 @@ def test_frontend_config_exposes_only_presentation_settings_to_signed_in_users(
     response = client.get("/api/v1/app/frontend_config", headers=headers)
 
     assert response.status_code == 200
-    assert response.json() == {"show_donation_link": visible}
+    assert response.json() == {"show_donation_link": visible, "precise_image_storage": precise}
 
 
 def _patch_database_cleaner(mock_invoker: Invoker, monkeypatch: Any) -> Mock:

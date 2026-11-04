@@ -1260,7 +1260,8 @@ type ExpectedItemActions = {
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
-    loadedItems?: Array<{ fullUrl: string; kind: 'image' | 'video'; name: string }>
+    loadedItems?: Array<{ fullUrl: string; kind: 'image' | 'video'; name: string }>,
+    options?: { exportFormat?: 'png16' }
   ): Promise<void>;
   moveItemsToBoard(refs: Array<{ kind: 'image' | 'video'; name: string }>, boardId: string): Promise<void>;
   openItemInPreview(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): void;
@@ -2649,6 +2650,39 @@ describe('mixed item downloads', () => {
     });
     expect(fetch).not.toHaveBeenCalled();
     expect(mocks.downloadBlob).toHaveBeenCalledWith(expect.any(Blob), 'images.zip');
+  });
+
+  it('forwards the 16-bit export format to the archive and shows a preparing toast that closes with the result', async () => {
+    const create = vi.spyOn(toaster, 'create').mockReturnValue('archive-toast');
+    const dismiss = vi.spyOn(toaster, 'dismiss');
+    mocks.downloadArchive.mockResolvedValue({ blob: new Blob(['archive']), fileName: 'hdr.zip' });
+
+    await act(async () => {
+      await getItemActions().downloadItems([{ kind: 'image', name: image.name }], [image], { exportFormat: 'png16' });
+    });
+
+    expect(mocks.downloadArchive).toHaveBeenCalledWith({
+      exportFormat: 'png16',
+      imageNames: [image.name],
+      signal: expect.any(AbortSignal),
+    });
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'widgets.gallery.itemActions.download.preparingPng16', type: 'loading' })
+    );
+    expect(dismiss).toHaveBeenCalledWith('archive-toast');
+    create.mockRestore();
+    dismiss.mockRestore();
+  });
+
+  it('says another 16-bit archive is being prepared when the server answers 503', async () => {
+    mocks.downloadArchive.mockRejectedValue(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '3' }));
+
+    await act(async () => {
+      await getItemActions().downloadItems([{ kind: 'image', name: image.name }], [image], { exportFormat: 'png16' });
+    });
+
+    expect(mocks.reportError).toHaveBeenCalledWith(expect.objectContaining({ message: 'widgets.gallery.archiveBusy' }));
+    expect(mocks.downloadBlob).not.toHaveBeenCalled();
   });
 
   it('downloads a single video from its protected full URL with its actual name', async () => {

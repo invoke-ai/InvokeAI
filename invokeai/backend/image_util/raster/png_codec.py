@@ -134,18 +134,22 @@ def encode_png(raster: RasterImage, text: PngText | None = None, *, compress_lev
         raise PngCodecError(f"compress_level must be 0-9, got {compress_level!r}")
 
     pixels = raster.view()
-    if pixels.shape[2] == 3:
-        pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR)
-    elif pixels.shape[2] == 4:
-        pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2BGRA)
-    else:
-        pixels = pixels[:, :, 0]
-    if compress_level == 1:
-        params = [cv2.IMWRITE_PNG_STRATEGY, cv2.IMWRITE_PNG_STRATEGY_RLE]
-    else:
-        params = [cv2.IMWRITE_PNG_COMPRESSION, compress_level]
-    ok, encoded = cv2.imencode(".png", pixels, params)
-    del pixels
+    try:
+        if pixels.shape[2] == 3:
+            pixels = cv2.cvtColor(pixels, cv2.COLOR_RGB2BGR)
+        elif pixels.shape[2] == 4:
+            pixels = cv2.cvtColor(pixels, cv2.COLOR_RGBA2BGRA)
+        else:
+            pixels = pixels[:, :, 0]
+        if compress_level == 1:
+            params = [cv2.IMWRITE_PNG_STRATEGY, cv2.IMWRITE_PNG_STRATEGY_RLE]
+        else:
+            params = [cv2.IMWRITE_PNG_COMPRESSION, compress_level]
+        ok, encoded = cv2.imencode(".png", pixels, params)
+    except cv2.error as e:
+        raise PngCodecError(f"OpenCV failed to encode the raster: {e}") from e
+    finally:
+        del pixels
     if not ok:
         raise PngCodecError("OpenCV failed to encode the raster")
 

@@ -37,6 +37,11 @@ from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.board_access.board_access_common import ItemAction
+from invokeai.app.services.bulk_download.bulk_download_common import (
+    BulkDownloadBusyError,
+    BulkDownloadException,
+    BulkDownloadStatus,
+)
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -997,7 +1002,6 @@ class ImagesDownloaded(BaseModel):
 )
 def download_images_from_list(
     current_user: CurrentUserOrDefault,
-    background_tasks: BackgroundTasks,
     image_names: Optional[list[ImageName]] = Body(
         default=None,
         description="The list of names of images to download",
@@ -1006,6 +1010,12 @@ def download_images_from_list(
     ),
     board_id: Optional[str] = Body(
         default=None, description="The board from which image should be downloaded", embed=True
+    ),
+    export_format: Optional[ImageExportFormat] = Body(
+        default=None,
+        description="`png16` stores each image with an exportable precise asset as a 16-bit PNG; the other "
+        "images keep their gallery files. Omit for the gallery files.",
+        embed=True,
     ),
 ) -> ImagesDownloaded:
     if (image_names is None or len(image_names) == 0) and board_id is None:
@@ -1024,13 +1034,12 @@ def download_images_from_list(
 
     bulk_download_item_id: str = ApiDependencies.invoker.services.bulk_download.generate_item_id(board_id)
 
-    background_tasks.add_task(
-        ApiDependencies.invoker.services.bulk_download.handler,
-        image_names,
-        board_id,
-        bulk_download_item_id,
-        current_user.user_id,
-    )
+    try:
+        ApiDependencies.invoker.services.bulk_download.start_job(
+            image_names, board_id, bulk_download_item_id, current_user.user_id, export_format
+        )
+    except BulkDownloadBusyError as e:
+        raise HTTPException(status_code=503, detail=str(e), headers={"Retry-After": "5"})
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
 
@@ -1044,40 +1053,50 @@ def download_images_from_list(
             "description": "Return the complete bulk download item",
             "content": {"application/zip": {}},
         },
+        202: {"description": "The archive is still being built; retry after the `Retry-After` seconds"},
         404: {"description": "Image not found"},
+        500: {"description": "Building the archive failed; the detail says why (reported once)"},
     },
 )
 def get_bulk_download_item(
     current_user: CurrentUserOrDefault,
     background_tasks: BackgroundTasks,
     bulk_download_item_name: str = Path(description="The bulk_download_item_name of the bulk download item to get"),
-) -> FileResponse:
-    """Gets a bulk download zip file.
+) -> Response:
+    """Gets a bulk download zip file, or answers 202 while it is being built.
 
     Requires authentication.  The caller must be the user who initiated the
     download (tracked by the bulk download service) or an admin.
     """
-    try:
-        # Verify the caller owns this download (or is an admin)
-        owner = ApiDependencies.invoker.services.bulk_download.get_owner(bulk_download_item_name)
-        if owner is not None and owner != current_user.user_id and not current_user.is_admin:
-            raise HTTPException(status_code=403, detail="Not authorized to access this download")
+    bulk_download = ApiDependencies.invoker.services.bulk_download
+    # Verify the caller owns this download (or is an admin)
+    owner = bulk_download.get_owner(bulk_download_item_name)
+    if owner is not None and owner != current_user.user_id and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to access this download")
 
-        path = ApiDependencies.invoker.services.bulk_download.get_path(bulk_download_item_name)
-
-        response = FileResponse(
-            path,
-            media_type="application/zip",
-            filename=bulk_download_item_name,
-            content_disposition_type="inline",
-        )
-        response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
-        background_tasks.add_task(ApiDependencies.invoker.services.bulk_download.delete, bulk_download_item_name)
-        return response
-    except HTTPException:
-        raise
-    except Exception:
+    status = bulk_download.get_status(bulk_download_item_name)
+    if status is BulkDownloadStatus.BUILDING:
+        return Response(status_code=202, headers={"Retry-After": "2"})
+    if status is BulkDownloadStatus.FAILED:
+        reason = bulk_download.pop_failure(bulk_download_item_name)
+        if reason is not None:
+            raise HTTPException(status_code=500, detail=reason)
+    if status is not BulkDownloadStatus.READY:
         raise HTTPException(status_code=404)
+
+    try:
+        path = bulk_download.get_path(bulk_download_item_name)
+    except BulkDownloadException:
+        raise HTTPException(status_code=404)
+    response = FileResponse(
+        path,
+        media_type="application/zip",
+        filename=bulk_download_item_name,
+        content_disposition_type="inline",
+    )
+    response.headers["Cache-Control"] = f"max-age={IMAGE_MAX_AGE}"
+    background_tasks.add_task(bulk_download.delete, bulk_download_item_name)
+    return response
 
 
 @images_router.get("/names", operation_id="get_image_names", deprecated=True)

@@ -1825,7 +1825,7 @@ export type paths = {
         };
         /**
          * Get Bulk Download Item
-         * @description Gets a bulk download zip file.
+         * @description Gets a bulk download zip file, or answers 202 while it is being built.
          *
          *     Requires authentication.  The caller must be the user who initiated the
          *     download (tracked by the bulk download service) or an admin.
@@ -6929,6 +6929,8 @@ export type components = {
              * @description The board from which image should be downloaded
              */
             board_id?: string | null;
+            /** @description `png16` stores each image with an exportable precise asset as a 16-bit PNG; the other images keep their gallery files. Omit for the gallery files. */
+            export_format?: components["schemas"]["ImageExportFormat"] | null;
         };
         /** Body_enqueue_batch */
         Body_enqueue_batch: {
@@ -17867,6 +17869,11 @@ export type components = {
              * @description Whether to show the Donate to InvokeAI menu link
              */
             show_donation_link: boolean;
+            /**
+             * Precise Image Storage
+             * @description Whether precise image storage is on; the UI offers 16-bit bulk downloads only then
+             */
+            precise_image_storage: boolean;
         };
         /**
          * GalleryItem
@@ -61042,6 +61049,13 @@ export interface operations {
                     "application/zip": unknown;
                 };
             };
+            /** @description The archive is still being built; retry after the `Retry-After` seconds */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Image not found */
             404: {
                 headers: {
@@ -61057,6 +61071,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Building the archive failed; the detail says why (reported once) */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

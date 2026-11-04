@@ -648,36 +648,42 @@ class ImageService(ImageServiceABC):
 
     def export_png16(self, image_name: str) -> ImageExport:
         record = self.get_record(image_name)
-        services = self.__invoker.services
         if not _EXPORT_SLOT.acquire(blocking=False):
             raise ImageExportBusyError("Another image export is running")
         claim = _ExportSlotClaim()
         try:
-            if not self._has_current_precise_asset(image_name):
-                raise ImageExportUnavailableError(f"{image_name} has no precise asset to export as a 16-bit PNG")
-            try:
-                descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
-            except (ImageFileNotFoundException, PreciseAssetError):
-                services.logger.error(f"Failed to read precise asset of {image_name}")
-                raise
-            refusal = png_descriptor_refusal(descriptor)
-            if refusal is not None:
-                raise ImageExportUnavailableError(refusal)
-            raster = self.get_raster(image_name)
-            if raster.dtype != numpy.uint16:
-                # Float assets: display quantization (clip to 0-1, round half to even). Non-finite values raise
-                # RasterConversionError. uint16 assets are encoded as they are, without a copy.
-                raster = quantize_unit(raster, numpy.uint16)
-            try:
-                text = services.image_files.read_png_text(image_name, record.image_subfolder)
-                content = encode_png(raster, text, compress_level=1)
-            except Exception:
-                services.logger.error(f"Failed to encode the 16-bit PNG of {image_name}")
-                raise
+            content = self._encode_png16(image_name, record)
         except BaseException:
             claim.release()
             raise
         return ImageExport(content, claim.release)
+
+    def encode_png16(self, image_name: str) -> bytes:
+        return self._encode_png16(image_name, self.get_record(image_name))
+
+    def _encode_png16(self, image_name: str, record: ImageRecord) -> bytes:
+        services = self.__invoker.services
+        if not self._has_current_precise_asset(image_name):
+            raise ImageExportUnavailableError(f"{image_name} has no precise asset to export as a 16-bit PNG")
+        try:
+            descriptor = services.image_files.read_precise_descriptor(image_name, record.image_subfolder)
+        except (ImageFileNotFoundException, PreciseAssetError):
+            services.logger.error(f"Failed to read precise asset of {image_name}")
+            raise
+        refusal = png_descriptor_refusal(descriptor)
+        if refusal is not None:
+            raise ImageExportUnavailableError(refusal)
+        raster = self.get_raster(image_name)
+        if raster.dtype != numpy.uint16:
+            # Float assets: display quantization (clip to 0-1, round half to even). Non-finite values raise
+            # RasterConversionError. uint16 assets are encoded as they are, without a copy.
+            raster = quantize_unit(raster, numpy.uint16)
+        try:
+            text = services.image_files.read_png_text(image_name, record.image_subfolder)
+            return encode_png(raster, text, compress_level=1)
+        except Exception:
+            services.logger.error(f"Failed to encode the 16-bit PNG of {image_name}")
+            raise
 
     def get_record(self, image_name: str) -> ImageRecord:
         try:

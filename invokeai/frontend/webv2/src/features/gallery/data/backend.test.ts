@@ -141,6 +141,72 @@ describe('downloadGalleryArchive', () => {
     mocks.sleep.mockReset();
   });
 
+  it('sends the export format and keeps polling through 202 without a time bound until the archive is served', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'hdr.zip' });
+      // Each wait advances the clock two hours: no elapsed time ends a building archive.
+      mocks.sleep.mockImplementation(() => {
+        vi.advanceTimersByTime(2 * 60 * 60 * 1000);
+
+        return Promise.resolve();
+      });
+      mocks.apiFetchRaw
+        .mockResolvedValueOnce(new Response(null, { headers: { 'Retry-After': '2' }, status: 202 }))
+        .mockResolvedValueOnce(new Response(null, { status: 202 }))
+        .mockResolvedValueOnce(new Response('zip'));
+
+      const { fileName } = await downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' });
+
+      expect(fileName).toBe('hdr.zip');
+      const init = mocks.apiFetchJson.mock.calls[0]?.[1] as RequestInit;
+      expect(JSON.parse(init.body as string)).toEqual({ board_id: 'board-1', export_format: 'png16' });
+      expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('retries a 404 right after the request, then fails once the grace window has passed', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'gone.zip' });
+      mocks.apiFetchRaw.mockImplementation(() => Promise.resolve(new Response(null, { status: 404 })));
+      mocks.sleep.mockImplementation(() => {
+        vi.advanceTimersByTime(6 * 1000);
+
+        return Promise.resolve();
+      });
+
+      await expect(downloadGalleryArchive({ boardId: 'board-1' })).rejects.toThrow('404');
+      // Polled at 0 s and 6 s (retried), then at 12 s (failed).
+      expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails with the server detail when the job failed, without polling again', async () => {
+    mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'bad.zip' });
+    mocks.apiFetchRaw.mockResolvedValue(
+      new Response(JSON.stringify({ detail: 'Archive build failed: disk full' }), { status: 500 })
+    );
+
+    await expect(downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' })).rejects.toThrow(
+      'Archive build failed: disk full'
+    );
+    expect(mocks.apiFetchRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it('passes the 503 for a busy 16-bit archive on as an ApiError without polling', async () => {
+    mocks.apiFetchJson.mockRejectedValue(new ApiError('{"detail":"busy"}', 503, { 'Retry-After': '30' }));
+
+    await expect(downloadGalleryArchive({ boardId: 'board-1', exportFormat: 'png16' })).rejects.toMatchObject({
+      status: 503,
+    });
+    expect(mocks.apiFetchRaw).not.toHaveBeenCalled();
+  });
+
   it('aborts polling before another account can request the prior account archive', async () => {
     let resumeSleep: (() => void) | undefined;
     mocks.apiFetchJson.mockResolvedValue({ bulk_download_item_name: 'user-a.zip' });

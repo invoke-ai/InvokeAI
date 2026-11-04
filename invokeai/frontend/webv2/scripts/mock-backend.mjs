@@ -1427,7 +1427,7 @@ export const startMockBackend = async (port, { clock = Date.now, profile = 'empt
       }
 
       if (method === 'GET' && path === '/api/v1/app/frontend_config') {
-        return json(200, { show_donation_link: true });
+        return json(200, { precise_image_storage: true, show_donation_link: true });
       }
 
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {

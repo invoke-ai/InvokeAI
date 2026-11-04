@@ -2,6 +2,7 @@
 import type { GalleryBoard, GalleryBoardAccess, GalleryBoardAction } from '@features/gallery/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -28,6 +29,8 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardTypeName': `Type "${String(values?.name)}" to confirm`,
         'widgets.gallery.downloadBoard': 'Download board',
         'widgets.gallery.downloadBoardWithOmission': `Download board (${String(values?.count)} video omitted)`,
+        'widgets.gallery.downloadBoardPng16': 'Download board (16-bit PNG)',
+        'widgets.gallery.downloadBoardPng16WithOmission': `Download board (16-bit PNG, ${String(values?.count)} video omitted)`,
         'widgets.gallery.imageCount': `${String(values?.count)} images`,
         'widgets.gallery.mediaCountsThree': `${String(values?.first)}, ${String(values?.second)} and ${String(
           values?.third
@@ -86,22 +89,31 @@ const targetContext = {
   gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1', followSelectedBoard: false } },
 } as unknown as GalleryWidgetContextValue;
 
+const FRONTEND_CONFIG_KEY = ['frontend-config'];
+let queryClient = new QueryClient();
+const setPreciseImageStorage = (enabled: boolean) =>
+  queryClient.setQueryData(FRONTEND_CONFIG_KEY, { precise_image_storage: enabled, show_donation_link: false });
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 beforeEach(async () => {
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  setPreciseImageStorage(false);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
   await act(async () => {
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={context}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={context}>
+            <GalleryBoardMenu target={target} onClose={noop} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     );
     await Promise.resolve();
   });
@@ -116,6 +128,39 @@ afterEach(async () => {
 
 it('states the exact number of videos omitted from the image-only board archive', () => {
   expect(document.body.textContent).toContain('Download board (1 video omitted)');
+});
+
+it('leaves the 16-bit entry out until the server confirms precise image storage', () => {
+  expect(menuItemLabels()).toEqual(expect.arrayContaining(['Download board (1 video omitted)']));
+  expect(document.body.textContent).not.toContain('16-bit');
+});
+
+it('leaves the 16-bit entry out while the config loads and after it failed', async () => {
+  queryClient.removeQueries({ queryKey: FRONTEND_CONFIG_KEY });
+  void queryClient.prefetchQuery({ queryFn: () => new Promise<never>(() => {}), queryKey: FRONTEND_CONFIG_KEY });
+  await renderMenuFor(board as GalleryBoard);
+  expect(document.body.textContent).not.toContain('16-bit');
+
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  await queryClient.prefetchQuery({
+    queryFn: () => Promise.reject(new Error('offline')),
+    queryKey: FRONTEND_CONFIG_KEY,
+  });
+  await renderMenuFor(board as GalleryBoard);
+  expect(document.body.textContent).not.toContain('16-bit');
+});
+
+it('downloads the board as 16-bit PNG when precise image storage is on, naming omitted videos', async () => {
+  setPreciseImageStorage(true);
+  await renderMenuFor(board as GalleryBoard);
+
+  const item = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find(
+    (element) => element.textContent === 'Download board (16-bit PNG, 1 video omitted)'
+  );
+
+  expect(item).toBeDefined();
+  await act(() => item?.click());
+  expect(context.actions.downloadBoard).toHaveBeenCalledWith('board-1', { exportFormat: 'png16' });
 });
 
 it('offers a plain board download when the board holds no videos', async () => {
@@ -216,11 +261,13 @@ it.each(['cancel', 'delete'] as const)(
   async (outcome) => {
     await act(async () => {
       root?.render(
-        <ChakraProvider value={system}>
-          <GalleryWidgetContext value={context}>
-            <ControlledMenu initialTarget={target} />
-          </GalleryWidgetContext>
-        </ChakraProvider>
+        <QueryClientProvider client={queryClient}>
+          <ChakraProvider value={system}>
+            <GalleryWidgetContext value={context}>
+              <ControlledMenu initialTarget={target} />
+            </GalleryWidgetContext>
+          </ChakraProvider>
+        </QueryClientProvider>
       );
       await Promise.resolve();
     });
@@ -260,11 +307,13 @@ it('makes the board the auto-add destination', async () => {
 it('hands results back to the default destination from the auto-add board itself', async () => {
   await act(async () => {
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={targetContext}>
-          <GalleryBoardMenu target={target} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={targetContext}>
+            <GalleryBoardMenu target={target} onClose={noop} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     );
     await Promise.resolve();
   });
@@ -293,11 +342,13 @@ const renderMenuFor = async (menuBoard: GalleryBoard, overrides: Partial<Gallery
   } as GalleryWidgetContextValue;
   await act(async () => {
     root?.render(
-      <ChakraProvider value={system}>
-        <GalleryWidgetContext value={value}>
-          <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
-        </GalleryWidgetContext>
-      </ChakraProvider>
+      <QueryClientProvider client={queryClient}>
+        <ChakraProvider value={system}>
+          <GalleryWidgetContext value={value}>
+            <GalleryBoardMenu target={{ board: menuBoard, x: 20, y: 20 }} onClose={noop} />
+          </GalleryWidgetContext>
+        </ChakraProvider>
+      </QueryClientProvider>
     );
     await Promise.resolve();
   });

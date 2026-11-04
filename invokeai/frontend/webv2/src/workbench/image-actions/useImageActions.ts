@@ -1,4 +1,4 @@
-import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
+import type { GalleryArchiveOptions, GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { VideoConditioningRole } from '@features/video';
@@ -125,7 +125,7 @@ export interface ImageActions extends GalleryItemActions {
     metadata: GalleryImageMetadata | null
   ) => ImageRecallCapabilities;
   downloadImage: (image: GalleryImage) => Promise<void>;
-  downloadImages: (imageNames: string[]) => Promise<void>;
+  downloadImages: (imageNames: string[], options?: GalleryArchiveOptions) => Promise<void>;
   /** Saves the 16-bit PNG the server exports from the image's precise asset, not a copy of the gallery PNG. */
   downloadImagePng16: (image: GalleryImage) => Promise<void>;
   /** Queues normal, roughness and displacement maps of the image into the project's auto-add board. */
@@ -894,7 +894,11 @@ export const useImageActions = ({
         }
       }
     };
-    const downloadItems = async (items: GalleryItemRef[], loadedItems: GalleryItem[] = []): Promise<void> => {
+    const downloadItems = async (
+      items: GalleryItemRef[],
+      loadedItems: GalleryItem[] = [],
+      options: GalleryArchiveOptions = {}
+    ): Promise<void> => {
       const owner = captureAccountScope();
       const loadedByKey = new Map(loadedItems.map((item) => [toGalleryItemKey(item), item]));
       const imageNames = items.filter((item) => item.kind === 'image').map((item) => item.name);
@@ -903,8 +907,22 @@ export const useImageActions = ({
       let succeededCount = 0;
 
       if (imageNames.length > 0) {
+        // The archive is built on the server before it can be saved; a toast shows the wait and closes with the result.
+        const progressToast = createActionToast({
+          actions: [],
+          duration: Number.POSITIVE_INFINITY,
+          signal: owner.signal,
+          title: t(
+            options.exportFormat === 'png16'
+              ? 'widgets.gallery.itemActions.download.preparingPng16'
+              : 'widgets.gallery.itemActions.download.preparing'
+          ),
+          type: 'loading',
+        });
+
         try {
           const { blob, fileName } = await galleryTransfers.downloadArchive({
+            exportFormat: options.exportFormat,
             imageNames,
             signal: owner.signal,
           });
@@ -912,12 +930,22 @@ export const useImageActions = ({
           assertAccountScopeCurrent(owner);
           downloadBlob(blob, fileName);
           succeededCount += imageNames.length;
-        } catch {
+        } catch (error: unknown) {
           if (!isAccountScopeCurrent(owner)) {
             return;
           }
 
+          if (error instanceof ApiError && error.status === 503) {
+            recordError(new Error(t('widgets.gallery.archiveBusy')));
+            return;
+          }
+
           failedCount += imageNames.length;
+        } finally {
+          // Without an id, dismiss would close every toast.
+          if (progressToast) {
+            toaster.dismiss(progressToast);
+          }
         }
       }
 
@@ -1042,7 +1070,12 @@ export const useImageActions = ({
           recordError(error);
         }
       },
-      downloadImages: (imageNames) => downloadItems(imageNames.map((name) => ({ kind: 'image', name }))),
+      downloadImages: (imageNames, options) =>
+        downloadItems(
+          imageNames.map((name) => ({ kind: 'image', name })),
+          [],
+          options
+        ),
       downloadImagePng16: async (image) => {
         const owner = captureAccountScope();
 

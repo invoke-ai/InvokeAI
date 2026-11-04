@@ -175,11 +175,18 @@ class ImageServiceABC(ABC):
         workflow, graph and resolved-inputs strings as the gallery PNG.
 
         Never waits: raises ImageExportBusyError while another export holds the slot. On success the caller owns the
-        slot and must call `release` once the file has been sent; on any error it is already released. Raises
-        ImageRecordNotFoundException for an unknown image, ImageExportUnavailableError (with the reason) for an image
-        without a row or with an asset the PNG writer cannot encode, RasterConversionError for non-finite pixels,
-        ImageFileNotFoundException for a missing asset file and PreciseAssetError for a corrupt or unsupported one.
+        slot and must call `release` once the file has been sent; on any error it is already released. Raises what
+        `encode_png16` raises.
         """
+        pass
+
+    @abstractmethod
+    def encode_png16(self, image_name: str) -> bytes:
+        """The encode behind `export_png16`, without the export slot: the caller bounds concurrency (the bulk
+        download does, with its single 16-bit job). Raises ImageRecordNotFoundException for an unknown image,
+        ImageExportUnavailableError (with the reason) for an image without a precise asset or with one the PNG writer
+        cannot encode, RasterConversionError for non-finite pixels, ImageFileNotFoundException for a missing asset
+        file, PreciseAssetError for a corrupt or unsupported one and PngCodecError when encoding fails."""
         pass
 
     @abstractmethod

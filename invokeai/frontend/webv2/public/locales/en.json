@@ -5544,6 +5544,7 @@
     "gallery": {
       "alwaysShowDimensions": "Always show dimensions",
       "archiveBoard": "Archive board",
+      "archiveBusy": "Another 16-bit archive is being prepared. Try again when it has finished.",
       "archivedBoards": "Archived boards",
       "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
       "autoAddRedirectedTooltip": "{{name}} can’t take new results (you can only view it, or it is gone), so new generations, canvas saves and pasted uploads land here instead, as do workflow nodes whose board is Auto.",
@@ -5557,8 +5558,12 @@
       "assetCount_other": "{{count}} uploads",
       "boardActionsForBoard": "Board actions for {{name}}",
       "boardArchived": "Archived board \"{{name}}\"",
-      "boardArchivePreparing_one": "Preparing an image archive of \"{{name}}\". {{count}} video will be omitted.",
-      "boardArchivePreparing_other": "Preparing an image archive of \"{{name}}\". {{count}} videos will be omitted.",
+      "boardArchivePreparing": "Preparing an image archive of \"{{name}}\".",
+      "boardArchivePreparingPng16": "Preparing a 16-bit PNG archive of \"{{name}}\". This can take minutes. Images without precise data come as normal PNGs.",
+      "boardArchivePreparingPng16WithOmission_one": "Preparing a 16-bit PNG archive of \"{{name}}\". This can take minutes. Images without precise data come as normal PNGs. {{count}} video will be omitted.",
+      "boardArchivePreparingPng16WithOmission_other": "Preparing a 16-bit PNG archive of \"{{name}}\". This can take minutes. Images without precise data come as normal PNGs. {{count}} videos will be omitted.",
+      "boardArchivePreparingWithOmission_one": "Preparing an image archive of \"{{name}}\". {{count}} video will be omitted.",
+      "boardArchivePreparingWithOmission_other": "Preparing an image archive of \"{{name}}\". {{count}} videos will be omitted.",
       "boardCountsBreakdown": "Media: {{media}} · Uploads: {{uploads}}",
       "boardCreated": "Created board \"{{name}}\"",
       "boardGroups": {
@@ -5688,10 +5693,14 @@
       "deleteItemsConfirmTitle_other": "Delete {{count}} items?",
       "deleteSelection": "Delete selection",
       "downloadBoard": "Download board",
+      "downloadBoardPng16": "Download board (16-bit PNG)",
+      "downloadBoardPng16WithOmission_one": "Download board (16-bit PNG, {{count}} video omitted)",
+      "downloadBoardPng16WithOmission_other": "Download board (16-bit PNG, {{count}} videos omitted)",
       "downloadBoardWithOmission_one": "Download board ({{count}} video omitted)",
       "downloadBoardWithOmission_other": "Download board ({{count}} videos omitted)",
       "downloadReady": "Download ready",
       "downloadSelection": "Download selection",
+      "downloadSelectionPng16": "Download selection (16-bit PNG)",
       "dropMediaToUploadToBoard": "Drop images, videos, or audio to upload to {{name}}",
       "emptyBoardUploadHint": "Drop media here or click to upload",
       "exportProjectFromBoard": "Export project (.invk)",
@@ -5739,6 +5748,8 @@
           "success_other": "Deleted {{count}} items."
         },
         "download": {
+          "preparing": "Preparing an image archive",
+          "preparingPng16": "Preparing a 16-bit PNG archive. This can take minutes. Images without precise data come as normal PNGs.",
           "partial": "{{succeeded}} of {{count}} items downloaded; {{failed}} failed or were skipped.",
           "success": "Download ready"
         },

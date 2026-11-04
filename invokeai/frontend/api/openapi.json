@@ -7859,7 +7859,7 @@
       "get": {
         "tags": ["images"],
         "summary": "Get Bulk Download Item",
-        "description": "Gets a bulk download zip file.\n\nRequires authentication.  The caller must be the user who initiated the\ndownload (tracked by the bulk download service) or an admin.",
+        "description": "Gets a bulk download zip file, or answers 202 while it is being built.\n\nRequires authentication.  The caller must be the user who initiated the\ndownload (tracked by the bulk download service) or an admin.",
         "operationId": "get_bulk_download_item",
         "security": [
           {
@@ -7886,8 +7886,14 @@
               "application/zip": {}
             }
           },
+          "202": {
+            "description": "The archive is still being built; retry after the `Retry-After` seconds"
+          },
           "404": {
             "description": "Image not found"
+          },
+          "500": {
+            "description": "Building the archive failed; the detail says why (reported once)"
           },
           "422": {
             "description": "Validation Error",
@@ -23492,6 +23498,17 @@
             ],
             "title": "Board Id",
             "description": "The board from which image should be downloaded"
+          },
+          "export_format": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageExportFormat"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "`png16` stores each image with an exportable precise asset as a 16-bit PNG; the other images keep their gallery files. Omit for the gallery files."
           }
         },
         "type": "object",
@@ -44741,10 +44758,15 @@
             "type": "boolean",
             "title": "Show Donation Link",
             "description": "Whether to show the Donate to InvokeAI menu link"
+          },
+          "precise_image_storage": {
+            "type": "boolean",
+            "title": "Precise Image Storage",
+            "description": "Whether precise image storage is on; the UI offers 16-bit bulk downloads only then"
           }
         },
         "type": "object",
-        "required": ["show_donation_link"],
+        "required": ["show_donation_link", "precise_image_storage"],
         "title": "FrontendConfig",
         "description": "Presentation settings any signed-in user may read; never include private runtime configuration here."
       },

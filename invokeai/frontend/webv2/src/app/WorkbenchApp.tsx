@@ -2,6 +2,8 @@ import type { WorkbenchSearch } from '@workbench/projects/session';
 
 import { LLMTaskProgressRuntime } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSearch } from '@tanstack/react-router';
 import { preloadBootWidgets } from '@workbench/bootWidgetPreload';
 import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
@@ -34,8 +36,14 @@ export const WorkbenchApp = () => {
     [search.new, search.project]
   );
 
-  // Preload widget chunks during hydration; the provider withholds the shell until hydration finishes.
-  useMountEffect(preloadBootWidgets);
+  const queryClient = useQueryClient();
+
+  // Preload widget chunks during hydration; the provider withholds the shell until hydration finishes. The deployment
+  // config is read now so menu entries that depend on it are settled before a menu opens.
+  useMountEffect(() => {
+    preloadBootWidgets();
+    void queryClient.prefetchQuery(frontendConfigQueryOptions);
+  });
 
   return (
     <WorkbenchProvider loadOptions={loadOptions}>

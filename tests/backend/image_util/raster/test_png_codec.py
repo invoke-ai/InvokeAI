@@ -6,6 +6,7 @@ import time
 import tracemalloc
 import zlib
 
+import cv2
 import numpy as np
 import pytest
 from PIL import Image, PngImagePlugin
@@ -849,3 +850,13 @@ def test_png_ihdr_returns_none_for_anything_that_is_not_a_png_start():
     assert png_ihdr(b"") is None
     assert png_ihdr(b"GIF89a" + bytes(40)) is None
     assert png_ihdr(SIGNATURE + bytes(30)) is None
+
+
+def test_an_opencv_failure_is_reported_as_a_codec_error(monkeypatch):
+    def failing_imencode(*args, **kwargs):
+        raise cv2.error("imencode failed")
+
+    monkeypatch.setattr(cv2, "imencode", failing_imencode)
+
+    with pytest.raises(PngCodecError, match="imencode failed"):
+        encode_png(sample_raster(RasterChannels.RGB, np.uint16, shape=(3, 3), seed=0))
