@@ -22,6 +22,7 @@ from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries.models import MAX_KEY_LENGTH, MAX_PATH_LENGTH, ModelQueries
 from invokeai.app.services.shared.database.schema.models import models
 from invokeai.app.services.shared.pagination import SQLiteDirection
+from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.lora import LoRA_LyCORIS_SDXL_Config
 from invokeai.backend.model_manager.configs.main import (
@@ -31,8 +32,9 @@ from invokeai.backend.model_manager.configs.main import (
     MainModelDefaultSettings,
 )
 from invokeai.backend.model_manager.configs.qwen3_encoder import Qwen3Encoder_Qwen3Encoder_Config
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
@@ -135,6 +137,41 @@ def test_update_changing_type_drops_stale_format_and_variant(store: ModelRecordS
     changes = ModelRecordChanges(type=ModelType.TextLLM)
     new_config = store.update_model(config.key, changes, allow_class_change=True)
     assert isinstance(new_config, TextLLM_Diffusers_Config)
+
+
+@pytest.mark.parametrize("class_order", ["by name", "reversed"])
+@pytest.mark.parametrize(
+    ("path", "expected"),
+    [
+        ("/tmp/flux-3-image-klein-pup", TextLLM_Diffusers_Config),
+        ("/tmp/qwen3.5_9b_flux3_prompt_upsampler_bf16.safetensors", TextLLM_Checkpoint_Config),
+    ],
+    ids=["folder", "single file"],
+)
+def test_a_type_change_picks_the_class_of_the_records_container(
+    store: ModelRecordServiceBase, monkeypatch: pytest.MonkeyPatch, path: str, expected: type, class_order: str
+) -> None:
+    """An unidentified FLUX.3 prompt upsampler, made a Text LLM by hand. Its `unknown` format names no Text LLM
+    class, so each class of the type is tried without it, and both validate: the record's path has to decide, in
+    whatever order the classes come. `CONFIG_CLASSES` is a set, and taking the first class it yielded made the
+    outcome differ between processes."""
+    ordered = sorted(Config_Base.CONFIG_CLASSES, key=lambda cls: cls.__name__, reverse=class_order == "reversed")
+    monkeypatch.setattr(Config_Base, "CONFIG_CLASSES", ordered)
+    config = Unknown_Config(
+        key="key1",
+        source="test/source/",
+        source_type=ModelSourceType.Path,
+        path=path,
+        file_size=1024,
+        name="FLUX.3 Prompt Upsampler",
+        hash="ABC123",
+    )
+    store.add_model(config)
+    changes = ModelRecordChanges(type=ModelType.TextLLM, base=BaseModelType.Any)
+
+    new_config = store.update_model(config.key, changes, allow_class_change=True)
+
+    assert type(new_config) is expected
 
 
 @pytest.mark.parametrize("allow_class_change", [False, True])
