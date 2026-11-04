@@ -160,7 +160,8 @@ def test_a_qwen_image_lora_is_still_claimed_by_qwen_image_alone(family: str) -> 
 def test_a_cogview4_lora_is_no_longer_taken_for_qwen_image(spelling: str) -> None:
     """CogView4 keeps its blocks under `transformer_blocks.N.attn1`; neither Qwen-Image nor SD 3 may claim it.
 
-    Other families' detectors are out of scope here.
+    Except Anima for the diffusers spelling: diffusers' Cosmos layout uses the same `transformer_blocks.N.attn1` names.
+    That match is a known misidentification that predates SD 3 support and is outside it.
     """
     keys: dict[str, list[int]] = {}
     for proj in ("to_q", "to_k", "to_v", "to_out.0"):
@@ -173,9 +174,8 @@ def test_a_cogview4_lora_is_no_longer_taken_for_qwen_image(spelling: str) -> Non
         keys[f"{layer}.{down}.weight"] = [16, 4096]
         keys[f"{layer}.{up}.weight"] = [4096, 16]
 
-    accepting = _accepting_lora_configs(_state_dict(keys), f"cogview4-{spelling}")
-    for config in ("LoRA_LyCORIS_QwenImage_Config", "LoRA_LyCORIS_SD3_Config", "LoRA_Diffusers_SD3_Config"):
-        assert config not in accepting
+    expected = ["LoRA_LyCORIS_Anima_Config"] if spelling == "diffusers" else []
+    assert _accepting_lora_configs(_state_dict(keys), f"cogview4-{spelling}") == expected
 
 
 def _clip_layers(prefix_l: str, prefix_g: str) -> dict[str, list[int]]:
@@ -274,3 +274,81 @@ def test_onetrainers_flat_names_are_not_taken_for_sd3() -> None:
 
     assert "LoRA_LyCORIS_SD3_Config" not in accepting
     assert len(accepting) <= 1
+
+
+def _pair(layer: str, rows: int, cols: int, *, peft: bool, rank: int = 4) -> dict[str, list[int]]:
+    down, up = ("lora_A", "lora_B") if peft else ("lora_down", "lora_up")
+    return {f"{layer}.{down}.weight": [rank, cols], f"{layer}.{up}.weight": [rows, rank]}
+
+
+def test_a_kohya_lora_that_keeps_diffusers_names_is_an_sd3_lora_at_an_sd3_width() -> None:
+    keys = _pair("lora_unet_transformer_blocks_0_attn_to_q", 1536, 1536, peft=False)
+    sd = _state_dict(keys)
+
+    assert _accepting_lora_configs(sd, "kohya-diffusers-names") == ["LoRA_LyCORIS_SD3_Config"]
+    mod, overrides = _mod(sd, "kohya-diffusers-names")
+    assert LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides).variant is SD3VariantType.Medium
+
+
+def test_the_same_kohya_names_at_qwen_images_width_are_still_qwen_image() -> None:
+    keys = _pair("lora_unet_transformer_blocks_0_attn_to_q", 3072, 3072, peft=False)
+
+    assert _accepting_lora_configs(_state_dict(keys), "kohya-qwen-width") == ["LoRA_LyCORIS_QwenImage_Config"]
+
+
+_SD3_LAYOUTS_QWEN_MUST_NOT_CLAIM = {
+    "mlp": _pair("transformer.transformer_blocks.0.ff.net.0.proj", 6144, 1536, peft=True),
+    "modulation": _pair("transformer.transformer_blocks.0.norm1.linear", 9216, 1536, peft=True),
+    "half-an-attention-layer": {"transformer.transformer_blocks.0.attn.to_q.lora_A.weight": [4, 1536]},
+    "attention-at-sd3-width-in-a-qwen-file": {
+        **_pair("transformer.transformer_blocks.0.attn.to_q", 1536, 1536, peft=True),
+        **_pair("transformer.transformer_blocks.0.attn.to_k", 3072, 3072, peft=True),
+    },
+}
+
+
+@pytest.mark.parametrize("layout", list(_SD3_LAYOUTS_QWEN_MUST_NOT_CLAIM))
+def test_a_file_with_sd3_module_names_or_widths_is_not_installed_as_qwen_image(layout: str) -> None:
+    accepting = _accepting_lora_configs(_state_dict(_SD3_LAYOUTS_QWEN_MUST_NOT_CLAIM[layout]), layout)
+
+    assert "LoRA_LyCORIS_QwenImage_Config" not in accepting
+
+
+def test_a_lone_half_of_a_kohya_diffusers_name_layer_is_not_installed() -> None:
+    keys = {"lora_unet_transformer_blocks_0_attn_to_q.lora_down.weight": [4, 3072]}
+
+    assert _accepting_lora_configs(_state_dict(keys), "kohya-lone") == []
+
+
+def _refusal(keys: dict) -> str:
+    mod, overrides = _mod(_state_dict(keys), "refused")
+    with pytest.raises(InvalidMatchError) as error:
+        LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides)
+    return str(error.value)
+
+
+def test_attention_layers_of_two_widths_are_refused() -> None:
+    keys = {
+        **_pair("transformer.transformer_blocks.0.attn.to_q", 1536, 1536, peft=True),
+        **_pair("transformer.transformer_blocks.1.attn.to_q", 2432, 2432, peft=True),
+    }
+
+    assert "different widths" in _refusal(keys)
+
+
+def test_a_block_beyond_the_models_depth_is_refused() -> None:
+    keys = _pair("transformer.transformer_blocks.99.attn.to_q", 1536, 1536, peft=True)
+
+    assert "block 99" in _refusal(keys)
+    assert "block 24" in _refusal(_pair("transformer.transformer_blocks.24.attn.to_q", 1536, 1536, peft=True))
+
+
+def test_one_dimensional_lokr_factors_get_a_variant_instead_of_failing_identification() -> None:
+    """A 1-D full factor is one row to `torch.kron`: kron((n,), (a, b)) is (a, n * b)."""
+    keys = {
+        "lycoris_transformer_blocks_0_attn_to_q.lokr_w1": [3],
+        "lycoris_transformer_blocks_0_attn_to_q.lokr_w2": [1536, 512],
+    }
+    mod, overrides = _mod(_state_dict(keys), "lokr-1d")
+
+    assert LoRA_LyCORIS_SD3_Config.from_model_on_disk(mod, overrides).variant is SD3VariantType.Medium

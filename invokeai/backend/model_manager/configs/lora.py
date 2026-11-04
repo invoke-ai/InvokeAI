@@ -72,7 +72,13 @@ from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import 
 from invokeai.backend.patches.lora_conversions.qwen_image_2_1_lora_constants import (
     unsupported_keys as qwen_image_21_unsupported_lora_keys,
 )
-from invokeai.backend.patches.lora_conversions.sd3_lora_constants import is_sd3_lora, sd3_lora_refusal, sd3_lora_variant
+from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
+    group_sd3_lora_layers,
+    is_sd3_lora,
+    layer_delta_shape,
+    sd3_lora_refusal,
+    sd3_lora_variant,
+)
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -897,6 +903,37 @@ def _has_prefixed_qwen_image_lora_keys(state_dict: dict[str | int, Any]) -> bool
     return any(_PREFIXED_QWEN_IMAGE_BLOCK_KEY_RE.match(key) for key in keys)
 
 
+# Qwen-Image's transformer width (24 heads of 128).
+_QWEN_IMAGE_HIDDEN_SIZE = 3072
+# Module names diffusers' SD 3 has and Qwen-Image does not (it names its MLPs `img_mlp`/`txt_mlp` and its modulation
+# `img_mod`/`txt_mod`), dotted or flattened.
+_SD3_ONLY_MODULE_RE = re.compile(r"(?:^|[._])(?:ff|ff_context)[._]net[._]|(?:^|[._])norm1(?:_context)?[._]linear$")
+_ATTENTION_PROJECTION_RE = re.compile(
+    r"(?:^|[._])attn[._](?:to_q|to_k|to_v|to_out(?:[._]0)?|add_q_proj|add_k_proj|add_v_proj|to_add_out)$"
+)
+
+
+def _is_not_a_qwen_image_lora(state_dict: dict[str | int, Any]) -> str | None:
+    """Why a state dict that uses Qwen-Image's attention names cannot be one: it names SD 3 modules, or an attention
+    projection is not Qwen-Image's width (SD 3 is 1536 or 2432 wide) or lacks half of its pair.
+
+    SD 3's recognizer needs a complete attention layer of its own, so a file with SD 3 module names but no such layer,
+    or only half of one, would otherwise install as Qwen-Image and break at generation.
+    """
+    for layer_path, values in group_sd3_lora_layers(state_dict).items():
+        if _SD3_ONLY_MODULE_RE.search(layer_path):
+            return f"layer {layer_path!r} names a module only SD 3 has"
+        if _ATTENTION_PROJECTION_RE.search(layer_path):
+            shape = layer_delta_shape(values)
+            if shape is None:
+                return f"layer {layer_path!r} is incomplete"
+            # Only a low-rank pair states the module's own width; a Kronecker product's shape is its factors'.
+            is_low_rank = "lora_B.weight" in values or "lora_up.weight" in values
+            if is_low_rank and shape != (_QWEN_IMAGE_HIDDEN_SIZE, _QWEN_IMAGE_HIDDEN_SIZE):
+                return f"layer {layer_path!r} is {shape}, not Qwen-Image's {_QWEN_IMAGE_HIDDEN_SIZE} wide"
+    return None
+
+
 class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
     """Model config for Qwen Image Edit LoRA models in LyCORIS format."""
 
@@ -954,6 +991,8 @@ class LoRA_LyCORIS_QwenImage_Config(LoRA_LyCORIS_Config_Base, Config_Base):
         # CogView4 keeps its blocks under `transformer_blocks.N.attn1`.
         if is_sd3_lora(state_dict) or _has_cogview4_lora_keys(state_dict):
             raise NotAMatchError("model looks like an SD 3 or CogView4 LoRA, not a Qwen Image LoRA")
+        if (not_qwen := _is_not_a_qwen_image_lora(state_dict)) is not None:
+            raise NotAMatchError(f"model is not a Qwen Image LoRA: {not_qwen}")
         if (
             has_qwen_ie_keys
             and has_lora_suffix

@@ -80,7 +80,11 @@ _FLAT_TEMPLATE_RE = {
 
 # Container prefixes in front of diffusers module names, longest first so a nested one is not left with a tail.
 SD3_LORA_TRANSFORMER_KEY_PREFIXES = ("base_model.model.transformer.", "base_model.model.", "transformer.")
-SD3_LORA_FLAT_TRANSFORMER_PREFIX = "lycoris_"
+# `lycoris_` is SimpleTuner's; `lora_unet_` is kohya-style trainers that keep diffusers' module names (kohya's own MMDiT
+# names, `lora_unet_joint_blocks_...`, are mapped separately and match no template).
+SD3_LORA_FLAT_TRANSFORMER_PREFIXES = ("lycoris_", "lora_unet_")
+# Transformer blocks of the released models, by width.
+SD3_BLOCKS_BY_WIDTH = {SD3_MEDIUM_WIDTH: 24, SD3_LARGE_WIDTH: 38}
 
 # Text-encoder prefixes: (diffusers, kohya) per encoder. T5 parts are dropped with a warning.
 SD3_LORA_CLIP_L_KEY_PREFIXES = ("text_encoder.", "lora_te1_")
@@ -120,6 +124,9 @@ _NON_SD3_ANTI_RES = (
 )
 
 
+_BLOCK_INDEX_RE = re.compile(r"^transformer_blocks\.(\d+)\.")
+
+
 def split_sd3_lora_key(key: str) -> tuple[str, str] | None:
     """Split a key into ``(layer path, parameter name)``, or ``None`` if its tail is not a supported parameter."""
     for param_name in SD3_LORA_PARAM_NAMES:
@@ -139,12 +146,13 @@ def resolve_sd3_transformer_module(layer_path: str) -> str | None:
             layer_path = layer_path[len(prefix) :]
             break
     else:
-        if layer_path.startswith(SD3_LORA_FLAT_TRANSFORMER_PREFIX):
-            flat = layer_path[len(SD3_LORA_FLAT_TRANSFORMER_PREFIX) :]
-            for template, pattern in _FLAT_TEMPLATE_RE.items():
-                if match := pattern.match(flat):
-                    return template.replace("{i}", match.group(1)) if match.groups() else template
-            return None
+        for flat_prefix in SD3_LORA_FLAT_TRANSFORMER_PREFIXES:
+            if layer_path.startswith(flat_prefix):
+                flat = layer_path[len(flat_prefix) :]
+                for template, pattern in _FLAT_TEMPLATE_RE.items():
+                    if match := pattern.match(flat):
+                        return template.replace("{i}", match.group(1)) if match.groups() else template
+                return None
     for pattern in _TEMPLATE_RE.values():
         if pattern.match(layer_path):
             return layer_path
@@ -161,10 +169,13 @@ def group_sd3_lora_layers(state_dict: dict[str | int, Any]) -> dict[str, dict[st
 
 
 def _factor_shape(values: dict[str, torch.Tensor], name: str) -> tuple[int, int] | None:
+    """A Kronecker factor's (rows, columns). A 1-D full factor is a single row, as `torch.kron` pads it."""
     if name in values:
-        return int(values[name].shape[0]), int(values[name].shape[1])
-    if f"{name}_a" in values and f"{name}_b" in values:
-        return int(values[f"{name}_a"].shape[0]), int(values[f"{name}_b"].shape[1])
+        shape = values[name].shape
+        return (1, int(shape[0])) if len(shape) == 1 else (int(shape[0]), int(shape[1]))
+    a, b = values.get(f"{name}_a"), values.get(f"{name}_b")
+    if a is not None and b is not None and a.ndim >= 2 and b.ndim >= 2:
+        return int(a.shape[0]), int(b.shape[1])
     return None
 
 
@@ -306,6 +317,32 @@ def sd3_lora_variant(state_dict: dict[str | int, Any]) -> SD3VariantType | None:
     return sd3_variant_from_width(_attention_width(group_sd3_lora_layers(state_dict)))
 
 
+def _width_or_depth_refusal(grouped: dict[str, dict[str, torch.Tensor]]) -> str | None:
+    """Why the transformer layers cannot all belong to one released model: attention at two widths, or a block index
+    beyond the deepest model's (or beyond the depth of the size the attention width names)."""
+    widths: set[int] = set()
+    blocks: dict[int, str] = {}
+    for layer_path, values in grouped.items():
+        targets = kohya_mmdit_targets(layer_path)
+        module = resolve_sd3_transformer_module(layer_path)
+        paths = targets or ((module,) if module is not None else ())
+        for path in paths:
+            if match := _BLOCK_INDEX_RE.match(path):
+                blocks.setdefault(int(match.group(1)), layer_path)
+        if paths and ".attn" in paths[0] and (shape := layer_delta_shape(values)) is not None:
+            widths.add(shape[1])
+    if len(widths) > 1:
+        return f"its attention layers have different widths ({sorted(widths)}); SD 3 Medium and Large are not mixed."
+    depth = SD3_BLOCKS_BY_WIDTH.get(next(iter(widths), 0), max(SD3_BLOCKS_BY_WIDTH.values()))
+    too_deep = [index for index in blocks if index >= depth]
+    if too_deep:
+        return (
+            f"layer {blocks[max(too_deep)]!r} is in block {max(too_deep)}, but the model has {depth} blocks "
+            f"(0-{depth - 1})."
+        )
+    return None
+
+
 def sd3_lora_refusal(state_dict: dict[str | int, Any]) -> str | None:
     """Why an SD 3 LoRA cannot be applied, or ``None`` if every tensor converts.
 
@@ -329,6 +366,9 @@ def sd3_lora_refusal(state_dict: dict[str | int, Any]) -> str | None:
             f"layer {incomplete[0]!r} is incomplete (has {sorted(grouped[incomplete[0]])}); the file is truncated or "
             "was edited."
         )
+    mismatch = _width_or_depth_refusal(grouped)
+    if mismatch is not None:
+        return mismatch
     # A fused qkv is split by rows and a swapped adaLN reorders them; both only work on a low-rank pair's `up`.
     needs_low_rank = [
         path
