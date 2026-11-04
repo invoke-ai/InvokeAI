@@ -64,14 +64,13 @@ export const syncVideoWidgetValuesWithModels = (
     values.references.length &&
     (values.firstFrameImage || values.lastFrameImage)
   );
+  // No catalog reconciliation is safe until the user chooses which conditioning to keep.
+  if (unresolvedLegacyConflict) {
+    return values;
+  }
   // Promote only installed H3 checkpoint overrides before other reconciliation; retain the old Diffusers main as
   // components and drop invalid overrides without evicting it.
-  if (
-    !unresolvedLegacyConflict &&
-    values.model?.base === 'minimax-h3' &&
-    values.model.format === 'diffusers' &&
-    values.h3TransformerModel
-  ) {
+  if (values.model?.base === 'minimax-h3' && values.model.format === 'diffusers' && values.h3TransformerModel) {
     const installedTransformer = models.find((candidate) => candidate.key === values.h3TransformerModel?.key);
 
     if (
@@ -97,15 +96,12 @@ export const syncVideoWidgetValuesWithModels = (
   const registered: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
-      : unresolvedLegacyConflict
-        ? values.model
-        : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
+      : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
   const sameH3 =
     registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
   const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
   const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
-  // Keep the legacy marker until conflicting media is resolved, including across save and reload.
-  const override = unresolvedLegacyConflict || Boolean(sameH3 && effectiveVariant !== detected);
+  const override = Boolean(sameH3 && effectiveVariant !== detected);
   // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
   // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
   const candidate =
@@ -209,12 +205,7 @@ export const syncVideoWidgetValuesWithModels = (
     componentSourceModel: syncComponent('componentSourceModel', base.componentSourceModel),
     h3HybridBaseModel: syncComponent('h3HybridBaseModel', base.h3HybridBaseModel),
     h3TextEncoderModel: syncComponent('h3TextEncoderModel', base.h3TextEncoderModel),
-    // The legacy override cannot be reconciled against Diffusers component slots: it will become the main
-    // model after the user resolves the media conflict. Keep it intact until that promotion can run.
-    h3TransformerModel:
-      unresolvedLegacyConflict && model?.base === 'minimax-h3' && model.format === 'diffusers'
-        ? base.h3TransformerModel
-        : syncComponent('h3TransformerModel', base.h3TransformerModel),
+    h3TransformerModel: syncComponent('h3TransformerModel', base.h3TransformerModel),
     loras,
     ltx2DurationHeadModel: syncComponent('ltx2DurationHeadModel', base.ltx2DurationHeadModel),
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
@@ -222,7 +213,7 @@ export const syncVideoWidgetValuesWithModels = (
     modelKey: model?.key ?? base.modelKey,
     h3ModeOverride: override,
     h3SelectedTask:
-      !unresolvedLegacyConflict && model?.base === 'minimax-h3' && model.format === 'checkpoint'
+      model?.base === 'minimax-h3' && model.format === 'checkpoint'
         ? model.variant === 'ref2va'
           ? 'ref2va'
           : 'fl2va'
@@ -239,13 +230,7 @@ export const syncVideoWidgetValuesWithModels = (
   }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
-  if (
-    next.references.length > 0 &&
-    model &&
-    !sameH3 &&
-    !unresolvedLegacyConflict &&
-    !getVideoModes(model).includes('reference')
-  ) {
+  if (next.references.length > 0 && model && !sameH3 && !getVideoModes(model).includes('reference')) {
     next.references = [];
   }
 

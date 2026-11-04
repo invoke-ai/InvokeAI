@@ -407,6 +407,59 @@ describe('H3 legacy migration', () => {
     expect(before).toEqual(after);
   });
 
+  it('preserves the entire legacy setup until conflict resolution, including unavailable selections', () => {
+    const main = { ...h3Model('checkpoint', 'hybrid-ref'), variant: 'ref2va', pruned: true };
+    const hybrid = { ...h3Model('checkpoint', 'chosen-hybrid'), pruned: true };
+    const components = { ...h3Model('diffusers', 'components'), components_only: true };
+    const encoder = { base: 'minimax-h3', key: 'missing-encoder', name: 'Missing encoder', type: 'qwen3_vl_encoder' };
+    const style = lora('missing-style', 'minimax-h3', null);
+    const catalog = [main, hybrid, components];
+    const legacy = {
+      ...createDefaultVideoWidgetValues(catalog),
+      model: main,
+      modelKey: main.key,
+      componentSourceModel: components,
+      h3HybridBaseModel: hybrid,
+      h3HybridStartBlock: 31,
+      h3TextEncoderModel: encoder,
+      loras: [{ model: style, weight: 0.75, isEnabled: true }],
+      h3ModeOverride: true,
+      h3SelectedTask: undefined,
+      references: [reference],
+      firstFrameImage: image,
+      lastFrameImage: image,
+      steps: 27,
+      cfgScale: 4,
+    };
+    const normalized = normalizeVideoWidgetValues(legacy)!;
+    expect(normalized).toMatchObject(legacy);
+    const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
+    expect(synced).toBe(normalized);
+    expect(synced).toEqual(normalized);
+    const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
+    expect(reloaded).toEqual(normalized);
+    const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
+    expect(resynced).toBe(reloaded);
+    for (const values of [normalized, synced, reloaded, resynced]) {
+      expect(getVideoWidgetValidationReasons(values, catalog)).toContain(
+        'References cannot be combined with first/last frames. Clear one side.'
+      );
+    }
+    const resolved = syncVideoWidgetValuesWithModels(
+      { ...resynced, firstFrameImage: null, lastFrameImage: null },
+      catalog
+    );
+    expect(resolved.h3SelectedTask).toBe('ref2va');
+    // Normal slot reconciliation resumes once the conflict is gone.
+    expect(resolved.h3HybridBaseModel).toBeNull();
+    expect(resolved.h3TextEncoderModel).toBeNull();
+    expect(resolved.loras).toEqual([]);
+    expect(getVideoWidgetValidationReasons(resolved, catalog)).toEqual(
+      expect.arrayContaining([expect.stringContaining('select a single-file Text encoder')])
+    );
+    expect(syncVideoWidgetValuesWithModels(resolved, catalog)).toBe(resolved);
+  });
+
   it('preserves conflicting legacy media and lets validation reject the conflict', () => {
     const model = h3Model('checkpoint', 'conflict');
     const values = {
