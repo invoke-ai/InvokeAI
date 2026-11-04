@@ -26,6 +26,23 @@ import {
 // Shared empty array, so clearing already-clear keys keeps its identity.
 const EMPTY_ACCELERATOR_LORA_KEYS: string[] = [];
 
+// Old override records did not distinguish catalog snapshots from effective synthetic models. Media is
+// conclusive only when it uses one kind of conditioning; otherwise retain the stored model's identity.
+const resolveH3Task = (values: VideoWidgetValues, detected: 'fl2va' | 'ref2va'): 'fl2va' | 'ref2va' => {
+  if (values.h3SelectedTask) {
+    return values.h3SelectedTask;
+  }
+  if (!values.h3ModeOverride) {
+    return detected;
+  }
+  const hasReferences = values.references.length > 0;
+  const hasFrames = Boolean(values.firstFrameImage || values.lastFrameImage);
+  if (hasReferences !== hasFrames) {
+    return hasReferences ? 'ref2va' : 'fl2va';
+  }
+  return values.model?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+};
+
 export const createDefaultVideoWidgetValues = (models: readonly ModelConfig[] = []): VideoWidgetValues => {
   const model = (models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null;
 
@@ -72,18 +89,7 @@ export const syncVideoWidgetValuesWithModels = (
   const sameH3 =
     registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
   const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
-  // Legacy records may contain either the classified model or the already-effective synthetic model.
-  const storedTask = values.model?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
-  const effectiveVariant = sameH3
-    ? (values.h3SelectedTask ??
-      (values.h3ModeOverride
-        ? storedTask !== detected
-          ? storedTask
-          : detected === 'ref2va'
-            ? 'fl2va'
-            : 'ref2va'
-        : detected))
-    : detected;
+  const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
   const override = Boolean(sameH3 && effectiveVariant !== detected);
   // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
   // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
@@ -213,7 +219,7 @@ export const syncVideoWidgetValuesWithModels = (
   }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
-  if (next.references.length > 0 && model && !getVideoModes(model).includes('reference')) {
+  if (next.references.length > 0 && model && !sameH3 && !getVideoModes(model).includes('reference')) {
     next.references = [];
   }
 
@@ -259,15 +265,7 @@ export const getVideoWidgetValidationReasons = (
     source.base === 'minimax-h3' && source.format === 'checkpoint'
       ? {
           ...source,
-          variant:
-            values.h3SelectedTask ??
-            (registered && values.h3ModeOverride
-              ? source.variant === 'ref2va'
-                ? 'fl2va'
-                : 'ref2va'
-              : source.variant === 'ref2va'
-                ? 'ref2va'
-                : 'fl2va'),
+          variant: resolveH3Task(values, source.variant === 'ref2va' ? 'ref2va' : 'fl2va'),
         }
       : source;
   const reasons = getVideoValidationReasons(effectiveModel, values);
