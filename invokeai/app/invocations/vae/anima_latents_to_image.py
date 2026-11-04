@@ -28,6 +28,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
@@ -187,13 +188,15 @@ class AnimaLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                     decoded = decoded.squeeze(2)
                 img = decoded
 
+            raster = precise_signed_decode_raster(context, img)
+
             img = img.clamp(-1, 1)
             img = rearrange(img[0], "c h w -> h w c")
             img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
 
         TorchDevice.empty_cache()
 
-        image_dto = context.images.save(image=img_pil)
+        image_dto = save_decoded_image(context, img_pil, raster)
         return ImageOutput.build(image_dto)
 
     def _recover_nonfinite_decode(

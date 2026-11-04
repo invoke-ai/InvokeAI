@@ -23,7 +23,7 @@ def precise_decode_raster(context: InvocationContext, unit_image: torch.Tensor) 
 
     None when precise storage is disabled, and (with a warning) when the first sample is not finite: such an output
     (e.g. SDXL fp16 overflow) used to save a black image and must not start failing. Call it before the device tensors
-    are released; the finiteness check runs on their device.
+    are released; the finiteness check runs where the tensor lives.
     """
     if not context.images.precise_storage_enabled:
         return None
@@ -33,6 +33,20 @@ def precise_decode_raster(context: InvocationContext, unit_image: torch.Tensor) 
             "Precise image storage skipped: the VAE decoder output is not finite; saving the ordinary 8-bit image."
         )
     return raster
+
+
+def precise_signed_decode_raster(context: InvocationContext, decoded: torch.Tensor) -> RasterImage | None:
+    """`precise_decode_raster` for a decoder whose output is in [-1, 1]: the first sample mapped to unit range.
+
+    The sample is copied to the host and widened there, so the precise path allocates no device memory and never
+    touches `decoded`, which the legacy quantizer still reads. It is widened before `+ 1.0`: a bf16 or fp16
+    sum rounds away the precision this path exists to keep. The result is not clamped.
+    """
+    if not context.images.precise_storage_enabled:
+        return None
+    unit = decoded[0].to("cpu", torch.float32, copy=True)
+    unit.add_(1.0).div_(2)
+    return precise_decode_raster(context, unit)
 
 
 def save_decoded_image(context: InvocationContext, legacy: PILImage, raster: RasterImage | None) -> ImageDTO:

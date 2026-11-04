@@ -21,6 +21,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ernie_image.sampling_utils import unpatchify_latents, vae_denormalize
 from invokeai.backend.util.devices import TorchDevice
@@ -60,10 +61,12 @@ class ErnieImageVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             latents = unpatchify_latents(latents)
             decoded = vae.decode(latents, return_dict=False)[0]
 
+        raster = precise_signed_decode_raster(context, decoded)
+
         img = (decoded / 2 + 0.5).clamp(0, 1)
         img = rearrange(img[0], "c h w -> h w c")
         img_np = (img * 255).byte().cpu().numpy()
         img_pil = Image.fromarray(img_np, mode="RGB")
 
-        image_dto = context.images.save(image=img_pil)
+        image_dto = save_decoded_image(context, img_pil, raster)
         return ImageOutput.build(image_dto)

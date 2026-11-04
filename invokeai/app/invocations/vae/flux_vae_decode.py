@@ -14,7 +14,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
-from invokeai.app.invocations.vae.precise_io import precise_decode_raster, save_decoded_image
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.model_manager.load.load_base import LoadedModel
@@ -146,14 +146,7 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
                 with scoped_vae_tiling(vae, 0):
                     img = decode()
 
-        raster = None
-        if context.images.precise_storage_enabled:
-            # Widen before adding: a bf16 `img + 1.0` rounds away the precision the precise path exists to keep.
-            # `copy=True` keeps `img` intact for the legacy image below, also for an fp32 VAE.
-            unit = img[0].to(torch.float32, copy=True)
-            unit.add_(1.0).div_(2)
-            raster = precise_decode_raster(context, unit)
-            del unit
+        raster = precise_signed_decode_raster(context, img)
 
         img = img.clamp(-1, 1)
         img = rearrange(img[0], "c h w -> h w c")  # noqa: F821

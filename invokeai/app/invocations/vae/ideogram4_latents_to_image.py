@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
+from invokeai.app.invocations.vae.precise_io import precise_signed_decode_raster, save_decoded_image
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ideogram4.autoencoder import AutoEncoder
 from invokeai.backend.ideogram4.latent_norm import get_latent_norm
@@ -87,10 +88,12 @@ class Ideogram4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
             TorchDevice.empty_cache()
             decoded = _decode(vae, z.to(vae_dtype))
 
+            raster = precise_signed_decode_raster(context, decoded)
+
             img = decoded.float().clamp(-1.0, 1.0)
             img = rearrange(img[0], "c h w -> h w c")
             img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
 
         TorchDevice.empty_cache()
-        image_dto = context.images.save(image=img_pil)
+        image_dto = save_decoded_image(context, img_pil, raster)
         return ImageOutput.build(image_dto)

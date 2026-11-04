@@ -88,6 +88,7 @@ def _context(
     # Explicit: a bare MagicMock attribute reads as truthy and would tile everything.
     context.config.get.return_value.force_tiled_decode = force_tiled_decode
     context.config.get.return_value.auto_tiled_decode = auto_tiled_decode
+    context.images.precise_storage_enabled = False
     context.tensors.save.return_value = "latents"
     context.tensors.load.return_value = latents
     context.images.save.side_effect = lambda image: MagicMock(
@@ -100,7 +101,7 @@ def _encode(context, image: torch.Tensor, **fields) -> torch.Tensor:
     invocation = Flux2VaeEncodeInvocation.model_construct(
         image=MagicMock(image_name="in.png"), vae=MagicMock(vae=MagicMock()), **fields
     )
-    with patch(f"{ENCODE_MODULE}.image_resized_to_grid_as_tensor", return_value=image[0]):
+    with patch(f"{ENCODE_MODULE}.load_image_as_grid_tensor", return_value=image[0]):
         invocation.invoke(context)
     return context.tensors.save.call_args.kwargs["tensor"]
 
