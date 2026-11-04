@@ -209,7 +209,12 @@ export const syncVideoWidgetValuesWithModels = (
     componentSourceModel: syncComponent('componentSourceModel', base.componentSourceModel),
     h3HybridBaseModel: syncComponent('h3HybridBaseModel', base.h3HybridBaseModel),
     h3TextEncoderModel: syncComponent('h3TextEncoderModel', base.h3TextEncoderModel),
-    h3TransformerModel: syncComponent('h3TransformerModel', base.h3TransformerModel),
+    // The legacy override cannot be reconciled against Diffusers component slots: it will become the main
+    // model after the user resolves the media conflict. Keep it intact until that promotion can run.
+    h3TransformerModel:
+      unresolvedLegacyConflict && model?.base === 'minimax-h3' && model.format === 'diffusers'
+        ? base.h3TransformerModel
+        : syncComponent('h3TransformerModel', base.h3TransformerModel),
     loras,
     ltx2DurationHeadModel: syncComponent('ltx2DurationHeadModel', base.ltx2DurationHeadModel),
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),

@@ -486,6 +486,65 @@ describe('H3 legacy migration', () => {
     }
   );
 
+  it.each(['frames', 'references'] as const)(
+    'preserves an installed legacy transformer with a missing Diffusers main until resolving to %s',
+    (keep) => {
+      const main = h3Model('diffusers', 'missing-main');
+      const transformer = h3Model('checkpoint', 'installed-transformer');
+      const catalog = [transformer];
+      const legacy = {
+        ...createDefaultVideoWidgetValues([main]),
+        model: main,
+        modelKey: main.key,
+        h3TransformerModel: transformer,
+        h3ModeOverride: true,
+        h3SelectedTask: undefined,
+        references: [reference],
+        firstFrameImage: image,
+        lastFrameImage: image,
+        steps: 27,
+        cfgScale: 4,
+      };
+      const normalized = normalizeVideoWidgetValues(legacy)!;
+      const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
+      const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
+      const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
+      for (const values of [normalized, synced, reloaded, resynced]) {
+        expect(values).toMatchObject({
+          model: main,
+          modelKey: main.key,
+          h3TransformerModel: transformer,
+          h3ModeOverride: true,
+          references: [reference],
+          firstFrameImage: image,
+          lastFrameImage: image,
+          steps: 27,
+          cfgScale: 4,
+        });
+        expect(values.h3SelectedTask).toBeUndefined();
+        expect(getVideoWidgetValidationReasons(values, catalog)).toEqual(
+          expect.arrayContaining([expect.stringContaining('no longer installed')])
+        );
+      }
+      expect(syncVideoWidgetValuesWithModels(resynced, catalog)).toBe(resynced);
+      const resolved = syncVideoWidgetValuesWithModels(
+        keep === 'frames'
+          ? { ...resynced, references: [] }
+          : { ...resynced, firstFrameImage: null, lastFrameImage: null },
+        catalog
+      );
+      expect(resolved.model?.key).toBe(transformer.key);
+      expect(resolved.modelKey).toBe(transformer.key);
+      expect(resolved.h3TransformerModel).toBeNull();
+      expect(resolved.h3SelectedTask).toBe(keep === 'frames' ? 'fl2va' : 'ref2va');
+      expect(resolved.references).toEqual(keep === 'frames' ? [] : [reference]);
+      expect(resolved.firstFrameImage).toEqual(keep === 'frames' ? image : null);
+      expect(resolved.lastFrameImage).toEqual(keep === 'frames' ? image : null);
+      expect(resolved.steps).toBe(27);
+      expect(resolved.cfgScale).toBe(4);
+    }
+  );
+
   it('honors explicit modern selection even when media suggests another task', () => {
     const model = h3Model('checkpoint', 'modern');
     const values = {
