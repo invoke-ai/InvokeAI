@@ -133,9 +133,10 @@ control image.
 
 ## Regional prompting
 
-Z-Image supports **Regional Guidance** layers on the Canvas with positive and negative prompts, together
-with a control layer if you like. **Auto-Negative** uses the region's positive prompt as a negative outside
-its mask. Regional negatives and auto-negative take effect only when **CFG Scale** is above 1; Turbo's
+Z-Image supports **Regional Guidance** layers on the Canvas with positive and negative prompts, together with
+a control layer if you like. The global positive prompt covers the area outside the regions, while the global
+negative prompt applies to the whole image. **Auto-Negative** uses the region's positive prompt as a negative
+outside its mask. Regional negatives and auto-negative take effect only when **CFG Scale** is above 1; Turbo's
 default CFG 1 ignores them. Regional reference images are not supported.
 
 In the workflow editor, **Prompt - Z-Image** takes an optional mask, and **Denoise - Z-Image** accepts

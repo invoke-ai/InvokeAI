@@ -20,7 +20,7 @@ from typing import Optional
 import torch
 import torchvision
 
-from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning, AnimaTextConditioning
+from invokeai.backend.anima.conditioning_data import AnimaRegionalTextConditioning
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.mask import to_standard_float_mask
 
@@ -41,36 +41,25 @@ class AnimaRegionalPromptingExtension:
         self.regional_text_conditioning = regional_text_conditioning
         self.cross_attn_mask = cross_attn_mask
 
-    @staticmethod
-    def estimate_mask_bytes(
-        positive: list[AnimaTextConditioning],
-        negative: list[AnimaTextConditioning],
-        img_seq_len: int,
-        dtype: torch.dtype,
-    ) -> int:
-        """Both resident boolean masks plus the larger construction/SDPA additive-bias transient."""
-        # preprocess_text_embeds pads each context to at least 512 T5 tokens.
-        mask_sizes = [
-            img_seq_len * sum(max(512, tc.t5xxl_ids.numel()) for tc in conditionings)
-            for conditionings in (positive, negative)
-            if any(tc.mask is not None for tc in conditionings)
-        ]
-        scratch_element_size = max(torch.float16.itemsize, dtype.itemsize)
-        return sum(mask_sizes) + max(mask_sizes, default=0) * scratch_element_size
-
     @classmethod
     def from_regional_conditioning(
         cls,
         regional_text_conditioning: AnimaRegionalTextConditioning,
         img_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> "AnimaRegionalPromptingExtension":
         """Create extension from pre-processed regional conditioning.
 
         Args:
             regional_text_conditioning: Regional conditioning with concatenated context and masks.
             img_seq_len: Number of image tokens (H_patches * W_patches).
+            unmasked_covers_whole_image: Let unmasked conditionings reach every image token instead of only the
+                background. Set for the negative pass, whose global negative must stay image-wide.
         """
-        cross_attn_mask = cls._prepare_cross_attn_mask(regional_text_conditioning, img_seq_len)
+        cross_attn_mask = cls._prepare_cross_attn_mask(
+            regional_text_conditioning, img_seq_len, unmasked_covers_whole_image=unmasked_covers_whole_image
+        )
         return cls(
             regional_text_conditioning=regional_text_conditioning,
             cross_attn_mask=cross_attn_mask,
@@ -81,16 +70,21 @@ class AnimaRegionalPromptingExtension:
         cls,
         regional_text_conditioning: AnimaRegionalTextConditioning,
         img_seq_len: int,
+        *,
+        unmasked_covers_whole_image: bool = False,
     ) -> torch.Tensor | None:
         """Prepare a cross-attention mask for regional prompting.
 
         The mask shape is (img_seq_len, context_seq_len) where:
         - Each image token can attend to context tokens from its assigned region
-        - Global prompts (mask=None) attend to background regions
+        - Global prompts (mask=None) attend to background regions, or to every image token when
+          `unmasked_covers_whole_image` is set
+        - Image tokens no conditioning reaches attend to all context tokens, as on the unmasked blocks
 
         Args:
             regional_text_conditioning: The regional text conditioning data.
             img_seq_len: Number of image tokens.
+            unmasked_covers_whole_image: Let unmasked conditionings reach every image token.
 
         Returns:
             Cross-attention mask of shape (img_seq_len, context_seq_len), or None
@@ -128,15 +122,16 @@ class AnimaRegionalPromptingExtension:
                 # Regional prompt: only masked image tokens attend to this region's context
                 mask_flat = image_mask.view(img_seq_len)
                 cross_attn_mask[:, ctx_start:ctx_end] = mask_flat.view(img_seq_len, 1)
+            elif unmasked_covers_whole_image or background_region_mask is None:
+                cross_attn_mask[:, ctx_start:ctx_end] = 1.0
             else:
                 # Global prompt: background image tokens attend to this context
-                if background_region_mask is not None:
-                    cross_attn_mask[:, ctx_start:ctx_end] = background_region_mask.view(img_seq_len, 1)
-                else:
-                    cross_attn_mask[:, ctx_start:ctx_end] = 1.0
+                cross_attn_mask[:, ctx_start:ctx_end] = background_region_mask.view(img_seq_len, 1)
 
-        # Convert to boolean
         cross_attn_mask = cross_attn_mask > 0.5
+        # A list of only masked conditionings leaves uncovered image tokens with no allowed context token, where
+        # SDPA returns NaN. Leave those tokens unrestricted.
+        cross_attn_mask |= ~cross_attn_mask.any(dim=1, keepdim=True)
         return cross_attn_mask
 
     @staticmethod

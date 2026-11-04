@@ -309,9 +309,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
                 dtype=inference_dtype,
                 device=device,
             )
+            # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
             negative_regional_extension = ZImageRegionalPromptingExtension.from_text_conditionings(
                 text_conditionings=neg_text_conditionings,
                 img_seq_len=img_seq_len,
+                unmasked_covers_whole_image=True,
             )
             neg_prompt_embeds = negative_regional_extension.regional_text_conditioning.prompt_embeds
 

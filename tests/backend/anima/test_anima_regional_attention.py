@@ -71,21 +71,53 @@ def test_restores_already_patched_blocks_when_installation_fails() -> None:
     assert state.cross_attn_mask is None
 
 
-def test_masked_only_conditioning_leaves_uncovered_queries_finite(monkeypatch) -> None:
+@pytest.fixture
+def _masks_on_cpu(monkeypatch) -> None:
     monkeypatch.setattr(
         "invokeai.backend.anima.regional_prompting.TorchDevice.choose_torch_device", lambda: torch.device("cpu")
     )
+
+
+@pytest.mark.usefixtures("_masks_on_cpu")
+def test_unmasked_conditioning_covers_the_whole_image_only_in_negative_mode() -> None:
+    # Context: [global token, region token]; image: [region token, background token].
     conditioning = AnimaRegionalTextConditioning(
-        context_embeds=torch.tensor([[2.0, 4.0]]),
-        image_masks=[torch.tensor([[[1.0, 0.0]]])],
-        context_ranges=[Range(start=0, end=1)],
+        context_embeds=torch.zeros(2, 2),
+        image_masks=[None, torch.tensor([[[1.0, 0.0]]])],
+        context_ranges=[Range(start=0, end=1), Range(start=1, end=2)],
     )
-    extension = AnimaRegionalPromptingExtension.from_regional_conditioning(conditioning, img_seq_len=2)
+    positive = AnimaRegionalPromptingExtension.from_regional_conditioning(conditioning, img_seq_len=2)
+    negative = AnimaRegionalPromptingExtension.from_regional_conditioning(
+        conditioning, img_seq_len=2, unmasked_covers_whole_image=True
+    )
+    assert torch.equal(positive.cross_attn_mask, torch.tensor([[False, True], [True, False]]))
+    assert torch.equal(negative.cross_attn_mask, torch.tensor([[True, True], [True, False]]))
+
+    global_only = AnimaRegionalTextConditioning(
+        context_embeds=torch.zeros(1, 2), image_masks=[None], context_ranges=[Range(start=0, end=1)]
+    )
+    unrestricted = AnimaRegionalPromptingExtension.from_regional_conditioning(
+        global_only, img_seq_len=2, unmasked_covers_whole_image=True
+    )
+    assert unrestricted.cross_attn_mask is None
+
+
+@pytest.mark.usefixtures("_masks_on_cpu")
+def test_image_tokens_outside_every_region_of_a_masked_only_list_attend_all_context() -> None:
+    conditioning = AnimaRegionalTextConditioning(
+        context_embeds=torch.tensor([[2.0, 0.0], [0.0, 4.0]]),
+        image_masks=[torch.tensor([[[1.0, 0.0, 0.0]]]), torch.tensor([[[0.0, 1.0, 0.0]]])],
+        context_ranges=[Range(start=0, end=1), Range(start=1, end=2)],
+    )
+    extension = AnimaRegionalPromptingExtension.from_regional_conditioning(conditioning, img_seq_len=3)
+    assert torch.equal(extension.cross_attn_mask, torch.tensor([[True, False], [False, True], [True, True]]))
+
     state = AnimaRegionalPromptingState(extension.cross_attn_mask)
     attention = _attention()
     with patch_anima_for_regional_prompting(SimpleNamespace(blocks=[SimpleNamespace(cross_attn=attention)]), state):
-        output = attention(torch.zeros(1, 2, 2), conditioning.context_embeds.unsqueeze(0))
-    torch.testing.assert_close(output, torch.tensor([[[2.0, 4.0], [0.0, 0.0]]]))
+        output = attention(torch.zeros(1, 3, 2), conditioning.context_embeds.unsqueeze(0))
+    assert not output.isnan().any()
+    torch.testing.assert_close(output, torch.tensor([[[2.0, 0.0], [0.0, 4.0], [1.0, 2.0]]]))
 
 
 def test_boolean_mask_matches_additive_bias_attention(monkeypatch) -> None:

@@ -30,6 +30,7 @@ class _Transformer(torch.nn.Module):
         self.blocks[0].cross_attn = attention
         self.original_forward = attention.forward
         self.outputs: list[torch.Tensor] = []
+        self.patched: list[bool] = []
         self.adapter_timesteps: list[torch.Tensor | None] = []
 
     def preprocess_text_embeds(self, text_embeds, text_ids, **kwargs):
@@ -37,6 +38,7 @@ class _Transformer(torch.nn.Module):
         return text_embeds
 
     def forward(self, x, context, **kwargs):
+        self.patched.append(self.blocks[0].cross_attn.forward != self.original_forward)
         output = self.blocks[0].cross_attn(torch.zeros(1, 2, 2), context)
         self.outputs.append(output.detach())
         if self.fail:
@@ -51,7 +53,6 @@ class _Loaded:
 
     @contextmanager
     def model_on_device(self, **kwargs):
-        self.model.working_mem_bytes = kwargs["working_mem_bytes"]
         yield None, self.model
 
 
@@ -115,12 +116,19 @@ def _run(
     return transformer
 
 
+def _expected_negative(negative_tokens: int = 1) -> torch.Tensor:
+    """The global negative stays image-wide: the region token averages it with its `negative_tokens` copies."""
+    region_token = [-1.0 / (1 + negative_tokens), -2.0 * negative_tokens / (1 + negative_tokens)]
+    return torch.tensor([[[-1.0, 0.0], region_token]])
+
+
 @pytest.mark.parametrize("scheduler", ["euler", "heun"])
 @pytest.mark.parametrize("negative_tokens", [1, 3], ids=["equal-context-length", "different-context-length"])
 def test_each_cfg_pass_uses_its_own_regions(monkeypatch, scheduler, negative_tokens) -> None:
     transformer = _run(monkeypatch, scheduler=scheduler, negative_tokens=negative_tokens)
+    # The positive pass's global prompt yields the region to the regional prompt.
     expected_pos = torch.tensor([[[0.0, 2.0], [1.0, 0.0]]])
-    expected_neg = torch.tensor([[[-1.0, 0.0], [0.0, -2.0]]])
+    expected_neg = _expected_negative(negative_tokens)
     for positive, negative in zip(transformer.outputs[::2], transformer.outputs[1::2], strict=True):
         torch.testing.assert_close(positive, expected_pos)
         torch.testing.assert_close(negative, expected_neg)
@@ -132,10 +140,12 @@ def test_a_global_branch_is_unmasked_even_when_the_other_branch_has_regions(
 ) -> None:
     transformer = _run(monkeypatch, positive_region=positive_region, negative_region=negative_region)
     expected_pos = [[[0.0, 2.0], [1.0, 0.0]]] if positive_region else [[[1.0, 0.0], [1.0, 0.0]]]
-    expected_neg = [[[-1.0, 0.0], [0.0, -2.0]]] if negative_region else [[[-1.0, 0.0], [-1.0, 0.0]]]
+    expected_neg = _expected_negative() if negative_region else torch.tensor([[[-1.0, 0.0], [-1.0, 0.0]]])
     for positive, negative in zip(transformer.outputs[::2], transformer.outputs[1::2], strict=True):
         torch.testing.assert_close(positive, torch.tensor(expected_pos))
-        torch.testing.assert_close(negative, torch.tensor(expected_neg))
+        torch.testing.assert_close(negative, expected_neg)
+    # Without any regional mask the cross-attention stays the original, unpatched forward.
+    assert set(transformer.patched) == {positive_region or negative_region}
 
 
 def test_cfg_off_ignores_negative_regions(monkeypatch) -> None:
@@ -154,7 +164,7 @@ def test_connector_rebuilds_every_region_on_both_sides_at_each_sigma(monkeypatch
             assert timestep is not None and timestep.dtype == torch.float32
             assert timestep.item() == pytest.approx(sigmas[step])
     for output in transformer.outputs[1::2]:
-        torch.testing.assert_close(output, torch.tensor([[[-1.0, 0.0], [0.0, -2.0]]]))
+        torch.testing.assert_close(output, _expected_negative())
 
 
 def test_transformer_failure_restores_regional_patches(monkeypatch) -> None:
@@ -162,13 +172,3 @@ def test_transformer_failure_restores_regional_patches(monkeypatch) -> None:
     with pytest.raises(RuntimeError, match="transformer failed"):
         _run(monkeypatch, transformer=transformer)
     assert transformer.blocks[0].cross_attn.forward == transformer.original_forward
-
-
-@pytest.mark.parametrize("negative_tokens", [1, 700])
-def test_reserves_both_masks_and_the_larger_pass_transient(monkeypatch, negative_tokens) -> None:
-    transformer = _run(monkeypatch, negative_tokens=negative_tokens)
-    # Two image tokens; each prompt pads to 512 context tokens unless its T5 sequence is longer.
-    positive_mask_bytes = 2 * (512 + 512)
-    negative_mask_bytes = 2 * (512 + max(512, negative_tokens))
-    expected = positive_mask_bytes + negative_mask_bytes + negative_mask_bytes * 4
-    assert transformer.working_mem_bytes == expected

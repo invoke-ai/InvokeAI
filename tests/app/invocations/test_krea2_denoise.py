@@ -650,6 +650,39 @@ def test_run_diffusion_sizes_regional_masks_per_pass_when_cfg_lengths_differ(mon
         assert mask.shape == (sequence_length, sequence_length)
 
 
+def test_run_diffusion_keeps_the_global_negative_image_wide_beside_negative_regions(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    def with_left_half(name: str) -> list[Krea2ConditioningField]:
+        return [
+            Krea2ConditioningField(conditioning_name=name),
+            Krea2ConditioningField(conditioning_name=name, mask=TensorField(tensor_name="left-half")),
+        ]
+
+    invocation = _runtime_invocation(cfg_scale=2.0, negative_conditioning=with_left_half("negative"))
+    invocation.positive_conditioning = with_left_half("positive")
+    # A 2x2 token grid, so the left-half region leaves a background beside it.
+    invocation.width = invocation.height = 32
+    context = _runtime_context(tmp_path, transformer)
+    left_half = torch.zeros(1, 32, 32)
+    left_half[..., :16] = 1
+    load_tensor = context.tensors.load
+    context.tensors = SimpleNamespace(load=lambda name: left_half if name == "left-half" else load_tensor(name))
+
+    invocation._run_diffusion(context)
+
+    positive_mask, negative_mask = transformer.regional_attention_masks[:2]
+    # Sequence: [global text (2), regional text (2), image tokens (4)].
+    global_text, image = slice(0, 2), slice(4, 8)
+    background = torch.tensor([False, True, False, True])
+    assert torch.equal(positive_mask[global_text, image], background.expand(2, 4))
+    assert torch.equal(positive_mask[image, global_text], background[:, None].expand(4, 2))
+    assert negative_mask[global_text, image].all() and negative_mask[image, global_text].all()
+    for mask in (positive_mask, negative_mask):
+        assert torch.equal(mask[2:4, image], (~background).expand(2, 4))
+
+
 def test_run_diffusion_releases_regional_mask_when_transformer_raises(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
 

@@ -769,14 +769,11 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         with ExitStack() as exit_stack:
             # A GGUF or int8_tensorwise build dequantizes each quantized Linear per forward, a transient its
-            # resident size does not cover. Reserve it alongside the regional masks; the cache floors this
-            # request at `device_working_mem_gb` because the node has no full activation estimate.
+            # resident size does not cover. Passed alone because this node has no activation estimate, so the
+            # cache floors it at `device_working_mem_gb`; zero for other builds. Read from the unlocked model.
             (cached_weights, transformer) = exit_stack.enter_context(
                 transformer_info.model_on_device(
                     working_mem_bytes=peak_dequant_transient_bytes(transformer_info.model, inference_dtype)
-                    + AnimaRegionalPromptingExtension.estimate_mask_bytes(
-                        pos_text_conditionings, neg_text_conditionings or [], img_seq_len, inference_dtype
-                    )
                 )
             )
             # Asked of the loaded module tree as well as the format: an int8_tensorwise checkpoint keeps its
@@ -882,7 +879,10 @@ class AnimaDenoiseInvocation(BaseInvocation):
                 pos_regional, img_seq_len
             ).cross_attn_mask
             neg_mask = (
-                AnimaRegionalPromptingExtension.from_regional_conditioning(neg_regional, img_seq_len).cross_attn_mask
+                # The global negative stays image-wide; only the positive pass's unmasked prompt yields to regions.
+                AnimaRegionalPromptingExtension.from_regional_conditioning(
+                    neg_regional, img_seq_len, unmasked_covers_whole_image=True
+                ).cross_attn_mask
                 if neg_regional is not None
                 else None
             )

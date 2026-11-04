@@ -16,6 +16,8 @@ from invokeai.app.invocations.fields import TensorField, ZImageConditioningField
 from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, ZImageConditioningInfo
+from invokeai.backend.z_image.extensions.regional_prompting_extension import ZImageRegionalPromptingExtension
+from invokeai.backend.z_image.text_conditioning import ZImageTextConditioning
 from invokeai.backend.z_image.z_image_transformer_patch import patch_transformer_for_regional_prompting
 
 LATENT_SIDE = 16  # 8x8 = 64 image tokens after the 2x2 patch, already a multiple of 32
@@ -116,15 +118,31 @@ def test_negative_only_regions_leave_positive_unmasked_and_restore_on_failure(ti
     torch.testing.assert_close(_forward(model, x, t, negative), plain_negative)
 
 
-@torch.no_grad()
-@pytest.mark.parametrize("scheduler", ["euler", "heun"])
-@pytest.mark.parametrize("guidance_scale", [1.0, 2.0])
-def test_denoise_consumes_negative_masks_only_with_cfg(
-    tiny_z_image_transformer, monkeypatch, scheduler: str, guidance_scale: float
-) -> None:
-    """Run both solvers through loading, regional attention and CFG with a real tiny transformer."""
-    model = tiny_z_image_transformer
-    original_forward = model.forward
+def test_unmasked_text_covers_the_whole_image_only_in_negative_mode(monkeypatch) -> None:
+    monkeypatch.setattr("invokeai.backend.util.devices.TorchDevice.choose_torch_device", lambda: torch.device("cpu"))
+    # Sequence: [region image token, background image token, global text, regional text].
+    conditionings = [
+        ZImageTextConditioning(prompt_embeds=torch.zeros(1, 4), mask=None),
+        ZImageTextConditioning(prompt_embeds=torch.zeros(1, 4), mask=torch.tensor([[[1.0, 0.0]]])),
+    ]
+    positive = ZImageRegionalPromptingExtension.from_text_conditionings(conditionings, img_seq_len=2)
+    negative = ZImageRegionalPromptingExtension.from_text_conditionings(
+        conditionings, img_seq_len=2, unmasked_covers_whole_image=True
+    )
+    global_text, regional_text = 2, 3
+    assert positive.regional_attn_mask is not None and negative.regional_attn_mask is not None
+    assert positive.regional_attn_mask[:2, global_text].tolist() == [False, True]
+    assert positive.regional_attn_mask[global_text, :2].tolist() == [False, True]
+    assert negative.regional_attn_mask[:2, global_text].tolist() == [True, True]
+    assert negative.regional_attn_mask[global_text, :2].tolist() == [True, True]
+    # Regional text keeps its region in both modes.
+    for extension in (positive, negative):
+        assert extension.regional_attn_mask[:2, regional_text].tolist() == [True, False]
+        assert extension.regional_attn_mask[regional_text, :2].tolist() == [True, False]
+
+
+def _regional_denoise(model, monkeypatch, *, guidance_scale: float, scheduler: str = "euler"):
+    """A denoise node on the tiny transformer, whose "region" tensor masks the left half of the image."""
     transformer_info = MagicMock(model=model)
     transformer_info.model_on_device.side_effect = lambda **kwargs: nullcontext((None, model))
     context = MagicMock()
@@ -160,10 +178,42 @@ def test_denoise_consumes_negative_masks_only_with_cfg(
         seed=0,
         scheduler=scheduler,
     )
-    plain = node._run_diffusion(context)
-    node.negative_conditioning = ZImageConditioningField(
-        conditioning_name="negative", mask=TensorField(tensor_name="region")
+    return node, context
+
+
+def _global_and_left_half(name: str) -> list[ZImageConditioningField]:
+    return [
+        ZImageConditioningField(conditioning_name=name),
+        ZImageConditioningField(conditioning_name=name, mask=TensorField(tensor_name="region")),
+    ]
+
+
+def _record_patches(monkeypatch) -> list[dict]:
+    patches: list[dict] = []
+
+    def record_patch(**kwargs):
+        patches.append(kwargs)
+        return patch_transformer_for_regional_prompting(**kwargs)
+
+    monkeypatch.setattr(
+        "invokeai.app.invocations.z_image.z_image_denoise.patch_transformer_for_regional_prompting", record_patch
     )
+    return patches
+
+
+@torch.no_grad()
+@pytest.mark.parametrize("scheduler", ["euler", "heun"])
+@pytest.mark.parametrize("guidance_scale", [1.0, 2.0])
+def test_denoise_consumes_negative_masks_only_with_cfg(
+    tiny_z_image_transformer, monkeypatch, scheduler: str, guidance_scale: float
+) -> None:
+    """Run both solvers through loading, regional attention and CFG with a real tiny transformer."""
+    model = tiny_z_image_transformer
+    original_forward = model.forward
+    node, context = _regional_denoise(model, monkeypatch, guidance_scale=guidance_scale, scheduler=scheduler)
+    plain = node._run_diffusion(context)
+    node.negative_conditioning = _global_and_left_half("negative")
+    patches = _record_patches(monkeypatch)
     regional = node._run_diffusion(context)
 
     assert model.forward == original_forward
@@ -173,3 +223,23 @@ def test_denoise_consumes_negative_masks_only_with_cfg(
         context.tensors.load.assert_not_called()
     else:
         assert not torch.allclose(regional, plain, atol=1e-3)
+        # The global negative stays image-wide while the regional negative keeps to its region.
+        negative_mask = patches[0]["negative_regional_attn_mask"]
+        global_text = slice(IMAGE_TOKENS, IMAGE_TOKENS + 20)
+        assert negative_mask[:IMAGE_TOKENS, global_text].all() and negative_mask[global_text, :IMAGE_TOKENS].all()
+        assert not negative_mask[:IMAGE_TOKENS, IMAGE_TOKENS + 20 :].all()
+
+
+@torch.no_grad()
+def test_denoise_keeps_the_global_positive_prompt_on_the_background(tiny_z_image_transformer, monkeypatch) -> None:
+    node, context = _regional_denoise(tiny_z_image_transformer, monkeypatch, guidance_scale=1.0)
+    node.positive_conditioning = _global_and_left_half("positive")
+    patches = _record_patches(monkeypatch)
+    node._run_diffusion(context)
+
+    positive_mask = patches[0]["regional_attn_mask"]
+    # 8x8 token grid, row-major: the region holds columns 0-3 of every row, the background columns 4-7.
+    background = torch.tensor([False, False, False, False, True, True, True, True]).repeat(8)
+    global_text = slice(IMAGE_TOKENS, IMAGE_TOKENS + 20)
+    assert torch.equal(positive_mask[:IMAGE_TOKENS, global_text], background[:, None].expand(IMAGE_TOKENS, 20))
+    assert torch.equal(positive_mask[global_text, :IMAGE_TOKENS], background[None, :].expand(20, IMAGE_TOKENS))
