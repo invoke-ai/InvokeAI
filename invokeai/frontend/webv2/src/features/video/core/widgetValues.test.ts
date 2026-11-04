@@ -273,3 +273,48 @@ describe('resolveVideoSeed', () => {
     expect(randomized).toBeGreaterThanOrEqual(0);
   });
 });
+
+describe('H3 per-job mode override', () => {
+  it('uses the opposite effective variant without changing the catalog and resets on model replacement', () => {
+    const checkpoint = h3Model('checkpoint', 'hybrid');
+    const other = h3Model('checkpoint', 'other');
+    const source = h3Model();
+    const catalog = [checkpoint, source];
+    const base = createDefaultVideoWidgetValues(catalog);
+    const changed = syncVideoWidgetValuesWithModels({ ...base, h3ModeOverride: true }, catalog);
+    expect(checkpoint.variant).toBe('fl2va');
+    expect(changed.model?.variant).toBe('ref2va');
+    expect(changed.h3ModeOverride).toBe(true);
+    expect(syncVideoWidgetValuesWithModels(changed, catalog)).toBe(changed);
+    const refreshed = syncVideoWidgetValuesWithModels(changed, [
+      { ...checkpoint, name: 'Renamed model', hash: 'newhash' },
+      source,
+    ]);
+    expect(refreshed.model).toMatchObject({ name: 'Renamed model', hash: 'newhash', variant: 'ref2va' });
+    const replaced = syncVideoWidgetValuesWithModels(changed, [other, source]);
+    expect(replaced.model?.key).toBe(other.key);
+    expect(replaced.model?.variant).toBe('fl2va');
+    expect(replaced.h3ModeOverride).toBe(false);
+  });
+});
+
+describe('H3 override queue readiness', () => {
+  it('validates persisted classified FL2VA as Ref2VA when override is selected', () => {
+    const model = h3Model('checkpoint', 'hybrid-readiness');
+    const component = h3Model('diffusers', 'h3-components');
+    const image = { image_name: 'reference.png', width: 512, height: 512 };
+    const values = {
+      ...createDefaultVideoWidgetValues([model, component]),
+      model,
+      h3ModeOverride: true,
+      componentSourceModel: component,
+      references: [{ kind: 'image' as const, detail: 'match' as const, image }],
+    };
+    const reasons = getVideoWidgetValidationReasons(values, [model, component]);
+    expect(reasons.some((reason) => reason.includes('does not support reference-conditioned generation'))).toBe(false);
+    const detectedReasons = getVideoWidgetValidationReasons({ ...values, h3ModeOverride: false }, [model, component]);
+    expect(detectedReasons.some((reason) => reason.includes('does not support reference-conditioned generation'))).toBe(
+      true
+    );
+  });
+});

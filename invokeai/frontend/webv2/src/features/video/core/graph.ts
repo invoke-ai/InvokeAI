@@ -454,7 +454,8 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, model: MainModelConfi
 
   // Hybrid loading overlays Ref2VA AdaLN blocks onto FL2VA; guard stale settings so unsupported mains cannot
   // silently load the wrong file.
-  const hybridBase = isSingleFileMain && model.variant === 'ref2va' ? settings.h3HybridBaseModel : null;
+  const hybridBase =
+    isSingleFileMain && model.variant === 'ref2va' && !settings.h3ModeOverride ? settings.h3HybridBaseModel : null;
 
   const graph: BackendGraphContract = { edges: [], id: createId('minimax_h3_video_graph'), nodes: {} };
   const { positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -462,6 +463,7 @@ const buildMiniMaxH3VideoGraph = (settings: VideoSettings, model: MainModelConfi
     id: 'model_loader',
     model: componentSource ?? model,
     text_encoder_model: settings.h3TextEncoderModel ?? undefined,
+    task_variant_override: settings.h3ModeOverride ? model.variant : undefined,
     transformer_model: isSingleFileMain ? (hybridBase ?? model) : undefined,
     type: 'minimax_h3_model_loader',
   });

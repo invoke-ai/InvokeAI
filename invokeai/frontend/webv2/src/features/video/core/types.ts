@@ -184,6 +184,8 @@ export interface VideoSettings extends DynamicPromptsSettings {
    * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while
    * retaining reference conditioning.
    */
+  /** Use the opposite H3 task from the selected model classification. */
+  h3ModeOverride?: boolean;
   h3HybridBaseModel: MainModelConfig | null;
   /** First transformer block (0-49) whose AdaLN projection stays Ref2VA's under the hybrid. */
   h3HybridStartBlock: number;

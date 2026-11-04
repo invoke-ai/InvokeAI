@@ -65,10 +65,28 @@ export const syncVideoWidgetValuesWithModels = (
   const storedMain = values.model ? modelsByKey.get(values.model.key) : undefined;
   // Preserve supported legacy nonselectable mains for repair guidance; automatic choices use the stricter
   // selectable filter.
-  const model: MainModelConfig | null =
+  const registered: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
+  const override =
+    registered?.base === 'minimax-h3' &&
+    registered.format === 'checkpoint' &&
+    registered.key === values.modelKey &&
+    values.h3ModeOverride === true;
+  const effectiveVariant = registered?.variant === 'ref2va' ? 'fl2va' : 'ref2va';
+  // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
+  // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
+  const candidate = override && registered ? { ...registered, variant: effectiveVariant } : registered;
+  const sameCandidate =
+    candidate &&
+    values.model &&
+    Object.keys(candidate).length === Object.keys(values.model).length &&
+    Object.entries(candidate).every(
+      ([key, value]) =>
+        JSON.stringify(value) === JSON.stringify((values.model as unknown as Record<string, unknown>)[key])
+    );
+  const model: MainModelConfig | null = sameCandidate ? values.model : candidate;
 
   // Run canonical selection transitions after model replacement so family-specific fps, frames, and resolution
   // cannot remain stale.
@@ -163,6 +181,7 @@ export const syncVideoWidgetValuesWithModels = (
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
+    h3ModeOverride: model?.key === values.modelKey && model?.base === 'minimax-h3' ? base.h3ModeOverride : false,
     vae: syncComponent('vae', base.vae),
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
@@ -211,10 +230,18 @@ export const getVideoWidgetValidationReasons = (
     return ['Video needs a Wan 2.2, MiniMax H3 or LTX-2 main model.'];
   }
 
-  const reasons = getVideoValidationReasons(values.model, values);
+  // Readiness may receive the persisted (classified) record before the view's catalog sync.
+  // Resolve the same effective H3 task the graph compiler will use, without changing any media.
+  const registered = models?.find((item) => item.key === values.model?.key);
+  const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
+  const effectiveModel =
+    values.h3ModeOverride && source.base === 'minimax-h3' && source.format === 'checkpoint'
+      ? { ...source, variant: source.variant === 'ref2va' ? 'fl2va' : 'ref2va' }
+      : source;
+  const reasons = getVideoValidationReasons(effectiveModel, values);
 
   if (models) {
-    reasons.push(...getVideoModelAvailabilityReasons(values.model, values, models));
+    reasons.push(...getVideoModelAvailabilityReasons(effectiveModel, values, models));
   }
 
   return reasons;

@@ -36,6 +36,7 @@ import {
 import {
   getAcceleratorLoraChangeResult,
   getAcceleratorToggleResult,
+  getH3ModeSwitchSettings,
   getEffectiveVideoTiming,
   getVideoDimensions,
   getAutoDurationBounds,
@@ -177,6 +178,30 @@ export const VideoWidgetView = () => {
   );
 
   const patch = useCallback((next: Partial<VideoWidgetValues>) => patchValues(next), [patchValues]);
+
+  const toggleH3Mode = useCallback(
+    ({ checked }: { checked: boolean }) => {
+      if (
+        values.references.length ||
+        values.firstFrameImage ||
+        values.lastFrameImage ||
+        values.sourceVideo ||
+        values.h3HybridBaseModel
+      ) {
+        toaster.create({
+          title: t('widgets.video.h3ClearModeInputs'),
+          description: t('widgets.video.h3ClearModeInputsDescription'),
+          type: 'warning',
+        });
+        return;
+      }
+      if (!values.model) {
+        return;
+      }
+      patch(getH3ModeSwitchSettings(values, values.model, models, checked));
+    },
+    [models, patch, t, values]
+  );
 
   // Async writes must use the latest committed list for this project while the sync effect is live. Hidden
   // Activity panels stop syncing, and old callbacks still target their original project; drop writes in either
@@ -537,6 +562,24 @@ export const VideoWidgetView = () => {
           values={values}
         />
       </Stack>
+
+      {values.model?.base === 'minimax-h3' && values.model.format === 'checkpoint' ? (
+        <HStack px="2" py="1" justify="space-between">
+          <Text fontSize="sm">
+            {t('widgets.video.h3Mode', {
+              mode: values.model.variant === 'ref2va' ? 'Ref2VA' : 'FL2VA',
+              source: values.h3ModeOverride ? t('widgets.video.h3ModeOverride') : t('widgets.video.h3ModeDetected'),
+            })}
+          </Text>
+          <Switch.Root checked={values.h3ModeOverride === true} onCheckedChange={toggleH3Mode}>
+            <Switch.HiddenInput />
+            <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
+              <Switch.Thumb />
+            </Switch.Control>
+            <Switch.Label>{t('widgets.video.h3SwitchMode')}</Switch.Label>
+          </Switch.Root>
+        </HStack>
+      ) : null}
 
       <VideoPromptFields
         batchCount={values.batchCount}

@@ -395,6 +395,7 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     stgScale: hasFiniteNumber(values, 'stgScale') ? (values.stgScale as number) : null,
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
+    h3ModeOverride: values.h3ModeOverride === true,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(

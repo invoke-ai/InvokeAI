@@ -90271,6 +90271,24 @@
             "ui_model_format": ["checkpoint"],
             "ui_model_type": ["qwen3_vl_encoder"]
           },
+          "task_variant_override": {
+            "anyOf": [
+              {
+                "enum": ["fl2va", "ref2va"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Override the detected transformer task variant for this invocation. The denoiser still validates conditioning against the selected variant.",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Task Variant Override"
+          },
           "type": {
             "const": "minimax_h3_model_loader",
             "default": "minimax_h3_model_loader",
