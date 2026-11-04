@@ -21,6 +21,7 @@ import { getModelTypeLabel, getModelTypePluralLabel } from '@features/models/cor
 import { getModelImageUrl } from '@features/models/data/api';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models/data/modelsStore';
 import { useModelsUi } from '@features/models/ui/ModelsUiContext';
+import { openModelManager } from '@features/models/ui/openModelManager';
 import { setPickerBaseFilters, setPickerCompactView, useModelsUiSelector } from '@features/models/ui/uiStore';
 import { formatBytes } from '@platform/i18n/languages';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -35,6 +36,7 @@ import {
   BoxIcon,
   CheckIcon,
   ChevronDownIcon,
+  DownloadIcon,
   ChevronsDownUpIcon,
   ChevronsUpDownIcon,
   LinkIcon,
@@ -99,6 +101,7 @@ export const ModelSelect = ({
   excludeKeys,
   filter,
   id,
+  installAction = false,
   invalid,
   isClearable = false,
   modelTypes,
@@ -114,6 +117,11 @@ export const ModelSelect = ({
   excludeKeys?: ReadonlySet<string>;
   filter?: (model: ModelConfig) => boolean;
   id?: string;
+  /**
+   * With nothing of `modelTypes` installed, offer the way to install one under the picker: the Model Manager filtered
+   * to the first type, or, for users who cannot manage models, who to ask. For pickers a form cannot run without.
+   */
+  installAction?: boolean;
   invalid?: boolean;
   isClearable?: boolean;
   modelTypes: readonly ModelTaxonomyType[];
@@ -407,7 +415,40 @@ export const ModelSelect = ({
           </Popover.Positioner>
         </Portal>
       </Popover.Root>
+      {installAction && isEmpty && !isAllExcluded && loadStatus === 'loaded' && modelTypes[0] ? (
+        <ModelInstallAction modelType={modelTypes[0]} />
+      ) : null}
     </Box>
+  );
+};
+
+/** Whether any installed model fits a picker with these options; null until the library has loaded. */
+export const useHasModelPickerCandidates = (
+  options: Pick<Parameters<typeof hasModelPickerCandidates>[1], 'filter' | 'modelTypes'>
+): boolean | null =>
+  useModelsSelector((snapshot) =>
+    snapshot.status === 'loaded' ? hasModelPickerCandidates(snapshot.models, options) : null
+  );
+
+const ModelInstallAction = ({ modelType }: { modelType: ModelTaxonomyType }) => {
+  const { t } = useTranslation();
+  const { canManageModels, managerProjectId } = useModelsUi();
+
+  if (!canManageModels) {
+    return (
+      <Text color="fg.muted" fontSize="xs" mt="1.5">
+        {t('models.askAdminToInstall')}
+      </Text>
+    );
+  }
+
+  const openManager = () => openModelManager({ modelType, projectId: managerProjectId });
+
+  return (
+    <Button mt="1.5" size="sm" variant="outline" onClick={openManager}>
+      <Icon as={DownloadIcon} boxSize="3.5" />
+      {t('models.installAModel')}
+    </Button>
   );
 };
 

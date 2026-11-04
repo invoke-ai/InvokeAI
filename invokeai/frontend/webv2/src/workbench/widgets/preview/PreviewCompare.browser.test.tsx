@@ -1,7 +1,12 @@
-import type { GeneratedImageContract } from '@features/gallery';
+import type { GalleryVideoItem, GeneratedImageContract } from '@features/gallery';
+import type * as GalleryModule from '@features/gallery';
+import type * as GalleryBackendModule from '@features/gallery/data/backend';
+import type * as GalleryQueriesModule from '@features/gallery/queries';
+import type { ImageActions } from '@workbench/image-actions';
 import type { WidgetRuntimeApi } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act, useCallback, useState } from 'react';
@@ -12,6 +17,58 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PreviewComparisonMode } from './previewSettings';
 
 import { PreviewCompare } from './PreviewCompare';
+import { PreviewDetailsPanel } from './PreviewDetailsPanel';
+import { usePreviewStageContext } from './previewHeaderStore';
+
+vi.mock('@features/gallery', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryModule>()),
+  galleryVideos: {
+    workflow: () => Promise.resolve({ graph: null, workflow: null }),
+  },
+}));
+// The transport under the gallery's shared video metadata query.
+vi.mock('@features/gallery/data/backend', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryBackendModule>()),
+  getGalleryVideoMetadata: () => Promise.resolve({ seed: 7 }),
+}));
+vi.mock('@features/gallery/queries', async (importOriginal) => ({
+  ...(await importOriginal<typeof GalleryQueriesModule>()),
+  imageIndexAvailabilityOptions: () => ({
+    queryFn: () => ({ modelName: null, state: 'disabled' }),
+    queryKey: ['test-image-index-availability'],
+  }),
+}));
+
+const detailsItem: GalleryVideoItem = {
+  boardId: 'none',
+  category: 'general',
+  createdAt: '2026-07-16T00:00:00.000Z',
+  durationSeconds: 5,
+  fullUrl: '/videos/clip.mp4',
+  height: 1080,
+  isIntermediate: false,
+  kind: 'video',
+  name: 'clip.mp4',
+  starred: false,
+  thumbnailUrl: '/thumbnails/clip.webp',
+  width: 1920,
+};
+
+const detailsActions = {} as ImageActions;
+const ignoreOpenChange = () => undefined;
+
+/** Details as the header wires it: open, and pinned to whichever stage Preview publishes. */
+const OpenDetails = () => (
+  <PreviewDetailsPanel
+    actions={detailsActions}
+    image={null}
+    isOpen
+    item={detailsItem}
+    position={null}
+    stageElement={usePreviewStageContext().stageElement}
+    onOpenChange={ignoreOpenChange}
+  />
+);
 
 const i18n = createInstance();
 const commandHandlers = new Map<string, () => void>();
@@ -108,9 +165,11 @@ const clearMouseHover = (element: HTMLElement): Promise<void> =>
 const renderComparison = async ({
   baseImage = createImage('base', 1200, 800),
   initialMode = 'hover',
+  withDetails = false,
 }: {
   baseImage?: GeneratedImageContract;
   initialMode?: PreviewComparisonMode;
+  withDetails?: boolean;
 } = {}) => {
   commandHandlers.clear();
   const onExit = vi.fn();
@@ -144,11 +203,14 @@ const renderComparison = async ({
   root = createRoot(host);
   await interact(() => {
     root?.render(
-      <I18nextProvider i18n={i18n}>
-        <ChakraProvider value={system}>
-          <Harness />
-        </ChakraProvider>
-      </I18nextProvider>
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            {withDetails ? <OpenDetails /> : null}
+            <Harness />
+          </ChakraProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
     );
   });
 
@@ -224,5 +286,40 @@ describe('PreviewCompare', () => {
     expect(frameRect.width).toBeLessThanOrEqual(stageRect.width);
     expect(frameRect.height).toBeLessThanOrEqual(stageRect.height);
     expect(frameRect.width / frameRect.height).toBeCloseTo(width / height, 1);
+  });
+
+  it('pins open Details in the comparison stage, clear of its mode controls and slider', async () => {
+    await renderComparison({ initialMode: 'slider', withDetails: true });
+    const frame = host!.querySelector<HTMLImageElement>('img[alt="base"]')!.parentElement!;
+    const stage = frame.parentElement!;
+    const panel = await vi.waitFor(() => {
+      const element = document.querySelector<HTMLElement>('[data-preview-details]');
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    const exit = Array.from(host!.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Exit Compare')
+    )!;
+
+    expect(panel.parentElement).toBe(stage);
+    expect(stage.contains(exit)).toBe(false);
+    expect(panel.getBoundingClientRect().bottom).toBeLessThanOrEqual(exit.getBoundingClientRect().top);
+
+    // Pressing inside Details leaves the divider where it was.
+    const overlay = host!.querySelector<HTMLImageElement>('img[alt="compare"]')!.parentElement!;
+    const clipPath = overlay.style.clipPath;
+    const rect = panel.getBoundingClientRect();
+    await interact(() =>
+      panel.dispatchEvent(
+        new PointerEvent('pointerdown', {
+          bubbles: true,
+          button: 0,
+          clientX: rect.left + 4,
+          clientY: rect.top + 4,
+          pointerType: 'mouse',
+        })
+      )
+    );
+    expect(overlay.style.clipPath).toBe(clipPath);
   });
 });

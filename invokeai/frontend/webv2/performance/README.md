@@ -58,7 +58,7 @@ A module shared by eager and lazy code got its own chunk, or one owner imports i
 
 ### Route bytes grew
 
-Locale strings count: `en.json` is part of each route's `otherAssetRawBytes`. New strings need a reviewed re-record.
+Locale strings count in the browser gate: `en.json` is part of each route's `otherRawBytes` (locale plus `index.html`). The build gate's `otherAssetRawBytes` does not include it. New strings need a reviewed browser re-record.
 
 ### Finding a new startup request
 

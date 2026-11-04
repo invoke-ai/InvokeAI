@@ -4,6 +4,7 @@ The tile geometry itself is applied by `patch_qwen_image_vae_tiling`, which this
 and Wan VAEs (same tiling attributes, 16x instead of 8x).
 """
 
+import dataclasses
 import functools
 import math
 from collections.abc import Mapping
@@ -15,53 +16,80 @@ from PIL import Image
 
 from invokeai.backend.util.devices import device_has_dedicated_vram
 from invokeai.backend.util.vae_working_memory import should_pretile_vae_decode
-from invokeai.backend.working_memory.coefficients import shipped_data
+from invokeai.backend.working_memory.coefficients import find_entry, shipped_data
 from invokeai.backend.working_memory.estimate import FeatureValue, WorkingMemoryEstimate, WorkingMemoryTerm
-from invokeai.backend.working_memory.fit import convolution_line
-from invokeai.backend.working_memory.platform import platform_for, priced_as
+from invokeai.backend.working_memory.fit import Line, convolution_line
+from invokeai.backend.working_memory.platform import Platform, platform_for, priced_as
 from invokeai.backend.working_memory.spec import EstimatorSpec, register
 
 SPATIAL_SCALE = 16
 
-# Peak reserved memory of an encode or decode, on the AutoencoderKL convolution line of `backend/util/vae_working_memory.py`:
-# `k_<operation>_<dtype>` bytes per output pixel plus `b_<operation>_<dtype>` bytes, per convolution backend and
-# allocator (`platform_for`). The coefficients and the measured points that bound them are in
+# Peak reserved memory of an encode or decode, on the convolution lines of `backend/util/vae_working_memory.py`:
+# `k_<line>` bytes per output pixel plus `b_<line>` bytes, per convolution backend, allocator (`platform_for`) and, where
+# an entry names it, OS. The coefficients and the measured points that bound them are in
 # `backend/working_memory/data/qwen_image_2_1_vae.json`; `backend/working_memory/fit.py` explains how they are fitted.
-# This VAE is far hungrier than the family's (a 1024px bf16 decode reserves ~9 GiB on cuDNN and ~12 GiB on MIOpen), and
-# on MIOpen the per-pixel cost steps up past ~1.5 Mpx, which the line covers by being fitted on the envelope.
+# This VAE is far hungrier than the family's: a 1024px bf16 decode peaks at 8.38 GiB on an RTX 4090, 11.81 GiB on a W7900
+# on Linux, and 14.06 GiB (10.49 GiB with expandable segments) on an RX 9060 XT on Windows.
 #
-# A tiled operation is priced as one tile of the line, widened for the overlap the tile blend adds, which differs by
-# convolution backend (the `conv_backend` feature, as `priced_as` names it). MIOpen's is fitted on its tiled points per
-# line, and its tiles cost more per pixel the smaller they are (17.4 KB at 512px, ~13.6 KB at 768px in bf16), so a tile
-# below the smallest measured one is priced as that one. cuDNN keeps the original 4000-bytes-per-element-byte pricing,
-# widened just enough to cover the RTX 4090's 768px and 512px tiles, which that pricing fell ~5% short of.
+# On MIOpen the bf16 decode steps up from ~12.5 KB per pixel to ~14.4 KB between 1264px and 1280px, so frames past the
+# step price on a line of their own, `decode_large_bf16`. A tiled operation prices its tile on the untiled line, the tile clamped to the frame
+# per axis, plus `tiled_<operation>_<dtype>` over the frame's pixels for what tiling adds (`fit.Line.sits_on`).
+_LINES = ("decode_bf16", "decode_fp32", "encode_bf16", "encode_fp32")
 _COEFFICIENTS = frozenset(
-    f"{part}_{operation}_{dtype}"
+    f"{part}_{line}"
     for part in ("k", "b")
-    for operation in ("decode", "encode")
-    for dtype in ("bf16", "fp32")
+    for line in (*_LINES, *(f"tiled_{line}" for line in _LINES), "decode_large_bf16")
 )
 _DTYPES = {2: "bf16", 4: "fp32"}
-_MIOPEN_TILE_OVERLAP = {"decode_bf16": 1.1175, "decode_fp32": 1.18, "encode_bf16": 1.2, "encode_fp32": 1.45}
-_MIOPEN_SMALLEST_MEASURED_TILE = 512
-_CUDNN_TILE_OVERLAP = 1.065
+_MIOPEN_DECODE_STEP_PIXELS = 1_580_000
+
+
+def _dtype(element_size: int) -> str:
+    """The dtype of a VAE with elements this wide. Two bytes are bf16: the loader never holds this VAE in fp16."""
+    dtype = _DTYPES.get(element_size)
+    if dtype is None:
+        raise ValueError(f"Qwen-Image-2.1's VAE has no working-memory lines for {element_size}-byte elements.")
+    return dtype
+
+
+def _untiled_line(suffix: str, pixels: int, features: Mapping[str, FeatureValue]) -> str:
+    """The untiled line `pixels` price on: past MIOpen's step, a bf16 decode's own."""
+    stepped = (
+        suffix == "decode_bf16" and features.get("conv_backend") == "miopen" and pixels > _MIOPEN_DECODE_STEP_PIXELS
+    )
+    return "decode_large_bf16" if stepped else suffix
+
+
+def _line(features: Mapping[str, FeatureValue]) -> Line | None:
+    """`convolution_line`, without the assembly phase, and with what lies past MIOpen's bf16 decode step on its own line:
+    an untiled frame, and a tile that large, which costs what the frame of its size does.
+
+    The features' `tile` is None where the tile covers the frame (`estimate_working_memory`)."""
+    line = convolution_line(features)
+    if line is None:
+        return None
+    if line.sits_on is not None:
+        beneath, tile_area = line.sits_on
+        # shortcut: a tiled decode's assembly is not priced separately, negligible next to a tile up to the measured
+        # 3072px; give this VAE an assembly line if frames past ~8K get measured.
+        return line._replace(sits_on=(_untiled_line(beneath, tile_area, features), tile_area), assembly=None)
+    return line._replace(suffix=_untiled_line(line.suffix, line.size, features))
 
 
 def _terms(features: Mapping[str, FeatureValue], values: Mapping[str, float]) -> tuple[WorkingMemoryTerm, ...]:
-    height, width = cast(int, features["height"]), cast(int, features["width"])
-    tile = cast(int | None, features["tile"])
-    pixels: float = height * width
-    line = f"{features['operation']}_{features['dtype']}"
-    # The VAE tiles only when a side is larger than the tile; a tile covering the frame runs the single pass.
-    if tile is not None and (tile < height or tile < width):
-        if features["conv_backend"] == "miopen":
-            side = max(tile, _MIOPEN_SMALLEST_MEASURED_TILE)
-            pixels = side * side * _MIOPEN_TILE_OVERLAP[line]
-        else:
-            pixels = tile * tile * _CUDNN_TILE_OVERLAP
+    line = _line(features)
+    assert line is not None, "an estimate's features always place it on a line"
+    if line.sits_on is None:
+        return (
+            WorkingMemoryTerm.fitted("convolutions", f"k_{line.suffix}", line.size, values),
+            WorkingMemoryTerm.fitted("convolution_base", f"b_{line.suffix}", 1, values),
+        )
+    beneath, tile_area = line.sits_on
     return (
-        WorkingMemoryTerm.fitted("convolutions", f"k_{line}", pixels, values),
-        WorkingMemoryTerm.fitted("convolution_base", f"b_{line}", 1, values),
+        WorkingMemoryTerm.fitted("convolutions", f"k_{beneath}", tile_area, values),
+        WorkingMemoryTerm.fitted("convolution_base", f"b_{beneath}", 1, values),
+        WorkingMemoryTerm.fitted("tiled", f"k_{line.suffix}", line.size, values),
+        WorkingMemoryTerm.fitted("tiled_base", f"b_{line.suffix}", 1, values),
     )
 
 
@@ -72,7 +100,7 @@ SPEC = register(
         coefficients=_COEFFICIENTS,
         platform_keys=("conv_backend", "allocator"),
         terms=_terms,
-        line=convolution_line,
+        line=_line,
     )
 )
 
@@ -95,28 +123,37 @@ def estimate_working_memory(
 ) -> WorkingMemoryEstimate:
     """The working memory an encode or decode of a `height` x `width` image needs on `device`, untiled or in
     `tile_size` tiles. `element_size` is the byte width of the VAE's dtype: 2 is bf16, 4 fp32."""
+    covering = tile_size is None or (tile_size >= height and tile_size >= width)
     features = {
         "operation": operation,
         "height": height,
         "width": width,
-        "tile": tile_size,
-        "dtype": _DTYPES[element_size],
+        # The VAE tiles only when a side is larger than the tile; a tile covering the frame runs the single pass.
+        "tile": None if covering else tile_size,
+        "dtype": _dtype(element_size),
         "conv_backend": priced_as(platform_for(device)).conv_backend,
     }
     return SPEC.estimate(features, device)
 
 
 @functools.cache
-def _measured_untiled_peaks(operation: str, conv_backend: str, dtype: str) -> tuple[tuple[int, int], ...]:
-    """The shipped untiled points of `operation` on `conv_backend` under the native allocator in `dtype`, as
-    (area, bytes) by area; the larger where two shapes share an area."""
+def _measured_untiled_peaks(operation: str, platform: Platform, dtype: str) -> tuple[tuple[int, int], ...]:
+    """The shipped untiled points of `operation` in `dtype` that cap the line where `platform` is priced, as (area,
+    bytes) by area; the larger where two shapes share an area."""
+    data = shipped_data().values()
+    entries = [entry for file in data for entry in file.coefficients]
+    priced = {key: str(value) for key, value in dataclasses.asdict(priced_as(platform)).items()}
+    measured_on = find_entry(entries, SPEC.id, SPEC.version, priced, str(priced)).platform
     peaks: dict[int, int] = {}
-    for data in shipped_data().values():
-        for point in data.points:
+    for file in data:
+        for point in file.points:
             features = point.features
             if (
                 point.estimator == SPEC.id
-                and point.platform == {"conv_backend": conv_backend, "allocator": "native"}
+                and point.version == SPEC.version
+                and point.in_fit
+                and point.holds_upper_bound
+                and point.platform == measured_on
                 and features["operation"] == operation
                 and features["tile"] is None
                 and features["dtype"] == dtype
@@ -132,17 +169,15 @@ def untiled_peak_bytes(
     """What an untiled encode or decode is expected to peak at, for the up-front tiling decision only.
 
     The reservation carries up to 1.3x headroom over the measured points; deciding to tile on it would tile frames
-    that fit, and tiled output is not pixel-identical. So within the measured untiled points of the device's backend
-    this is the chord between the two neighbouring points, in bytes, and below the first one that point's bytes per
-    pixel, as `qwen_image_untiled_decode_peak_bytes` does for Qwen-Image. Past the last point, or with fewer than two
-    points (cuDNN, and every backend priced as it), it is the reservation.
-
-    The points are the native allocator's under every allocator: the other allocators' entries (``cudaMallocAsync``,
-    MIOpen's expandable segments on Windows) carry the native entry's values as stand-ins and no points of their own.
+    that fit, and tiled output is not pixel-identical. So within the measured untiled points of the platform the device
+    is priced as (each OS-specific entry has its own) this is the chord between the two neighbouring points, in bytes,
+    and below the first one that point's bytes per pixel, as `qwen_image_untiled_decode_peak_bytes` does for Qwen-Image.
+    Past the last point, or with no point at all, it is the reservation. One point decides up to its own size: cuDNN's,
+    so a 1024px decode on NVIDIA tiles on its measured 8.38 GiB rather than on what it reserves.
     """
-    peaks = _measured_untiled_peaks(operation, priced_as(platform_for(device)).conv_backend, _DTYPES[element_size])
+    peaks = _measured_untiled_peaks(operation, platform_for(device), _dtype(element_size))
     area = height * width
-    if len(peaks) < 2 or area > peaks[-1][0]:
+    if not peaks or area > peaks[-1][0]:
         return estimate_working_memory(operation, height, width, None, element_size, device).reservation_bytes
     previous_area, previous_bytes = 0, 0
     for measured_area, measured_bytes in peaks:

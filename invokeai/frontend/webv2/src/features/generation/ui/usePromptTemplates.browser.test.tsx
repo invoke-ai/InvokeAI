@@ -16,6 +16,7 @@ const transport = vi.hoisted(() => ({
 vi.mock('@platform/transport/http', () => ({
   apiFetch: transport.apiFetch,
   apiFetchJson: transport.apiFetchJson,
+  getApiErrorMessage: (error: unknown, fallback: string) => (error instanceof Error ? error.message : fallback),
 }));
 
 vi.mock('@platform/state/accountLifecycle', () => ({

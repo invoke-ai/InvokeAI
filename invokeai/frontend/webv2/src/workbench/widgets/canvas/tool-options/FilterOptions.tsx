@@ -1,7 +1,6 @@
 import type {
   OperationPropertyForm,
   ToolFormProps,
-  ToolFooterProps,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
@@ -46,12 +45,8 @@ export const getFilterSaveTargetEligibility = (
   raster: eligibility.canSave,
 });
 
-export const getFilterActionEligibility = (
-  session: FilterOperationSessionState,
-  isExternalInteractionLocked = false
-): FilterActionEligibility => {
-  const busy = session.status === 'processing' || session.status === 'committing';
-  const actionsBlocked = busy || isExternalInteractionLocked;
+export const getFilterActionEligibility = (session: FilterOperationSessionState): FilterActionEligibility => {
+  const actionsBlocked = session.status === 'processing' || session.status === 'committing';
   const hasPreview = session.preview !== null && !actionsBlocked;
   const isValid = isFilterConfigValid(session.draft.type, session.draft.settings);
   return {
@@ -126,7 +121,7 @@ const useFilterDraft = (engine: ToolFormProps['engine']) => {
 };
 
 /** Filter choice (grouped by category) and auto-process: the iteration dials. */
-const FilterChooseSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const FilterChooseSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
   const { operations, setType } = useFilterDraft(engine);
@@ -164,7 +159,7 @@ const FilterChooseSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormPr
   if (!session) {
     return null;
   }
-  const eligibility = getFilterActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getFilterActionEligibility(session);
   return (
     <>
       <Select
@@ -190,13 +185,13 @@ const FilterChooseSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormPr
 };
 
 /** The chosen filter's parameters. */
-const FilterParamsSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormProps) => {
+const FilterParamsSettings = ({ engine }: ToolFormProps) => {
   const session = useFilterSession(engine);
   const { setSettings, setType } = useFilterDraft(engine);
   if (!session) {
     return null;
   }
-  const eligibility = getFilterActionEligibility(session, isSurfaceInteractionLocked);
+  const eligibility = getFilterActionEligibility(session);
   return (
     <LayerFilterControls
       disabled={!eligibility.canEdit}
@@ -210,7 +205,7 @@ const FilterParamsSettings = ({ engine, isSurfaceInteractionLocked }: ToolFormPr
   );
 };
 
-const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => {
+const FilterFooter = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const session = useFilterSession(engine);
   const { operations, reset } = useFilterDraft(engine);
@@ -222,7 +217,7 @@ const FilterFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) 
   if (!session) {
     return null;
   }
-  const eligibility = getFilterActionEligibility(session, isExternalInteractionLocked);
+  const eligibility = getFilterActionEligibility(session);
   const saveTargets = getFilterSaveTargetEligibility(eligibility);
   const sourceLabel = `${session.layerName} · ${t(`widgets.layers.selectObject.saveAs_${session.layerType}`)}`;
   const isBusy = !session.error && (session.status === 'processing' || session.status === 'committing');

@@ -82,19 +82,6 @@ describe('getFilterActionEligibility', () => {
     });
   });
 
-  it('disables mutating actions under an external interaction lock but preserves Cancel', () => {
-    const eligibility = getFilterActionEligibility(state(), true);
-    expect(eligibility).toEqual({
-      canApply: false,
-      canCancel: true,
-      canEdit: false,
-      canProcess: false,
-      canReset: false,
-      canSave: false,
-    });
-    expect(getFilterSaveTargetEligibility(eligibility)).toEqual({ control: false, raster: false });
-  });
-
   it('disables Process for Spandrel until a compatible model is selected', () => {
     expect(
       getFilterActionEligibility(state({ draft: { settings: { model: null }, type: 'spandrel_filter' } }))
@@ -202,12 +189,10 @@ const renderRegions = (session: FilterOperationSessionState) => {
     );
   const [choose, params] = filterOperationForm.groups;
   return {
-    choose: render(createElement(choose!.body, { engine: engine as never, isSurfaceInteractionLocked: false })),
-    footer: render(
-      createElement(filterOperationForm.footer, { engine: engine as never, isExternalInteractionLocked: false })
-    ),
+    choose: render(createElement(choose!.body, { engine: engine as never })),
+    footer: render(createElement(filterOperationForm.footer, { engine: engine as never })),
     operations,
-    params: render(createElement(params!.body, { engine: engine as never, isSurfaceInteractionLocked: false })),
+    params: render(createElement(params!.body, { engine: engine as never })),
   };
 };
 

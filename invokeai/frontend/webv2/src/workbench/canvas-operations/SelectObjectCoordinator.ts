@@ -187,9 +187,6 @@ export const createSelectObjectOperationCoordinator = (
 
   return {
     start: (layerId) => {
-      if (deps.isInteractionLocked()) {
-        return 'locked';
-      }
       const prepared = deps.prepareStart(layerId);
       if (prepared.status !== 'ready') {
         return prepared.status;
@@ -251,9 +248,6 @@ export const createSelectObjectOperationCoordinator = (
       return 'started';
     },
     update: (changes) => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       if (!session) {
         return 'stale';
       }
@@ -276,16 +270,10 @@ export const createSelectObjectOperationCoordinator = (
       return 'updated';
     },
     process: () => {
-      if (deps.isInteractionLocked()) {
-        return Promise.resolve('blocked');
-      }
       invalidateCommit();
       return session?.process() ?? Promise.resolve('stale');
     },
     apply: async (durable): Promise<CommitGeneratedImageResult> => {
-      if (deps.isInteractionLocked()) {
-        return { status: 'locked' };
-      }
       const currentSession = session;
       const preview = currentPreview();
       if (!currentSession || !preview) {
@@ -304,11 +292,7 @@ export const createSelectObjectOperationCoordinator = (
         return durability;
       }
       if (!isOwnerCurrent(owner)) {
-        return deps.isInteractionLocked() ? { status: 'locked' } : { status: 'stale' };
-      }
-      if (deps.isInteractionLocked()) {
-        invalidateCommit();
-        return { status: 'locked' };
+        return { status: 'stale' };
       }
       let result: CommitGeneratedImageResult;
       try {
@@ -334,9 +318,6 @@ export const createSelectObjectOperationCoordinator = (
       return result;
     },
     save: async (target: SelectObjectSaveTarget, durable): Promise<SaveSelectObjectSessionResult> => {
-      if (deps.isInteractionLocked()) {
-        return { status: 'locked' };
-      }
       const currentSession = session;
       const preview = currentPreview();
       if (!currentSession || !preview) {
@@ -366,11 +347,7 @@ export const createSelectObjectOperationCoordinator = (
         return durability;
       }
       if (!isOwnerCurrent(owner)) {
-        return deps.isInteractionLocked() ? { status: 'locked' } : { status: 'stale' };
-      }
-      if (deps.isInteractionLocked()) {
-        invalidateCommit();
-        return { status: 'locked' };
+        return { status: 'stale' };
       }
       let result: SaveSelectObjectSessionResult;
       try {
@@ -399,9 +376,6 @@ export const createSelectObjectOperationCoordinator = (
       return result;
     },
     reset: () => {
-      if (deps.isInteractionLocked()) {
-        return 'blocked';
-      }
       const operation = deps.controller.getSnapshot();
       if (
         !session ||
@@ -427,10 +401,6 @@ export const createSelectObjectOperationCoordinator = (
       if (deps.isSamToolActive()) {
         deps.setViewTool();
       }
-    },
-    interruptAndBlock: () => {
-      invalidateCommit();
-      session?.interruptProcessing();
     },
     isActive: () => session !== null,
     dispose: () => clear(),

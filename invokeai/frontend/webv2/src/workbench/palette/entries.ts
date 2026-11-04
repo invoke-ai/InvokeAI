@@ -128,6 +128,17 @@ export const PROVIDER_MIN_QUERY_LENGTH = 2;
 /** Group for the synthesized "Search images…"-style scope commands. */
 export const SEARCH_SCOPE_GROUP = 'Search in';
 
+/** Every whitespace-separated query term must appear, case-insensitively; providers filter client-side with it. */
+export const createTermsMatcher = (query: string): ((haystack: string) => boolean) => {
+  const terms = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  return (haystack) => {
+    const lower = haystack.toLowerCase();
+
+    return terms.every((term) => lower.includes(term));
+  };
+};
+
 const PALETTE_GROUP_ORDER = [
   'Recent',
   'Generation',
@@ -165,6 +176,14 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'app.promptWeightDown',
   'app.promptWeightUp',
   'canvas.nextEntity',
+  'canvas.nudgeDown',
+  'canvas.nudgeDownLarge',
+  'canvas.nudgeLeft',
+  'canvas.nudgeLeftLarge',
+  'canvas.nudgeRight',
+  'canvas.nudgeRightLarge',
+  'canvas.nudgeUp',
+  'canvas.nudgeUpLarge',
   'canvas.prevEntity',
   'gallery.clearSelection',
   'gallery.extendSelectionDown',
@@ -198,7 +217,10 @@ const APP_COMMAND_GROUPS: Record<string, string> = {
   'app.invokeFront': 'Generation',
   'app.promptHistoryNext': 'Generation',
   'app.promptHistoryPrev': 'Generation',
+  'app.openWidgets': 'Layout',
+  'app.redoLayoutChange': 'Layout',
   'app.resetPanelLayout': 'Layout',
+  'app.undoLayoutChange': 'Layout',
   'app.selectCanvasTab': 'Navigation',
   'app.selectGenerateTab': 'Navigation',
   'app.selectModelsTab': 'Navigation',
@@ -219,12 +241,6 @@ const TITLE_KEYS: Record<string, string> = {
 const TITLE_OVERRIDES: Record<string, string> = {
   'app.promptHistoryNext': 'Next Prompt from History',
   'app.promptHistoryPrev': 'Previous Prompt from History',
-  'app.selectCanvasTab': 'Go to Canvas',
-  'app.selectGenerateTab': 'Go to Generate',
-  'app.selectModelsTab': 'Go to Models',
-  'app.selectQueueTab': 'Go to Queue',
-  'app.selectUpscalingTab': 'Go to Upscaling',
-  'app.selectWorkflowsTab': 'Go to Workflows',
 };
 
 /** Widget-scoped catalog categories: shown only while the widget type is in the layout. */
@@ -249,11 +265,24 @@ export const getEntryKeys = (
   return keys[0] ? formatHotkey(keys[0]) : undefined;
 };
 
+/**
+ * The catalog commands that open one widget. The palette offers each widget once, as a widget entry (see
+ * `buildWidgetEntries`) that keeps the command's id and key; the Workflow editor's command stays a command, since it
+ * opens the editor in the center rather than the widget wherever it is.
+ */
+export const WIDGET_OPEN_COMMANDS: Readonly<Record<string, string>> = {
+  'app.selectCanvasTab': 'canvas',
+  'app.selectGenerateTab': 'generate',
+  'app.selectQueueTab': 'queue',
+  'app.selectUpscalingTab': 'upscale',
+};
+
 export const buildCatalogCommandEntries = ({
   catalog,
   customHotkeys,
   execute,
   formatHotkey,
+  isHandled,
   presentWidgetTypeIds,
   t,
   titleOverrides,
@@ -262,12 +291,22 @@ export const buildCatalogCommandEntries = ({
   customHotkeys: CustomHotkeys;
   execute: (commandId: string) => unknown;
   formatHotkey: (key: string) => string[];
+  /**
+   * Whether a command has a handler now. The catalog mirrors widget keys a widget registers only in some states
+   * (Preview's item arrows and zoom); an entry with nothing to run is left out.
+   */
+  isHandled?: (commandId: string) => boolean;
   presentWidgetTypeIds: ReadonlySet<string>;
   t: TFunction;
   titleOverrides?: Readonly<Record<string, string>>;
 }): PaletteEntry[] =>
   catalog
-    .filter((definition) => definition.implemented !== false && !PALETTE_HIDDEN_COMMANDS.has(definition.commandId))
+    .filter(
+      (definition) =>
+        !PALETTE_HIDDEN_COMMANDS.has(definition.commandId) &&
+        WIDGET_OPEN_COMMANDS[definition.commandId] === undefined &&
+        (isHandled?.(definition.commandId) ?? true)
+    )
     .filter((definition) => {
       const widgetGroup = WIDGET_CATEGORY_GROUPS[definition.category];
 
@@ -298,6 +337,49 @@ export const buildCatalogCommandEntries = ({
           }),
       };
     });
+
+/**
+ * One entry per widget the layout can show, so a widget removed from every rail is never lost: running it brings the
+ * widget forward where the layout has it, else opens it.
+ */
+export const buildWidgetEntries = ({
+  catalog,
+  customHotkeys,
+  formatHotkey,
+  show,
+  t,
+  widgets,
+}: {
+  catalog: readonly HotkeyDefinition[];
+  customHotkeys: CustomHotkeys;
+  formatHotkey: (key: string) => string[];
+  show: (typeId: string) => void;
+  t: TFunction;
+  widgets: ReadonlyArray<{ label: string; typeId: string }>;
+}): PaletteEntry[] =>
+  widgets.map(({ label, typeId }) => {
+    // A widget with its own open command keeps that command's id (recents survive) and advertises its key.
+    const commandId = Object.keys(WIDGET_OPEN_COMMANDS).find((id) => WIDGET_OPEN_COMMANDS[id] === typeId);
+    const group = commandId ? 'Navigation' : 'Layout';
+
+    return {
+      group,
+      groupLabel: t(`commandPalette.groups.${group.toLowerCase()}`),
+      id: commandId ?? `widget.show.${typeId}`,
+      isPersistentRecent: true,
+      keys: commandId
+        ? getEntryKeys(
+            catalog.find((definition) => definition.id === commandId),
+            customHotkeys,
+            formatHotkey
+          )
+        : undefined,
+      keywords: `${t('commandPalette.widgetKeywords')} ${typeId}`,
+      run: () => show(typeId),
+      showInEmptyState: commandId !== undefined,
+      title: t('commandPalette.showWidget', { label }),
+    };
+  });
 
 export interface SettingsEntryDeps {
   openSettingsSection: (destination: SettingsSectionId | SettingsDestination) => void;

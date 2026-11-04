@@ -1,4 +1,5 @@
-import type { ForLoopValidationReason } from '@features/workflow/utility';
+import type { GenerationIssue } from '@features/generation/contracts';
+import type { WorkflowReadinessReason } from '@features/workflow/contracts';
 import type { ControlLayerIssue } from '@workbench/controlLayerChecks';
 
 export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
@@ -7,8 +8,18 @@ export type InvocationMode = 'global' | 'dialog';
 
 export type ResultDestination = 'canvas' | 'gallery';
 
+/** The prompt and settings an expansion was computed from. The sample seed travels on its own: it may rotate. */
+export interface DynamicPromptsExpansionSource {
+  combinatorial: boolean;
+  maxPrompts: number;
+  /** The effective (template-merged) positive prompt. */
+  positivePrompt: string;
+}
+
 /** A dynamic prompt expansion, with the sample seed it drew from (null for All combinations). */
 export interface ExpandedPositivePrompts {
+  /** A submission whose source no longer matches what it compiles is refused rather than queued. */
+  expandedFrom: DynamicPromptsExpansionSource;
   positivePrompts: string[];
   /** Recall reproduces this draw, and a resampling submission rotates only while the project still holds it. */
   positivePromptsSampleSeed: number | null;
@@ -33,7 +44,32 @@ export interface ControlLayerValidationReason {
   controlLayerIssue: ControlLayerIssue;
 }
 
-export type InvocationValidationReason = string | ForLoopValidationReason | ControlLayerValidationReason;
+/**
+ * A Generate settings issue, kept structured: the shell words it from the locale today, and its `target` (section and
+ * field) and `fix` are there for a surface that jumps to the field or applies the fix.
+ */
+export interface GenerationValidationReason {
+  generationIssue: GenerationIssue;
+}
+
+/** A problem with the route itself rather than its source's settings, kept structured so Invoke can offer the fix. */
+export type RouteIssue =
+  /** The source's widget is in no region or window of this project. */
+  | { kind: 'sourceNotMounted'; sourceId: InvocationSourceId }
+  /** Canvas staging takes images only. */
+  | { kind: 'videoNeedsGallery' }
+  | { kind: 'emptyCanvasFrame' };
+
+export interface RouteValidationReason {
+  routeIssue: RouteIssue;
+}
+
+export type InvocationValidationReason =
+  | string
+  | WorkflowReadinessReason
+  | ControlLayerValidationReason
+  | GenerationValidationReason
+  | RouteValidationReason;
 
 export interface ResolvedInvocationRoute extends InvocationRoute {
   mode: InvocationMode;

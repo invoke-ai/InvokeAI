@@ -8,7 +8,7 @@ import { isResizeDragActive, subscribeResizeDrag } from '@platform/ui/ResizeHand
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from '@workbench/hotkeys/targetWidget';
 import { getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
-import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
+import { CANVAS_SURFACE_ATTR, shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
 import { TextEditPortal } from '@workbench/widgets/canvas/TextEditPortal';
 import { useWorkbenchQueries } from '@workbench/WorkbenchContext';
 import { useRef } from 'react';
@@ -117,6 +117,7 @@ export const CanvasSurface = ({ engine, instanceId }: { engine: CanvasSurfaceEng
   return (
     <Box
       ref={bindContainer}
+      {...{ [CANVAS_SURFACE_ATTR]: '' }}
       h="full"
       outline="none"
       overflow="hidden"

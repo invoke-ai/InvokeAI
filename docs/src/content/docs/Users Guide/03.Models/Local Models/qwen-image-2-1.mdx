@@ -1,9 +1,9 @@
 ---
 title: Qwen-Image-2.1
-description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders or a GGUF transformer, including transparent (RGBA) output.
-lastUpdated: 2026-10-22
+description: Generate images with Qwen-Image-2.1 and its 8-step Turbo variant, from the Diffusers folders, a GGUF or an int8 transformer, including transparent (RGBA) output.
+lastUpdated: 2026-11-01
 sidebar:
-  order: 8
+  order: 9
 ---
 ## Qwen-Image-2.1
 
@@ -24,7 +24,7 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 ### Installing Qwen-Image-2.1
 
-The starter models install the complete Diffusers folders, which carry the transformer, the VAE and the Qwen3-VL 8B encoder:
+The Diffusers starter models install the complete folders, which carry the transformer, the VAE and the Qwen3-VL 8B encoder:
 
 - [`Qwen/Qwen-Image-2.1`](https://huggingface.co/Qwen/Qwen-Image-2.1) — the base model, ~31 GB.
 - [`Qwen/Qwen-Image-2.1-Turbo`](https://huggingface.co/Qwen/Qwen-Image-2.1-Turbo) — the Turbo variant, ~30 GB.
@@ -40,6 +40,8 @@ A GGUF or single-file transformer carries only the transformer. Pick the other t
 
 The **Qwen-Image-2.1 (Q4_K_M GGUF)** starter model, from [`unsloth/Qwen-Image-2.1-GGUF`](https://huggingface.co/unsloth/Qwen-Image-2.1-GGUF), installs the VAE and the 8B encoder with it, ~15 GB in all. Other quantization levels from that repository load the same way.
 
+The **Qwen-Image-2.1 (int8)** and **Qwen-Image-2.1 Turbo (int8)** starter models, Comfy-Org's `int8_convrot` builds (~7.3 GB each), install the same VAE and 8B encoder. Their int8 layers stay int8 on every supported GPU, and [int8 Compute](/configuration/optimization/int8-compute/) can run them on NVIDIA int8 tensor cores.
+
 Single-file transformers in bf16, scaled fp8 or `int8_convrot` (ComfyUI repackages) load as well. nvfp4 files, torchao-quantized files (such as unsloth's FP8 build), and int8 files without ComfyUI's `int8_convrot` marker, are refused at install. GGUF files with int8 layers (ComfyUI-GGUF's `Q8_CR`) are refused too.
 
 The Turbo variant is recognized from the filename: a single file or GGUF whose name contains `turbo` installs as Turbo, anything else as the base model. If a file was detected as the wrong variant, edit the model in the Model Manager and change its **Variant**. The default settings were chosen at install, so also set **Steps** under **Default Settings**: 8 for Turbo, 40 for the base model.
@@ -52,10 +54,31 @@ Measured on an RTX 4090 at 1024×1024:
 |---|---|---|
 | bf16 (Diffusers) | 13.9 GB during denoising | 0.62 s per step, about 25 s for 40 steps |
 | GGUF Q4_K_M | 4.0 GB | about 40 s for 40 steps |
+| int8 (`int8_convrot`) | 7.3 GB | about 37 s for 40 steps |
 
 The text encoder runs first and is unloaded from the GPU when the transformer needs the room. At 2048×2048 the bf16 transformer needs 15.5 GB and 3.7 s per step.
 
-The VAE needs about 8 GB of working memory to decode a 1024×1024 image on an NVIDIA card and about 12 GB on an AMD card; with `precision: float32`, about twice that on NVIDIA and about 1.6 times on AMD. Encoding one for image-to-image, inpainting or outpainting is reserved like a decode on NVIDIA and needs about 5 GB on AMD, at either precision. When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks 1024-pixel tiles, and 768 or 512 only on cards with less memory: measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
+The VAE's working memory depends on the card. Decoding a 1024×1024 image in bf16:
+
+| Card | Peak | Reserved |
+|---|---|---|
+| RTX 4090 | 8.4 GiB | 8.8 GiB |
+| Radeon PRO W7900, Linux | 11.8 GiB | 12.9 GiB |
+| RX 9060 XT, Windows (Invoke's default, expandable segments) | 10.5 GiB | 11.0 GiB |
+| RX 9060 XT, Windows (native allocator) | 14.1 GiB | 14.8 GiB |
+
+With `precision: float32` a decode reserves about twice that on NVIDIA and 19.8 GiB on Linux AMD cards. Encoding one for image-to-image, inpainting or outpainting is reserved like a decode on NVIDIA and peaks at 3.6 to 4.7 GiB on AMD. When an image is too large for the card to handle in one piece, Invoke decodes and encodes it in tiles; see [Large decodes](/configuration/optimization/low-vram-mode/). Invoke picks the largest tile whose reservation fits half of the card's memory. For a bf16 decode:
+
+| Card | 1024-pixel tiles | 768-pixel tiles | 512-pixel tiles |
+|---|---|---|---|
+| NVIDIA | 18.25 GiB and up | 11.02 to 18.25 GiB | below 11.02 GiB |
+| AMD, Linux | 30.69 GiB and up | 19.44 to 30.69 GiB | below 19.44 GiB |
+| AMD, Windows (default) | 23.27 GiB and up | 13.80 to 23.27 GiB | below 13.80 GiB |
+| AMD, Windows (native allocator) | 32.31 GiB and up | 19.31 to 32.31 GiB | below 19.31 GiB |
+
+So a 16 GB RX 9060 XT decodes in 768-pixel tiles by default, which reserve 6.9 GiB. Measured at 2048×2048, 1024-pixel tiles came close to an untiled decode (47.7 dB PSNR), while the 256-pixel tiles other VAEs default to left visible seams (35.6 dB).
+
+Known limit: on AMD the per-pixel cost of a decode steps up between 1264×1264 and 1280×1280, at about 1.6 megapixels. Frames from 1.58 megapixels are priced past the step, so 1264×1264 already is. Nothing past that step is measured on Windows, so a conservative figure stands in for it, 23.2 GiB at 1264×1264, and Windows AMD cards of 20 to 24 GB tile those frames even where they might fit whole. With the native allocator on Windows, 1264×1264 reserves 27.6 GiB, and cards up to about 30.6 GiB tile such frames.
 
 ### Reference images
 

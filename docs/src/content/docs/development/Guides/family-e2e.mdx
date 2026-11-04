@@ -188,13 +188,13 @@ A run's record can be complete and still unfit for some comparisons. Each invali
 
 ## Shared paths
 
-The scratch server uses the template root's models directory, model caches, legacy model configs, custom fonts and custom nodes. Its startup touches them as starting the template's own server would:
+The scratch server uses the template root's models directory, model caches, legacy model configs, custom fonts, custom nodes and prompt files. Its startup touches them as starting the template's own server would:
 
 - `models/README.txt` is written.
 - Install claims (`*.invokeai_install_active`) of processes that no longer run are removed.
 - Missing model files are reported in the log.
 - `configs/` receives the legacy model configs of the server's code when they differ.
-- `fonts/README.txt` is written when missing.
+- `fonts/README.txt` and `prompt_files/README.txt` are written when missing.
 - Models a node fetches on first use are cached in `models/.download_cache`.
 
 The server would also finish an incomplete install, but the model would then be registered in the scratch database only. So `start` and `resume` refuse while the models directory holds a `tmpinstall_*` entry: finish or cancel that install in the dev server first.

@@ -109,3 +109,35 @@ def test_external_graph_execution_state_runs_node() -> None:
     session.complete(node.id, output)
 
     assert session.results[node.id] == output
+
+
+def test_external_invocation_cache_is_scoped_to_the_queueing_user_in_multiuser() -> None:
+    from invokeai.app.invocations.baseinvocation import services_for_queue_user
+    from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
+
+    model_config = _build_model()
+    context = _build_context(model_config, Image.new("RGB", (16, 16), color="black"))
+    context._data.queue_item.user_id = "alice"
+    services = SimpleNamespace(
+        configuration=SimpleNamespace(node_cache_size=5, multiuser=True),
+        invocation_cache=MemoryInvocationCache(max_cache_size=5),
+        intermediates=MagicMock(),
+        logger=MagicMock(),
+    )
+
+    def run() -> None:
+        OpenAIImageGenerationInvocation(
+            id="external_node", model=ModelIdentifierField.from_config(model_config), mode="txt2img", prompt="p"
+        ).invoke_internal_with_effects(
+            context,
+            services_for_queue_user(services, context._data.queue_item.user_id),  # type: ignore[arg-type]
+        )
+
+    generate = context._services.external_generation.generate
+    run()
+    run()  # alice again: a cache hit duplicates her images without calling the provider
+    assert generate.call_count == 1
+
+    context._data.queue_item.user_id = "bob"
+    run()
+    assert generate.call_count == 2
