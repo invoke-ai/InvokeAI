@@ -154,6 +154,11 @@ def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_r
         # A cyclical variant repeats `red` forever and the two-pick dedupes every repeat away, so the
         # immediate value never produces a result even though it reads no unknown wildcard.
         "${c=!{2$$${x:{@red}}|red}} __nope__",
+        # A cyclical multi-pick with fewer distinct options than picks has no combination to cycle
+        # over, so the sampler spins without ever drawing a result, alone or inside a larger value.
+        "${c=!{@2$$red|red}} __nope__",
+        "${c=!x {@2$$red|red}} __nope__",
+        "${c=!{@3$$red|blue|red}} __nope__",
     ],
 )
 def test_find_missing_wildcards_does_not_hang_on_an_immediate_value_that_never_produces_a_result(
@@ -162,6 +167,23 @@ def test_find_missing_wildcards_does_not_hang_on_an_immediate_value_that_never_p
     assert find_missing_wildcards(prompt) == ["nope"]
     result = expand_dynamic_prompt(prompt, max_prompts=1, combinatorial=True)
     assert result.error is not None
+
+
+@pytest.mark.parametrize(
+    ("prompt", "expected"),
+    [
+        # Enough distinct options for every pick: the cyclical variant has combinations, so the dry
+        # run still samples it.
+        ("${c=!{@2$$red|blue}} a ${c} __nope__", ["nope"]),
+        ("${c=!{@2$$red|blue}} a ${c}", []),
+        # A `{__wildcard__}` variant of an unknown wildcard is expanded first, so it is reported.
+        ("${c=!{@2$$__nope__}} a", ["nope"]),
+    ],
+)
+def test_find_missing_wildcards_samples_cyclical_multi_picks_with_enough_options(
+    prompt: str, expected: list[str]
+) -> None:
+    assert find_missing_wildcards(prompt) == expected
 
 
 def test_immediate_assignment_keeps_only_the_first_result() -> None:

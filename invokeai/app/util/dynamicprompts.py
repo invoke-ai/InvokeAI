@@ -20,6 +20,7 @@ from dynamicprompts.samplers import Sampler
 from dynamicprompts.samplers.combinatorial import CombinatorialSampler
 from dynamicprompts.samplers.cycle import CyclicalSampler
 from dynamicprompts.samplers.random import RandomSampler
+from dynamicprompts.samplers.utils import wildcard_to_variant
 from dynamicprompts.sampling_context import SamplingContext
 from dynamicprompts.types import ResultGen
 from dynamicprompts.wildcards import WildcardManager
@@ -32,6 +33,8 @@ _SAMPLED_VALUE = LiteralCommand("")
 # before it treats the value as hanging. A value that loops forever (an unknown wildcard's not-found
 # fallback, or a cyclical variant whose repeats a multi-pick keeps deduping away) keeps drawing
 # without producing a result, while a value that produces a result at all needs only a few draws.
+# The one loop that never draws, a cyclical variant with no combination of distinct options, is
+# caught before it starts (see `_cyclical_variant_has_combination`).
 _DRAW_LIMIT = 10_000
 
 
@@ -85,7 +88,40 @@ class _BudgetedSampler:
         return getattr(self._inner, name)
 
     def generator_from_command(self, command: Command, context: SamplingContext) -> ResultGen:
+        if (
+            isinstance(self._inner, CyclicalSampler)
+            and isinstance(command, VariantCommand)
+            and not _cyclical_variant_has_combination(command, context)
+        ):
+            # The cyclical sampler cycles over the variant's combinations forever. With none to cycle
+            # over it spins without yielding or drawing anything, so the budget would never be
+            # charged: treat the value as having no result instead.
+            raise _DrawLimitReached()
         return self._budget.count(self._inner.generator_from_command(command, context))
+
+
+def _cyclical_variant_has_combination(command: VariantCommand, context: SamplingContext) -> bool:
+    """Whether `CyclicalSampler` has at least one combination of `command`'s options to cycle over.
+
+    It picks each combination from mutually distinct options (`VariantCommand.get_value_combinations`)
+    for every pick count in the variant's range, so there is one exactly when the smallest pick count
+    is no larger than the number of distinct options. A `{__wildcard__}` variant is expanded to the
+    wildcard's values first, as the sampler does.
+    """
+    if len(command.values) == 1 and isinstance(command.values[0], WildcardCommand):
+        command = wildcard_to_variant(
+            command.values[0],
+            context=context,
+            min_bound=command.min_bound,
+            max_bound=command.max_bound,
+            separator=command.separator,
+        )
+    command = command.adjust_range()
+    distinct: list[Command] = []
+    for value in command.values:
+        if value not in distinct:
+            distinct.append(value)
+    return command.min_bound <= len(distinct)
 
 
 def _sample_first_result(
