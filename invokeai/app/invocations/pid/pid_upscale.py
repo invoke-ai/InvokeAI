@@ -21,7 +21,6 @@ from contextlib import ExitStack
 
 import einops
 import torch
-from PIL import Image
 from transformers import PreTrainedModel, PreTrainedTokenizerBase
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
@@ -34,8 +33,10 @@ from invokeai.app.invocations.fields import (
     WithMetadata,
 )
 from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, VAEField
+from invokeai.app.invocations.pid.pid_output import save_pid_image
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
+from invokeai.app.invocations.vae.precise_io import load_image_as_grid_tensor
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.util import is_flux_family_vae
 from invokeai.backend.model_manager.taxonomy import BaseModelType
@@ -47,7 +48,6 @@ from invokeai.backend.pid.decode import (
     encode_caption_for_pid,
     estimate_pid_decode_working_memory,
 )
-from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
 
 
@@ -110,8 +110,7 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
         )
 
         # 1) Encode the source image into a FLUX-normalized latent.
-        pil_image = context.images.get_pil(self.image.image_name).convert("RGB")
-        image_tensor = image_resized_to_grid_as_tensor(pil_image)
+        image_tensor = load_image_as_grid_tensor(context, self.image.image_name)
         if image_tensor.dim() == 3:
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
@@ -203,7 +202,4 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
 
         TorchDevice.empty_cache()
 
-        img = einops.rearrange(x0[0].clamp(-1, 1), "c h w -> h w c")
-        img_pil = Image.fromarray((127.5 * (img + 1.0)).byte().cpu().numpy())
-        image_dto = context.images.save(image=img_pil)
-        return ImageOutput.build(image_dto)
+        return ImageOutput.build(save_pid_image(context, x0))

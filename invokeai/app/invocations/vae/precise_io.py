@@ -33,7 +33,7 @@ def precise_decode_raster(
     raster = decoded_unit_raster(unit_image, alpha=alpha)
     if raster is None:
         context.logger.warning(
-            "Precise image storage skipped: the VAE decoder output is not finite; saving the ordinary 8-bit image."
+            "Precise image storage skipped: the decoder output is not finite; saving the ordinary 8-bit image."
         )
     return raster
 

@@ -416,3 +416,50 @@ class TestLoadPidDecoderRejectsPartialCheckpoints:
         sd: dict[Any, torch.Tensor] = dict(tiny_net.state_dict()) | {1: torch.zeros(1)}
         with pytest.raises(RuntimeError, match="1 keys that are not strings"):
             load_pid_decoder(sd, BaseModelType.Flux)
+
+
+def test_decode_returns_the_parameter_dtype_clamped_to_unit_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The PiD nodes save this tensor precisely, so the clamp and the float32 dtype are the decoder's contract."""
+    net = PidNet(
+        in_channels=3,
+        num_groups=2,
+        hidden_size=8,
+        pixel_hidden_size=4,
+        pixel_attn_hidden_size=8,
+        pixel_num_groups=2,
+        patch_depth=1,
+        pixel_depth=1,
+        num_text_blocks=1,
+        patch_size=2,
+        txt_embed_dim=6,
+        txt_max_length=4,
+        rope_mode="original",
+        rope_ref_h=4,
+        rope_ref_w=4,
+        lq_in_channels=0,
+        lq_latent_channels=2,
+        lq_hidden_dim=4,
+        lq_num_res_blocks=1,
+        lq_interval=1,
+        sr_scale=1,
+        latent_spatial_down_factor=8,
+    ).eval()
+    # Push the real sampler's output outside [-1, 1] on both sides; only the decoder's own clamp brings it back.
+    # (CPU decodes run without the CUDA bf16 autocast, so this pins the float32 parameter dtype, not the autocast path.)
+    real_loop = pid_decode_module._student_sample_loop
+
+    def overshooting_loop(*args: Any, **kwargs: Any) -> torch.Tensor:
+        out = real_loop(*args, **kwargs)
+        return out + torch.tensor([3.0, -3.0, 3.0]).view(1, 3, 1, 1).to(out.dtype)
+
+    monkeypatch.setattr(pid_decode_module, "_student_sample_loop", overshooting_loop)
+
+    output = PiDDecoder(net, backbone=BaseModelType.Flux).decode(
+        latent=torch.randn(1, 2, 2, 2),
+        caption_embs=torch.randn(1, 4, 6),
+        config=PiDDecodeConfig(num_inference_steps=1, seed=0),
+    )
+
+    assert output.dtype is torch.float32
+    assert output.min() == -1.0
+    assert output.max() == 1.0
