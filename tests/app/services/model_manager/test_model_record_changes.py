@@ -311,6 +311,21 @@ def test_reidentify_refiles_a_misidentified_model_and_keeps_what_the_user_set(
     assert (later_install.default_settings.cpu_only, later_install.default_settings.fp8_storage) == (None, None)
 
 
+def test_reidentify_of_a_file_the_probes_refuse_says_why_and_keeps_the_record(harness: _Harness) -> None:
+    """A CLIP-G without the projection SD 3 needs is recognised and refused as unusable; the record is not touched."""
+    keys = dict(clip_g_comfy_keys.state_dict_keys)
+    del keys["text_projection.weight"]
+    (harness.models_path / MODEL_PATH).parent.mkdir(parents=True, exist_ok=True)
+    write_header_only_safetensors(harness.models_path / MODEL_PATH, keys)
+    record = _sd1_record()
+    harness.store.add_model(record)
+
+    with pytest.raises(InvalidModelException, match="Unable to identify model format: .*text_projection"):
+        harness.manager.reidentify_model(KEY)
+
+    assert harness.store.get_model(KEY) == record
+
+
 def test_reidentify_while_a_load_of_the_old_record_is_queued_rebuilds_it_from_the_new_record(
     harness: _Harness,
 ) -> None:
