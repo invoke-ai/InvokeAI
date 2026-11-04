@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from invokeai.backend.qwen_image_2_1.vae import SPEC
+from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, SPEC
 from invokeai.backend.working_memory.coefficients import find_entry, shipped_data
 from invokeai.backend.working_memory.counters import CounterReading
 from invokeai.backend.working_memory.measurement import fresh_window
@@ -48,6 +48,27 @@ def test_a_size_is_a_side_or_a_shape() -> None:
     assert script.shapes("512,896x1152") == [(512, 512), (896, 1152)]
     with pytest.raises(ValueError):
         script.shapes("1x2x3")
+
+
+def test_main_refuses_a_side_off_the_latent_grid_before_measuring_and_accepts_the_defaults(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert script.SPATIAL_SCALE == SPATIAL_SCALE
+    measured = []
+    monkeypatch.setattr(fresh_points, "measure_points", lambda points, **_: measured.append(points) or [])
+    base = ["script", "--vae", "vae", "--out", str(tmp_path / "points.jsonl")]
+
+    for option, value in [("--sizes", "1024x1000"), ("--frames", "2040"), ("--tiles", "1000")]:
+        monkeypatch.setattr("sys.argv", [*base, option, value])
+        with pytest.raises(SystemExit) as refused:
+            script.main()
+        assert refused.value.code == 2
+        assert value.split("x")[-1] in capsys.readouterr().err
+    assert measured == []
+
+    monkeypatch.setattr("sys.argv", base)
+    script.main()
+    assert len(measured) == 1 and measured[0]
 
 
 def _reading(*, reserved: int, peak_reserved: int, driver: int, retries: int = 0) -> CounterReading:

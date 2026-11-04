@@ -33,6 +33,8 @@ if TYPE_CHECKING:
     from invokeai.backend.working_memory.measurement import FreshWindow
 
 LOGGER_NAME = "calibrate_qwen_image_2_1_vae_working_memory"
+# As `invokeai.backend.qwen_image_2_1.vae`, whose import starts CUDA in the parent, which must stay free of torch.
+SPATIAL_SCALE = 16
 _COLUMNS = f"{'op':7}{'dtype':9}{'size':>12}{'tile':>6}"
 
 
@@ -91,7 +93,7 @@ def _measure(point: Point, force: bool) -> dict[str, Any]:
     import torch
     from diffusers import AutoencoderKLQwenImage21
 
-    from invokeai.backend.qwen_image_2_1.vae import SPATIAL_SCALE, SPEC, estimate_working_memory
+    from invokeai.backend.qwen_image_2_1.vae import SPEC, estimate_working_memory
     from invokeai.backend.util.qwen_image_vae import patch_qwen_image_vae_tiling
     from invokeai.backend.working_memory import platform as working_memory_platform
     from invokeai.backend.working_memory.measurement import measure
@@ -169,6 +171,11 @@ def main() -> None:
     if args.vae is None or args.out is None:
         parser.error("--vae and --out are required to measure")
     fresh_points.check_alloc_conf(parser, args.alloc_conf)
+    sides = {side for shape in args.sizes for side in shape} | {*args.frames, *args.tiles}
+    # The decode floors to whole latents, so an off-grid side would run smaller than the point it records.
+    off_grid = sorted(side for side in sides if side % SPATIAL_SCALE)
+    if off_grid:
+        parser.error(f"--sizes, --frames and --tiles must be multiples of {SPATIAL_SCALE}; these are not: {off_grid}")
     points = plan(args.vae, args.operations.split(","), args.dtypes.split(","), args.sizes, args.frames, args.tiles)
     lines = fresh_points.measure_points(
         points,
