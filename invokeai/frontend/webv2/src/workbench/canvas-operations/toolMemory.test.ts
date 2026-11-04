@@ -1,6 +1,7 @@
 import {
   DEFAULT_BRUSH_OPTIONS,
   DEFAULT_ERASER_OPTIONS,
+  DEFAULT_PAINT_BUCKET_OPTIONS,
   DEFAULT_SHAPE_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   MAX_BRUSH_SIZE,
@@ -27,6 +28,7 @@ describe('normalizeCanvasToolMemory', () => {
       expect(normalizeCanvasToolMemory(raw)).toEqual({
         brush: DEFAULT_BRUSH,
         eraser: DEFAULT_ERASER_OPTIONS,
+        paintBucket: DEFAULT_PAINT_BUCKET_OPTIONS,
         shape: DEFAULT_SHAPE_OPTIONS,
         text: DEFAULT_TEXT_OPTIONS,
       });
@@ -65,12 +67,49 @@ describe('normalizeCanvasToolMemory', () => {
       fontWeight: 650,
     });
   });
+
+  it('keeps paint bucket fields in their ranges and drops unknown modes and samples', () => {
+    expect(
+      normalizeCanvasToolMemory({
+        paintBucket: {
+          antiAlias: false,
+          closeGaps: 40,
+          contiguous: 'yes',
+          expandMask: -20,
+          expandRaster: 3.6,
+          mode: 'erase',
+          opacity: 62.6,
+          sample: 'everything',
+          tolerance: 150,
+        },
+      }).paintBucket
+    ).toEqual({
+      antiAlias: false,
+      closeGaps: 32,
+      contiguous: true,
+      expandMask: -16,
+      expandRaster: 4,
+      mode: 'erase',
+      opacity: 63,
+      sample: 'all',
+      tolerance: 100,
+    });
+    expect(normalizeCanvasToolMemory({ paintBucket: { opacity: -5, tolerance: 31.4 } }).paintBucket).toMatchObject({
+      opacity: 0,
+      tolerance: 31,
+    });
+    expect(normalizeCanvasToolMemory({ paintBucket: { mode: 'flood', sample: 'layer' } }).paintBucket).toEqual({
+      ...DEFAULT_PAINT_BUCKET_OPTIONS,
+      sample: 'layer',
+    });
+  });
 });
 
 describe('bindCanvasToolMemory', () => {
   const stored: CanvasToolMemory = {
     brush: { ...DEFAULT_BRUSH, size: 12 },
     eraser: { ...DEFAULT_ERASER_OPTIONS, hardness: 0.5 },
+    paintBucket: { ...DEFAULT_PAINT_BUCKET_OPTIONS, sample: 'layer', tolerance: 45 },
     shape: { ...DEFAULT_SHAPE_OPTIONS, kind: 'star' },
     text: { ...DEFAULT_TEXT_OPTIONS, fontSize: 20 },
   };
@@ -84,6 +123,18 @@ describe('bindCanvasToolMemory', () => {
     expect(stores.eraserOptions.get()).toEqual(stored.eraser);
     expect(stores.shapeOptions.get().kind).toBe('star');
     expect(stores.textOptions.get().fontSize).toBe(20);
+    expect(stores.paintBucketOptions.get()).toEqual(stored.paintBucket);
+  });
+
+  it('saves a tolerance the paint bucket landed on like any other option change', () => {
+    vi.useFakeTimers();
+    const stores = createEngineStores();
+    const write = vi.fn();
+    bindCanvasToolMemory(stores, { read: () => stored, write });
+
+    stores.paintBucketOptions.set({ ...stores.paintBucketOptions.get(), tolerance: 62 });
+    vi.advanceTimersByTime(TOOL_MEMORY_WRITE_DELAY_MS);
+    expect(write).toHaveBeenCalledExactlyOnceWith({ paintBucket: { ...stored.paintBucket, tolerance: 62 } });
   });
 
   it('saves the changed tools once quiet, ignores a brush color change, and saves a pending change on disposal', () => {

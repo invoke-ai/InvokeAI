@@ -29,7 +29,8 @@ vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   useOptionalWorkbenchExtensions: () => workbench.extensions,
 }));
 
-import { recordSelectFamilyTool } from './toolFamilyStore';
+import { executeCanvasToolCommand } from './canvasToolCommands';
+import { recordFamilyTool } from './toolFamilyStore';
 import { ToolStrip } from './ToolStrip';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -66,6 +67,15 @@ const createFakeEngine = () => {
   };
   return {
     engine: engine as unknown as StripEngine,
+    /** Runs a tool hotkey against this engine, as the Canvas's registered handler would. */
+    pressToolKey: (commandId: 'canvas.tool.gradient' | 'canvas.tool.paintBucket') =>
+      executeCanvasToolCommand(commandId, {
+        engine: engine as unknown as Parameters<typeof executeCanvasToolCommand>[1]['engine'],
+        reportTransformRefusal: () => {},
+        resetActiveColors: () => {},
+        selectedLayerId: null,
+        swapActiveColors: () => {},
+      }),
     get activeTool() {
       return values.get('activeTool');
     },
@@ -104,8 +114,10 @@ describe('tool strip family slots', () => {
   });
 
   beforeEach(() => {
-    recordSelectFamilyTool('marquee');
+    recordFamilyTool('select', 'marquee');
+    recordFamilyTool('fill', 'gradient');
     localStorage.removeItem('invokeai:v7:webv2:select-family-tool');
+    localStorage.removeItem('invokeai:v7:webv2:fill-family-tool');
   });
 
   afterEach(async () => {
@@ -418,6 +430,86 @@ describe('tool strip family slots', () => {
     expect(fake.activeTool).toBe('brush');
     await act(() => userEvent.click(button('Lasso select')));
     expect(fake.activeTool).toBe('lasso');
+  });
+
+  it('the Fill slot restores the member picked from its menu, and remembers it across reloads', async () => {
+    const fake = await renderStrip();
+    await act(() => userEvent.click(button('Gradient')));
+    expect(fake.activeTool).toBe('gradient');
+
+    await openByContextMenu((await button('Gradient').element()) as HTMLElement);
+    expect(Array.from(document.querySelectorAll('[role="menuitemradio"]')).map((item) => item.textContent)).toEqual([
+      'Gradient',
+      'Paint bucket',
+    ]);
+    await act(() => userEvent.click(entry('Paint bucket')));
+    expect(fake.activeTool).toBe('paintBucket');
+    expect(localStorage.getItem('invokeai:v7:webv2:fill-family-tool')).toBe('paintBucket');
+
+    // Leave the family and come back with a plain click: the slot now stands for the bucket.
+    await act(() => userEvent.click(button('Brush')));
+    await act(() => userEvent.click(button('Paint bucket')));
+    expect(fake.activeTool).toBe('paintBucket');
+  });
+
+  it('G toggles within the Fill family and otherwise selects the member the slot stands for', async () => {
+    const fake = await renderStrip();
+    await act(() => fake.pressToolKey('canvas.tool.gradient'));
+    expect(fake.activeTool).toBe('gradient');
+    await act(() => fake.pressToolKey('canvas.tool.gradient'));
+    expect(fake.activeTool).toBe('paintBucket');
+    await expect.element(button('Paint bucket')).toHaveAttribute('aria-pressed', 'true');
+    await act(() => fake.pressToolKey('canvas.tool.gradient'));
+    expect(fake.activeTool).toBe('gradient');
+
+    // A pick from the menu becomes what G returns to from another tool.
+    await openByContextMenu((await button('Gradient').element()) as HTMLElement);
+    await act(() => userEvent.click(entry('Paint bucket')));
+    await act(() => userEvent.click(button('Brush')));
+    await act(() => fake.pressToolKey('canvas.tool.gradient'));
+    expect(fake.activeTool).toBe('paintBucket');
+
+    // The bucket's own command, unbound by default, also becomes the slot's memory.
+    await act(() => recordFamilyTool('fill', 'gradient'));
+    await act(() => userEvent.click(button('Brush')));
+    await act(() => fake.pressToolKey('canvas.tool.paintBucket'));
+    await act(() => userEvent.click(button('Brush')));
+    await act(() => userEvent.click(button('Paint bucket')));
+    expect(fake.activeTool).toBe('paintBucket');
+  });
+
+  it('keeps saved bindings on the gradient command id: a remapped G titles the Fill slot and its entries', async () => {
+    accountLifecycle.activate('tool-strip-test');
+    await patchWorkbenchPreferences({ customHotkeys: { 'canvas.tool.gradient': ['k'] } });
+    const extensions = createExtensionRegistry();
+    const source = { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' } as const;
+    for (const [id, keys] of [
+      ['canvas.tool.gradient', ['g']],
+      ['canvas.tool.paintBucket', []],
+    ] as const) {
+      extensions.hotkeys.register({ commandId: id, defaultKeys: [...keys], id, source, title: id });
+    }
+    workbench.extensions = extensions;
+
+    try {
+      await renderStrip();
+      const slot = (await button('Gradient').element()) as HTMLElement;
+      await hoverSlot(slot);
+      await expect.poll(tooltipText).toBe('Gradient (K)');
+      await openByContextMenu(slot);
+      // The unbound bucket shows the family key that reaches it.
+      const bucket = page.getByRole('menuitemradio', { name: /^Paint bucket/ });
+      expect((await bucket.element()).textContent).toBe('Paint bucketk');
+      await act(() => userEvent.click(bucket));
+      await hoverSlot((await button('Paint bucket').element()) as HTMLElement);
+      await expect
+        .poll(tooltipText)
+        .toBe(
+          'Paint bucket (K)Click to fill an area of similar color. Hold and drag sideways to adjust the tolerance.'
+        );
+    } finally {
+      await patchWorkbenchPreferences({ customHotkeys: {} });
+    }
   });
 
   it('names the key that selects each tool in its tooltip, remaps included', async () => {

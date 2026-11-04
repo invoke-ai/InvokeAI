@@ -1,7 +1,7 @@
 ---
 title: Canvas guide
 description: A detailed guide to the Canvas — its tools and their options, navigation, the header buttons, the generation frame, selections, transform, filters, the staging area, menus, settings and keyboard shortcuts.
-lastUpdated: 2026-10-29
+lastUpdated: 2026-11-02
 ---
 
 import { Image } from 'astro:assets';
@@ -31,12 +31,13 @@ A tool that cannot change the selected layer says so instead of doing nothing: t
 | **Brush** | **B** | Paint on the selected raster layer, or paint a mask or region on the selected inpaint mask or regional guidance layer. **Shift**-click draws a straight line from the end of the last stroke on that layer. |
 | **Eraser** | **E** | Erase paint or mask. **Shift**-click erases a straight line, as with the Brush. |
 | **Shape** | **U** | Draw a rectangle, ellipse, triangle, star, polygon or freehand shape on a raster layer, or add a shaped area to the selected inpaint mask or regional guidance layer. Press **U** again to cycle through the shapes. |
-| **Gradient** | **G** | Create a linear or radial gradient. |
+| **Gradient** | **G** | Create a linear or radial gradient. Press **G** again to switch to the Paint bucket. |
+| **Paint bucket** | **G** | Fill an area of similar color with one click: on the selected raster or control layer, or as an area added to the selected inpaint mask or regional guidance layer. Hold and drag sideways to adjust how far the fill reaches. Press **G** again to switch back to the Gradient. |
 | **Text** | **T** | Add editable text. |
 | **Marquee select** / **Lasso select** | **M** / **L** | Select an area of pixels. Press **M** again to switch between rectangle and ellipse, or **L** again for freehand and polygon. |
 | **Color picker** | **I** | Pick a color from the canvas (see below). |
 
-The Shape and Select buttons hold several tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with the Brush, Eraser, Shape, Gradient, Text or View tool and click, or press **I** for the Color picker tool. Move, Transform, the Generation frame and the selection tools use **Alt** themselves, so holding it there changes their drag instead. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release, and **Escape** cancels the pick and restores the previous color. The picked color goes to what you are editing:
+The Shape, Gradient and Select buttons hold several tools: the shapes, the Gradient and Paint bucket, and the two selection tools. Click to use the current one, or press and hold (or right-click, or press **→** on) the button to choose another from a menu that lists each tool with its shortcut. To pick a color from the canvas, hold **Alt** with the Brush, Eraser, Shape, Gradient, Paint bucket, Text or View tool and click, or press **I** for the Color picker tool. Move, Transform, the Generation frame and the selection tools use **Alt** themselves, so holding it there changes their drag instead. While you pick, a round **loupe** follows the pointer: it magnifies the pixels around it, boxes the pixel that will be picked in the center, and shows that pixel's RGB values. The pointer itself is hidden, so aim with the boxed pixel. You can drag to sample as you go; the color is set when you release, and **Escape** cancels the pick and restores the previous color. The picked color goes to what you are editing:
 
 * the selected mask's tint, while **Mask tint** is chosen in the [Color](/users-guide/canvas/layers-panel/#color) tab;
 * the selected shape layer's fill when the foreground chip is active, or its stroke when the background chip is active. A pick never turns on a fill or stroke the shape doesn't have; it sets the active color instead;
@@ -49,12 +50,13 @@ A pick that changes a layer is one undoable step. Gradient stops are not picked 
 
 * **Brush** — **Size**, **Opacity** and **Hardness**; the **Foreground** color; and, under **Dynamics**, whether pen pressure affects the width or the opacity. **[** and **]** make the brush smaller or larger, and so does **Ctrl**+scroll. Painting on an image layer, such as an accepted result or an added picture, paints on that layer itself instead of adding a new one; one undo restores the original image. **Shift**-click joins the click to the end of the last Brush or Eraser stroke on the same layer with a straight line. The line follows the selection and the frame clipping like any stroke, and one undo removes it. Undo, redo or deleting the layer clears the remembered point, so the next **Shift**-click paints a dot.
 * **Eraser** — **Size**, **Opacity** and **Hardness**; and, under **Dynamics**, whether pen pressure affects the width. Pressure never changes how strongly the eraser erases.
-
-The Brush, Eraser, Shape and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
 * **Shape** — the **Kind** of shape; **Place on**, which draws on the **Selected layer** or on a **New layer** of its own; **Fill** and **Stroke**, each with a color; and the stroke **Width**. **Shift** constrains the proportions. For polygons, click to place points and double-click, press **Enter** or click the first point to close the shape. With an inpaint mask or regional guidance layer selected, the shape is added to the mask or region, which makes shapes a quick way to mark rectangular or geometric areas; the colors are ignored.
 * **Gradient** — **Kind** (Linear or Radial), **Angle**, and the color **Stops**, which can be added and removed or follow the foreground and background colors. Dragging creates a gradient layer the size of the generation frame, or repositions the selected gradient layer.
+* **Paint bucket** — **Mode** (**Fill** or **Erase**); **Tolerance**, how different a color can be from the one you click and still be filled; **Contiguous**, which fills only the connected area (off fills every similar pixel); **Sample**, which compares colors across **All layers** or on the **Current layer** alone; **Close gaps**, which stops the fill at gaps in an outline up to that many pixels wide instead of leaking through (only while **Contiguous** is on); **Expand**, which grows or shrinks the filled area by up to 16 pixels; **Anti-alias**, for a soft edge; **Opacity**; and the **Foreground** color, which the fill paints with. Click to fill. Hold and drag sideways to adjust the tolerance while you watch the area grow or shrink; the tolerance you let go at is kept for the next click. **Escape** before you let go cancels the fill. The fill goes into the selected raster or control layer; on an image layer it paints the image itself, and one undo restores it. With an inpaint mask or regional guidance layer selected, the area is added to the mask or region (or removed, in Erase mode) with a hard edge, so **Anti-alias** and **Opacity** are hidden; masks keep their own **Expand**, which starts at 2 pixels so the mask covers the soft edge of the area. With a group, text, shape or gradient layer selected, or none, the fill goes on a new paint layer; as that layer starts empty, such a fill samples all layers even with **Current layer** chosen, and **Erase** has nothing to erase. **All layers** samples what you see of the raster and control layers, not mask or region tints, and not a staged result you have not accepted. A selection limits the fill. The bucket searches at most 4096 × 4096 pixels: on a larger canvas, it asks for a selection, which shrinks the searched area to the selection. On a rotated or scaled layer, the fill follows the picture, not the layer's pixel grid.
 * **Text** — the font **Family**, **Style** or **Weight**, **Size**, **Line height**, **Align** and **Fill** color. Click the canvas to start typing; **Ctrl+Enter** or clicking elsewhere finishes the text, and **Escape** cancels it. The text stays editable as a text layer.
 * **Marquee select** and **Lasso select** — the **Shape** and the selection **Mode** (Replace, Add, Subtract or Intersect). **Shift** adds to the selection and **Alt** subtracts from it. The **Actions** fill or erase the selection, lift it to a **New layer**, **Invert** it, select everything, or **Deselect**.
+
+The Brush, Eraser, Shape, Paint bucket and Text options are remembered for your account, so they are the same in every project and after a reload. Colors are the project's own.
 
 ### Fonts
 
@@ -64,10 +66,10 @@ Fonts placed in the server's fonts directory are also available to everyone. It 
 
 If a project uses a font that is not installed, a dialog lets you retry, upload the font, or choose a replacement. You can keep editing with a marked fallback, but generating or saving the affected text needs the font. When you export a project, **Include font files** bundles the fonts it uses, if you have the right to redistribute them.
 
-Selections restrict painting: while an area is selected, brush strokes stay inside it. **Ctrl+A** selects all, **Ctrl+D** deselects and **Ctrl+Shift+I** inverts the selection.
+Selections restrict painting: while an area is selected, brush strokes and fills stay inside it. **Ctrl+A** selects all, **Ctrl+D** deselects and **Ctrl+Shift+I** inverts the selection.
 
 :::note[Changed from v6]
-In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if needed. In v7, the Lasso and Marquee make pixel selections on any layer instead, and the selection's **Fill** and **Erase** actions apply to raster layers only. To mask an irregular area, select it with the Lasso, select the inpaint mask or regional guidance layer, and paint over the area with a large Brush: the strokes stay inside the selection.
+In InvokeAI 6, the Lasso drew directly into an inpaint mask, and created one if needed. In v7, the Lasso and Marquee make pixel selections on any layer instead, and the selection's **Fill** and **Erase** actions apply to raster layers only. To mask an irregular area, select the inpaint mask or regional guidance layer and click the area with the Paint bucket: the mask follows the area's edges in the picture. Hold and drag sideways to adjust the tolerance until the mask covers what you want. To mask an area you outline yourself, select it with the Lasso, select the mask, and paint over the area with a large Brush: the strokes stay inside the selection.
 :::
 
 ## Navigating the canvas
@@ -222,6 +224,7 @@ The tool keys, **Shift+T**, **[** and **]**, and **X** and **D** also work after
 | Shortcut | Action |
 |---|---|
 | **H**, **V**, **Shift+T**, **C**, **B**, **E**, **U**, **G**, **T**, **M**, **L**, **I** | Select a tool (see [Tools](#tools)) |
+| **G** again | Switch between the Gradient and the Paint bucket. The Paint bucket has no key of its own; you can give it one in **Settings → Hotkeys** |
 | Hold **Space** | Pan temporarily |
 | Hold **Alt** | Pick a color (with tools that do not use **Alt** themselves) |
 | Hold / tap **C** | Use the generation frame tool until you let go / switch to it |

@@ -83,9 +83,12 @@ const PaintStrokeSettings = ({ engine }: ToolFormProps) => {
   );
 };
 
-/** A mirror of the project foreground, not brush-owned state: the pair feeds the engine's brush color. */
+/** A mirror of the project foreground, not tool-owned state: the pair feeds the brush's and the bucket's color. */
 const PaintColorSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
+  const activeTool = useCanvasActiveTool(engine);
+  const colorLabelKey =
+    activeTool === 'paintBucket' ? 'widgets.canvas.toolOptions.fillColor' : 'widgets.canvas.toolOptions.brushColor';
   const pair = useActiveColorPair();
   const { setPairColor } = useActiveColorCommands();
   const onColorChange = useCallback((color: string) => setPairColor('foreground', color), [setPairColor]);
@@ -93,7 +96,7 @@ const PaintColorSettings = ({ engine }: ToolFormProps) => {
   return (
     <PropertyControlRow label={t('widgets.properties.foreground')}>
       <ColorPicker
-        aria-label={t('widgets.canvas.toolOptions.brushColor')}
+        aria-label={t(colorLabelKey)}
         value={pair.foreground}
         onSampleColor={sampleColor}
         onValueChange={onColorChange}
@@ -148,12 +151,15 @@ const DYNAMICS_GROUP: ToolPropertyGroup = {
   labelKey: 'widgets.properties.groups.dynamics',
 };
 
+/** Shared with the paint bucket, so switching between it and the brush keeps the color row. */
+export const PAINT_COLOR_GROUP: ToolPropertyGroup = {
+  body: PaintColorSettings,
+  id: 'paint-color',
+  labelKey: 'widgets.properties.rows.color',
+};
+
 export const brushForm: ToolPropertyForm = {
-  groups: [
-    STROKE_GROUP,
-    { body: PaintColorSettings, id: 'paint-color', labelKey: 'widgets.properties.rows.color' },
-    DYNAMICS_GROUP,
-  ],
+  groups: [STROKE_GROUP, PAINT_COLOR_GROUP, DYNAMICS_GROUP],
   id: 'brush',
   paintsLeaf: true,
   preview: PaintPreview,

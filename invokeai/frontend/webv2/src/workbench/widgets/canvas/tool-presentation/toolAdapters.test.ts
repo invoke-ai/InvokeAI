@@ -13,6 +13,7 @@ const TOOL_IDS = Object.keys({
   lasso: true,
   marquee: true,
   move: true,
+  paintBucket: true,
   sam: true,
   shape: true,
   text: true,

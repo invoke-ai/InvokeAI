@@ -12,6 +12,7 @@ import type {
   LassoToolOptions,
   LayerQuickSwitchState,
   MarqueeToolOptions,
+  PaintBucketOptions,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -273,6 +274,23 @@ export const useShapeOptions = (engine: CanvasCoreStoreCapability): ShapeToolOpt
 /** The gradient tool's current options (kind / angle / stops). Write through `engine.interaction.set`. */
 export const useGradientOptions = (engine: CanvasCoreStoreCapability): GradientToolOptions =>
   useCanvasInteractionState(engine, 'gradientOptions');
+
+/** The paint bucket's current options. Write through `engine.interaction.set`. */
+export const usePaintBucketOptions = (engine: CanvasCoreStoreCapability): PaintBucketOptions =>
+  useCanvasInteractionState(engine, 'paintBucketOptions');
+
+/**
+ * The tolerance a held bucket press is scrubbing, or null between presses. Only the number is read, so pointer moves
+ * that leave it unchanged do not re-render.
+ */
+export const usePaintBucketScrubTolerance = (engine: CanvasCoreStoreCapability): number | null => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine.interaction.subscribe('paintBucketScrub', listener),
+    [engine]
+  );
+  const getSnapshot = useCallback(() => engine.interaction.get('paintBucketScrub')?.tolerance ?? null, [engine]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+};
 
 /** The text tool's current options (font / size / weight / line-height / align / color). */
 export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptions =>

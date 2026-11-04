@@ -75,7 +75,7 @@ const mount = async (layers: readonly CanvasNodeContract[], selectedLayerId: str
       </ChakraProvider>
     )
   );
-  const emit = (refusal: CanvasLayerEditRefusal) => act(() => listeners.forEach((listener) => listener(refusal)));
+  const emit = (refusal: CanvasEditRefusal) => act(() => listeners.forEach((listener) => listener(refusal)));
   return { emit, stub };
 };
 
@@ -93,13 +93,27 @@ describe('CanvasEditRefusalNotices', () => {
     [
       'layer-alpha-locked',
       '“Sky” has its transparency locked',
-      'The eraser can’t remove pixels while transparency is locked.',
+      'Erasing can’t remove pixels while transparency is locked.',
     ],
     ['layer-loading', '“Sky” is still loading', 'Its pixels are on their way. Try again in a moment.'],
   ] as const)('explains a %s refusal with no offer', async (status, title, message) => {
     const { emit } = await mount([layerContract('sky', 'raster', { name: 'Sky' })], 'sky');
     await emit(refusal(status, 'sky', 'Sky'));
     await expect.poll(toastTexts).toEqual([{ actions: [], message, title }]);
+  });
+
+  it('asks for a smaller area when a fill is too large, once however often it is pressed', async () => {
+    const { emit } = await mount([layerContract('sky', 'raster', { name: 'Sky' })], 'sky');
+    await emit({ status: 'fill-too-large' });
+    await emit({ status: 'fill-too-large' });
+    await expect.poll(toastTexts).toEqual([
+      {
+        actions: [],
+        message:
+          'This canvas is too large to fill without a selection. Select around the area you want to fill, then click inside it.',
+        title: 'Too large to fill',
+      },
+    ]);
   });
 
   it('replaces a repeated refusal without an offer, one toast per layer and reason', async () => {

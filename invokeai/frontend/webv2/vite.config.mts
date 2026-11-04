@@ -383,6 +383,9 @@ const CANVAS_LAYER_SHARED_MODULES = [
   '/workbench/widgets/canvas/canvasRestorePoints.ts',
   '/workbench/widgets/canvas/useCanvasRecovery.ts',
   '/workbench/widgets/canvas/canvasToolCommands.ts',
+  // The tool commands (Canvas and Layers keys) and the lazy tool strip share the family memory; alone it costs a
+  // request.
+  '/workbench/widgets/canvas/toolFamilyStore.ts',
   '/workbench/widgets/canvas/color-system/colorPair.ts',
   '/workbench/widgets/canvas/color-system/maskTintTarget.ts',
   '/workbench/widgets/canvas/color-system/useActiveColors.ts',

@@ -38,6 +38,24 @@ describe('renderOverlay', () => {
     expect(dashArgs).toContainEqual([4, 4]);
   });
 
+  it('shows a scrubbed paint bucket tolerance as its value alone, beside the pointer in CSS pixels', () => {
+    const backend = createTestStubRasterBackend();
+    const target = backend.createSurface(400, 400);
+    renderOverlay(target, baseState({ dpr: 2, toleranceReadout: { screenPoint: { x: 50, y: 60 }, tolerance: 32 } }));
+
+    const label = target.callLog.find((e) => e.op === 'fillText');
+    expect(label?.args[0]).toBe('32%');
+    // Right of and below the pointer, in CSS pixels: the frame's DPR transform scales it to device pixels.
+    expect(label?.args[1] as number).toBeGreaterThan(50);
+    expect(label?.args[2] as number).toBeGreaterThan(60);
+    expect(target.callLog.find((e) => e.op === 'setTransform')?.args).toEqual([1, 0, 0, 1, 0, 0]);
+    expect(target.callLog.filter((e) => e.op === 'setTransform').map((e) => e.args)).toContainEqual([2, 0, 0, 2, 0, 0]);
+
+    const idle = backend.createSurface(400, 400);
+    renderOverlay(idle, baseState({ toleranceReadout: null }));
+    expect(idle.callLog.some((e) => e.op === 'fillText')).toBe(false);
+  });
+
   it('draws no grid when showGrid is false', () => {
     const backend = createTestStubRasterBackend();
     const target = backend.createSurface(200, 200);

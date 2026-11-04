@@ -43,6 +43,8 @@ import type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  PaintBucketOptions,
+  PaintBucketScrub,
   ShapeToolOptions,
   TextEditSession,
   TextToolOptions,
@@ -217,6 +219,9 @@ export interface CanvasInteractionState {
   layerPixelEpoch: number;
   /** Monotonic signal: the mirrored document changed (an edit, sync or swap), after the engine reacted to it. */
   documentEpoch: number;
+  paintBucketOptions: PaintBucketOptions;
+  /** The tolerance a held paint bucket press is scrubbing and the pointer's CSS position; null otherwise. */
+  paintBucketScrub: PaintBucketScrub | null;
   ruleOfThirds: boolean;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;
@@ -251,6 +256,7 @@ export type CanvasWritableInteractionKey = Extract<
   | 'lassoOptions'
   | 'layerQuickSwitch'
   | 'marqueeOptions'
+  | 'paintBucketOptions'
   | 'ruleOfThirds'
   | 'shapeOptions'
   | 'showBbox'
@@ -428,14 +434,23 @@ export interface CanvasLayerEditRefusal {
 }
 
 /**
- * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape). An
+ * A paint bucket press whose sample domain (the frame and the sampled content, cut by the selection and Clip to frame)
+ * holds more than the fill's pixel cap. Selecting a smaller area makes it fillable.
+ */
+export interface CanvasFillTooLargeRefusal {
+  readonly status: 'fill-too-large';
+}
+
+/**
+ * Why the engine refused an edit the user started without a caller to report to (a stroke, a shape, a fill). An
  * `AdjustmentRefusal` names a layer whose spatial adjustments cannot run, so its pixels cannot be baked for painting;
  * a `CanvasLayerEditRefusal` names a layer the active tool cannot edit.
  */
 export type CanvasEditRefusal =
   | SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>
   | AdjustmentRefusal
-  | CanvasLayerEditRefusal;
+  | CanvasLayerEditRefusal
+  | CanvasFillTooLargeRefusal;
 
 export type LayerThumbnailRequestResult =
   | 'ready'
@@ -898,6 +913,10 @@ export type {
   LayerQuickSwitchState,
   LayerThumbnailStatus,
   MarqueeToolOptions,
+  PaintBucketMode,
+  PaintBucketOptions,
+  PaintBucketSample,
+  PaintBucketScrub,
   ShapeToolKind,
   ShapeToolOptions,
   ShapeToolTarget,
@@ -909,9 +928,14 @@ export {
   DEFAULT_BRUSH_OPTIONS,
   DEFAULT_ERASER_OPTIONS,
   DEFAULT_GRADIENT_OPTIONS,
+  DEFAULT_PAINT_BUCKET_OPTIONS,
   DEFAULT_SHAPE_OPTIONS,
   DEFAULT_TEXT_OPTIONS,
   MAX_BRUSH_SIZE,
+  MAX_FILL_CLOSE_GAPS,
+  MAX_FILL_EXPAND,
+  MAX_FILL_OPACITY,
+  MAX_FILL_TOLERANCE,
   MAX_SHAPE_STROKE_WIDTH,
   MAX_TEXT_FONT_SIZE,
   MIN_BRUSH_SIZE,
@@ -995,6 +1019,7 @@ export {
   isLayerTransparencyLocked,
   isNodeHidden,
   isPixelBackedLayer,
+  paintsInPlace,
 } from './document/layerEligibility';
 export {
   type DocumentCommand,

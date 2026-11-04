@@ -100,6 +100,8 @@ export const getCanvasShortcutHints = ({
     hints.push(gesture('pan', [], 'drag'), ZOOM);
   } else if (tool === 'colorPicker') {
     hints.push(gesture('sample', [], 'click'));
+  } else if (tool === 'paintBucket') {
+    hints.push(gesture('fill', [], 'click'), gesture('adjustTolerance', [], 'drag'), SAMPLE, CANCEL);
   } else if (tool === 'brush' || tool === 'eraser') {
     hints.push(
       { commandId: 'canvas.brushSizeDown', labelKey: 'workbench.shortcuts.actions.smaller' },

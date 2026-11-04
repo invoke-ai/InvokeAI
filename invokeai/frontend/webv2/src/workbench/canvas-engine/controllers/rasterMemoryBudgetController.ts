@@ -7,7 +7,8 @@ export type RasterBackgroundPurpose =
   | 'thumbnail'
   | 'raster-export'
   | 'psd-export'
-  | 'spatial-adjustment';
+  | 'spatial-adjustment'
+  | 'fill-sample';
 
 export interface RasterMemoryLease {
   release(): void;

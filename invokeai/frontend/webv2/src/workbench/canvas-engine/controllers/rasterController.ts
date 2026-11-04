@@ -32,6 +32,11 @@ import {
   createDerivedSurfaceCache,
   type DerivedSurfaceCache,
 } from '@workbench/canvas-engine/render/derivedSurfaceCache';
+import {
+  createFloodFillService,
+  type FloodFillExecutor,
+  type FloodFillService,
+} from '@workbench/canvas-engine/render/fill/floodFillService';
 import { createGroupSurfaceCache, type GroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
 import {
@@ -61,6 +66,8 @@ export interface RasterControllerOptions {
   readonly onAdjustmentStatus?: (ownerId: string, status: AdjustedSurfaceStatus | null) => void;
   /** Spatial worker factory; Node tests pass `createInlineSpatialExecutor`. Defaults to a module worker. */
   readonly createSpatialExecutor?: () => SpatialAdjustmentExecutor;
+  /** Flood fill worker factory; Node tests pass `createInlineFloodFillExecutor`. Defaults to a module worker. */
+  readonly createFloodFillExecutor?: () => FloodFillExecutor;
 }
 
 /** Access clocks captured before a frame draws; artifacts read after them are that frame's working set. */
@@ -84,6 +91,11 @@ export class RasterController {
   readonly bitmaps: DecodedBitmapPool;
   /** Evaluates spatial adjustments off the main thread; each job reserves its pixel buffer here. */
   readonly spatial: SpatialAdjustmentService;
+  /**
+   * Computes paint bucket regions off the main thread. Its worker heap stays outside the budget like spatial scratch;
+   * the sample a press composites is reserved by the tool as a `fill-sample` operation.
+   */
+  readonly floodFill: FloodFillService;
   private readonly diagnostics: CanvasDiagnostics;
   private readonly isLayerHeld: (layerId: string) => boolean;
   private readonly isAdjustmentBaked: (layerId: string) => boolean;
@@ -115,6 +127,7 @@ export class RasterController {
       createExecutor: options.createSpatialExecutor,
       reserve: (bytes) => memory.reserveOperation(bytes, { purpose: 'spatial-adjustment' }),
     });
+    this.floodFill = createFloodFillService({ createExecutor: options.createFloodFillExecutor });
     this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, {
       damageSince: (layerId, version) => this.layers.damageSince(layerId, version),
       spatial: {
@@ -376,6 +389,7 @@ export class RasterController {
     this.layers.dispose();
     this.adjustments.dispose();
     this.spatial.dispose();
+    this.floodFill.dispose();
     this.groups.clear();
     this.bitmaps.dispose();
     this.memory.dispose();

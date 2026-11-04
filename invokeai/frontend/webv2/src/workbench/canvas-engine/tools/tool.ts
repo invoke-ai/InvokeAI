@@ -16,6 +16,7 @@ import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { CompositeOptions } from '@workbench/canvas-engine/render/compositor';
+import type { FloodFillService } from '@workbench/canvas-engine/render/fill/floodFillService';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
@@ -37,8 +38,11 @@ export interface StrokeCommittedEvent {
   beforeImageData: ImageData;
   /** Cache pixels within `dirtyRect` after the stroke. */
   afterImageData: ImageData;
-  /** Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer. */
-  tool: 'brush' | 'eraser' | 'shape';
+  /**
+   * Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer, and the paint bucket records
+   * a fill or an erase.
+   */
+  tool: 'brush' | 'eraser' | 'shape' | 'paintBucket' | 'paintBucketErase';
   /** Optional auto-created layer and insertion placement let stroke history remove/recreate both layer and pixels. */
   createdLayer?: { layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor };
 }
@@ -86,6 +90,19 @@ export interface PaintLineEnds {
   get(layerId: string): Vec2 | undefined;
   set(layerId: string, point: Vec2): void;
   clear(): void;
+}
+
+/**
+ * The paint bucket's region worker. The engine counts a press as part of its gesture from `begin` until the tool's
+ * `end`, so other edits, history replays and cache trims wait for a released fill to land as they wait for a held
+ * stroke.
+ */
+export interface ToolFloodFill extends Pick<FloodFillService, 'begin' | 'region' | 'end'> {
+  /**
+   * Reserves a fill sample's pixels against the raster budget; null when they do not fit. Hand the lease to `begin`,
+   * which releases it once the worker has the buffer, or release it yourself when no press begins.
+   */
+  reserveSample(bytes: number): { release(): void } | null;
 }
 
 /** Everything a tool is allowed to reach, injected by the engine. */
@@ -152,6 +169,13 @@ export interface ToolContext {
    * in test harnesses.
    */
   resolveColorSample?(hex: string, phase: ColorSamplePhase): boolean;
+  /** The paint bucket's region worker and sample reservation; optional in test harnesses, where the bucket refuses. */
+  floodFill?: ToolFloodFill;
+  /**
+   * The engine's live transform overrides (a materialized pixel edit's identity, move previews). A composite that
+   * samples the document applies them as the screen does; absent means none.
+   */
+  transformOverrides?: CompositeOptions['transformOverrides'];
   /** Compositor providers that make sampling WYSIWYG; absent ⇒ raw cached pixels. */
   sampleProviders?: Pick<CompositeOptions, 'adjustedSurface' | 'derivedSurfaces' | 'groupSurface'>;
   /**
@@ -223,6 +247,12 @@ export interface Tool {
   onPointerUp?(ctx: ToolContext, input: PointerInput): void;
   /** The active gesture was cancelled (Esc, pointercancel, focus loss). */
   onPointerCancel?(ctx: ToolContext): void;
+  /**
+   * Ends work the tool still finishes after its gesture (a released fill waiting on the worker), putting back what it
+   * changed, synchronously. The engine calls it on every tool, active or not (a temporary hold may have taken over),
+   * wherever it cancels the active gesture and before cooldown persists pixels.
+   */
+  cancelSettling?(ctx: ToolContext): void;
   /**
    * Optional session commands from the pipeline; tools may apply/cancel while gesture cancellation remains
    * separate.

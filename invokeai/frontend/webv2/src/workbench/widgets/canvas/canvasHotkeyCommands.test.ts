@@ -20,6 +20,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import { CANVAS_HEADER_HOTKEYS } from './canvasHeaderCommands';
 import { CANVAS_ONLY_HOTKEYS, executeCanvasHotkeyCommand, type CanvasHotkeyContext } from './canvasHotkeyCommands';
 import { CANVAS_COMPANION_HOTKEYS, executeCanvasToolCommand, reportTransformRefusal } from './canvasToolCommands';
+import { recordFamilyTool, rememberedFamilyTool } from './toolFamilyStore';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasLayerContract> = {}): CanvasLayerContract =>
   ({
@@ -132,6 +133,7 @@ const run = (commandId: string, overrides: Partial<CanvasHotkeyContext> = {}) =>
 };
 
 beforeEach(() => {
+  recordFamilyTool('fill', 'gradient');
   dispatch = vi.fn();
   copySelection = vi.fn();
   pasteFromClipboard = vi.fn();
@@ -581,6 +583,26 @@ describe('tool selection', () => {
       engine: createEngine({ activeTool: 'shape', shapeOptions: { kind: 'freehand' } as never }),
     });
     expect(fromFreehand.interaction.set).toHaveBeenCalledWith('shapeOptions', { kind: 'rect' });
+  });
+
+  it('G selects the remembered Fill family member from outside the family', () => {
+    expect(run('canvas.tool.gradient').tools.setTool).toHaveBeenCalledExactlyOnceWith('gradient');
+    recordFamilyTool('fill', 'paintBucket');
+    expect(run('canvas.tool.gradient').tools.setTool).toHaveBeenCalledExactlyOnceWith('paintBucket');
+  });
+
+  it('G toggles between Gradient and Paint Bucket while either is active, and remembers the one it chose', () => {
+    const fromGradient = run('canvas.tool.gradient', { engine: createEngine({ activeTool: 'gradient' }) });
+    expect(fromGradient.tools.setTool).toHaveBeenCalledExactlyOnceWith('paintBucket');
+    expect(rememberedFamilyTool('fill')).toBe('paintBucket');
+    const fromBucket = run('canvas.tool.gradient', { engine: createEngine({ activeTool: 'paintBucket' }) });
+    expect(fromBucket.tools.setTool).toHaveBeenCalledExactlyOnceWith('gradient');
+    expect(rememberedFamilyTool('fill')).toBe('gradient');
+  });
+
+  it('the unbound paint bucket command selects the bucket and makes it the family memory', () => {
+    expect(run('canvas.tool.paintBucket').tools.setTool).toHaveBeenCalledExactlyOnceWith('paintBucket');
+    expect(rememberedFamilyTool('fill')).toBe('paintBucket');
   });
 });
 

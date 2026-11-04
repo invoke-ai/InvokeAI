@@ -41,6 +41,7 @@ export type ToolId =
   | 'eraser'
   | 'shape'
   | 'gradient'
+  | 'paintBucket'
   | 'lasso'
   | 'marquee'
   | 'move'

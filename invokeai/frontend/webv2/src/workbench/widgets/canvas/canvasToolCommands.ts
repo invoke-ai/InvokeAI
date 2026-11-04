@@ -1,6 +1,7 @@
 import type { BeginTransformResult, CanvasEngine } from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
+import { recordFamilyTool, rememberedFamilyTool } from '@workbench/widgets/canvas/toolFamilyStore';
 import { reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
 
 /** One hotkey row: its command id, title key and default keys. */
@@ -23,7 +24,9 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
   ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
+  // G selects the Fill family (Gradient, Paint Bucket). The id predates the family; saved bindings key on it.
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
+  ['canvas.tool.paintBucket', 'widgets.canvas.commands.selectPaintBucketTool', []],
   // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
   ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],
   ['canvas.brushSizeDown', 'widgets.canvas.commands.decreaseBrushSize', ['[']],
@@ -154,8 +157,18 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
     case 'canvas.tool.text':
       engine.tools.setTool('text');
       return;
-    case 'canvas.tool.gradient':
-      engine.tools.setTool('gradient');
+    case 'canvas.tool.gradient': {
+      // Toggles within the family while one member is active, like U cycles shapes; otherwise the remembered one.
+      const active = engine.interaction.get('activeTool');
+      const next =
+        active === 'gradient' ? 'paintBucket' : active === 'paintBucket' ? 'gradient' : rememberedFamilyTool('fill');
+      recordFamilyTool('fill', next);
+      engine.tools.setTool(next);
+      return;
+    }
+    case 'canvas.tool.paintBucket':
+      recordFamilyTool('fill', 'paintBucket');
+      engine.tools.setTool('paintBucket');
       return;
     case 'canvas.tool.colorPicker':
       engine.tools.setTool('colorPicker');

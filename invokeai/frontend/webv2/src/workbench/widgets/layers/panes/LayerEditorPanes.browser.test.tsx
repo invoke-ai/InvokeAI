@@ -407,6 +407,24 @@ describe('Properties pane', () => {
     expect(page.getByRole('button', { exact: true, name: 'Brush color' }).query()).toBeNull();
   });
 
+  it('gives the bucket the brush color row and names the new layer it fills above a selected group', async () => {
+    await mount(PropertiesPane, 'group');
+    await act(() => engine!.tools.setTool('brush'));
+    await settle();
+    // Brush strokes need a layer inside the group, so the Tool section repeats the Layer section's notice; a bucket
+    // fill creates a layer above the group, so its section names that layer instead.
+    const notices = () => host!.textContent!.split('Select a layer inside this group to paint.').length - 1;
+    expect(notices()).toBe(2);
+    const color = page.getByRole('button', { exact: true, name: 'Brush color' }).element();
+
+    await act(() => engine!.tools.setTool('paintBucket'));
+    await settle();
+    expect(notices()).toBe(1);
+    expect(host!.textContent).toContain('Editing: New layer');
+    // The shared Color group keeps its DOM across the switch, relabelled for the fill.
+    expect(page.getByRole('button', { exact: true, name: 'Fill color' }).element()).toBe(color);
+  });
+
   it('labels the shape form with its edit target and gates stroke width on the stroke slot', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('shape'));
