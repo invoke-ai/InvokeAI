@@ -339,6 +339,7 @@ class GalleryService(GalleryServiceABC):
         queue_media = MediaReferences()
         other_queue_items = 0
         for item in active:
+            # As the queue's own owner checks: an item stored without an owner is no caller's.
             if item.user_id == user_id:
                 queue_items += 1
                 target = queue_media

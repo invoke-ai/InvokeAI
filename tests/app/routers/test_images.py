@@ -10,7 +10,7 @@ from pydantic import ValidationError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE
+from invokeai.app.api.routers._limits import MAX_IMAGE_BATCH_SIZE
 from invokeai.app.api_app import app
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.auth.token_service import TokenData

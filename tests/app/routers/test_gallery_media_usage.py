@@ -12,6 +12,8 @@ from invokeai.app.services.gallery import gallery_default
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import intermediates as intermediate_queries
+from invokeai.app.services.shared.database.queries import media_references as media_reference_queries
 from invokeai.app.services.shared.media_references import MediaReferences
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowCategory,
@@ -120,7 +122,7 @@ def _quarantined(database: Database, user_id: str, project_id: str, name: str, *
     )
 
 
-def _queue_item(database: Database, user_id: str, status: str, *images: str) -> None:
+def _queue_item(database: Database, user_id: Optional[str], status: str, *images: str) -> None:
     nodes = {f"n{index}": {"image": {"image_name": image}} for index, image in enumerate(images)}
     with sqlite_cursor(database) as cursor:
         cursor.execute(
@@ -244,6 +246,31 @@ def test_other_accounts_use_is_counted_without_naming_it(
     assert user2 not in response.text
 
 
+def test_queue_work_without_an_owner_counts_as_another_accounts(
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    admin_token: str,
+    user1_token: str,
+    user1: str,
+) -> None:
+    # The queue's own access rules match an item's owner by equality, so a row stored without one is no caller's.
+    _image(mock_invoker, "orphan.png", user1)
+    _queue_item(mock_sqlite_database, None, "pending", "orphan.png")
+
+    for token in (user1_token, admin_token):
+        usage = _usage(client, token, image_names=["orphan.png"])
+
+        assert usage["in_use_image_count"] == 1
+        assert usage["queue"] == NO_QUEUE
+        assert usage["other_accounts"] == {
+            "document_count": 0,
+            "queue_item_count": 1,
+            "image_count": 1,
+            "video_count": 0,
+        }
+
+
 def test_names_the_caller_may_not_delete_are_not_checked(
     client: TestClient,
     mock_invoker: Invoker,
@@ -303,6 +330,44 @@ def test_board_scope_checks_what_deleting_the_board_would_delete(
     assert usage["in_use_image_count"] == 2
     assert usage["documents"] == []
     assert usage["other_accounts"] == {"document_count": 2, "queue_item_count": 0, "image_count": 2, "video_count": 1}
+
+
+def test_board_scope_spanning_query_chunks_reports_every_use(
+    client: TestClient,
+    mock_invoker: Invoker,
+    mock_sqlite_database: Database,
+    monkeypatch: pytest.MonkeyPatch,
+    user1_token: str,
+    user1: str,
+    user2: str,
+) -> None:
+    # Document names are read in chunks of ids per kind, active queue sessions in chunks of item ids.
+    monkeypatch.setattr(media_reference_queries, "IN_CHUNK", 2)
+    monkeypatch.setattr(intermediate_queries, "IN_CHUNK", 2)
+    board_id = _create_board(client, user1_token)
+    images = [f"board-{index}.png" for index in range(7)]
+    for name in images:
+        _image(mock_invoker, name, user1, board_id)
+    for index, name in enumerate(images[:5]):
+        _workflow(mock_invoker, user1, f"flow {index}", name)
+    for index, name in enumerate(images[:3]):
+        _project(mock_invoker, user1, f"project {index}", _naming(name, images[6]))
+    for name in images[:5]:
+        _queue_item(mock_sqlite_database, user1, "pending", name)
+    _workflow(mock_invoker, user2, "theirs", images[5])
+
+    usage = _usage(client, user1_token, board_id=board_id)
+
+    assert usage["checked_image_count"] == 7
+    assert usage["in_use_image_count"] == 7
+    assert _documents(usage) == [
+        *((("project", f"project {index}", sorted([images[index], images[6]]), []) for index in range(3))),
+        *((("workflow", f"flow {index}", [images[index]], []) for index in range(5))),
+    ]
+    assert usage["documents_total"] == 8
+    assert usage["queue"]["item_count"] == 5
+    assert usage["queue"]["image_names"] == sorted(images[:5])
+    assert usage["other_accounts"] == {"document_count": 1, "queue_item_count": 0, "image_count": 1, "video_count": 0}
 
 
 def test_board_scope_follows_the_board_deletion_errors(
