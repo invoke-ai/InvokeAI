@@ -1141,6 +1141,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     createPath2D: createPath2DImpl,
     dispatch: (action) => dispatchCanvasMutation(action),
     beginStrokeEdit: (initialBytes) => strokeEdits.begin(initialBytes),
+    beginSelectedLayerEdit: () => beginSelectedLayerEdit(),
     reportEditRefusal,
     getDocument: () => mirror.getDocument(),
     getSelectedLayerIds: () => {
@@ -1526,21 +1527,30 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   /** Whether the pointer gesture in progress edits a mask or a region, which a shown staged preview otherwise hides. */
   let gestureEditsStagingHiddenStack = false;
   /**
-   * Decided once as a gesture starts, so its pointer moves read a flag. While a preview is shown, the start and the
-   * end of such a gesture each repaint in full: the stacks show above the preview, then hide again.
+   * Set once per gesture, so its pointer moves read a flag. While a preview is shown, setting and clearing it each
+   * repaint in full: the stacks show above the preview, then hide again.
    */
-  const onGestureChange = (active: boolean): void => {
-    const document = active ? mirror.getDocument() : null;
-    const edits =
-      !!document &&
-      (activeTool()?.editsSelectedLayer?.(toolContext) ?? false) &&
-      isStagingHiddenStackSelected(document);
+  const setGestureEditsStagingHiddenStack = (edits: boolean): void => {
     if (edits === gestureEditsStagingHiddenStack) {
       return;
     }
     gestureEditsStagingHiddenStack = edits;
     if (renderController.previews.getStaged()) {
       scheduler.invalidate({ all: true });
+    }
+  };
+  /** The pointer gesture in progress edits the selected layer in place: at its press, or later (a move's drag). */
+  const beginSelectedLayerEdit = (): void => {
+    const document = mirror.getDocument();
+    if (pipeline.isGestureActive() && document && isStagingHiddenStackSelected(document)) {
+      setGestureEditsStagingHiddenStack(true);
+    }
+  };
+  const onGestureChange = (active: boolean): void => {
+    if (!active) {
+      setGestureEditsStagingHiddenStack(false);
+    } else if (activeTool()?.editsSelectedLayer?.(toolContext)) {
+      beginSelectedLayerEdit();
     }
   };
 

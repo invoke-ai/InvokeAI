@@ -205,8 +205,6 @@ export const createMoveTool = (): Tool => {
       const leaf = doc?.selectedLayerId && !state ? lookupDocumentLeaf(doc, doc.selectedLayerId) : null;
       return leaf && leafEditRefusal(leaf) ? 'not-allowed' : 'move';
     },
-    // Moves the selected layer (with the rest of the panel selection) unless a locked or hidden one refuses the drag.
-    editsSelectedLayer: (ctx) => planSelectedLayerDrag(ctx).kind === 'drag',
     id: 'move',
     // Alt bypasses grid snapping for the drag, so holding it first must not switch to the color picker.
     usesAltKey: true,
@@ -254,6 +252,10 @@ export const createMoveTool = (): Tool => {
         state.moved = true;
         if (state.mode.kind === 'lift') {
           state.mode = liftOnDrag(ctx, state.mode);
+        }
+        // Only now does the gesture edit the selected layer in place; a click, a float or a refused drag never does.
+        if (state.mode.kind === 'layer') {
+          ctx.beginSelectedLayerEdit?.();
         }
       }
       applyDelta(ctx, state, input);

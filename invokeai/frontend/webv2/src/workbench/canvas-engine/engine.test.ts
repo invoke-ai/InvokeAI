@@ -16049,12 +16049,25 @@ describe('masks while a result is staged', () => {
     overlay.fire('pointercancel', pointerAt(5, 5));
     expect(frame()).toEqual({ ...UNMASKED, full: 1 });
 
-    // So does a move press released in place, which changes nothing itself.
+    // A move click edits nothing, so it shows nothing, even with a wobble under the drag threshold.
     h.useTool('move');
     overlay.fire('pointerdown', pointerAt(5, 5));
-    expect(frame()).toEqual({ ...MASKED, full: 1 });
-    overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
-    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    expect(frame()).toMatchObject({ full: 0 });
+    overlay.fire('pointermove', pointerAt(6, 6));
+    overlay.fire('pointerup', pointerAt(6, 6, { buttons: 0 }));
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+
+    // A move drag shows them from the move that crosses the threshold until it lands or is cancelled.
+    for (const end of ['pointerup', 'pointercancel'] as const) {
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      expect(frame()).toMatchObject({ full: 0 });
+      overlay.fire('pointermove', pointerAt(15, 15));
+      expect(frame()).toEqual({ ...MASKED, full: 1 });
+      overlay.fire('pointermove', pointerAt(16, 16));
+      expect(frame()).toMatchObject(MASKED);
+      overlay.fire(end, pointerAt(16, 16, { buttons: 0 }));
+      expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    }
 
     // Panning and sampling colors edit nothing, so the masks stay hidden from the press on.
     for (const tool of ['view', 'colorPicker'] as const) {
@@ -16078,6 +16091,35 @@ describe('masks while a result is staged', () => {
     expect(frame()).toEqual({ ...MASKED, full: 0 });
     overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
     expect(frame()).toMatchObject(MASKED);
+    h.dispose();
+  });
+
+  it('keeps the selected mask loaded while hidden, so a stroke on it starts at once', async () => {
+    const h = setup(stacksFrom([rasterLayer('a')]));
+    await h.showPreview();
+    h.frame();
+    // A mask with durable pixels arrives while the preview hides its stack, and is selected; nothing else (no
+    // Layers-panel thumbnail) asks for its pixels.
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('m'),
+      mask: { ...maskLayer('m').mask, bitmap: { height: 20, imageName: 'mask.png', width: 20 } },
+    };
+    h.update({ document: { ...makeDoc(), selectedLayerId: 'm', stacks: stacksFrom([mask, rasterLayer('a')]) } });
+    expect(h.frame().drawn).toEqual(UNMASKED.drawn);
+    await flushMicrotasks();
+    h.frame();
+
+    const refusals: CanvasEditRefusal[] = [];
+    h.engine.tools.onEditRefused((refusal) => refusals.push(refusal));
+    const strokes: StrokeCommittedEvent[] = [];
+    h.engine.tools.onStrokeCommitted((event) => strokes.push(event));
+    h.useTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(h.frame()).toEqual({ ...MASKED, full: 1 });
+    h.overlay.fire('pointermove', pointerAt(15, 15));
+    h.overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(refusals).toEqual([]);
+    expect(strokes.map((stroke) => stroke.layerId)).toEqual(['m']);
     h.dispose();
   });
 
@@ -16142,13 +16184,24 @@ describe('masks while a result is staged', () => {
     for (const tool of ['move', 'brush', 'eraser', 'shape'] as const) {
       h.useTool(tool);
       h.frame();
-      if (tool === 'move' && moveReveals) {
-        h.overlay.fire('pointerdown', pointerAt(5, 5));
-        expect(h.frame()).toMatchObject({ full: 1, regionOverlays: true });
-        h.overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+      h.expectPressHidden();
+      if (tool !== 'move') {
+        continue;
+      }
+      // A move drag is refused on a locked or disabled mask, but moves a group's masks, showing them from the
+      // threshold on.
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointermove', pointerAt(15, 15));
+      const dragged = h.frame();
+      h.overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+      if (moveReveals) {
+        expect(dragged).toMatchObject({ full: 1, regionOverlays: true });
         expect(h.frame()).toMatchObject({ full: 1, regionOverlays: false });
       } else {
-        h.expectPressHidden();
+        // The refused drag repaints nothing, so neither the drag nor its release shows or hides a stack.
+        expect(dragged).toMatchObject({ full: 0 });
+        expect(dragged.regionOverlays).not.toBe(true);
+        expect(h.frame()).toMatchObject({ full: 0 });
       }
     }
     h.dispose();
