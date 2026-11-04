@@ -20,7 +20,6 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.qwen_image_vae import (
     QWEN_IMAGE_VAE_MIN_TILE_SIZE,
     as_qwen_image_vae,
@@ -129,7 +128,7 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
             # Reinterpret an Anima-classified Wan VAE as AutoencoderKLQwenImage (identical weights).
             vae = as_qwen_image_vae(vae)
 
-            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae.dtype)
+            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae.dtype)
 
             # Tiling bounds the encode's peak memory to a single tile, which is what makes large
             # inputs (e.g. a 2560x1440 upscale round-trip) encodable while a multi-GB transformer
