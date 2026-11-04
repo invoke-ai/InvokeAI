@@ -230,7 +230,16 @@ def _with(extra: dict[str, list[int]], base: dict[str, list[int]] = _BASE) -> di
 _UNAPPLICABLE_FILES = {
     "lora_A without lora_B": ({f"{_Q}.lora_A.weight": [4, 4096]}, "low-rank pair"),
     "orphan alpha": ({f"{_K}.alpha": []}, "incomplete or inconsistent"),
-    "orphan lora_mid": ({f"{_K}.lora_mid.weight": [4, 4, 1, 1]}, "incomplete or inconsistent"),
+    "lora_mid next to a valid pair": ({f"{_Q}.lora_mid.weight": [32, 32, 1, 1]}, "cannot be applied"),
+    "low-rank and LoHA keys on one module": (
+        {
+            f"{_Q}.lora_A.weight": [32, 4096],
+            f"{_Q}.lora_B.weight": [4096, 32],
+            f"{_Q}.hada_w1_a": [4096, 4],
+            f"{_Q}.hada_w1_b": [4, 4096],
+        },
+        "mixes layer types",
+    ),
     "hada_w1_a only": ({f"{_Q}.hada_w1_a": [4096, 4]}, "incomplete or inconsistent"),
     "lokr_w1 only": ({f"{_Q}.lokr_w1": [8, 8]}, "incomplete or inconsistent"),
     "lokr_w2 only": ({f"{_Q}.lokr_w2": [512, 512]}, "incomplete or inconsistent"),

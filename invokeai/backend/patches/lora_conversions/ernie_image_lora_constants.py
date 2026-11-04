@@ -37,9 +37,10 @@ _PREFIX_RE = r"^(?:" + "|".join(re.escape(p) for p in ERNIE_IMAGE_LORA_KEY_PREFI
 # container prefix. Z-Image keeps its blocks under ``layers.N`` too, but names them ``attention`` and
 # ``feed_forward``; Ideogram 4 uses ``attention.qkv`` and ``feed_forward.w1..3``. The transformer's top-level
 # modules ``adaLN_modulation.1`` and ``final_norm.linear`` exist in no other one either (``time_embedding`` and
-# ``text_proj`` are not markers: SD UNets have them), which identifies a file that touches only those and the MLP. ``mlp.gate_proj`` / ``up_proj`` alone are deliberately not markers: a PEFT LoRA over a
-# Qwen3-style LLM uses the same names under the same ``base_model.model.`` prefix, so they only count once a
-# marker has identified the file.
+# ``text_proj`` are not markers: SD UNets have them), which identifies a file that touches only those and the
+# MLP. ``mlp.gate_proj`` / ``up_proj`` alone are deliberately not markers: a PEFT LoRA over a Qwen3-style LLM
+# uses the same names under the same ``base_model.model.`` prefix, so they only count once a marker has
+# identified the file.
 _ERNIE_IMAGE_MARKER_RE = re.compile(
     _PREFIX_RE
     + r"(?:layers\.\d+\.(?:self_attention\.(?:to_q|to_k|to_v|to_out\.0)|mlp\.linear_fc2)\."
@@ -103,7 +104,6 @@ ERNIE_IMAGE_LORA_PARAM_NAMES = (
     "lora_B.weight",
     "lora_down.weight",
     "lora_up.weight",
-    "lora_mid.weight",
     "alpha",
     "lokr_w1",
     "lokr_w1_a",

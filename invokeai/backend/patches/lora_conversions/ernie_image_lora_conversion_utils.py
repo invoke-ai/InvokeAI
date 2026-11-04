@@ -24,7 +24,7 @@ from invokeai.backend.patches.lora_conversions.ernie_image_lora_constants import
     ernie_image_weight_shape,
     split_ernie_image_lora_key,
 )
-from invokeai.backend.patches.lora_conversions.flux3_lora_constants import _update_shape
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import update_shape
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 
 
@@ -65,6 +65,13 @@ def ernie_image_lora_defect(state_dict: Dict[str, torch.Tensor]) -> str | None:
 
 def _build_layer(layer_path: str, values: dict[str, torch.Tensor]) -> BaseLayerPatch:
     """Build one layer; the layer factories signal a missing or inconsistent tensor with assorted exceptions."""
+    kinds = {"lora": "lora_A.weight" in values or "lora_down.weight" in values, "hada": "hada_w1_a" in values}
+    kinds["lokr"] = any(k.startswith("lokr_") for k in values)
+    if sum(kinds.values()) > 1:
+        raise ValueError(
+            f"ERNIE-Image LoRA layer {layer_path!r} mixes layer types (has {sorted(values)}); "
+            "only one of low-rank, LoHA or LoKR per module can be applied."
+        )
     try:
         return any_lora_layer_from_state_dict(_normalize_lora_param_names(values))
     except (ValueError, KeyError, AssertionError, TypeError, RuntimeError) as e:
@@ -76,12 +83,12 @@ def _build_layer(layer_path: str, values: dict[str, torch.Tensor]) -> BaseLayerP
 
 def _check_update_shape(layer_path: str, values: dict[str, torch.Tensor]) -> None:
     weight_shape = ernie_image_weight_shape(layer_path)
-    if weight_shape is None or "lora_mid.weight" in values:
-        return  # Placement was settled by the key check; a Tucker mid has no plain product to compare.
-    update_shape = _update_shape(_normalize_lora_param_names(values))
-    if update_shape != weight_shape:
+    if weight_shape is None:
+        return  # Placement was settled by the key check.
+    shape = update_shape(_normalize_lora_param_names(values))
+    if shape != weight_shape:
         raise ValueError(
-            f"ERNIE-Image LoRA layer {layer_path!r} updates a weight of shape {update_shape}, "
+            f"ERNIE-Image LoRA layer {layer_path!r} updates a weight of shape {shape}, "
             f"but the module's weight is {weight_shape}."
         )
 
