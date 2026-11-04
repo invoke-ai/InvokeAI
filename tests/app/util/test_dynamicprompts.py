@@ -106,6 +106,10 @@ def test_find_missing_wildcards_reports_nothing_for_resolvable_wildcards_in_vari
         "${c=!__nope__ {a|b}} a ${c}",
         # Allowing zero options makes the first result an empty string.
         "${c=!{0-1$$__nope__|{__nope__}}} a ${c}",
+        # Picking several options keeps the first combination, the first options in order, when
+        # they are distinct literals.
+        "${c=!{2$$red|blue|__nope__}} a ${c}",
+        "${c=!{2-3$$red|blue|{__nope__}}} a ${c}",
     ],
 )
 def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: str) -> None:
@@ -128,6 +132,9 @@ def test_find_missing_wildcards_ignores_variable_values_that_never_run(prompt: s
         "${c=!{{2$$__nope__|{__nope__}}|red}} a ${c}",
         "${c=!x ${d:{__nope__}}} a ${c}",
         "${c=!{__nope__}} ${c=red} a ${c}",
+        # Duplicate literals in the first combination are deduped away, so later combinations
+        # with the unknown wildcard run.
+        "${c=!{2$$red|red|__nope__|{__nope__}}} a ${c}",
     ],
 )
 def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_result(prompt: str) -> None:
@@ -140,6 +147,12 @@ def test_immediate_assignment_keeps_only_the_first_result() -> None:
     result = expand_dynamic_prompt("${c=!{red|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
 
     assert result == ExpandedPrompts(prompts=[" a red"])
+
+
+def test_immediate_multi_pick_assignment_keeps_the_first_combination() -> None:
+    result = expand_dynamic_prompt("${c=!{2$$red|blue|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
+
+    assert result == ExpandedPrompts(prompts=[" a red,blue"])
 
 
 @pytest.mark.timeout(5)

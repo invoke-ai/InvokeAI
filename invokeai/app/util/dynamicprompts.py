@@ -22,6 +22,12 @@ from pyparsing import ParseException
 _SAMPLED_VALUE = LiteralCommand("")
 
 
+def _first_combination_is_distinct_literals(values: list[Command]) -> bool:
+    """Whether `values` are plain literals with pairwise different text."""
+    texts = [value.literal for value in values if isinstance(value, LiteralCommand)]
+    return len(texts) == len(values) and len(set(texts)) == len(texts)
+
+
 def _collect_wildcard_names(command: Command) -> list[str]:
     """Return the statically-known wildcard names that sampling `command` would evaluate, in order.
 
@@ -92,14 +98,20 @@ def _collect_wildcard_names(command: Command) -> list[str]:
                     visit(token, scope, scope_key, first_only)
         elif isinstance(command, VariantCommand):
             is_wildcard_variant = len(command.values) == 1 and isinstance(command.values[0], WildcardCommand)
-            if (
+            smallest_pick = min(command.min_bound, len(command.values))
+            first_only_variant = (
                 first_only
                 and not is_wildcard_variant
                 and command.sampling_method in (None, SamplingMethod.COMBINATORIAL)
-                and min(command.min_bound, len(command.values)) <= 1
-            ):
+            )
+            if first_only_variant and smallest_pick <= 1:
                 if command.min_bound >= 1 and command.values:
                     visit(command.values[0], scope, scope_key, first_only)
+            elif first_only_variant and _first_combination_is_distinct_literals(command.values[:smallest_pick]):
+                # The first combination the sampler tries is the first `smallest_pick` options in
+                # order. Distinct literals always survive deduplication, so that combination is the
+                # first result and no other option is ever sampled.
+                pass
             else:
                 for value in command.values:
                     visit(value, scope, scope_key)
