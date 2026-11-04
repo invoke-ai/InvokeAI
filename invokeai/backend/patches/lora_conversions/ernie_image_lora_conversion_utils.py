@@ -65,7 +65,10 @@ def ernie_image_lora_defect(state_dict: Dict[str, torch.Tensor]) -> str | None:
 
 def _build_layer(layer_path: str, values: dict[str, torch.Tensor]) -> BaseLayerPatch:
     """Build one layer; the layer factories signal a missing or inconsistent tensor with assorted exceptions."""
-    kinds = {"lora": "lora_A.weight" in values or "lora_down.weight" in values, "hada": "hada_w1_a" in values}
+    kinds = {
+        "lora": "lora_A.weight" in values or "lora_down.weight" in values,
+        "hada": any(k.startswith("hada_") for k in values),
+    }
     kinds["lokr"] = any(k.startswith("lokr_") for k in values)
     if sum(kinds.values()) > 1:
         raise ValueError(

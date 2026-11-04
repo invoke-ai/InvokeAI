@@ -230,7 +230,10 @@ def _with(extra: dict[str, list[int]], base: dict[str, list[int]] = _BASE) -> di
 _UNAPPLICABLE_FILES = {
     "lora_A without lora_B": ({f"{_Q}.lora_A.weight": [4, 4096]}, "low-rank pair"),
     "orphan alpha": ({f"{_K}.alpha": []}, "incomplete or inconsistent"),
-    "lora_mid next to a valid pair": ({f"{_Q}.lora_mid.weight": [32, 32, 1, 1]}, "cannot be applied"),
+    "lora_mid next to a valid pair": (
+        {"diffusion_model.layers.0.self_attention.to_q.lora_mid.weight": [32, 32, 1, 1]},
+        "cannot be applied",
+    ),
     "low-rank and LoHA keys on one module": (
         {
             f"{_Q}.lora_A.weight": [32, 4096],
@@ -249,6 +252,15 @@ _UNAPPLICABLE_FILES = {
             "diffusion_model.layers.99.self_attention.to_q.lora_B.weight": [4096, 32],
         },
         "beyond the model's 36",
+    ),
+    "low-rank and only the second LoHA half on one module": (
+        {
+            f"{_Q}.lora_A.weight": [32, 4096],
+            f"{_Q}.lora_B.weight": [4096, 32],
+            f"{_Q}.hada_w2_a": [4096, 4],
+            f"{_Q}.hada_w2_b": [4, 4096],
+        },
+        "mixes layer types",
     ),
     "wrong input width": (
         {f"{_Q}.lora_A.weight": [32, 3072], f"{_Q}.lora_B.weight": [4096, 32]},
