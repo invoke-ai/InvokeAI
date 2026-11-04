@@ -23,6 +23,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SD3VariantType
+from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import SD3_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
@@ -107,6 +108,44 @@ def test_a_lora_without_a_recorded_size_is_refused_by_its_shapes(sd35_medium: SD
 
     with pytest.raises(ValueError, match="does not fit this SD 3 model.*another SD 3 size"):
         _fit_check(sd35_medium, patch, None)
+
+
+def _lokr(w1_shape: tuple[int, int], w2_shape: tuple[int, int]) -> LoKRLayer:
+    return LoKRLayer(
+        w1=torch.zeros(w1_shape),
+        w1_a=None,
+        w1_b=None,
+        w2=torch.zeros(w2_shape),
+        w2_a=None,
+        w2_b=None,
+        t2=None,
+        alpha=None,
+        bias=None,
+    )
+
+
+def test_a_lokr_that_fits_passes(sd35_medium: SD3Transformer2DModel) -> None:
+    _fit_check(sd35_medium, _patch({"transformer_blocks.0.attn2.to_q": _lokr((2, 2), (768, 768))}), None)
+
+
+def test_a_mismatched_lokr_is_refused_instead_of_failing_at_the_first_forward(
+    sd35_medium: SD3Transformer2DModel,
+) -> None:
+    """kron((6, 1), (1536, 1536)) is 9216 x 1536, a plain block's `norm1.linear`; 3.5 Medium's dual-attention block 0 has 13824."""
+    patch = _patch({"transformer_blocks.0.norm1.linear": _lokr((6, 1), (1536, 1536))})
+
+    with pytest.raises(ValueError, match=r"does not fit this SD 3 model: `transformer_blocks.0.norm1.linear` is"):
+        _fit_check(sd35_medium, patch, None)
+
+
+def test_a_medium_lora_that_does_not_fit_a_medium_model_is_not_blamed_on_the_size(
+    sd35_medium: SD3Transformer2DModel,
+) -> None:
+    patch = _patch({"transformer_blocks.0.norm1.linear": _lokr((6, 1), (1536, 1536))})
+
+    with pytest.raises(ValueError, match="different SD 3 checkpoint layout") as error:
+        _fit_check(sd35_medium, patch, SD3VariantType.Medium)
+    assert "another SD 3 size" not in str(error.value)
 
 
 def test_a_35_medium_lora_with_dual_attention_is_refused_on_sd3_medium(sd3_medium: SD3Transformer2DModel) -> None:

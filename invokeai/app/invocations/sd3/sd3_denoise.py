@@ -27,7 +27,9 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional
 from invokeai.backend.model_manager.taxonomy import BaseModelType, SD3VariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.lora_layer import LoRALayer
+from invokeai.backend.patches.layers.lora_layer_base import LoRALayerBase
 from invokeai.backend.patches.lora_conversions.sd3_lora_constants import (
     SD3_LORA_TRANSFORMER_PREFIX,
     sd3_variant_from_width,
@@ -46,6 +48,20 @@ _SD3_SIZES = {SD3VariantType.Medium: "SD 3 / 3.5 Medium", SD3VariantType.Large: 
 # What one sidecar-patched layer holds while it computes its residual -- a second copy of the layer's output, or for a
 # LoKR/LoHA layer its full weight delta. Same margin as LTX-2 and ERNIE-Image.
 _SIDECAR_TRANSIENT_BYTES = 1024**3
+
+
+def _delta_fits(layer: BaseLayerPatch, weight: torch.Tensor) -> bool:
+    """Whether the layer's weight delta can be applied to `weight`.
+
+    Low-rank layers are compared by their factors' dimensions. Every other layer type (LoKR, LoHA, full, ...) builds a
+    delta that the patcher reshapes to the target's shape, so it fits only when it has as many elements.
+    """
+    if isinstance(layer, LoRALayer):
+        return layer.up.shape[0] == weight.shape[0] and layer.down.shape[1] == weight.shape[1]
+    if isinstance(layer, LoRALayerBase):
+        with torch.no_grad():
+            return layer.get_weight(weight).numel() == weight.numel()
+    return True
 
 
 @invocation(
@@ -424,12 +440,15 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 except AttributeError:
                     hint = " (it was trained for SD 3.5 Medium's dual attention)" if ".attn2." in path else ""
                     raise ValueError(f"LoRA '{name}' patches `{path}`, which this SD 3 model does not have{hint}.")
-                if isinstance(layer, LoRALayer) and (
-                    layer.up.shape[0] != module.weight.shape[0] or layer.down.shape[1] != module.weight.shape[1]
-                ):
+                if not _delta_fits(layer, module.weight):
+                    other_size = (
+                        " It was trained for another SD 3 size."
+                        if lora_variant is None or lora_variant is not model_variant
+                        else " It was trained for a different SD 3 checkpoint layout."
+                    )
                     raise ValueError(
-                        f"LoRA '{name}' does not fit this SD 3 model: `{path}` is {tuple(module.weight.shape)} here. "
-                        "It was trained for another SD 3 size."
+                        f"LoRA '{name}' does not fit this SD 3 model: `{path}` is {tuple(module.weight.shape)} here."
+                        + other_size
                     )
 
     def _prepare_noise_tensor(
