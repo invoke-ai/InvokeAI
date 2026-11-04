@@ -199,6 +199,7 @@ def test_keeping_fp8_reserves_less_than_folding(
     for keep in (False, True):
         _keep_fp8(monkeypatch, keep)
         loader._ram_cache = MagicMock()
+        loader.__dict__.pop("_keeps_fp8_decisions", None)  # a real load gets a fresh loader
         _load_encoder(loader, path)
         loader._ram_cache.make_room.assert_called_once()
         reserved[keep] = loader._ram_cache.make_room.call_args.args[0]
@@ -275,3 +276,20 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
         dtypes[name] = weight_dtype(loader)
 
     assert dtypes == {"capable": FP8, "incapable": torch.float32}
+
+
+def test_the_cache_key_and_the_stored_format_come_from_one_capability_decision(
+    loader: T5EncoderSingleFileLoader, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # The key is computed before the load lock and the build runs under it; a probe that turns positive in
+    # between must not store float8 under a key that says folded, where an incapable device would adopt it.
+    path = tmp_path / "t5xxl.safetensors"
+    _write_scaled_fp8(_tiny_reference(), path)
+    config = _config(path)
+    _keep_fp8(monkeypatch, False)
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder2) == ""
+
+    _keep_fp8(monkeypatch, True)
+    model = loader._load_model(config, SubModelType.TextEncoder2)
+
+    assert all(p.dtype == torch.float32 for p in model.parameters())

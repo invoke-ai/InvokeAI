@@ -737,8 +737,13 @@ class T5EncoderSingleFileLoader(ModelLoader):
         return super().get_size_fs(config, model_path, submodel_type)
 
     def _keeps_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
+        # Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
+        # and the capability probes can flip between the key computation and the build under the load lock.
         device = self._get_execution_device(config, submodel_type) or self._torch_device
-        return should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+        decisions = self.__dict__.setdefault("_keeps_fp8_decisions", {})
+        if device not in decisions:
+            decisions[device] = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+        return decisions[device]
 
     def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
         # Whether the Linear weights stay float8 depends on the device, and device caches share one canonical CPU
