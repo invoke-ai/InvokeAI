@@ -118,7 +118,7 @@ def test_two_single_files_both_take_the_lora_and_give_it_back() -> None:
     x = torch.randn(2, TINY.emb_dim)
 
     with ExitStack() as stack:
-        conditional, unconditional = invocation._load_branches(context, stack, 0)
+        conditional, unconditional = invocation._load_branches(context, stack, 0, lora_rows=ROWS)
         for branch, model in (("cond", conditional), ("uncond", unconditional)):
             torch.testing.assert_close(_qkv(model, x), x @ (weights[branch] + 0.5 * delta).T)
 
@@ -140,7 +140,7 @@ def test_a_pair_patches_both_of_its_branches_and_gives_them_back() -> None:
     }
 
     with ExitStack() as stack:
-        invocation._load_branches(context, stack, 0)
+        invocation._load_branches(context, stack, 0, lora_rows=ROWS)
         for branch in ("conditional", "unconditional"):
             torch.testing.assert_close(_qkv(getattr(pair, branch), x), x @ (live[branch] + delta).T)
 
@@ -173,7 +173,7 @@ def test_a_directly_patched_pair_restores_each_branch_from_its_own_half_of_the_r
     )
 
     with ExitStack() as stack:
-        invocation._load_branches(context, stack, 0)
+        invocation._load_branches(context, stack, 0, lora_rows=ROWS)
         for branch in restored_to:
             torch.testing.assert_close(getattr(pair, branch).get_submodule(QKV).weight, live[branch] + delta)
 
@@ -190,7 +190,7 @@ def test_loras_on_the_unconditional_input_are_refused() -> None:
     context = _context({"cond": _transformer(0), "uncond": _transformer(1)}, {})
 
     with pytest.raises(ValueError, match="Transformer \\(Unconditional\\)"), ExitStack() as stack:
-        invocation._load_branches(context, stack, 0)
+        invocation._load_branches(context, stack, 0, lora_rows=ROWS)
 
 
 def _lokr_on_qkv() -> ModelPatchRaw:
@@ -345,7 +345,7 @@ def test_patches_take_the_dtype_the_branch_computes_in() -> None:
     x = torch.randn(2, TINY.emb_dim)
 
     with ExitStack() as stack:
-        conditional, _unconditional = invocation._load_branches(context, stack, 0)
+        conditional, _unconditional = invocation._load_branches(context, stack, 0, lora_rows=ROWS)
         torch.testing.assert_close(_qkv(conditional, x), x @ (weight + delta).T)
 
     torch.testing.assert_close(patch.layers[f"{IDEOGRAM4_LORA_TRANSFORMER_PREFIX}{QKV}"].down, original_down)

@@ -160,7 +160,9 @@ def test_a_bundled_pair_supplies_both_branches_from_one_model() -> None:
     invocation = _invocation(transformer=_field("pipeline"))
 
     with ExitStack() as stack:
-        conditional, unconditional = invocation._load_branches(_context({"pipeline": pair}, released), stack, 0)
+        conditional, unconditional = invocation._load_branches(
+            _context({"pipeline": pair}, released), stack, 0, lora_rows=0
+        )
 
         assert conditional is pair.conditional
         assert unconditional is pair.unconditional
@@ -178,7 +180,9 @@ def test_two_single_files_are_both_held_for_the_whole_loop() -> None:
     loaded: list[str] = []
     calls: list[tuple[str, int]] = []
     with ExitStack() as stack:
-        conditional, unconditional = invocation._load_branches(_context(models, released, calls, loaded), stack, 0)
+        conditional, unconditional = invocation._load_branches(
+            _context(models, released, calls, loaded), stack, 0, lora_rows=0
+        )
 
         assert conditional is models["cond"]
         assert unconditional is models["uncond"]
@@ -199,7 +203,7 @@ def test_a_lone_single_file_is_refused() -> None:
     invocation = _invocation(transformer=_field("cond"))
 
     with pytest.raises(ValueError, match="only one branch"), ExitStack() as stack:
-        invocation._load_branches(_context({"cond": Ideogram4Transformer(TINY)}, released), stack, 0)
+        invocation._load_branches(_context({"cond": Ideogram4Transformer(TINY)}, released), stack, 0, lora_rows=0)
 
 
 def test_a_bundled_pair_with_a_second_branch_connected_is_refused() -> None:
@@ -211,7 +215,10 @@ def test_a_bundled_pair_with_a_second_branch_connected_is_refused() -> None:
     loaded: list[str] = []
     with pytest.raises(ValueError, match="already carries both"), ExitStack() as stack:
         invocation._load_branches(
-            _context({"pipeline": pair, "uncond": Ideogram4Transformer(TINY)}, released, loaded=loaded), stack, 0
+            _context({"pipeline": pair, "uncond": Ideogram4Transformer(TINY)}, released, loaded=loaded),
+            stack,
+            0,
+            lora_rows=0,
         )
 
     # The refusal comes before the second branch is read: a mis-wired graph costs an error, not a
@@ -320,7 +327,7 @@ def test_a_mixed_pair_reserves_for_the_hungrier_branch(int8_branch: str) -> None
     assert transient > 0
 
     with ExitStack() as stack:
-        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3)
+        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3, lora_rows=0)
 
     assert calls == [("cond", 4 * 1024**3 + transient), ("uncond", 4 * 1024**3 + transient)]
 
@@ -338,7 +345,7 @@ def test_both_branches_reserve_the_same_activation_headroom() -> None:
     invocation.unconditional_transformer = _field("uncond")
 
     with ExitStack() as stack:
-        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3)
+        invocation._load_branches(_context(models, [], calls), stack, 4 * 1024**3, lora_rows=0)
 
     assert calls == [("cond", 4 * 1024**3), ("uncond", 4 * 1024**3)]
 
@@ -457,6 +464,7 @@ def _drive(
             ),
             stack,
             reservation,
+            lora_rows=0,
         )
     return cond, uncond, calls, emptied
 
@@ -612,7 +620,7 @@ def test_the_bundled_pair_is_never_capped(monkeypatch) -> None:
 
     with ExitStack() as stack:
         invocation._load_branches(
-            _context({"pipeline": pair}, [], residency={"pipeline": pair_record}), stack, RESERVATION
+            _context({"pipeline": pair}, [], residency={"pipeline": pair_record}), stack, RESERVATION, lora_rows=0
         )
 
     assert pair_record.unloaded == []

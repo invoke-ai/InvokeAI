@@ -113,7 +113,8 @@ The filter is known to **false-positive on completely benign prompts**, and the 
 Ideogram 4 LoRAs are supported in the layouts trainers publish them in: ai-toolkit and the LoRAs on Civitai
 (`diffusion_model.` prefix, fused attention), including LoKR, and the diffusers training script (`transformer.` prefix,
 split attention projections, which Invoke fuses), as single files or, for a diffusers repository, as a folder holding
-`pytorch_lora_weights.safetensors`. Kohya-flattened names (`lora_unet__layers_0_feed_forward_w1`) are recognized too.
+`pytorch_lora_weights.safetensors`. Kohya-flattened names (`lora_unet__layers_0_feed_forward_w1`) are recognized for the block modules only; a
+flattened file that also trains `input_proj`, `final_layer` or the other top-level modules is not recognized.
 DoRA files, and files with layers that match no Ideogram 4
 transformer module, are refused when you install them; LoHA files are not recognized. Add them in the **Guidance**
 section like any other concept.

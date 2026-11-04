@@ -295,7 +295,7 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
         return peak_dequant_transient_bytes(model, get_model_compute_dtype(model))
 
     def _load_branches(
-        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int, lora_rows: int = 0
+        self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int, lora_rows: int
     ) -> tuple[Ideogram4Transformer, Ideogram4Transformer]:
         """Put both transformer branches on the device and keep them there for the whole loop.
 
