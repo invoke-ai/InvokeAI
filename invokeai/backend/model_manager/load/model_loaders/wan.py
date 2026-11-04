@@ -33,7 +33,6 @@ from invokeai.backend.model_manager.load.model_loaders.comfyui_state_dict_utils 
     _strip_quantization_metadata,
 )
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
-from invokeai.backend.model_manager.load.quantized_embedding import materialize_quantized_embedding
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
     BaseModelType,
@@ -48,7 +47,7 @@ from invokeai.backend.model_manager.util.llamacpp_t5 import (
     make_feed_forward_gguf_safe,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
-from invokeai.backend.quantization.gguf.loaders import UNQUANTIZED_GGML_TYPES, gguf_sd_loader, unpack_ggml_tensor
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader, unpack_ggml_at_load
 from invokeai.backend.quantization.gguf.utils import TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
@@ -690,29 +689,15 @@ class WanT5EncoderGGUFLoader(ModelLoader):
         with accelerate.init_empty_weights():
             model = UMT5EncoderModel(infer_t5_encoder_config(sd, UMT5Config))
 
-        # Not `unpack_ggml_at_load` with the model's declared skip patterns, as other GGUF loaders do:
-        # UMT5 declares `_keep_in_fp32_modules = ["wo"]`, which would unpack every feed-forward output
-        # projection -- nearly a fifth of the encoder's weights. transformers keeps those in float32
-        # only for a float16 load, against an overflow this loader never computes in.
+        # No model-declared skip patterns, unlike other GGUF loaders: UMT5 declares
+        # `_keep_in_fp32_modules = ["wo"]`, which would unpack every feed-forward output projection --
+        # nearly a fifth of the encoder's weights. transformers keeps those in float32 only for a
+        # float16 load, against an overflow this loader never computes in.
         source = "Wan UMT5 GGUF encoder"
+        unpack_ggml_at_load(sd, model, (), self._ram_cache.make_room)
         load_state_dict_ignoring_extras(
             model, sd, source=source, assign=True, allowed_missing={"encoder.embed_tokens.weight"}
         )
-        # `sd` still holds every packed original. Dropping it frees each one as its replacement lands
-        # below; otherwise an F32 file (21 GiB) peaks at its size plus the unpacked copy.
-        sd.clear()
-        for module in model.modules():
-            # The embedding last, with its reservation: decoded while an F32 file's Linears were still
-            # resident, its copy would land on top of the whole file.
-            if module is model.shared:
-                continue
-            is_linear = isinstance(module, torch.nn.Linear)
-            for name, param in list(module.named_parameters(recurse=False)):
-                if isinstance(param, GGMLTensor) and (
-                    not is_linear or param._ggml_quantization_type in UNQUANTIZED_GGML_TYPES
-                ):
-                    setattr(module, name, torch.nn.Parameter(unpack_ggml_tensor(param), requires_grad=False))
-        materialize_quantized_embedding(model.shared, ram_cache=self._ram_cache)
         model.encoder.embed_tokens.weight = model.shared.weight
 
         make_feed_forward_gguf_safe(model)
