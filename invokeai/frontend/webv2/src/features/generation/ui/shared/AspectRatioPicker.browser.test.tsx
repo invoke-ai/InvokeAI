@@ -277,8 +277,7 @@ describe('AspectRatioPicker saved ratios', () => {
     await expect.element(nameInput()).toHaveFocus();
     await expect.element(widthTerm()).toHaveValue('12');
     await expect.element(heightTerm()).toHaveValue('5');
-    await expect.element(page.getByText('From the current size · 1536×640')).toBeVisible();
-    await expect.element(widthTerm()).toHaveAccessibleDescription('From the current size · 1536×640');
+    await expect.element(widthTerm()).toHaveAccessibleDescription('Picking it sets 1536×640');
 
     await userEvent.keyboard('Banner{Enter}');
 
@@ -288,7 +287,7 @@ describe('AspectRatioPicker saved ratios', () => {
     expect(isOpen()).toBe(true);
   });
 
-  it('prefills a locked ratio, not the size snapped to it, and says where the terms came from', async () => {
+  it('prefills a locked ratio, not the size snapped to it, and names the size the typed terms set', async () => {
     // 1368×768 is exactly 57:32, the 16:9 lock snapped to the grid.
     await render({ currentSize: { height: 768, width: 1368 }, initial: [], lockedRatio: 16 / 9 });
 
@@ -297,7 +296,19 @@ describe('AspectRatioPicker saved ratios', () => {
 
     await expect.element(widthTerm()).toHaveValue('16');
     await expect.element(heightTerm()).toHaveValue('9');
-    await expect.element(page.getByText('From the locked ratio · 16:9')).toBeVisible();
+    await expect.element(page.getByText('Picking it sets 1368×768')).toBeVisible();
+
+    // 1368×768 at 2.39:1 is 1584.6×663.0, snapped to 1584×664.
+    await userEvent.clear(widthTerm());
+    await userEvent.type(widthTerm(), '2.39');
+    await userEvent.clear(heightTerm());
+    await userEvent.type(heightTerm(), '1');
+    await expect.element(heightTerm()).toHaveAccessibleDescription('Picking it sets 1584×664');
+
+    // Terms that make no ratio leave the line blank and describe nothing.
+    await userEvent.clear(widthTerm());
+    await expect.element(page.getByText(/^Picking it sets/)).not.toBeInTheDocument();
+    await expect.element(heightTerm()).toHaveAccessibleDescription('');
   });
 
   it('keeps focus in the popover when a full list saves nothing', async () => {
@@ -380,6 +391,9 @@ describe('AspectRatioPicker saved ratios', () => {
     await expect.element(page.getByText('Enter a name.')).toBeVisible();
     await expect.element(page.getByText('Enter two numbers above 0.')).toBeVisible();
     await expect.element(nameInput()).toHaveFocus();
+    // Only the zero is marked; the 5 beside it is fine.
+    await expect.element(widthTerm()).toBeInvalid();
+    await expect.element(heightTerm()).toBeValid();
 
     await userEvent.type(nameInput(), 'Strip');
     await userEvent.clear(widthTerm());
@@ -391,14 +405,57 @@ describe('AspectRatioPicker saved ratios', () => {
     await expect.element(page.getByText('Use a ratio between 1:8 and 8:1.')).toBeVisible();
     await expect.element(page.getByText('Enter a name.')).not.toBeInTheDocument();
     await expect.element(widthTerm()).toHaveFocus();
+    // The range is the pair's, so both terms are marked.
+    await expect.element(widthTerm()).toBeInvalid();
+    await expect.element(heightTerm()).toBeInvalid();
     expect(page.getByRole('button', { name: /^Strip,/ }).elements()).toHaveLength(0);
 
     // Only plain decimals read as terms, never what `Number` would also accept.
-    for (const unreadable of ['1e1', '0x10', '1,000']) {
+    for (const unreadable of ['1e1', '0x10']) {
       await userEvent.clear(widthTerm());
       await userEvent.type(widthTerm(), unreadable);
       await expect.element(page.getByText('Enter two numbers above 0.')).toBeVisible();
+      await expect.element(heightTerm()).toBeValid();
     }
+
+    // A third decimal is past the precision a term keeps; a comma is a decimal separator, never a thousands one.
+    for (const precise of ['1.234', '1,000']) {
+      await userEvent.clear(widthTerm());
+      await userEvent.type(widthTerm(), precise);
+      await expect.element(page.getByText('Use up to two decimals.')).toBeVisible();
+      await expect.element(widthTerm()).toBeInvalid();
+      await expect.element(widthTerm()).toHaveAccessibleDescription('Use up to two decimals.');
+      await expect.element(heightTerm()).toBeValid();
+      await expect.element(heightTerm()).toHaveAccessibleDescription('');
+    }
+
+    // Submitting focuses the term that is wrong, here the second.
+    await userEvent.clear(widthTerm());
+    await userEvent.type(widthTerm(), '2');
+    await userEvent.clear(heightTerm());
+    await userEvent.type(heightTerm(), '0.125');
+    await userEvent.click(page.getByRole('button', { name: 'Add', exact: true }));
+    await expect.element(heightTerm()).toHaveFocus();
+    await expect.element(widthTerm()).toBeValid();
+
+    // With a different error in each term, only the term the message is about is marked; the other's comes next.
+    await userEvent.clear(widthTerm());
+    await userEvent.type(widthTerm(), '0');
+    await userEvent.clear(heightTerm());
+    await userEvent.type(heightTerm(), '1.234');
+    await expect.element(page.getByText('Enter two numbers above 0.')).toBeVisible();
+    await expect.element(widthTerm()).toBeInvalid();
+    await expect.element(heightTerm()).toBeValid();
+    await expect.element(heightTerm()).toHaveAccessibleDescription('');
+    await userEvent.clear(widthTerm());
+    await userEvent.type(widthTerm(), '2');
+    await expect.element(page.getByText('Use up to two decimals.')).toBeVisible();
+    await expect.element(widthTerm()).toBeValid();
+    await expect.element(heightTerm()).toBeInvalid();
+
+    // A trailing separator reads as the whole number.
+    await userEvent.clear(heightTerm());
+    await userEvent.type(heightTerm(), '1.');
 
     // A comma decimal reads as a decimal.
     await userEvent.clear(widthTerm());

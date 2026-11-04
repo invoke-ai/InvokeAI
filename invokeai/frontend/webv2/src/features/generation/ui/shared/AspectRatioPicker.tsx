@@ -97,16 +97,26 @@ const ClippedText = ({ children, ...props }: TextProps & { children: string }) =
 };
 
 /**
- * Digits with up to two decimals after either separator, the precision a term keeps. Nothing else `Number` reads
- * (`0x10`, `1e1`), and no thousands separator: `1,000` is not a term.
+ * Digits with decimals after either separator; a trailing separator (`5.`) reads as the whole number. Nothing else
+ * `Number` reads (`0x10`, `1e1`), and no thousands separator: `1,000` reads as a decimal with too many places.
  */
-const TERM_PATTERN = /^\d*(?:[.,]\d{1,2})?$/;
+const TERM_PATTERN = /^\d*(?:[.,](\d*))?$/;
+/** The precision a term keeps: saved terms come back to the edit form at two decimals. */
+const MAX_TERM_DECIMALS = 2;
 
-/** A typed term; a blank or unreadable one is NaN, which validation names. */
-const parseTerm = (value: string): number => {
+type TermError = 'number' | 'decimals';
+
+/** A typed term above 0, or why it is not one: blank, unreadable or 0 (`number`), or too precise (`decimals`). */
+const readTerm = (value: string): number | TermError => {
   const trimmed = value.trim();
+  const match = trimmed === '' ? null : TERM_PATTERN.exec(trimmed);
+  const term = match ? Number(trimmed.replace(',', '.')) : Number.NaN;
 
-  return trimmed === '' || !TERM_PATTERN.test(trimmed) ? Number.NaN : Number(trimmed.replace(',', '.'));
+  if (!match || !Number.isFinite(term) || term <= 0) {
+    return 'number';
+  }
+
+  return (match[1]?.length ?? 0) > MAX_TERM_DECIMALS ? 'decimals' : term;
 };
 
 /** Focus targets are keyed, so a control that mounts after the change that needs it can still take focus. */
@@ -139,7 +149,7 @@ const useDeferredFocus = () => {
 type DeferredFocus = ReturnType<typeof useDeferredFocus>;
 
 const PresetForm = ({
-  hint,
+  getSizeForRatio,
   registerFocusTarget,
   initial,
   submitLabel,
@@ -147,8 +157,8 @@ const PresetForm = ({
   onCancel,
   onSubmit,
 }: {
-  /** The line under the terms while no error shows, given the entered ratio (null while the terms make none). */
-  hint: (ratio: number | null) => string;
+  /** Names the size the entered ratio would set, on the line under the terms while no error shows. */
+  getSizeForRatio: (ratio: number) => Size;
   registerFocusTarget: DeferredFocus['registerTarget'];
   initial: { label: string; terms: AspectRatioTerms };
   submitLabel: string;
@@ -168,18 +178,37 @@ const PresetForm = ({
   // Errors wait for the first submit, then follow every edit.
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const nameError = label.trim() === '' ? t('widgets.generate.aspectRatioNameRequired') : null;
-  const termsErrorKind = getAspectRatioTermsError(parseTerm(width), parseTerm(height));
+  const widthTerm = readTerm(width);
+  const heightTerm = readTerm(height);
+  // Each term is checked on its own, so only the offending field is marked; the range is the pair's.
+  const termsErrorKind =
+    widthTerm === 'number' || heightTerm === 'number'
+      ? 'number'
+      : widthTerm === 'decimals' || heightTerm === 'decimals'
+        ? 'decimals'
+        : getAspectRatioTermsError(widthTerm, heightTerm);
   const termsError =
-    termsErrorKind === 'terms'
-      ? t('widgets.generate.aspectRatioTermsInvalid')
+    termsErrorKind === 'decimals'
+      ? t('widgets.generate.aspectRatioTermDecimals')
       : termsErrorKind === 'range'
         ? t('widgets.generate.aspectRatioOutOfRange')
-        : null;
+        : termsErrorKind
+          ? t('widgets.generate.aspectRatioTermsInvalid')
+          : null;
   // Follows the terms as they are typed; a dashed square until they make a ratio this build accepts.
-  const previewRatio = termsErrorKind === null ? parseTerm(width) / parseTerm(height) : null;
+  const previewRatio = termsErrorKind === null ? (widthTerm as number) / (heightTerm as number) : null;
   const showsTermsError = hasSubmitted && termsError !== null;
-  const hintText = hint(previewRatio);
-  const termsDescription = showsTermsError ? termsErrorId : hintText ? hintId : undefined;
+  // Marked only where the shown message applies: a term with another error waits until this one is fixed.
+  const isTermInvalid = (term: number | TermError) =>
+    showsTermsError && (term === termsErrorKind || termsErrorKind === 'range');
+  const isWidthInvalid = isTermInvalid(widthTerm);
+  const isHeightInvalid = isTermInvalid(heightTerm);
+  const hintText =
+    previewRatio === null
+      ? ''
+      : t('widgets.generate.aspectRatioWouldSetSize', { size: formatSize(getSizeForRatio(previewRatio)) });
+  const describeTerm = (isInvalid: boolean) =>
+    isInvalid ? termsErrorId : !showsTermsError && hintText ? hintId : undefined;
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -188,13 +217,18 @@ const PresetForm = ({
     setHasSubmitted(true);
 
     if (nameError || termsError) {
-      event.currentTarget
-        .querySelector<HTMLElement>(nameError ? '[data-focus-key="form-name"]' : '[data-term]')
-        ?.focus();
+      // The name, else the first term the message is about; both are for a ratio out of range.
+      const target = nameError
+        ? '[data-focus-key="form-name"]'
+        : widthTerm === termsErrorKind || termsErrorKind === 'range'
+          ? '[data-term="width"]'
+          : '[data-term="height"]';
+
+      event.currentTarget.querySelector<HTMLElement>(target)?.focus();
       return;
     }
 
-    onSubmit({ height: parseTerm(height), label: label.trim(), width: parseTerm(width) });
+    onSubmit({ height: heightTerm as number, label: label.trim(), width: widthTerm as number });
   };
 
   return (
@@ -240,10 +274,10 @@ const PresetForm = ({
             <Stack gap="1">
               <HStack alignItems="center" gap="1.5">
                 <Input
-                  aria-describedby={termsDescription}
-                  aria-invalid={showsTermsError || undefined}
+                  aria-describedby={describeTerm(isWidthInvalid)}
+                  aria-invalid={isWidthInvalid || undefined}
                   aria-label={t('widgets.generate.aspectRatioWidthTerm')}
-                  data-term=""
+                  data-term="width"
                   flex="1"
                   inputMode="decimal"
                   minW="0"
@@ -255,9 +289,10 @@ const PresetForm = ({
                   :
                 </Text>
                 <Input
-                  aria-describedby={termsDescription}
-                  aria-invalid={showsTermsError || undefined}
+                  aria-describedby={describeTerm(isHeightInvalid)}
+                  aria-invalid={isHeightInvalid || undefined}
                   aria-label={t('widgets.generate.aspectRatioHeightTerm')}
+                  data-term="height"
                   flex="1"
                   inputMode="decimal"
                   minW="0"
@@ -519,20 +554,12 @@ export const AspectRatioPicker = ({
 
   // A new ratio starts from the locked ratio (a snapped size is only close to it), else from the size itself.
   const addTerms = getAspectRatioTerms(lockedRatio ?? currentRatio);
-  const addHint =
-    lockedRatio === null
-      ? t('widgets.generate.aspectRatioFromCurrentSize', { size: formatSize(currentSize) })
-      : t('widgets.generate.aspectRatioFromLockedRatio', { ratio: formatAspectRatioTerms(addTerms, locale) });
 
   const formFor = (subject: FormSubject) =>
     subject.mode === 'edit' ? (
       <PresetForm
         key={subject.preset.id}
-        hint={(ratio) =>
-          ratio === null
-            ? ''
-            : t('widgets.generate.aspectRatioWouldSetSize', { size: formatSize(getSizeForRatio(ratio)) })
-        }
+        getSizeForRatio={getSizeForRatio}
         registerFocusTarget={registerTarget}
         initial={{ label: subject.preset.label, terms: subject.preset }}
         submitLabel={t('common.save')}
@@ -542,7 +569,7 @@ export const AspectRatioPicker = ({
       />
     ) : (
       <PresetForm
-        hint={() => addHint}
+        getSizeForRatio={getSizeForRatio}
         registerFocusTarget={registerTarget}
         initial={{ label: '', terms: addTerms }}
         submitLabel={t('common.add')}
