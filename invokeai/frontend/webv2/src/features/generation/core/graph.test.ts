@@ -1587,6 +1587,18 @@ describe('FLUX.3 graphs', () => {
     expect(getNodeByType(kleinBase, 'flux3_denoise')).toMatchObject({ cfg_scale: 3.5, steps: 50 });
   });
 
+  it('wires a variant-less FLUX.3 LoRA on Klein to the transformer alone', () => {
+    // FLUX.3 LoRAs carry no variant: Klein and Klein Base share the transformer they change.
+    const lora: LoraModelConfig = { base: 'flux3', key: 'flux3-lora', name: 'A LoRA', type: 'lora' };
+    const graph = compile(kleinModel, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
+
+    const loader = getNodeByType(graph, 'flux3_lora_collection_loader');
+    expect(loader).toBeDefined();
+    expect(getEdge(graph, 'denoise_latents', 'transformer')?.source.node_id).toBe(loader?.id);
+    expect(getEdge(graph, loader?.id ?? '', 'transformer')?.source.node_id).toBe('model_loader');
+    expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+  });
+
   it('sends the prompt through the layout node, whose boxes become edit targets once references are wired', () => {
     const plain = compile(kleinModel);
     const withReference = compile(kleinModel, { referenceImages: [reference('a')] });
