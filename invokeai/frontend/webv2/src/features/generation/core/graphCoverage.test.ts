@@ -245,6 +245,8 @@ describe('generate graph coverage', () => {
         'anima/qwen35:qwen-image/undefined',
         'krea-2/standalone-components:anima/undefined',
         'qwen-image/standalone-components:anima/undefined',
+        // A GGUF SD3 transformer brings no VAE, so the selected one has to reach the loader.
+        'sd-3/standalone-components:sd-3/undefined',
         'z-image/standalone-components:flux/undefined',
       ])
     );

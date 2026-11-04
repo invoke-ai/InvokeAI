@@ -19,7 +19,13 @@ register(
     # (28/3.5) because there is one `sd-3` row and no variant to tell them apart, and Medium is the
     # smaller, more commonly run model.
     DefaultSettingsFacet(
-        {None: MainModelDefaultSettings(scheduler="euler_a", steps=40, cfg_scale=4.5, width=1024, height=1024)}
+        {None: MainModelDefaultSettings(scheduler="euler_a", steps=40, cfg_scale=4.5, width=1024, height=1024)},
+        # stable-diffusion-3.5-large-turbo's example: 4 steps at guidance 0, i.e. no CFG -- CFG 1 here, where the
+        # denoise always mixes the two predictions. Turbo and Large share an architecture and a config, so the
+        # name is the only signal. The card names no scheduler; SD3 always samples with its own flow sampler.
+        by_name_hint={
+            "turbo": MainModelDefaultSettings(scheduler="euler_a", steps=4, cfg_scale=1.0, width=1024, height=1024)
+        },
     ),
     ModalityFacet(frozenset({"txt2img", "img2img", "inpaint", "outpaint"}), metadata_slug="sd3"),
     FeaturesFacet(

@@ -22,7 +22,7 @@ from invokeai.backend.model_manager.configs.clip_embed import (
 )
 from invokeai.backend.model_manager.load.load_default import put_in_eval_mode
 from invokeai.backend.model_manager.load.model_loaders.flux import CLIPSingleFileLoader
-from invokeai.backend.model_manager.taxonomy import SubModelType
+from invokeai.backend.model_manager.taxonomy import ClipVariantType, SubModelType
 
 TINY = CLIPTextConfig(
     vocab_size=49408,
@@ -55,7 +55,7 @@ def _reference(model_class: type) -> torch.nn.Module:
 
 
 def _input_ids() -> torch.Tensor:
-    return load_bundled_clip_tokenizer()(
+    return load_bundled_clip_tokenizer(ClipVariantType.L)(
         ["a cat on a sofa"], padding="max_length", max_length=77, return_tensors="pt"
     ).input_ids
 
@@ -111,3 +111,19 @@ def test_the_tokenizer_is_the_bundled_one_and_reserves_nothing(loader: CLIPSingl
     assert isinstance(tokenizer, CLIPTokenizer)
     assert tokenizer.model_max_length == 77
     assert loader.get_size_fs(config, path, SubModelType.Tokenizer) == 0
+
+
+def test_each_variant_tokenizes_as_sd3s_own_tokenizer_for_it_does(loader: CLIPSingleFileLoader, tmp_path: Path) -> None:
+    """SD 3 conditions on all 77 positions, so the pad token is part of the prompt. The expected ids are what
+    stable-diffusion-3.5-medium's `tokenizer` (CLIP-L) and `tokenizer_2` (CLIP-G) give: CLIP-G pads with "!" (id 0)
+    and, holding it as a special token, never merges "!!" into CLIP-L's single token 748."""
+    path = tmp_path / "clip.safetensors"
+    clip_l = CLIPEmbed_Checkpoint_L_Config.model_construct(path=str(path), name="clip_l", cpu_only=None)
+    clip_g = CLIPEmbed_Checkpoint_G_Config.model_construct(path=str(path), name="clip_g", cpu_only=None)
+
+    def ids(config) -> list[int]:
+        tokenizer = loader._load_model(config, SubModelType.Tokenizer)
+        return tokenizer("a photo!!", padding="max_length", max_length=77).input_ids
+
+    assert ids(clip_l) == [49406, 320, 1125, 748, 49407] + [49407] * 72
+    assert ids(clip_g) == [49406, 320, 1125, 0, 0, 49407] + [0] * 71

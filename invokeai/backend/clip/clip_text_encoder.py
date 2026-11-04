@@ -24,10 +24,17 @@ _TEXT_CONFIG_FILES = {
 }
 
 
-@lru_cache(maxsize=1)
-def load_bundled_clip_tokenizer() -> CLIPTokenizer:
-    """Load the vendored CLIP tokenizer. Result is cached for the process."""
-    tokenizer = load_gzipped_tokenizer_dir(_PACKAGE_DIR / "tokenizer")
+@lru_cache(maxsize=None)
+def load_bundled_clip_tokenizer(variant: ClipVariantType) -> CLIPTokenizer:
+    """Load the vendored CLIP tokenizer as the variant's text encoder was trained with it. Cached per variant.
+
+    CLIP-G pads with "!" (id 0) where CLIP-L pads with its end token: OpenCLIP, which trained CLIP-G, pads with
+    zeros, and the `tokenizer_2` SD 3 and SDXL ship says so. SD 3 conditions on all 77 positions, padding included,
+    so the pad token changes the image. Registered as a special token, as there, "!" also never merges with its
+    neighbours: "!!" tokenizes as two "!", not as CLIP-L's single "!!" token.
+    """
+    overrides = {"pad_token": "!"} if variant is ClipVariantType.G else {}
+    tokenizer = load_gzipped_tokenizer_dir(_PACKAGE_DIR / "tokenizer", **overrides)
     assert isinstance(tokenizer, CLIPTokenizer)
     return tokenizer
 
