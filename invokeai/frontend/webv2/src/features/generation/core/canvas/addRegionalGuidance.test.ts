@@ -259,6 +259,7 @@ describe('getRegionalGuidanceSupport', () => {
       layoutKinds: ['object', 'character', 'text'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
     // The structured caption has object elements only.
@@ -268,6 +269,7 @@ describe('getRegionalGuidanceSupport', () => {
       layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
     // Regions become rows of the box table.
@@ -277,6 +279,7 @@ describe('getRegionalGuidanceSupport', () => {
       layoutKinds: ['object'],
       mode: 'layout',
       negativePrompt: false,
+      negativesNeedCfg: false,
       referenceImages: null,
     });
   });
@@ -524,6 +527,7 @@ describe('addRegionalGuidance — multiple regions coexist', () => {
 
 describe('getRegionalGuidanceRejectionReason', () => {
   const params = {
+    cfgScale: 7,
     hasContent: true,
     layerName: 'Region 1',
     mainBase: 'sd-1',
@@ -587,13 +591,27 @@ describe('getRegionalGuidanceRejectionReason', () => {
     ).toBe(`Regional guidance "Region 1" has no prompt or reference image ${label} can use.`);
   });
 
-  it.each(['krea-2', 'z-image', 'anima'])('accepts a %s region with only a negative prompt', (mainBase) => {
+  it.each(['krea-2', 'z-image', 'anima'])(
+    'accepts a %s region with only a negative prompt only while CFG is above 1',
+    (mainBase) => {
+      const negativeOnly = { ...params, mainBase, negativePrompt: 'blurry', positivePrompt: null };
+
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1.5 })).toBeNull();
+      for (const cfgScale of [1, 0.5]) {
+        expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale })).toMatch(/no prompt or reference/);
+      }
+      // A positive prompt still carries the region at CFG 1.
+      expect(getRegionalGuidanceRejectionReason({ ...negativeOnly, cfgScale: 1, positivePrompt: 'a cat' })).toBeNull();
+      expect(
+        getRegionalGuidanceRejectionReason({ ...params, mainBase, positivePrompt: null, referenceImageCount: 1 })
+      ).toMatch(/no prompt or reference/);
+    }
+  );
+
+  it('accepts an SD region with only a negative prompt at CFG 1, where its graph still reads negatives', () => {
     expect(
-      getRegionalGuidanceRejectionReason({ ...params, mainBase, negativePrompt: 'blurry', positivePrompt: null })
+      getRegionalGuidanceRejectionReason({ ...params, cfgScale: 1, negativePrompt: 'blurry', positivePrompt: null })
     ).toBeNull();
-    expect(
-      getRegionalGuidanceRejectionReason({ ...params, mainBase, positivePrompt: null, referenceImageCount: 1 })
-    ).toMatch(/no prompt or reference/);
   });
 
   it('keeps a FLUX region that only carries a Redux reference image', () => {
@@ -605,6 +623,7 @@ describe('getRegionalGuidanceRejectionReason', () => {
 
 describe('getRegionalGuidanceRejectionReason — layout bases', () => {
   const params = {
+    cfgScale: 7,
     hasContent: true,
     layerName: 'Sign',
     mainBase: 'moss-image',

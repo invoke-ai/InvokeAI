@@ -259,7 +259,8 @@ export const resolveRegionalReferenceImages = (
  * prompt/reference/layout metadata for graph inputs.
  */
 const createRegionalGuidanceCollector = (
-  model: GenerateModelConfig
+  model: GenerateModelConfig,
+  cfgScale: number
 ): {
   shouldComposite(layer: CanvasRegionalGuidanceLayerContract): boolean;
   toGraphInputs(
@@ -275,6 +276,7 @@ const createRegionalGuidanceCollector = (
       }
       const referenceImages = resolveRegionalReferenceImages(layer, model.base);
       const rejection = getRegionalGuidanceRejectionReason({
+        cfgScale,
         hasContent: true,
         layerName: layer.name,
         layout: layer.layout,
@@ -346,7 +348,7 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     await deps.flushPendingUploads();
 
     const controls = createControlLayerCollector(model, deps.models, deps.controlModelMemory);
-    const regions = createRegionalGuidanceCollector(model);
+    const regions = createRegionalGuidanceCollector(model, settings.cfgScale);
     const composed = await deps.composeForGeneration({
       // Mode-union drift guard: `detectCanvasMode`'s facts/mode types must stay
       // structurally identical to canvas-operations' `GenerationModeFacts` /

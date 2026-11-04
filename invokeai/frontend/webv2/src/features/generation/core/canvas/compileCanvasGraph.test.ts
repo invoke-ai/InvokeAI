@@ -7,7 +7,10 @@ import type {
   VaeModelConfig,
 } from '@features/generation/core/types';
 
-import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { getPidDecoderBaseForMainBase } from '@features/generation/core/pid';
 import { isPidDecodeNodeType } from '@features/generation/core/pidGraph';
@@ -17,6 +20,7 @@ import type { ControlLayerGraphInput } from './addControlLayers';
 import type { RegionalGuidanceInput } from './addRegionalGuidance';
 import type { CanvasCompileMode, CanvasCompositingSettings, CanvasScalingSettings, Rect } from './types';
 
+import { areRegionalNegativesActive, getRegionalGuidanceSupport } from './addRegionalGuidance';
 import { compileCanvasGraph } from './compileCanvasGraph';
 
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
@@ -2223,6 +2227,42 @@ describe('compileCanvasGraph — regional guidance', () => {
       expect(graph.nodes.neg_cond_collect).toBeUndefined();
       expect(getEdge(graph, 'denoise_latents', 'negative_conditioning')).toBeUndefined();
     });
+  });
+
+  // The canvas settings and the region collector decide from the support row which regional negatives a graph keeps,
+  // so the row has to agree with where each base graph actually has a negative collector.
+  const modelsByBase: Record<string, MainModelConfig> = Object.fromEntries(
+    [sd1Model, sd2Model, sdxlModel, zImageModel, animaModel, krea2Model].map((model) => [model.base, model])
+  );
+  // Collected before capabilities are seeded, so straight from the fixture the tests run against.
+  const negativeMaskBases = [
+    ...new Set(
+      architectureCapabilitiesFixture
+        .filter((row) => row.features.supports_regional_guidance && row.features.regional_negative)
+        .map((row) => row.base)
+    ),
+  ];
+
+  it('covers every mask base that reads regional negatives', () => {
+    expect(negativeMaskBases.length).toBeGreaterThan(0);
+    for (const base of negativeMaskBases) {
+      expect(modelsByBase[base], base).toBeDefined();
+    }
+  });
+
+  it.each(negativeMaskBases)('reads regional negatives on %s exactly at the CFG Scales its support names', (base) => {
+    const support = getRegionalGuidanceSupport(base);
+    expect(support).toMatchObject({ mode: 'masks', negativePrompt: true });
+    for (const cfgScale of [1, 1.5, 4]) {
+      const { backendGraph: graph } = compile(modelsByBase[base]!, 'txt2img', {
+        regionalGuidance: [region('r1', { negativePrompt: 'blurry' })],
+        settings: { cfgScale },
+      });
+
+      expect(graph.nodes.rg_neg_cond_r1 !== undefined, `cfg ${cfgScale}`).toBe(
+        areRegionalNegativesActive(support!, cfgScale)
+      );
+    }
   });
 
   it('copies both Anima-3.8B encoders to regional negatives and auto-negatives', () => {

@@ -1797,6 +1797,20 @@ describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
       graph?.edges.filter((edge) => edge.destination.node_id === 'neg_cond_collect').map((edge) => edge.source.node_id)
     ).toEqual(['neg_cond', 'rg_neg_cond_rg']);
   });
+
+  it('neither composites nor grafts an Anima region with only a negative prompt while CFG Scale is 1', async () => {
+    const harness = makeAnimaHarness(regionalLayer('rg', { negativePrompt: 'blurry', positivePrompt: null }));
+    harness.deps.generateValues = { ...animaGenerateValues(), cfgScale: 1 };
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.denoise_latents?.type).toBe('anima_denoise');
+    expect(graph?.nodes.rg_mask_to_tensor_rg).toBeUndefined();
+    expect(graph?.nodes.rg_neg_cond_rg).toBeUndefined();
+  });
 });
 
 describe('runCanvasInvocation — layout regions on MOSS-Image', () => {
