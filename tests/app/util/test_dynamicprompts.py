@@ -147,6 +147,23 @@ def test_find_missing_wildcards_detects_immediate_values_that_cannot_produce_a_r
     assert result.error is not None
 
 
+@pytest.mark.timeout(5)
+@pytest.mark.parametrize(
+    "prompt",
+    [
+        # A cyclical variant repeats `red` forever and the two-pick dedupes every repeat away, so the
+        # immediate value never produces a result even though it reads no unknown wildcard.
+        "${c=!{2$$${x:{@red}}|red}} __nope__",
+    ],
+)
+def test_find_missing_wildcards_does_not_hang_on_an_immediate_value_that_never_produces_a_result(
+    prompt: str,
+) -> None:
+    assert find_missing_wildcards(prompt) == ["nope"]
+    result = expand_dynamic_prompt(prompt, max_prompts=1, combinatorial=True)
+    assert result.error is not None
+
+
 def test_immediate_assignment_keeps_only_the_first_result() -> None:
     result = expand_dynamic_prompt("${c=!{red|__nope__}} a ${c}", max_prompts=10, combinatorial=True)
 

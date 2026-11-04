@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from itertools import islice
 from typing import cast
 
 from dynamicprompts.commands import (
@@ -17,6 +16,7 @@ from dynamicprompts.commands import (
 from dynamicprompts.commands.variable_commands import VariableAccessCommand, VariableAssignmentCommand
 from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from dynamicprompts.parser.parse import parse
+from dynamicprompts.samplers import Sampler
 from dynamicprompts.samplers.combinatorial import CombinatorialSampler
 from dynamicprompts.samplers.cycle import CyclicalSampler
 from dynamicprompts.samplers.random import RandomSampler
@@ -28,14 +28,15 @@ from pyparsing import ParseException
 # Stands in for an immediate `${c=!...}` value whose first result could not be worked out.
 _SAMPLED_VALUE = LiteralCommand("")
 
-# How many times the dry run of an immediate value may draw an unknown wildcard's not-found fallback
-# before it treats the value as hanging. The fallback repeats one string forever, so a value that
-# produces a result at all needs only a few draws.
-_FALLBACK_DRAW_LIMIT = 1000
+# How many results the dry run of an immediate value may draw, summed over every part of the value,
+# before it treats the value as hanging. A value that loops forever (an unknown wildcard's not-found
+# fallback, or a cyclical variant whose repeats a multi-pick keeps deduping away) keeps drawing
+# without producing a result, while a value that produces a result at all needs only a few draws.
+_DRAW_LIMIT = 10_000
 
 
-class _FallbackDrawLimitReached(Exception):
-    """Raised when the dry run keeps drawing an unknown wildcard's fallback without a result."""
+class _DrawLimitReached(Exception):
+    """Raised when the dry run keeps drawing results without producing a first result."""
 
 
 class _RecordingWildcardManager:
@@ -55,16 +56,36 @@ class _RecordingWildcardManager:
         return values
 
 
-class _BoundedCombinatorialSampler(CombinatorialSampler):
-    """The combinatorial sampler with a limit on draws from an unknown wildcard's fallback."""
+class _DrawBudget:
+    """Counts the results drawn across the whole dry run and stops it at `_DRAW_LIMIT`."""
 
-    def _get_wildcard(self, command: WildcardCommand, context: SamplingContext) -> ResultGen:
-        wildcard_path = next(iter(context.sample_prompts(command.wildcard, 1))).text
-        if context.wildcard_manager.get_values(wildcard_path):
-            yield from super()._get_wildcard(command, context)
-            return
-        yield from islice(super()._get_wildcard(command, context), _FALLBACK_DRAW_LIMIT)
-        raise _FallbackDrawLimitReached(wildcard_path)
+    def __init__(self) -> None:
+        self.draws = 0
+
+    def count(self, results: ResultGen) -> ResultGen:
+        for result in results:
+            self.draws += 1
+            if self.draws > _DRAW_LIMIT:
+                raise _DrawLimitReached()
+            yield result
+
+
+class _BudgetedSampler:
+    """Wraps a sampler so that every result it hands out is charged to a shared `_DrawBudget`.
+
+    `SamplingContext` looks up the sampler for every sub-command, so wrapping the context's samplers
+    bounds all of the dry run's work, however deeply the value nests.
+    """
+
+    def __init__(self, inner: Sampler, budget: _DrawBudget) -> None:
+        self._inner = inner
+        self._budget = budget
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._inner, name)
+
+    def generator_from_command(self, command: Command, context: SamplingContext) -> ResultGen:
+        return self._budget.count(self._inner.generator_from_command(command, context))
 
 
 def _sample_first_result(
@@ -75,26 +96,28 @@ def _sample_first_result(
     The sampler keeps only the first result of an immediate value, so whether an unknown wildcard in it
     matters depends on whether that wildcard has to run before the first result comes out. Rather than
     predicting that from the parse tree, the value is sampled with the real combinatorial sampler,
-    with a limit on how often an unknown wildcard's endless fallback may be drawn.
+    with a limit on how many results the whole dry run may draw.
 
     Returns the first result, or `None` when there is none, together with the unknown wildcards that
     were reached when there is no result (the sampler would hang or fail on them).
     """
     recorder = _RecordingWildcardManager(wildcard_manager)
+    budget = _DrawBudget()
+    samplers: dict[SamplingMethod, Sampler] = {
+        SamplingMethod.COMBINATORIAL: CombinatorialSampler(),
+        SamplingMethod.CYCLICAL: CyclicalSampler(),
+        SamplingMethod.RANDOM: RandomSampler(),
+    }
     context = SamplingContext(
         default_sampling_method=SamplingMethod.COMBINATORIAL,
         wildcard_manager=cast(WildcardManager, recorder),
-        samplers={
-            SamplingMethod.COMBINATORIAL: _BoundedCombinatorialSampler(),
-            SamplingMethod.CYCLICAL: CyclicalSampler(),
-            SamplingMethod.RANDOM: RandomSampler(),
-        },
+        samplers={method: cast(Sampler, _BudgetedSampler(sampler, budget)) for method, sampler in samplers.items()},
         variables=dict(scope),
     )
     try:
         return str(next(iter(context.generator_from_command(value)))), []
-    except (_FallbackDrawLimitReached, StopIteration):
-        # No first result: either the fallback would be drawn forever, or the value has no results.
+    except (_DrawLimitReached, StopIteration):
+        # No first result: either the value would keep drawing forever, or it has no results.
         return None, list(recorder.missing)
     except RuntimeError as e:
         if isinstance(e.__cause__, StopIteration):
