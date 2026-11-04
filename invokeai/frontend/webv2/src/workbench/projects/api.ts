@@ -126,9 +126,10 @@ export const getProject = (projectId: string, signal?: AbortSignal): Promise<Pro
   apiFetchJson<ProjectWithWorkspaceDTO>(getProjectPath(projectId), { signal });
 
 /**
- * A project record no larger than `maxBytes`, else null without parsing it: for reads that inspect a closed project in
- * passing and must not spend the main thread on a large document. A declared `Content-Length` over the bound skips
- * the body; without one the text is read and measured (in UTF-16 code units, close to bytes for JSON) before parsing.
+ * A project record no larger than `maxBytes` once decoded, else null without parsing it: for reads that inspect a
+ * closed project in passing and must not spend the main thread on a large document. A declared `Content-Length` over
+ * the bound skips the body at once. That header counts the encoded body, and the server compresses JSON, so a small one
+ * proves nothing: the body is read as a stream, counting decoded bytes, and the read stops once past the bound.
  */
 export const getProjectWithinSize = async (
   projectId: string,
@@ -143,9 +144,29 @@ export const getProjectWithinSize = async (
     return null;
   }
 
-  const text = await response.text();
+  const decoder = new TextDecoder();
+  let text = '';
+  let size = 0;
 
-  return text.length > maxBytes ? null : (JSON.parse(text) as ProjectWithWorkspaceDTO);
+  if (response.body) {
+    const reader = response.body.getReader();
+
+    for (;;) {
+      const { done, value } = await reader.read();
+
+      if (done) {
+        break;
+      }
+      size += value.byteLength;
+      if (size > maxBytes) {
+        await reader.cancel();
+        return null;
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  }
+
+  return JSON.parse(text + decoder.decode()) as ProjectWithWorkspaceDTO;
 };
 
 const isProjectWriteBusyError = (error: unknown): error is ApiError => {

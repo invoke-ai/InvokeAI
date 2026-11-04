@@ -62,9 +62,49 @@ describe('getProjectWithinSize', () => {
     expect(cancel).toHaveBeenCalledOnce();
     expect(text).not.toHaveBeenCalled();
 
-    // Without a declared length (a compressed or chunked answer) the text is measured before it is parsed.
+    // Without a declared length (a chunked answer) the body is measured as it arrives.
     transport.apiFetch.mockResolvedValueOnce(new Response(`{"padding":"${'x'.repeat(2000)}"}`));
     await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+  });
+
+  it('stops reading a compressed answer whose small declared length hides a body past the bound', async () => {
+    // What a gzipped answer looks like once the browser decodes it: the header counts the compressed bytes.
+    const chunk = new TextEncoder().encode(`{"padding":"${'x'.repeat(390)}",`);
+    let pulls = 0;
+    let cancelled = false;
+    const body = new ReadableStream<Uint8Array>({
+      cancel: () => {
+        cancelled = true;
+      },
+      pull: (controller) => {
+        pulls += 1;
+        controller.enqueue(chunk);
+      },
+    });
+
+    transport.apiFetch.mockResolvedValueOnce(new Response(body, { headers: { 'Content-Length': '120' } }));
+
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toBeNull();
+    expect(cancelled).toBe(true);
+    // The third chunk crosses the bound; the endless rest is never pulled.
+    expect(pulls).toBeLessThanOrEqual(4);
+  });
+
+  it('decodes a record split across chunks, a character straddling two of them', async () => {
+    const record = { name: 'Café', project_id: 'p-1' };
+    const bytes = new TextEncoder().encode(JSON.stringify(record));
+    const split = bytes.indexOf(0xc3) + 1;
+    const body = new ReadableStream<Uint8Array>({
+      start: (controller) => {
+        controller.enqueue(bytes.slice(0, split));
+        controller.enqueue(bytes.slice(split));
+        controller.close();
+      },
+    });
+
+    transport.apiFetch.mockResolvedValueOnce(new Response(body, { headers: { 'Content-Length': '30' } }));
+
+    await expect(getProjectWithinSize('p-1', 1000)).resolves.toEqual(record);
   });
 });
 
