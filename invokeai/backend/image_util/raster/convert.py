@@ -36,7 +36,8 @@ _TORCH_DTYPES = {
 }
 
 
-def _srgb_descriptor(channels: RasterChannels, icc_profile: bytes | None) -> RasterDescriptor:
+def srgb_descriptor(channels: RasterChannels, icc_profile: bytes | None = None) -> RasterDescriptor:
+    """Descriptor of an sRGB unit-range raster: straight alpha when the channels include alpha."""
     has_alpha = channels in (RasterChannels.LA, RasterChannels.RGBA)
     return RasterDescriptor(
         channels=channels,
@@ -65,8 +66,8 @@ def raster_from_pil(image: Image.Image) -> RasterImage:
             # Pillow has no 16-bit LA: the gray color key becomes a straight uint16 alpha channel.
             alpha = np.where(pixels == key, 0, 65535).astype(np.uint16)
             pixels = np.concatenate([pixels, alpha], axis=2)
-            return RasterImage._adopt(pixels, _srgb_descriptor(RasterChannels.LA, icc_profile))
-        return RasterImage._adopt(pixels, _srgb_descriptor(RasterChannels.L, icc_profile))
+            return RasterImage._adopt(pixels, srgb_descriptor(RasterChannels.LA, icc_profile))
+        return RasterImage._adopt(pixels, srgb_descriptor(RasterChannels.L, icc_profile))
     if mode == "1":
         image = image.convert("LA" if image.has_transparency_data else "L")
     elif mode in ("P", "PA"):
@@ -81,7 +82,7 @@ def raster_from_pil(image: Image.Image) -> RasterImage:
     pixels = np.array(image, dtype=np.uint8)
     if pixels.ndim == 2:
         pixels = pixels[:, :, np.newaxis]
-    return RasterImage._adopt(pixels, _srgb_descriptor(_PIL_MODE_CHANNELS[image.mode], icc_profile))
+    return RasterImage._adopt(pixels, srgb_descriptor(_PIL_MODE_CHANNELS[image.mode], icc_profile))
 
 
 def pil_refusal(raster: RasterImage) -> str | None:
@@ -150,7 +151,7 @@ def decoded_unit_raster(unit_chw: torch.Tensor, alpha: bool = False) -> RasterIm
         return None
     if sample.dtype not in (torch.float16, torch.float32):
         sample = sample.float()
-    return raster_from_torch(sample, _srgb_descriptor(RasterChannels.RGBA if alpha else RasterChannels.RGB, None))
+    return raster_from_torch(sample, srgb_descriptor(RasterChannels.RGBA if alpha else RasterChannels.RGB, None))
 
 
 def raster_to_torch(raster: RasterImage, device: torch.device | str | None = None) -> torch.Tensor:

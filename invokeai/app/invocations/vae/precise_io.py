@@ -11,14 +11,9 @@ from PIL.Image import Image as PILImage
 
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.image_util.raster.convert import decoded_unit_raster
+from invokeai.backend.image_util.raster.convert import decoded_unit_raster, srgb_descriptor
 from invokeai.backend.image_util.raster.descriptor import (
-    FIXED_CHANNEL_COUNTS,
-    AlphaMode,
-    ColorEncoding,
     RasterChannels,
-    RasterDescriptor,
-    ValueRange,
 )
 from invokeai.backend.image_util.raster.precise_asset import (
     PreciseAssetError,
@@ -100,14 +95,7 @@ def float_output_raster(context: InvocationContext, buffer: np.ndarray) -> Raste
             )
             return None
     channels = _FLOAT_OUTPUT_CHANNELS[buffer.shape[2]]
-    descriptor = RasterDescriptor(
-        channels=channels,
-        color=ColorEncoding.SRGB,
-        value_range=ValueRange.UNIT,
-        alpha=AlphaMode.STRAIGHT if channels is RasterChannels.RGBA else AlphaMode.NONE,
-        channel_count=FIXED_CHANNEL_COUNTS[channels],
-    )
-    return RasterImage.borrow(buffer, descriptor)
+    return RasterImage.borrow(buffer, srgb_descriptor(channels))
 
 
 def save_decoded_image(context: InvocationContext, legacy: PILImage, raster: RasterImage | None) -> ImageDTO:
