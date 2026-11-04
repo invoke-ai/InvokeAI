@@ -7,7 +7,12 @@ import numpy as np
 import pytest
 import torch
 
-from invokeai.app.invocations.vae.precise_io import load_precise_unit_tensor, precise_signed_decode_raster
+from invokeai.app.invocations.vae.precise_io import (
+    float_output_fits,
+    float_output_raster,
+    load_precise_unit_tensor,
+    precise_signed_decode_raster,
+)
 from invokeai.backend.image_util.raster import AlphaMode, RasterChannels
 
 
@@ -68,3 +73,42 @@ def test_a_precise_asset_gives_its_unclamped_unit_tensor(precise_world, alpha: b
 
     expected = array.transpose(2, 0, 1)
     np.testing.assert_array_equal(tensor.numpy(), expected if alpha else expected[:3])
+
+
+@pytest.mark.parametrize(
+    ("channels", "expected", "alpha"),
+    [
+        (1, RasterChannels.L, AlphaMode.NONE),
+        (3, RasterChannels.RGB, AlphaMode.NONE),
+        (4, RasterChannels.RGBA, AlphaMode.STRAIGHT),
+    ],
+)
+def test_a_float_output_becomes_a_zero_copy_raster(channels, expected, alpha) -> None:
+    buffer = np.random.default_rng(0).random((600, 7, channels), dtype=np.float32) * 3 - 1  # past 0..1, > 1 row block
+
+    raster = float_output_raster(_context(), buffer)
+
+    assert (raster.descriptor.channels, raster.descriptor.alpha) == (expected, alpha)
+    assert np.shares_memory(raster.view(), buffer)
+    np.testing.assert_array_equal(raster.view(), buffer)
+
+
+@pytest.mark.parametrize("bad_row", [0, 599])
+def test_a_non_finite_float_output_gives_no_raster_and_a_warning(bad_row) -> None:
+    buffer = np.zeros((600, 4, 3), dtype=np.float32)
+    buffer[bad_row, 2, 1] = np.inf
+    context = _context()
+
+    assert float_output_raster(context, buffer) is None
+    assert "not finite" in context.logger.warning.call_args.args[0]
+
+
+def test_a_float_output_beyond_the_asset_bounds_is_refused_before_allocation(monkeypatch) -> None:
+    monkeypatch.setattr("invokeai.backend.image_util.raster.precise_asset.MAX_PIXEL_BYTES", 4 * 3 * 100)
+    context = _context()
+
+    assert float_output_fits(context, 10, 10, 3)
+    context.logger.warning.assert_not_called()
+    assert not float_output_fits(context, 10, 11, 3)
+    context.logger.warning.assert_called_once()
+    assert not float_output_fits(_context(enabled=False), 1, 1, 3)

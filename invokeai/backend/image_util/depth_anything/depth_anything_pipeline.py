@@ -1,6 +1,7 @@
 import pathlib
 from typing import Optional
 
+import numpy as np
 import torch
 from PIL import Image
 from transformers import pipeline
@@ -20,6 +21,23 @@ class DepthAnythingPipeline(RawModel):
         depth_map = self._pipeline(image)["depth"]
         assert isinstance(depth_map, Image.Image)
         return depth_map
+
+    def generate_depth_with_unit(self, image: Image.Image) -> tuple[Image.Image, np.ndarray]:
+        """The uint8 depth image of `generate_depth` and the same depth before its uint8 conversion: an HxW float32
+        array normalized to [0, 1], from the output of one pipeline call.
+
+        `predicted_depth` is the pipeline's depth already interpolated to the input size, so only the min-max
+        min-max normalization that its postprocess applies before quantizing is repeated, computed in float32: a half
+        precision model would otherwise leave only a few hundred distinct levels. It is not finite when the depth is
+        constant (0/0) or the model overflowed; the caller decides what to do then.
+        """
+        output = self._pipeline(image)
+        depth_map = output["depth"]
+        assert isinstance(depth_map, Image.Image)
+        depth = output["predicted_depth"].detach().cpu().float().numpy()
+        with np.errstate(invalid="ignore", divide="ignore"):
+            unit = (depth - depth.min()) / (depth.max() - depth.min())
+        return depth_map, unit.astype(np.float32)
 
     def to(self, device: Optional[torch.device] = None, dtype: Optional[torch.dtype] = None):
         if device is not None and device.type not in {"cpu", "cuda", "xpu"}:

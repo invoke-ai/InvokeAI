@@ -1,16 +1,30 @@
-"""The precise-image policy the VAE nodes share: how a decode is saved and how an image is loaded for encoding.
+"""The precise-image policy the model nodes share (VAE decodes and encodes, upscalers, depth): how a model output is
+turned into a raster and saved, and how an image is loaded as model input.
 
-A family keeps only its value map (decoder output to unit range) and its legacy 8-bit quantizer; the policy for the
+A node keeps only its value map (model output to unit range) and its legacy 8-bit quantizer; the policy for the
 opt-in precise path lives here once.
 """
 
+import numpy as np
 import torch
 from PIL.Image import Image as PILImage
 
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.raster.convert import decoded_unit_raster
-from invokeai.backend.image_util.raster.precise_asset import PreciseAssetError, check_precise_asset_bounds
+from invokeai.backend.image_util.raster.descriptor import (
+    FIXED_CHANNEL_COUNTS,
+    AlphaMode,
+    ColorEncoding,
+    RasterChannels,
+    RasterDescriptor,
+    ValueRange,
+)
+from invokeai.backend.image_util.raster.precise_asset import (
+    PreciseAssetError,
+    check_precise_asset_bounds,
+    check_precise_shape_bounds,
+)
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
     image_resized_to_grid_as_tensor,
@@ -52,6 +66,48 @@ def precise_signed_decode_raster(
     unit = decoded[0].to("cpu", torch.float32, copy=True)
     unit.add_(1.0).div_(2)
     return precise_decode_raster(context, unit, alpha=alpha)
+
+
+_FLOAT_OUTPUT_CHANNELS = {1: RasterChannels.L, 3: RasterChannels.RGB, 4: RasterChannels.RGBA}
+# Rows per block of the finiteness check, so its temporaries stay small next to the image.
+_FINITE_CHECK_ROWS = 256
+
+
+def float_output_fits(context: InvocationContext, height: int, width: int, channels: int) -> bool:
+    """Whether a node should keep a float32 HxWxC output for a precise save: precise storage is on and the output is
+    within the precise asset bounds. Ask before allocating the buffer; when the bounds refuse, this logs the skip
+    warning and the node runs exactly its ordinary 8-bit path."""
+    if not context.images.precise_storage_enabled:
+        return False
+    try:
+        check_precise_shape_bounds(height, width, channels, np.dtype(np.float32).itemsize)
+    except PreciseAssetError as error:
+        context.logger.warning(f"Precise image storage skipped: {error}; saving the ordinary 8-bit image.")
+        return False
+    return True
+
+
+def float_output_raster(context: InvocationContext, buffer: np.ndarray) -> RasterImage | None:
+    """A zero-copy raster over a float32 HxWxC model output (1, 3 or 4 channels: L, RGB, RGBA with straight alpha),
+    or None with a warning when it holds a non-finite value, which the ordinary 8-bit save has always tolerated.
+
+    The caller must not change `buffer` while the raster is in use. The finiteness check runs in row blocks.
+    """
+    for top in range(0, buffer.shape[0], _FINITE_CHECK_ROWS):
+        if not np.isfinite(buffer[top : top + _FINITE_CHECK_ROWS]).all():
+            context.logger.warning(
+                "Precise image storage skipped: the model output is not finite; saving the ordinary 8-bit image."
+            )
+            return None
+    channels = _FLOAT_OUTPUT_CHANNELS[buffer.shape[2]]
+    descriptor = RasterDescriptor(
+        channels=channels,
+        color=ColorEncoding.SRGB,
+        value_range=ValueRange.UNIT,
+        alpha=AlphaMode.STRAIGHT if channels is RasterChannels.RGBA else AlphaMode.NONE,
+        channel_count=FIXED_CHANNEL_COUNTS[channels],
+    )
+    return RasterImage.borrow(buffer, descriptor)
 
 
 def save_decoded_image(context: InvocationContext, legacy: PILImage, raster: RasterImage | None) -> ImageDTO:

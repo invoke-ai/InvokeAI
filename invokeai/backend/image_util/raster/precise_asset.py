@@ -68,6 +68,14 @@ def _check_bounds(height: int, width: int, channels: int, itemsize: int, icc_len
         raise PreciseAssetError(f"icc_profile exceeds the limit of {MAX_ICC_BYTES} bytes")
 
 
+def check_precise_shape_bounds(height: int, width: int, channels: int, itemsize: int) -> None:
+    """Raise PreciseAssetError when an array of this shape and item size is outside the asset bounds.
+
+    Lets a caller refuse an output before it allocates the buffer that would hold it.
+    """
+    _check_bounds(height, width, channels, itemsize, None)
+
+
 def check_precise_asset_bounds(raster: RasterImage) -> None:
     """Raise PreciseAssetError when `raster` is outside the bounds `write_precise_asset` enforces.
 
