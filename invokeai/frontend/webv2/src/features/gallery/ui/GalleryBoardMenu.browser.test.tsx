@@ -27,10 +27,19 @@ vi.mock('react-i18next', () => ({
         'widgets.gallery.deleteBoardDescription': `Its ${String(values?.media)} move to Uncategorized.`,
         'widgets.gallery.deleteBoardEmptyDescription': 'The board is empty.',
         'widgets.gallery.deleteBoardWithMediaDescription': `Its ${String(values?.media)} are deleted with it.`,
+        'widgets.gallery.deleteBoardWithOwnMediaDescription': `Your ${String(
+          values?.media
+        )} on it are deleted with it; the rest move to Uncategorized.`,
+        'widgets.gallery.deleteBoardWithNoOwnMediaDescription':
+          'None of its media is yours; all of it moves to Uncategorized.',
+        'widgets.gallery.deleteBoardIncludeOwnMedia': `Also permanently delete your ${String(values?.count)} items`,
+        'widgets.gallery.deleteBoardIncludeOwnMediaNone': 'Also permanently delete your items',
+        'widgets.gallery.deleteBoardAndOwnMedia': `Delete board and your ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardIncludeMedia': `Also permanently delete its ${String(values?.count)} items`,
         'widgets.gallery.deleteBoardQuestion': `Delete board "${String(values?.name)}"?`,
         'widgets.gallery.deleteBoardTypeName': `Type "${String(values?.name)}" to confirm`,
         'widgets.gallery.deleteInUse.checking': 'Checking where this media is used…',
+        'widgets.gallery.deleteInUse.none': 'Nothing uses this media.',
         'widgets.gallery.deleteInUse.failed': 'Couldn’t check where this media is used.',
         'widgets.gallery.deleteInUse.group.project': `Project “${String(values?.name)}”`,
         'widgets.gallery.deleteInUse.itemCount': `${String(values?.count)} items`,
@@ -321,6 +330,207 @@ it('asks once per opening: not again when ticked twice, but again when the dialo
   await tickDeleteMedia(dialog);
 
   await vi.waitFor(() => expect(getBoardMediaUsage).toHaveBeenCalledTimes(2));
+});
+
+/** A check that never answers, recording the signal of each call. */
+const hangingChecks = () => {
+  const signals: AbortSignal[] = [];
+  vi.mocked(context.actions.getBoardMediaUsage)
+    .mockReset()
+    .mockImplementation((_boardId, signal) => {
+      signals.push(signal);
+      return new Promise(() => {});
+    });
+
+  return signals;
+};
+
+const closeDialog = {
+  cancel: () => act(() => userEvent.click(dialogButton('Cancel')!)),
+  escape: () => act(() => userEvent.keyboard('{Escape}')),
+  // A refetch finds the board gone (deleted elsewhere, or access revoked): the menu closes the dialog on its own.
+  external: () => renderMenuFor(board as GalleryBoard, { gallery: { ...context.gallery, boards: [] } } as never),
+};
+
+it.each(Object.keys(closeDialog) as (keyof typeof closeDialog)[])(
+  'stops a running check when the dialog closes (%s)',
+  async (how) => {
+    const signals = hangingChecks();
+    const dialog = await openDeleteDialog();
+
+    await tickDeleteMedia(dialog);
+    await vi.waitFor(() => expect(signals).toHaveLength(1));
+    expect(signals[0]!.aborted).toBe(false);
+
+    await closeDialog[how]();
+    await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+    expect(signals[0]!.aborted).toBe(true);
+  }
+);
+
+it('stops a running check when the media is unticked, and asks again when it is ticked once more', async () => {
+  const signals = hangingChecks();
+  const dialog = await openDeleteDialog();
+
+  await tickDeleteMedia(dialog);
+  await vi.waitFor(() => expect(signals).toHaveLength(1));
+  await tickDeleteMedia(dialog);
+  expect(signals[0]!.aborted).toBe(true);
+
+  // The stopped check left no answer behind: ticking again within the same opening asks again.
+  await tickDeleteMedia(dialog);
+  await vi.waitFor(() => expect(signals).toHaveLength(2));
+  expect(signals[1]!.aborted).toBe(false);
+  expect(dialog.textContent).toContain('Checking where this media is used…');
+});
+
+/** Opens the dialog for `menuBoard`, ticks the media and answers the check with `checkedCount` items to delete. */
+const answerWithCheckedCount = async (menuBoard: GalleryBoard, checkedCount: number, onlyImages = true) => {
+  let settle: (report: GalleryMediaUsageReport) => void = () => {};
+  vi.mocked(context.actions.getBoardMediaUsage)
+    .mockReset()
+    .mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        })
+    );
+  await renderMenuFor(menuBoard);
+  const dialog = await openDeleteDialog();
+
+  await tickDeleteMedia(dialog);
+  const before = dialog.textContent;
+  const regionBefore = dialog.querySelector<HTMLElement>('[aria-live="polite"]');
+  const regionBeforePosition = regionBefore ? getComputedStyle(regionBefore).position : null;
+  await act(() =>
+    settle({
+      ...boardUsageReport,
+      checkedCount,
+      groups: checkedCount === 0 ? [] : boardUsageReport.groups,
+      inUseCount: Math.min(1, checkedCount),
+      onlyImages,
+    })
+  );
+  await vi.waitFor(() => expect(dialog.textContent).not.toContain('Checking where this media is used…'), REPORT_WAIT);
+
+  return { before, dialog, regionBefore, regionBeforePosition };
+};
+
+it('names only the caller’s own items once the check says only those go, and keeps saying so when unticked', async () => {
+  // A shared board of 61 items; the caller added two of them.
+  const shared = { ...board, assetCount: 40, imageCount: 20 } as GalleryBoard;
+  const { before, dialog } = await answerWithCheckedCount(shared, 2);
+
+  // Until the check answers, the board's own counts are all there is, and so many items need the name typed.
+  expect(before).toContain('Its 20 images, 1 videos and 40 uploads are deleted with it.');
+  expect(before).toContain('Type "Board 1" to confirm');
+
+  expect(dialog.textContent).toContain('Your 2 images on it are deleted with it; the rest move to Uncategorized.');
+  expect(dialog.textContent).toContain('Also permanently delete your 2 items');
+  expect(dialog.textContent).toContain('1 of the 2 images this deletes are still in use:');
+  // Two items are not many: no name to type.
+  expect(dialog.textContent).not.toContain('to confirm');
+  expect(dialogButton('Delete board and your 2 items')!.disabled).toBe(false);
+
+  await tickDeleteMedia(dialog);
+  expect(dialog.textContent).toContain('Also permanently delete your 2 items');
+  await tickDeleteMedia(dialog);
+  await act(() => userEvent.click(dialogButton('Delete board and your 2 items')!));
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', true);
+});
+
+it('keeps the name field, and what was typed, once typing started, however the answer lowers the count', async () => {
+  let settle: (report: GalleryMediaUsageReport) => void = () => {};
+  vi.mocked(context.actions.getBoardMediaUsage)
+    .mockReset()
+    .mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          settle = resolve;
+        })
+    );
+  await renderMenuFor({ ...board, assetCount: 40, imageCount: 20 } as GalleryBoard);
+  let dialog = await openDeleteDialog();
+  const nameField = () => dialog.querySelector<HTMLInputElement>('input:not([type="checkbox"])');
+
+  await tickDeleteMedia(dialog);
+  await act(() => userEvent.type(nameField()!, 'Boa'));
+  await act(() => settle({ ...boardUsageReport, checkedCount: 2, inUseCount: 1, onlyImages: true }));
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Also permanently delete your 2 items'), REPORT_WAIT);
+
+  // Two items would not ask for the name, but the user had started: the field and its requirement stay.
+  expect(nameField()?.value).toBe('Boa');
+  expect(dialogButton('Delete board and your 2 items')!.disabled).toBe(true);
+  await act(() => userEvent.type(nameField()!, 'rd 1'));
+  expect(dialogButton('Delete board and your 2 items')!.disabled).toBe(false);
+
+  // A new opening starts over: the answer again decides.
+  await act(() => userEvent.click(dialogButton('Cancel')!));
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+  dialog = await openDeleteDialog();
+  await tickDeleteMedia(dialog);
+  await act(() => settle({ ...boardUsageReport, checkedCount: 2, inUseCount: 1, onlyImages: true }));
+  await vi.waitFor(() => expect(dialog.textContent).toContain('Also permanently delete your 2 items'), REPORT_WAIT);
+  expect(nameField()).toBeNull();
+});
+
+it('leaves Retry in place but disabled as the dialog closes', async () => {
+  vi.mocked(context.actions.getBoardMediaUsage).mockReset().mockRejectedValue(new Error('offline'));
+  const dialog = await openDeleteDialog();
+
+  await tickDeleteMedia(dialog);
+  await vi.waitFor(() => expect(dialogButton('Retry')?.disabled).toBe(false), REPORT_WAIT);
+
+  await act(() => userEvent.click(dialogButton('Cancel')!));
+  // Still on screen while it animates out, Retry can no longer run.
+  expect(dialogButton('Retry')?.disabled).toBe(true);
+  await vi.waitFor(() => expect(document.querySelector('[role="alertdialog"]')).toBeNull());
+  expect(context.actions.getBoardMediaUsage).toHaveBeenCalledOnce();
+});
+
+it('says none of the media goes when the caller added none of it, with no count to delete', async () => {
+  const { before, dialog, regionBefore, regionBeforePosition } = await answerWithCheckedCount(board as GalleryBoard, 0);
+
+  // Until the check answers, it shows as running.
+  expect(before).toContain('Checking where this media is used…');
+
+  expect(dialog.textContent).toContain('None of its media is yours; all of it moves to Uncategorized.');
+  expect(dialog.textContent).toContain('Also permanently delete your items');
+  expect(dialog.textContent).not.toMatch(/\b0 (items|images)\b/);
+  // Nothing is deleted, so there is no use to report: no "unused" verdict about the board's media. The live region
+  // that said it was checking reads out the outcome instead, the description, not shown a second time.
+  expect(dialog.textContent).not.toContain('Nothing uses this media.');
+  const liveRegion = dialog.querySelector<HTMLElement>('[aria-live="polite"]');
+  // The very region that showed the check running, visibly, then.
+  expect(liveRegion).toBe(regionBefore);
+  expect(regionBeforePosition).not.toBe('absolute');
+  expect(liveRegion?.getAttribute('aria-busy')).toBe('false');
+  expect(liveRegion?.textContent).toBe('None of its media is yours; all of it moves to Uncategorized.');
+  // Hidden as a whole, out of the layout: no gap where it stands.
+  expect(getComputedStyle(liveRegion!).position).toBe('absolute');
+  expect(liveRegion!.getBoundingClientRect().width).toBeLessThanOrEqual(1);
+  await act(() => userEvent.click(dialogButton('Delete board')!));
+  // Nothing of the caller's to delete: the board goes without asking for its media.
+  expect(context.actions.deleteBoard).toHaveBeenLastCalledWith('board-1', false);
+});
+
+it('keeps counting every item for an administrator overriding, who deletes them all', async () => {
+  const overridden = {
+    ...board,
+    access: {
+      actions: ['read', 'rename', 'archive', 'delete'],
+      adminOverride: true,
+      generalAccess: 'restricted',
+      role: null,
+    },
+  } as GalleryBoard;
+  // The board's counts went stale: one item left since they were read.
+  const { dialog } = await answerWithCheckedCount(overridden, 2, false);
+
+  expect(dialog.textContent).toContain('Its 2 items are deleted with it.');
+  expect(dialog.textContent).toContain('Also permanently delete its 2 items');
+  expect(dialog.textContent).not.toContain('your');
+  expect(dialogButton('Delete board and 2 items')).toBeDefined();
 });
 
 /** The panel's part: the menu target clears when the menu closes. */

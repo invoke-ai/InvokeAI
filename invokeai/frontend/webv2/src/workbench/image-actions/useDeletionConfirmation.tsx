@@ -9,6 +9,7 @@ import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Dialog } from '@platform/ui/Dialog';
+import { toaster } from '@platform/ui/toaster';
 import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -55,6 +56,12 @@ interface PendingUsageCheck {
 const NO_ITEMS: readonly GalleryItemRef[] = [];
 /** Tiles in the dialog's one row of thumbnails: all of a small deletion, else one fewer and a count of the rest. */
 export const DELETION_PREVIEW_SLOTS = 8;
+
+const countMedia = (t: Parameters<typeof formatGalleryMediaCounts>[0], itemRefs: readonly GalleryItemRef[]): string =>
+  formatGalleryMediaCounts(t, {
+    images: itemRefs.filter((ref) => ref.kind === 'image').length,
+    videos: itemRefs.filter((ref) => ref.kind === 'video').length,
+  });
 
 const getThumbnailUrl = (ref: GalleryItemRef): string =>
   ref.kind === 'video' ? galleryVideoUrls.thumbnail(ref.name) : galleryImageUrls.thumbnail(ref.name);
@@ -120,6 +127,8 @@ export const useDeletionConfirmation = (): {
   const [returnFocus, setReturnFocus] = useState<(() => HTMLElement | null) | null>(null);
   const pendingDeletionRef = useRef<PendingDeletion | null>(null);
   const deletionInFlightRef = useRef(false);
+  // The same, for rendering: Retry stays in place but disabled while the confirmed deletion runs.
+  const [isDeleting, setIsDeleting] = useState(false);
   // Read only when deletion is confirmed, so ticking it and then cancelling changes nothing.
   const [skipFutureConfirmations, setSkipFutureConfirmations] = useState(false);
   // With routine confirmations already off, the dialog only appears because the media is in use or the request
@@ -170,6 +179,7 @@ export const useDeletionConfirmation = (): {
 
     pendingDeletionRef.current = null;
     deletionInFlightRef.current = false;
+    setIsDeleting(false);
     pending.usageCheckController.abort();
     setPendingDeletion(null);
     pending.resolve();
@@ -182,6 +192,21 @@ export const useDeletionConfirmation = (): {
       { canSkipFutureConfirmations = false, checkUsage, returnFocus: getReturnFocus, usage } = {}
     ) => {
       if (pendingDeletionRef.current) {
+        // One dialog at a time. A second request is refused, and says so: with routine confirmations off it comes from
+        // a check that found its media in use while another dialog waited, or while a confirmed deletion still runs,
+        // long after the press, and would otherwise vanish without a word.
+        toaster.create({
+          title: t(
+            deletionInFlightRef.current
+              ? 'widgets.gallery.deleteBlockedByRunning'
+              : 'widgets.gallery.deleteBlockedByPending',
+            {
+              count: itemRefs.length,
+              media: countMedia(t, itemRefs),
+            }
+          ),
+          type: 'warning',
+        });
         return Promise.resolve();
       }
 
@@ -209,7 +234,7 @@ export const useDeletionConfirmation = (): {
         }
       });
     },
-    [runUsageCheck]
+    [runUsageCheck, t]
   );
 
   const handleRetryUsageCheck = useCallback(() => {
@@ -228,13 +253,22 @@ export const useDeletionConfirmation = (): {
     }
 
     deletionInFlightRef.current = true;
+    setIsDeleting(true);
 
     if (skipFutureConfirmations && pending.canSkipFutureConfirmations) {
       void patchWorkbenchPreferences({ confirmImageDeletion: false });
     }
 
-    // Deleting anyway while the check runs: its answer no longer matters.
+    // Deleting anyway while the check runs: its answer no longer matters, and the panel stops saying it is checking.
+    // A retry's earlier answer stays; a first check leaves nothing to show.
     pending.usageCheckController.abort();
+    setUsageCheck((current) =>
+      current?.pending !== pending || current.check.status !== 'checking'
+        ? current
+        : current.check.previous
+          ? { check: current.check.previous, pending }
+          : null
+    );
 
     try {
       await pending.executeDeletion();
@@ -242,6 +276,7 @@ export const useDeletionConfirmation = (): {
       if (pendingDeletionRef.current === pending) {
         pendingDeletionRef.current = null;
         deletionInFlightRef.current = false;
+        setIsDeleting(false);
         setPendingDeletion(null);
         pending.resolve();
       }
@@ -262,10 +297,7 @@ export const useDeletionConfirmation = (): {
   const shownUsageCheck = usageCheck?.check ?? null;
   const canRetryUsageCheck = usageCheck !== null && usageCheck.pending.checkUsage !== undefined;
   const itemRefs = pendingDeletion?.itemRefs ?? NO_ITEMS;
-  const countSummary = formatGalleryMediaCounts(t, {
-    images: itemRefs.filter((ref) => ref.kind === 'image').length,
-    videos: itemRefs.filter((ref) => ref.kind === 'video').length,
-  });
+  const countSummary = countMedia(t, itemRefs);
   const canSkipFutureConfirmations = confirmsRoutineDeletions && pendingDeletion?.canSkipFutureConfirmations === true;
 
   return {
@@ -285,6 +317,8 @@ export const useDeletionConfirmation = (): {
             {shownUsageCheck ? (
               <GalleryMediaUsagePanel
                 check={shownUsageCheck}
+                // Also while the dialog closes: the request it would inform is settled.
+                isRetryDisabled={isDeleting || pendingDeletion === null}
                 onRetry={canRetryUsageCheck ? handleRetryUsageCheck : undefined}
               />
             ) : null}

@@ -5,6 +5,7 @@ import type { Ref } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { act, createRef, useImperativeHandle } from 'react';
@@ -29,6 +30,8 @@ vi.mock('react-i18next', () => ({
       const messages: Record<string, string> = {
         'common.cancel': 'Cancel',
         'common.retry': 'Retry',
+        'widgets.gallery.deleteBlockedByPending': `${String(values?.media)} not deleted: answer the open deletion first.`,
+        'widgets.gallery.deleteBlockedByRunning': `${String(values?.media)} not deleted: wait for the deletion under way.`,
         'widgets.gallery.deleteConfirmLabel': 'Delete',
         'widgets.gallery.deleteConfirmSkip': "Don't ask me again",
         'widgets.gallery.deleteConfirmSkipHint': 'You can turn this confirmation back on in Settings.',
@@ -365,6 +368,46 @@ describe('useDeletionConfirmation', () => {
     expect(document.activeElement).toBe(panel);
   });
 
+  it('keeps the earlier answer, not the checking state, when deleted anyway during a retry', async () => {
+    let resolveDeletion!: () => void;
+    const executeDeletion = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDeletion = resolve;
+        })
+    );
+    let request!: Promise<void>;
+
+    await act(() => {
+      request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
+        checkUsage: () => new Promise(() => {}),
+        usage: usageReport({
+          groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'canvasRaster' }] }],
+          inUseCount: 1,
+          serverCheck: 'unavailable',
+        }),
+      });
+    });
+    await vi.waitFor(() => expect(buttonNamed('Retry')).not.toBeNull(), REPORT_WAIT);
+    await act(() => userEvent.click(buttonNamed('Retry')!));
+    expect(openDialog()?.textContent).toContain('Checking where this media is used…');
+
+    await clickButton('Delete');
+
+    // The deletion runs, the dialog with it: the answer the retry was replacing is back, with no spinner, and its Retry
+    // stays in place but cannot run.
+    expect(executeDeletion).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(openDialog()?.textContent).toContain('Other projects couldn’t be checked.'));
+    expect(openDialog()?.textContent).toContain('This project');
+    expect(openDialog()?.textContent).not.toContain('Checking where this media is used…');
+    expect(buttonNamed('Retry')?.disabled).toBe(true);
+
+    await act(async () => {
+      resolveDeletion();
+      await request;
+    });
+  });
+
   it('shows a known report at once, without a checking state, and says what went unchecked', async () => {
     await act(() => {
       void confirmationRef.current!.requestDeletionConfirmation(
@@ -456,21 +499,37 @@ describe('useDeletionConfirmation', () => {
   });
 
   it('deletes at once when confirmed while the check runs, and stops the check', async () => {
-    const executeDeletion = vi.fn(async () => {});
+    let resolveDeletion!: () => void;
+    const executeDeletion = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDeletion = resolve;
+        })
+    );
     const captured: { signal?: AbortSignal } = {};
+    let request!: Promise<void>;
 
     await act(() => {
-      void confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
+      request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, executeDeletion, {
         checkUsage: (signal) => {
           captured.signal = signal;
           return new Promise(() => {});
         },
       });
     });
+    expect(openDialog()?.textContent).toContain('Checking where this media is used…');
     await clickButton('Delete');
 
     expect(executeDeletion).toHaveBeenCalledOnce();
     expect(captured.signal?.aborted).toBe(true);
+    // The deletion is still running, the dialog with it; the stopped check no longer says it is checking.
+    expect(openDialog()).not.toBeNull();
+    expect(openDialog()?.textContent).not.toContain('Checking where this media is used…');
+
+    await act(async () => {
+      resolveDeletion();
+      await request;
+    });
   });
 
   it('stops the check when the dialog is cancelled', async () => {
@@ -598,20 +657,67 @@ describe('useDeletionConfirmation', () => {
     expect(document.querySelector('[role="alertdialog"][data-state="open"]')).toBeNull();
   });
 
-  it('ignores a second request while confirmation is pending', async () => {
+  it('refuses a second request while confirmation is pending, and says it did not delete', async () => {
+    const createToast = vi.spyOn(toaster, 'create');
     const firstDeletion = vi.fn(async () => {});
     const secondDeletion = vi.fn(async () => {});
 
-    await act(() => {
-      void confirmationRef.current!.requestDeletionConfirmation(imageRefs, firstDeletion);
-      void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, secondDeletion);
-    });
+    try {
+      await act(() => {
+        void confirmationRef.current!.requestDeletionConfirmation(imageRefs, firstDeletion);
+        // With routine confirmations off, a second item whose check found it in use arrives on its own, much later.
+        void confirmationRef.current!.requestDeletionConfirmation(mixedRefs, secondDeletion);
+      });
 
-    expect(document.querySelector('[role="alertdialog"][data-state="open"]')?.textContent).toContain('Delete image?');
-    await clickButton('Delete');
+      expect(createToast).toHaveBeenCalledExactlyOnceWith({
+        title: '1 image and 1 video not deleted: answer the open deletion first.',
+        type: 'warning',
+      });
+      expect(document.querySelector('[role="alertdialog"][data-state="open"]')?.textContent).toContain('Delete image?');
+      await clickButton('Delete');
 
-    expect(firstDeletion).toHaveBeenCalledOnce();
-    expect(secondDeletion).not.toHaveBeenCalled();
+      expect(firstDeletion).toHaveBeenCalledOnce();
+      expect(secondDeletion).not.toHaveBeenCalled();
+    } finally {
+      createToast.mockRestore();
+    }
+  });
+
+  it('says a second request waits for a confirmed deletion still running, not for an answer', async () => {
+    const createToast = vi.spyOn(toaster, 'create');
+    let resolveDeletion!: () => void;
+    const firstDeletion = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveDeletion = resolve;
+        })
+    );
+    let request!: Promise<void>;
+
+    try {
+      await act(() => {
+        request = confirmationRef.current!.requestDeletionConfirmation(imageRefs, firstDeletion);
+      });
+      await clickButton('Delete');
+      await act(() => {
+        void confirmationRef.current!.requestDeletionConfirmation(
+          mixedRefs,
+          vi.fn(async () => {})
+        );
+      });
+
+      expect(createToast).toHaveBeenCalledExactlyOnceWith({
+        title: '1 image and 1 video not deleted: wait for the deletion under way.',
+        type: 'warning',
+      });
+
+      await act(async () => {
+        resolveDeletion();
+        await request;
+      });
+    } finally {
+      createToast.mockRestore();
+    }
   });
 
   it('settles a pending request safely when the host unmounts', async () => {

@@ -181,8 +181,9 @@ const getAccountKey = (owner: AccountScope): GalleryAccountKey => ({
 
 /**
  * Where a board's media is still used, for one opening of its deletion dialog: a reopened dialog asks again, and
- * nothing refetches it while open. Kept outside the `gallery` root so gallery invalidations never re-run a check the
- * user is reading.
+ * nothing refetches it while open. `opening` is null while the dialog is closed, so a closing dialog leaves its
+ * opening's key, which stops a check still running there. Kept outside the `gallery` root so gallery invalidations
+ * never re-run a check the user is reading.
  */
 export const galleryBoardMediaUsageQueryOptions = ({
   boardId,
@@ -192,7 +193,7 @@ export const galleryBoardMediaUsageQueryOptions = ({
 }: {
   boardId: string;
   load: (boardId: string, signal: AbortSignal) => Promise<GalleryMediaUsageReport>;
-  opening: number;
+  opening: number | null;
   owner: AccountScope;
 }) =>
   queryOptions({

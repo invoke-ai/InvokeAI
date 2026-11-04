@@ -186,6 +186,35 @@ const claimDeletion = (items: readonly GalleryItemRef[]): (() => void) | null =>
 };
 
 /**
+ * The one "checking" notice for every silent-deletion check running at once, from any surface: shown once a check has
+ * run for a moment, and dismissed only when the last running check ends, however it ends.
+ */
+const PENDING_CHECK_NOTICE_ID = 'gallery-deletion-usage-check';
+let pendingChecks = 0;
+
+/** Counts a check as running until the returned release, which is safe to call more than once. */
+const holdPendingCheckNotice = (title: string): (() => void) => {
+  pendingChecks += 1;
+  const timer = setTimeout(() => {
+    // The same id updates a notice already showing instead of stacking a second one.
+    toaster.create({ duration: Number.POSITIVE_INFINITY, id: PENDING_CHECK_NOTICE_ID, title, type: 'loading' });
+  }, PENDING_CHECK_NOTICE_DELAY_MS);
+  let released = false;
+
+  return () => {
+    if (released) {
+      return;
+    }
+    released = true;
+    clearTimeout(timer);
+    pendingChecks -= 1;
+    if (pendingChecks === 0) {
+      toaster.dismiss(PENDING_CHECK_NOTICE_ID);
+    }
+  };
+};
+
+/**
  * Selected as booleans so Video panel edits re-render action consumers only when an answer flips (the workbench
  * selector compares shallowly). The cache skips re-normalizing video values that have not changed since the last
  * store update.
@@ -638,37 +667,40 @@ export const useImageActions = ({
         // Without routine confirmation, one visible item goes silently only once the check finds nothing using it; a
         // use, or a check that could not finish in time, still asks. A check slower than a moment says it is running.
         const owner = captureAccountScope();
-        let noticeId: string | undefined;
-        const noticeTimer = setTimeout(() => {
-          noticeId = toaster.create({
-            duration: Number.POSITIVE_INFINITY,
-            title: t('widgets.gallery.deleteInUse.checking'),
-            type: 'loading',
-          });
-        }, PENDING_CHECK_NOTICE_DELAY_MS);
-        let usage: GalleryMediaUsageReport;
-        let isUnused: boolean;
+        const releaseNotice = holdPendingCheckNotice(t('widgets.gallery.deleteInUse.checking'));
+        // The report the dialog shows when one asks; none when it must check again.
+        let usage: GalleryMediaUsageReport | undefined;
+        let isUnused = false;
+        let checkFailed = false;
 
         try {
-          const [{ resolveMediaUsage }, { isGalleryMediaUnused }] = await Promise.all([
+          const [{ isUsedInLoadedProjects, resolveMediaUsage }, { isGalleryMediaUnused }] = await Promise.all([
             import('./mediaUsageReport'),
             import('@features/gallery/mediaUsage'),
           ]);
-
-          usage = await resolveMediaUsage(request, usageHost, {
+          const report = await resolveMediaUsage(request, usageHost, {
             projectReadsTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
             serverTimeoutMs: UNCONFIRMED_DELETION_CHECK_TIMEOUT_MS,
           });
-          isUnused = isGalleryMediaUnused(usage);
+
+          if (!isGalleryMediaUnused(report)) {
+            usage = report;
+          } else {
+            // The answer can be seconds old. A use added in this tab since still asks; the dialog checks again rather
+            // than show an answer that missed it.
+            isUnused = !isUsedInLoadedProjects(items, usageHost);
+          }
         } catch {
+          checkFailed = true;
+        } finally {
+          // Before any dialog opens: the notice is about the check, not the answer.
+          releaseNotice();
+        }
+
+        if (checkFailed) {
           // The resolver rejects only on an account change, and the deletion belonged to the previous account. Its
           // code failing to load leaves the check undone: the dialog runs it again, and offers Retry if it fails.
           return isAccountScopeCurrent(owner) ? await confirm() : undefined;
-        } finally {
-          clearTimeout(noticeTimer);
-          if (noticeId !== undefined) {
-            toaster.dismiss(noticeId);
-          }
         }
 
         return isUnused ? await deleteItemsConfirmed(items) : await confirm(usage);

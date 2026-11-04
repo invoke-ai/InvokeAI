@@ -144,7 +144,15 @@ const UsageGroup = ({ group, showCounts }: { group: GalleryMediaUsageGroup; show
 };
 
 /** A check that did not (fully) run: a warning, distinct from the muted notes, with a way to run it again. */
-const UsageWarning = ({ message, onRetry }: { message: string; onRetry?: () => void }) => {
+const UsageWarning = ({
+  isRetryDisabled = false,
+  message,
+  onRetry,
+}: {
+  isRetryDisabled?: boolean;
+  message: string;
+  onRetry?: () => void;
+}) => {
   const { t } = useTranslation();
 
   return (
@@ -152,7 +160,7 @@ const UsageWarning = ({ message, onRetry }: { message: string; onRetry?: () => v
       <Icon aria-hidden="true" as={TriangleAlertIcon} boxSize="3.5" flexShrink={0} mt="0.5" />
       <Text flex="1">{message}</Text>
       {onRetry ? (
-        <Button flexShrink={0} size="xs" variant="outline" onClick={onRetry}>
+        <Button disabled={isRetryDisabled} flexShrink={0} size="xs" variant="outline" onClick={onRetry}>
           {t('common.retry')}
         </Button>
       ) : null}
@@ -162,10 +170,12 @@ const UsageWarning = ({ message, onRetry }: { message: string; onRetry?: () => v
 
 const UsageReport = ({
   isRechecking,
+  isRetryDisabled,
   onRetry,
   report,
 }: {
   isRechecking: boolean;
+  isRetryDisabled: boolean;
   onRetry?: () => void;
   report: GalleryMediaUsageReport;
 }) => {
@@ -176,12 +186,14 @@ const UsageReport = ({
     <GalleryMediaUsageChecking />
   ) : report.serverCheck === 'complete' ? null : (
     <UsageWarning
+      isRetryDisabled={isRetryDisabled}
       message={t(
         report.serverCheck === 'tooManyItems'
           ? `${KEY}.tooManyItems`
           : report.groups.length === 0
             ? `${KEY}.uncheckedNone`
-            : `${KEY}.unchecked`
+            : `${KEY}.unchecked`,
+        { count: report.checkedCount }
       )}
       // Retrying cannot shrink a selection past the limit.
       onRetry={report.serverCheck === 'unavailable' ? onRetry : undefined}
@@ -229,18 +241,32 @@ const UsageReport = ({
 export const GalleryMediaUsageOutcome = ({
   check,
   isRechecking = false,
+  isRetryDisabled = false,
   onRetry,
 }: {
   check: GalleryMediaUsageSettledCheck;
   /** A retry runs: the answer stays, the checking state in place of its warning. */
   isRechecking?: boolean;
+  /** Retry stays in place but cannot run, such as while the deletion it would inform is already under way. */
+  isRetryDisabled?: boolean;
   onRetry?: () => void;
 }) => {
   const { t } = useTranslation();
 
   if (check.status === 'ready') {
-    return <UsageReport isRechecking={isRechecking} report={check.report} onRetry={onRetry} />;
+    return (
+      <UsageReport
+        isRechecking={isRechecking}
+        isRetryDisabled={isRetryDisabled}
+        report={check.report}
+        onRetry={onRetry}
+      />
+    );
   }
 
-  return isRechecking ? <GalleryMediaUsageChecking /> : <UsageWarning message={t(`${KEY}.failed`)} onRetry={onRetry} />;
+  return isRechecking ? (
+    <GalleryMediaUsageChecking />
+  ) : (
+    <UsageWarning isRetryDisabled={isRetryDisabled} message={t(`${KEY}.failed`)} onRetry={onRetry} />
+  );
 };

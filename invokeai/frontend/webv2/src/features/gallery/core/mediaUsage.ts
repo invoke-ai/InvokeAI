@@ -1,7 +1,8 @@
 /**
  * What still uses gallery media the user is about to delete: the server's reference check as the client reads it, and
  * the report a deletion dialog shows. The server answer is conservative (it counts gallery selections, recents and
- * workflow last runs inside projects); a host that can open projects narrows it before building the report.
+ * workflow last runs inside projects); a host that can open projects narrows it before building the report, dropping
+ * only what it knows shows or records media rather than working on it.
  */
 
 import type { GalleryItemRef } from './items';
@@ -53,7 +54,9 @@ export type GalleryMediaUsageSurface =
   | 'canvasSnapshot'
   | 'upscale'
   | 'video'
-  | 'workflow';
+  | 'workflow'
+  /** Anything else in the project that names the media: the scan fails safe on fields it has no surface for. */
+  | 'otherProjectState';
 
 export interface GalleryMediaUsageSurfaceRow {
   /** How many checked items the surface uses. */
@@ -79,7 +82,7 @@ export type GalleryMediaUsageGroup =
   | { count: number; kind: 'otherAccounts' };
 
 export interface GalleryMediaUsageReport {
-  /** Items checked: the requested items, or the board's as the server counted them. */
+  /** Items checked: the requested items, or the board's as the server counted them (the items deleting it removes). */
   checkedCount: number;
   groups: GalleryMediaUsageGroup[];
   /** Distinct checked items something uses; a lower bound where the server's name lists were capped. */

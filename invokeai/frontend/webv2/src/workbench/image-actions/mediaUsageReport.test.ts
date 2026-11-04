@@ -32,8 +32,22 @@ vi.mock('@workbench/projects/projectHydration', () => ({
 
 const image = (name: string): GalleryItemRef => ({ kind: 'image', name });
 
-/** A project whose canvas raster layers hold `raster`; `selected` is only the Gallery's selection. */
-const project = (id: string, name: string, { raster = [] as string[], selected = null as string | null } = {}) => ({
+const widget = (typeId: string, values: Record<string, unknown>) => ({
+  createdAt: '2026-01-01T00:00:00.000Z',
+  id: typeId,
+  state: { id: typeId, label: typeId, values, version: 1 },
+  typeId,
+});
+
+/**
+ * A project whose canvas raster layers hold `raster`; `selected` is only the Gallery's selection, `pinned` a name in a
+ * widget the usage panel has no surface for.
+ */
+const project = (
+  id: string,
+  name: string,
+  { pinned = null as string | null, raster = [] as string[], selected = null as string | null } = {}
+) => ({
   canvas: {
     document: {
       stacks: {
@@ -48,17 +62,10 @@ const project = (id: string, name: string, { raster = [] as string[], selected =
   },
   id,
   name,
-  widgetInstances:
-    selected === null
-      ? {}
-      : {
-          gallery: {
-            createdAt: '2026-01-01T00:00:00.000Z',
-            id: 'gallery',
-            state: { id: 'gallery', label: 'gallery', values: { selectedImageName: selected }, version: 1 },
-            typeId: 'gallery',
-          },
-        },
+  widgetInstances: {
+    ...(selected === null ? {} : { gallery: widget('gallery', { selectedImageName: selected }) }),
+    ...(pinned === null ? {} : { 'image-notes': widget('image-notes', { pinned: { imageName: pinned } }) }),
+  },
   workflows: { activeWorkflowId: null, entries: [] },
 });
 
@@ -138,6 +145,58 @@ describe('resolveMediaUsage', () => {
       scope: 'items',
       serverCheck: 'complete',
     });
+  });
+
+  it('keeps a project whose only use of the media is a field the panel has no surface for', async () => {
+    mocks.check.mockResolvedValue(
+      answer({
+        documents: [
+          usageDocument('project', 'p-a', 'Atlas', ['a.png']),
+          usageDocument('project', 'p-b', 'Birch', ['b.png']),
+        ],
+      })
+    );
+    serveProjects([project('p-a', 'Atlas', { pinned: 'a.png' })]);
+
+    const report = await resolveMediaUsage(
+      items('a.png', 'b.png'),
+      host([project('p-b', 'Birch', { pinned: 'b.png' })])
+    );
+
+    expect(report.groups).toEqual([
+      { count: 1, kind: 'project', name: 'Birch', surfaces: [{ count: 1, surface: 'otherProjectState' }] },
+      { count: 1, kind: 'project', name: 'Atlas', surfaces: [{ count: 1, surface: 'otherProjectState' }] },
+    ]);
+    expect(report.inUseCount).toBe(2);
+  });
+
+  it('counts the items asked about, as the dialog title does, even when the server could check fewer', async () => {
+    // Of three selected items on a shared board the caller owns one: the server checks only that one, without saying
+    // which, so the projects here are scanned for all three.
+    mocks.check.mockResolvedValue(answer({ checkedImageCount: 1 }));
+
+    const report = await resolveMediaUsage(
+      items('mine.png', 'theirs-1.png', 'theirs-2.png'),
+      host([project('open', 'Open', { raster: ['theirs-1.png'] })], 'open')
+    );
+
+    expect(report).toMatchObject({ checkedCount: 3, inUseCount: 1 });
+  });
+
+  it('tells an image from a video of the same name when counting what a project uses', async () => {
+    mocks.check.mockRejectedValue(new ApiError('Not Found', 404));
+    const loaded = {
+      ...project('open', 'Open'),
+      widgetInstances: { video: widget('video', { sourceVideo: { video_name: 'same' } }) },
+    };
+
+    const report = await resolveMediaUsage(
+      { kind: 'items', refs: [image('same'), { kind: 'video', name: 'same' }] },
+      host([loaded as unknown as TestProject], 'open')
+    );
+
+    expect(report.groups).toEqual([{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'video' }] }]);
+    expect(report.inUseCount).toBe(1);
   });
 
   it('lists a project as the server counts it when it cannot be read, its names are capped, or past the read cap', async () => {
@@ -260,13 +319,16 @@ describe('resolveMediaUsage', () => {
     ]);
   });
 
-  it('takes workflows, the legacy editor, projects kept for repair, queued jobs and other accounts as they are', async () => {
+  it('takes workflows, the legacy editor, projects kept for repair, unknown documents, queued jobs and other accounts as they are', async () => {
     mocks.check.mockResolvedValue(
       answer({
         documents: [
           usageDocument('legacyEditor', 'legacy_editor', null, ['a.png']),
           usageDocument('quarantinedProject', 'q-1', 'Broken', ['b.png']),
           usageDocument('workflow', 'wf-1', 'Upscale pass', ['a.png', 'b.png']),
+          // A kind of saved document this build does not know.
+          usageDocument('other', 'board-notes-1', 'Board notes', ['b.png']),
+          usageDocument('other', 'unnamed-1', null, ['a.png']),
         ],
         documentsTotal: 105,
         otherAccounts: { documentCount: 1, imageCount: 1, queueItemCount: 1, videoCount: 0 },
@@ -280,7 +342,9 @@ describe('resolveMediaUsage', () => {
       { count: 1, kind: 'quarantinedProject', name: 'Broken' },
       { count: 2, kind: 'workflow', name: 'Upscale pass' },
       { count: 1, kind: 'legacyEditor' },
-      { documentCount: 102, kind: 'moreDocuments' },
+      { count: 1, kind: 'otherDocument', name: 'Board notes' },
+      { count: 1, kind: 'otherDocument', name: null },
+      { documentCount: 100, kind: 'moreDocuments' },
       { count: 1, jobCount: 2, kind: 'queue' },
       { count: 1, kind: 'otherAccounts' },
     ]);

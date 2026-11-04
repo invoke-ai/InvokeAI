@@ -15,10 +15,19 @@ const GalleryMediaUsageOutcome = lazy(() =>
  * state shows at once, before any of the report's code has loaded.
  */
 export const GalleryMediaUsagePanel = ({
+  announcement,
   check,
+  isRetryDisabled = false,
   onRetry,
 }: {
+  /**
+   * Read out in place of a settled answer the dialog does not show, because what it says is already on screen
+   * elsewhere: the live region still announces how the check came out, without showing the text twice.
+   */
+  announcement?: string;
   check: GalleryMediaUsageCheck;
+  /** Keeps Retry in place, disabled: the deletion is already under way, or the dialog closing. */
+  isRetryDisabled?: boolean;
   /** Runs the check again after it failed or could not reach the server. */
   onRetry?: () => void;
 }) => {
@@ -31,6 +40,9 @@ export const GalleryMediaUsagePanel = ({
   }, [onRetry]);
 
   const settled = check.status === 'checking' ? check.previous : check;
+  // The same live region throughout, hidden as a whole once it only reads out `announcement`: out of the layout, so it
+  // takes no spacing slot beside the text it repeats.
+  const isAnnouncementOnly = settled !== undefined && announcement !== undefined;
 
   return (
     <Stack
@@ -43,16 +55,20 @@ export const GalleryMediaUsagePanel = ({
       m="-1.5"
       p="1.5"
       rounded="l2"
+      srOnly={isAnnouncementOnly}
       // Focusable only by script, as Retry's stand-in: no tab stop of its own.
       tabIndex={-1}
     >
-      {settled ? (
+      {isAnnouncementOnly ? (
+        announcement
+      ) : settled ? (
         // A settled answer never shows as "checking" while its code loads: nothing, for a frame, then the answer. A
         // retry keeps it on screen, the checking state standing where its warning and Retry were.
         <Suspense fallback={null}>
           <GalleryMediaUsageOutcome
             check={settled}
             isRechecking={check.status === 'checking'}
+            isRetryDisabled={isRetryDisabled}
             onRetry={onRetry ? handleRetry : undefined}
           />
         </Suspense>

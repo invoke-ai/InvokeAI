@@ -1,10 +1,12 @@
 /**
  * Where media about to be deleted is still used, across the account: the server's reference check narrowed by the
  * projects' own scans. The server counts every media name a project document holds, including the Gallery's selection
- * and recents and workflow last runs; only a project's saved surfaces (`collectMediaUsage`: live work, staged canvas
- * results, canvas snapshots) are work the deletion would break. So each project the server names is scanned here:
- * from memory when this tab has it loaded, else read from the server without opening it in the editor. Workflows, the
- * legacy editor, projects kept for repair, queued jobs and other accounts are taken from the server as they are.
+ * and recents and workflow last runs, which only show or record media; the deletion breaks the rest. So each project
+ * the server names is scanned here (`collectMediaUsage`), from memory when this tab has it loaded, else read from the
+ * server without opening it in the editor, and is dropped only when the scan finds nothing. The scan fails safe: it
+ * leaves out only fields it knows show or record media, and reports a name anywhere else in the project, so a field it
+ * has no surface for keeps the project in the report. Workflows, the legacy editor, projects kept for repair, queued
+ * jobs and other accounts are taken from the server as they are.
  *
  * Projects in memory are fresher than the server, which autosaves after a short debounce. For items that holds in
  * full: the requested refs are scanned. For a board it does not: only the server knows the board's members, so a
@@ -15,6 +17,7 @@
 import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { Project } from '@workbench/projectContracts';
 
+import { toGalleryItemKey } from '@features/gallery/contracts';
 import {
   checkGalleryMediaUsage,
   type GalleryMediaUsage,
@@ -46,11 +49,9 @@ const PROJECT_READ_CONCURRENCY = 2;
 const DEFAULT_SERVER_TIMEOUT_MS = 10_000;
 const DEFAULT_PROJECT_READS_TIMEOUT_MS = 5_000;
 
-type UsageProject = Parameters<typeof collectMediaUsage>[0];
-
 export interface MediaUsageHost {
   /** Projects this tab holds in memory; their live state wins over the server's copy. */
-  getLoadedProjects(): readonly Pick<Project, 'canvas' | 'id' | 'name' | 'widgetInstances' | 'workflows'>[];
+  getLoadedProjects(): readonly Project[];
   /** The project the deletion is made from, listed as "This project"; null without one. */
   openProjectId: string | null;
 }
@@ -88,8 +89,6 @@ const withDeadline = (signal: AbortSignal, ms: number): { clear: () => void; sig
   };
 };
 
-const toKey = (kind: GalleryItemRef['kind'], name: string): string => `${kind}:${name}`;
-
 const isTruncated = (entry: GalleryMediaUsageDocument): boolean =>
   entry.imageCount > entry.imageNames.length || entry.videoCount > entry.videoNames.length;
 
@@ -102,7 +101,7 @@ const dedupeRefs = (refs: readonly GalleryItemRef[]): GalleryItemRef[] => {
   const seen = new Set<string>();
 
   return refs.filter((ref) => {
-    const key = toKey(ref.kind, ref.name);
+    const key = toGalleryItemKey(ref);
 
     if (seen.has(key)) {
       return false;
@@ -116,7 +115,7 @@ const dedupeRefs = (refs: readonly GalleryItemRef[]): GalleryItemRef[] => {
  * Reads a closed project the way the editor would load it, without opening it; null when it cannot be loaded or is
  * past the read bound.
  */
-const readClosedProject = async (projectId: string, signal: AbortSignal): Promise<UsageProject | null> => {
+const readClosedProject = async (projectId: string, signal: AbortSignal): Promise<Project | null> => {
   const record = await getProjectWithinSize(projectId, MEDIA_USAGE_MAX_PROJECT_READ_BYTES, signal);
   const loaded = record ? deserializeProjectRecord(record) : null;
 
@@ -141,20 +140,17 @@ const runLimited = async <Item>(
   );
 };
 
-/** The checked refs a project's surfaces use: each surface lists names, matched back to the refs it was given. */
-const usedKeysOf = (usage: readonly MediaUsage[], refs: readonly GalleryItemRef[]): Set<string> => {
-  const names = new Set(usage.flatMap((entry) => entry.names));
-
-  return new Set(refs.filter((ref) => names.has(ref.name)).map((ref) => toKey(ref.kind, ref.name)));
-};
+/** The checked refs a project's surfaces use, by kind and name. */
+const usedKeysOf = (usage: readonly MediaUsage[]): Set<string> =>
+  new Set(usage.flatMap((entry) => entry.refs.map(toGalleryItemKey)));
 
 const toSurfaceRows = (usage: readonly MediaUsage[]): GalleryMediaUsageSurfaceRow[] =>
-  usage.map(({ label, names, surface }) =>
-    label === undefined ? { count: names.length, surface } : { count: names.length, label, surface }
+  usage.map(({ label, refs, surface }) =>
+    label === undefined ? { count: refs.length, surface } : { count: refs.length, label, surface }
   );
 
 type ProjectOutcome =
-  | { kind: 'scanned'; refs: readonly GalleryItemRef[]; usage: MediaUsage[] }
+  | { kind: 'scanned'; usage: MediaUsage[] }
   | { kind: 'unchecked'; entry: GalleryMediaUsageDocument };
 
 /**
@@ -221,7 +217,7 @@ export const resolveMediaUsage = async (
     }
 
     const refs = request.kind === 'items' ? requestedRefs : entry ? refsOf(entry) : [];
-    outcomes.set(project.id, { kind: 'scanned', refs, usage: collectMediaUsage(project, refs) });
+    outcomes.set(project.id, { kind: 'scanned', usage: collectMediaUsage(project, refs) });
   }
 
   const candidates = [...serverProjects.values()].filter((entry) => !outcomes.has(entry.id));
@@ -240,8 +236,7 @@ export const resolveMediaUsage = async (
       const project = await readClosedProject(entry.id, readsSignal);
 
       if (project) {
-        const refs = refsOf(entry);
-        outcomes.set(entry.id, { kind: 'scanned', refs, usage: collectMediaUsage(project, refs) });
+        outcomes.set(entry.id, { kind: 'scanned', usage: collectMediaUsage(project, refsOf(entry)) });
       }
     } catch {
       // Unreadable, refused, or past the deadline: listed as the server counts it.
@@ -283,8 +278,8 @@ const buildReport = ({
   // counted that name, no longer holds.
   let narrowed = false;
   const addNames = (entry: { imageCount: number; imageNames: string[]; videoCount: number; videoNames: string[] }) => {
-    entry.imageNames.forEach((name) => inUse.add(toKey('image', name)));
-    entry.videoNames.forEach((name) => inUse.add(toKey('video', name)));
+    entry.imageNames.forEach((name) => inUse.add(toGalleryItemKey({ kind: 'image', name })));
+    entry.videoNames.forEach((name) => inUse.add(toGalleryItemKey({ kind: 'video', name })));
     if (entry.imageCount > entry.imageNames.length || entry.videoCount > entry.videoNames.length) {
       exact = false;
       lowerBound = Math.max(lowerBound, entry.imageCount + entry.videoCount);
@@ -296,8 +291,7 @@ const buildReport = ({
     // A capped list hides names the scan may have dropped; more counted than the scan kept means some were.
     return Boolean(
       entry &&
-      (refsOf(entry).some((ref) => !used.has(toKey(ref.kind, ref.name))) ||
-        entry.imageCount + entry.videoCount > used.size)
+      (refsOf(entry).some((ref) => !used.has(toGalleryItemKey(ref))) || entry.imageCount + entry.videoCount > used.size)
     );
   };
   const projectGroup = (projectId: string, name: string | null): GalleryMediaUsageGroup | null => {
@@ -311,7 +305,7 @@ const buildReport = ({
       return { count: outcome.entry.imageCount + outcome.entry.videoCount, kind: 'projectUnchecked', name };
     }
 
-    const used = usedKeysOf(outcome.usage, outcome.refs);
+    const used = usedKeysOf(outcome.usage);
 
     if (dropsServerNames(projectId, used)) {
       narrowed = true;
@@ -394,6 +388,9 @@ const buildReport = ({
     }
   }
 
+  // Items: what was asked about, as the dialog's title counts them. The server's checked counts leave out items the
+  // caller may not delete, but not which ones, so this tab's scans could not be held to the same set. A board: the
+  // server's count, the items deleting it removes.
   const checkedCount =
     request.kind === 'items' || !server ? requestedRefs.length : server.checkedImageCount + server.checkedVideoCount;
   const serverInUse = server && !narrowed ? server.inUseImageCount + server.inUseVideoCount : 0;
@@ -411,3 +408,10 @@ const buildReport = ({
     serverCheck: server ? 'complete' : overServerLimit ? 'tooManyItems' : 'unavailable',
   };
 };
+
+/**
+ * Whether a project this tab holds uses any of `refs` now: a last look before deleting without asking, since a use
+ * added while the check ran is not in its answer.
+ */
+export const isUsedInLoadedProjects = (refs: readonly GalleryItemRef[], host: MediaUsageHost): boolean =>
+  host.getLoadedProjects().some((project) => collectMediaUsage(project, refs).length > 0);
