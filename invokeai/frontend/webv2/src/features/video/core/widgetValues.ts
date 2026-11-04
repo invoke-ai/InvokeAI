@@ -69,15 +69,28 @@ export const syncVideoWidgetValuesWithModels = (
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
       : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
-  const override =
-    registered?.base === 'minimax-h3' &&
-    registered.format === 'checkpoint' &&
-    registered.key === values.modelKey &&
-    values.h3ModeOverride === true;
-  const effectiveVariant = registered?.variant === 'ref2va' ? 'fl2va' : 'ref2va';
+  const sameH3 =
+    registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
+  const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+  // Legacy records may contain either the classified model or the already-effective synthetic model.
+  const storedTask = values.model?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+  const effectiveVariant = sameH3
+    ? (values.h3SelectedTask ??
+      (values.h3ModeOverride
+        ? storedTask !== detected
+          ? storedTask
+          : detected === 'ref2va'
+            ? 'fl2va'
+            : 'ref2va'
+        : detected))
+    : detected;
+  const override = Boolean(sameH3 && effectiveVariant !== detected);
   // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
   // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
-  const candidate = override && registered ? { ...registered, variant: effectiveVariant } : registered;
+  const candidate =
+    registered?.base === 'minimax-h3' && registered.format === 'checkpoint'
+      ? { ...registered, variant: effectiveVariant }
+      : registered;
   const sameCandidate =
     candidate &&
     values.model &&
@@ -181,7 +194,13 @@ export const syncVideoWidgetValuesWithModels = (
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
-    h3ModeOverride: model?.key === values.modelKey && model?.base === 'minimax-h3' ? base.h3ModeOverride : false,
+    h3ModeOverride: override,
+    h3SelectedTask:
+      model?.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
     vae: syncComponent('vae', base.vae),
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
@@ -202,6 +221,8 @@ export const syncVideoWidgetValuesWithModels = (
     base === values &&
     next.model === values.model &&
     next.modelKey === values.modelKey &&
+    next.h3SelectedTask === values.h3SelectedTask &&
+    next.h3ModeOverride === values.h3ModeOverride &&
     next.acceleratorEnabled === values.acceleratorEnabled &&
     next.acceleratorLoraKeys === values.acceleratorLoraKeys &&
     next.vae === values.vae &&
@@ -235,8 +256,19 @@ export const getVideoWidgetValidationReasons = (
   const registered = models?.find((item) => item.key === values.model?.key);
   const source = registered && isSupportedVideoModel(registered) ? registered : values.model;
   const effectiveModel =
-    values.h3ModeOverride && source.base === 'minimax-h3' && source.format === 'checkpoint'
-      ? { ...source, variant: source.variant === 'ref2va' ? 'fl2va' : 'ref2va' }
+    source.base === 'minimax-h3' && source.format === 'checkpoint'
+      ? {
+          ...source,
+          variant:
+            values.h3SelectedTask ??
+            (registered && values.h3ModeOverride
+              ? source.variant === 'ref2va'
+                ? 'fl2va'
+                : 'ref2va'
+              : source.variant === 'ref2va'
+                ? 'ref2va'
+                : 'fl2va'),
+        }
       : source;
   const reasons = getVideoValidationReasons(effectiveModel, values);
 

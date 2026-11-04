@@ -28,6 +28,8 @@ export const areVideoValuesEqual = (left: VideoWidgetValues, right: VideoWidgetV
   return (
     left.modelKey === right.modelKey &&
     left.h3ModeOverride === right.h3ModeOverride &&
+    left.h3SelectedTask === right.h3SelectedTask &&
+    stableStringify(left.model) === stableStringify(right.model) &&
     areVideoModelsEquivalent(left.model, right.model) &&
     left.positivePrompt === right.positivePrompt &&
     left.negativePrompt === right.negativePrompt &&

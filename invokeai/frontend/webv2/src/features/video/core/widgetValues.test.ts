@@ -281,7 +281,10 @@ describe('H3 per-job mode override', () => {
     const source = h3Model();
     const catalog = [checkpoint, source];
     const base = createDefaultVideoWidgetValues(catalog);
-    const changed = syncVideoWidgetValuesWithModels({ ...base, h3ModeOverride: true }, catalog);
+    const changed = syncVideoWidgetValuesWithModels(
+      { ...base, h3SelectedTask: undefined, h3ModeOverride: true },
+      catalog
+    );
     expect(checkpoint.variant).toBe('fl2va');
     expect(changed.model?.variant).toBe('ref2va');
     expect(changed.h3ModeOverride).toBe(true);
@@ -306,6 +309,7 @@ describe('H3 override queue readiness', () => {
     const values = {
       ...createDefaultVideoWidgetValues([model, component]),
       model,
+      h3SelectedTask: undefined,
       h3ModeOverride: true,
       componentSourceModel: component,
       references: [{ kind: 'image' as const, detail: 'match' as const, image }],
@@ -316,5 +320,84 @@ describe('H3 override queue readiness', () => {
     expect(detectedReasons.some((reason) => reason.includes('does not support reference-conditioned generation'))).toBe(
       true
     );
+  });
+});
+
+describe('H3 selected task persistence', () => {
+  it('preserves references across same-key catalog reclassification', () => {
+    const model = h3Model('checkpoint', 'stable');
+    const component = h3Model();
+    const image = { image_name: 'reference.png', width: 512, height: 512 };
+    const values = syncVideoWidgetValuesWithModels(
+      {
+        ...createDefaultVideoWidgetValues([model, component]),
+        h3SelectedTask: 'ref2va',
+        h3ModeOverride: true,
+        references: [{ kind: 'image', detail: 'match', image }],
+      },
+      [model, component]
+    );
+    const reclassified = syncVideoWidgetValuesWithModels(values, [{ ...model, variant: 'ref2va' }, component]);
+    expect(reclassified.model?.variant).toBe('ref2va');
+    expect(reclassified.references).toEqual(values.references);
+    expect(reclassified.h3SelectedTask).toBe('ref2va');
+    expect(reclassified.h3ModeOverride).toBe(false);
+  });
+
+  it('does not invert an effective persisted model without a catalog', () => {
+    const model = { ...h3Model('checkpoint'), variant: 'ref2va' };
+    const values = {
+      ...createDefaultVideoWidgetValues([model]),
+      h3ModeOverride: true,
+      h3SelectedTask: 'ref2va' as const,
+      references: [
+        { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'r.png', width: 512, height: 512 } },
+      ],
+    };
+    expect(
+      getVideoWidgetValidationReasons(values).some((reason) =>
+        reason.includes('does not support reference-conditioned generation')
+      )
+    ).toBe(false);
+  });
+});
+
+describe('H3 legacy migration', () => {
+  it.each(['fl2va', 'ref2va'] as const)(
+    'pins a legacy %s override regardless of whether the saved model was synthetic',
+    (detected) => {
+      const model = { ...h3Model('checkpoint', 'legacy'), variant: detected };
+      const opposite = detected === 'fl2va' ? 'ref2va' : 'fl2va';
+      const base = createDefaultVideoWidgetValues([model]);
+      for (const saved of [model, { ...model, variant: opposite }]) {
+        const migrated = syncVideoWidgetValuesWithModels(
+          { ...base, model: saved, h3SelectedTask: undefined, h3ModeOverride: true },
+          [model]
+        );
+        expect(migrated.h3SelectedTask).toBe(opposite);
+        expect(migrated.model?.variant).toBe(opposite);
+        const hydrated = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(migrated)))!;
+        const reclassified = syncVideoWidgetValuesWithModels(hydrated, [{ ...model, variant: opposite }]);
+        expect(reclassified.h3SelectedTask).toBe(opposite);
+        expect(reclassified.model?.variant).toBe(opposite);
+        expect(reclassified.h3ModeOverride).toBe(false);
+      }
+    }
+  );
+  it('validates an already-effective legacy model without a catalog without inverting it', () => {
+    const model = { ...h3Model('checkpoint'), variant: 'ref2va' };
+    const values = {
+      ...createDefaultVideoWidgetValues([model]),
+      h3SelectedTask: undefined,
+      h3ModeOverride: true,
+      references: [
+        { kind: 'image' as const, detail: 'match' as const, image: { image_name: 'r.png', width: 512, height: 512 } },
+      ],
+    };
+    expect(
+      getVideoWidgetValidationReasons(values).some((reason) =>
+        reason.includes('does not support reference-conditioned generation')
+      )
+    ).toBe(false);
   });
 });

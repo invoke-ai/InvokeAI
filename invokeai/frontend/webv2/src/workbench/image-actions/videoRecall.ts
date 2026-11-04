@@ -657,7 +657,7 @@ export const buildVideoRecallSettings = ({
     const task = recordedMode === 'minimax_h3_ref2v' ? 'ref2va' : 'fl2va';
     const h3ModeOverride = task !== (registeredModel.variant === 'ref2va' ? 'ref2va' : 'fl2va');
     model = { ...model, variant: task };
-    values = { ...values, model, h3ModeOverride };
+    values = { ...values, model, h3ModeOverride, h3SelectedTask: task };
   }
 
   const { numFrames } = record;

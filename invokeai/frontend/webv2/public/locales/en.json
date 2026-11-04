@@ -6164,6 +6164,7 @@
       "h3ModeOverride": "override",
       "h3ModeDetected": "detected",
       "h3SwitchMode": "Switch mode",
+      "h3TurboRemoved": "Turbo was removed and sampling steps were reset for the selected mode.",
       "h3ClearModeInputs": "Clear mode-specific inputs first",
       "h3ClearModeInputsDescription": "Remove reference media, frames, initial video, and hybrid quality base before switching modes.",
       "targetResolution": "Target Resolution",

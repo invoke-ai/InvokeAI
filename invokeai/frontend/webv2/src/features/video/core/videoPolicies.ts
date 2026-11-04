@@ -1311,10 +1311,12 @@ export const getH3ModeSwitchSettings = (
   models: readonly ModelConfig[],
   override: boolean
 ): VideoSettings => {
+  const detected = model.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+  const task = override ? (detected === 'ref2va' ? 'fl2va' : 'ref2va') : detected;
   const base = settings.acceleratorEnabled
-    ? getAcceleratorToggleResult(settings, model, models, false).settings
+    ? getAcceleratorToggleResult(settings, { ...model, variant: task }, models, false).settings
     : settings;
-  return { ...base, h3ModeOverride: override };
+  return { ...base, h3ModeOverride: override, h3SelectedTask: task };
 };
 
 export type AcceleratorLoraChangeOutcome = 'unchanged' | 'switched' | 'disabled';
@@ -1850,6 +1852,12 @@ export const getDefaultVideoSettings = (
     firstFrameImage: null,
     fps: config.fps.defaultValue,
     h3ModeOverride: false,
+    h3SelectedTask:
+      model?.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
     h3HybridBaseModel: null,
     h3HybridStartBlock: MINIMAX_H3_HYBRID_BLOCK_RANGE.defaultStart,
     h3TextEncoderModel: null,
@@ -1999,6 +2007,12 @@ export const getVideoModelSelectionResult = ({
     ...start,
     modelKey: model.key,
     h3ModeOverride: h3TargetOverride ?? (model.key === currentSettings.modelKey ? start.h3ModeOverride : false),
+    h3SelectedTask:
+      model.base === 'minimax-h3' && model.format === 'checkpoint'
+        ? model.variant === 'ref2va'
+          ? 'ref2va'
+          : 'fl2va'
+        : undefined,
   };
   const losses: VideoModelSwitchLoss[] = [];
   const adjustments = new Set<VideoModelSwitchAdjustment>();

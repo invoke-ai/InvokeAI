@@ -101,9 +101,9 @@ export const VideoModelField = ({
   // panel values reconciled with the catalog; stored values are judged the same way.
   const getTransition = (current: VideoWidgetValues, model: MainModelConfig, mode: 'auto' | 'ref2va' | 'fl2va') => {
     const eligible = model.base === 'minimax-h3' && model.format === 'checkpoint';
-    const requested = eligible && mode !== 'auto' ? mode : model.variant;
-    const effective = eligible ? { ...model, variant: requested } : model;
     const detected = model.variant === 'ref2va' ? 'ref2va' : 'fl2va';
+    const requested = eligible && mode !== 'auto' ? mode : detected;
+    const effective = eligible ? { ...model, variant: requested } : model;
     const h3TargetOverride = eligible && requested !== detected;
     return getVideoModelSelectionResult({
       currentSettings: modelsLoaded ? syncVideoWidgetValuesWithModels(current, models) : current,
@@ -133,7 +133,14 @@ export const VideoModelField = ({
     patchValues((current) => {
       result = getTransition(current, candidate, loadMode);
 
-      return result.losses.length > 0 ? {} : { ...result.settings, model: candidate };
+      return result.losses.length > 0
+        ? {}
+        : {
+            ...result.settings,
+            model: result.settings.h3SelectedTask
+              ? { ...candidate, variant: result.settings.h3SelectedTask }
+              : candidate,
+          };
     });
 
     if (!result) {
@@ -163,7 +170,18 @@ export const VideoModelField = ({
     // Recompute against the settings as they stand now: they may have changed while the dialog was open.
     patchValues((current) => ({
       ...getTransition(current, pendingModel, pendingSwitch?.mode ?? 'auto').settings,
-      model: pendingModel,
+      model:
+        pendingSwitch?.mode && pendingModel.base === 'minimax-h3' && pendingModel.format === 'checkpoint'
+          ? {
+              ...pendingModel,
+              variant:
+                pendingSwitch.mode === 'auto'
+                  ? pendingModel.variant === 'ref2va'
+                    ? 'ref2va'
+                    : 'fl2va'
+                  : pendingSwitch.mode,
+            }
+          : pendingModel,
     }));
   };
 
@@ -199,6 +217,7 @@ export const VideoModelField = ({
                       key={mode}
                       size="sm"
                       variant={loadMode === mode ? 'solid' : 'outline'}
+                      aria-pressed={loadMode === mode}
                       onClick={() => setLoadMode(mode)}
                     >
                       {mode === 'auto' ? t('widgets.video.h3Detected') : mode === 'ref2va' ? 'Ref2VA' : 'FL2VA'}
@@ -211,6 +230,7 @@ export const VideoModelField = ({
               </Box>
             }
             onChange={selectModel}
+            onPickerClose={() => setLoadMode('auto')}
           />
         </Box>
       </Field>

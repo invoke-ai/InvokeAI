@@ -1545,6 +1545,7 @@ describe('H3 overridden task recall', () => {
       models: [model],
     });
     expect(result?.values.h3ModeOverride).toBe(true);
+    expect(result?.values.h3SelectedTask).toBe('ref2va');
     expect(result?.values.model?.variant).toBe('ref2va');
     expect(model.variant).toBe('fl2va');
   });
@@ -1563,6 +1564,7 @@ describe('H3 overridden task recall', () => {
       models: [current],
     });
     expect(result?.values.h3ModeOverride).toBe(false);
+    expect(result?.values.h3SelectedTask).toBe('fl2va');
     expect(result?.values.model?.variant).toBe('fl2va');
   });
 });

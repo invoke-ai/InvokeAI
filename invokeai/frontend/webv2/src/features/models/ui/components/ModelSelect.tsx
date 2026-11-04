@@ -107,6 +107,7 @@ export const ModelSelect = ({
   isClearable = false,
   modelTypes,
   onChange,
+  onPickerClose,
   pickerHeader,
   placeholder,
   scopeLabel: scopeLabelOverride,
@@ -128,6 +129,7 @@ export const ModelSelect = ({
   isClearable?: boolean;
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
+  onPickerClose?: () => void;
   pickerHeader?: ReactNode;
   placeholder?: string;
   /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
@@ -246,6 +248,7 @@ export const ModelSelect = ({
   const selectModel = (model: ModelConfig) => {
     onChange(model);
     setIsOpen(false);
+    onPickerClose?.();
   };
   const canClear = isClearable && Boolean(value);
 
@@ -286,6 +289,9 @@ export const ModelSelect = ({
           }
 
           setIsOpen(event.open);
+          if (!event.open) {
+            onPickerClose?.();
+          }
         }}
       >
         <Box minW="0" position="relative" w="full">

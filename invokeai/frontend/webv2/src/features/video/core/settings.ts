@@ -396,6 +396,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
     h3ModeOverride: values.h3ModeOverride === true,
+    h3SelectedTask:
+      values.h3SelectedTask === 'fl2va' || values.h3SelectedTask === 'ref2va' ? values.h3SelectedTask : undefined,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(
@@ -535,7 +537,17 @@ export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues |
     return null;
   }
 
-  return { ...settings, model: isMainModelConfig(values.model) ? values.model : null };
+  const model = isMainModelConfig(values.model) ? values.model : null;
+  return {
+    ...settings,
+    model:
+      model?.base === 'minimax-h3' &&
+      model.format === 'checkpoint' &&
+      settings.h3SelectedTask &&
+      model.variant !== settings.h3SelectedTask
+        ? { ...model, variant: settings.h3SelectedTask }
+        : model,
+  };
 };
 
 export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues => {
