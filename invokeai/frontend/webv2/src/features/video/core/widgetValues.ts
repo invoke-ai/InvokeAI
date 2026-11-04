@@ -57,9 +57,21 @@ export const syncVideoWidgetValuesWithModels = (
   values: VideoWidgetValues,
   models: readonly ModelConfig[]
 ): VideoWidgetValues => {
+  // Do not pick a task or replace the model while ambiguous legacy media needs a user decision.
+  const unresolvedLegacyConflict = Boolean(
+    values.h3ModeOverride &&
+    !values.h3SelectedTask &&
+    values.references.length &&
+    (values.firstFrameImage || values.lastFrameImage)
+  );
   // Promote only installed H3 checkpoint overrides before other reconciliation; retain the old Diffusers main as
   // components and drop invalid overrides without evicting it.
-  if (values.model?.base === 'minimax-h3' && values.model.format === 'diffusers' && values.h3TransformerModel) {
+  if (
+    !unresolvedLegacyConflict &&
+    values.model?.base === 'minimax-h3' &&
+    values.model.format === 'diffusers' &&
+    values.h3TransformerModel
+  ) {
     const installedTransformer = models.find((candidate) => candidate.key === values.h3TransformerModel?.key);
 
     if (
@@ -85,19 +97,14 @@ export const syncVideoWidgetValuesWithModels = (
   const registered: MainModelConfig | null =
     storedMain && isSupportedVideoModel(storedMain)
       ? storedMain
-      : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
+      : unresolvedLegacyConflict
+        ? values.model
+        : ((models.find((candidate) => isVideoModelSelectable(candidate)) as MainModelConfig | undefined) ?? null);
   const sameH3 =
     registered?.base === 'minimax-h3' && registered.format === 'checkpoint' && registered.key === values.modelKey;
   const detected = registered?.variant === 'ref2va' ? 'ref2va' : 'fl2va';
   const effectiveVariant = sameH3 ? resolveH3Task(values, detected) : detected;
   // Keep the legacy marker until conflicting media is resolved, including across save and reload.
-  const unresolvedLegacyConflict = Boolean(
-    sameH3 &&
-    values.h3ModeOverride &&
-    !values.h3SelectedTask &&
-    values.references.length &&
-    (values.firstFrameImage || values.lastFrameImage)
-  );
   const override = unresolvedLegacyConflict || Boolean(sameH3 && effectiveVariant !== detected);
   // Reuse identity only while every catalog field still agrees: same-key reinstalls or edits must
   // refresh the synthetic model instead of retaining stale hashes, paths, names, or capabilities.
@@ -227,7 +234,13 @@ export const syncVideoWidgetValuesWithModels = (
   }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
-  if (next.references.length > 0 && model && !sameH3 && !getVideoModes(model).includes('reference')) {
+  if (
+    next.references.length > 0 &&
+    model &&
+    !sameH3 &&
+    !unresolvedLegacyConflict &&
+    !getVideoModes(model).includes('reference')
+  ) {
     next.references = [];
   }
 

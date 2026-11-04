@@ -441,6 +441,51 @@ describe('H3 legacy migration', () => {
     expect(resolved.lastFrameImage).toEqual(image);
   });
 
+  it.each(['empty', 'replacement'] as const)(
+    'retains a missing model and conflicting media across reload with %s catalog, then resolves',
+    (catalogKind) => {
+      const model = h3Model('checkpoint', 'missing-conflict');
+      const replacement = h3Model('checkpoint', 'replacement');
+      const catalog = catalogKind === 'empty' ? [] : [replacement];
+      const legacy = {
+        ...createDefaultVideoWidgetValues([model]),
+        h3ModeOverride: true,
+        h3SelectedTask: undefined,
+        references: [reference],
+        firstFrameImage: image,
+        lastFrameImage: image,
+      };
+      const normalized = normalizeVideoWidgetValues(legacy)!;
+      const synced = syncVideoWidgetValuesWithModels(normalized, catalog);
+      const reloaded = normalizeVideoWidgetValues(JSON.parse(JSON.stringify(synced)))!;
+      const resynced = syncVideoWidgetValuesWithModels(reloaded, catalog);
+      for (const values of [normalized, synced, reloaded, resynced]) {
+        expect(values.model?.key).toBe(model.key);
+        expect(values.h3ModeOverride).toBe(true);
+        expect(values.h3SelectedTask).toBeUndefined();
+        expect(values.references).toEqual([reference]);
+        expect(values.firstFrameImage).toEqual(image);
+        expect(values.lastFrameImage).toEqual(image);
+        expect(getVideoWidgetValidationReasons(values, catalog)).toEqual(
+          expect.arrayContaining([expect.stringContaining('no longer installed')])
+        );
+      }
+      const restored = syncVideoWidgetValuesWithModels(resynced, [model]);
+      expect(restored.h3ModeOverride).toBe(true);
+      expect(restored.h3SelectedTask).toBeUndefined();
+      expect(getVideoWidgetValidationReasons(restored, [model])).toContain(
+        'References cannot be combined with first/last frames. Clear one side.'
+      );
+      const resolved = syncVideoWidgetValuesWithModels({ ...restored, references: [] }, [model]);
+      expect(resolved.h3SelectedTask).toBe('fl2va');
+      expect(resolved.firstFrameImage).toEqual(image);
+      expect(resolved.lastFrameImage).toEqual(image);
+      expect(getVideoWidgetValidationReasons(resolved, [model])).not.toContain(
+        'References cannot be combined with first/last frames. Clear one side.'
+      );
+    }
+  );
+
   it('honors explicit modern selection even when media suggests another task', () => {
     const model = h3Model('checkpoint', 'modern');
     const values = {
