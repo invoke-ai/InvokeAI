@@ -693,6 +693,7 @@ exclude = [
   "invokeai/backend/image_util/normal_bae/",     # External code
   "invokeai/backend/image_util/pidi/",           # External code
   "invokeai/backend/image_util/imwatermark/",    # External code
+  "tests/app/invocations/third_party_cinematic_effects/", # External code, kept unmodified
 ]
 
 [tool.ruff.lint]
