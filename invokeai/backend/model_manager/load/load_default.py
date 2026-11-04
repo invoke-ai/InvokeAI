@@ -356,7 +356,7 @@ class ModelLoader(ModelLoaderBase):
         """A suffix for the cache key when the weights this loader builds depend on its device.
 
         Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
-        loader. A loader whose stored format depends on the device (float8 where supported, folded otherwise)
+        loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
         returns the format here, so only devices that build the same weights share a copy. Empty by default.
         """
         return ""

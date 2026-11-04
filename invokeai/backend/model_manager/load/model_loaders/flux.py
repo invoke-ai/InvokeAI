@@ -725,6 +725,9 @@ class T5EncoderSingleFileLoader(ModelLoader):
     ~9.5 GB. Text encoders are excluded from FP8 Storage by design, so there is no per-model setting behind this;
     elsewhere the scales are folded and everything is cast, as on a device without float8. Kept weights are
     dequantized per forward and never multiplied in fp8, whatever `fp8_compute` says.
+
+    Everything else is held in `choose_bfloat16_safe_dtype`'s dtype, except on CPU, which holds float32 (twice the
+    bf16 size): CPU bf16 GEMM is unreliable on part of the Windows fleet.
     """
 
     def get_size_fs(
@@ -736,22 +739,30 @@ class T5EncoderSingleFileLoader(ModelLoader):
             return 0
         return super().get_size_fs(config, model_path, submodel_type)
 
-    def _keeps_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
-        # Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
-        # and the capability probes can flip between the key computation and the build under the load lock.
+    def _storage_format(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> tuple[bool, torch.dtype]:
+        """Whether Linear weights stay float8, and the dtype everything else is held and computed in.
+
+        Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
+        and the capability probes can flip between the key computation and the build under the load lock.
+        CPU holds float32: bf16 GEMM on CPU faults with an illegal instruction on part of the Windows fleet, and
+        `choose_bfloat16_safe_dtype` only checks that a bf16 tensor can be allocated.
+        """
         device = self._get_execution_device(config, submodel_type) or self._torch_device
-        decisions = self.__dict__.setdefault("_keeps_fp8_decisions", {})
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
         if device not in decisions:
-            decisions[device] = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+            dtype = torch.float32 if device.type == "cpu" else TorchDevice.choose_bfloat16_safe_dtype(device)
+            decisions[device] = (keep_fp8, dtype)
         return decisions[device]
 
     def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
-        # Whether the Linear weights stay float8 depends on the device, and device caches share one canonical CPU
-        # copy per key: a device that cannot run float8 must not adopt it, nor a capable one the folded copy.
-        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3) and self._keeps_fp8(
-            config, submodel_type
-        ):
-            return "fp8"
+        # Both the float8 decision and the dtype depend on the device, and device caches share one canonical CPU
+        # copy per key: a device must not adopt a format or dtype it would not have built itself.
+        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
+            keep_fp8, dtype = self._storage_format(config, submodel_type)
+            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
         return ""
 
     def _load_model(
@@ -776,8 +787,7 @@ class T5EncoderSingleFileLoader(ModelLoader):
 
     def _load_text_encoder(self, config: T5Encoder_Checkpoint_Config, submodel_type: SubModelType) -> T5EncoderModel:
         model_path = Path(config.path)
-        device = self._get_execution_device(config, submodel_type) or self._torch_device
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(device)
+        keep_fp8, model_dtype = self._storage_format(config, submodel_type)
 
         sd = load_file(model_path)
         # ComfyUI writes the token embedding twice, as `shared` and as the encoder's `embed_tokens`, which the
@@ -795,7 +805,6 @@ class T5EncoderSingleFileLoader(ModelLoader):
         }
         # Pops every scale and the `scaled_fp8` marker, so what is left loads into a model that knows no fp8.
         fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
-        keep_fp8 = self._keeps_fp8(config, submodel_type)
 
         with accelerate.init_empty_weights():
             model = T5EncoderModel(infer_t5_encoder_config(sd))

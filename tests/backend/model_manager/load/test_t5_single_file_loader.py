@@ -110,12 +110,11 @@ def _write_scaled_fp8(reference: T5EncoderModel, path: Path) -> dict[str, torch.
 
 
 @pytest.fixture
-def loader(monkeypatch: pytest.MonkeyPatch) -> T5EncoderSingleFileLoader:
+def loader() -> T5EncoderSingleFileLoader:
     loader = object.__new__(T5EncoderSingleFileLoader)
     loader._ram_cache = MagicMock()
     loader._logger = InvokeAILogger.get_logger("test")
     loader._torch_device = torch.device("cpu")
-    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float32))
     return loader
 
 
@@ -199,7 +198,7 @@ def test_keeping_fp8_reserves_less_than_folding(
     for keep in (False, True):
         _keep_fp8(monkeypatch, keep)
         loader._ram_cache = MagicMock()
-        loader.__dict__.pop("_keeps_fp8_decisions", None)  # a real load gets a fresh loader
+        loader.__dict__.pop("_storage_format_decisions", None)  # a real load gets a fresh loader
         _load_encoder(loader, path)
         loader._ram_cache.make_room.assert_called_once()
         reserved[keep] = loader._ram_cache.make_room.call_args.args[0]
@@ -219,6 +218,28 @@ def test_the_tokenizer_is_the_bundled_one_and_reserves_nothing(
     assert loader.get_size_fs(config, path, SubModelType.Tokenizer3) == 0
 
 
+def _device_loader(store, budget, device: str, tmp_path: Path) -> T5EncoderSingleFileLoader:
+    """A loader on its own device cache that shares `store` with the others."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=InvokeAILogger.get_logger("test"),
+        shared_cpu_weights=store,
+        ram_budget=budget,
+    )
+    loader = object.__new__(T5EncoderSingleFileLoader)
+    loader._app_config = MagicMock(log_memory_usage=False, models_path=tmp_path)
+    loader._logger = InvokeAILogger.get_logger("test")
+    loader._ram_cache = cache
+    loader._torch_device = torch.device(device)
+    return loader
+
+
 @pytest.mark.parametrize("capable_first", [True, False], ids=["capable_loads_first", "incapable_loads_first"])
 def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_format(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capable_first: bool
@@ -226,7 +247,6 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     # Device caches share one canonical CPU copy per cache key and adopt it without rerunning the loader. Which
     # format the T5 is stored in depends on the device, so the second device must neither adopt float8 it cannot
     # run nor the folded copy that throws away a capable device's saving.
-    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
     from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
     from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
     from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
@@ -243,25 +263,10 @@ def test_device_caches_share_weights_only_with_a_device_that_builds_the_same_for
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=10**12, shared_store=store)
 
-    def make_loader(device: str) -> T5EncoderSingleFileLoader:
-        cache = ModelCache(
-            execution_device_working_mem_gb=1.0,
-            enable_partial_loading=False,
-            keep_ram_copy_of_weights=True,
-            execution_device="cpu",
-            storage_device="cpu",
-            logger=InvokeAILogger.get_logger("test"),
-            shared_cpu_weights=store,
-            ram_budget=budget,
-        )
-        loader = object.__new__(T5EncoderSingleFileLoader)
-        loader._app_config = MagicMock(log_memory_usage=False, models_path=tmp_path)
-        loader._logger = InvokeAILogger.get_logger("test")
-        loader._ram_cache = cache
-        loader._torch_device = torch.device(device)
-        return loader
-
-    capable, incapable = make_loader("cuda:0"), make_loader("cpu")
+    capable, incapable = (
+        _device_loader(store, budget, "cuda:0", tmp_path),
+        _device_loader(store, budget, "cpu", tmp_path),
+    )
 
     def weight_dtype(loader: T5EncoderSingleFileLoader) -> torch.dtype:
         record, _claim = loader._load_and_cache(config, SubModelType.TextEncoder2)
@@ -287,9 +292,60 @@ def test_the_cache_key_and_the_stored_format_come_from_one_capability_decision(
     _write_scaled_fp8(_tiny_reference(), path)
     config = _config(path)
     _keep_fp8(monkeypatch, False)
-    assert loader._cache_key_variant(config, SubModelType.TextEncoder2) == ""
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder2) == "float32"
 
     _keep_fp8(monkeypatch, True)
     model = loader._load_model(config, SubModelType.TextEncoder2)
 
     assert all(p.dtype == torch.float32 for p in model.parameters())
+
+
+def test_a_cpu_only_t5_on_a_gpu_box_holds_float32(
+    loader: T5EncoderSingleFileLoader, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # `cpu_only` runs the encoder on the CPU while the loader's own device is the GPU; the dtype follows the
+    # execution device, not `_torch_device`. The dtype choice is patched to float16 so a GPU decision shows.
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    _keep_fp8(monkeypatch, False)
+    path = tmp_path / "t5xxl.safetensors"
+    _write_fp16(_tiny_reference(), path)
+    loader._torch_device = torch.device("cuda:0")
+    config = T5Encoder_Checkpoint_Config.model_construct(path=str(path), name=path.stem, cpu_only=True)
+
+    assert loader._cache_key_variant(config, SubModelType.TextEncoder2) == "float32"
+    model = loader._load_model(config, SubModelType.TextEncoder2)
+    assert all(p.dtype == torch.float32 for p in model.parameters())
+
+
+@pytest.mark.parametrize("cpu_first", [True, False], ids=["cpu_loads_first", "cuda_loads_first"])
+def test_device_caches_do_not_share_folded_weights_of_different_dtypes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, cpu_first: bool
+) -> None:
+    # Both devices fold, but CPU holds float32 and a CUDA device without bf16 holds float16: the shared CPU
+    # store must not hand one device the other's dtype.
+    from invokeai.backend.model_manager.load.model_cache.ram_budget import RamBudget
+    from invokeai.backend.model_manager.load.model_cache.shared_cpu_weights import SharedCpuWeightsStore
+    from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+
+    monkeypatch.setattr(loader_module.TorchDevice, "choose_bfloat16_safe_dtype", staticmethod(lambda _: torch.float16))
+    _keep_fp8(monkeypatch, False)
+    path = tmp_path / "t5xxl.safetensors"
+    _write_scaled_fp8(_tiny_reference(), path)
+    config = T5Encoder_Checkpoint_Config.model_construct(
+        key="t5", path=path.name, name="t5xxl", base=BaseModelType.Any, type=ModelType.T5Encoder, cpu_only=None
+    )
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=10**12, shared_store=store)
+
+    loaders = {}  # a device's cache entry holds the shared weights only while its cache lives
+
+    def weight_dtype(device: str) -> torch.dtype:
+        loaders[device] = _device_loader(store, budget, device, tmp_path)
+        record, _claim = loaders[device]._load_and_cache(config, SubModelType.TextEncoder2)
+        return record.cached_model.model.encoder.block[0].layer[0].SelfAttention.q.weight.dtype
+
+    dtypes = {}
+    for name, device in [("cpu", "cpu"), ("cuda", "cuda:0")] if cpu_first else [("cuda", "cuda:0"), ("cpu", "cpu")]:
+        dtypes[name] = weight_dtype(device)
+
+    assert dtypes == {"cpu": torch.float32, "cuda": torch.float16}

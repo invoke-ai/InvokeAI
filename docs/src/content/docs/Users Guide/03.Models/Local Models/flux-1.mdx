@@ -79,7 +79,9 @@ components. Installing a starter model installs them as dependencies:
 | CLIP embed | `clip-vit-large-patch14` (~250 MB) |
 
 You can also install the T5 encoder ComfyUI uses as a single file (`t5xxl_fp16`, or `t5xxl_fp8_e4m3fn_scaled` for
-about half the VRAM) and select it here; see [Model Format Support](/users-guide/models/model-format-support/#text-encoders).
+about half the VRAM) and select it here; see
+[Model Format Support](/users-guide/models/model-format-support/#text-encoders). A single-file T5 run on the CPU is
+held in float32 (about 19 GB of RAM for T5-XXL).
 
 Select them in the **Components** section next to the model. The SDNQ pipeline carries its own encoders
 and VAE, so its component pickers stay empty.
