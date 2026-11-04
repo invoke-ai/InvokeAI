@@ -701,6 +701,9 @@ describe('LoRA settings helpers', () => {
     expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: undefined })).toBe(
       true
     );
+    // The API sends null, not undefined, for a record without one.
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: null }, medium)).toBe(true);
+    expect(isLoraCompatibleWithModel({ base: 'sd-3', variant: 'sd3_large' }, { ...medium, variant: null })).toBe(true);
     expect(isLoraCompatibleWithModel({ base: 'qwen-image' }, medium)).toBe(false);
   });
 });
