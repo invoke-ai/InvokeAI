@@ -152,7 +152,9 @@ def _normalize_lora_keys(layer_dict: dict[str, torch.Tensor], alpha: float | Non
             "lora_down.weight": layer_dict["lora_A.weight"],
             "lora_up.weight": layer_dict["lora_B.weight"],
         }
-        if alpha is not None:
+        if "alpha" in layer_dict:
+            values["alpha"] = layer_dict["alpha"]
+        elif alpha is not None:
             values["alpha"] = torch.tensor(alpha)
         # A PEFT DoRA magnitude indexes the output dim; dropping it would apply the adapter as a plain LoRA.
         if "lora_magnitude_vector.weight" in layer_dict:
