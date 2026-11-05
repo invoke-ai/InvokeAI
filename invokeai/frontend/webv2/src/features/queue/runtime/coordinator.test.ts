@@ -581,7 +581,7 @@ describe('queueCoordinator', () => {
     });
   });
 
-  it('coalesces gallery refreshes across a burst of completions', async () => {
+  it('leaves socket completion invalidation to Gallery', async () => {
     vi.useFakeTimers();
     harness = createHarness({ galleryRefreshCoalesceMs: 400 });
     harness.api.enqueueGenerate.mockResolvedValue({
@@ -601,7 +601,7 @@ describe('queueCoordinator', () => {
 
     await vi.advanceTimersByTimeAsync(500);
 
-    expect(harness.callbacks.onGalleryRefresh).toHaveBeenCalledTimes(1);
+    expect(harness.callbacks.onGalleryRefresh).not.toHaveBeenCalled();
   });
 
   it('does not refresh the gallery for failed or canceled items', async () => {

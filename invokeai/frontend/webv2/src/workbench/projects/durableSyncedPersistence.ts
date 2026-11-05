@@ -4,6 +4,7 @@ import type { Project, ProjectLoadResult, RefusedWorkbenchProject, WorkbenchStat
 import { createUuid } from '@platform/browser/randomUuid';
 import { createLogger } from '@platform/logging/logger';
 import { assertAccountScopeCurrent, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { RequestDeadlineError } from '@platform/transport/http';
 import {
   getProjectCanvasSchemaRequirement,
   isCanvasSchemaVersionSupported,
@@ -1666,7 +1667,7 @@ export const createDurableSyncedWorkbenchPersistence = (
      * any other half diverged.
      */
     const reconcile = async (): Promise<
-      | { kind: 'acknowledged' | 'retry'; entry: Omit<SyncEntry, 'pushedDoc'> }
+      | { kind: 'acknowledged' | 'retry'; entry: SyncEntry }
       | { kind: 'diverged'; half?: 'workspace'; serverRevision: number }
     > => {
       const latest = await api.getProject(project.id, owner.signal);
@@ -1679,13 +1680,16 @@ export const createDurableSyncedWorkbenchPersistence = (
       const serverHalves = splitProjectDocument(server.document);
       const split = isSplitProjectRecord(latest);
       const base = syncEntries.get(project.id);
-      const contentHeld = split && serverHalves.contentJson === halves.contentJson;
+      const contentHeld = split
+        ? serverHalves.contentJson === halves.contentJson
+        : keepsWhole && server.documentJson === documentJson;
       const sent = sentHalves.get(project.id);
       // Unmoved: still what this page last had acknowledged, or what it sent and never heard back about.
       const contentUnmoved = split
         ? base?.pushedContent === serverHalves.contentJson || sent?.content.includes(serverHalves.contentJson) === true
         : base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson;
-      const workspaceHeld = Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson;
+      const workspaceHeld =
+        (!split && keepsWhole) || (Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson);
       const workspaceUnmoved = latest.workspace
         ? base?.pushedWorkspace === serverHalves.workspaceJson ||
           sent?.workspace.includes(serverHalves.workspaceJson) === true
@@ -1703,7 +1707,10 @@ export const createDurableSyncedWorkbenchPersistence = (
         revision: latest.revision,
         workspaceRevision: latest.workspace?.revision ?? null,
       };
-      return { entry, kind: contentHeld && workspaceHeld ? 'acknowledged' : 'retry' };
+      return {
+        entry: { ...entry, pushedDoc: split ? acknowledgedDocument(entry) : server.documentJson },
+        kind: contentHeld && workspaceHeld ? 'acknowledged' : 'retry',
+      };
     };
 
     let base = entry;
@@ -1737,7 +1744,8 @@ export const createDurableSyncedWorkbenchPersistence = (
           }
           return conflicted({ kind: 'deleted' });
         }
-        if (!isStatus(error, 409)) {
+        const timedOut = error instanceof RequestDeadlineError;
+        if (!isStatus(error, 409) && !timedOut) {
           if (isDeterministicClientError(error)) {
             throw error;
           }
@@ -1757,10 +1765,10 @@ export const createDurableSyncedWorkbenchPersistence = (
           if (readRefusal) {
             return settleRefusal(readRefusal);
           }
-          if (isStatus(readError, 404)) {
+          if (isStatus(readError, 404) && !timedOut) {
             return conflicted({ kind: 'deleted' });
           }
-          if (isDeterministicClientError(readError)) {
+          if (isDeterministicClientError(readError) && !(timedOut && isStatus(readError, 404))) {
             throw readError;
           }
           hasPending = true;
@@ -1770,6 +1778,10 @@ export const createDurableSyncedWorkbenchPersistence = (
           await settleAck(project, generation, settled.entry, document, documentJson, store, editorSessionId);
           return { documentJson, kind: 'acknowledged' };
         }
+        if (settled.kind === 'retry' && attempt > 0 && timedOut) {
+          hasPending = true;
+          return { documentJson, kind: 'unsynced' };
+        }
         if (settled.kind === 'diverged' || attempt > 0) {
           return conflicted({
             ...(settled.kind === 'diverged' && settled.half ? { half: settled.half } : {}),
@@ -1777,7 +1789,7 @@ export const createDurableSyncedWorkbenchPersistence = (
             serverRevision: settled.kind === 'diverged' ? settled.serverRevision : settled.entry.revision,
           });
         }
-        base = { ...settled.entry, pushedDoc: acknowledgedDocument(settled.entry) };
+        base = settled.entry;
         syncEntries.set(project.id, base);
       }
     }

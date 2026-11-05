@@ -1,7 +1,7 @@
 import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./deploymentBase', () => ({
   getDeploymentBasePath: () => '/invoke',
@@ -10,6 +10,8 @@ vi.mock('./deploymentBase', () => ({
 
 import {
   ApiError,
+  RequestDeadlineError,
+  withRequestDeadline,
   absolutizeApiUrl,
   apiFetch,
   apiFetchJson,
@@ -381,5 +383,90 @@ describe('structured error details', () => {
     expect(getApiErrorCode(validation)).toBeNull();
     expect(getApiErrorCode(new ApiError('<html>', 502))).toBeNull();
     expect(getApiErrorCode(new Error('offline'))).toBeNull();
+  });
+});
+
+describe('request deadline cancellation', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    configureTestAuth(() => ({ identity: null, token: null }));
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['headers', 'body', 'error-body'] as const)('aborts a hung %s and disposes the deadline', async (phase) => {
+    let signal!: AbortSignal;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url, init) => {
+        signal = init.signal;
+        if (phase === 'headers') {
+          return new Promise(() => {
+            /* Simulate an unresponsive request. */
+          });
+        }
+        return Promise.resolve(new Response(new ReadableStream(), { status: phase === 'body' ? 200 : 500 }));
+      })
+    );
+    const result = expect(
+      withRequestDeadline((signal) => apiFetchJson('/hung', { signal }), 100)
+    ).rejects.toBeInstanceOf(RequestDeadlineError);
+    await vi.advanceTimersByTimeAsync(100);
+    await result;
+    expect(signal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each(['caller', 'account'] as const)('cancels underlying work immediately on %s abort', async (source) => {
+    const caller = new AbortController();
+    let requestSignal!: AbortSignal;
+    const result = withRequestDeadline(
+      (signal) => {
+        requestSignal = signal;
+        return new Promise(() => {
+          /* Simulate an unresponsive request. */
+        });
+      },
+      100,
+      caller.signal
+    );
+    const rejected = expect(result).rejects.toMatchObject({ name: 'AbortError' });
+    if (source === 'caller') {
+      caller.abort();
+    } else {
+      accountLifecycle.invalidate();
+    }
+    await rejected;
+    expect(requestSignal.aborted).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('consumes a late rejection after the deadline has already ended the wait', async () => {
+    let rejectLate!: (error: Error) => void;
+    const result = expect(
+      withRequestDeadline(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectLate = reject;
+          }),
+        100
+      )
+    ).rejects.toBeInstanceOf(RequestDeadlineError);
+    await vi.advanceTimersByTimeAsync(100);
+    await result;
+    rejectLate(new Error('late response failure'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cleans up after success, rejection and an already aborted caller', async () => {
+    await expect(withRequestDeadline(() => Promise.resolve(1), 100)).resolves.toBe(1);
+    await expect(withRequestDeadline(() => Promise.reject(new Error('failed')), 100)).rejects.toThrow('failed');
+    const request = vi.fn();
+    await expect(withRequestDeadline(request, 100, AbortSignal.abort())).rejects.toMatchObject({ name: 'AbortError' });
+    expect(request).not.toHaveBeenCalled();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

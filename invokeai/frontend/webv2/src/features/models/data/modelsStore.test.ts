@@ -63,6 +63,70 @@ describe('models store loading', () => {
     expect(store.getModelsSnapshot().models.map((model) => model.key)).toEqual(['a']);
   });
 
+  it.each(['replace', 'patch', 'delete', 'cover'] as const)(
+    'fences an older list after a confirmed %s and reads unrelated changes on the trailing pass',
+    async (mutation) => {
+      const original = { key: 'a', name: 'Before', cover_image: null } as ModelConfig;
+      let finishOld!: (models: ModelConfig[]) => void;
+      let finishFresh!: (models: ModelConfig[]) => void;
+      api.listModels
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishOld = resolve;
+          })
+        )
+        .mockReturnValueOnce(
+          new Promise((resolve) => {
+            finishFresh = resolve;
+          })
+        );
+      const store = await import('./modelsStore');
+      store.setModelsSnapshotForTests({ models: [original], status: 'loaded' });
+      const refresh = store.refreshModels();
+      if (mutation === 'replace') {
+        store.replaceModelInStore({ ...original, name: 'After' });
+      }
+      if (mutation === 'patch') {
+        store.patchModelInStore('a', { name: 'After' });
+      }
+      if (mutation === 'delete') {
+        store.removeModelsFromStore(['a']);
+      }
+      if (mutation === 'cover') {
+        store.markCoverImageChanged('a', true);
+      }
+      const confirmed = store.getModelsSnapshot().models;
+      finishOld([original]);
+      await refresh;
+      expect(store.getModelsSnapshot().models).toEqual(confirmed);
+      expect(api.listModels).toHaveBeenCalledTimes(2);
+      finishFresh([...confirmed, { key: 'b', name: 'Unrelated' } as ModelConfig]);
+      await store.ensureModelsLoaded();
+      expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('Unrelated');
+    }
+  );
+
+  it('accepts authoritative data after an optimistic change rolls back', async () => {
+    const model = { key: 'a', name: 'Before', cpu_only: null } as ModelConfig;
+    let finishOld!: (models: ModelConfig[]) => void;
+    api.listModels
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishOld = resolve;
+        })
+      )
+      .mockResolvedValueOnce([{ ...model, name: 'Server rename' }]);
+    const store = await import('./modelsStore');
+    store.setModelsSnapshotForTests({ models: [model], status: 'loaded' });
+    const refresh = store.refreshModels();
+    store.patchModelInStore('a', { cpu_only: true });
+    store.patchModelInStore('a', { cpu_only: null });
+    finishOld([model]);
+    await refresh;
+    await store.ensureModelsLoaded();
+    expect(store.getModelsSnapshot().modelsByKey.get('a')).toMatchObject({ name: 'Server rename', cpu_only: null });
+  });
+
   it('unwraps FastAPI detail bodies into the snapshot error', async () => {
     const { ApiError } = await import('@platform/transport/http');
     api.listModels.mockRejectedValueOnce(new ApiError('{"detail":"Model records unavailable"}', 500));

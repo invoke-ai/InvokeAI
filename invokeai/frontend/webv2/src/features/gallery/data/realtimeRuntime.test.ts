@@ -197,9 +197,8 @@ describe('gallery realtime runtime', () => {
     runtime.start();
     // Another user's item, as an admin receives it, and as everyone else receives it.
     emitStatusChanged({ destination, user_id: 'bob' });
+    emitStatusChanged({ destination, user_id: 'bob', origin: CLIENT_ORIGIN });
     emitStatusChanged({ destination: null, origin: null, user_id: 'redacted' });
-    // An item this client enqueued, which Queue refreshes for in the tab tracking it.
-    emitStatusChanged({ destination, origin: CLIENT_ORIGIN });
 
     for (const status of ['pending', 'in_progress', 'waiting', 'failed', 'canceled'] as const) {
       emitStatusChanged({ destination, status });
@@ -208,6 +207,19 @@ describe('gallery realtime runtime', () => {
     vi.advanceTimersByTime(1000);
 
     expect(invalidate).not.toHaveBeenCalled();
+    expect(onRevealRequest).not.toHaveBeenCalled();
+    runtime.dispose();
+  });
+
+  it('coalesces frontend completions from this and other tabs without revealing', () => {
+    const runtime = createRuntime();
+    runtime.start();
+    for (let item_id = 1; item_id <= 20; item_id += 1) {
+      emitStatusChanged({ destination: 'gallery:reveal', origin: CLIENT_ORIGIN, item_id });
+      emitStatusChanged({ destination: 'gallery:reveal', origin: CLIENT_ORIGIN, item_id });
+    }
+    vi.advanceTimersByTime(250);
+    expect(invalidate).toHaveBeenCalledTimes(1);
     expect(onRevealRequest).not.toHaveBeenCalled();
     runtime.dispose();
   });

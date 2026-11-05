@@ -52,6 +52,7 @@ Behavior specs live beside their owning code. Read the owner's document before c
 | ------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | Identity credential and session lifetimes                     | [features/identity/README.md](src/features/identity/README.md)                         |
 | Application and project event logging                         | [platform/logging/README.md](src/platform/logging/README.md)                           |
+| Models catalog and read fencing                               | [features/models/README.md](src/features/models/README.md)                             |
 | Queue backend port and active sessions                        | [features/queue/README.md](src/features/queue/README.md)                               |
 | Gallery listings and reveal                                   | [features/gallery/README.md](src/features/gallery/README.md)                           |
 | Intermediates manager and cleanup                             | [features/intermediates/README.md](src/features/intermediates/README.md)               |

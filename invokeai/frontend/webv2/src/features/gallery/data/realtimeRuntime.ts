@@ -50,7 +50,7 @@ export const createGalleryRealtimeRuntime = ({
   /** Null when events cannot be attributed to a user (single-user servers tag every event `system`). */
   getSessionUserId: () => string | null;
   invalidate: () => void | Promise<void>;
-  /** True for origins of items this client enqueues; Queue refreshes for those in the tab that tracks them. */
+  /** Frontend origins refresh only; they never request external reveal. */
   isClientQueueItemOrigin: (origin: string | null) => boolean;
   minIntervalMs?: number;
   /** Receives the backend item id of each of those completions whose batch asked to be revealed. */
@@ -83,24 +83,16 @@ export const createGalleryRealtimeRuntime = ({
   };
 
   const handleQueueItemStatusChanged = (event: QueueItemStatusChangedPayload): void => {
-    // Admins also receive other users' full events and everyone else's arrive redacted, so only the session user's
-    // completions can add to this gallery. Items this client enqueued are left to Queue, which refreshes only in the
-    // tab tracking the item: another tab or device of the same user is not refreshed for them. Known limitation,
-    // left intentionally: refreshing here too would double-refresh the enqueuing tab.
+    // Admins receive other users' events too. All own-account completions refresh here, including other tabs.
     const sessionUserId = getSessionUserId();
 
-    if (
-      !isActive() ||
-      event.status !== 'completed' ||
-      isClientQueueItemOrigin(event.origin) ||
-      (sessionUserId !== null && event.user_id !== sessionUserId)
-    ) {
+    if (!isActive() || event.status !== 'completed' || (sessionUserId !== null && event.user_id !== sessionUserId)) {
       return;
     }
 
     scheduleInvalidation();
 
-    if (event.destination === REVEAL_DESTINATION) {
+    if (!isClientQueueItemOrigin(event.origin) && event.destination === REVEAL_DESTINATION) {
       onRevealRequest?.(event.item_id);
     }
   };

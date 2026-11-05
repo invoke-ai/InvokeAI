@@ -1,8 +1,15 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
 import { queryClient } from '@platform/query/client';
-import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
-import { ApiError, apiFetch, apiFetchJson, sleep } from '@platform/transport/http';
+import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
+import {
+  ApiError,
+  apiFetch,
+  apiFetchJson,
+  RequestDeadlineError,
+  sleep,
+  withRequestDeadline,
+} from '@platform/transport/http';
 import {
   DEFAULT_PROJECT_CANVAS_SCHEMA_VERSION,
   MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
@@ -15,6 +22,8 @@ import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 const PROJECTS_BASE = '/api/v1/projects';
 const PROJECT_WRITE_MAX_ATTEMPTS = 9;
 const PROJECT_WRITE_RETRY_WINDOW_MS = 125_000;
+// Leave room for busy retries without allowing one request/body to monopolize the serialized save queue.
+const PROJECT_REQUEST_TIMEOUT_MS = 30_000;
 // The path's queue segment is ignored by the backend (kept for compatibility).
 const CLIENT_STATE_BASE = '/api/v1/client_state/default';
 
@@ -116,13 +125,22 @@ export interface ProjectWorkspaceSaveRequest {
 }
 
 export const listProjects = (signal?: AbortSignal): Promise<ProjectSummaryDTO[]> =>
-  apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal });
+  withRequestDeadline(
+    (signal) => apiFetchJson<ProjectSummaryDTO[]>(`${PROJECTS_BASE}/`, { signal }),
+    PROJECT_REQUEST_TIMEOUT_MS,
+    signal
+  );
 
 export const getProject = (projectId: string, signal?: AbortSignal): Promise<ProjectWithWorkspaceDTO> =>
-  apiFetchJson<ProjectWithWorkspaceDTO>(
-    `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
-      `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
-    { signal }
+  withRequestDeadline(
+    (signal) =>
+      apiFetchJson<ProjectWithWorkspaceDTO>(
+        `${PROJECTS_BASE}/${encodeURIComponent(projectId)}?max_canvas_schema_version=${MAX_SUPPORTED_CANVAS_SCHEMA_VERSION}` +
+          `&max_document_schema_version=${PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION}`,
+        { signal }
+      ),
+    PROJECT_REQUEST_TIMEOUT_MS,
+    signal
   );
 
 const isProjectWriteBusyError = (error: unknown): error is ApiError => {
@@ -160,14 +178,23 @@ const createProjectWriteRetryBudget = (): ProjectWriteRetryBudget => ({
 });
 
 const requestProjectWrite = async <T>(
-  request: () => Promise<T>,
+  request: (signal: AbortSignal) => Promise<T>,
   signal: AbortSignal | undefined,
   budget: ProjectWriteRetryBudget = createProjectWriteRetryBudget()
 ): Promise<T> => {
+  const requestSignal = AbortSignal.any([captureAccountScope().signal, ...(signal ? [signal] : [])]);
   while (budget.attempts < PROJECT_WRITE_MAX_ATTEMPTS) {
     budget.attempts += 1;
     try {
-      return await request();
+      requestSignal.throwIfAborted();
+      if (Date.now() >= budget.deadline) {
+        throw new RequestDeadlineError();
+      }
+      return await withRequestDeadline(
+        request,
+        Math.min(PROJECT_REQUEST_TIMEOUT_MS, budget.deadline - Date.now()),
+        requestSignal
+      );
     } catch (error) {
       if (!isProjectWriteBusyError(error) || budget.attempts >= PROJECT_WRITE_MAX_ATTEMPTS) {
         throw error;
@@ -183,7 +210,7 @@ const requestProjectWrite = async <T>(
       if (delayMs > remainingMs) {
         throw error;
       }
-      await sleep(delayMs, signal);
+      await sleep(delayMs, requestSignal);
     }
   }
 
@@ -219,7 +246,7 @@ const createProjectFromBody = (
   budget: ProjectWriteRetryBudget
 ): Promise<ProjectWithWorkspaceDTO> =>
   requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/`, {
         body,
         method: 'POST',
@@ -244,7 +271,7 @@ export const updateProject = (
   });
 
   return requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWithWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}`, {
         body,
         method: 'PUT',
@@ -272,7 +299,7 @@ export const saveProjectWorkspace = (
   });
 
   return requestProjectWrite(
-    () =>
+    (signal) =>
       apiFetchJson<ProjectWorkspaceDTO>(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}/workspace`, {
         body,
         method: 'PUT',
@@ -292,9 +319,32 @@ export const deleteProject = async (
   signal?: AbortSignal,
   boards: DeleteProjectBoards = 'release'
 ): Promise<void> => {
+  signal ??= captureAccountScope().signal;
   const query = boards === 'release' ? '' : '?boards=delete';
 
-  await apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal });
+  try {
+    await withRequestDeadline(
+      (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
+      PROJECT_REQUEST_TIMEOUT_MS,
+      signal
+    );
+  } catch (error) {
+    if (!(error instanceof RequestDeadlineError)) {
+      throw error;
+    }
+    // Repeat the same identity/policy: a settled 404 also proves the first delete committed.
+    try {
+      await withRequestDeadline(
+        (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
+        PROJECT_REQUEST_TIMEOUT_MS,
+        signal
+      );
+    } catch (retryError) {
+      if (!isProjectNotFoundError(retryError)) {
+        throw retryError;
+      }
+    }
+  }
 };
 
 /** Every board of the project with its visible media; excludes intermediate/other categories. */
@@ -546,10 +596,16 @@ const isRefusal = (error: unknown): boolean => error instanceof ApiError && erro
 const isIndeterminate = (error: unknown): boolean => !(error instanceof ApiError) || error.status >= 500;
 
 export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<string | null> =>
-  apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal });
+  withRequestDeadline(
+    (signal) =>
+      apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal }),
+    PROJECT_REQUEST_TIMEOUT_MS,
+    signal
+  );
 
 /** The endpoint takes a JSON-encoded string body, hence the stringify of a string. */
 export const setClientStateValue = async (key: string, value: string, signal?: AbortSignal): Promise<void> => {
+  // Unconditional writes must settle before callers release their ordering queues; a timeout cannot fence a late commit.
   await apiFetchJson<string>(`${CLIENT_STATE_BASE}/set_by_key?key=${encodeURIComponent(key)}`, {
     body: JSON.stringify(value),
     method: 'POST',

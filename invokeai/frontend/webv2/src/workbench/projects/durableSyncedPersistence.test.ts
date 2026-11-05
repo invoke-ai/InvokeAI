@@ -2,7 +2,7 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
-import { ApiError } from '@platform/transport/http';
+import { ApiError, RequestDeadlineError } from '@platform/transport/http';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
@@ -1688,6 +1688,100 @@ describe('durable project persistence', () => {
     });
     expect(service.hasPendingChanges()).toBe(true);
   });
+
+  it.each(['committed', 'uncommitted', 'diverged', 'unavailable', 'repeated-timeout', 'missing'] as const)(
+    'reconciles a timed-out update with %s server state and preserves newer edits',
+    async (outcome) => {
+      const owner = captureAccountScope();
+      const api = createApi();
+      const draftStore = createMemoryProjectDraftStore();
+      const project = createDraftProject([]);
+      api.records.set(project.id, toSplitRecord(project));
+      vi.mocked(api.loadSession).mockResolvedValue({
+        account: createInitialWorkbenchState().account,
+        activeProjectId: project.id,
+        openProjectIds: [project.id],
+      });
+      const service = createService(owner, api, draftStore);
+      const loaded = await service.loadWorkbench();
+      const local = { ...loaded.state.projects[0]!, name: 'First edit' };
+      const write = vi.mocked(api.updateProject).getMockImplementation()!;
+      vi.mocked(api.updateProject).mockImplementationOnce(async (...args) => {
+        if (outcome === 'committed') {
+          await write(...args);
+        }
+        if (outcome === 'diverged') {
+          api.records.set(project.id, toSplitRecord({ ...project, name: 'Other writer' }, 2));
+        }
+        if (outcome === 'unavailable') {
+          vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+        }
+        if (outcome === 'missing') {
+          vi.mocked(api.getProject).mockRejectedValueOnce(new ApiError('not yet visible', 404));
+        }
+        if (outcome === 'repeated-timeout') {
+          vi.mocked(api.updateProject).mockRejectedValueOnce(new RequestDeadlineError());
+        }
+        throw new RequestDeadlineError();
+      });
+      const result = await service.saveWorkbench(stateWith([local]));
+      if (outcome === 'diverged') {
+        expect(result.conflicts).toEqual([expect.objectContaining({ kind: 'revision' })]);
+      } else if (['unavailable', 'repeated-timeout', 'missing'].includes(outcome)) {
+        expect(result).toMatchObject({ hasPendingChanges: true, shouldRetry: true });
+        await expect(draftStore.get(project.id, 'editor-1')).resolves.toMatchObject({
+          kind: 'found',
+          draft: { state: 'dirty' },
+        });
+      } else {
+        expect(result).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+        expect(api.updateProject).toHaveBeenCalledTimes(outcome === 'committed' ? 1 : 2);
+      }
+      if (outcome !== 'diverged') {
+        const next = await service.saveWorkbench(stateWith([{ ...local, name: 'Newer edit' }]));
+        expect(next).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+        expect(api.records.get(project.id)?.name).toBe('Newer edit');
+      }
+    }
+  );
+
+  it.each([true, false])(
+    'reconciles a workspace timeout after content is acknowledged (committed: %s)',
+    async (committed) => {
+      const api = createApi();
+      const project = createDraftProject([]);
+      api.records.set(project.id, toSplitRecord(project));
+      vi.mocked(api.loadSession).mockResolvedValue({
+        account: createInitialWorkbenchState().account,
+        activeProjectId: project.id,
+        openProjectIds: [project.id],
+      });
+      const service = createService(captureAccountScope(), api);
+      const loaded = (await service.loadWorkbench()).state.projects[0]!;
+      const write = vi.mocked(api.saveProjectWorkspace).getMockImplementation()!;
+      vi.mocked(api.saveProjectWorkspace).mockImplementationOnce(async (...args) => {
+        if (committed) {
+          await write(...args);
+        }
+        throw new RequestDeadlineError();
+      });
+      const result = await service.saveWorkbench(
+        stateWith([
+          {
+            ...loaded,
+            name: 'Content changed',
+            promptHistory: [{ negativePrompt: null, positivePrompt: 'Workspace changed' }],
+          },
+        ])
+      );
+      expect(result).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+      expect(api.updateProject).toHaveBeenCalledTimes(1);
+      expect(api.saveProjectWorkspace).toHaveBeenCalledTimes(committed ? 1 : 2);
+      expect(api.records.get(project.id)?.workspace?.data).toMatchObject({
+        promptHistory: [{ negativePrompt: null, positivePrompt: 'Workspace changed' }],
+      });
+    }
+  );
 
   it('persists a divergent revision conflict and does not auto-fork', async () => {
     const owner = captureAccountScope();
@@ -4938,6 +5032,38 @@ describe('a project from before the split whose workflow repeats an item id', ()
       name: 'Still whole',
       revision: 2,
     });
+  });
+
+  it('acknowledges an unanswered committed whole-document save without inventing a conflict', async () => {
+    const { api, project, service } = await open(toRecord(withRepeatedNode(createDraftProject([]))));
+    const write = vi.mocked(api.updateProject).getMockImplementation()!;
+    vi.mocked(api.updateProject).mockImplementationOnce(async (...args) => {
+      await write(...args);
+      throw new RequestDeadlineError();
+    });
+    const result = await service.saveWorkbench(stateWith([{ ...project, name: 'Committed whole' }]));
+    expect(result).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+    expect(api.updateProject).toHaveBeenCalledTimes(1);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('keeps repeated unanswered whole-document saves pending and saves a later edit', async () => {
+    const { api, project, service } = await open(toRecord(withRepeatedNode(createDraftProject([]))));
+    vi.mocked(api.updateProject)
+      .mockRejectedValueOnce(new RequestDeadlineError())
+      .mockRejectedValueOnce(new RequestDeadlineError());
+
+    const result = await service.saveWorkbench(stateWith([{ ...project, name: 'Unanswered whole' }]));
+
+    expect(result).toMatchObject({ hasPendingChanges: true, shouldRetry: true, conflicts: [] });
+    expect(api.updateProject).toHaveBeenCalledTimes(2);
+    expect(api.records.get(project.id)?.name).toBe(project.name);
+
+    const next = await service.saveWorkbench(stateWith([{ ...project, name: 'Later whole edit' }]));
+
+    expect(next).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+    expect(api.records.get(project.id)?.name).toBe('Later whole edit');
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 
   it('raises the canvas floor to 5 when a whole save adds a noise adjustment, so a v4 reader is refused', async () => {
