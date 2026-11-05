@@ -69,7 +69,7 @@ is also the fallback written when the remux fails, so a record is never lost to 
 
 ## The record: `invokeai_metadata`
 
-A flat JSON object, the output of the `core_metadata` node. Video is a *profile* of the same
+A flat JSON object emitted either by the `core_metadata` node (in linear/canvas graphs) or directly by any denoise invocation (`*denoise*` nodes inherit `WithMetadata` and emit `metadata` on their output, merging any upstream `metadata` input with the node's own sampling, model, LoRA, and adapter fields via `build_denoise_metadata`). Custom node workflows can wire a denoise node's `metadata` output straight into the decode (`*_l2i` / `*_latents_to_video`) node without a `core_metadata` node. Video is a *profile* of the same
 record as images, discriminated by `generation_mode`, not a second format. Every key is
 optional; readers ignore keys they do not know and never reject a record for having them.
 

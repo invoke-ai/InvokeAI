@@ -38,11 +38,17 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     WanConditioningField,
     WanRefImageConditioningField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import LoRAField, WanTransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
@@ -340,10 +346,10 @@ class _ExpertSwapper:
     title="Denoise - Wan 2.2",
     tags=["image", "wan"],
     category="image",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class WanDenoiseInvocation(BaseInvocation):
+class WanDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Wan 2.2 model.
 
     Drives the flow-matching schedule the model ships with (UniPC with flow
@@ -414,12 +420,51 @@ class WanDenoiseInvocation(BaseInvocation):
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "wan_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("wan_img2img" if getattr(self, "latents", None) is not None else "wan_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "guidance": self.guidance_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.guidance_scale_low_noise is not None and self.guidance_scale_low_noise >= 1.0:
+            updates["wan_guidance_scale_low_noise"] = self.guidance_scale_low_noise
+        if getattr(self.transformer, "transformer_low_noise", None) is not None:
+            updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
+
+        loras = serialize_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            getattr(self.transformer, "loras_low_noise", None),
+        )
+        if loras:
+            updates["loras"] = loras
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         if self.denoising_start >= self.denoising_end:

@@ -12,7 +12,7 @@ LoRA iteration) live in ``wan_denoise`` and are imported here.
 """
 
 from contextlib import ExitStack
-from typing import Callable, Iterable, Optional
+from typing import Any, Callable, Iterable, Optional
 
 import torch
 from tqdm import tqdm
@@ -22,11 +22,18 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LatentsField,
+    MetadataField,
     WanConditioningField,
     WanRefImageConditioningField,
+    WithMetadata,
+)
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import WanTransformerField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.wan.wan_denoise import (
     WAN_MAX_RESIDENT_TRANSFORMER_BYTES,
     WanDenoiseInvocation,
@@ -57,10 +64,10 @@ from invokeai.backend.wan.sampling_utils import (
     title="Denoise Video - Wan 2.2",
     tags=["video", "wan"],
     category="latents",
-    version="1.0.0",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
-class WanVideoDenoiseInvocation(BaseInvocation):
+class WanVideoDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the Wan 2.2 denoising loop on a multi-frame latent tensor.
 
     The output is a 5D ``[1, C, T_lat, H/8, W/8]`` latent tensor ready for
@@ -137,8 +144,33 @@ class WanVideoDenoiseInvocation(BaseInvocation):
     steps: int = InputField(default=40, gt=0, description="Number of denoising steps.")
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": "wan_i2v" if getattr(self, "ref_image", None) is not None else "wan_t2v",
+            "width": self.width,
+            "height": self.height,
+            "num_frames": self.num_frames,
+            "steps": self.steps,
+            "cfg_scale": self.guidance_scale,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+        }
+        if self.guidance_scale_low_noise is not None and self.guidance_scale_low_noise >= 1.0:
+            updates["wan_guidance_scale_low_noise"] = self.guidance_scale_low_noise
+        if getattr(self.transformer, "transformer_low_noise", None) is not None:
+            updates["wan_transformer_low_noise"] = self.transformer.transformer_low_noise
+
+        loras = serialize_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            getattr(self.transformer, "loras_low_noise", None),
+        )
+        if loras:
+            updates["loras"] = loras
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         # Keep the 5D shape (B, C, T, H, W) — wan_latents_to_video expects it.
         latents = latents.detach().to("cpu")
@@ -146,12 +178,11 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # LatentsOutput.build uses latents.size()[3] / [2] for width / height.
         # For 5D the spatial dims are at indices 4 / 3 instead of 3 / 2, so we
         # call the constructor directly with the actual H/W from the inputs.
-        from invokeai.app.invocations.fields import LatentsField
-
-        return LatentsOutput(
+        return LatentsMetaOutput(
             latents=LatentsField(latents_name=name, seed=self.seed),
             width=self.width,
             height=self.height,
+            metadata=self._build_metadata(),
         )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:

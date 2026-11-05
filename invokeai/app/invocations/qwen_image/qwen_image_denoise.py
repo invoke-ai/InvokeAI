@@ -1,7 +1,7 @@
 import math
 from contextlib import ExitStack
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, ClassVar, Iterator, Optional, TypeAlias
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator, Optional, TypeAlias
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -19,12 +19,17 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
     QwenImageConditioningField,
-    WithBoard,
     WithMetadata,
 )
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.qwen_image.qwen_image_control import QwenImageControlField
 from invokeai.app.invocations.vae.qwen_image_image_to_latents import QwenImageImageToLatentsInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -79,10 +84,10 @@ ControlNet run beside it."""
     title="Denoise - Qwen Image",
     tags=["image", "qwen_image"],
     category="image",
-    version="1.1.1",
+    version="1.2.0",
     classification=Classification.Prototype,
 )
-class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
+class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run the denoising process with a Qwen Image model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -133,13 +138,51 @@ class QwenImageDenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         input=Input.Connection,
     )
 
+    def _build_metadata(self) -> MetadataField:
+        updates: dict[str, Any] = {
+            "generation_mode": (
+                "qwen_image_inpaint"
+                if getattr(self, "denoise_mask", None) is not None
+                else ("qwen_image_img2img" if getattr(self, "latents", None) is not None else "qwen_image_txt2img")
+            ),
+            "width": self.width,
+            "height": self.height,
+            "steps": self.steps,
+            "cfg_scale": self.cfg_scale,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "seed": self.seed,
+            "model": self.transformer.transformer,
+            "qwen_image_shift": self.shift if self.shift is not None else "auto",
+        }
+        if self.vae is not None:
+            updates["vae"] = self.vae.vae
+            updates["qwen_image_vae"] = self.vae.vae
+
+        loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
+        if loras:
+            updates["loras"] = loras
+
+        controlnets = serialize_adapter_metadata(self.control)
+        if controlnets:
+            updates["controlnets"] = controlnets
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
 
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(),
+            width=self.width,
+            height=self.height,
+        )
 
     @staticmethod
     def _schedule(

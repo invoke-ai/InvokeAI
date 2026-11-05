@@ -1,5 +1,5 @@
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Union
+from typing import Any, Callable, Iterator, Optional, Union
 
 import einops
 import numpy as np
@@ -22,11 +22,19 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     LatentsField,
+    MetadataField,
+    WithMetadata,
 )
 from invokeai.app.invocations.flux.flux_controlnet import FluxControlNetField
 from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
+from invokeai.app.invocations.metadata import (
+    LatentsMetaOutput,
+    build_denoise_metadata,
+    serialize_adapter_metadata,
+    serialize_ip_adapter_ref_images,
+    serialize_lora_metadata,
+)
 from invokeai.app.invocations.model import ControlLoRAField, LoRAField, TransformerField, VAEField
-from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd.ip_adapter import IPAdapterField
 from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -77,9 +85,9 @@ from invokeai.backend.util.sage_attention import sage_attention_scope
     title="FLUX Denoise",
     tags=["image", "flux"],
     category="latents",
-    version="4.6.0",
+    version="4.7.0",
 )
-class FluxDenoiseInvocation(BaseInvocation):
+class FluxDenoiseInvocation(BaseInvocation, WithMetadata):
     """Run denoising process with a FLUX transformer model."""
 
     # If latents is provided, this means we are doing image-to-image.
@@ -209,13 +217,79 @@ class FluxDenoiseInvocation(BaseInvocation):
         ui_order=102,
     )
 
+    def _build_metadata(self, context: Optional[InvocationContext] = None) -> MetadataField:
+        suffix = (
+            "inpaint"
+            if getattr(self, "denoise_mask", None) is not None
+            else ("img2img" if getattr(self, "latents", None) is not None else "txt2img")
+        )
+        updates: dict[str, Any] = {
+            "generation_mode": f"flux_{suffix}",
+            "width": self.width,
+            "height": self.height,
+            "steps": self.num_steps,
+            "scheduler": self.scheduler,
+            "guidance": self.guidance,
+            "cfg_scale": self.cfg_scale,
+            "cfg_scale_start_step": self.cfg_scale_start_step,
+            "cfg_scale_end_step": self.cfg_scale_end_step,
+            "denoising_start": self.denoising_start,
+            "denoising_end": self.denoising_end,
+            "add_noise": self.add_noise,
+            "model": self.transformer.transformer,
+            "dype_preset": self.dype_preset,
+        }
+        if self.dype_scale is not None:
+            updates["dype_scale"] = self.dype_scale
+        if self.dype_exponent is not None:
+            updates["dype_exponent"] = self.dype_exponent
+
+        loras = serialize_lora_metadata(
+            getattr(self.transformer, "loras", None),
+            [self.control_lora] if self.control_lora is not None else None,
+        )
+        if loras:
+            updates["loras"] = loras
+
+        controlnets = serialize_adapter_metadata(self.control)
+        if controlnets:
+            updates["controlnets"] = controlnets
+        existing = getattr(self, "metadata", None)
+        if getattr(self, "controlnet_vae", None) is not None and (existing is None or "vae" not in existing.root):
+            updates["vae"] = self.controlnet_vae.vae
+        ref_images = serialize_ip_adapter_ref_images(
+            self.ip_adapter, context=context, default_width=self.width, default_height=self.height
+        )
+        if ref_images:
+            updates["ref_images"] = ref_images
+
+        if (
+            self.noise is not None
+            and self.noise.seed is not None
+            and (self.latents is None or getattr(self, "add_noise", True))
+        ):
+            updates["seed"] = self.noise.seed
+        elif self.seed is not None:
+            updates["seed"] = self.seed
+        elif self.latents and self.latents.seed is not None:
+            updates["seed"] = self.latents.seed
+
+        return build_denoise_metadata(getattr(self, "metadata", None), updates)
+
     @torch.no_grad()
-    def invoke(self, context: InvocationContext) -> LatentsOutput:
+    def invoke(self, context: InvocationContext) -> LatentsMetaOutput:
         latents = self._run_diffusion(context)
         latents = latents.detach().to("cpu")
 
         name = context.tensors.save(tensor=latents)
-        return LatentsOutput.build(latents_name=name, latents=latents, seed=None)
+        return LatentsMetaOutput.build(
+            latents_name=name,
+            latents=latents,
+            seed=None,
+            metadata=self._build_metadata(context),
+            width=self.width,
+            height=self.height,
+        )
 
     def _run_diffusion(
         self,
