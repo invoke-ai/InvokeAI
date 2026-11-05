@@ -1,7 +1,8 @@
 """The FLUX/SD3 T5 GGUF loader (``T5EncoderGGUFModel``).
 
-Its llama.cpp key mapping, config inference and feed-forward patch are shared with the Wan UMT5
-loader and tested in ``tests/backend/model_manager/util/test_llamacpp_t5.py``.
+Its llama.cpp key mapping and feed-forward patch are shared with the Wan UMT5 loader and tested in
+``tests/backend/model_manager/util/test_llamacpp_t5.py``. Its config inference is shared with the
+single-file loader and tested in ``tests/backend/t5/test_t5_encoder.py``.
 """
 
 from unittest.mock import MagicMock

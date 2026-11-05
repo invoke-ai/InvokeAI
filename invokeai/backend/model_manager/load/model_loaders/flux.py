@@ -13,7 +13,6 @@ from transformers import (
     CLIPTextModel,
     CLIPTextModelWithProjection,
     CLIPTokenizer,
-    T5Config,
     T5EncoderModel,
     T5Tokenizer,
 )
@@ -62,6 +61,7 @@ from invokeai.backend.model_manager.configs.main import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_BnBLLMint8_Config,
+    T5Encoder_Checkpoint_Config,
     T5Encoder_GGUF_Config,
     T5Encoder_SDNQ_Config,
     T5Encoder_T5Encoder_Config,
@@ -70,6 +70,7 @@ from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Bas
 from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
+    _device_supports_fp8_storage,
     _model_declared_skip_patterns,
     resolve_submodel_path,
 )
@@ -91,7 +92,6 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.model_manager.util.llamacpp_t5 import (
     convert_llamacpp_t5_keys,
     has_per_layer_relative_bias,
-    infer_t5_encoder_config,
     make_feed_forward_gguf_safe,
 )
 from invokeai.backend.model_manager.util.model_util import (
@@ -99,6 +99,7 @@ from invokeai.backend.model_manager.util.model_util import (
 )
 from invokeai.backend.quantization.bnb_import import bnb_unavailable_message, record_bnb_import_failure
 from invokeai.backend.quantization.fp8_scaled import (
+    FP8_WEIGHT_DTYPES,
     Fp8ScaledLayer,
     attach_fp8_scales,
     can_stay_quantized,
@@ -113,6 +114,7 @@ from invokeai.backend.quantization.fp8_scaled import (
     parse_quantization_metadata,
     read_safetensors_metadata,
     reject_quantized_side_channel,
+    should_keep_fp8_weights,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
@@ -130,6 +132,8 @@ from invokeai.backend.quantization.int8_convrot import (
 from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.t5.t5_encoder import infer_t5_encoder_config, make_t5_feed_forward_safe
+from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.silence_warnings import SilenceWarnings
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
@@ -624,7 +628,7 @@ class T5EncoderGGUFModel(ModelLoader):
 
         sd = convert_llamacpp_t5_keys(sd)
 
-        t5_config = infer_t5_encoder_config(sd, T5Config)
+        t5_config = infer_t5_encoder_config(sd)
 
         with accelerate.init_empty_weights():
             model = T5EncoderModel(t5_config)
@@ -657,6 +661,143 @@ class T5EncoderGGUFModel(ModelLoader):
                 f"Failed to load all parameters from GGUF T5 encoder. Remaining meta tensors: {meta_params}. "
                 "This may indicate missing keys in the GGUF file or a key mapping issue."
             )
+
+        return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.T5Encoder, format=ModelFormat.Checkpoint)
+class T5EncoderSingleFileLoader(ModelLoader):
+    """Load a T5 encoder from one safetensors file with transformers key names (ComfyUI's ``t5xxl_*``).
+
+    fp16 and bf16 files are cast to the compute dtype. fp8 files, raw or scaled, keep their Linear weights in
+    float8 where the device can hold them: that is what such a file is chosen for, ~4.9 GB resident instead of
+    ~9.5 GB. Text encoders are excluded from FP8 Storage by design, so there is no per-model setting behind this;
+    elsewhere the scales are folded and everything is cast, as on a device without float8. Kept weights are
+    dequantized per forward and never multiplied in fp8, whatever `fp8_compute` says.
+
+    Everything else is held in `choose_bfloat16_safe_dtype`'s dtype, except on CPU, which holds float32 (twice the
+    bf16 size): CPU bf16 GEMM is unreliable on part of the Windows fleet.
+    """
+
+    def get_size_fs(
+        self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
+    ) -> int:
+        # The tokenizer is bundled, not read from the file: sizing it as the file would make room for the
+        # whole encoder and evict models to load a few hundred kilobytes.
+        if submodel_type in (SubModelType.Tokenizer2, SubModelType.Tokenizer3):
+            return 0
+        return super().get_size_fs(config, model_path, submodel_type)
+
+    def _storage_format(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> tuple[bool, torch.dtype]:
+        """Whether Linear weights stay float8, and the dtype everything else is held and computed in.
+
+        Decided once per loader (a fresh one serves each load): the cache key and the stored format must agree,
+        and the capability probes can flip between the key computation and the build under the load lock.
+        CPU holds float32: bf16 GEMM on CPU faults with an illegal instruction on part of the Windows fleet, and
+        `choose_bfloat16_safe_dtype` only checks that a bf16 tensor can be allocated.
+        """
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
+        if device not in decisions:
+            keep_fp8 = should_keep_fp8_weights(device) or _device_supports_fp8_storage(device, self._logger)
+            dtype = torch.float32 if device.type == "cpu" else TorchDevice.choose_bfloat16_safe_dtype(device)
+            decisions[device] = (keep_fp8, dtype)
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        # Both the float8 decision and the dtype depend on the device, and device caches share one canonical CPU
+        # copy per key: a device must not adopt a format or dtype it would not have built itself.
+        if submodel_type in (SubModelType.TextEncoder2, SubModelType.TextEncoder3):
+            keep_fp8, dtype = self._storage_format(config, submodel_type)
+            return f"{'fp8-' if keep_fp8 else ''}{str(dtype).removeprefix('torch.')}"
+        return ""
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, T5Encoder_Checkpoint_Config):
+            raise ValueError("Only T5Encoder_Checkpoint_Config models are supported here.")
+
+        match submodel_type:
+            case SubModelType.Tokenizer2 | SubModelType.Tokenizer3:
+                from invokeai.backend.t5.t5_tokenizer import load_bundled_t5_tokenizer
+
+                return load_bundled_t5_tokenizer()
+            case SubModelType.TextEncoder2 | SubModelType.TextEncoder3:
+                return self._load_text_encoder(config, submodel_type)
+
+        raise ValueError(
+            f"Only Tokenizer and TextEncoder submodels are currently supported. Received: {submodel_type.value if submodel_type else 'None'}"
+        )
+
+    def _load_text_encoder(self, config: T5Encoder_Checkpoint_Config, submodel_type: SubModelType) -> T5EncoderModel:
+        model_path = Path(config.path)
+        keep_fp8, model_dtype = self._storage_format(config, submodel_type)
+
+        sd = load_file(model_path)
+        # ComfyUI writes the token embedding twice, as `shared` and as the encoder's `embed_tokens`, which the
+        # model ties to one parameter. Dropping the copy before anything is cast or reserved saves its size; a file
+        # with only the encoder's copy has it renamed, with any scale beside it.
+        has_shared = "shared.weight" in sd
+        for key in [key for key in sd if key.startswith("encoder.embed_tokens.")]:
+            value = sd.pop(key)
+            if not has_shared:
+                sd["shared." + key.removeprefix("encoder.embed_tokens.")] = value
+
+        layer_hints = {
+            **extract_comfy_quant_hints(sd),
+            **parse_quantization_metadata(read_safetensors_metadata(model_path, self._logger)),
+        }
+        # Pops every scale and the `scaled_fp8` marker, so what is left loads into a model that knows no fp8.
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+
+        with accelerate.init_empty_weights():
+            model = T5EncoderModel(infer_t5_encoder_config(sd))
+
+        # One reservation for the state dict as it will be held, before the fold or the cast widens anything.
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            fp8_layers=fp8_layers if keep_fp8 else {},
+            nvfp4_payloads={},
+        )
+        if keep_fp8:
+            # Folds the layers that cannot stay fp8, so the cast below never drops a scale.
+            fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model)
+        else:
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
+        kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model)
+
+        load_state_dict_ignoring_extras(
+            model,
+            sd,
+            source="single-file T5 encoder",
+            assign=True,
+            allowed_missing={"encoder.embed_tokens.weight"},
+        )
+        # `assign=True` replaces `shared` without the encoder's tied alias following it.
+        model.encoder.embed_tokens.weight = model.shared.weight
+        make_t5_feed_forward_safe(model)
+
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            warn_on_unattached_scales(self._logger, "T5 encoder", attached, fp8_layers)
+        if kept:
+            # Storage only: the fp8 matmul quantizes activations too, and T5's feed-forward outliers make that
+            # measurably worse (scaled build vs bf16, worst-token cosine 0.87 -> 0.46) for a speedup a single
+            # encoder pass per prompt does not need.
+            for module in model.modules():
+                if isinstance(module, torch.nn.Linear) and module.weight.dtype in FP8_WEIGHT_DTYPES:
+                    module._fp8_full_precision_matmul = True
+            self._logger.info(f"T5 encoder: kept {kept} weight(s) in fp8, dequantized per forward")
 
         return model
 
