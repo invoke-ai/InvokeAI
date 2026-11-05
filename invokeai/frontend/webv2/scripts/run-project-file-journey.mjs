@@ -8,6 +8,7 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
 
+import { observeBrowserDiagnostics, waitForRenderedMedia } from './browser-validation.mjs';
 import {
   collectCanvasLeaves,
   MOCK_BACKEND_PROFILE_COUNTS,
@@ -79,36 +80,32 @@ const waitForPreview = async (getPreviewExit) => {
   throw new Error(`Vite preview did not become ready at ${origin}.`);
 };
 
-const observeBrowserErrors = (page, phase, errors) => {
-  page.on('pageerror', (error) => {
-    errors.push(new Error(`${phase} page error: ${error.stack ?? error.message}`));
-  });
-  page.on('console', (message) => {
-    if (message.type() === 'error') {
-      const location = message.location();
-
-      // The HTTP-only mock has no Socket.IO; ignore only its expected transport 404.
+export const observeBrowserErrors = (page, phase, errors) => {
+  observeBrowserDiagnostics(page, {
+    onError: (event) => errors.push(new Error(`${phase}: ${JSON.stringify(event)}`)),
+    expected: (event) => {
+      // This scenario deliberately abandons held saves at unload; the browser cancels the old page's requests.
       if (
-        location.url.includes('/ws/socket.io/') &&
-        message.text().includes('the server responded with a status of 404')
+        phase === 'unload recovery' &&
+        event.kind === 'requestfailed' &&
+        /(?:ERR_ABORTED|NS_BINDING_ABORTED|cancelled)/i.test(event.message) &&
+        new URL(event.url).pathname.startsWith('/api/')
       ) {
-        return;
+        return true;
       }
-
-      // Import probes archived video names; this 404 triggers restoration.
-      if (
+      // Import probes an archived video DTO before restoring its binary under a new identity.
+      return (
         phase.endsWith('import') &&
-        location.url &&
-        new URL(location.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
-        message.text().includes('the server responded with a status of 404')
-      ) {
-        return;
-      }
-
-      const where = location.url ? ` (${location.url}:${String(location.lineNumber)})` : '';
-
-      errors.push(new Error(`${phase} console error${where}: ${message.text()}`));
-    }
+        event.url &&
+        new URL(event.url).pathname === `/api/v1/videos/i/${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}` &&
+        (event.status === 404 ||
+          (event.kind === 'console' && /404/.test(event.message)) ||
+          // The existence probe explicitly cancels an unread missing-response body before restoring the archive.
+          (event.kind === 'requestfailed' &&
+            [403, 404].includes(event.responseStatus) &&
+            /^(?:net::)?ERR_ABORTED$/.test(event.message)))
+      );
+    },
   });
 };
 
@@ -290,6 +287,7 @@ const importArchive = async ({ archivePath, browser, contexts, errors, phase }) 
   await (await chooserPromise).setFiles(archivePath);
   await page.waitForURL(/#\/app$/);
   await page.getByRole('main', { exact: true, name: sourceProjectName }).waitFor();
+  await waitForRenderedMedia(page);
 
   return { context, page };
 };

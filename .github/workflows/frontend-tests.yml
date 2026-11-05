@@ -71,9 +71,9 @@ jobs:
         with:
           working-directory: invokeai/frontend/webv2
 
-      - name: install Chromium
+      - name: install smoke browsers
         if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm exec playwright install --with-deps chromium'
+        run: 'pnpm exec playwright install --with-deps chromium firefox webkit'
         shell: bash
 
       # A pull request into main, or a merge group, is compared with the base branch's
@@ -103,6 +103,11 @@ jobs:
         env:
           WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}
           WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outputs.cache-matched-key }}
+
+      - name: browser lifecycle smoke
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm test:browser:smoke'
+        shell: bash
 
       # Recorded even when the gate failed: a main that has outgrown the committed baseline is
       # still the right thing for a pull request to be compared with. A main job that ran the gate
@@ -139,4 +144,5 @@ jobs:
             invokeai/frontend/webv2/artifacts/architecture
             invokeai/frontend/webv2/artifacts/architecture-performance
             invokeai/frontend/webv2/artifacts/accessibility
+            invokeai/frontend/webv2/artifacts/browser-smoke
           if-no-files-found: ignore

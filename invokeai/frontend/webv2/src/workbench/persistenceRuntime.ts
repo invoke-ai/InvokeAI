@@ -61,6 +61,7 @@ export interface PersistenceClock {
 export interface PageLifecyclePort {
   /** Asks before the page unloads; a true answer has the browser offer to stay, with its own wording. */
   subscribeBeforeUnload(shouldPrompt: () => boolean): () => void;
+  /** Checkpoints before unload as well as on hidden/pagehide; the callback must tolerate repeated signals. */
   subscribeHidden(listener: () => void): () => void;
 }
 
@@ -107,7 +108,7 @@ const browserClock: PersistenceClock = {
   setTimeout: (callback, delayMs) => window.setTimeout(callback, delayMs),
 };
 
-/** `pagehide` and becoming hidden; hidden is often the last event a backgrounded or discarded page receives. */
+/** Checkpoint before WebKit starts tearing IndexedDB down; hidden still covers pages that are later discarded. */
 export const browserPageLifecycle: PageLifecyclePort = {
   subscribeBeforeUnload: (shouldPrompt) => {
     const listener = (event: BeforeUnloadEvent): void => {
@@ -126,9 +127,11 @@ export const browserPageLifecycle: PageLifecyclePort = {
         listener();
       }
     };
+    window.addEventListener('beforeunload', listener);
     window.addEventListener('pagehide', listener);
     document.addEventListener('visibilitychange', onVisibilityChange);
     return () => {
+      window.removeEventListener('beforeunload', listener);
       window.removeEventListener('pagehide', listener);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };

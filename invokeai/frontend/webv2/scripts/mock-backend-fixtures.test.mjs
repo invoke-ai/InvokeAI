@@ -2404,3 +2404,27 @@ test('wildcards are stateful: create, rename, delete one, and delete a batch of 
     await backend.close();
   }
 });
+
+test('settings read routes provide usable vocabulary and dependency information', async () => {
+  const backend = await startMockBackend(0, { profile: 'representative' });
+  try {
+    const vocabulary = await fetch(`${backend.origin}/api/v1/image_map/vocab`);
+    assert.equal(vocabulary.status, 200);
+    assert.deepEqual(await vocabulary.json(), {
+      terms: ['architectural study', 'watercolor'],
+      state: 'ready',
+      error: null,
+      max_terms: 500,
+      max_term_length: 64,
+    });
+    const dependencies = await fetch(`${backend.origin}/api/v1/app/app_deps`);
+    assert.equal(dependencies.status, 200);
+    const versions = await dependencies.json();
+    assert.equal(versions.CUDA, 'N/A');
+    const version = await fetch(`${backend.origin}/api/v1/app/version`).then((response) => response.json());
+    assert.equal(versions.invokeai, version.version, 'About dependency information must identify the served app');
+    assert.ok(Object.values(versions).every((value) => typeof value === 'string'));
+  } finally {
+    await backend.close();
+  }
+});

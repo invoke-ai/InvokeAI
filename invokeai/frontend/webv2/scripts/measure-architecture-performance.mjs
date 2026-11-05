@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
 
+import { observeBrowserDiagnostics, waitForRenderedMedia, runSustainedWorkload } from './browser-validation.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import {
   BROWSER_RESOURCE_METRIC_KEYS,
@@ -340,8 +341,9 @@ const runSample = async (browser, fixture, sample) => {
     await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
   }
 
+  const page = await context.newPage();
+  const diagnostics = observeBrowserDiagnostics(page);
   try {
-    const page = await context.newPage();
     await page.addInitScript(() => {
       window.__architectureLongTasks = [];
       new PerformanceObserver((list) => {
@@ -562,13 +564,44 @@ const runSample = async (browser, fixture, sample) => {
 
     await waitForWidgetRequests(fixture, scripts);
     const routeReadyMs = await waitForSemanticMark(page, fixture.readyMark);
+    const renderedMedia = await waitForRenderedMedia(page, {
+      canvas: fixture.id === 'editor-canvas' && fixture.stateProfile === 'representative',
+      requireImage: fixture.stateProfile === 'representative' && fixture.id === 'launchpad',
+    });
     const resources = await resourceCollector.settle();
     const activatedResources = resources.filter((resource) => activatedResourcePaths.has(resource.path));
     const timing = await getTiming(page);
     const scriptSourceOwners = getScriptSourceOwners(scripts);
     const layoutReturnSwitchMs = await measureLayoutReturnSwitch(page, fixture);
 
+    const sustained =
+      mode !== 'resources' &&
+      sample.kind === 'scored' &&
+      fixture.id === 'editor-minimal' &&
+      fixture.stateProfile === 'representative'
+        ? await runSustainedWorkload(page)
+        : null;
+    await diagnostics.assertHealthy();
+    if (sustained) {
+      await mkdir(dirname(artifactPath), { recursive: true });
+      await writeFile(
+        resolve(dirname(artifactPath), `sustained-${sample.index}.json`),
+        JSON.stringify(
+          {
+            runner: process.env.GITHUB_RUNNER_NAME ?? process.env.RUNNER_NAME ?? 'local-unconfigured',
+            platform: process.platform,
+            browser: browser.version(),
+            renderedMedia,
+            mediaRequests: diagnostics.media,
+            sustained,
+          },
+          null,
+          2
+        )
+      );
+    }
     return {
+      media: { renderedMedia, requests: diagnostics.media },
       activatedResources: summarizeBrowserResources(activatedResources),
       profileCounts: profile.counts,
       resources: summarizeBrowserResources(resources),
@@ -583,6 +616,27 @@ const runSample = async (browser, fixture, sample) => {
       },
       tracePath: sample.kind === 'trace' ? tracePath : null,
     };
+  } catch (error) {
+    await mkdir(dirname(artifactPath), { recursive: true });
+    const failurePath = resolve(
+      dirname(artifactPath),
+      `failure-${fixture.id}-${fixture.stateProfile}-${sample.kind}-${sample.index}`
+    );
+    await writeFile(
+      `${failurePath}.json`,
+      JSON.stringify(
+        {
+          error: String(error),
+          diagnostics: diagnostics.errors,
+          media: diagnostics.media,
+          sustained: error.sustained ?? null,
+        },
+        null,
+        2
+      )
+    );
+    await page.screenshot({ path: `${failurePath}.png`, fullPage: true }).catch(() => {});
+    throw error;
   } finally {
     if (sample.kind === 'trace') {
       await context.tracing.stop({ path: tracePath });
@@ -645,6 +699,7 @@ try {
       }
       routeReports.push({
         ...summarizeBrowserSamples(observedSamples, mode),
+        mediaObservations: observedSamples.map((sample) => sample.media),
         id: fixture.id,
         owner: fixture.owner,
         readyMark: fixture.readyMark,

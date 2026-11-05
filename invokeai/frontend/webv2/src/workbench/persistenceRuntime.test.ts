@@ -1334,7 +1334,7 @@ describe('Workbench persistence runtime unload journal', () => {
     return journaledNames;
   };
 
-  it('journals committed drafts before the hidden-page save, including a revision whose save is in flight', async () => {
+  it('journals held drafts before saving once across repeated unload and hidden checkpoints, including an in-flight save', async () => {
     const page = createPage();
     const draft = createHeldDraft();
     const { aggregate, clock, persistence } = await startLoaded({ commitDrafts: draft.commit, page: page.port });
@@ -1346,9 +1346,11 @@ describe('Workbench persistence runtime unload journal', () => {
 
     draft.held.name = 'Typed just before hiding';
     page.hide();
-    // Unloading fires both `pagehide` and becoming hidden; the second has nothing new to journal.
+    // Before unload, pagehide and becoming hidden checkpoint the same revision.
+    page.hide();
     page.hide();
     expect(journaledNames).toEqual(['Typed just before hiding']);
+    expect(savedNames(persistence)).toEqual(['Typed just before hiding']);
     expect(vi.mocked(persistence.journalBeforeUnload!).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(persistence.saveWorkbench).mock.invocationCallOrder[0]!
     );
