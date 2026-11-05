@@ -48407,6 +48407,12 @@ export type components = {
              * @default []
              */
             previous_names?: string[];
+            /**
+             * Compatible Bases
+             * @description Other bases this model also serves, besides `base`.
+             * @default []
+             */
+            compatible_bases?: components["schemas"]["BaseModelType"][];
             /** Dependencies */
             dependencies?: components["schemas"]["StarterModelWithoutDependencies"][] | null;
         };
@@ -48452,6 +48458,12 @@ export type components = {
              * @default []
              */
             previous_names?: string[];
+            /**
+             * Compatible Bases
+             * @description Other bases this model also serves, besides `base`.
+             * @default []
+             */
+            compatible_bases?: components["schemas"]["BaseModelType"][];
         };
         /**
          * Empty Loop State

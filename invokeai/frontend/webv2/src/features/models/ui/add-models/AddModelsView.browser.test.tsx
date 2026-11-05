@@ -50,11 +50,14 @@ const INSTALLED_STARTERS = [
   },
 ];
 
+const DEFAULT_STARTER_RESPONSE = { starter_bundles: {}, starter_models: INSTALLED_STARTERS };
+let starterResponse: object = DEFAULT_STARTER_RESPONSE;
+
 vi.mock('@features/models/data/startersStore', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ensureStartersLoaded: vi.fn(),
   useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ error: null, response: { starter_bundles: {}, starter_models: INSTALLED_STARTERS }, status: 'loaded' }),
+    selector({ error: null, response: starterResponse, status: 'loaded' }),
 }));
 
 vi.mock('@features/models/data/externalProvidersStore', async (importOriginal) => ({
@@ -603,5 +606,120 @@ describe('AddModelsView models folder scan', () => {
 
     expect(scanModelsFolder()).toBeDisabled();
     expect(document.querySelector('[role="alert"]')).toBeNull();
+  });
+});
+
+describe('AddModelsView bundle preview decoder', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const TAEF1 = {
+    base: 'flux',
+    compatible_bases: ['z-image'],
+    description: 'Preview decoder.',
+    is_installed: false,
+    name: 'TAEF1 (FLUX.1 preview decoder)',
+    source: 'https://example/taef1.safetensors',
+    type: 'tiny_autoencoder',
+  };
+  const Z_IMAGE = {
+    base: 'z-image',
+    description: 'Z-Image main model.',
+    is_installed: false,
+    name: 'Z-Image Turbo',
+    source: 'https://example/z-image-turbo',
+    type: 'main',
+  };
+  const Z_IMAGE_ENCODER = {
+    ...Z_IMAGE,
+    name: 'Z-Image encoder',
+    source: 'https://example/qwen3',
+    type: 'qwen3_encoder',
+  };
+
+  const useCatalog = (decoderInstalled: boolean) => {
+    const decoder = { ...TAEF1, is_installed: decoderInstalled };
+    starterResponse = {
+      starter_bundles: { 'z-image': { models: [Z_IMAGE, Z_IMAGE_ENCODER], name: 'Z-Image' } },
+      starter_models: [...INSTALLED_STARTERS, Z_IMAGE, Z_IMAGE_ENCODER, decoder],
+    };
+  };
+
+  const mount = async () => {
+    root = createRoot(host);
+    await act(async () => {
+      root.render(
+        <ChakraProvider value={system}>
+          <WithAccountPreferences>
+            <AddModelsView />
+          </WithAccountPreferences>
+        </ChakraProvider>
+      );
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  };
+  const selectBundle = () =>
+    act(() =>
+      userEvent.click(
+        [...document.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Z-Image'))!
+      )
+    );
+  const hint = () => document.querySelector<HTMLButtonElement>('button[aria-label="models.showStarterModel"]');
+  const listedNames = () => [...document.querySelectorAll('[title]')].map((element) => element.getAttribute('title'));
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    document.body.append(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    starterResponse = DEFAULT_STARTER_RESPONSE;
+    updateModelsUi({ selectedBundleName: null });
+    resetSessionAndPreferences();
+  });
+
+  it('points a bundle at its missing decoder, and reveals it in the starters filtered to the family', async () => {
+    useCatalog(false);
+    // A type filter and search text that would each hide the decoder; revealing it replaces both.
+    updateModelsUi({ addModelsTypeSeed: 'main' });
+    setAddModelsQuery('turbo');
+    await mount();
+    await selectBundle();
+
+    // The bundle lists only its own members; the decoder is a hint beside its summary.
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(listedNames()).not.toContain(TAEF1.name);
+    expect(hint()?.textContent).toBe(TAEF1.name);
+
+    hint()!.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBeNull();
+    expect(hint()).toBeNull();
+    await expect.poll(listedNames).toContain(TAEF1.name);
+    // Only the decoder: the family's other starters and the rest of the catalog stay out.
+    expect(listedNames()).not.toContain(Z_IMAGE.name);
+    expect(listedNames()).not.toContain(Z_IMAGE_ENCODER.name);
+    expect(listedNames()).not.toContain(INSTALLED_STARTERS[0]!.name);
+    expect(getModelsUiSnapshotForTests().addModelsQuery).toBe('');
+    // The hint left with the bar; focus moves on to the revealed decoder's own install button.
+    await expect
+      .poll(() => document.activeElement?.closest('[data-list-row]')?.getAttribute('data-list-row'))
+      .toBe(TAEF1.source);
+    expect(document.activeElement?.tagName).toBe('BUTTON');
+    expect(installActions.installMany).not.toHaveBeenCalled();
+  });
+
+  it('gives no hint when the decoder is already installed', async () => {
+    useCatalog(true);
+    await mount();
+    await selectBundle();
+
+    expect(getModelsUiSnapshotForTests().selectedBundleName).toBe('Z-Image');
+    expect(hint()).toBeNull();
   });
 });

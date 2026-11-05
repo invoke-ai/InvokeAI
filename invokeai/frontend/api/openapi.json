@@ -110576,6 +110576,15 @@
             "title": "Previous Names",
             "default": []
           },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -110770,6 +110779,15 @@
             },
             "type": "array",
             "title": "Previous Names",
+            "default": []
+          },
+          "compatible_bases": {
+            "items": {
+              "$ref": "#/components/schemas/BaseModelType"
+            },
+            "type": "array",
+            "title": "Compatible Bases",
+            "description": "Other bases this model also serves, besides `base`.",
             "default": []
           }
         },
