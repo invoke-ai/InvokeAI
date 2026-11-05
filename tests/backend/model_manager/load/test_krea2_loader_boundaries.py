@@ -300,6 +300,35 @@ def test_gguf_loader_constructs_and_materializes_model(monkeypatch, tmp_path) ->
     assert torch.equal(model.weight, torch.ones(2, 2))
 
 
+@pytest.mark.parametrize(("device_type", "expected"), [("mps", torch.float32), ("cpu", torch.bfloat16)])
+def test_gguf_loader_dequantizes_to_the_dtype_denoise_feeds_it(monkeypatch, tmp_path, device_type, expected) -> None:
+    """Denoise picks its inference dtype from the same policy; a GGUF loader that disagrees breaks every matmul."""
+    config = Main_GGUF_Krea2_Config.model_construct(path=str(tmp_path / "krea2.gguf"), variant=Krea2VariantType.Turbo)
+    compute_dtypes: list[torch.dtype] = []
+
+    class _Stop(Exception):
+        pass
+
+    def _record(_path, *, compute_dtype, **_kwargs):
+        compute_dtypes.append(compute_dtype)
+        raise _Stop
+
+    monkeypatch.setattr("invokeai.backend.model_manager.load.model_loaders.krea2.gguf_sd_loader", _record)
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
+        lambda: torch.device(device_type),
+    )
+    monkeypatch.setattr(
+        "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+
+    with pytest.raises(_Stop):
+        object.__new__(Krea2GGUFCheckpointModel)._load_from_gguf(config)
+
+    assert compute_dtypes == [expected]
+
+
 def _gguf_driver(monkeypatch, path, model_class):
     import diffusers
 
@@ -438,7 +467,7 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     fp8_calls: list = []
@@ -450,7 +479,6 @@ def test_checkpoint_encoder_loader_decodes_int8_and_does_not_call_it_fp8(monkeyp
     loader._apply_fp8_to_nn_module = lambda *a, **k: fp8_calls.append(a)
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -714,7 +742,7 @@ def test_the_encoder_names_itself_when_refusing_an_unmarked_int8_weight(monkeypa
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
@@ -724,7 +752,6 @@ def test_the_encoder_names_itself_when_refusing_an_unmarked_int8_weight(monkeypa
     loader._load_te_config = lambda _config: SimpleNamespace()
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -788,7 +815,7 @@ def test_a_merged_encoder_checkpoint_is_not_mistaken_for_a_mixed_format_one(
             return cls()
 
     checkpoint_path = tmp_path / "qwen3vl_int8_convrot.safetensors"
-    checkpoint_path.touch()
+    safetensors_torch.save_file(state_dict, str(checkpoint_path))
     config = Qwen3VLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint_path), name="encoder")
 
     loader = object.__new__(Qwen3VLEncoderCheckpointLoader)
@@ -799,7 +826,6 @@ def test_a_merged_encoder_checkpoint_is_not_mistaken_for_a_mixed_format_one(
     loader._apply_fp8_to_nn_module = lambda *a, **k: None
 
     monkeypatch.setattr(transformers, "Qwen3VLModel", _TinyEncoder, raising=False)
-    monkeypatch.setattr(safetensors_torch, "load_file", lambda _path: state_dict)
     monkeypatch.setattr(
         "invokeai.backend.model_manager.load.model_loaders.krea2.TorchDevice.choose_torch_device",
         lambda: torch.device("cpu"),
@@ -1029,7 +1055,7 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
 
     A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the state a guard keyed
     on `weight_scale_2` -- the key the decode itself keys on -- lets straight through.
-    `_find_nvfp4_layers` refuses it and `test_nvfp4.py` pins that; what only a seam can answer is
+    `find_nvfp4_layers` refuses it and `test_nvfp4.py` pins that; what only a seam can answer is
     whether this loader reaches the detector before it asks the cache for room. Krea-2 pops on the
     *native* keys, before the conversion that remaps the payload paths, so the refusal has to survive
     being upstream of the rename as well as upstream of the reservation.

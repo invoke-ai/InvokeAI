@@ -8,6 +8,7 @@ import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities 
 import {
   describeDynamicPromptsFailure,
   describeGenerationIssue,
+  getDynamicPromptsConfig,
   getEffectivePrompts,
   normalizeGenerateSettings,
   sanitizeBatchCount,
@@ -15,6 +16,7 @@ import {
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { isUpscaleBatchCountFixed } from '@features/upscale';
+import { normalizeVideoWidgetValues } from '@features/video';
 import { getInvocationTemplatesSnapshot, subscribeInvocationTemplates } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { useExternalStoreSelector } from '@platform/state/selectors';
@@ -168,11 +170,15 @@ export const useInvocationState = (): InvocationState => {
           ? routeInput.workflowValues
           : routeInput.generateValues;
 
+  // Video reads its own normalized values, so the count follows what its submission expands.
+  const videoValues = invocation.sourceId === 'video' ? normalizeVideoWidgetValues(routeInput.videoValues) : null;
   const promptExpansion = useDynamicPrompts(
-    readEffectivePositivePrompt(routeInput.generateValues),
-    invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
-      ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
-      : null
+    videoValues ? videoValues.positivePrompt : readEffectivePositivePrompt(routeInput.generateValues),
+    videoValues
+      ? getDynamicPromptsConfig(videoValues)
+      : invocation.sourceId === 'generate' || invocation.sourceId === 'canvas'
+        ? sanitizeDynamicPromptsConfig(readDynamicPromptsConfig(routeInput.generateValues))
+        : null
   );
   // Block unexpandable prompts rather than submitting literal dynamic syntax; hotkey submission enforces the same
   // rule. The prompt field offers the way out: retry, or turn dynamic prompts off and run the prompt as typed.
@@ -184,7 +190,14 @@ export const useInvocationState = (): InvocationState => {
       ...(isConnected
         ? []
         : [{ message: t('topbar.invoke.serverDisconnected'), target: { kind: 'connection' } } as const]),
-      ...(expansionReason === null ? [] : [{ message: expansionReason, target: { kind: 'prompt' } } as const]),
+      ...(expansionReason === null
+        ? []
+        : [
+            {
+              message: expansionReason,
+              target: { kind: 'prompt', widgetId: invocation.sourceId === 'video' ? 'video' : 'generate' },
+            } as const,
+          ]),
       ...resolvedRoute.validationReasons.map((reason) => ({
         message: localizeInvocationValidationReason(reason, t),
         target: getInvocationIssueTarget(reason, invocation.sourceId),
