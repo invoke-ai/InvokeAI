@@ -281,3 +281,6 @@ export const useTextOptions = (engine: CanvasCoreStoreCapability): TextToolOptio
 /** The active text-editing session (create/edit mode + live source + transform), or `null`. */
 export const useTextEditSession = (engine: CanvasCoreStoreCapability): TextEditSession | null =>
   useCanvasInteractionState(engine, 'textEditSession');
+
+export const useTransformOptions = (engine: CanvasCoreStoreCapability) =>
+  useCanvasInteractionState(engine, 'transformOptions');

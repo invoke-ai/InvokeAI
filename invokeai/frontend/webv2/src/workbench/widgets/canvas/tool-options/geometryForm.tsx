@@ -6,13 +6,14 @@ import type {
   ToolPropertyGroup,
 } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
-import { Flex, Text } from '@chakra-ui/react';
+import { Flex, Stack, Text } from '@chakra-ui/react';
 import { AspectRatioLockButton, AspectRatioSelect } from '@features/generation/components';
 import { ASPECT_RATIO_MAP, deriveAspectRatioId } from '@features/generation/settings';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { constrainBboxToRatio, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import {
   useCanvasActiveTool,
+  useCanvasDocumentEditingLocked,
   useCanvasHasFloatingSelection,
   usePendingTransformLayerId,
   useTransformSession,
@@ -28,6 +29,7 @@ import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/Workb
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { TransformResamplingSettings } from './TransformResamplingSettings';
 import { useBboxEditor } from './useBboxEditor';
 
 const RAD_TO_DEG = 180 / Math.PI;
@@ -61,6 +63,9 @@ export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKe
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
   const session = useTransformSession(engine);
+  const activeTool = useCanvasActiveTool(engine);
+  const hasFloat = useCanvasHasFloatingSelection(engine);
+  const locked = useCanvasDocumentEditingLocked(engine);
   const selected = useActiveProjectSelector(
     (project): SelectedLeafTransform | null => {
       const { document } = project.canvas;
@@ -70,8 +75,17 @@ export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKe
     (a, b) => a?.id === b?.id && a?.locked === b?.locked && a?.transform === b?.transform
   );
   const transform = session?.transform ?? (selected && !selected.locked ? selected.transform : null);
+  const editable =
+    !locked &&
+    !session?.processing &&
+    selected !== null &&
+    !selected.locked &&
+    (activeTool !== 'transform' || hasFloat || session?.layerId === selected.id);
   const patch = useCallback(
     (next: Partial<LayerTransform>) => {
+      if (!editable) {
+        return;
+      }
       if (session) {
         engine.layers.updateTransformSession({ ...session.transform, ...next });
         return;
@@ -83,9 +97,9 @@ export const useLayerTransformEditor = (engine: ToolFormProps['engine'], labelKe
         model.prepare({ id: selected.id, patch: { transform: next }, type: 'patch' })
       );
     },
-    [commitPrepared, engine, labelKey, selected, session, t]
+    [commitPrepared, editable, engine, labelKey, selected, session, t]
   );
-  return { patch, transform };
+  return { editable, patch, transform };
 };
 
 /** Share geometry rows across frame, selected layer, and transform session to preserve X/Y DOM identity. */
@@ -93,6 +107,7 @@ const GeometryPositionSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const activeTool = useCanvasActiveTool(engine);
   const isFrame = activeTool === 'bbox';
+  const isTransform = activeTool === 'transform';
   // The move tool keeps its own undo verbiage; everything else is a transform edit.
   const layerEditor = useLayerTransformEditor(
     engine,
@@ -114,17 +129,20 @@ const GeometryPositionSettings = ({ engine }: ToolFormProps) => {
     )
   );
   return (
-    <Flex gap="2" w="full">
+    <Flex align={isTransform ? 'center' : undefined} gap="2" w="full">
+      <Text color="fg.muted" flexShrink={0} hidden={!isTransform} w="6rem">
+        {t('widgets.transform.position')}
+      </Text>
       <FormNumberField
         aria-label={t('widgets.canvas.toolOptions.positionX')}
-        disabled={x === null}
+        disabled={x === null || (!isFrame && !layerEditor.editable)}
         label={t('widgets.canvas.toolOptions.positionX')}
         value={x === null ? '' : String(x)}
         onValueCommit={onX}
       />
       <FormNumberField
         aria-label={t('widgets.canvas.toolOptions.positionY')}
-        disabled={y === null}
+        disabled={y === null || (!isFrame && !layerEditor.editable)}
         label={t('widgets.canvas.toolOptions.positionY')}
         value={y === null ? '' : String(y)}
         onValueCommit={onY}
@@ -136,7 +154,7 @@ const GeometryPositionSettings = ({ engine }: ToolFormProps) => {
 /** Scale percent pair and rotation for the transform session / selected leaf. */
 export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
-  const { patch, transform } = useLayerTransformEditor(engine);
+  const { editable, patch, transform } = useLayerTransformEditor(engine);
   const onScaleX = useNumberCommit(
     useCallback((value: number) => patch({ scaleX: clampScalePercent(value) / 100 }), [patch])
   );
@@ -147,12 +165,12 @@ export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
     useCallback((value: number) => patch({ rotation: wrapDegrees(value) * DEG_TO_RAD }), [patch])
   );
   return (
-    <>
-      <PropertyControlRow label={t('widgets.transform.scale')}>
+    <Stack gap="2">
+      <PropertyControlRow label={t('widgets.transform.scale')} labelWidth="6rem">
         <Flex gap="2" gridColumn="2 / -1">
           <FormNumberField
             aria-label={t('widgets.canvas.toolOptions.scaleWidth')}
-            disabled={!transform}
+            disabled={!editable}
             label={t('widgets.canvas.toolOptions.frameWidth')}
             suffix="%"
             value={transform ? String(round2(transform.scaleX * 100)) : ''}
@@ -160,7 +178,7 @@ export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
           />
           <FormNumberField
             aria-label={t('widgets.canvas.toolOptions.scaleHeight')}
-            disabled={!transform}
+            disabled={!editable}
             label={t('widgets.canvas.toolOptions.frameHeight')}
             suffix="%"
             value={transform ? String(round2(transform.scaleY * 100)) : ''}
@@ -168,16 +186,16 @@ export const TransformScaleSettings = ({ engine }: ToolFormProps) => {
           />
         </Flex>
       </PropertyControlRow>
-      <PropertyControlRow label={t('widgets.transform.rotation')}>
+      <PropertyControlRow label={t('widgets.transform.rotation')} labelWidth="6rem">
         <FormNumberField
           aria-label={t('widgets.canvas.toolOptions.rotation')}
-          disabled={!transform}
+          disabled={!editable}
           suffix="°"
           value={transform ? String(round2(wrapDegrees(transform.rotation * RAD_TO_DEG))) : ''}
           onValueCommit={onRotation}
         />
       </PropertyControlRow>
-    </>
+    </Stack>
   );
 };
 
@@ -295,7 +313,13 @@ const TransformFooter = ({ engine }: ToolFormProps) => {
   const onCancel = useCallback(() => engine.layers.cancelTransform(), [engine]);
   const pendingText = t('widgets.canvas.transformPending');
   return (
-    <ApplyCancelBar applyDisabled={disabled} cancelDisabled={disabled} onApply={onApply} onCancel={onCancel}>
+    <ApplyCancelBar
+      applyDisabled={disabled || session?.processing === true}
+      applyLoading={session?.processing}
+      cancelDisabled={disabled}
+      onApply={onApply}
+      onCancel={onCancel}
+    >
       {/* Always mounted, so screen readers hear the wait start and end as the live region's text changes. The
           tooltip shows the whole line where a narrow pane truncates it. */}
       <Text color="fg.muted" role="status" truncate>
@@ -329,8 +353,9 @@ export const bboxForm: ToolPropertyForm = {
 export const transformForm: ToolPropertyForm = {
   footer: TransformFooter,
   groups: [
-    POSITION_GROUP,
-    { body: TransformScaleSettings, id: 'transform-scale', labelKey: 'widgets.transform.scale' },
+    { body: TransformResamplingSettings, id: 'transform-resampling', labelKey: 'widgets.transform.resampling' },
+    { ...POSITION_GROUP, hideLabel: true },
+    { body: TransformScaleSettings, id: 'transform-scale', labelKey: 'widgets.transform.scale', hideLabel: true },
   ],
   id: 'transform',
 };

@@ -194,6 +194,27 @@ afterEach(() => {
 });
 
 describe('runUtilityGraph — await + settle', () => {
+  it.each([false, true])('requests front-of-queue execution only when prepend is %s', async (prepend) => {
+    const fake = createFakeHub();
+    const enqueue = vi.fn(okEnqueue);
+    const promise = runUtilityGraph({
+      createId: () => UTIL_ID,
+      enqueue,
+      graph: { edges: [], id: 'g', nodes: {} },
+      hub: fake.hub,
+      prepend,
+    });
+    await Promise.resolve();
+    expect(enqueue).toHaveBeenCalledWith({
+      graph: { edges: [], id: 'g', nodes: {} },
+      origin: ORIGIN,
+      ...(prepend ? { prepend: true } : {}),
+    });
+    fake.emit('invocation_complete', completeEvent());
+    fake.emit('queue_item_status_changed', statusEvent('completed'));
+    await expect(promise).resolves.toMatchObject({ imageName: 'filtered.png' });
+  });
+
   it('resolves with the captured image name and the isolated origin on completion', async () => {
     const fake = createFakeHub();
     const promise = runUtilityGraph({

@@ -109,6 +109,8 @@ const scheduleUtilityReconcileRetry: UtilityReconcileRetryScheduler = (callback,
 
 /** Dependencies for {@link runUtilityGraph} (all injectable for tests). */
 export interface RunUtilityGraphOptions {
+  /** Runs an interactive utility ahead of queued generation items when requested. */
+  prepend?: boolean;
   /** The graph to enqueue and await. */
   graph: QueueBackendGraph;
   /**
@@ -539,7 +541,7 @@ export const submitUtilityGraph = async (options: SubmitUtilityGraphOptions): Pr
  * enqueue errors as {@link UtilityQueueError}.
  */
 export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<UtilityGraphResult> => {
-  const { graph, hub, outputNodeId, signal } = options;
+  const { graph, hub, outputNodeId, prepend, signal } = options;
   const enqueue = options.enqueue ?? enqueueUtility;
   const cancel = options.cancel ?? cancelQueueItems;
   const readItemStatus = options.readItemStatus ?? readUtilityItemStatus;
@@ -817,7 +819,7 @@ export const runUtilityGraph = (options: RunUtilityGraphOptions): Promise<Utilit
     // Enqueue last. A synchronous listener callback could already have fired by
     // the time this resolves; `settled` guards against a late enqueue result.
     void Promise.resolve()
-      .then(() => enqueue({ graph, origin }))
+      .then(() => enqueue({ graph, origin, ...(prepend === true ? { prepend: true } : {}) }))
       .then((result) => {
         const inspected = inspectUtilityEnqueueResult(result);
         const validResult = inspected.result;

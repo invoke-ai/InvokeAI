@@ -69,7 +69,13 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
           title={t('widgets.properties.sections.operation')}
         >
           {running.groups.map((group) => (
-            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
+            <PropertyGroup
+              key={group.id}
+              collapsible={group.collapsible}
+              hideLabel={group.hideLabel}
+              id={group.id}
+              label={t(group.labelKey)}
+            >
               <group.body {...regionProps} />
             </PropertyGroup>
           ))}
@@ -87,7 +93,13 @@ const ConnectedProperties = ({ engine }: { engine: CanvasEngineHandle }) => {
           {tool.groups.map((group) => (
             // Keyed by GROUP id, not tool id: tools sharing a group keep its
             // DOM (and collapse state) alive across the tool switch.
-            <PropertyGroup key={group.id} collapsible={group.collapsible} id={group.id} label={t(group.labelKey)}>
+            <PropertyGroup
+              key={group.id}
+              collapsible={group.collapsible}
+              hideLabel={group.hideLabel}
+              id={group.id}
+              label={t(group.labelKey)}
+            >
               <group.body {...regionProps} />
             </PropertyGroup>
           ))}

@@ -80,7 +80,8 @@ const ConnectedTransform = ({ engine }: { engine: CanvasEngineHandle }) => {
   );
 
   const transform = session?.transform ?? selected?.transform ?? null;
-  const editable = session !== null || (selected !== null && !selected.locked);
+  const processing = session?.processing ?? false;
+  const editable = !processing && (session !== null || (selected !== null && !selected.locked));
   const patch = useCallback(
     (next: Partial<LayerTransform>) => {
       if (session) {
@@ -170,7 +171,9 @@ const ConnectedTransform = ({ engine }: { engine: CanvasEngineHandle }) => {
             <Button variant="ghost" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
-            <Button onClick={onApply}>{t('common.apply')}</Button>
+            <Button disabled={processing} loading={processing} onClick={onApply}>
+              {t('common.apply')}
+            </Button>
           </Flex>
         ) : (
           <Text color="fg.muted" fontSize="xs">

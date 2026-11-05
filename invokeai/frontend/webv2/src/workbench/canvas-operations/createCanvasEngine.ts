@@ -2,7 +2,6 @@ import type {
   CanvasEngineImplementation as CoreCanvasEngineImplementation,
   CanvasEngineOptions as CoreCanvasEngineOptions,
 } from '@workbench/canvas-engine/engine';
-import type { CanvasUtilityGraphResult } from '@workbench/canvas-operations/contracts';
 import type { GenerationCompositeHost } from '@workbench/canvas-operations/generationComposite';
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
@@ -13,6 +12,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
+import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import { isUploadProjectNotFound } from '@workbench/canvas-operations/backend/canvasImages';
 import { createBoundedCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
@@ -20,14 +20,15 @@ import { createControlDetectionCoordinator } from '@workbench/canvas-operations/
 import { composeForGeneration } from '@workbench/canvas-operations/generationComposite';
 import { controlTypeForDetector } from '@workbench/controlTypes';
 
-import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
+import type { CanvasOperationCapability, CanvasOperationImplementation, CanvasUtilityGraphResult } from './contracts';
 
 import { attachCanvasOperations } from './operationAccess';
 import { bindCanvasToolMemory, type CanvasToolMemoryPort } from './toolMemory';
+import { createTransformResampler } from './transformResampling';
 
 export interface CanvasEngineOptions extends Omit<
   CoreCanvasEngineOptions,
-  'uploadImage' | 'uploadIntermediateImage' | 'getMainModelBase'
+  'uploadImage' | 'uploadIntermediateImage' | 'getMainModelBase' | 'resampleTransform'
 > {
   /**
    * Waits for the owning project identity to be acknowledged by the server, so uploads can carry it as provenance.
@@ -134,6 +135,13 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   const composition = createCanvasEngineCore({
     ...coreOptions,
     getMainModelBase: options.getMainModelBase,
+    resampleTransform: createTransformResampler({
+      lifetime: AbortSignal.any([owner.signal, uploadLifetime.signal]),
+      backend: options.backend ?? createDomRasterBackend(),
+      resolveImage: options.imageResolver,
+      upload: (blob, signal) => uploadImage(blob, { isIntermediate: true, signal }),
+      runGraph: (runOptions) => canvasApplicationPort.runGraph(runOptions),
+    }),
     uploadImage: (blob) => uploadImage(blob),
     uploadIntermediateImage: (blob) => uploadImage(blob, { isIntermediate: true }),
   });
