@@ -2,6 +2,7 @@ import type { GalleryImageItem } from '@features/gallery/core/items';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { requestGalleryItemReveal } from '@features/gallery/core/selection';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, type ComponentProps } from 'react';
@@ -226,6 +227,25 @@ it('publishes whether boards can be shared to the board panel and menus', async 
   );
 
   expect(mocks.boardSharing).toBe(true);
+});
+
+it('reads the deployment config when it mounts so 16-bit menu entries are settled before a menu opens', async () => {
+  mocks.galleryData = createGalleryData(createImageItem('deep-result'));
+  const queryClient = new QueryClient();
+
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient}>
+          <GalleryUiProvider adapter={adapter}>
+            <GalleryWidgetView region="left" runtime={runtime} />
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      </ChakraProvider>
+    )
+  );
+
+  expect(queryClient.getQueryState(frontendConfigQueryOptions.queryKey)?.fetchStatus).toBeDefined();
 });
 
 describe('external reveal announcements', () => {

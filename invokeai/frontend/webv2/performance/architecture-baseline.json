@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 817495,
+        "brotliBytes": 818429,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 816818,
+        "gzipBytes": 817911,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2109541,
+        "initialRawBytes": 2115064,
         "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 110927,
-        "requestCount": 35,
-        "scriptRequestCount": 19,
+        "ownedRawBytes": 112681,
+        "requestCount": 34,
+        "scriptRequestCount": 18,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -363,15 +363,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1254258,
+        "brotliBytes": 1262514,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1247521,
+        "gzipBytes": 1255319,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3460233,
+        "initialRawBytes": 3487788,
         "largestAssetRawBytes": 751084,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 172801,
+        "ownedRawBytes": 172775,
         "requestCount": 70,
         "scriptRequestCount": 54,
         "sourceOwners": [
@@ -777,6 +777,7 @@
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
           "source:src/platform/runtime/appMetadata.ts",
+          "source:src/platform/runtime/frontendConfig.ts",
           "source:src/platform/search/dateTokens.ts",
           "source:src/platform/state/accountLifecycle.ts",
           "source:src/platform/state/compareAndSwapRollback.ts",
@@ -935,6 +936,7 @@
           "source:src/workbench/image-actions/GalleryBoardDestinationGroups.tsx",
           "source:src/workbench/image-actions/recallParametersBridge.ts",
           "source:src/workbench/image-actions/useFindGalleryItem.ts",
+          "source:src/workbench/image-actions/useImageExportFormats.ts",
           "source:src/workbench/invocation.ts",
           "source:src/workbench/invocationPreparation.ts",
           "source:src/workbench/invocationSubmit.ts",
@@ -1169,7 +1171,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-29",
+  "capturedAt": "2026-11-05",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

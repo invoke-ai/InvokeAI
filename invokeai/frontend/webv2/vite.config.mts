@@ -162,6 +162,10 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/gallery/ui/GalleryItemSearch.tsx',
   // The image menu (editor boot) and the lazy layer menu share the board destination list; alone it costs a request.
   '/workbench/image-actions/GalleryBoardDestinationGroups.tsx',
+  // The image menus (editor boot), the Gallery's board menu and the lazy app/help menus share the deployment config
+  // query and the export-format probe; alone each costs a request.
+  '/platform/runtime/frontendConfig.ts',
+  '/workbench/image-actions/useImageExportFormats.ts',
   // The image menu's canvas destinations and the lazy Layers widget share the layer-kind glyphs; alone they cost a
   // request.
   '/workbench/widgets/layers/layerTypeIcon.ts',

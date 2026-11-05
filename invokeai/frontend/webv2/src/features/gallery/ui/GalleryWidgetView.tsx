@@ -8,6 +8,8 @@ import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
 import { getGalleryRevealRequest, subscribeGalleryRevealRequests } from '@features/gallery/core/selection';
 import { getGallerySettings, toGalleryMediaKind } from '@features/gallery/core/settings';
 import { GALLERY_PAGE_SIZE, galleryItemNamesOptions } from '@features/gallery/data/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { frontendConfigQueryOptions } from '@platform/runtime/frontendConfig';
 import { StatusWidgetChip } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { ImageIcon, TriangleAlertIcon } from 'lucide-react';
@@ -109,6 +111,11 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
   const knownTotalImages = getGalleryTotalImages(galleryValues);
   const settings = getGallerySettings(galleryValues);
   const queryClient = useQueryClient();
+  // The board and image menus gate their 16-bit entries on the deployment config. Reading it while the gallery mounts
+  // settles those entries before a menu opens, so they do not appear under the pointer.
+  useMountEffect(() => {
+    void queryClient.prefetchQuery(frontendConfigQueryOptions);
+  });
   const semanticQuery = useGallerySemanticImageQuery(galleryValues.semanticImageQuery);
   const data = useGalleryData({
     galleryView,

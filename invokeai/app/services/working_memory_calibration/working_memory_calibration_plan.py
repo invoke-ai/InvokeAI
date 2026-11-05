@@ -119,10 +119,13 @@ FORCE_TILED_BASES: Final = frozenset(
         BaseModelType.Flux,
         BaseModelType.ZImage,
         BaseModelType.Flux2,
+        BaseModelType.Ideogram4,
     }
 )
-"""Bases whose decode node tiles every decode under `force_tiled_decode` (`latents_to_image`, `flux_vae_decode`,
-`z_image_latents_to_image`, `flux2_vae_decode`). The SD3, CogView4 and Ideogram 4 nodes ignore the setting."""
+"""Bases whose decode node reads `force_tiled_decode` (`latents_to_image`, `flux_vae_decode`,
+`z_image_latents_to_image`, `flux2_vae_decode`, `ideogram4_latents_to_image`). The SD3 and CogView4 nodes ignore the
+setting. Ideogram 4 tiles only with a standalone `AutoencoderKLFlux2`; no plan reaches such a decode, since an
+Ideogram 4 model is no calibration target and its pipeline's vendored autoencoder cannot tile."""
 
 PLANNABLE_BASES: Final = frozenset(
     {
