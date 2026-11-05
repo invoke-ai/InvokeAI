@@ -1131,6 +1131,27 @@ describe('compileGenerateGraph', () => {
       expect(latentImages).toEqual(['a.png', 'b.png']);
     });
 
+    it('wires the references of a single-file model, whose standalone encoder reads them', () => {
+      const checkpoint: MainModelConfig = { ...qwenImage21Model, format: 'checkpoint', key: 'qwen21-int8' };
+      const encoder = {
+        base: 'any',
+        format: 'checkpoint',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+      const graph = compile(checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        referenceImages: references('a.png', 'b.png'),
+        vae: { base: 'qwen-image-2-1', key: 'qwen21-vae', name: 'Qwen-Image-2.1 VAE', type: 'vae' },
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: { key: 'qwen3-vl-8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    });
+
     it('applies LoRAs to the transformer through its own collection loader', () => {
       const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
       const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });
@@ -1525,6 +1546,74 @@ describe('Qwen-Image-2.1 graphs', () => {
     const graph = compile(qwen21Gguf, { qwen3VLEncoderModel: qwen3Vl8bEncoder, vae: qwen21Vae });
 
     expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: qwen3Vl8bEncoder, vae_model: qwen21Vae });
+  });
+
+  describe('Vision Tower', () => {
+    const ggufEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'gguf_quantized' };
+    const checkpointEncoder: ComponentModelConfig = { ...qwen3Vl8bEncoder, format: 'checkpoint' };
+    const tower = (variant: string): ComponentModelConfig => ({
+      base: 'any',
+      format: 'gguf_quantized',
+      key: `mmproj-${variant}`,
+      name: 'mmproj',
+      type: 'qwen3_vl_vision_tower',
+      variant,
+    });
+    const referenceImages: GenerateReferenceImage[] = [
+      {
+        config: {
+          image: { original: { image: { height: 512, image_name: 'a.png', width: 512 } } },
+          type: 'qwen_image_2_1_reference_image',
+        },
+        id: 'a.png',
+        isEnabled: true,
+      },
+    ];
+
+    it('sends the tower with a GGUF 8B encoder, and the references ride on the unchanged encoder edge', () => {
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_8b'),
+        referenceImages,
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_vision_tower_model: { key: 'mmproj-qwen3_vl_8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'pos_cond', 'qwen3_vl_encoder')?.source.node_id).toBe('model_loader');
+      expect(getNodeByType(graph, 'core_metadata')).toMatchObject({
+        qwen3_vl_vision_tower: { key: 'mmproj-qwen3_vl_8b' },
+      });
+    });
+
+    it('refuses references beside a GGUF encoder without a tower, and sends no 4B tower', () => {
+      expect(() => compile(qwen21Gguf, { qwen3VLEncoderModel: ggufEncoder, referenceImages, vae: qwen21Vae })).toThrow(
+        "Reference images need this encoder's Vision Tower"
+      );
+
+      const graph = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: ggufEncoder,
+        qwen3VLVisionTowerModel: tower('qwen3_vl_4b'),
+        vae: qwen21Vae,
+      });
+
+      expect(graph.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
+
+    it('never sends a stale tower beside a non-GGUF encoder or a Diffusers main', () => {
+      const stale = tower('qwen3_vl_8b');
+      const withSafetensors = compile(qwen21Gguf, {
+        qwen3VLEncoderModel: checkpointEncoder,
+        qwen3VLVisionTowerModel: stale,
+        referenceImages,
+        vae: qwen21Vae,
+      });
+      const diffusers = compile(qwen21Diffusers, { qwen3VLVisionTowerModel: stale });
+
+      expect(withSafetensors.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+      expect(getEdge(withSafetensors, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(diffusers.nodes.model_loader?.qwen3_vl_vision_tower_model).toBeUndefined();
+    });
   });
 });
 

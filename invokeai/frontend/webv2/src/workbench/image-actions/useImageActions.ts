@@ -234,7 +234,9 @@ export const useImageActions = ({
       const values = getCurrentGenerateValues({ generateValues, supportedModels });
 
       return {
-        canUseAsReferenceImage: Boolean(values && values.referenceImages.length < getMaxReferenceImages(values.model)),
+        canUseAsReferenceImage: Boolean(
+          values && values.referenceImages.length < getMaxReferenceImages(values.model, values)
+        ),
         currentGenerateValues: values,
       };
     }, [generateValues, supportedModels])

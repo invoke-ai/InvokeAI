@@ -34,9 +34,11 @@ import {
   isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
+  isGgufQwen3Vl8bEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
   isQwen3Vl8bEncoder,
+  isQwen3Vl8bVisionTower,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
   isSelfContainedSDNQFlux1Pipeline,
@@ -1486,6 +1488,11 @@ const buildQwenImage21Graph = (
   // requires both before this runs.
   const vaeModel = getCompatibleVae(settings, model);
   const qwen3VlEncoderModel = getCompatibleComponent(settings.qwen3VLEncoderModel, isQwen3Vl8bEncoder);
+  // The loader rejects a tower beside any other encoder, so a stale pick is never sent.
+  const qwen3VlVisionTowerModel =
+    qwen3VlEncoderModel && isGgufQwen3Vl8bEncoder(qwen3VlEncoderModel)
+      ? getCompatibleComponent(settings.qwen3VLVisionTowerModel, isQwen3Vl8bVisionTower)
+      : null;
 
   const graph: BackendGraphContract = { edges: [], id: createId('qwen_image_2_1_graph'), nodes: {} };
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
@@ -1495,6 +1502,7 @@ const buildQwenImage21Graph = (
     id: 'model_loader',
     model,
     qwen3_vl_encoder_model: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower_model: qwen3VlVisionTowerModel ?? undefined,
     type: 'qwen_image_2_1_model_loader',
     vae_model: vaeModel ?? undefined,
   });
@@ -1537,6 +1545,7 @@ const buildQwenImage21Graph = (
   // through it on the way to the decoder.
   addMetadata(graph, denoise, settings, model, 'qwen_image_2_1_txt2img', projectSettings, {
     qwen3_vl_encoder: qwen3VlEncoderModel ?? undefined,
+    qwen3_vl_vision_tower: qwen3VlVisionTowerModel ?? undefined,
     vae: vaeModel ?? undefined,
   });
   addEdge(graph, denoise, 'metadata', output, 'metadata');

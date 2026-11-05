@@ -25,6 +25,7 @@ const CPU_ONLY_TYPES: ReadonlySet<string> = new Set([
   'gemma2_encoder',
   'mistral_encoder',
   'qwen3_vl_encoder',
+  'qwen3_vl_vision_tower',
   'qwen3_5_encoder',
 ]);
 

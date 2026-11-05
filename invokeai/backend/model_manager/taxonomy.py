@@ -103,6 +103,7 @@ class ModelType(str, Enum):
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
+    Qwen3VLVisionTower = "qwen3_vl_vision_tower"
     Qwen35Encoder = "qwen3_5_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"

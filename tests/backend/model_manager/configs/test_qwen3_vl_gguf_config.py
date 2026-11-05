@@ -109,23 +109,18 @@ def test_a_text_only_qwen3_gguf_still_identifies_as_a_qwen3_encoder(tmp_path: Pa
     assert isinstance(result.config, Qwen3Encoder_GGUF_Config)
 
 
-def test_the_companion_mmproj_file_is_turned_away_with_its_reason(tmp_path: Path) -> None:
-    """Installing the whole HuggingFace GGUF repo hands the user the visual tower too. Run at the
-    *default* `allow_unknown`, because that is what decides what the user sees: an unrecognised file
-    registers as an Unknown model and the install reports success, so a plain non-match here would
-    leave a dead entry in the model list with the explanation only in the server log."""
-    result = _identify(
-        _write_gguf(
-            tmp_path / "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
-            architecture="clip",
-            hidden_size=None,
-            projector_type="qwen3vl_merger",
-        ),
-        allow_unknown=True,
+def test_the_companion_mmproj_file_is_not_a_text_encoder(tmp_path: Path) -> None:
+    """Installing the whole HuggingFace GGUF repo hands the user the visual tower too. It must not install
+    as a language tower; `Qwen3VLVisionTower_GGUF_Config` claims it (see its own tests)."""
+    path = _write_gguf(
+        tmp_path / "mmproj-Qwen3VL-4B-Instruct-F16.gguf",
+        architecture="clip",
+        hidden_size=None,
+        projector_type="qwen3vl_merger",
     )
 
-    assert result.config is None
-    assert any("visual tower" in str(reason) for reason in result.invalid_matches)
+    with pytest.raises(NotAMatchError, match="'clip'"):
+        _config_from(path)
 
 
 # --- variant and completeness ---------------------------------------------------------------------
