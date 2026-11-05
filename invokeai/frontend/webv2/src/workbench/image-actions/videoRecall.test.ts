@@ -20,7 +20,7 @@ import {
   EMPTY_VIDEO_RECALL_CAPABILITIES,
   getVideoRecallCapabilities,
   getVideoRecallMessage,
-  getVideoSizeRecall,
+  getVideoSizeRecalls,
   parseVideoRecallRecord,
   resolveVideoSizeRecall,
 } from './videoRecall';
@@ -196,18 +196,17 @@ describe('getVideoRecallMessage', () => {
   });
 });
 
-describe('getVideoSizeRecall', () => {
+describe('getVideoSizeRecalls', () => {
   it('inverts a preset-derived canvas exactly', () => {
-    expect(getVideoSizeRecall(WAN_T2V, 1280, 720)).toEqual({ aspectRatioId: '16:9', targetResolution: '720p' });
-    expect(getVideoSizeRecall(h3Model(), 1344, 768)).toEqual({
-      aspectRatioId: '16:9',
-      targetResolution: '768 highres',
-    });
+    expect(getVideoSizeRecalls(WAN_T2V, 1280, 720)).toEqual([{ aspectRatioId: '16:9', targetResolution: '720p' }]);
+    expect(getVideoSizeRecalls(h3Model(), 1344, 768)).toEqual([
+      { aspectRatioId: '16:9', targetResolution: '768 highres' },
+    ]);
   });
 
   it('rejects sizes that came from conditioning media rather than a preset', () => {
     // 1920x1080-shaped media at some odd snap no preset reproduces.
-    expect(getVideoSizeRecall(WAN_T2V, 848, 464)).toBeNull();
+    expect(getVideoSizeRecalls(WAN_T2V, 848, 464)).toEqual([]);
   });
 });
 
@@ -417,6 +416,41 @@ describe('buildVideoRecallSettings', () => {
     expect(resolveVideoSizeRecall({ ...h3Values, firstFrameImage: narrowFrame }, 1344, 768).outcome).toBe(
       'media-unresolvable'
     );
+  });
+
+  describe('a size more than one preset reproduces', () => {
+    const h3 = h3Model();
+    const h3Values = createDefaultVideoWidgetValues([h3]);
+    const withFrame = (width: number, height: number): VideoWidgetValues => ({
+      ...h3Values,
+      firstFrameImage: { height, image_name: 'held.png', width },
+    });
+
+    it('takes the preset that fits the held frame, not just the first match', () => {
+      const values = withFrame(1003, 1024);
+      const lowres = { aspectRatioId: '1:1', targetResolution: '768 lowres' };
+
+      expect(resolveVideoSizeRecall(values, 768, 768)).toEqual({ outcome: 'fits', sizeRecall: lowres });
+
+      const result = buildVideoRecallSettings({
+        currentValues: values,
+        kind: 'size',
+        metadata: wanMetadata({ height: 768, width: 768 }),
+        models: [h3],
+      });
+
+      expect(result?.values).toEqual({ ...values, ...lowres });
+      expect(getVideoDimensions(h3, result!.values)).toMatchObject({ height: 768, width: 768 });
+    });
+
+    it('reports the first preset when none fits the held frame', () => {
+      // 1920x1080 at 768 highres: 1365.3x768 exceeds the pixel cap, scales to 1354.6x762, snaps to 1344x768.
+      // 768 lowres would report 768x448.
+      expect(resolveVideoSizeRecall(withFrame(1920, 1080), 768, 768)).toMatchObject({
+        effective: { height: 768, width: 1344 },
+        outcome: 'media-conflict',
+      });
+    });
   });
 
   it('remix recalls everything except the seed', () => {
