@@ -14,6 +14,7 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    QwenImageConditioningField,
     UIComponent,
 )
 from invokeai.app.invocations.model import QwenVLEncoderField
@@ -183,7 +184,15 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             conditionings=[QwenImageConditioningInfo(prompt_embeds=prompt_embeds, prompt_embeds_mask=prompt_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return QwenImageConditioningOutput.build(conditioning_name)
+        return QwenImageConditioningOutput(
+            conditioning=QwenImageConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                quantization=self.quantization,
+                qwen_vl_encoder=getattr(self.qwen_vl_encoder, "text_encoder", None),
+                component_source=getattr(self, "component_source", None),
+            )
+        )
 
     @staticmethod
     def _build_processor(tokenizer: Any, model_root: Path) -> Any:

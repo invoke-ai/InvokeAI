@@ -2,7 +2,13 @@ import torch
 from transformers import GlmModel, PreTrainedTokenizerFast
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    CogView4ConditioningField,
+    FieldDescriptions,
+    Input,
+    InputField,
+    UIComponent,
+)
 from invokeai.app.invocations.model import GlmEncoderField
 from invokeai.app.invocations.primitives import CogView4ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -41,7 +47,13 @@ class CogView4TextEncoderInvocation(BaseInvocation):
         glm_embeds = glm_embeds.detach().to("cpu")
         conditioning_data = ConditioningFieldData(conditionings=[CogView4ConditioningInfo(glm_embeds=glm_embeds)])
         conditioning_name = context.conditioning.save(conditioning_data)
-        return CogView4ConditioningOutput.build(conditioning_name)
+        return CogView4ConditioningOutput(
+            conditioning=CogView4ConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                glm_encoder=getattr(self.glm_encoder, "text_encoder", None),
+            )
+        )
 
     def _glm_encode(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         prompt = [self.prompt]

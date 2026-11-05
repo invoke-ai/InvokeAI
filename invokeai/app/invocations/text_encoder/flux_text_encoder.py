@@ -10,6 +10,7 @@ from invokeai.app.invocations.fields import (
     FluxConditioningField,
     Input,
     InputField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
 )
@@ -73,8 +74,17 @@ class FluxTextEncoderInvocation(BaseInvocation):
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
+        all_loras = list(self.clip.loras) + list(self.t5_encoder.loras)
+        loras = [LoRAMetadataField(model=item.lora, weight=item.weight) for item in all_loras] if all_loras else None
         return FluxConditioningOutput(
-            conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=FluxConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                t5_encoder=getattr(self.t5_encoder, "text_encoder", None),
+                clip_embed_model=getattr(self.clip, "text_encoder", None),
+                loras=loras,
+            )
         )
 
     def _t5_encode(self, context: InvocationContext) -> torch.Tensor:

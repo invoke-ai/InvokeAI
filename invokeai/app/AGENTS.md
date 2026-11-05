@@ -25,6 +25,7 @@
 - Preserve project/account isolation, document bounds, queue admission/receipts, lost-response retry safety. Never silently discard recovery data. Never resolve conflicts with last-write-wins.
 - Bound concurrency. Support cancellation, timeouts/retries, file/process/listener/task cleanup. Keep CPU and blocking I/O off the async server loop.
 - Preserve file/path validation, remote-fetch protections, sanitized errors. Never modify real user models, databases, outputs, or credentials in tests or debugging.
+- Every denoise invocation (`*denoise*` in `invokeai/app/invocations/`) must inherit `WithMetadata`, must not inherit `WithBoard`, must return `LatentsMetaOutput` (or an output subclassing `MetadataOutput` for multi-tensor outputs), and must build a new `MetadataField` via `build_denoise_metadata` without mutating `self.metadata.root`. Never create new `*_denoise_meta` wrapper nodes; enforced by `tests/app/invocations/test_denoise_metadata.py`.
 
 ## Efficiency and verification
 

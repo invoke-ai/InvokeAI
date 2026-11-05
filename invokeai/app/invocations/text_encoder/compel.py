@@ -11,6 +11,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LoRAMetadataField,
     OutputField,
     TensorField,
     UIComponent,
@@ -126,10 +127,18 @@ class CompelInvocation(BaseInvocation):
         conditioning_data = ConditioningFieldData(conditionings=[BasicConditioningInfo(embeds=c)])
 
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.clip.loras]
+            if self.clip.loras
+            else None
+        )
         return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
+                prompt=self.prompt,
+                skipped_layers=self.clip.skipped_layers,
+                loras=loras,
             )
         )
 
@@ -329,10 +338,16 @@ class SDXLCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase):
 
         conditioning_name = context.conditioning.save(conditioning_data)
 
+        all_loras = list(self.clip.loras) + list(self.clip2.loras)
+        loras = [LoRAMetadataField(model=item.lora, weight=item.weight) for item in all_loras] if all_loras else None
         return ConditioningOutput(
             conditioning=ConditioningField(
                 conditioning_name=conditioning_name,
                 mask=self.mask,
+                prompt=self.prompt,
+                style_prompt=self.style,
+                skipped_layers=self.clip.skipped_layers,
+                loras=loras,
             )
         )
 
@@ -377,7 +392,21 @@ class SDXLRefinerCompelPromptInvocation(BaseInvocation, SDXLPromptInvocationBase
 
         conditioning_name = context.conditioning.save(conditioning_data)
 
-        return ConditioningOutput.build(conditioning_name)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.clip2.loras]
+            if self.clip2.loras
+            else None
+        )
+        return ConditioningOutput(
+            conditioning=ConditioningField(
+                conditioning_name=conditioning_name,
+                mask=getattr(self, "mask", None),
+                prompt=getattr(self, "prompt", None),
+                style_prompt=self.style,
+                aesthetic_score=self.aesthetic_score,
+                loras=loras,
+            )
+        )
 
 
 @invocation_output("clip_skip_output")

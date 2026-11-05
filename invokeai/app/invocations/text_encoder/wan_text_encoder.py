@@ -6,6 +6,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     UIComponent,
+    WanConditioningField,
 )
 from invokeai.app.invocations.model import WanT5EncoderField
 from invokeai.app.invocations.primitives import WanConditioningOutput
@@ -60,7 +61,14 @@ class WanTextEncoderInvocation(BaseInvocation):
             conditionings=[WanConditioningInfo(prompt_embeds=prompt_embeds, prompt_attention_mask=attention_mask)]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return WanConditioningOutput.build(conditioning_name)
+        return WanConditioningOutput(
+            conditioning=WanConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                wan_t5_encoder_model=getattr(self.wan_t5_encoder, "text_encoder", None),
+                wan_component_source=getattr(self, "wan_component_source", None),
+            )
+        )
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         from diffusers.pipelines.wan.pipeline_wan import prompt_clean

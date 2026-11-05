@@ -10,6 +10,8 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    Krea2ConditioningField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
 )
@@ -102,7 +104,20 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return Krea2ConditioningOutput.build(conditioning_name, mask=self.mask)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.qwen3_vl_encoder.loras]
+            if self.qwen3_vl_encoder.loras
+            else None
+        )
+        return Krea2ConditioningOutput(
+            conditioning=Krea2ConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_vl_encoder=getattr(self.qwen3_vl_encoder, "text_encoder", None),
+                loras=loras,
+            )
+        )
 
     def _encode(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor | None]:
         images = [prepare_vlm_reference(context.images.get_pil(field.image_name)) for field in self.reference_images]

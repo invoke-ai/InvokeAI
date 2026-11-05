@@ -3,7 +3,14 @@ from contextlib import nullcontext
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    Input,
+    InputField,
+    QwenImage21ConditioningField,
+    UIComponent,
+)
 from invokeai.app.invocations.model import ModelIdentifierField, Qwen3VLEncoderField
 from invokeai.app.invocations.primitives import QwenImage21ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -121,7 +128,13 @@ class QwenImage21TextEncoderInvocation(BaseInvocation):
             reference_grids=encoding.reference_grids,
         )
         name = context.conditioning.save(ConditioningFieldData(conditionings=[conditioning]))
-        return QwenImage21ConditioningOutput.build(name)
+        return QwenImage21ConditioningOutput(
+            conditioning=QwenImage21ConditioningField(
+                conditioning_name=name,
+                prompt=self.prompt,
+                qwen3_vl_encoder=getattr(self.qwen3_vl_encoder, "text_encoder", None),
+            )
+        )
 
     def _edit_identifiers(self, context: InvocationContext) -> tuple[ModelIdentifierField, ModelIdentifierField]:
         """The vision tower and the image processor an edit adds, which only a Qwen-Image-2.1 pipeline brings.

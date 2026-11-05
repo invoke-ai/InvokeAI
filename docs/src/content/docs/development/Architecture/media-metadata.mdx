@@ -69,7 +69,7 @@ is also the fallback written when the remux fails, so a record is never lost to 
 
 ## The record: `invokeai_metadata`
 
-A flat JSON object, the output of the `core_metadata` node. Video is a *profile* of the same
+A flat JSON object emitted either by the `core_metadata` node (in linear/canvas graphs) or directly by any denoise invocation (`*denoise*` nodes inherit `WithMetadata` and emit `metadata` on their output, merging any upstream `metadata` input with the node's own sampling, model, LoRA, and adapter fields via `build_denoise_metadata`). Denoise nodes also automatically extract prompts (`positive_prompt`, `negative_prompt`), standalone text encoder models, text-encoder LoRAs, and conditioning modifiers directly from incoming conditioning edges (`positive_conditioning`, `negative_conditioning`, etc.) via `extract_conditioning_metadata()`, alongside their own denoise parameters. Custom node workflows can wire a denoise node's `metadata` output straight into the decode (`*_l2i` / `*_latents_to_video`) node without a `core_metadata` node. Video is a *profile* of the same
 record as images, discriminated by `generation_mode`, not a second format. Every key is
 optional; readers ignore keys they do not know and never reject a record for having them.
 
@@ -102,6 +102,8 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 |---|---|
 | `generation_mode` | string. Video values: `wan_t2v`, `wan_i2v`, `wan_interpolate`, `wan_extend_video`, `minimax_h3_t2v`, `minimax_h3_i2v`, `minimax_h3_lf2v`, `minimax_h3_flf2v`, `minimax_h3_extend_video`, `minimax_h3_ref2v`. A record is video metadata iff this is one of them. |
 | `positive_prompt`, `negative_prompt` | string; `negative_prompt` is absent for MiniMax H3, which has no CFG |
+| `positive_prompts`, `negative_prompts` | `string[]`: complete list of prompts when multiple conditionings are collected, e.g. via `Collect` node |
+| `positive_style_prompt`, `negative_style_prompt` | `string`: SDXL style prompts |
 | `seed`, `steps` | integer |
 | `cfg_scale` | number (Wan only) |
 | `width`, `height` | integer |

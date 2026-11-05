@@ -19,6 +19,7 @@ from invokeai.app.invocations.fields import (
     FluxConditioningField,
     Input,
     InputField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
 )
@@ -93,8 +94,19 @@ class Flux2KleinTextEncoderInvocation(BaseInvocation):
 
             # The models are still locked while we save the data
             conditioning_name = context.conditioning.save(conditioning_data)
+            loras = (
+                [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.qwen3_encoder.loras]
+                if self.qwen3_encoder.loras
+                else None
+            )
             return FluxConditioningOutput(
-                conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+                conditioning=FluxConditioningField(
+                    conditioning_name=conditioning_name,
+                    mask=self.mask,
+                    prompt=self.prompt,
+                    qwen3_encoder=getattr(self.qwen3_encoder, "text_encoder", None),
+                    loras=loras,
+                )
             )
 
     def _encode_prompt(self, context: InvocationContext, exit_stack: ExitStack) -> Tuple[torch.Tensor, torch.Tensor]:

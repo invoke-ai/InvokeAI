@@ -108,9 +108,27 @@ class LTX2TextEncoderInvocation(BaseInvocation):
                 for state in hidden_states
             ]
 
+        encoder_model = getattr(self.text_encoder, "text_encoder", None)
+        component_source = getattr(self, "ltx2_component_source", None)
+        cond = LTX2ConditioningField(
+            conditioning_name=names[0],
+            prompt=self.prompt,
+            ltx2_text_encoder_model=encoder_model,
+            ltx2_component_source=component_source,
+        )
+        neg_cond = (
+            LTX2ConditioningField(
+                conditioning_name=names[1],
+                prompt=self.negative_prompt,
+                ltx2_text_encoder_model=encoder_model,
+                ltx2_component_source=component_source,
+            )
+            if len(names) > 1
+            else None
+        )
         return LTX2TextEncoderOutput(
-            conditioning=LTX2ConditioningField(conditioning_name=names[0]),
-            negative_conditioning=LTX2ConditioningField(conditioning_name=names[1]) if len(names) > 1 else None,
+            conditioning=cond,
+            negative_conditioning=neg_cond,
         )
 
     def _encode_with_tower(
