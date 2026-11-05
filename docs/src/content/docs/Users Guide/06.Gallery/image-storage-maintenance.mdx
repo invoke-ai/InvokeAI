@@ -42,3 +42,13 @@ Precise files move only for images that have a precise asset record. A precise f
 `outputs/images/precise` must stay on the same volume as `outputs/images`: moves and deletes rename files, and renaming across volumes fails. The move preflight only compares a precise file's old and new paths, so it does not detect a precise folder placed on another volume.
 
 Empty source directories left behind by successful moves, including empty precise directories, are removed when safe.
+
+## Precise files in backups, deletes and recovery
+
+An image saved with [precise image storage](/configuration/invokeai-yaml/#precise-image-storage) has its exact pixels in `outputs/images/precise/`. Which images have such a file is recorded in the database, so the folder and the database belong together.
+
+- **Backup.** Back up `outputs/images/precise/` together with `outputs/images` and the database. A backup without the folder keeps every gallery image, but nodes that read an image's exact pixels fail for the images that had one, and so does their 16-bit download.
+- **Moves.** A move relocates the precise file of each image that has one, in the same step as its image and thumbnail, and keeps the folder on the same volume.
+- **Delete.** Deleting an image deletes its precise file with it. Deleting the folder yourself does not remove the records: the images stay in the Gallery without their exact pixels.
+- **Restoring an older database.** Precise files that no restored record names are not part of any image. Gallery maintenance archives them instead of deleting them.
+- **Turning the setting off.** Existing precise files and the images that own them keep working; only new precise saves stop.
