@@ -11,8 +11,9 @@
  * its vertices. A new layer the document refuses (busy, not ready, over budget) is reported too.
  * Commits wait for the gesture to end, so a new layer is never refused mid-gesture: a drag or trace commits on
  * release, a polygon on Enter or on the release of the press that closes it. Escape (through the engine ladder) or a
- * cancelled press drops the session. Previews and cancellation do not dispatch, and a nonzero shape produces one
- * structural or stroke commit.
+ * cancelled press drops the session. A box or freehand gesture bound for the selected layer's pixels tells the engine
+ * so as soon as its modifiers decide it, so a mask it edits shows above a staged preview; polygons never do. Previews
+ * and cancellation do not dispatch, and a nonzero shape produces one structural or stroke commit.
  */
 
 import type { CanvasLayerEditRefusal, CanvasShapeCutoutRefusal } from '@workbench/canvas-engine/capabilities';
@@ -83,7 +84,7 @@ const CUTOUT_CURSOR_SVG = `<svg xmlns='http://www.w3.org/2000/svg' width='24' he
 </svg>`;
 
 type Session =
-  | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean }
+  | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean; editsSelected: boolean }
   | {
       kind: 'polyline';
       session: PolylineSession;
@@ -92,7 +93,7 @@ type Session =
       /** The close a press (or Enter during one) armed, committed on the release in this mode. */
       closing: ShapeMode | null;
     }
-  | ({ kind: 'freehand' } & FreehandTrace);
+  | ({ kind: 'freehand'; editsSelected: boolean } & FreehandTrace);
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -208,6 +209,23 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
     if (held !== cutoutHeld) {
       cutoutHeld = held;
       ctx.updateCursor();
+    }
+  };
+
+  /**
+   * Tells the engine, once per box or freehand gesture, that it writes the selected layer's pixels as soon as the
+   * modifiers make it so: at the press, or when the mod key turns a drag into a cutout. The engine asks
+   * `editsSelectedLayer` before the press reaches the tool, too early to see its modifiers, so the tool answers here
+   * instead. Polygons never count: vertex presses write nothing, and a close commits after its gesture has ended.
+   */
+  const noteSelectedLayerEdit = (
+    ctx: ToolContext,
+    gesture: Extract<Session, { editsSelected: boolean }>,
+    modifiers: PointerModifiers
+  ): void => {
+    if (!gesture.editsSelected && resolveTarget(ctx, modeOf(modifiers, isMacOs), 'skip').kind === 'pixels') {
+      gesture.editsSelected = true;
+      ctx.beginSelectedLayerEdit?.();
     }
   };
 
@@ -481,8 +499,15 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
       }
       session =
         kind === 'freehand'
-          ? { ...startFreehandTrace(input), kind: 'freehand' }
-          : { kind: 'drag', moved: false, startDoc: input.documentPoint, startScreen: input.screenPoint };
+          ? { ...startFreehandTrace(input), editsSelected: false, kind: 'freehand' }
+          : {
+              editsSelected: false,
+              kind: 'drag',
+              moved: false,
+              startDoc: input.documentPoint,
+              startScreen: input.screenPoint,
+            };
+      noteSelectedLayerEdit(ctx, session, input.modifiers);
     },
     onPointerMove: (ctx, input, batch) => {
       noteModifiers(ctx, input.modifiers);
@@ -502,6 +527,7 @@ export const createShapeTool = ({ isMacOs = IS_MAC_OS }: { isMacOs?: boolean } =
         ctx.invalidate({ overlay: true });
         return;
       }
+      noteSelectedLayerEdit(ctx, session, input.modifiers);
       if (session.kind === 'freehand') {
         extendFreehandTrace(session, batch);
         ctx.stores.lassoPreview.set({ kind: 'freehand', points: session.points.slice() });
