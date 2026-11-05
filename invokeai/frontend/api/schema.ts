@@ -6089,10 +6089,11 @@ export type components = {
              */
             reference_images_require_variant?: string | null;
             /**
-             * Reference Images Require Format
-             * @description If set, reference images are only accepted for models of this format.
+             * Reference Images Require Vision Tower
+             * @description If true, reference images are read by the Qwen3-VL vision tower: the effective encoder (the model's own or a standalone one) must carry one.
+             * @default false
              */
-            reference_images_require_format?: string | null;
+            reference_images_require_vision_tower?: boolean;
             /**
              * Supports Regional Guidance
              * @default false
@@ -44423,7 +44424,7 @@ export type components = {
             qwen3_vl_encoder?: components["schemas"]["Qwen3VLEncoderField"] | null;
             /**
              * Reference Images
-             * @description Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.
+             * @description Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs an encoder with a vision tower: a Diffusers Qwen-Image-2.1 model's own, or a standalone non-GGUF Qwen3-VL 8B encoder.
              * @default []
              */
             reference_images?: components["schemas"]["ImageField"][];

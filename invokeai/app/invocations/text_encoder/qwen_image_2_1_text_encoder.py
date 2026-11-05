@@ -26,8 +26,8 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
 from invokeai.backend.util.devices import TorchDevice
 
 _NO_VISION_TOWER = (
-    "Reference images are read by the Qwen3-VL vision tower, which only the Qwen-Image-2.1 Diffusers model's own "
-    "encoder brings. Clear the standalone encoder, or use a Qwen-Image-2.1 Diffusers model."
+    "Reference images are read by the Qwen3-VL vision tower, and {name!r} has none. Use a Diffusers Qwen-Image-2.1 "
+    "model's own encoder or a standalone non-GGUF Qwen3-VL 8B encoder; a GGUF encoder keeps no tower."
 )
 
 
@@ -54,8 +54,8 @@ class QwenImage21TextEncoderInvocation(BaseInvocation):
     reference_images: list[ImageField] = InputField(
         default=[],
         description="Reference images to edit or draw from, in the order the denoise node receives their latents, "
-        f"at most {require(BaseModelType.QwenImage21, FeaturesFacet).max_reference_images}. Needs a Qwen-Image-2.1 "
-        "Diffusers model's own encoder.",
+        f"at most {require(BaseModelType.QwenImage21, FeaturesFacet).max_reference_images}. Needs an encoder with a "
+        "vision tower: a Diffusers Qwen-Image-2.1 model's own, or a standalone non-GGUF Qwen3-VL 8B encoder.",
     )
 
     @torch.no_grad()
@@ -124,19 +124,24 @@ class QwenImage21TextEncoderInvocation(BaseInvocation):
         return QwenImage21ConditioningOutput.build(name)
 
     def _edit_identifiers(self, context: InvocationContext) -> tuple[ModelIdentifierField, ModelIdentifierField]:
-        """The vision tower and the image processor an edit adds, which only a Qwen-Image-2.1 pipeline brings.
+        """The vision tower and the image processor an edit adds, read from the models the encoder field names.
 
-        Checked on the configs, before anything loads: a graph can pair a standalone encoder with this pipeline's
-        tokenizer, or the other way round.
+        Checked on the configs, before anything loads: a Qwen-Image-2.1 Diffusers pipeline or a standalone Qwen3-VL
+        encoder serves both. A GGUF encoder keeps no tower, and a graph can pair the two sources, so tokenizer and
+        encoder are each checked.
         """
         for identifier in (self.qwen3_vl_encoder.tokenizer, self.qwen3_vl_encoder.text_encoder):
             config = context.models.get_config(identifier)
-            if (
-                config.base is not BaseModelType.QwenImage21
-                or config.type is not ModelType.Main
-                or config.format is not ModelFormat.Diffusers
-            ):
-                raise ValueError(_NO_VISION_TOWER)
+            is_pipeline = (
+                config.base is BaseModelType.QwenImage21
+                and config.type is ModelType.Main
+                and config.format is ModelFormat.Diffusers
+            )
+            is_encoder_with_tower = config.type is ModelType.Qwen3VLEncoder and config.format is not (
+                ModelFormat.GGUFQuantized
+            )
+            if not (is_pipeline or is_encoder_with_tower):
+                raise ValueError(_NO_VISION_TOWER.format(name=config.name))
         return (
             self.qwen3_vl_encoder.text_encoder.model_copy(update={"submodel_type": SubModelType.VisionEncoder}),
             self.qwen3_vl_encoder.tokenizer.model_copy(update={"submodel_type": SubModelType.Processor}),

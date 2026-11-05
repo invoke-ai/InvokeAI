@@ -604,25 +604,39 @@ def test_the_metadata_records_whether_the_prefix_was_cached(cache_fits: bool, mo
     assert (output.latents.latents_name, output.width, output.height) == ("out", 64, 64)
 
 
-def test_a_standalone_encoder_cannot_read_references() -> None:
+def _standalone_encoder_node(*, tokenizer_from=None) -> QwenImage21TextEncoderInvocation:
     encoder = ModelIdentifierField(
         key="enc", hash="h", name="qwen3vl_8b", base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder
     )
-    node = QwenImage21TextEncoderInvocation.model_construct(
+    return QwenImage21TextEncoderInvocation.model_construct(
         prompt="swap them",
-        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=encoder, text_encoder=encoder, loras=[]),
+        qwen3_vl_encoder=Qwen3VLEncoderField(tokenizer=tokenizer_from or encoder, text_encoder=encoder, loras=[]),
         reference_images=[ImageField(image_name="ref.png")],
     )
+
+
+def _encoder_config(model_format: ModelFormat):
+    return SimpleNamespace(
+        name="qwen3vl_8b", base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=model_format
+    )
+
+
+def test_a_standalone_checkpoint_encoder_brings_the_tower_and_the_processor() -> None:
+    context = SimpleNamespace(
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.Checkpoint))
+    )
+    tower, processor = _standalone_encoder_node()._edit_identifiers(context)
+    assert (tower.key, tower.submodel_type) == ("enc", SubModelType.VisionEncoder)
+    assert (processor.key, processor.submodel_type) == ("enc", SubModelType.Processor)
+
+
+def test_a_gguf_encoder_cannot_read_references() -> None:
     context = SimpleNamespace(
         images=SimpleNamespace(get_pil=lambda _name: Image.new("RGB", (64, 64))),
-        models=SimpleNamespace(
-            get_config=lambda _identifier: SimpleNamespace(
-                base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint
-            )
-        ),
+        models=SimpleNamespace(get_config=lambda _identifier: _encoder_config(ModelFormat.GGUFQuantized)),
     )
-    with pytest.raises(ValueError, match="vision tower"):
-        node.invoke(context)
+    with pytest.raises(ValueError, match="'qwen3vl_8b' has none.*non-GGUF Qwen3-VL 8B encoder"):
+        _standalone_encoder_node().invoke(context)
 
 
 def _pipeline_encoder_node(num_references: int) -> QwenImage21TextEncoderInvocation:
@@ -653,15 +667,51 @@ def test_the_processor_comes_from_the_qwen_image_2_1_pipeline_the_tokenizer_is_f
     assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
 
 
-def test_a_standalone_encoder_beside_the_pipelines_tokenizer_cannot_read_references() -> None:
-    # The tokenizer passes; the encoder, whose pipeline would have to bring the vision tower, does not.
-    def get_config(identifier):
-        if identifier.submodel_type is SubModelType.Tokenizer:
-            return SimpleNamespace(base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers)
-        return SimpleNamespace(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint)
+def _mixed_node(encoder_key: str) -> QwenImage21TextEncoderInvocation:
+    """The pipeline's tokenizer beside a standalone encoder, the way a graph can pair them."""
+    node = _pipeline_encoder_node(1)
+    encoder = ModelIdentifierField(
+        key=encoder_key,
+        hash="h",
+        name="qwen3vl_8b",
+        base=BaseModelType.Any,
+        type=ModelType.Qwen3VLEncoder,
+        submodel_type=SubModelType.TextEncoder,
+    )
+    return node.model_copy(
+        update={
+            "qwen3_vl_encoder": Qwen3VLEncoderField(
+                tokenizer=node.qwen3_vl_encoder.tokenizer, text_encoder=encoder, loras=[]
+            )
+        }
+    )
 
-    with pytest.raises(ValueError, match="vision tower"):
-        _pipeline_encoder_node(1)._edit_identifiers(SimpleNamespace(models=SimpleNamespace(get_config=get_config)))
+
+def _by_key(configs: dict):
+    return SimpleNamespace(models=SimpleNamespace(get_config=lambda identifier: configs[identifier.key]))
+
+
+_PIPELINE_CONFIG = SimpleNamespace(
+    name="pipe", base=BaseModelType.QwenImage21, type=ModelType.Main, format=ModelFormat.Diffusers
+)
+
+
+def test_a_gguf_encoder_beside_the_pipelines_tokenizer_cannot_read_references() -> None:
+    # The tokenizer passes; the encoder, whose tower the pipeline does not bring, does not.
+    context = _by_key({"qwen21": _PIPELINE_CONFIG, "enc": _encoder_config(ModelFormat.GGUFQuantized)})
+
+    with pytest.raises(ValueError, match="has none"):
+        _mixed_node("enc")._edit_identifiers(context)
+
+
+@pytest.mark.parametrize("model_format", [ModelFormat.Checkpoint, ModelFormat.Qwen3VLEncoder])
+def test_a_standalone_encoder_beside_the_pipelines_tokenizer_brings_the_tower(model_format: ModelFormat) -> None:
+    # The HF-folder format (`Qwen3VLEncoder`) serves the tower too.
+    context = _by_key({"qwen21": _PIPELINE_CONFIG, "enc": _encoder_config(model_format)})
+    tower, processor = _mixed_node("enc")._edit_identifiers(context)
+
+    assert (tower.key, tower.submodel_type) == ("enc", SubModelType.VisionEncoder)
+    assert (processor.key, processor.submodel_type) == ("qwen21", SubModelType.Processor)
 
 
 def test_more_references_than_the_architecture_reads_are_refused_before_anything_loads() -> None:

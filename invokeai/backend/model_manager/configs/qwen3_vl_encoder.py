@@ -268,9 +268,9 @@ def _raise_if_qwen3_vl_mmproj(mod: ModelOnDisk) -> None:
         return
     raise InvalidMatchError(
         "this is the Qwen3-VL visual tower ('mmproj'), not a text encoder. Install the language tower "
-        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'). GGUF encoders read text only; Krea-2 edit "
-        "reference images need a Qwen3-VL encoder with its vision weights, such as the Krea-2 Diffusers "
-        "model's encoder or a single-file Qwen3-VL checkpoint."
+        "instead (e.g. 'Qwen3VL-4B-Instruct-Q4_K_M.gguf'). GGUF encoders read text only; edit "
+        "reference images need a Qwen3-VL encoder with its vision weights, such as a Diffusers model's "
+        "encoder or a single-file Qwen3-VL checkpoint."
     )
 
 

@@ -3345,7 +3345,7 @@
       "referenceImagePromptTagExplanation": "Write {{tag}} in the prompt to refer to this image.",
       "referenceImagePromptTagHint": "Write {{tag}} in the prompt to refer to this image. Click to copy.",
       "referenceImages": "Reference images",
-      "referenceImagesNeedFormat": "Reference images need a {{format}} {{base}} model.",
+      "referenceImagesNeedVisionTower": "Reference images need a Qwen3-VL 8B encoder that is not GGUF. Select one under Components (e.g. Qwen3-VL 8B Encoder), or use a Diffusers Qwen-Image-2.1 model.",
       "referenceImagesUnsupported": "Reference images are not supported by the selected model.",
       "removeConcept": "Remove concept",
       "removeConceptNamed": "Remove {{name}}",

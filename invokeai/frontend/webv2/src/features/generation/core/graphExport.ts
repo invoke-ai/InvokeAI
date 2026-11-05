@@ -23,7 +23,7 @@ import {
   getComponentSectionPolicy,
   getDefaultGenerateSettings,
   getGenerateModelSelectionResult,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   getSchedulerOptions,
   isArchitectureDescribed,
   isGenerateModelSelectable,
@@ -316,11 +316,13 @@ const withReferenceImages = (
 
   const { model } = values;
 
-  if (!isReferenceImageSupported(model)) {
-    const format = getMissingReferenceImageFormat(model);
-
+  if (!isReferenceImageSupported(model, values.qwen3VLEncoderModel)) {
     throw new Error(
-      `reference_images: ${model.name} takes no reference images${format ? ` in this format; they need ${format}` : ''}.`
+      `reference_images: ${model.name} takes no reference images${
+        getReferenceImageUnavailableReason(model, values.qwen3VLEncoderModel)
+          ? ' without a Qwen3-VL 8B encoder that has a vision tower (a Diffusers model or a safetensors encoder)'
+          : ''
+      }.`
     );
   }
 

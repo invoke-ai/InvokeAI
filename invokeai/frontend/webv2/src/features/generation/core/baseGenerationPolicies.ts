@@ -19,6 +19,7 @@ import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
+  ComponentModelConfig,
   ExpandPromptSuggestion,
   ExternalGenerationMode,
   GenerateLora,
@@ -1224,8 +1225,8 @@ const getBaseComponentSectionPolicy = (
         {
           ...qwen3VlEncoderSlot(
             'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
-              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder, the " +
-              'only one that reads reference images.',
+              "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder. Reference " +
+              'images are read by its vision tower, which a GGUF encoder lacks.',
             isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
@@ -1493,8 +1494,24 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
 export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
   Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
 
-/** Picker and validation must agree on compatibility, including required variants. */
-export const isReferenceImageSupported = (model: GenerateModelConfig | undefined): boolean => {
+/**
+ * The encoder that reads the references is the selected Qwen3-VL 8B encoder when there is one, else the model's own.
+ * Only a Diffusers main brings its own; a GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file).
+ * The 8B filter is Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base that sets the
+ * flag with another encoder size needs its own filter here.
+ */
+const hasReferenceVisionTower = (
+  model: Exclude<GenerateModelConfig, { type: 'external_image_generator' }>,
+  encoder: ComponentModelConfig | null | undefined
+): boolean =>
+  encoder && isQwen3Vl8bEncoder(encoder) ? encoder.format !== 'gguf_quantized' : model.format === 'diffusers';
+
+/**
+ * Whether the base and variant take references at all, whichever encoder reads them. Model switches and recall use
+ * this, so a change of encoder never deletes references: they stay and validation flags them while
+ * `isReferenceImageSupported` is false.
+ */
+export const takesReferenceImages = (model: GenerateModelConfig | undefined): boolean => {
   if (!model) {
     return false;
   }
@@ -1505,42 +1522,55 @@ export const isReferenceImageSupported = (model: GenerateModelConfig | undefined
 
   const features = getArchitectureFeatures(model.base);
 
-  if (!features || features.max_reference_images <= 0) {
-    return false;
-  }
-
-  // The backend declares which reference-image features require a specific variant or format.
+  // The backend declares which reference-image features require a specific variant.
   return (
-    (features.reference_images_require_variant === null ||
-      model.variant === features.reference_images_require_variant) &&
-    (features.reference_images_require_format === null || model.format === features.reference_images_require_format)
+    Boolean(features) &&
+    features!.max_reference_images > 0 &&
+    (features!.reference_images_require_variant === null ||
+      model.variant === features!.reference_images_require_variant)
   );
 };
 
 /**
- * The model format the selected base needs for reference images, when the model's format is all that keeps them
- * unavailable, so the UI can say what to switch to instead of hiding the section without a reason.
+ * Picker and validation must agree on compatibility, including required variants. `encoder` is the selected
+ * Qwen3-VL encoder (`settings.qwen3VLEncoderModel`); it matters only for bases whose references the encoder reads.
  */
-export const getMissingReferenceImageFormat = (model: GenerateModelConfig | undefined): string | null => {
-  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model)) {
-    return null;
+export const isReferenceImageSupported = (
+  model: GenerateModelConfig | undefined,
+  encoder?: ComponentModelConfig | null
+): boolean => {
+  if (!model || !takesReferenceImages(model)) {
+    return false;
   }
 
-  const features = getArchitectureFeatures(model.base);
-
-  if (
-    !features ||
-    features.max_reference_images <= 0 ||
-    (features.reference_images_require_variant !== null && model.variant !== features.reference_images_require_variant)
-  ) {
-    return null;
+  if (model.type === 'external_image_generator') {
+    return true;
   }
 
-  return features.reference_images_require_format;
+  return (
+    !getArchitectureFeatures(model.base)?.reference_images_require_vision_tower ||
+    hasReferenceVisionTower(model, encoder)
+  );
 };
 
-export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): number => {
-  if (!model || !isReferenceImageSupported(model)) {
+/**
+ * Why references are unavailable although the base takes them, so the UI can say what to change instead of hiding the
+ * section without a reason. Null when they are available or the base never takes them.
+ */
+export const getReferenceImageUnavailableReason = (
+  model: GenerateModelConfig | undefined,
+  encoder?: ComponentModelConfig | null
+): 'visionTower' | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, encoder)) {
+    return null;
+  }
+
+  return takesReferenceImages(model) ? 'visionTower' : null;
+};
+
+/** The base's limit, whichever encoder reads the references. */
+export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): number => {
+  if (!model || !takesReferenceImages(model)) {
     return 0;
   }
 
@@ -1550,6 +1580,11 @@ export const getMaxReferenceImages = (model: GenerateModelConfig | undefined): n
 
   return getArchitectureFeatures(model.base)?.max_reference_images ?? DEFAULT_REFERENCE_IMAGE_LIMIT;
 };
+
+export const getMaxReferenceImages = (
+  model: GenerateModelConfig | undefined,
+  encoder?: ComponentModelConfig | null
+): number => (isReferenceImageSupported(model, encoder) ? getReferenceImageLimit(model) : 0);
 
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
@@ -1649,9 +1684,8 @@ const getReferenceImageConfigSupported = (
     case 'krea2_reference_image':
       return model.type !== 'external_image_generator' && model.base === 'krea-2';
     case 'qwen_image_2_1_reference_image':
-      return (
-        model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)
-      );
+      // The encoder decides whether they run (see `isReferenceImageSupported`); the type fits the base alone.
+      return model.type !== 'external_image_generator' && model.base === 'qwen-image-2-1';
     case 'flux_kontext_reference_image':
       return isFluxKontextModel(model);
     case 'flux_redux':
@@ -1720,7 +1754,7 @@ const canRunWithEnabledReferenceImages = (
   enabled: readonly GenerateReferenceImage[],
   referenceImage: GenerateReferenceImage
 ): boolean => {
-  if (enabled.length >= getMaxReferenceImages(model)) {
+  if (enabled.length >= getReferenceImageLimit(model)) {
     return false;
   }
 
@@ -1825,7 +1859,7 @@ export const getCompatibleReferenceImages = (
     return referenceImages;
   }
 
-  if (!isReferenceImageSupported(model)) {
+  if (!takesReferenceImages(model)) {
     return [];
   }
 
@@ -1950,7 +1984,7 @@ const getSettingsWithCompatibleModelSelections = (
   // Enabled references the new family cannot run together are switched off rather than deleted: Invoke is not left
   // blocked, the first enabled ones keep running, and switching back can turn the rest on again. A model without
   // references keeps them as they are, all switched off, for the next model that takes them.
-  const referencesSupported = isReferenceImageSupported(model);
+  const referencesSupported = takesReferenceImages(model);
   const retargetedReferenceImages = referencesSupported
     ? getCompatibleReferenceImages(settings.referenceImages, model, models)
     : settings.referenceImages;
@@ -2363,10 +2397,9 @@ const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSe
   return settings.pidSteps < 1 ? [issue('advanced:pidSteps', 'pidSteps', 'PiD steps must be at least 1.', target)] : [];
 };
 
-/** Only the encoder of a Qwen-Image-2.1 Diffusers model keeps the vision tower that reads references. */
-export const QWEN_IMAGE_21_STANDALONE_ENCODER_REASON =
-  "Reference images need the Qwen-Image-2.1 model's own encoder, the only one with a vision tower. " +
-  'Clear the Qwen3-VL Encoder component.';
+/** The vision tower that reads references comes with a Diffusers pipeline's encoder or a non-GGUF Qwen3-VL one. */
+export const QWEN_IMAGE_21_NO_VISION_TOWER_REASON =
+  'Reference images need a Qwen3-VL 8B encoder that is not GGUF. Select one under Components (e.g. Qwen3-VL 8B Encoder), or use a Diffusers Qwen-Image-2.1 model.';
 
 const getReferenceImageValidationIssues = (
   model: GenerateModelConfig,
@@ -2375,10 +2408,10 @@ const getReferenceImageValidationIssues = (
   const issues: GenerationIssue[] = [];
   // Use the shared reference limit, but report unsupported images individually rather than a misleading maximum of
   // zero.
-  const maxReferenceImages = getMaxReferenceImages(model);
+  const maxReferenceImages = getReferenceImageLimit(model);
   const active = settings.referenceImages.filter(isReferenceImageActive);
 
-  if (isReferenceImageSupported(model) && active.length > maxReferenceImages) {
+  if (takesReferenceImages(model) && active.length > maxReferenceImages) {
     issues.push(
       issue(
         'referenceImages:limit',
@@ -2494,20 +2527,25 @@ const getReferenceImageValidationIssues = (
   });
 
   // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
-  // inherit one that cannot read the references.
+  // inherit one that cannot read the references. Clearing it helps only where the model brings its own encoder.
   if (
     model.base === 'qwen-image-2-1' &&
-    settings.qwen3VLEncoderModel &&
-    isQwen3Vl8bEncoder(settings.qwen3VLEncoderModel) &&
+    !isReferenceImageSupported(model, settings.qwen3VLEncoderModel) &&
     settings.referenceImages.some(
       (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'qwen_image_2_1_reference_image'
     )
   ) {
     issues.push(
-      createUntranslatedGenerationIssue(QWEN_IMAGE_21_STANDALONE_ENCODER_REASON, REFERENCE_IMAGES_TARGET, {
-        key: 'qwen3VLEncoderModel',
-        kind: 'clearModel',
-      })
+      // A single-file main has to swap the encoder, so the issue points at its slot; a Diffusers one clears it.
+      model.format === 'diffusers'
+        ? createUntranslatedGenerationIssue(QWEN_IMAGE_21_NO_VISION_TOWER_REASON, REFERENCE_IMAGES_TARGET, {
+            key: 'qwen3VLEncoderModel',
+            kind: 'clearModel',
+          })
+        : createUntranslatedGenerationIssue(QWEN_IMAGE_21_NO_VISION_TOWER_REASON, {
+            field: 'qwen3VLEncoderModel',
+            section: 'components',
+          })
     );
   }
 

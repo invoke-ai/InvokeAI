@@ -2,6 +2,7 @@ import type { GalleryItem } from '@features/gallery';
 import type { GalleryPickerSelection } from '@features/gallery/picker';
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type {
+  ComponentModelConfig,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -19,7 +20,7 @@ import {
   createReferenceImageId,
   getGenerationDimensions,
   getMaxReferenceImages,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   isReferenceImageSupported,
   withAddedReferenceImages,
 } from '@features/generation/core/baseGenerationPolicies';
@@ -45,13 +46,14 @@ import { ReferenceImageCard } from './ReferenceImageCard';
 
 const UPLOAD_ZONE_HOVER_STYLES = { bg: 'bg.muted', color: 'fg' };
 /** Display names for the formats the backend can require of reference-image models. */
-const MODEL_FORMAT_LABELS: Record<string, string> = { diffusers: 'Diffusers' };
 const IMAGE_ONLY = ['image'] as const;
 /** The picker's trigger skips a click whose default is prevented, so a full set opens no picker. */
 const preventPickerOpen = (event: MouseEvent) => event.preventDefault();
 
 interface GenerateReferenceImagesContentProps {
   models: readonly ModelConfig[];
+  /** The selected Qwen3-VL encoder: for some bases it decides whether the references can be read. */
+  qwen3VLEncoderModel: ComponentModelConfig | null;
   referenceImages: GenerateReferenceImage[];
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
@@ -62,14 +64,15 @@ export const GenerateReferenceImagesContent = ({
   models,
   onCommit,
   onCommitImmediate,
+  qwen3VLEncoderModel,
   referenceImages,
   selectedModel,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
-  const { gallery, models: modelUi, notifications, project, settings } = useGenerationUi();
-  const isSupported = isReferenceImageSupported(selectedModel);
-  const missingFormat = getMissingReferenceImageFormat(selectedModel);
-  const maxReferenceImages = getMaxReferenceImages(selectedModel);
+  const { gallery, notifications, project, settings } = useGenerationUi();
+  const isSupported = isReferenceImageSupported(selectedModel, qwen3VLEncoderModel);
+  const unavailableReason = getReferenceImageUnavailableReason(selectedModel, qwen3VLEncoderModel);
+  const maxReferenceImages = getMaxReferenceImages(selectedModel, qwen3VLEncoderModel);
   const referenceImageCount = referenceImages.length;
   const freeSlots = Math.max(0, maxReferenceImages - referenceImageCount);
   const canAdd = freeSlots > 0;
@@ -93,7 +96,9 @@ export const GenerateReferenceImagesContent = ({
 
       // The commit applies the update at once (a later flush may replay it), so `added` is set when this returns.
       onCommit((currentSettings) => {
-        const remaining = getMaxReferenceImages(selectedModel) - currentSettings.referenceImages.length;
+        const remaining =
+          getMaxReferenceImages(selectedModel, currentSettings.qwen3VLEncoderModel) -
+          currentSettings.referenceImages.length;
 
         added = Math.max(0, Math.min(remaining, images.length));
 
@@ -166,7 +171,10 @@ export const GenerateReferenceImagesContent = ({
         const removedIds = new Set(removed.map((referenceImage) => referenceImage.id));
         const restored = [...removed, ...current.filter((referenceImage) => !removedIds.has(referenceImage.id))];
         // A model that takes references gets no more running than it takes: the rest come back turned off.
-        const limit = values && isReferenceImageSupported(values.model) ? getMaxReferenceImages(values.model) : null;
+        const limit =
+          values && isReferenceImageSupported(values.model, values.qwen3VLEncoderModel)
+            ? getMaxReferenceImages(values.model, values.qwen3VLEncoderModel)
+            : null;
         let running = 0;
 
         settings.patchGenerateSettings(
@@ -270,17 +278,13 @@ export const GenerateReferenceImagesContent = ({
     },
   });
 
-  // A model that only lacks the right format says which one would take references.
-  const unsupportedMessage =
-    selectedModel && missingFormat
-      ? t('widgets.generate.referenceImagesNeedFormat', {
-          base: modelUi.getBaseLabel(selectedModel.base),
-          format: MODEL_FORMAT_LABELS[missingFormat] ?? missingFormat,
-        })
-      : t('widgets.generate.referenceImagesUnsupported');
+  // A model whose encoder lacks the vision tower says what would take references.
+  const unsupportedMessage = unavailableReason
+    ? t('widgets.generate.referenceImagesNeedVisionTower')
+    : t('widgets.generate.referenceImagesUnsupported');
 
   if (!isSupported && referenceImageCount === 0) {
-    return missingFormat ? (
+    return unavailableReason ? (
       <Text color="fg.muted" fontSize="xs">
         {unsupportedMessage}
       </Text>

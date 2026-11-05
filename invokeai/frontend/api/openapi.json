@@ -21925,17 +21925,11 @@
             "title": "Reference Images Require Variant",
             "description": "If set, reference images are only accepted for models of this variant."
           },
-          "reference_images_require_format": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reference Images Require Format",
-            "description": "If set, reference images are only accepted for models of this format."
+          "reference_images_require_vision_tower": {
+            "type": "boolean",
+            "title": "Reference Images Require Vision Tower",
+            "description": "If true, reference images are read by the Qwen3-VL vision tower: the effective encoder (the model's own or a standalone one) must carry one.",
+            "default": false
           },
           "supports_regional_guidance": {
             "type": "boolean",
@@ -102695,7 +102689,7 @@
           },
           "reference_images": {
             "default": [],
-            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs a Qwen-Image-2.1 Diffusers model's own encoder.",
+            "description": "Reference images to edit or draw from, in the order the denoise node receives their latents, at most 4. Needs an encoder with a vision tower: a Diffusers Qwen-Image-2.1 model's own, or a standalone non-GGUF Qwen3-VL 8B encoder.",
             "field_kind": "input",
             "input": "any",
             "items": {

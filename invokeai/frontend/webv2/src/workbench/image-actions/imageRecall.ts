@@ -1364,6 +1364,7 @@ export const buildImageRecallSettings = ({
     // metadata model was not recalled (e.g. uninstalled), `values.model` is
     // still the current one and incompatible configs are re-targeted or dropped.
     const recordedReferenceImages = getMetadataReferenceImages(metadata);
+    // Only the base decides; an encoder without a vision tower is flagged by validation, not recalled away.
     const referenceImages = getCompatibleReferenceImages(
       resolveReferenceImageModels(recordedReferenceImages ?? [], models),
       values.model,

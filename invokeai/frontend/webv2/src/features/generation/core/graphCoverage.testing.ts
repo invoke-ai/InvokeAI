@@ -228,14 +228,16 @@ export const fullyFilledSettingsFor = (base: SupportedGenerateBase, shape: Model
 /** References for the families whose builders wire them through their own nodes rather than an adapter. */
 const tunedReferenceImagesFor = (
   model: MainModelConfig,
-  image: GenerateReferenceImageAsset
+  image: GenerateReferenceImageAsset,
+  encoder: GenerateSettings['qwen3VLEncoderModel']
 ): GenerateReferenceImage[] | undefined => {
   if (model.base === 'krea-2') {
     return [{ config: { image, styleStrength: 1, type: 'krea2_reference_image' }, id: 'style', isEnabled: true }];
   }
 
-  // Only the Diffusers pipeline's own encoder reads references; other shapes compile without them.
-  if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model)) {
+  // Only an encoder with a vision tower reads references: a Diffusers pipeline's own, or a standalone safetensors
+  // one; other shapes compile without them.
+  if (model.base === 'qwen-image-2-1' && isReferenceImageSupported(model, encoder)) {
     return [{ config: { image, type: 'qwen_image_2_1_reference_image' }, id: 'edit', isEnabled: true }];
   }
 
@@ -263,7 +265,7 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
       fluxDypeScale: 3,
       qwenImageEncoderQuantization: 'nf4' as const,
       qwenImageShift: 3,
-      referenceImages: tunedReferenceImagesFor(model, image) ?? settings.referenceImages,
+      referenceImages: tunedReferenceImagesFor(model, image, settings.qwen3VLEncoderModel) ?? settings.referenceImages,
       zImageSeedVarianceEnabled: true,
       zImageSeedVarianceStrength: 0.2,
       zImageShift: 3,

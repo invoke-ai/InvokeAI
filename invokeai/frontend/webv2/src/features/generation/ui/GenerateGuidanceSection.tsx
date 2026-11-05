@@ -4,7 +4,7 @@ import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@fe
 import { Badge, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getKrea2EditLoraState,
-  getMissingReferenceImageFormat,
+  getReferenceImageUnavailableReason,
   isReferenceImageSupported,
 } from '@features/generation/core/baseGenerationPolicies';
 import {
@@ -33,7 +33,7 @@ interface GenerateGuidanceSectionProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
-const selectGuidanceSettings = pickGenerateSettings(['loras', 'referenceImages']);
+const selectGuidanceSettings = pickGenerateSettings(['loras', 'qwen3VLEncoderModel', 'referenceImages']);
 
 export const GenerateGuidanceSection = ({
   draft,
@@ -47,7 +47,7 @@ export const GenerateGuidanceSection = ({
 }: GenerateGuidanceSectionProps) => {
   const { t } = useTranslation();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectGuidanceSettings);
-  const referenceImagesSupported = isReferenceImageSupported(selectedModel);
+  const referenceImagesSupported = isReferenceImageSupported(selectedModel, settings.qwen3VLEncoderModel);
   const referenceImageCount = settings.referenceImages.length;
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
@@ -87,6 +87,7 @@ export const GenerateGuidanceSection = ({
       <Stack gap="2" p="2">
         <GenerateReferenceImagesContent
           models={models}
+          qwen3VLEncoderModel={settings.qwen3VLEncoderModel}
           referenceImages={settings.referenceImages}
           selectedModel={selectedModel}
           onCommit={onReferenceCommit}
@@ -98,7 +99,9 @@ export const GenerateGuidanceSection = ({
             {t('widgets.generate.krea2EditReferencesNeedLora')}
           </Text>
         ) : null}
-        {referenceImagesSupported || referenceImageCount > 0 || getMissingReferenceImageFormat(selectedModel) ? (
+        {referenceImagesSupported ||
+        referenceImageCount > 0 ||
+        getReferenceImageUnavailableReason(selectedModel, settings.qwen3VLEncoderModel) ? (
           <Separator borderColor="bg.subtle" />
         ) : null}
         <GenerateConceptsContent

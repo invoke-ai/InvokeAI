@@ -1131,6 +1131,27 @@ describe('compileGenerateGraph', () => {
       expect(latentImages).toEqual(['a.png', 'b.png']);
     });
 
+    it('wires the references of a single-file model, whose standalone encoder reads them', () => {
+      const checkpoint: MainModelConfig = { ...qwenImage21Model, format: 'checkpoint', key: 'qwen21-int8' };
+      const encoder = {
+        base: 'any',
+        format: 'checkpoint',
+        key: 'qwen3-vl-8b',
+        name: 'Qwen3-VL 8B',
+        type: 'qwen3_vl_encoder',
+        variant: 'qwen3_vl_8b',
+      };
+      const graph = compile(checkpoint, {
+        qwen3VLEncoderModel: encoder,
+        referenceImages: references('a.png', 'b.png'),
+        vae: { base: 'qwen-image-2-1', key: 'qwen21-vae', name: 'Qwen-Image-2.1 VAE', type: 'vae' },
+      });
+
+      expect(graph.nodes.model_loader).toMatchObject({ qwen3_vl_encoder_model: { key: 'qwen3-vl-8b' } });
+      expect(getEdge(graph, 'pos_cond', 'reference_images')).toBeDefined();
+      expect(getEdge(graph, 'denoise_latents', 'reference_latents')).toBeDefined();
+    });
+
     it('applies LoRAs to the transformer through its own collection loader', () => {
       const lora: LoraModelConfig = { base: 'qwen-image-2-1', key: 'qwen21-lora', name: 'A LoRA', type: 'lora' };
       const graph = compile(qwenImage21Model, { loras: [{ isEnabled: true, model: lora, weight: 0.7 }] });

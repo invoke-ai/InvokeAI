@@ -131,6 +131,7 @@ const render = async ({
                 <div data-testid="section">
                   <GenerateReferenceImagesContent
                     models={NO_MODELS}
+                    qwen3VLEncoderModel={null}
                     referenceImages={referenceImages}
                     selectedModel={selectedModel}
                     onCommit={onCommit}

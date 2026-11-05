@@ -352,11 +352,19 @@ describe('image recall', () => {
     expect(result?.fields).toContain('referenceImages');
   });
 
-  // Only the Diffusers pipeline reads Qwen-Image-2.1 references, so the recalled flavor survives there and nowhere else.
-  it('recalls Qwen-Image-2.1 reference images onto a Diffusers model and drops them on a GGUF one', () => {
-    const recall = (model: MainModelConfig) =>
+  // The base decides what recall keeps; an encoder without a vision tower is flagged by validation, never recalled away.
+  it('recalls Qwen-Image-2.1 reference images whichever encoder sits in the slot', () => {
+    const encoder = (format: string) => ({
+      base: 'any',
+      format,
+      key: 'enc',
+      name: 'Qwen3-VL 8B',
+      type: 'qwen3_vl_encoder',
+      variant: 'qwen3_vl_8b',
+    });
+    const recall = (model: MainModelConfig, qwen3VLEncoderModel: ReturnType<typeof encoder> | null = null) =>
       buildImageRecallSettings({
-        currentValues: createValues({ model, modelKey: model.key }),
+        currentValues: createValues({ model, modelKey: model.key, qwen3VLEncoderModel }),
         image,
         kind: 'all',
         metadata: {
@@ -376,10 +384,7 @@ describe('image recall', () => {
         supportedModels: [model],
         vaeModels: [],
       });
-    const diffusers = recall({ base: 'qwen-image-2-1', format: 'diffusers', key: 'q21', name: 'Q21', type: 'main' });
-    const gguf = recall({ base: 'qwen-image-2-1', format: 'gguf_quantized', key: 'q21-q4', name: 'Q4', type: 'main' });
-
-    expect(diffusers?.values.referenceImages).toEqual([
+    const kept = [
       {
         config: {
           image: { original: { image: { height: 640, image_name: 'edit.png', width: 480 } } },
@@ -388,10 +393,28 @@ describe('image recall', () => {
         id: 'edit-1',
         isEnabled: true,
       },
-    ]);
-    expect(diffusers?.fields).toContain('referenceImages');
-    expect(gguf?.values.referenceImages).toEqual([]);
-    expect(gguf?.fields).not.toContain('referenceImages');
+    ];
+    const diffusers: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'diffusers',
+      key: 'q21',
+      name: 'Q21',
+      type: 'main',
+    };
+    const int8: MainModelConfig = {
+      base: 'qwen-image-2-1',
+      format: 'checkpoint',
+      key: 'q21-int8',
+      name: 'Int8',
+      type: 'main',
+    };
+
+    expect(recall(diffusers)?.values.referenceImages).toEqual(kept);
+    expect(recall(diffusers)?.fields).toContain('referenceImages');
+    expect(recall(int8, encoder('checkpoint'))?.values.referenceImages).toEqual(kept);
+    // A stale GGUF encoder left over from another model must not cost the recorded references.
+    expect(recall(diffusers, encoder('gguf_quantized'))?.values.referenceImages).toEqual(kept);
+    expect(recall(int8, null)?.values.referenceImages).toEqual(kept);
   });
 
   it('preserves canonical original and crop provenance from legacy metadata', () => {
