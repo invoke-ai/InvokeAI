@@ -26,6 +26,7 @@ const api = vi.hoisted(() => {
 
 const libraryCache = vi.hoisted(() => ({
   getLibraryWorkflowCached: vi.fn(),
+  getLibraryWorkflowRecordCached: vi.fn(),
   onWorkflowLibraryCacheInvalidated: vi.fn(),
   WorkflowLibraryChangedDuringReadError: class extends Error {},
 }));
@@ -141,6 +142,10 @@ const flushAsyncWork = (): Promise<void> =>
 let account: typeof accountLifecycleModule;
 let browse: typeof libraryBrowseStoreModule;
 let invalidate: () => void;
+const demandEntries = () =>
+  browse.setWorkflowLibraryVisibleDemand(
+    browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id)
+  );
 
 beforeEach(async () => {
   vi.resetModules();
@@ -148,6 +153,9 @@ beforeEach(async () => {
   api.getAllWorkflowTags.mockReset().mockResolvedValue([]);
   api.getWorkflowTagCounts.mockReset().mockResolvedValue({});
   api.listLibraryWorkflows.mockReset().mockResolvedValue(buildPage([]));
+  libraryCache.getLibraryWorkflowRecordCached
+    .mockReset()
+    .mockImplementation((id: string) => Promise.resolve({ workflow_id: id, name: id, revision: 1, workflow: {} }));
   libraryCache.getLibraryWorkflowCached.mockReset().mockResolvedValue(buildRawWorkflow(1));
   libraryCache.onWorkflowLibraryCacheInvalidated.mockReset().mockImplementation((listener: () => void) => {
     invalidate = listener;
@@ -166,6 +174,7 @@ beforeEach(async () => {
 describe('workflow library page fetching', () => {
   it('sends the active category, tag, and search filter to the list endpoint', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'user', page: 0, perPage: 20, query: undefined, tags: undefined })
@@ -174,6 +183,7 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockClear();
     browse.setWorkflowLibraryBrowseFilter({ category: 'default', search: 'upscale', tag: 'lora' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
     });
 
@@ -189,6 +199,7 @@ describe('workflow library page fetching', () => {
       Promise.resolve(buildPage([buildItem(isPublic ? `shared-${page}` : 'yours')], { page, pages: 2, total: 2 }))
     );
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(api.listLibraryWorkflows.mock.calls[0]?.[0]).toMatchObject({ category: 'user', page: 0, perPage: 20 });
     expect(api.listLibraryWorkflows.mock.calls[0]?.[0]).not.toHaveProperty('isPublic');
@@ -199,6 +210,7 @@ describe('workflow library page fetching', () => {
     browse.setWorkflowLibraryBrowseFilter({ category: 'user', isPublic: true, tag: null });
 
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
       expect(api.getWorkflowTagCounts).toHaveBeenCalled();
     });
@@ -241,6 +253,7 @@ describe('workflow library page fetching', () => {
 
   it('ignores a repeated filter patch that changes nothing', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     api.listLibraryWorkflows.mockClear();
 
     browse.setWorkflowLibraryBrowseFilter({ category: 'user', search: '' });
@@ -256,10 +269,12 @@ describe('workflow library page fetching', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(2);
 
     browse.loadNextWorkflowLibraryPage();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
     });
 
@@ -282,6 +297,7 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a'), buildItem('b')], { pages: 3, total: 6 }));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     browse.setWorkflowLibraryBrowseFilter({ tag: 'lora' });
 
     const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
@@ -291,6 +307,7 @@ describe('workflow library page fetching', () => {
 
   it('drops a stale in-flight page when the filter changes mid-flight', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     const stale = createDeferred<WorkflowLibraryPage>();
     api.listLibraryWorkflows.mockReturnValueOnce(stale.promise);
@@ -299,6 +316,7 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('fresh')]));
     browse.setWorkflowLibraryBrowseFilter({ search: 'fresh' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
     });
 
@@ -315,6 +333,7 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockRejectedValue(new Error('backend down'));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
     expect(snapshot.status).toBe('error');
@@ -325,6 +344,7 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a', { tags: ' lora , , sdxl ' })]));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.tags).toEqual(['lora', 'sdxl']);
   });
@@ -343,6 +363,7 @@ describe('workflow library sort', () => {
 
   it('refetches page 0 in a new sort, and returns to an earlier sort from the cache', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     api.listLibraryWorkflows.mockClear();
 
     browse.setWorkflowLibraryBrowseFilter({ sort: 'name' });
@@ -402,10 +423,12 @@ describe('workflow library sort', () => {
 
   it('keeps views in other orders when a workflow is opened', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     api.listLibraryWorkflows.mockClear();
 
     api.notifyOpened();
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await flushAsyncWork();
 
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
@@ -433,6 +456,7 @@ describe('workflow library tag counts', () => {
     api.getWorkflowTagCounts.mockResolvedValue({ lora: 2, sdxl: 5, unused: 0 });
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(api.getAllWorkflowTags).toHaveBeenCalledWith(expect.objectContaining({ categories: ['user'] }));
     expect(api.getWorkflowTagCounts).toHaveBeenCalledWith(
@@ -446,16 +470,19 @@ describe('workflow library tag counts', () => {
 
   it('refetches counts for the new category and not for a search-only change', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     api.getAllWorkflowTags.mockClear();
 
     browse.setWorkflowLibraryBrowseFilter({ search: 'cat' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().filter.search).toBe('cat');
     });
     expect(api.getAllWorkflowTags).not.toHaveBeenCalled();
 
     browse.setWorkflowLibraryBrowseFilter({ category: 'default' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(api.getAllWorkflowTags).toHaveBeenCalledWith(expect.objectContaining({ categories: ['default'] }));
     });
   });
@@ -467,7 +494,9 @@ describe('workflow library entry enrichment', () => {
     libraryCache.getLibraryWorkflowCached.mockResolvedValue(buildRawWorkflow(2));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready');
     });
 
@@ -485,7 +514,9 @@ describe('workflow library entry enrichment', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[1]?.enrichment.status).toBe('ready');
     });
 
@@ -499,7 +530,9 @@ describe('workflow library entry enrichment', () => {
     libraryCache.getLibraryWorkflowCached.mockResolvedValue('not a workflow');
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('error');
     });
   });
@@ -518,7 +551,9 @@ describe('workflow library entry enrichment', () => {
     });
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(deferrals.size).toBe(4);
     });
 
@@ -532,6 +567,7 @@ describe('workflow library entry enrichment', () => {
     }
 
     await vi.waitFor(() => {
+      demandEntries();
       expect(deferrals.size).toBe(6);
     });
   });
@@ -547,7 +583,9 @@ describe('workflow library entry enrichment', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(
         browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'error')
       ).toBe(true);
@@ -567,7 +605,9 @@ describe('workflow library entry enrichment', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a')]));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('error');
     });
 
@@ -579,6 +619,7 @@ describe('workflow library entry enrichment', () => {
 
     await browse.refreshWorkflowLibraryBrowse();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready');
     });
   });
@@ -589,11 +630,14 @@ describe('workflow library entry enrichment', () => {
     libraryCache.getLibraryWorkflowCached.mockReturnValueOnce(stalled.promise);
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(1));
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('kept')]));
     libraryCache.getLibraryWorkflowCached.mockResolvedValue(buildRawWorkflow(3));
     browse.setWorkflowLibraryBrowseFilter({ search: 'kept' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready');
     });
 
@@ -614,7 +658,9 @@ describe('workflow library entry enrichment', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready');
     });
 
@@ -622,6 +668,7 @@ describe('workflow library entry enrichment', () => {
 
     slow.resolve(buildRawWorkflow(1));
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[1]?.enrichment.status).toBe('ready');
     });
 
@@ -634,6 +681,7 @@ describe('workflow library browse refresh', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a')]));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     api.listLibraryWorkflows.mockClear();
 
     invalidate();
@@ -641,6 +689,7 @@ describe('workflow library browse refresh', () => {
     invalidate();
 
     await vi.waitFor(() => {
+      demandEntries();
       expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(1);
     });
     await flushAsyncWork();
@@ -654,8 +703,10 @@ describe('workflow library browse refresh', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     browse.setWorkflowLibraryBrowseFilter({ category: 'user', isPublic: true, tag: null });
     await vi.waitFor(() => {
+      demandEntries();
       const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
       expect(snapshot.status).toBe('loaded');
       expect(snapshot.entries.map((entry) => entry.item.workflow_id)).toEqual(['shared']);
@@ -665,6 +716,7 @@ describe('workflow library browse refresh', () => {
     invalidate();
 
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({
         entries: [],
         filter: { category: 'user', isPublic: true },
@@ -783,11 +835,18 @@ describe('workflow library browse refresh', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     browse.loadNextWorkflowLibraryPage();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(2);
     });
 
+    await vi.waitFor(() =>
+      expect(
+        browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'ready')
+      ).toBe(true)
+    );
     const before = browse.getWorkflowLibraryBrowseSnapshot().entries;
     api.listLibraryWorkflows.mockClear();
 
@@ -806,7 +865,9 @@ describe('workflow library browse refresh', () => {
     libraryCache.getLibraryWorkflowCached.mockResolvedValue(buildRawWorkflow(1));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment).toMatchObject({ nodeCount: 1 });
     });
 
@@ -815,6 +876,7 @@ describe('workflow library browse refresh', () => {
 
     await browse.refreshWorkflowLibraryBrowse();
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment).toMatchObject({ nodeCount: 5 });
     });
   });
@@ -825,8 +887,10 @@ describe('workflow library browse account ownership', () => {
     api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('a')], { total: 3 }));
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     browse.setWorkflowLibraryBrowseFilter({ category: 'default', search: 'cat', tag: 'lora' });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(1);
     });
 
@@ -847,6 +911,7 @@ describe('workflow library browse account ownership', () => {
 
   it('drops an in-flight shared page when the account switches', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     const stale = createDeferred<WorkflowLibraryPage>();
     api.listLibraryWorkflows.mockReturnValueOnce(stale.promise);
@@ -871,6 +936,7 @@ describe('workflow library user total probe', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'user', page: 0, perPage: 1 })
@@ -880,7 +946,9 @@ describe('workflow library user total probe', () => {
 
   it('probes only once across repeated ensure calls', async () => {
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
 
     expect(api.listLibraryWorkflows.mock.calls.filter(([params]) => params.perPage === 1)).toHaveLength(1);
   });
@@ -892,12 +960,15 @@ describe('workflow library view cache', () => {
     api.listLibraryWorkflows.mockImplementation(({ category }: { category: string }) =>
       Promise.resolve(buildPage(items[category] ?? []))
     );
-  const allEnriched = () =>
-    browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'ready');
+  const allEnriched = () => {
+    demandEntries();
+    return browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'ready');
+  };
 
   const browseYoursThenBrowse = async () => {
     listByCategory({ default: [buildItem('x', { category: 'default' })], user: userItems });
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() => expect(allEnriched()).toBe(true));
     const yours = browse.getWorkflowLibraryBrowseSnapshot().entries;
 
@@ -916,7 +987,7 @@ describe('workflow library view cache', () => {
     const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
 
     expect(snapshot.status).toBe('loaded');
-    expect(snapshot.entries).toBe(yours);
+    expect(snapshot.entries.map((entry) => entry.item)).toEqual(yours.map((entry) => entry.item));
     await flushAsyncWork();
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
     expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
@@ -934,6 +1005,7 @@ describe('workflow library view cache', () => {
     );
 
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    demandEntries();
     await vi.waitFor(() =>
       expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 1, tag: 'yours-tag' }])
     );
@@ -941,6 +1013,7 @@ describe('workflow library view cache', () => {
 
     browse.setWorkflowLibraryBrowseFilter({ isPublic: true });
     await vi.waitFor(() => {
+      demandEntries();
       expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('shared');
       expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 2, tag: 'shared-tag' }]);
     });
@@ -948,17 +1021,21 @@ describe('workflow library view cache', () => {
 
     api.listLibraryWorkflows.mockClear();
     browse.setWorkflowLibraryBrowseFilter({ isPublic: undefined });
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(yours);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item)).toEqual(
+      yours.map((entry) => entry.item)
+    );
     expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 1, tag: 'yours-tag' }]);
 
     browse.setWorkflowLibraryBrowseFilter({ isPublic: true });
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(shared);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item)).toEqual(
+      shared.map((entry) => entry.item)
+    );
     expect(browse.getWorkflowLibraryBrowseSnapshot().tagCounts).toEqual([{ count: 2, tag: 'shared-tag' }]);
     await flushAsyncWork();
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
   });
 
-  it('keeps a stale view on screen while it revalidates, then merges without re-reading unchanged rows', async () => {
+  it('keeps stale metadata on screen while it revalidates and waits for renewed detail demand', async () => {
     const yours = await browseYoursThenBrowse();
     const later = Date.now() + 60_000;
     const now = vi.spyOn(Date, 'now').mockReturnValue(later);
@@ -968,16 +1045,20 @@ describe('workflow library view cache', () => {
     browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
 
     // The cached rows stay up while the refresh is in flight.
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(yours);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item)).toEqual(
+      yours.map((entry) => entry.item)
+    );
     await vi.waitFor(() => expect(api.listLibraryWorkflows).toHaveBeenCalled());
 
     refreshed.resolve(buildPage([...userItems, buildItem('c')]));
     await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(3));
 
     const entries = browse.getWorkflowLibraryBrowseSnapshot().entries;
-    expect(entries[0]).toBe(yours[0]);
-    expect(entries[1]).toBe(yours[1]);
-    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(1));
+    expect(entries[0]?.item).toEqual(yours[0]?.item);
+    expect(entries[1]?.item).toEqual(yours[1]?.item);
+    expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
+    demandEntries();
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(3));
     expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledWith('c', expect.anything());
     now.mockRestore();
   });
@@ -1012,4 +1093,378 @@ describe('workflow library view cache', () => {
       expect(api.listLibraryWorkflows).toHaveBeenCalledWith(expect.objectContaining({ category: 'user' }))
     );
   });
+});
+
+describe('large library retention fixture', () => {
+  const seedLargeLibrary = () => {
+    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) =>
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: perPage }, (_, index) => buildItem(`large-${page * perPage + index}`)),
+          { page, pages: Math.ceil(1000 / perPage), total: 1000 }
+        )
+      )
+    );
+    libraryCache.getLibraryWorkflowCached.mockResolvedValue(buildRawWorkflow(40));
+  };
+
+  it('bounds retention and reads only demanded workflows across 1,000 results', async () => {
+    seedLargeLibrary();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
+    browse.setWorkflowLibrarySelectedDemand('large-0');
+    for (let page = 0; page < 50; page += 1) {
+      await browse.loadWorkflowLibraryRange(page * 20, page * 20 + 5);
+      const ids = Array.from({ length: 6 }, (_, index) => `large-${page * 20 + index}`);
+      browse.setWorkflowLibraryVisibleDemand(ids);
+      await vi.waitFor(() =>
+        expect(
+          ids.every(
+            (id) =>
+              browse.getWorkflowLibraryBrowseSnapshot().entries.find((entry) => entry.item.workflow_id === id)
+                ?.enrichment.status === 'ready'
+          )
+        ).toBe(true)
+      );
+      expect(browse.getWorkflowLibraryBrowseSnapshot().entries.length).toBeLessThanOrEqual(60);
+      expect(
+        browse.getWorkflowLibraryBrowseSnapshot().entries.filter((entry) => entry.enrichment.status === 'ready').length
+      ).toBeLessThanOrEqual(7);
+    }
+    expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(300);
+    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(53);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item.workflow_id).toBe('large-0');
+    await browse.loadWorkflowLibraryRange(0, 5);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('large-0');
+    expect(browse.getWorkflowLibraryBrowseSnapshot().total).toBe(1000);
+    browse.setWorkflowLibraryVisibleDemand([]);
+    browse.setWorkflowLibrarySelectedDemand(null);
+    expect(
+      browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'pending')
+    ).toBe(true);
+  });
+
+  it('reaches a stable bound across repeated cached views and restores return-scroll', async () => {
+    seedLargeLibrary();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    for (let view = 0; view < 20; view += 1) {
+      browse.setWorkflowLibraryBrowseFilter({ search: `view-${view}` });
+      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+      await browse.loadWorkflowLibraryRange(400, 405);
+      browse.rememberWorkflowLibraryScroll(browse.getWorkflowLibraryBrowseSnapshot().filter, {
+        index: 400,
+        fraction: view / 20,
+      });
+      browse.setWorkflowLibraryVisibleDemand(['large-400']);
+      await vi.waitFor(() =>
+        expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('ready')
+      );
+      const retained = browse.getWorkflowLibraryBrowseRetention();
+      expect(retained.cachedViews).toBeLessThanOrEqual(8);
+      expect(retained.metadataEntries).toBeLessThanOrEqual(540);
+      expect(retained.parsedDocuments).toBe(1);
+    }
+    browse.setWorkflowLibraryBrowseFilter({ search: 'view-18' });
+    expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({
+      startIndex: 400,
+      scrollAnchor: { index: 400, fraction: 0.9 },
+      total: 1000,
+    });
+    expect(browse.getWorkflowLibraryBrowseRetention().parsedDocuments).toBe(0);
+  });
+
+  it('rejects scroll measurements from a leaving view', async () => {
+    seedLargeLibrary();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    const leavingFilter = browse.getWorkflowLibraryBrowseSnapshot().filter;
+    browse.rememberWorkflowLibraryScroll(leavingFilter, { index: 400, fraction: 0.75 });
+    browse.setWorkflowLibraryBrowseFilter({ search: 'another view' });
+    browse.rememberWorkflowLibraryScroll(leavingFilter, { index: 0, fraction: 0 });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().scrollAnchor).toBeNull();
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+    browse.setWorkflowLibraryBrowseFilter({ search: '' });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().scrollAnchor).toEqual({ index: 400, fraction: 0.75 });
+  });
+
+  it('gives selected detail priority over waiting visible work', async () => {
+    seedLargeLibrary();
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibrarySelectedDemand('large-19');
+    browse.setWorkflowLibraryVisibleDemand(['large-0', 'large-1', 'large-2', 'large-3', 'large-4']);
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalled());
+    expect(libraryCache.getLibraryWorkflowCached.mock.calls[0]?.[0]).toBe('large-19');
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseRetention().activeReads).toBe(0));
+    expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(6);
+  });
+
+  it('aborts obsolete demand and fences late reads of the same revision', async () => {
+    seedLargeLibrary();
+    const slow = createDeferred<Record<string, unknown>>();
+    libraryCache.getLibraryWorkflowCached.mockReturnValue(slow.promise);
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibraryVisibleDemand(['large-0']);
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(1));
+    const signal = libraryCache.getLibraryWorkflowCached.mock.calls[0]?.[1].signal as AbortSignal;
+    browse.setWorkflowLibraryVisibleDemand([]);
+    expect(signal.aborted).toBe(true);
+    slow.resolve(buildRawWorkflow(40));
+    await flushAsyncWork();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.enrichment.status).toBe('pending');
+  });
+});
+
+describe('review regressions', () => {
+  const seed = async () => {
+    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) =>
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: perPage }, (_, i) => buildItem(`wf-${page * perPage + i}`)),
+          { page, pages: 50, total: 1000 }
+        )
+      )
+    );
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibrarySelectedDemand('wf-0');
+    await browse.loadWorkflowLibraryRange(400, 410);
+  };
+  it('keeps and independently updates an off-window selection on unrelated invalidation, without retaining raw payload in metadata', async () => {
+    await seed();
+    libraryCache.getLibraryWorkflowRecordCached.mockResolvedValue({
+      workflow_id: 'wf-0',
+      name: 'Updated selection',
+      revision: 2,
+      workflow: { description: 'new', nodes: Array(40).fill({}) },
+    });
+    invalidate();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item.workflow_id).toBe('wf-0');
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item.name).toBe('Updated selection')
+    );
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item).not.toHaveProperty('workflow');
+    expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(400);
+  });
+  it('keeps fresh resident metadata and its document when an older selected read finishes last', async () => {
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0')]));
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibrarySelectedDemand('wf-0');
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.enrichment.status).toBe('ready')
+    );
+    const selectedRead = createDeferred<{
+      workflow_id: string;
+      name: string;
+      revision: number;
+      workflow: Record<string, unknown>;
+    }>();
+    const residentRead = createDeferred<WorkflowLibraryPage>();
+    libraryCache.getLibraryWorkflowRecordCached.mockReturnValueOnce(selectedRead.promise);
+    libraryCache.getLibraryWorkflowCached.mockImplementation((_id, { expectedRevision }) =>
+      Promise.resolve({ ...buildRawWorkflow(expectedRevision), name: `Document revision ${expectedRevision}` })
+    );
+    api.listLibraryWorkflows.mockReturnValueOnce(residentRead.promise);
+    const refresh = browse.refreshWorkflowLibraryBrowse();
+    residentRead.resolve(buildPage([buildItem('wf-0', { revision: 2, name: 'Fresh listing' })]));
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2));
+    selectedRead.resolve({
+      workflow_id: 'wf-0',
+      revision: 1,
+      name: 'Old selected read',
+      workflow: buildRawWorkflow(1),
+    });
+    await refresh;
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.enrichment.status).toBe('ready')
+    );
+    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+    expect(snapshot.selectedEntry?.item).toMatchObject({ revision: 2, name: 'Fresh listing' });
+    expect(snapshot.selectedEntry?.item).not.toHaveProperty('workflow');
+    for (const entry of [snapshot.selectedEntry, snapshot.entries[0]]) {
+      expect(entry?.enrichment).toMatchObject({
+        status: 'ready',
+        nodeCount: 2,
+        document: { name: 'Document revision 2' },
+      });
+    }
+  });
+
+  it('keeps fresh resident metadata when the concurrent selected read fails transiently', async () => {
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0')]));
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibrarySelectedDemand('wf-0');
+    const selectedRead = createDeferred<never>();
+    libraryCache.getLibraryWorkflowRecordCached.mockReturnValueOnce(selectedRead.promise);
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0', { revision: 2, name: 'Fresh listing' })]));
+    const refresh = browse.refreshWorkflowLibraryBrowse();
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.revision).toBe(2));
+    selectedRead.reject(new Error('temporarily offline'));
+    await refresh;
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry).toMatchObject({
+      item: { revision: 2, name: 'Fresh listing' },
+      enrichment: { status: 'error', message: 'temporarily offline' },
+    });
+  });
+
+  it('retains a newer selected revision when an older resident listing arrives later', async () => {
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0')]));
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    browse.setWorkflowLibrarySelectedDemand('wf-0');
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.enrichment.status).toBe('ready')
+    );
+    const residentRead = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(residentRead.promise);
+    libraryCache.getLibraryWorkflowRecordCached.mockResolvedValueOnce({
+      workflow_id: 'wf-0',
+      revision: 2,
+      name: 'Fresh selection',
+      workflow: buildRawWorkflow(2),
+    });
+    libraryCache.getLibraryWorkflowCached.mockImplementation((_id, { expectedRevision }) =>
+      Promise.resolve({ ...buildRawWorkflow(expectedRevision), name: `Document revision ${expectedRevision}` })
+    );
+    const refresh = browse.refreshWorkflowLibraryBrowse();
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item.revision).toBe(2));
+    residentRead.resolve(buildPage([buildItem('wf-0')]));
+    await refresh;
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.enrichment.status).toBe('ready')
+    );
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry).toMatchObject({
+      item: { revision: 2, name: 'Fresh selection' },
+      enrichment: { status: 'ready', nodeCount: 2, document: { name: 'Document revision 2' } },
+    });
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]).toMatchObject({
+      item: { revision: 1 },
+      enrichment: { status: 'ready', nodeCount: 1, document: { name: 'Raw workflow' } },
+    });
+  });
+
+  it('discards old selected enrichment when resident metadata advances during the read', async () => {
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0')]));
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    const oldDocument = createDeferred<Record<string, unknown>>();
+    libraryCache.getLibraryWorkflowCached.mockReturnValueOnce(oldDocument.promise).mockResolvedValue({
+      ...buildRawWorkflow(2),
+      name: 'Fresh document',
+    });
+    browse.setWorkflowLibrarySelectedDemand('wf-0');
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(1));
+    api.listLibraryWorkflows.mockResolvedValue(buildPage([buildItem('wf-0', { revision: 2, name: 'Fresh listing' })]));
+    await browse.loadWorkflowLibraryRange(0, 0, true);
+    oldDocument.resolve({ ...buildRawWorkflow(1), name: 'Obsolete document' });
+    await vi.waitFor(() =>
+      expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.enrichment.status).toBe('ready')
+    );
+    for (const entry of [
+      browse.getWorkflowLibraryBrowseSnapshot().selectedEntry,
+      browse.getWorkflowLibraryBrowseSnapshot().entries[0],
+    ]) {
+      expect(entry).toMatchObject({
+        item: { revision: 2, name: 'Fresh listing' },
+        enrichment: { status: 'ready', nodeCount: 2, document: { name: 'Fresh document' } },
+      });
+    }
+  });
+
+  it.each([403, 404, 500])('clears a selected pin only for confirmed access loss/removal (%s)', async (status) => {
+    await seed();
+    const { ApiError } = await import('@platform/transport/http');
+    libraryCache.getLibraryWorkflowRecordCached.mockRejectedValue(new ApiError('unavailable', status));
+    invalidate();
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowRecordCached).toHaveBeenCalled());
+    await flushAsyncWork();
+    const selected = browse.getWorkflowLibraryBrowseSnapshot().selectedEntry;
+    if (status === 500) {
+      expect(selected?.item.workflow_id).toBe('wf-0');
+      expect(selected?.enrichment.status).toBe('error');
+    } else {
+      expect(selected).toBeNull();
+    }
+  });
+  it('keeps independent selected revalidation inside the detail concurrency bound', async () => {
+    await seed();
+    let release!: (value: unknown) => void;
+    libraryCache.getLibraryWorkflowRecordCached.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    libraryCache.getLibraryWorkflowCached.mockImplementation(() => new Promise(() => {}));
+    invalidate();
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowRecordCached).toHaveBeenCalled());
+    browse.setWorkflowLibraryVisibleDemand(['wf-400', 'wf-401', 'wf-402', 'wf-403', 'wf-404']);
+    expect(browse.getWorkflowLibraryBrowseRetention().activeReads).toBe(4);
+    release({ workflow_id: 'wf-0', name: 'selected', revision: 2, workflow: {} });
+    await flushAsyncWork();
+    expect(browse.getWorkflowLibraryBrowseRetention().activeReads).toBeLessThanOrEqual(4);
+  });
+  it.each(['filter', 'account'])('fences independent selection reads after a %s change', async (change) => {
+    await seed();
+    let release!: (value: unknown) => void;
+    libraryCache.getLibraryWorkflowRecordCached.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        })
+    );
+    invalidate();
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowRecordCached).toHaveBeenCalled());
+    if (change === 'filter') {
+      browse.setWorkflowLibraryBrowseFilter({ search: 'other' });
+    } else {
+      account.accountLifecycle.invalidate();
+    }
+    expect(libraryCache.getLibraryWorkflowRecordCached.mock.calls.at(-1)?.[1].signal.aborted).toBe(true);
+    release({ workflow_id: 'wf-0', name: 'obsolete', revision: 99, workflow: {} });
+    await flushAsyncWork();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry).toBeNull();
+  });
+  it('coalesces range waiters and distinguishes supersession from readiness', async () => {
+    await seed();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const list = api.listLibraryWorkflows.getMockImplementation()!;
+    api.listLibraryWorkflows.mockImplementation(async (params) => {
+      await gate;
+      return list(params);
+    });
+    const first = browse.loadWorkflowLibraryRange(100, 105);
+    const joined = browse.loadWorkflowLibraryRange(100, 105);
+    expect(joined).toBe(first);
+    const newer = browse.loadWorkflowLibraryRange(200, 205);
+    release();
+    expect(await first).toBe(false);
+    expect(await newer).toBe(true);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(200);
+  });
+  it('explicit retry revalidates resident entries after failed refresh', async () => {
+    await seed();
+    api.listLibraryWorkflows.mockRejectedValueOnce(new Error('offline'));
+    await browse.refreshWorkflowLibraryBrowse();
+    expect(browse.getWorkflowLibraryBrowseSnapshot().error).not.toBeNull();
+    const before = api.listLibraryWorkflows.mock.calls.length;
+    expect(await browse.loadWorkflowLibraryRange(400, 410, true)).toBe(true);
+    expect(api.listLibraryWorkflows.mock.calls.length).toBe(before + 3);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBeNull();
+  });
+});
+
+it('selects matching snapshot entries by revision with selected errors authoritative on ties', () => {
+  const resident: libraryBrowseStoreModule.WorkflowLibraryEntry = {
+    item: buildItem('wf-0'),
+    tags: [],
+    enrichment: { status: 'pending' },
+  };
+  const selected: libraryBrowseStoreModule.WorkflowLibraryEntry = {
+    ...resident,
+    enrichment: { status: 'error', message: 'record offline' },
+  };
+  expect(browse.selectWorkflowLibraryEntry({ entries: [resident], selectedEntry: selected }, 'wf-0')).toBe(selected);
+  const newer = { ...resident, item: buildItem('wf-0', { revision: 2 }) };
+  expect(browse.selectWorkflowLibraryEntry({ entries: [newer], selectedEntry: selected }, 'wf-0')).toBe(newer);
+  expect(browse.selectWorkflowLibraryEntry({ entries: [resident], selectedEntry: selected }, 'other')).toBeUndefined();
+  expect(browse.selectWorkflowLibraryEntry({ entries: [resident], selectedEntry: selected }, null)).toBeUndefined();
 });

@@ -55,6 +55,26 @@ import { WORKFLOW_THUMBNAIL_ASPECT_RATIO, WorkflowThumbnailImage } from './workf
  */
 
 const DETAIL_RAIL_WIDTH = '18rem';
+const COLUMNS_CSS = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    flexDirection: 'column',
+  },
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+  },
+} as const;
+const DETAIL_RAIL_CSS = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    width: '100%',
+  },
+  '@container workflow-library-content (width < 42rem) and (height >= 32rem)': {
+    flexBasis: '45%',
+  },
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+    height: '20rem',
+  },
+} as const;
 
 export interface ProjectWorkflowsViewProps {
   contextMenuPoint: WorkflowCardMenuAnchor | null;
@@ -155,7 +175,7 @@ export const ProjectWorkflowsView = ({
             </Button>
           </HStack>
         </HStack>
-        <HStack align="stretch" flex="1" gap="3" minH="0" minW="0">
+        <HStack css={COLUMNS_CSS} align="stretch" flex="1" gap="3" minH="0" minW="0">
           <WorkflowLibraryGrid
             activeWorkflowId={activeWorkflowId}
             entries={entries}
@@ -315,7 +335,15 @@ const ProjectWorkflowDetailPanel = ({
 
   if (!entry || !libraryEntry) {
     return (
-      <Box borderColor="border.subtle" borderWidth="1px" flexShrink={0} minH="0" rounded="md" w={DETAIL_RAIL_WIDTH} />
+      <Box
+        css={DETAIL_RAIL_CSS}
+        borderColor="border.subtle"
+        borderWidth="1px"
+        flexShrink={0}
+        minH="0"
+        rounded="md"
+        w={DETAIL_RAIL_WIDTH}
+      />
     );
   }
 
@@ -381,6 +409,7 @@ const ProjectWorkflowDetailPanel = ({
     <Stack
       borderColor="border.subtle"
       borderWidth="1px"
+      css={DETAIL_RAIL_CSS}
       data-project-workflow-detail={workflowId}
       flexShrink={0}
       gap="0"
@@ -422,7 +451,7 @@ const ProjectWorkflowDetailPanel = ({
           </HStack>
 
           {entry.document.description ? (
-            <Text color="fg.muted" fontSize="xs" lineClamp={4}>
+            <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
               {entry.document.description}
             </Text>
           ) : null}

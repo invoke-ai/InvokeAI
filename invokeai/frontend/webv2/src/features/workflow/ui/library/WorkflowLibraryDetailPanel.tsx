@@ -61,6 +61,18 @@ import {
 /** Install missing models before offering Open; keep the detail rail mounted across selections to prevent flashing. */
 
 const DETAIL_RAIL_WIDTH = '18rem';
+const DETAIL_RAIL_CSS = {
+  '@container workflow-library-content (width < 42rem) and ((height >= 32rem) or (width < 32rem))': {
+    width: '100%',
+  },
+  '@container workflow-library-content (width < 42rem) and (height >= 32rem)': {
+    flexBasis: '45%',
+  },
+  '@container workflow-library-content ((width < 32rem) and (height < 32rem)) or (height < 20rem)': {
+    flex: '0 0 auto',
+    height: '20rem',
+  },
+} as const;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 
 type VisibilityState =
@@ -628,6 +640,7 @@ export const WorkflowLibraryDetailPanel = ({
         <Stack
           borderColor="border.subtle"
           borderWidth="1px"
+          css={DETAIL_RAIL_CSS}
           data-workflow-detail={item.workflow_id}
           flexShrink={0}
           gap="0"
@@ -712,7 +725,7 @@ export const WorkflowLibraryDetailPanel = ({
               ) : null}
 
               {item.description ? (
-                <Text color="fg.muted" fontSize="xs" lineClamp={4}>
+                <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
                   {item.description}
                 </Text>
               ) : null}
@@ -812,7 +825,15 @@ export const WorkflowLibraryDetailPanel = ({
           />
         </Stack>
       ) : (
-        <Box borderColor="border.subtle" borderWidth="1px" flexShrink={0} minH="0" rounded="md" w={DETAIL_RAIL_WIDTH} />
+        <Box
+          css={DETAIL_RAIL_CSS}
+          borderColor="border.subtle"
+          borderWidth="1px"
+          flexShrink={0}
+          minH="0"
+          rounded="md"
+          w={DETAIL_RAIL_WIDTH}
+        />
       )}
       {/* Outside the rail: a delete empties or retargets it while this dialog animates out. */}
       <ConfirmDialog
