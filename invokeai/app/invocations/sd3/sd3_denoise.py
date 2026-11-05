@@ -22,6 +22,7 @@ from invokeai.app.invocations.latent_noise import validate_noise_tensor_shape
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import TransformerField
@@ -102,6 +103,15 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["seed"] = self.seed
         elif self.latents and self.latents.seed is not None:
             updates["seed"] = self.latents.seed
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

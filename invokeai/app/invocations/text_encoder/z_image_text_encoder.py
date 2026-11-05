@@ -9,6 +9,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
     ZImageConditioningField,
@@ -63,8 +64,20 @@ class ZImageTextEncoderInvocation(BaseInvocation):
         prompt_embeds = prompt_embeds.detach().to("cpu")
         conditioning_data = ConditioningFieldData(conditionings=[ZImageConditioningInfo(prompt_embeds=prompt_embeds)])
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.qwen3_encoder.loras]
+            if self.qwen3_encoder.loras
+            else None
+        )
         return ZImageConditioningOutput(
-            conditioning=ZImageConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=ZImageConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_encoder=getattr(self.qwen3_encoder, "text_encoder", None),
+                qwen3_source=getattr(self, "qwen3_source", None),
+                loras=loras,
+            )
         )
 
     def _encode_prompt(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:

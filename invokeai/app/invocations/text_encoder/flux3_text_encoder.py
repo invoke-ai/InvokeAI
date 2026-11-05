@@ -3,7 +3,14 @@ from contextlib import ExitStack
 import torch
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, Classification, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField, UIComponent
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Flux3ConditioningField,
+    Input,
+    InputField,
+    LoRAMetadataField,
+    UIComponent,
+)
 from invokeai.app.invocations.model import Qwen3VLEncoderField
 from invokeai.app.invocations.primitives import Flux3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -63,4 +70,16 @@ class Flux3TextEncoderInvocation(BaseInvocation):
             conditionings=[Flux3ConditioningInfo(prompt_embeds=prompt_embeds.detach().to("cpu"))]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return Flux3ConditioningOutput.build(conditioning_name)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.qwen3_vl_encoder.loras]
+            if self.qwen3_vl_encoder.loras
+            else None
+        )
+        return Flux3ConditioningOutput(
+            conditioning=Flux3ConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                qwen3_vl_encoder=getattr(self.qwen3_vl_encoder, "text_encoder", None),
+                loras=loras,
+            )
+        )

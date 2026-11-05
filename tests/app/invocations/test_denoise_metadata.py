@@ -32,6 +32,7 @@ from invokeai.app.invocations.metadata import (
     MetadataItemField,
     MetadataOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_adapter_metadata,
     serialize_ip_adapter_ref_images,
     serialize_lora_metadata,
@@ -51,6 +52,7 @@ from invokeai.app.invocations.metadata_linked import (
     FluxDenoiseLatentsMetaInvocation,
     MetadataToControlnetsInvocation,
     MetadataToIPAdaptersInvocation,
+    MetadataToStringCollectionInvocation,
     MetadataToT2IAdaptersInvocation,
     ZImageDenoiseMetaInvocation,
 )
@@ -1869,3 +1871,250 @@ def test_metadata_item_linked_unwraps_submodel_fields_and_does_not_mutate_input(
     assert none_out.metadata.root["positive_prompt"] == "astronaut"
     assert none_out.metadata.root["qwen3_encoder"]["key"] == "qwen3-vl-key"
     assert "qwen3_5_encoder" not in none_out.metadata.root
+
+
+def test_extract_conditioning_metadata() -> None:
+    enc_id = _make_model_id(key="enc-1", base=BaseModelType.Any)
+    lora_id = _make_model_id(key="lora-cond-1", base=BaseModelType.Any, model_type=ModelType.LoRA)
+
+    # 1. Single positive and negative prompts
+    pos_single = SimpleNamespace(
+        prompt="a golden retriever", style_prompt="cyberpunk", skipped_layers=1, aesthetic_score=6.5
+    )
+    neg_single = SimpleNamespace(prompt="blurry, low quality", style_prompt="worst quality", aesthetic_score=2.0)
+    res = extract_conditioning_metadata(pos_single, neg_single)
+    assert res["positive_prompt"] == "a golden retriever"
+    assert res["positive_style_prompt"] == "cyberpunk"
+    assert res["clip_skip"] == 1
+    assert res["positive_aesthetic_score"] == 6.5
+    assert res["negative_prompt"] == "blurry, low quality"
+    assert res["negative_style_prompt"] == "worst quality"
+    assert res["negative_aesthetic_score"] == 2.0
+    assert "regions" not in res
+    assert "positive_prompts" not in res
+    assert "negative_prompts" not in res
+
+    # 2. Multi-prompt with regional masks and unmasked base prompt
+    pos_multi = [
+        SimpleNamespace(prompt="red sports car", mask=SimpleNamespace(tensor_name="mask1")),
+        SimpleNamespace(prompt="lush mountain backdrop", mask=None),
+        SimpleNamespace(prompt="clear blue sky", mask=SimpleNamespace(tensor_name="mask2")),
+    ]
+    neg_multi = [
+        SimpleNamespace(prompt="lowres"),
+        SimpleNamespace(prompt="overexposed"),
+    ]
+    res_multi = extract_conditioning_metadata(pos_multi, neg_multi)
+    assert res_multi["positive_prompt"] == "lush mountain backdrop"
+    assert res_multi["positive_prompts"] == ["red sports car", "lush mountain backdrop", "clear blue sky"]
+    assert len(res_multi["regions"]) == 3
+    assert res_multi["regions"][0]["positive_prompt"] == "red sports car"
+    assert res_multi["negative_prompt"] == "lowres"
+    assert res_multi["negative_prompts"] == ["lowres", "overexposed"]
+
+    # 3. All masked items fallback to pos_list[0].prompt
+    pos_all_masked = [
+        SimpleNamespace(prompt="masked one", mask=SimpleNamespace(tensor_name="m1")),
+        SimpleNamespace(prompt="masked two", mask=SimpleNamespace(tensor_name="m2")),
+    ]
+    res_all_masked = extract_conditioning_metadata(pos_all_masked)
+    assert res_all_masked["positive_prompt"] == "masked one"
+    assert res_all_masked["positive_prompts"] == ["masked one", "masked two"]
+
+    # 4. Standalone submodel attributes and modifier parameters
+    pos_special = SimpleNamespace(
+        prompt="special test",
+        t5_encoder=enc_id,
+        qwen3_vl_encoder=enc_id,
+        loras=[LoRAField(lora=lora_id, weight=0.75)],
+        rebalance_enabled=True,
+        rebalance_multiplier=1.2,
+        rebalance_weights=["high:1.5"],
+        seed_variance_enabled=True,
+        seed_variance_strength=0.8,
+        seed_variance_randomize_percent=25,
+        color_palette="pastel",
+        quantization="int8",
+        flux3_caption="detailed flux3 caption",
+        layout_prompt="moss layout json",
+    )
+    res_special = extract_conditioning_metadata(pos_special)
+    assert res_special["positive_prompt"] == "special test"
+    assert res_special["t5_encoder"] == enc_id
+    assert res_special["qwen3_vl_encoder"] == enc_id
+    assert len(res_special["loras"]) == 1
+    assert res_special["loras"][0]["model"]["key"] == "lora-cond-1"
+    assert res_special["loras"][0]["weight"] == 0.75
+    assert res_special["krea2_rebalance_enabled"] is True
+    assert res_special["krea2_rebalance_multiplier"] == 1.2
+    assert res_special["krea2_rebalance_weights"] == ["high:1.5"]
+    assert res_special["krea2_seed_variance_enabled"] is True
+    assert res_special["krea2_seed_variance_strength"] == 0.8
+    assert res_special["krea2_seed_variance_randomize_percent"] == 25
+    assert res_special["ideogram4_color_palette"] == "pastel"
+    assert res_special["qwen_image_quantization"] == "int8"
+    assert res_special["flux3_caption"] == "detailed flux3 caption"
+    assert res_special["moss_image_layout_prompt"] == "moss layout json"
+
+    # 5. Z-Image seed variance modifier parameters
+    pos_zimage = SimpleNamespace(
+        prompt="z-image prompt",
+        qwen3_source=enc_id,
+        seed_variance_enabled=True,
+        seed_variance_strength=0.6,
+        seed_variance_randomize_percent=50,
+    )
+    res_z = extract_conditioning_metadata(pos_zimage)
+    assert res_z["z_image_seed_variance_enabled"] is True
+    assert res_z["z_image_seed_variance_strength"] == 0.6
+    assert res_z["z_image_seed_variance_randomize_percent"] == 50
+
+
+def test_metadata_to_string_collection() -> None:
+    ctx = SimpleNamespace()
+
+    # 1. List value from metadata
+    meta_list = MetadataField.model_validate({"positive_prompts": ["prompt A", "prompt B"]})
+    node_list = MetadataToStringCollectionInvocation.model_validate(
+        {
+            "id": "node-sc-1",
+            "type": "metadata_to_string_collection",
+            "label": "positive_prompts",
+            "metadata": meta_list.model_dump(),
+            "default_value": ["default"],
+        }
+    )
+    out_list = node_list.invoke(ctx)
+    assert out_list.collection == ["prompt A", "prompt B"]
+
+    # 2. String value from metadata
+    meta_str = MetadataField.model_validate({"positive_prompt": "single prompt"})
+    node_str = MetadataToStringCollectionInvocation.model_validate(
+        {
+            "id": "node-sc-2",
+            "type": "metadata_to_string_collection",
+            "label": "positive_prompt",
+            "metadata": meta_str.model_dump(),
+            "default_value": ["default"],
+        }
+    )
+    out_str = node_str.invoke(ctx)
+    assert out_str.collection == ["single prompt"]
+
+    # 3. None value -> default_value
+    node_none = MetadataToStringCollectionInvocation.model_validate(
+        {
+            "id": "node-sc-3",
+            "type": "metadata_to_string_collection",
+            "label": "negative_prompts",
+            "metadata": meta_str.model_dump(),
+            "default_value": ["fallback"],
+        }
+    )
+    out_none = node_none.invoke(ctx)
+    assert out_none.collection == ["fallback"]
+
+
+def test_denoise_sdxl_refiner_metadata() -> None:
+    base_model = _make_model_id(key="sdxl-base", base=BaseModelType.StableDiffusionXL)
+    refiner_model = _make_model_id(key="sdxl-refiner", base=BaseModelType.StableDiffusionXLRefiner)
+
+    base_md = MetadataField.model_validate(
+        {
+            "model": base_model.model_dump(),
+            "cfg_scale": 7.5,
+            "steps": 40,
+            "scheduler": "euler",
+            "positive_prompt": "majestic lion",
+        }
+    )
+
+    pos_cond = SimpleNamespace(
+        prompt="majestic lion close up",
+        style_prompt="photorealistic",
+        aesthetic_score=7.0,
+    )
+    neg_cond = SimpleNamespace(
+        prompt="blur",
+        aesthetic_score=2.5,
+    )
+
+    refiner_node = DenoiseLatentsInvocation.model_construct(
+        unet=UNetField(unet=refiner_model, scheduler=base_model, loras=[]),
+        positive_conditioning=pos_cond,
+        negative_conditioning=neg_cond,
+        steps=20,
+        cfg_scale=6.0,
+        scheduler="dpmpp_2m",
+        denoising_start=0.7,
+        denoising_end=1.0,
+        cfg_rescale_multiplier=0.0,
+        hidiffusion=False,
+        hidiffusion_raunet=False,
+        hidiffusion_window_attn=False,
+        hidiffusion_t1_ratio=0.8,
+        hidiffusion_t2_ratio=0.4,
+        control=None,
+        metadata=base_md,
+    )
+
+    md = refiner_node._build_metadata(width=1024, height=1024).root
+    # Base pass values preserved
+    assert md["model"] == base_model.model_dump()
+    assert md["cfg_scale"] == 7.5
+    assert md["steps"] == 40
+    assert md["scheduler"] == "euler"
+    # Refiner values recorded
+    assert md["refiner_model"] == refiner_model
+    assert md["refiner_cfg_scale"] == 6.0
+    assert md["refiner_steps"] == 20
+    assert md["refiner_scheduler"] == "dpmpp_2m"
+    assert md["refiner_start"] == 0.7
+    assert md["refiner_positive_aesthetic_score"] == 7.0
+    assert md["refiner_negative_aesthetic_score"] == 2.5
+
+
+def test_denoise_ltx2_two_stage_metadata() -> None:
+    ltx_tf = _make_model_id(key="ltx2-tf", base=BaseModelType.LTX2)
+    stage1_md = MetadataField.model_validate(
+        {
+            "width": 768,
+            "height": 512,
+            "num_frames": 97,
+            "fps": 24,
+        }
+    )
+
+    pos_cond = SimpleNamespace(prompt="a waterfall in autumn forest")
+    neg_cond = SimpleNamespace(prompt="ugly")
+
+    # Stage 2 with different dimensions and input latents
+    ltx2_node = LTX2DenoiseInvocation.model_construct(
+        transformer=LTX2TransformerField(transformer=ltx_tf, loras=[]),
+        positive_conditioning=pos_cond,
+        negative_conditioning=neg_cond,
+        width=1280,
+        height=768,
+        num_frames=97,
+        fps=24.0,
+        steps=30,
+        cfg_scale=3.0,
+        audio_cfg_scale=7.0,
+        stg_scale=1.0,
+        modality_scale=3.0,
+        guidance_rescale=0.7,
+        schedule="dev",
+        seed=123,
+        latents=LatentsField(latents_name="stage1_latents"),
+        noise_scale=0.5,
+        metadata=stage1_md,
+    )
+
+    md = ltx2_node._build_metadata().root
+    assert md["width"] == 1280
+    assert md["height"] == 768
+    assert md["ltx2_two_stage"] is True
+    assert md["ltx2_base_width"] == 768
+    assert md["ltx2_base_height"] == 512
+    assert md["positive_prompt"] == "a waterfall in autumn forest"
+    assert md["negative_prompt"] == "ugly"

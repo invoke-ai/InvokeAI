@@ -4981,6 +4981,28 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Qwen3 encoder model
+             * @default null
+             */
+            qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone Qwen3.5 encoder model
+             * @default null
+             */
+            qwen3_5_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * AnimaConditioningOutput
@@ -8830,6 +8852,17 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone GLM encoder model
+             * @default null
+             */
+            glm_encoder?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * CogView4ConditioningOutput
@@ -9690,6 +9723,36 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Prompt
+             * @description The positive or negative prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Style Prompt
+             * @description The style prompt text (e.g. SDXL)
+             * @default null
+             */
+            style_prompt?: string | null;
+            /**
+             * Skipped Layers
+             * @description CLIP skip layer count
+             * @default null
+             */
+            skipped_layers?: number | null;
+            /**
+             * Aesthetic Score
+             * @description SDXL aesthetic score
+             * @default null
+             */
+            aesthetic_score?: number | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * Conditioning Primitive
@@ -12977,6 +13040,17 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Mistral encoder model
+             * @default null
+             */
+            mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * ErnieImageConditioningOutput
@@ -15704,6 +15778,34 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Flux3 Caption
+             * @description Structured layout prompt / caption
+             * @default null
+             */
+            flux3_caption?: string | null;
+            /**
+             * @description Standalone Qwen3 encoder model
+             * @default null
+             */
+            qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone Qwen3-VL encoder model
+             * @default null
+             */
+            qwen3_vl_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * Flux3ConditioningOutput
@@ -16178,6 +16280,43 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone T5 encoder model
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone CLIP embed model
+             * @default null
+             */
+            clip_embed_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone Mistral encoder model
+             * @default null
+             */
+            mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone Qwen3 encoder model
+             * @default null
+             */
+            qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Source model for Qwen3 encoder
+             * @default null
+             */
+            qwen3_source?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * FluxConditioningOutput
@@ -20121,6 +20260,29 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Color Palette
+             * @description Color palette
+             * @default null
+             */
+            color_palette?: string | null;
+            /**
+             * @description Standalone Qwen3-VL encoder model
+             * @default null
+             */
+            qwen3_vl_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * Ideogram4ConditioningOutput
@@ -25790,6 +25952,59 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Qwen3-VL encoder model
+             * @default null
+             */
+            qwen3_vl_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
+            /**
+             * Rebalance Enabled
+             * @description Whether conditioning rebalance is enabled
+             * @default null
+             */
+            rebalance_enabled?: boolean | null;
+            /**
+             * Rebalance Multiplier
+             * @description Conditioning rebalance multiplier
+             * @default null
+             */
+            rebalance_multiplier?: number | null;
+            /**
+             * Rebalance Weights
+             * @description Conditioning rebalance weights
+             * @default null
+             */
+            rebalance_weights?: string[] | null;
+            /**
+             * Seed Variance Enabled
+             * @description Whether seed variance is enabled
+             * @default null
+             */
+            seed_variance_enabled?: boolean | null;
+            /**
+             * Seed Variance Strength
+             * @description Seed variance strength
+             * @default null
+             */
+            seed_variance_strength?: number | null;
+            /**
+             * Seed Variance Randomize Percent
+             * @description Seed variance randomize percent
+             * @default null
+             */
+            seed_variance_randomize_percent?: number | null;
         };
         /**
          * Krea2ConditioningOutput
@@ -26809,6 +27024,22 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone LTX-2 text encoder model
+             * @default null
+             */
+            ltx2_text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description LTX-2 component source model
+             * @default null
+             */
+            ltx2_component_source?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * Denoise - LTX-2
@@ -37013,7 +37244,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "width" | "height" | "seed" | "rand_device" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step" | "denoising_start" | "denoising_end" | "strength" | "init_image" | "add_noise" | "shift" | "dype_preset" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_enabled" | "hrf_method" | "hrf_strength" | "refiner_model" | "refiner_cfg_scale" | "refiner_steps" | "refiner_scheduler" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "pid_mode" | "pid_steps" | "pid_decoder" | "gemma2_encoder" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "t5_encoder" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "qwen3_encoder" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_guidance_scale" | "ideogram4_mu" | "ideogram4_sampler_preset" | "ideogram4_steps" | "ideogram4_unconditional_model" | "krea2_rebalance_enabled" | "krea2_rebalance_multiplier" | "krea2_rebalance_weights" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "krea2_seed_variance_randomize_percent" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_component_source" | "ltx2_conditioning_role" | "ltx2_context_frames" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_schedule" | "ltx2_stg_scale" | "ltx2_text_encoder_model" | "ltx2_two_stage" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_hybrid_start_block" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "moss_image_layout_prompt" | "moss_image_uncond_skip_layers" | "qwen_image_2_1_prefix_kv_cache" | "qwen_image_component_source" | "qwen_image_quantization" | "qwen_image_qwen_vl_encoder" | "qwen_image_shift" | "qwen_image_vae" | "wan_component_source" | "wan_guidance_scale_low_noise" | "wan_t5_encoder_model" | "wan_transformer_low_noise" | "z_image_seed_variance_enabled" | "z_image_seed_variance_randomize_percent" | "z_image_seed_variance_strength" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "width" | "height" | "seed" | "rand_device" | "cfg_scale" | "cfg_rescale_multiplier" | "steps" | "scheduler" | "clip_skip" | "model" | "vae" | "seamless_x" | "seamless_y" | "guidance" | "cfg_scale_start_step" | "cfg_scale_end_step" | "denoising_start" | "denoising_end" | "strength" | "init_image" | "add_noise" | "shift" | "dype_preset" | "dype_scale" | "dype_exponent" | "freeu_s1" | "freeu_s2" | "freeu_b1" | "freeu_b2" | "hidiffusion" | "hidiffusion_raunet" | "hidiffusion_window_attn" | "hidiffusion_t1_ratio" | "hidiffusion_t2_ratio" | "hrf_enabled" | "hrf_method" | "hrf_strength" | "refiner_model" | "refiner_cfg_scale" | "refiner_steps" | "refiner_scheduler" | "refiner_positive_aesthetic_score" | "refiner_negative_aesthetic_score" | "refiner_start" | "pid_mode" | "pid_steps" | "pid_decoder" | "gemma2_encoder" | "tile_width" | "tile_height" | "tile_overlap" | "num_frames" | "fps" | "source_video_start_frame" | "source_video_end_frame" | "t5_encoder" | "clip_embed_model" | "clip_l_model" | "clip_g_model" | "mistral_encoder" | "qwen3_encoder" | "qwen3_source" | "qwen3_5_encoder" | "qwen3_vl_encoder" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_guidance_scale" | "ideogram4_mu" | "ideogram4_sampler_preset" | "ideogram4_steps" | "ideogram4_unconditional_model" | "krea2_rebalance_enabled" | "krea2_rebalance_multiplier" | "krea2_rebalance_weights" | "krea2_reference_kv_cache" | "krea2_seed_variance_enabled" | "krea2_seed_variance_randomize_percent" | "krea2_seed_variance_strength" | "krea2_style_strength" | "ltx2_audio_cfg_scale" | "ltx2_base_height" | "ltx2_base_width" | "ltx2_component_source" | "ltx2_conditioning_role" | "ltx2_context_frames" | "ltx2_guidance_rescale" | "ltx2_modality_scale" | "ltx2_noise_scale" | "ltx2_schedule" | "ltx2_stg_scale" | "ltx2_text_encoder_model" | "ltx2_two_stage" | "minimax_h3_component_source" | "minimax_h3_hybrid_base_model" | "minimax_h3_hybrid_start_block" | "minimax_h3_text_encoder_model" | "minimax_h3_transformer_model" | "moss_image_layout_prompt" | "moss_image_uncond_skip_layers" | "qwen_image_2_1_prefix_kv_cache" | "qwen_image_component_source" | "qwen_image_quantization" | "qwen_image_qwen_vl_encoder" | "qwen_image_shift" | "qwen_image_vae" | "wan_component_source" | "wan_guidance_scale_low_noise" | "wan_t5_encoder_model" | "wan_transformer_low_noise" | "z_image_seed_variance_enabled" | "z_image_seed_variance_randomize_percent" | "z_image_seed_variance_strength" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -37886,7 +38117,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -37939,7 +38170,7 @@ export type components = {
              * @default * CUSTOM LABEL *
              * @enum {string}
              */
-            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_style_prompt" | "negative_prompt" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
+            label?: "* CUSTOM LABEL *" | "generation_mode" | "positive_prompt" | "positive_prompts" | "positive_style_prompt" | "negative_prompt" | "negative_prompts" | "negative_style_prompt" | "rand_device" | "init_image" | "hrf_method" | "pid_mode" | "dype_preset" | "flux3_caption" | "ideogram4_caption" | "ideogram4_color_palette" | "ideogram4_sampler_preset" | "krea2_rebalance_weights" | "ltx2_conditioning_role" | "ltx2_schedule" | "moss_image_layout_prompt" | "qwen_image_quantization" | "qwen_image_shift" | "z_image_shift";
             /**
              * Custom Label
              * @description Label for this metadata item
@@ -38089,6 +38320,22 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone MiniMax H3 text encoder model
+             * @default null
+             */
+            minimax_h3_text_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description MiniMax H3 component source model
+             * @default null
+             */
+            minimax_h3_component_source?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * MiniMaxH3ConditioningOutput
@@ -40339,6 +40586,29 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Layout Prompt
+             * @description Layout prompt string
+             * @default null
+             */
+            layout_prompt?: string | null;
+            /**
+             * @description Standalone Qwen3.5 encoder model
+             * @default null
+             */
+            qwen3_5_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * MossImageConditioningOutput
@@ -43987,6 +44257,17 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Qwen3-VL encoder model
+             * @default null
+             */
+            qwen3_vl_encoder?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * QwenImage21ConditioningOutput
@@ -44489,6 +44770,28 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * Quantization
+             * @description Quantization mode
+             * @default null
+             */
+            quantization?: string | null;
+            /**
+             * @description Standalone Qwen-VL encoder model
+             * @default null
+             */
+            qwen_vl_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Component source model
+             * @default null
+             */
+            component_source?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * QwenImageConditioningOutput
@@ -46179,6 +46482,33 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone T5 encoder model
+             * @default null
+             */
+            t5_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone CLIP-L model
+             * @default null
+             */
+            clip_l_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Standalone CLIP-G model
+             * @default null
+             */
+            clip_g_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
         };
         /**
          * SD3ConditioningOutput
@@ -54551,6 +54881,22 @@ export type components = {
              * @description The name of conditioning tensor
              */
             conditioning_name: string;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Wan T5 encoder model
+             * @default null
+             */
+            wan_t5_encoder_model?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Wan component source model
+             * @default null
+             */
+            wan_component_source?: components["schemas"]["ModelIdentifierField"] | null;
         };
         /**
          * WanConditioningOutput
@@ -57094,6 +57440,46 @@ export type components = {
              * @default null
              */
             mask?: components["schemas"]["TensorField"] | null;
+            /**
+             * Prompt
+             * @description The prompt text
+             * @default null
+             */
+            prompt?: string | null;
+            /**
+             * @description Standalone Qwen3 encoder model
+             * @default null
+             */
+            qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * @description Source model for Qwen3 encoder
+             * @default null
+             */
+            qwen3_source?: components["schemas"]["ModelIdentifierField"] | null;
+            /**
+             * Loras
+             * @description LoRAs applied to text encoders
+             * @default null
+             */
+            loras?: components["schemas"]["LoRAMetadataField"][] | null;
+            /**
+             * Seed Variance Enabled
+             * @description Whether seed variance is enabled
+             * @default null
+             */
+            seed_variance_enabled?: boolean | null;
+            /**
+             * Seed Variance Strength
+             * @description Seed variance strength
+             * @default null
+             */
+            seed_variance_strength?: number | null;
+            /**
+             * Seed Variance Randomize Percent
+             * @description Seed variance randomize percent
+             * @default null
+             */
+            seed_variance_randomize_percent?: number | null;
         };
         /**
          * ZImageConditioningOutput

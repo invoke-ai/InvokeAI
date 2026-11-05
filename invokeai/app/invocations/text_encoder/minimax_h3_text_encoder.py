@@ -6,6 +6,7 @@ from invokeai.app.invocations.fields import (
     ImageField,
     Input,
     InputField,
+    MiniMaxH3ConditioningField,
     MiniMaxH3ReferenceMediaField,
     UIComponent,
 )
@@ -199,4 +200,11 @@ class MiniMaxH3TextEncoderInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
-        return MiniMaxH3ConditioningOutput.build(conditioning_name)
+        return MiniMaxH3ConditioningOutput(
+            conditioning=MiniMaxH3ConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                minimax_h3_text_encoder_model=getattr(self.text_encoder, "text_encoder", None),
+                minimax_h3_component_source=getattr(self, "minimax_h3_component_source", None),
+            )
+        )

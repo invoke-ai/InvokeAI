@@ -70,8 +70,10 @@ CORE_LABELS = Literal[
     f"{CUSTOM_LABEL}",
     "generation_mode",
     "positive_prompt",
+    "positive_prompts",
     "positive_style_prompt",
     "negative_prompt",
+    "negative_prompts",
     "negative_style_prompt",
     "width",
     "height",
@@ -193,8 +195,10 @@ CORE_LABELS_STRING = Literal[
     f"{CUSTOM_LABEL}",
     "generation_mode",
     "positive_prompt",
+    "positive_prompts",
     "positive_style_prompt",
     "negative_prompt",
+    "negative_prompts",
     "negative_style_prompt",
     "rand_device",
     "init_image",
@@ -1674,9 +1678,14 @@ class MetadataToStringCollectionInvocation(BaseInvocation, WithMetadata):
 
     def invoke(self, context: InvocationContext) -> StringCollectionOutput:
         data: Dict[str, Any] = {} if self.metadata is None else self.metadata.root
-        output = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label), self.default_value)
-
-        return StringCollectionOutput(collection=output)
+        val = data.get(str(self.custom_label if self.label == CUSTOM_LABEL else self.label))
+        if val is None:
+            return StringCollectionOutput(collection=self.default_value)
+        if isinstance(val, list):
+            return StringCollectionOutput(collection=val)
+        if isinstance(val, str):
+            return StringCollectionOutput(collection=[val])
+        return StringCollectionOutput(collection=self.default_value)
 
 
 @invocation(

@@ -56,7 +56,11 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return ErnieImageConditioningOutput(
-            conditioning=ErnieImageConditioningField(conditioning_name=conditioning_name)
+            conditioning=ErnieImageConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                mistral_encoder=getattr(self.text_encoder, "text_encoder", None),
+            )
         )
 
     def _encode_prompt(self, context: InvocationContext, prompt: str) -> torch.Tensor:

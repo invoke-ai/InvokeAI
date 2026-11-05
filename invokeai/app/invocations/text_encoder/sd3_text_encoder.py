@@ -11,7 +11,13 @@ from transformers import (
 )
 
 from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
-from invokeai.app.invocations.fields import FieldDescriptions, Input, InputField
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    Input,
+    InputField,
+    LoRAMetadataField,
+    SD3ConditioningField,
+)
 from invokeai.app.invocations.model import CLIPField, T5EncoderField
 from invokeai.app.invocations.primitives import SD3ConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -93,7 +99,20 @@ class Sd3TextEncoderInvocation(BaseInvocation):
         )
 
         conditioning_name = context.conditioning.save(conditioning_data)
-        return SD3ConditioningOutput.build(conditioning_name)
+        all_loras = list(self.clip_l.loras) + list(self.clip_g.loras)
+        if self.t5_encoder is not None:
+            all_loras.extend(self.t5_encoder.loras)
+        loras = [LoRAMetadataField(model=item.lora, weight=item.weight) for item in all_loras] if all_loras else None
+        return SD3ConditioningOutput(
+            conditioning=SD3ConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                t5_encoder=getattr(self.t5_encoder, "text_encoder", None) if self.t5_encoder is not None else None,
+                clip_l_model=getattr(self.clip_l, "text_encoder", None),
+                clip_g_model=getattr(self.clip_g, "text_encoder", None),
+                loras=loras,
+            )
+        )
 
     def _t5_encode(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:
         assert self.t5_encoder is not None

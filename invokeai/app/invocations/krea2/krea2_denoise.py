@@ -28,6 +28,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import LoRAField, TransformerField
@@ -248,6 +249,15 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata):
             updates["loras"] = loras
         if getattr(self, "reference_latents", None) is not None and self._reference_latent_fields() and loras:
             updates["krea2_reference_kv_cache"] = self.reference_kv_cache
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

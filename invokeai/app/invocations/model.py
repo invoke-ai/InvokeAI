@@ -9,7 +9,14 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input, InputField, OutputField
+from invokeai.app.invocations.fields import (
+    FieldDescriptions,
+    ImageField,
+    Input,
+    InputField,
+    ModelIdentifierField,
+    OutputField,
+)
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
@@ -55,31 +62,6 @@ def is_self_contained_sdnq_flux1_pipeline(config: AnyModelConfig) -> bool:
         return False
     submodels = getattr(config, "submodels", None) or {}
     return _REQUIRED_FLUX1_PIPELINE_SUBMODELS.issubset(submodels.keys())
-
-
-class ModelIdentifierField(BaseModel):
-    key: str = Field(description="The model's unique key")
-    hash: str = Field(description="The model's BLAKE3 hash")
-    name: str = Field(description="The model's name")
-    base: BaseModelType = Field(description="The model's base model type")
-    type: ModelType = Field(description="The model's type")
-    submodel_type: SubModelType | None = Field(
-        description="The submodel to load, if this is a main model",
-        default=None,
-    )
-
-    @classmethod
-    def from_config(
-        cls, config: "AnyModelConfig", submodel_type: Optional[SubModelType] = None
-    ) -> "ModelIdentifierField":
-        return cls(
-            key=config.key,
-            hash=config.hash,
-            name=config.name,
-            base=config.base,
-            type=config.type,
-            submodel_type=submodel_type,
-        )
 
 
 class LoRAField(BaseModel):

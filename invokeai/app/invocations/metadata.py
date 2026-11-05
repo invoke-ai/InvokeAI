@@ -16,12 +16,13 @@ from invokeai.app.invocations.fields import (
     ImageField,
     InputField,
     LatentsField,
+    LoRAMetadataField,
     MetadataField,
+    ModelIdentifierField,
     OutputField,
     UIType,
     VideoField,
 )
-from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import LatentsOutput, StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.controlnet_utils import CONTROLNET_MODE_VALUES, CONTROLNET_RESIZE_VALUES
@@ -31,13 +32,6 @@ from invokeai.version.invokeai_version import __version__
 class MetadataItemField(BaseModel):
     label: str = Field(description=FieldDescriptions.metadata_item_label)
     value: Any = Field(description=FieldDescriptions.metadata_item_value)
-
-
-class LoRAMetadataField(BaseModel):
-    """LoRA Metadata Field"""
-
-    model: ModelIdentifierField = Field(description=FieldDescriptions.lora_model)
-    weight: float = Field(description=FieldDescriptions.lora_weight)
 
 
 class IPAdapterMetadataField(BaseModel):
@@ -296,19 +290,31 @@ def serialize_lora_metadata(*lora_lists: Optional[Sequence[Any]]) -> list[dict[s
         if not lora_list:
             continue
         for item in lora_list:
-            key = getattr(item.lora, "key", item.lora)
-            ident = (key, item.weight)
+            if isinstance(item, dict):
+                model_val = item.get("model")
+                weight = float(item.get("weight", 1.0))
+                key = model_val.get("key") if isinstance(model_val, dict) else getattr(model_val, "key", model_val)
+                ident = (key, weight)
+                if ident in seen:
+                    continue
+                seen.add(ident)
+                result.append(item)
+                continue
+            model = getattr(item, "model", None) or getattr(item, "lora", None)
+            weight = getattr(item, "weight", 1.0)
+            key = getattr(model, "key", model)
+            ident = (key, weight)
             if ident in seen:
                 continue
             seen.add(ident)
-            if isinstance(item.lora, ModelIdentifierField):
+            if isinstance(model, ModelIdentifierField):
                 result.append(
-                    LoRAMetadataField(model=item.lora, weight=item.weight).model_dump(
+                    LoRAMetadataField(model=model, weight=weight).model_dump(
                         exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"}
                     )
                 )
             else:
-                result.append({"model": item.lora, "weight": item.weight})
+                result.append({"model": model, "weight": weight})
     return result
 
 
@@ -462,6 +468,174 @@ def _ref_image_dedup_key(entry: Any) -> Optional[tuple[Any, Any, Any]]:
     model = cfg.get("model")
     model_key = model.get("key") if isinstance(model, dict) else getattr(model, "key", None)
     return (cfg_type, image_name, model_key)
+
+
+def extract_conditioning_metadata(
+    positive_conditioning: Union[Any, list[Any], None] = None,
+    negative_conditioning: Union[Any, list[Any], None] = None,
+) -> dict[str, Any]:
+    """Extract prompt strings, standalone text encoders, SDXL styles, modifier parameters,
+    and LoRAs from positive and negative conditioning fields into metadata update dict."""
+    updates: dict[str, Any] = {}
+
+    pos_list: list[Any] = (
+        positive_conditioning
+        if isinstance(positive_conditioning, list)
+        else ([positive_conditioning] if positive_conditioning is not None else [])
+    )
+    neg_list: list[Any] = (
+        negative_conditioning
+        if isinstance(negative_conditioning, list)
+        else ([negative_conditioning] if negative_conditioning is not None else [])
+    )
+
+    def _get(item: Any, key: str) -> Any:
+        if isinstance(item, dict):
+            return item.get(key)
+        return getattr(item, key, None)
+
+    # Single vs. Multi-Prompt: Positive
+    if len(pos_list) == 1:
+        prompt = _get(pos_list[0], "prompt")
+        if prompt is not None:
+            updates["positive_prompt"] = prompt
+    elif len(pos_list) > 1:
+        unmasked = [item for item in pos_list if _get(item, "mask") is None and _get(item, "prompt") is not None]
+        if unmasked:
+            updates["positive_prompt"] = _get(unmasked[0], "prompt")
+        elif _get(pos_list[0], "prompt") is not None:
+            updates["positive_prompt"] = _get(pos_list[0], "prompt")
+
+        pos_prompts = [_get(item, "prompt") for item in pos_list if _get(item, "prompt") is not None]
+        if pos_prompts:
+            updates["positive_prompts"] = pos_prompts
+
+    if any(_get(item, "mask") is not None for item in pos_list) or len(pos_list) > 1:
+        regions = [{"positive_prompt": _get(item, "prompt")} for item in pos_list if _get(item, "prompt") is not None]
+        if regions:
+            updates["regions"] = regions
+
+    # Negative
+    if len(neg_list) == 1:
+        prompt = _get(neg_list[0], "prompt")
+        if prompt is not None:
+            updates["negative_prompt"] = prompt
+    elif len(neg_list) > 1:
+        if _get(neg_list[0], "prompt") is not None:
+            updates["negative_prompt"] = _get(neg_list[0], "prompt")
+        neg_prompts = [_get(item, "prompt") for item in neg_list if _get(item, "prompt") is not None]
+        if neg_prompts:
+            updates["negative_prompts"] = neg_prompts
+
+    # SDXL style prompts & clip skip
+    if pos_list:
+        style_prompt = _get(pos_list[0], "style_prompt")
+        if style_prompt is not None:
+            updates["positive_style_prompt"] = style_prompt
+        skipped_layers = _get(pos_list[0], "skipped_layers")
+        if skipped_layers is not None:
+            updates["clip_skip"] = skipped_layers
+        aesthetic_score = _get(pos_list[0], "aesthetic_score")
+        if aesthetic_score is not None:
+            updates["positive_aesthetic_score"] = aesthetic_score
+
+    if neg_list:
+        style_prompt = _get(neg_list[0], "style_prompt")
+        if style_prompt is not None:
+            updates["negative_style_prompt"] = style_prompt
+        aesthetic_score = _get(neg_list[0], "aesthetic_score")
+        if aesthetic_score is not None:
+            updates["negative_aesthetic_score"] = aesthetic_score
+
+    # Standalone Text Encoder Submodels
+    standalone_attrs = (
+        "t5_encoder",
+        "clip_embed_model",
+        "clip_l_model",
+        "clip_g_model",
+        "mistral_encoder",
+        "qwen3_encoder",
+        "qwen3_source",
+        "qwen3_5_encoder",
+        "qwen3_vl_encoder",
+        "qwen_vl_encoder",
+        "glm_encoder",
+        "component_source",
+        "wan_t5_encoder_model",
+        "wan_component_source",
+        "ltx2_text_encoder_model",
+        "ltx2_component_source",
+        "minimax_h3_text_encoder_model",
+        "minimax_h3_component_source",
+    )
+    for item in (*pos_list, *neg_list):
+        for attr in standalone_attrs:
+            val = _get(item, attr)
+            if val is not None and attr not in updates:
+                updates[attr] = unwrap_metadata_value(val)
+
+    # Modifier Parameters
+    for item in (*pos_list, *neg_list):
+        cls_name = type(item).__name__
+        has_krea_attrs = (
+            "Krea2" in cls_name
+            or hasattr(item, "rebalance_enabled")
+            or hasattr(item, "rebalance_multiplier")
+            or hasattr(item, "rebalance_weights")
+        )
+        has_z_attrs = "ZImage" in cls_name or hasattr(item, "qwen3_source") or hasattr(item, "seed_variance_enabled")
+        if has_krea_attrs:
+            krea_fields = (
+                "rebalance_enabled",
+                "rebalance_multiplier",
+                "rebalance_weights",
+                "seed_variance_enabled",
+                "seed_variance_strength",
+                "seed_variance_randomize_percent",
+            )
+            for k in krea_fields:
+                val = _get(item, k)
+                if val is not None and f"krea2_{k}" not in updates:
+                    updates[f"krea2_{k}"] = val
+        elif has_z_attrs:
+            z_fields = (
+                "seed_variance_enabled",
+                "seed_variance_strength",
+                "seed_variance_randomize_percent",
+            )
+            for k in z_fields:
+                val = _get(item, k)
+                if val is not None and f"z_image_{k}" not in updates:
+                    updates[f"z_image_{k}"] = val
+
+        color_palette = _get(item, "color_palette")
+        if color_palette is not None and "ideogram4_color_palette" not in updates:
+            updates["ideogram4_color_palette"] = color_palette
+
+        quantization = _get(item, "quantization")
+        if quantization is not None and "qwen_image_quantization" not in updates:
+            updates["qwen_image_quantization"] = quantization
+
+        flux3_caption = _get(item, "flux3_caption")
+        if flux3_caption is not None and "flux3_caption" not in updates:
+            updates["flux3_caption"] = flux3_caption
+
+        layout_prompt = _get(item, "layout_prompt")
+        if layout_prompt is not None and "moss_image_layout_prompt" not in updates:
+            updates["moss_image_layout_prompt"] = layout_prompt
+
+    # LoRAs
+    lora_sequences = []
+    for item in (*pos_list, *neg_list):
+        item_loras = _get(item, "loras")
+        if item_loras:
+            lora_sequences.append(item_loras)
+    if lora_sequences:
+        merged_loras = serialize_lora_metadata(*lora_sequences)
+        if merged_loras:
+            updates["loras"] = merged_loras
+
+    return updates
 
 
 def build_denoise_metadata(existing: Optional[MetadataField], updates: dict[str, Any]) -> MetadataField:

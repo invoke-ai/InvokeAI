@@ -29,6 +29,7 @@ from invokeai.app.invocations.fields import (
     FieldDescriptions,
     Input,
     InputField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
 )
@@ -117,8 +118,22 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = (
+            [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.qwen3_encoder.loras]
+            if self.qwen3_encoder.loras
+            else None
+        )
         return AnimaConditioningOutput(
-            conditioning=AnimaConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=AnimaConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_encoder=getattr(self.qwen3_encoder, "text_encoder", None),
+                qwen3_5_encoder=getattr(self.qwen3_5_encoder, "text_encoder", None)
+                if self.qwen3_5_encoder is not None
+                else None,
+                loras=loras,
+            )
         )
 
     def _encode_prompt(

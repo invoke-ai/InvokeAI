@@ -28,6 +28,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     MetadataOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_lora_metadata,
 )
 from invokeai.app.invocations.model import LTX2TransformerField
@@ -438,6 +439,23 @@ class LTX2DenoiseInvocation(BaseInvocation, WithMetadata):
         loras = serialize_lora_metadata(getattr(self.transformer, "loras", None))
         if loras:
             updates["loras"] = loras
+
+        if self.latents is not None and getattr(self, "metadata", None) is not None:
+            base_w = self.metadata.root.get("width")
+            base_h = self.metadata.root.get("height")
+            if (base_w is not None and base_w != self.width) or (base_h is not None and base_h != self.height):
+                updates["ltx2_two_stage"] = True
+                updates["ltx2_base_width"] = base_w
+                updates["ltx2_base_height"] = base_h
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

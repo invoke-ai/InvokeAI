@@ -19160,6 +19160,59 @@
             ],
             "default": null,
             "description": "The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 encoder model"
+          },
+          "qwen3_5_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3.5 encoder model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -26766,6 +26819,31 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "glm_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone GLM encoder model"
           }
         },
         "required": ["conditioning_name"],
@@ -28411,6 +28489,74 @@
             ],
             "default": null,
             "description": "The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The positive or negative prompt text",
+            "title": "Prompt"
+          },
+          "style_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The style prompt text (e.g. SDXL)",
+            "title": "Style Prompt"
+          },
+          "skipped_layers": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "CLIP skip layer count",
+            "title": "Skipped Layers"
+          },
+          "aesthetic_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "SDXL aesthetic score",
+            "title": "Aesthetic Score"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -35064,6 +35210,31 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Mistral encoder model"
           }
         },
         "required": ["conditioning_name"],
@@ -40359,6 +40530,72 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "flux3_caption": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Structured layout prompt / caption",
+            "title": "Flux3 Caption"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 encoder model"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL encoder model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -41244,6 +41481,95 @@
             ],
             "default": null,
             "description": "The mask associated with this conditioning tensor. Excluded regions should be set to False, included regions should be set to True."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "t5_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone T5 encoder model"
+          },
+          "clip_embed_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone CLIP embed model"
+          },
+          "mistral_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Mistral encoder model"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 encoder model"
+          },
+          "qwen3_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Source model for Qwen3 encoder"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -50411,6 +50737,60 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "color_palette": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Color palette",
+            "title": "Color Palette"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL encoder model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -66048,6 +66428,128 @@
             ],
             "default": null,
             "description": "The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL encoder model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
+          },
+          "rebalance_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether conditioning rebalance is enabled",
+            "title": "Rebalance Enabled"
+          },
+          "rebalance_multiplier": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Conditioning rebalance multiplier",
+            "title": "Rebalance Multiplier"
+          },
+          "rebalance_weights": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Conditioning rebalance weights",
+            "title": "Rebalance Weights"
+          },
+          "seed_variance_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether seed variance is enabled",
+            "title": "Seed Variance Enabled"
+          },
+          "seed_variance_strength": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed variance strength",
+            "title": "Seed Variance Strength"
+          },
+          "seed_variance_randomize_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed variance randomize percent",
+            "title": "Seed Variance Randomize Percent"
           }
         },
         "required": ["conditioning_name"],
@@ -67797,6 +68299,43 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "ltx2_text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone LTX-2 text encoder model"
+          },
+          "ltx2_component_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LTX-2 component source model"
           }
         },
         "required": ["conditioning_name"],
@@ -86756,8 +87295,10 @@
               "* CUSTOM LABEL *",
               "generation_mode",
               "positive_prompt",
+              "positive_prompts",
               "positive_style_prompt",
               "negative_prompt",
+              "negative_prompts",
               "negative_style_prompt",
               "width",
               "height",
@@ -88865,8 +89406,10 @@
               "* CUSTOM LABEL *",
               "generation_mode",
               "positive_prompt",
+              "positive_prompts",
               "positive_style_prompt",
               "negative_prompt",
+              "negative_prompts",
               "negative_style_prompt",
               "rand_device",
               "init_image",
@@ -88999,8 +89542,10 @@
               "* CUSTOM LABEL *",
               "generation_mode",
               "positive_prompt",
+              "positive_prompts",
               "positive_style_prompt",
               "negative_prompt",
+              "negative_prompts",
               "negative_style_prompt",
               "rand_device",
               "init_image",
@@ -89304,6 +89849,43 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "minimax_h3_text_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone MiniMax H3 text encoder model"
+          },
+          "minimax_h3_component_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "MiniMax H3 component source model"
           }
         },
         "required": ["conditioning_name"],
@@ -96048,6 +96630,60 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "layout_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Layout prompt string",
+            "title": "Layout Prompt"
+          },
+          "qwen3_5_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3.5 encoder model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -102195,6 +102831,31 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "qwen3_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3-VL encoder model"
           }
         },
         "required": ["conditioning_name"],
@@ -103206,6 +103867,56 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "quantization": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Quantization mode",
+            "title": "Quantization"
+          },
+          "qwen_vl_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen-VL encoder model"
+          },
+          "component_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Component source model"
           }
         },
         "required": ["conditioning_name"],
@@ -106378,6 +107089,71 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "t5_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone T5 encoder model"
+          },
+          "clip_l_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone CLIP-L model"
+          },
+          "clip_g_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone CLIP-G model"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
           }
         },
         "required": ["conditioning_name"],
@@ -121946,6 +122722,43 @@
             "description": "The name of conditioning tensor",
             "title": "Conditioning Name",
             "type": "string"
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "wan_t5_encoder_model": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Wan T5 encoder model"
+          },
+          "wan_component_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Wan component source model"
           }
         },
         "required": ["conditioning_name"],
@@ -126450,6 +127263,98 @@
             ],
             "default": null,
             "description": "The mask associated with this conditioning tensor for regional prompting. Excluded regions should be set to False, included regions should be set to True."
+          },
+          "prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The prompt text",
+            "title": "Prompt"
+          },
+          "qwen3_encoder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Standalone Qwen3 encoder model"
+          },
+          "qwen3_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Source model for Qwen3 encoder"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAMetadataField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRAs applied to text encoders",
+            "title": "Loras"
+          },
+          "seed_variance_enabled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Whether seed variance is enabled",
+            "title": "Seed Variance Enabled"
+          },
+          "seed_variance_strength": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed variance strength",
+            "title": "Seed Variance Strength"
+          },
+          "seed_variance_randomize_percent": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Seed variance randomize percent",
+            "title": "Seed Variance Randomize Percent"
           }
         },
         "required": ["conditioning_name"],

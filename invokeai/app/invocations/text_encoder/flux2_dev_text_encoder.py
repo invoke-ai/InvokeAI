@@ -32,6 +32,7 @@ from invokeai.app.invocations.fields import (
     FluxConditioningField,
     Input,
     InputField,
+    LoRAMetadataField,
     TensorField,
     UIComponent,
 )
@@ -124,8 +125,19 @@ class Flux2DevTextEncoderInvocation(BaseInvocation):
                 ]
             )
             conditioning_name = context.conditioning.save(conditioning_data)
+            loras = (
+                [LoRAMetadataField(model=item.lora, weight=item.weight) for item in self.mistral_encoder.loras]
+                if self.mistral_encoder.loras
+                else None
+            )
             return FluxConditioningOutput(
-                conditioning=FluxConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+                conditioning=FluxConditioningField(
+                    conditioning_name=conditioning_name,
+                    mask=self.mask,
+                    prompt=self.prompt,
+                    mistral_encoder=getattr(self.mistral_encoder, "text_encoder", None),
+                    loras=loras,
+                )
             )
 
     def _encode_prompt(self, context: InvocationContext, exit_stack: ExitStack) -> torch.Tensor:
