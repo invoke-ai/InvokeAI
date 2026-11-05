@@ -46,6 +46,7 @@ const createHarness = (
     return true;
   };
   const rasterFits = { value: true };
+  const releaseRaster = vi.fn();
   const ctx = createCanvasMutationContext({
     commitEdit: vi.fn(),
     createLayerId: () => 'unused',
@@ -66,7 +67,7 @@ const createHarness = (
     refreshMirror: () => undefined,
     reserveRaster: () =>
       rasterFits.value
-        ? { lease: { release: () => undefined }, status: 'ok' }
+        ? { lease: { release: releaseRaster }, status: 'ok' }
         : { availableBytes: 0, requestedBytes: 1, status: 'over-budget' },
     subscribeReducer: () => () => undefined,
   });
@@ -123,6 +124,7 @@ const createHarness = (
     layer: () => getDocumentLayer(project.canvas.document, layer.id),
     pending: () => pending,
     rasterFits,
+    releaseRaster,
     session: () => session,
     state,
   };
@@ -479,6 +481,24 @@ describe('Transform resampling', () => {
   const image = layerContract('image', 'raster', {
     source: { type: 'image', image: { imageName: 'source.png', width: 4, height: 4 } },
   } as Partial<CanvasLayerContract>);
+
+  it('releases the raster reservation when a pending resample is cancelled', async () => {
+    const h = createHarness(paint, {
+      resample: (_surface, _size, _mode, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }),
+    });
+    h.controller.begin(paint.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    expect(h.session()?.processing).toBe(true);
+    expect(h.releaseRaster).not.toHaveBeenCalled();
+    h.controller.cancel();
+    await vi.waitFor(() => expect(h.releaseRaster).toHaveBeenCalledOnce());
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.layer()).toEqual(paint);
+  });
 
   it.each([paint, image])('supersamples $id and restores its source and pixels in one undo step', async (layer) => {
     const resample = vi.fn(() => Promise.resolve(pixels()));
