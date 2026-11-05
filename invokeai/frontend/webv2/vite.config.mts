@@ -323,6 +323,15 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/ui/useGalleryUploadInput.ts',
 ] as const;
 
+// The backend and its URL helpers load together for recent outputs. Keep picker UI out of that lazy Launchpad read.
+const GALLERY_BACKEND_MODULES = [
+  '/features/gallery/core/imagePaths.ts',
+  '/features/gallery/core/videoPaths.ts',
+  '/features/gallery/data/backend.ts',
+  '/features/gallery/data/imageUrls.ts',
+  '/features/gallery/data/videoUrls.ts',
+] as const;
+
 // Gallery's shared state projection and UI port travel together.
 const GALLERY_STATE_MODULES = [
   // Board access predicates: the state view, the gallery's caches and the picker read them; alone they cost a request.
@@ -507,6 +516,12 @@ export default defineConfig({
               name: 'gallery-picker',
               priority: 30,
               test: (id) => matchesAnySuffix(id, GALLERY_PICKER_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'gallery-backend',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, GALLERY_BACKEND_MODULES),
             },
             {
               includeDependenciesRecursively: false,

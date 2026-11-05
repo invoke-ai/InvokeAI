@@ -17,6 +17,7 @@ import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integ
 import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
+import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
 import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
@@ -309,8 +310,14 @@ const createCommands = (
       setSource: command('setInvocationSource', (sourceId: ActionPayload<'setInvocationSource'>['sourceId']) => ({
         sourceId,
       })),
-      submitCanvas: command('submitCanvasInvocationSnapshot'),
-      submitModelOnlyUpscale: command('submitModelOnlyUpscale'),
+      submitCanvas: (payload: Omit<ActionPayload<'submitCanvasInvocationSnapshot'>, 'runtime'>) =>
+        dispatch({
+          ...payload,
+          runtime: captureInvocationRuntimeInputs('canvas'),
+          type: 'submitCanvasInvocationSnapshot',
+        }),
+      submitModelOnlyUpscale: (payload: Omit<ActionPayload<'submitModelOnlyUpscale'>, 'runtime'>) =>
+        dispatch({ ...payload, runtime: captureInvocationRuntimeInputs('upscale'), type: 'submitModelOnlyUpscale' }),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),

@@ -1,6 +1,11 @@
+import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
+import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
+import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+
+import type { InvocationRuntimeInputs, InvocationSourceId } from './invocationContracts';
 
 interface InvocationPreparationSnapshot {
   leases: ReadonlyMap<string, number>;
@@ -54,4 +59,14 @@ export const useIsInvocationPreparing = (projectId: string): boolean =>
 registerAccountOwnedResource({
   clear: () => store.setSnapshot({ leases: EMPTY_LEASES }),
   name: 'invocation-preparation',
+});
+
+/** Capture after async prerequisites, immediately before the synchronous submission command. */
+export const captureInvocationRuntimeInputs = (sourceId: InvocationSourceId): InvocationRuntimeInputs => ({
+  noiseDevice: resolveRandDeviceMetadata(false, getGenerationDevicesSnapshot().options),
+  templates:
+    sourceId === 'workflow'
+      ? structuredClone(getInvocationTemplatesSnapshot())
+      : { error: null, status: 'idle', templates: {} },
+  boardDestinationIds: getGalleryBoardDestinationIds(),
 });
