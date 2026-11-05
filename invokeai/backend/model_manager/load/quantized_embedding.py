@@ -11,12 +11,12 @@ The framework reserves a model's *file size* before a load (``ModelLoader._load_
 by construction does not cover unpacking a tensor on top of it. That gap is the reason this lives in
 one place: 0.78 GB for a Qwen3-VL 4B, 1.24 GB for the 8B, and several times that at the peak.
 
-Callers are the five single-file text-encoder loaders that reach a quantized embedding: Qwen3-VL
-GGUF, Qwen3 GGUF, Qwen3 SDNQ, Z-Image diffusers SDNQ and Mistral GGUF. Not an inventory of every
-such step in the tree -- ``gemma2_encoder.py`` dequantizes a 1.18 GB Gemma-2 embedding from a free
-function with no cache to reserve against, and ``flux.py`` does the same for T5 and CLIP. Those are
-other families, still unreserved, and folding them in means threading a cache through their call
-chains.
+Callers are the six single-file text-encoder loaders that reach a quantized embedding: Qwen3-VL
+GGUF, Qwen3 GGUF, Qwen3 SDNQ, Z-Image diffusers SDNQ, Mistral GGUF and Wan's UMT5 GGUF. Not an
+inventory of every such step in the tree -- ``gemma2_encoder.py`` dequantizes a 1.18 GB Gemma-2
+embedding from a free function with no cache to reserve against, and ``flux.py`` does the same for
+T5 and CLIP. Those are other families, still unreserved, and folding them in means threading a
+cache through their call chains.
 """
 
 from typing import Any
