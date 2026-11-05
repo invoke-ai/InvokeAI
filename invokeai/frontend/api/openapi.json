@@ -1686,6 +1686,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -1719,6 +1722,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -1735,6 +1741,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -1873,6 +1882,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -2237,6 +2249,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -2270,6 +2285,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -2286,6 +2304,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -2424,6 +2445,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -2788,6 +2812,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -2821,6 +2848,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -2837,6 +2867,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -2975,6 +3008,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -3384,6 +3420,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -3417,6 +3456,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -3433,6 +3475,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -3571,6 +3616,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -4007,6 +4055,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -4040,6 +4091,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -4056,6 +4110,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -4194,6 +4251,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -5505,6 +5565,9 @@
                       "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                     },
                     {
@@ -5538,6 +5601,9 @@
                       "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                     },
                     {
@@ -5554,6 +5620,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -5692,6 +5761,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -21399,6 +21471,9 @@
             "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
           },
           {
@@ -21432,6 +21507,9 @@
             "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+          },
+          {
             "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
           },
           {
@@ -21448,6 +21526,9 @@
           },
           {
             "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+          },
+          {
+            "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
           },
           {
             "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -21586,6 +21667,9 @@
           },
           {
             "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+          },
+          {
+            "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
           },
           {
             "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -40767,6 +40851,220 @@
         "title": "Flux3LayoutRegion",
         "type": "object"
       },
+      "Flux3LoRACollectionLoader": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Applies a collection of LoRAs to a FLUX.3 transformer.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoRAField"
+              },
+              {
+                "items": {
+                  "$ref": "#/components/schemas/LoRAField"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA models and weights. May be a single LoRA or collection.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "LoRAs",
+            "ui_model_base": ["flux3"],
+            "ui_model_type": ["lora"]
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "flux3_lora_collection_loader",
+            "default": "flux3_lora_collection_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "flux3", "flux"],
+        "title": "Apply LoRA Collection - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
+        }
+      },
+      "Flux3LoRALoaderInvocation": {
+        "category": "model",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Apply a LoRA model to a FLUX.3 transformer. A LoRA trained on Klein Base also applies to Klein.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "lora": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "LoRA model to load",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "LoRA",
+            "ui_model_base": ["flux3"],
+            "ui_model_type": ["lora"]
+          },
+          "weight": {
+            "default": 1.0,
+            "description": "The weight at which the LoRA is applied to each model",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Weight",
+            "type": "number"
+          },
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_default": null,
+            "orig_required": false,
+            "title": "Transformer"
+          },
+          "type": {
+            "const": "flux3_lora_loader",
+            "default": "flux3_lora_loader",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["lora", "model", "flux3", "flux"],
+        "title": "Apply LoRA - FLUX.3",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
+        }
+      },
+      "Flux3LoRALoaderOutput": {
+        "class": "output",
+        "description": "FLUX.3 LoRA Loader Output",
+        "properties": {
+          "transformer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TransformerField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Transformer",
+            "field_kind": "output",
+            "title": "Transformer",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "flux3_lora_loader_output",
+            "default": "flux3_lora_loader_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "transformer", "type", "type"],
+        "title": "Flux3LoRALoaderOutput",
+        "type": "object"
+      },
       "Flux3ModelLoaderInvocation": {
         "category": "model",
         "class": "invocation",
@@ -46609,6 +46907,12 @@
                   "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/Flux3LoRACollectionLoader"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3LoRALoaderInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
                 },
                 {
@@ -47579,6 +47883,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Flux3ConditioningOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
                 },
                 {
                   "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
@@ -57082,6 +57389,12 @@
                 "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
               },
               {
+                "$ref": "#/components/schemas/Flux3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRALoaderInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
               },
               {
@@ -58050,6 +58363,9 @@
                 "$ref": "#/components/schemas/Flux3ConditioningOutput"
               },
               {
+                "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
+              },
+              {
                 "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
               },
               {
@@ -58767,6 +59083,12 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
@@ -59944,6 +60266,12 @@
           "flux3_layout_prompt": {
             "$ref": "#/components/schemas/StringOutput"
           },
+          "flux3_lora_collection_loader": {
+            "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
+          },
+          "flux3_lora_loader": {
+            "$ref": "#/components/schemas/Flux3LoRALoaderOutput"
+          },
           "flux3_model_loader": {
             "$ref": "#/components/schemas/Flux3ModelLoaderOutput"
           },
@@ -60857,6 +61185,8 @@
           "flux2_vae_encode",
           "flux3_denoise",
           "flux3_layout_prompt",
+          "flux3_lora_collection_loader",
+          "flux3_lora_loader",
           "flux3_model_loader",
           "flux3_text_encoder",
           "flux_control_lora_loader",
@@ -61490,6 +61820,12 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
@@ -62783,6 +63119,12 @@
               },
               {
                 "$ref": "#/components/schemas/Flux3LayoutPromptInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRACollectionLoader"
+              },
+              {
+                "$ref": "#/components/schemas/Flux3LoRALoaderInvocation"
               },
               {
                 "$ref": "#/components/schemas/Flux3ModelLoaderInvocation"
@@ -71786,6 +72128,158 @@
         "title": "LoRA_Diffusers_Flux2_Config",
         "description": "Model config for FLUX.2 (Klein) LoRA models in Diffusers format."
       },
+      "LoRA_Diffusers_Flux3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux3",
+            "title": "Base",
+            "default": "flux3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_Diffusers_Flux3_Config",
+        "description": "Model config for a FLUX.3 Image LoRA saved as a diffusers folder (`pytorch_lora_weights.safetensors`), as a\nrepository-id install of a diffusers trainer's output leaves it. The file is held to what\n`LoRA_LyCORIS_Flux3_Config` holds a single file to."
+      },
       "LoRA_Diffusers_SD1_Config": {
         "properties": {
           "key": {
@@ -72867,6 +73361,158 @@
         ],
         "title": "LoRA_LyCORIS_Flux2_Config",
         "description": "Model config for FLUX.2 (Klein) LoRA models in LyCORIS format."
+      },
+      "LoRA_LyCORIS_Flux3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "lora",
+            "title": "Type",
+            "default": "lora"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoraModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "format": {
+            "type": "string",
+            "const": "lycoris",
+            "title": "Format",
+            "default": "lycoris"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux3",
+            "title": "Base",
+            "default": "flux3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "format",
+          "base"
+        ],
+        "title": "LoRA_LyCORIS_Flux3_Config",
+        "description": "Model config for FLUX.3 Image LoRA files: diffusers/PEFT, Black Forest Labs' native names (ai-toolkit, ComfyUI)\nand raw PEFT, of low-rank, DoRA, LoKR, LoHA or full layers that apply to the transformer in full, with no diffusers\nheader or one describing a PEFT LoRA (`peft_scale`). LyCORIS here is the single-file format: LyCORIS's own\nflattened key names (`lycoris_...`) are none of these layouts and are not recognized.\n\nNo variant: Klein and Klein Base share the transformer, so a LoRA trained on either runs on both."
       },
       "LoRA_LyCORIS_Krea2_Config": {
         "properties": {
@@ -91751,6 +92397,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
               },
               {
@@ -91784,6 +92433,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -91800,6 +92452,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -91938,6 +92593,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -92548,6 +93206,9 @@
                     "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                   },
                   {
@@ -92581,6 +93242,9 @@
                     "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                   },
                   {
@@ -92597,6 +93261,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                   },
                   {
                     "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -92735,6 +93402,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                   },
                   {
                     "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -93275,6 +93945,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
               },
               {
@@ -93308,6 +93981,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -93324,6 +94000,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -93462,6 +94141,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -93813,6 +94495,9 @@
                 "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
               },
               {
@@ -93846,6 +94531,9 @@
                 "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
               },
               {
@@ -93862,6 +94550,9 @@
               },
               {
                 "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+              },
+              {
+                "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -94000,6 +94691,9 @@
               },
               {
                 "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+              },
+              {
+                "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -94848,6 +95542,9 @@
                   "$ref": "#/components/schemas/LoRA_LyCORIS_QwenImage21_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_LyCORIS_Flux3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_LyCORIS_LTX2_Config"
                 },
                 {
@@ -94881,6 +95578,9 @@
                   "$ref": "#/components/schemas/LoRA_Diffusers_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/LoRA_Diffusers_Flux3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/LoRA_Diffusers_ZImage_Config"
                 },
                 {
@@ -94897,6 +95597,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/T5Encoder_GGUF_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/T5Encoder_Checkpoint_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Qwen3VLEncoder_Checkpoint_MiniMaxH3_Config"
@@ -95035,6 +95738,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/TextLLM_Diffusers_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/TextLLM_Checkpoint_Config"
                 },
                 {
                   "$ref": "#/components/schemas/ExternalApiModelConfig"
@@ -112447,6 +113153,155 @@
         "title": "T5Encoder_BnBLLMint8_Config",
         "description": "Configuration for T5 Encoder models quantized by bitsandbytes' LLM.int8."
       },
+      "T5Encoder_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "type": {
+            "type": "string",
+            "const": "t5_encoder",
+            "title": "Type",
+            "default": "t5_encoder"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "base",
+          "type",
+          "format",
+          "cpu_only"
+        ],
+        "title": "T5Encoder_Checkpoint_Config",
+        "description": "Configuration for a T5 encoder in a single safetensors file with transformers key names.\n\nThis is how ComfyUI distributes T5-XXL (``t5xxl_fp16``, ``t5xxl_fp8_e4m3fn`` and\n``t5xxl_fp8_e4m3fn_scaled``): the ``T5EncoderModel`` state dict as is, with no config and no tokenizer."
+      },
       "T5Encoder_GGUF_Config": {
         "properties": {
           "key": {
@@ -113862,6 +114717,162 @@
           "$ref": "#/components/schemas/StringOutput"
         }
       },
+      "TextLLM_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "text_llm",
+            "title": "Type",
+            "default": "text_llm"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "any",
+            "title": "Base",
+            "default": "any"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "supports_images": {
+            "type": "boolean",
+            "title": "Supports Images",
+            "description": "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image",
+            "default": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "base",
+          "cpu_only",
+          "supports_images"
+        ],
+        "title": "TextLLM_Checkpoint_Config",
+        "description": "Model config for a single-file Qwen3.5 vision-language model, run as a text LLM.\n\nThe layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3\nprompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file\ncarries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,\nwhich exist for the 9B. Its LM head sets it apart from the Qwen3.5 text-encoder exports, which have none and\nare `Qwen35Encoder_Checkpoint_Config`'s."
+      },
       "TextLLM_Diffusers_Config": {
         "properties": {
           "key": {
@@ -114008,7 +115019,7 @@
           "supports_images"
         ],
         "title": "TextLLM_Diffusers_Config",
-        "description": "Model config for text-only causal language models (e.g. Llama, Phi, Qwen, Mistral)."
+        "description": "Model config for a language model folder: a causal LM (Llama, Phi, Qwen, Mistral, ...) or an allow-listed\nvision-language model (Gemma-4, Qwen3.5)."
       },
       "TextureInvocation": {
         "category": "image",

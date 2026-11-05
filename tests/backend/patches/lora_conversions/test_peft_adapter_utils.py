@@ -88,3 +88,14 @@ def test_preserves_integer_keys():
     result = normalize_peft_adapter_names(sd)
     assert 0 in result
     assert "x.lora_A.weight" in result
+
+
+def test_strips_the_adapter_name_from_a_dora_magnitude():
+    """A raw PEFT DoRA state dict names its magnitude like its pair; left named, the magnitude matches no layer."""
+    sd = {
+        "x.lora_A.default.weight": _t(),
+        "x.lora_B.default.weight": _t(),
+        "x.lora_magnitude_vector.default.weight": _t(),
+    }
+    result = normalize_peft_adapter_names(sd)
+    assert set(result) == {"x.lora_A.weight", "x.lora_B.weight", "x.lora_magnitude_vector.weight"}

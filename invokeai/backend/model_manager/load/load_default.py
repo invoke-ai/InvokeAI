@@ -365,6 +365,15 @@ class ModelLoader(ModelLoaderBase):
 
         return None
 
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        """A suffix for the cache key when the weights this loader builds depend on its device.
+
+        Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
+        loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
+        returns the format here, so only devices that build the same weights share a copy. Empty by default.
+        """
+        return ""
+
     def _load_and_cache(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
     ) -> tuple[CacheRecord, Optional[FirstUseClaim]]:
@@ -380,6 +389,9 @@ class ModelLoader(ModelLoaderBase):
         """
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
         cache_key = get_model_cache_key(config.key, submodel_type)
+        variant = self._cache_key_variant(config, submodel_type)
+        if variant:
+            cache_key = f"{cache_key}:{variant}"
         try:
             return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
         except IndexError:
