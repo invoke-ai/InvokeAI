@@ -60,7 +60,15 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
 
         # No-op when the effect is disabled, so the node can stay wired in the graph without altering output.
         if self.strength == 0.0 or self.randomize_percent == 0.0:
-            return Krea2ConditioningOutput.build(self.conditioning.conditioning_name, mask=self.conditioning.mask)
+            return Krea2ConditioningOutput(
+                conditioning=self.conditioning.model_copy(
+                    update={
+                        "seed_variance_enabled": False,
+                        "seed_variance_strength": self.strength,
+                        "seed_variance_randomize_percent": int(self.randomize_percent),
+                    }
+                )
+            )
 
         # Auto-calibrate the noise magnitude to the embedding scale (same approach as the Z-Image enhancer).
         # This keeps the perceptual effect of `strength` stable across prompts and, crucially, whether or not
@@ -87,4 +95,13 @@ class Krea2SeedVarianceInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(new_data)
-        return Krea2ConditioningOutput.build(conditioning_name, mask=self.conditioning.mask)
+        return Krea2ConditioningOutput(
+            conditioning=self.conditioning.model_copy(
+                update={
+                    "conditioning_name": conditioning_name,
+                    "seed_variance_enabled": True,
+                    "seed_variance_strength": self.strength,
+                    "seed_variance_randomize_percent": int(self.randomize_percent),
+                }
+            )
+        )

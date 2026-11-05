@@ -32,6 +32,7 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen3EncoderField, Qwen35EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -117,8 +118,16 @@ class AnimaTextEncoderInvocation(BaseInvocation):
             ]
         )
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = extract_loras_metadata(getattr(self.qwen3_encoder, "loras", None))
         return AnimaConditioningOutput(
-            conditioning=AnimaConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=AnimaConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_encoder=extract_encoder_model(self.qwen3_encoder),
+                qwen3_5_encoder=extract_encoder_model(self.qwen3_5_encoder),
+                loras=loras,
+            )
         )
 
     def _encode_prompt(

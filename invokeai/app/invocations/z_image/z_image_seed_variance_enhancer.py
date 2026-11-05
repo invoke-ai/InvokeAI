@@ -69,7 +69,15 @@ class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):
 
         # Early return if strength is zero (no modification needed)
         if self.strength == 0:
-            return ZImageConditioningOutput(conditioning=self.conditioning)
+            return ZImageConditioningOutput(
+                conditioning=self.conditioning.model_copy(
+                    update={
+                        "seed_variance_enabled": False,
+                        "seed_variance_strength": 0.0,
+                        "seed_variance_randomize_percent": int(self.randomize_percent),
+                    }
+                )
+            )
 
         # Clone embeddings to avoid modifying the original
         prompt_embeds = z_image_conditioning.prompt_embeds.clone()
@@ -107,8 +115,12 @@ class ZImageSeedVarianceEnhancerInvocation(BaseInvocation):
         conditioning_name = context.conditioning.save(conditioning_data)
 
         return ZImageConditioningOutput(
-            conditioning=ZImageConditioningField(
-                conditioning_name=conditioning_name,
-                mask=self.conditioning.mask,
+            conditioning=self.conditioning.model_copy(
+                update={
+                    "conditioning_name": conditioning_name,
+                    "seed_variance_enabled": True,
+                    "seed_variance_strength": self.strength,
+                    "seed_variance_randomize_percent": int(self.randomize_percent),
+                }
             )
         )

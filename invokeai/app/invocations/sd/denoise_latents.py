@@ -36,6 +36,7 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.metadata import (
     LatentsMetaOutput,
     build_denoise_metadata,
+    extract_conditioning_metadata,
     serialize_adapter_metadata,
     serialize_ip_adapter_ref_images,
     serialize_lora_metadata,
@@ -984,6 +985,34 @@ class DenoiseLatentsInvocation(BaseInvocation, WithMetadata):
             updates["seed"] = self.noise.seed
         elif self.latents and self.latents.seed is not None:
             updates["seed"] = self.latents.seed
+
+        cond_updates = extract_conditioning_metadata(
+            self.positive_conditioning, getattr(self, "negative_conditioning", None)
+        )
+        if (
+            getattr(self.unet.unet, "base", None) == BaseModelType.StableDiffusionXLRefiner
+            and getattr(self, "metadata", None) is not None
+            and "model" in self.metadata.root
+        ):
+            updates["refiner_model"] = self.unet.unet
+            updates["refiner_cfg_scale"] = self.cfg_scale
+            updates["refiner_steps"] = self.steps
+            updates["refiner_scheduler"] = self.scheduler
+            updates["refiner_start"] = self.denoising_start
+            updates.pop("model", None)
+            updates.pop("cfg_scale", None)
+            updates.pop("steps", None)
+            updates.pop("scheduler", None)
+            if "positive_aesthetic_score" in cond_updates:
+                updates["refiner_positive_aesthetic_score"] = cond_updates.pop("positive_aesthetic_score")
+            if "negative_aesthetic_score" in cond_updates:
+                updates["refiner_negative_aesthetic_score"] = cond_updates.pop("negative_aesthetic_score")
+
+        if "loras" in cond_updates and "loras" in updates:
+            updates["loras"] = serialize_lora_metadata(updates.get("loras"), cond_updates.get("loras"))
+        for k, v in cond_updates.items():
+            if k not in updates:
+                updates[k] = v
 
         return build_denoise_metadata(getattr(self, "metadata", None), updates)
 

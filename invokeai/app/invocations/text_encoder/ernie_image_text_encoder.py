@@ -10,6 +10,7 @@ from invokeai.app.invocations.fields import (
     InputField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model
 from invokeai.app.invocations.model import Mistral3EncoderField
 from invokeai.app.invocations.primitives import ErnieImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -56,7 +57,11 @@ class ErnieImageTextEncoderInvocation(BaseInvocation):
         )
         conditioning_name = context.conditioning.save(conditioning_data)
         return ErnieImageConditioningOutput(
-            conditioning=ErnieImageConditioningField(conditioning_name=conditioning_name)
+            conditioning=ErnieImageConditioningField(
+                conditioning_name=conditioning_name,
+                prompt=self.prompt,
+                mistral_encoder=extract_encoder_model(self.text_encoder),
+            )
         )
 
     def _encode_prompt(self, context: InvocationContext, prompt: str) -> torch.Tensor:
