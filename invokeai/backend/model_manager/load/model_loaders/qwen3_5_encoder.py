@@ -65,6 +65,7 @@ def load_qwen3_5_text_encoder(
     final_norm: bool,
     keep_fp8: bool,
     what: str,
+    model_dtype: Optional[torch.dtype] = None,
 ) -> "Qwen35Encoder":
     """Build a `Qwen35Encoder` from the language-model tensors of a safetensors file or of a model's shards.
 
@@ -77,11 +78,11 @@ def load_qwen3_5_text_encoder(
         final_norm: Build and load the final norm, for a caller that reads the last hidden state. The
             checkpoint must then ship `norm.weight` and every layer whole.
         keep_fp8: Whether a raw-fp8 checkpoint's weights stay packed rather than widened: the calling
-            loader's `_keep_fp8_weights` answer, asked by the caller because `test_fp8_capability.py`
-            can only see the fp8 helpers reached through a loader's own methods. For an encoder that
-            means the fp8 matmul: text encoders never take FP8 Storage's layerwise cast
+            loader's snapshotted storage decision. For an encoder that means the fp8 matmul:
+            text encoders never take FP8 Storage's layerwise cast
             (`_FP8_EXCLUDED_SUBMODEL_TYPES`).
         what: Names the checkpoint in errors and log lines.
+        model_dtype: The calling loader's snapshotted dtype; direct callers may use the session default.
     """
     from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder
 
@@ -120,7 +121,8 @@ def load_qwen3_5_text_encoder(
                 layer.post_attention_layernorm = nn.Identity()
                 loader._logger.info(f"Qwen3.5 encoder: layer {index} ships without an MLP; running it attention-only.")
 
-    model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+    if model_dtype is None:
+        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
     skip_patterns = _model_declared_skip_patterns(model)
     reserve_for_load(
         loader.ram_cache.make_room,
@@ -148,6 +150,8 @@ def load_qwen3_5_text_encoder(
 class Qwen35EncoderCheckpointLoader(ModelLoader):
     """Loads a single-file Qwen3.5 text encoder and the vendored Qwen3.5 tokenizer."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Qwen35Encoder_Checkpoint_Config):
             raise ValueError("Only Qwen35Encoder_Checkpoint_Config models are supported here.")
@@ -169,6 +173,7 @@ class Qwen35EncoderCheckpointLoader(ModelLoader):
         from invokeai.backend.qwen3_5.qwen3_5_encoder import qwen3_5_text_config
 
         model_path = Path(config.path)
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
         model = load_qwen3_5_text_encoder(
             self,
             [model_path],
@@ -176,7 +181,8 @@ class Qwen35EncoderCheckpointLoader(ModelLoader):
             # MOSS-Image reads the 9B after its final norm. Anima-3.8B reads intermediate layers of the 4B,
             # and its checkpoint keeps a projection head under `norm.*` instead.
             final_norm=config.variant in QWEN3_5_FINAL_NORM_VARIANTS,
-            keep_fp8=self._keep_fp8_weights(config, SubModelType.TextEncoder),
+            keep_fp8=keep_fp8,
             what=f"Qwen3.5 encoder checkpoint {model_path.name}",
+            model_dtype=model_dtype,
         )
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.TextEncoder)

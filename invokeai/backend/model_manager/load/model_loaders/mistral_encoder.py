@@ -1126,6 +1126,25 @@ class MistralEncoderDiffusersLoader(ModelLoader):
 class MistralEncoderCheckpointLoader(ModelLoader):
     """Load a Mistral encoder from a single safetensors file (text-only)."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
+
+    def _storage_format(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> tuple[bool, torch.dtype]:
+        # Like T5, the encoder keeps checkpoint fp8 whenever storage is supported, independently
+        # of the denoiser's FP8 Storage setting. cpu_only changes both this policy and the dtype.
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
+        key = (id(config), submodel_type)
+        if key not in decisions:
+            device = self._get_execution_device(config, submodel_type) or self._torch_device
+            compute = should_keep_fp8_weights(device)
+            self.__dict__.setdefault("_fp8_compute_decisions", {})[device] = compute
+            decisions[key] = (
+                compute or _device_supports_fp8_storage(device, self._logger),
+                self._storage_dtype(config, submodel_type),
+            )
+        return decisions[key]
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1150,8 +1169,7 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         from safetensors.torch import load_file
 
         logger = InvokeAILogger.get_logger(self.__class__.__name__)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
 
         model_path = Path(config.path)
         sd = load_file(model_path)
@@ -1205,7 +1223,6 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         # placed after it would never run on the device almost everyone loads on.
         reject_int8_layers_a_plain_fold_cannot_decode(sd, "This Mistral encoder checkpoint")
 
-        keep_fp8 = should_keep_fp8_weights(target_device) or _device_supports_fp8_storage(target_device, logger)
         fp8_layers: dict[str, Any] = {}
         if keep_fp8:
             layer_hints = {**extract_comfy_quant_hints(sd), **header_hints}

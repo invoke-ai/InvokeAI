@@ -355,6 +355,7 @@ def _qwen_image_2_1_pipeline(
     )
     config = Main_Diffusers_QwenImage21_Config.model_construct(path=str(tmp_path), repo_variant=None)
     loader = object.__new__(QwenImage21DiffusersModel)
+    loader._torch_device = torch.device("cpu")
     loader._apply_fp8_layerwise_casting = lambda model, _config, _submodel: model
     encoder = saved.model if conditional_generation else saved
     return loader, config, encoder

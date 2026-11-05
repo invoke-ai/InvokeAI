@@ -242,6 +242,9 @@ def _convert_z_image_gguf_to_diffusers(sd: dict[str, Any]) -> dict[str, Any]:
 class ZImageDiffusersModel(GenericDiffusersLoader):
     """Class to load Z-Image main models (Z-Image-Turbo, Z-Image-Base, Z-Image-Edit)."""
 
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return self._storage_dtype(config, submodel_type)
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -267,9 +270,8 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
         repo_variant = config.repo_variant if isinstance(config, Diffusers_Config_Base) else None
         variant = repo_variant.value if repo_variant else None
 
-        # Z-Image prefers bfloat16, but use safe dtype based on target device capabilities.
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        # Reuse the constructor dtype that selected the shared-weight key.
+        dtype = self._layerwise_dtype(config, submodel_type)
         try:
             result: AnyModel = load_class.from_pretrained(
                 submodel_path,
@@ -463,6 +465,8 @@ class ZImageDiffusersModel(GenericDiffusersLoader):
 class ZImageCheckpointModel(ModelLoader):
     """Class to load Z-Image transformer models from single-file checkpoints (safetensors, etc)."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -500,9 +504,8 @@ class ZImageCheckpointModel(ModelLoader):
         # "model.diffusion_model." (ComfyUI-style format). Check if we need to strip this prefix.
         sd = CheckpointPrefix.detect(sd).strip(sd)
 
-        # Determine safe dtype based on target device capabilities
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        # Use the same dtype snapshot that selected the shared-weight cache key.
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         # Per-layer hints from the safetensors header and/or the per-tensor `.comfy_quant` markers:
         # `full_precision_matrix_mult` for scaled fp8, and for nvfp4 the evidence that a layer follows

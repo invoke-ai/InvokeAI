@@ -857,6 +857,11 @@ class T5EncoderSingleFileLoader(ModelLoader):
 class FluxCheckpointModel(ModelLoader):
     """Class to load main models."""
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    def _storage_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1129,6 +1134,9 @@ class FluxBnbQuantizednf4bCheckpointModel(ModelLoader):
 class FluxDiffusersModel(GenericDiffusersLoader):
     """Class to load FLUX.1 main models in diffusers format."""
 
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -1147,7 +1155,7 @@ class FluxDiffusersModel(GenericDiffusersLoader):
         model_path = model_path / submodel_type.value
 
         # We force bfloat16 for FLUX models. This is required for correct inference.
-        dtype = torch.bfloat16
+        dtype = self._layerwise_dtype(config, submodel_type)
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -1170,6 +1178,9 @@ class FluxDiffusersModel(GenericDiffusersLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Diffusers)
 class Flux2DiffusersModel(GenericDiffusersLoader):
     """Class to load FLUX.2 main models in diffusers format (e.g. FLUX.2 Klein)."""
+
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return torch.bfloat16
 
     def _load_model(
         self,
@@ -1194,7 +1205,7 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
         # won't be in the checkpoint but the model class still creates them.
         # We use SilenceWarnings to suppress the "guidance_embeds is not expected" warning
         # from diffusers Flux2Transformer2DModel.
-        dtype = torch.bfloat16
+        dtype = self._layerwise_dtype(config, submodel_type)
         with SilenceWarnings():
             try:
                 result: AnyModel = load_class.from_pretrained(
@@ -1247,6 +1258,11 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.Flux2, type=ModelType.Main, format=ModelFormat.Checkpoint)
 class Flux2CheckpointModel(ModelLoader):
     """Class to load FLUX.2 transformer models from single-file checkpoints (safetensors)."""
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
+    def _storage_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return torch.bfloat16
 
     def _load_model(
         self,

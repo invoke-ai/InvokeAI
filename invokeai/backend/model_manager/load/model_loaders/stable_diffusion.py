@@ -22,7 +22,6 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXL_Config,
     Main_Diffusers_SDXLRefiner_Config,
 )
-from invokeai.backend.model_manager.load.model_cache.model_cache import get_model_cache_key
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.generic_diffusers import GenericDiffusersLoader
 from invokeai.backend.model_manager.taxonomy import (
@@ -152,12 +151,13 @@ class StableDiffusionDiffusersModel(GenericDiffusersLoader):
             if subtype == submodel_type:
                 continue
             if submodel := getattr(pipeline, subtype.value, None):
+                cache_key = self._get_cache_key(config, subtype)
                 self._apply_fp8_layerwise_casting(submodel, config, subtype)
                 # prefetch: nothing will get()/lock() these submodels during this load, so they
                 # must be admitted without the post-admission grace — otherwise the never-used
                 # records would be skipped by budget reconciles until some later admission on
                 # this cache sweeps the stale flags.
-                self._ram_cache.put(get_model_cache_key(config.key, subtype), model=submodel, prefetch=True)
+                self._ram_cache.put(cache_key, model=submodel, prefetch=True)
         result = getattr(pipeline, submodel_type.value)
         result = self._apply_fp8_layerwise_casting(result, config, submodel_type)
         return result

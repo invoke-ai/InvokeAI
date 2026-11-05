@@ -144,12 +144,16 @@ def _read_component_state_dict(directory: Path) -> dict[str, torch.Tensor]:
 class _MossImageTransformerLoading(ModelLoader):
     """The transformer load both MOSS-Image formats share, once each has a state dict and a geometry."""
 
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        return TorchDevice.choose_bfloat16_safe_dtype(device)
+
     def _load_transformer(
         self, config: AnyModelConfig, sd: dict[str, torch.Tensor], geometry: dict[str, Any], what: str
     ) -> AnyModel:
         # Strict below would name an orphaned scale key; this names the cause before anything is reserved.
         reject_quantized_side_channel(sd, what)
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+        dtype = self._layerwise_dtype(config, SubModelType.Transformer)
 
         with accelerate.init_empty_weights():
             model = MOSSImageTransformer(**geometry)
@@ -181,6 +185,8 @@ class _MossImageTransformerLoading(ModelLoader):
 @ModelLoaderRegistry.register(base=BaseModelType.MossImage, type=ModelType.Main, format=ModelFormat.Diffusers)
 class MossImageDiffusersModel(_MossImageTransformerLoading):
     """Loads MOSS-Image submodels from a diffusers pipeline folder (MOSS-Image Base or SFT)."""
+
+    _fp8_checkpoint_submodels = frozenset({SubModelType.TextEncoder})
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Diffusers_MossImage_Config):
@@ -224,14 +230,16 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
         shards = list(moss_image_component_shards(text_encoder_dir))
         # No FP8 Storage cast follows: text encoders never take it (`_FP8_EXCLUDED_SUBMODEL_TYPES`). `keep_fp8` only
         # keeps a raw-fp8 checkpoint packed for the fp8 matmul.
+        keep_fp8, model_dtype = self._storage_format(config, SubModelType.TextEncoder)
         return load_qwen3_5_text_encoder(
             self,
             shards,
             text_config,
             # MOSS-Image reads the last hidden state, after the final norm.
             final_norm=True,
-            keep_fp8=self._keep_fp8_weights(config, SubModelType.TextEncoder),
+            keep_fp8=keep_fp8,
             what=f"MOSS-Image text encoder in {Path(config.path).name}",
+            model_dtype=model_dtype,
         )
 
 
@@ -242,6 +250,8 @@ class MossImageCheckpointModel(_MossImageTransformerLoading):
     The file holds the transformer alone, under the diffusers checkpoint's keys. Its text encoder and VAE are separate
     models, chosen on the loader node.
     """
+
+    _default_submodel_type = SubModelType.Transformer
 
     def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
         if not isinstance(config, Main_Checkpoint_MossImage_Config):

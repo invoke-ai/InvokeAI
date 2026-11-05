@@ -15,6 +15,7 @@ import psutil
 import torch
 
 from invokeai.app.util.torch_cuda_allocator import expandable_segments_enabled
+from invokeai.backend.model_manager.cache_key import get_model_cache_key  # noqa: F401 - public import compatibility
 from invokeai.backend.model_manager.load.memory_snapshot import MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
@@ -33,7 +34,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch
     apply_custom_layers_to_model,
 )
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
-from invokeai.backend.model_manager.taxonomy import AnyModel, SubModelType
+from invokeai.backend.model_manager.taxonomy import AnyModel
 from invokeai.backend.util.devices import TorchDevice, device_has_dedicated_vram
 from invokeai.backend.util.level_zero import xpu_device_is_integrated
 from invokeai.backend.util.logging import InvokeAILogger
@@ -389,15 +390,6 @@ MODEL_LOAD_LOCK = _ModelLoadReadWriteLock()
 # construction's wait to roughly one pass. 1 GiB keeps the per-pass overhead (lock churn plus a
 # re-scan of the model's state dict) negligible against the transfer itself.
 VRAM_MOVE_PASS_BYTES = 1 << 30
-
-
-# TODO(ryand): Where should this go? The ModelCache shouldn't be concerned with submodels.
-def get_model_cache_key(model_key: str, submodel_type: Optional[SubModelType] = None) -> str:
-    """Get the cache key for a model based on the optional submodel type."""
-    if submodel_type:
-        return f"{model_key}:{submodel_type.value}"
-    else:
-        return model_key
 
 
 def synchronized(method: Callable[..., Any]) -> Callable[..., Any]:

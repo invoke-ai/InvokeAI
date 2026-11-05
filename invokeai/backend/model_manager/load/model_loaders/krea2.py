@@ -418,6 +418,9 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
     pipeline's tokenizer for reference images. Krea-2's edit mode loads both only when a prompt has references.
     """
 
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return self._storage_dtype(config, submodel_type)
+
     def get_size_fs(
         self, config: AnyModelConfig, model_path: Path, submodel_type: Optional[SubModelType] = None
     ) -> int:
@@ -468,9 +471,8 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
         variant = repo_variant.value if repo_variant else None
         model_path = model_path / submodel_type.value
 
-        # Krea-2 prefers bfloat16; use a safe dtype based on target device capabilities.
-        target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        # Reuse the constructor dtype that selected the shared-weight key.
+        dtype = self._layerwise_dtype(config, submodel_type)
 
         extra_kwargs: dict[str, Any] = {}
         if submodel_type is SubModelType.TextEncoder:
@@ -524,6 +526,8 @@ class Krea2CheckpointModel(ModelLoader):
     build, whose layers the header names too, stays packed as `NVFP4Linear`.
     """
 
+    _fp8_checkpoint_submodels = frozenset({SubModelType.Transformer})
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -546,8 +550,7 @@ class Krea2CheckpointModel(ModelLoader):
             raise TypeError(f"Expected Main_Checkpoint_Krea2_Config, got {type(config).__name__}.")
         model_path = Path(config.path)
 
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        _keep, model_dtype = self._storage_format(config, SubModelType.Transformer)
 
         sd = load_file(model_path)
         metadata = read_safetensors_metadata(model_path, self._logger)
@@ -1067,6 +1070,25 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
 
     CONFIG_CLASS = Qwen3VLEncoder_Checkpoint_Config
 
+    def _encoder_storage_format(self, config: AnyModelConfig) -> tuple[bool, bool, torch.dtype]:
+        device = self._get_execution_device(config, SubModelType.TextEncoder) or self._torch_device
+        decisions = self.__dict__.setdefault("_encoder_storage_decisions", {})
+        if device not in decisions:
+            compute = should_keep_fp8_weights(device)
+            storage = _device_supports_fp8_storage(device, self._logger)
+            self.__dict__.setdefault("_fp8_compute_decisions", {})[device] = compute
+            decisions[device] = (compute, storage, self._storage_dtype(config, SubModelType.TextEncoder))
+        return decisions[device]
+
+    def _cache_key_variant(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        if submodel_type is SubModelType.TextEncoder:
+            compute, storage, dtype = self._encoder_storage_format(config)
+            return (
+                f"{'fp8' if compute or storage else 'full'}-{str(dtype).removeprefix('torch.')}"
+                f"{'-layerwise' if storage else ''}"
+            )
+        return super()._cache_key_variant(config, submodel_type)
+
     def _vision_encoder_nbytes(self, model_path: Path) -> int:
         return qwen3vl_visual_tower_nbytes([model_path])
 
@@ -1085,8 +1107,7 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
         from transformers import Qwen3VLModel
 
         model_path = Path(config.path)
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        keep_matmul_fp8, storage_supported, model_dtype = self._encoder_storage_format(config)
 
         sd = load_file(str(model_path))
         # Ahead of every pass that reads tensors, so the tower is never dequantized, cast, copied or
@@ -1147,17 +1168,9 @@ class Qwen3VLEncoderCheckpointLoader(_Qwen3VLEncoderSingleFileLoader[Qwen3VLEnco
             source_is_fp8 = bool(fp8_layers) or any(
                 getattr(t, "dtype", None) in (torch.float8_e4m3fn, torch.float8_e5m2) for t in sd.values()
             )
-            # Resolved once. `device_supports_fp8_matmul` deliberately does not cache an inconclusive
-            # probe, so two calls can disagree: a transient failure here followed by a success below
-            # would leave the scales already folded while the raw Linears stay quantized, i.e. the
-            # encoder silently on the storage path with the matmul log line never printed.
-            keep_matmul_fp8 = should_keep_fp8_weights(target_device)
-            # Resolved here, next to the matmul probe and for the same reason: the fold below is
-            # irreversible, so both consumers have to be known before it runs. Asking only about the
-            # matmul folded the scales away and then let the storage cast re-quantize the result to
-            # *unscaled* fp8 -- on a scaled checkpoint that is ~3% of the weights lost to underflow,
-            # for the byte count the file already had.
-            use_fp8_storage = source_is_fp8 and _device_supports_fp8_storage(self._torch_device, self._logger)
+            # Both consumers were snapshotted before the shared-store lookup. Folding is irreversible,
+            # so a later successful probe must not change the choice after the scales are gone.
+            use_fp8_storage = source_is_fp8 and storage_supported
 
         # Every layer that arrived scaled, before the split folds the ones the matmul cannot take. The storage
         # pass below must leave those alone: cast again, they would be re-quantized *without* their scale.

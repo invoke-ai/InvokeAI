@@ -53,6 +53,9 @@ class WanDiffusersModel(GenericDiffusersLoader):
     class for each submodel via the parent loader's ``get_hf_load_class``.
     """
 
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        return torch.bfloat16
+
     def _load_model(
         self,
         config: AnyModelConfig,
@@ -94,11 +97,12 @@ class WanDiffusersModel(GenericDiffusersLoader):
 
         # bfloat16 across the board: matches Diffusers WanPipeline reference and
         # avoids the fp16 instability seen in the Wan VAE.
+        dtype = self._layerwise_dtype(config, submodel_type)
         try:
-            result: AnyModel = _load_with_variant_fallback({"dtype": torch.bfloat16})
+            result: AnyModel = _load_with_variant_fallback({"dtype": dtype})
         except TypeError:
             # Older diffusers releases use torch_dtype instead of dtype.
-            result = _load_with_variant_fallback({"torch_dtype": torch.bfloat16})
+            result = _load_with_variant_fallback({"torch_dtype": dtype})
 
         # This override exists to force bfloat16, and in doing so it replaced the parent's whole
         # `_load_model` -- including the cast at `GenericDiffusersLoader._load_model`, which every

@@ -265,6 +265,12 @@ def _model_declared_skip_patterns(model: torch.nn.Module) -> tuple[str, ...]:
 class ModelLoader(ModelLoaderBase):
     """Default implementation of ModelLoaderBase."""
 
+    # Components whose checkpoint decoding can retain float8 even without FP8 Storage.
+    # Other components retain their ordinary keys, including tokenizers and VAEs.
+    _fp8_checkpoint_submodels: frozenset[SubModelType] = frozenset()
+    # Only loaders where None aliases one component declare this. Whole pipelines retain None.
+    _default_submodel_type: Optional[SubModelType] = None
+
     # Optionally set on an instance before `load_model()`: on a cache miss, entered with the caller's config
     # before MODEL_LOAD_LOCK is taken (entering may block) and exited after it is released; the callable it
     # yields is called once construction is serialized against cache invalidation, must not block, and False
@@ -357,9 +363,67 @@ class ModelLoader(ModelLoaderBase):
 
         Device caches share one canonical CPU copy per key, which a second device adopts instead of rerunning the
         loader. A loader whose stored format depends on the device (float8 where supported, the dtype it computes in)
-        returns the format here, so only devices that build the same weights share a copy. Empty by default.
+        returns the format here, so only devices that build the same weights share a copy. This deliberately
+        partitions by policy before reading the file, even if a particular file has no float8 weights.
         """
-        return ""
+        use_storage = self._snapshot_fp8_storage(config, submodel_type)
+        checkpoint = submodel_type in self._fp8_checkpoint_submodels
+        if checkpoint:
+            keep, dtype = self._storage_format(config, submodel_type)
+        elif (
+            self._fp8_storage_asked_for(config, submodel_type)
+            and fp8_storage_verdict(config.base, config.type, config.format).supported
+        ):
+            keep, dtype = use_storage, self._layerwise_dtype(config, submodel_type)
+        else:
+            return ""
+        return f"{'fp8' if keep else 'full'}-{str(dtype).removeprefix('torch.')}{'-layerwise' if use_storage else ''}"
+
+    def _snapshot_fp8_storage(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
+        """Freeze a construction decision without caching direct policy queries."""
+        decisions = self.__dict__.setdefault("_fp8_storage_decisions", {})
+        key = (id(config), submodel_type)
+        if key not in decisions:
+            decisions[key] = self._should_use_fp8(config, submodel_type)
+        return decisions[key]
+
+    def _storage_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        """The dtype a checkpoint loader holds beside any retained float8 weights."""
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        return TorchDevice.choose_bfloat16_safe_dtype(device)
+
+    def _select_layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        """The constructor's precision policy; generic loaders use the configured dtype."""
+        return self._torch_dtype
+
+    def _layerwise_dtype(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> torch.dtype:
+        """One constructor dtype for the shared key, skipped weights and cast hooks."""
+        decisions = self.__dict__.setdefault("_layerwise_dtype_decisions", {})
+        key = (id(config), submodel_type)
+        if key not in decisions:
+            decisions[key] = self._select_layerwise_dtype(config, submodel_type)
+        return decisions[key]
+
+    def _storage_format(
+        self, config: AnyModelConfig, submodel_type: Optional[SubModelType]
+    ) -> tuple[bool, torch.dtype]:
+        # ModelLoadService creates a fresh loader per public load. Snapshot here, before cache lookup,
+        # and reuse under MODEL_LOAD_LOCK: a transient capability failure may succeed on its next probe.
+        decisions = self.__dict__.setdefault("_storage_format_decisions", {})
+        key = (id(config), submodel_type)
+        if key not in decisions:
+            device = self._get_execution_device(config, submodel_type) or self._torch_device
+            compute = self.__dict__.setdefault("_fp8_compute_decisions", {})
+            if device not in compute:
+                compute[device] = should_keep_fp8_weights(device)
+            decisions[key] = (
+                compute[device] or self._snapshot_fp8_storage(config, submodel_type),
+                self._storage_dtype(config, submodel_type),
+            )
+        return decisions[key]
+
+    def _get_cache_key(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> str:
+        return get_model_cache_key(config.key, submodel_type, variant=self._cache_key_variant(config, submodel_type))
 
     def _load_and_cache(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
@@ -374,11 +438,10 @@ class ModelLoader(ModelLoaderBase):
         raises after the claim is armed, the claim dies with the frame that holds it and releases
         the hold itself.
         """
+        if submodel_type is None:
+            submodel_type = self._default_submodel_type
         stats_name = ":".join([config.base, config.type, config.name, (submodel_type or "")])
-        cache_key = get_model_cache_key(config.key, submodel_type)
-        variant = self._cache_key_variant(config, submodel_type)
-        if variant:
-            cache_key = f"{cache_key}:{variant}"
+        cache_key = self._get_cache_key(config, submodel_type)
         try:
             return self._ram_cache.get_with_first_use_claim(key=cache_key, stats_name=stats_name)
         except IndexError:
@@ -526,6 +589,11 @@ class ModelLoader(ModelLoaderBase):
 
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
+        # Direct policy queries remain live until key selection or construction takes a snapshot.
+        decisions = self.__dict__.get("_fp8_storage_decisions", {})
+        key = (id(config), submodel_type)
+        if key in decisions:
+            return decisions[key]
         if not self._fp8_storage_asked_for(config, submodel_type):
             return False
 
@@ -539,7 +607,8 @@ class ModelLoader(ModelLoaderBase):
         # Device support is probed last, so it runs only for a model that actually wants FP8 -- not on
         # the first load of any tokenizer/VAE/scheduler, and not on API or install threads, where it
         # would force XPU lazy SYCL init on a thread that never generates.
-        return _device_supports_fp8_storage(self._torch_device, self._logger)
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        return _device_supports_fp8_storage(device, self._logger)
 
     def _report_inert_fp8_request(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> None:
         """Say so when a record asks for FP8 Storage that this kind of model cannot take.
@@ -578,7 +647,16 @@ class ModelLoader(ModelLoaderBase):
         memory nobody asked to save. `_should_use_fp8` already requires the device to support fp8
         storage, so an unsupported device keeps the folding path.
         """
-        return should_keep_fp8_weights(self._torch_device) or self._should_use_fp8(config, submodel_type)
+        decisions = self.__dict__.get("_storage_format_decisions", {})
+        key = (id(config), submodel_type)
+        if key in decisions:
+            return decisions[key][0]
+        device = self._get_execution_device(config, submodel_type) or self._torch_device
+        return should_keep_fp8_weights(device) or self._should_use_fp8(config, submodel_type)
+
+    def _uses_fp8_compute(self, device: torch.device) -> bool:
+        decisions = self.__dict__.get("_fp8_compute_decisions", {})
+        return decisions[device] if device in decisions else should_keep_fp8_weights(device)
 
     def _fp8_kept_reason(self) -> str:
         """Which consumer kept a checkpoint's fp8 weights packed, for the line that reports it.
@@ -588,7 +666,7 @@ class ModelLoader(ModelLoaderBase):
         is the case a reader would most want to tell apart. The storage path also dequantizes on
         each forward instead of running on the tensor cores, so the line says so.
         """
-        if should_keep_fp8_weights(self._torch_device):
+        if self._uses_fp8_compute(self._torch_device):
             return "fp8_compute, on the fp8 tensor cores"
         return "FP8 Storage, dequantized per forward"
 
