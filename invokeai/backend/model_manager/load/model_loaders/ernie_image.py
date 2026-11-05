@@ -75,7 +75,7 @@ class ErnieImageDiffusersModel(GenericDiffusersLoader):
             return result
 
         target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        dtype = self._submodel_dtype(submodel_type, TorchDevice.choose_bfloat16_safe_dtype(target_device))
         try:
             result = load_class.from_pretrained(model_path, torch_dtype=dtype, variant=variant, local_files_only=True)
         except OSError as e:

@@ -318,9 +318,22 @@ class ModelLoader(ModelLoaderBase):
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
 
-    def _torch_dtype_avoiding_float16(self) -> torch.dtype:
-        """The configured dtype on this loader's device, except float16 (`TorchDevice.dtype_avoiding_float16`)."""
-        return TorchDevice.dtype_avoiding_float16(self._torch_dtype, self._torch_device)
+    def _autoencoder_dtype(self, otherwise: Optional[torch.dtype] = None) -> torch.dtype:
+        """The dtype a VAE decoder covered by `precise_image_storage` loads in (`TorchDevice.autoencoder_dtype`).
+
+        Float32 under the setting. Off: `otherwise`, the dtype the loader gave this VAE before the setting existed,
+        or when it gave none the configured dtype except float16. Only a VAE's loader asks; a transformer or text
+        encoder keeps the dtype it has.
+        """
+        return TorchDevice.autoencoder_dtype(
+            self._torch_dtype, self._torch_device, self._app_config.precise_image_storage, otherwise
+        )
+
+    def _submodel_dtype(self, submodel_type: Optional[SubModelType], otherwise: torch.dtype) -> torch.dtype:
+        """`otherwise`, the dtype a pipeline loader gives every submodel, except for the VAE (`_autoencoder_dtype`)."""
+        if submodel_type is SubModelType.VAE:
+            return self._autoencoder_dtype(otherwise)
+        return otherwise
 
     def _get_execution_device(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None

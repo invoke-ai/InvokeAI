@@ -1,3 +1,5 @@
+from contextlib import nullcontext
+
 import torch
 from diffusers import AutoencoderKLFlux2
 from einops import rearrange
@@ -20,7 +22,10 @@ from invokeai.backend.ideogram4.autoencoder import AutoEncoder
 from invokeai.backend.ideogram4.latent_norm import get_latent_norm
 from invokeai.backend.ideogram4.sampling_utils import unpatchify_and_denormalize
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2
+from invokeai.backend.util.oom import is_oom_error
+from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
+from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux2, should_pretile_vae_decode
+from invokeai.backend.working_memory.estimate import WorkingMemoryEstimate
 
 
 def _decode(vae: object, z: torch.Tensor) -> torch.Tensor:
@@ -78,15 +83,50 @@ class Ideogram4LatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
         # This is the 32-channel autoencoder FLUX.2 decodes with, at the same resolutions: ~4.3 GB
         # of activations at 1024px, far above what the cache reserves by default. It matters more
         # here than anywhere else, because both Ideogram transformers may still be resident.
-        estimated_working_memory = estimate_vae_working_memory_flux2(
-            operation="decode", image_tensor=z, vae=vae_info.model, device=device
-        )
+        #
+        # Only a standalone `AutoencoderKLFlux2` can decode in tiles, and it is the one that runs in float32 under
+        # `precise_image_storage`, so it gets the FLUX.2 node's fallbacks: tile up front when the estimate would not
+        # fit, retry tiled after an out-of-memory error. The pipeline's vendored `AutoEncoder` cannot tile.
+        config = context.config.get()
+        can_tile = isinstance(vae_info.model, AutoencoderKLFlux2)
+        use_tiling = can_tile and config.force_tiled_decode
+
+        def estimate(tiled: bool) -> WorkingMemoryEstimate:
+            return estimate_vae_working_memory_flux2(
+                operation="decode", image_tensor=z, vae=vae_info.model, tile_size=0 if tiled else None, device=device
+            )
+
+        estimated_working_memory = estimate(use_tiling)
+        if (
+            can_tile
+            and not use_tiling
+            and config.auto_tiled_decode
+            and should_pretile_vae_decode(device, estimated_working_memory.reservation_bytes)
+        ):
+            use_tiling = True
+            estimated_working_memory = estimate(use_tiling)
 
         with vae_info.model_on_device(working_memory=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
             vae_dtype = next(vae.parameters()).dtype
             TorchDevice.empty_cache()
-            decoded = _decode(vae, z.to(vae_dtype))
+            z_in = z.to(vae_dtype)
+            try:
+                with scoped_vae_tiling(vae, 0) if use_tiling else nullcontext():
+                    decoded = _decode(vae, z_in)
+            except RuntimeError as e:
+                if not can_tile or use_tiling or not is_oom_error(e):
+                    raise
+                context.util.signal_progress("VAE decode ran out of memory, retrying tiled")
+                context.logger.warning(
+                    "VAE decode ran out of memory; retrying with tiling. The tiled result is not identical to an "
+                    "untiled decode -- the decoder's normalisation and attention are global, so the difference is "
+                    "spread over the image rather than confined to the seams."
+                )
+                e.__traceback__ = None
+                TorchDevice.empty_cache()
+                with scoped_vae_tiling(vae, 0):
+                    decoded = _decode(vae, z_in)
 
             raster = precise_signed_decode_raster(context, decoded)
 

@@ -56,23 +56,29 @@ class DecodeLines:
     precision_setting: bool = False
 
 
+IDEOGRAM4_PIPELINE_VAE_DTYPE: Final = "bf16"
+"""The VAE of an Ideogram 4 Diffusers pipeline, which `Ideogram4DiffusersModel._load_vae` loads in the device's
+bfloat16-safe dtype. `precise_image_storage` does not move it: its vendored autoencoder cannot tile."""
+
+
 @dataclass(frozen=True)
 class VaeDtypes:
     """What the VAE loaders choose on the calibration device, with dtypes named as the lines are (`fp16`, `bf16`,
     `fp32`). The service reads them through the loaders' own rules, so the plan sizes the decode that runs."""
 
     standalone_flux: str
-    """A standalone FLUX.1 or FLUX.2 VAE, and the FLUX.1 VAE Z-Image decodes with: the configured dtype, except fp16
-    (`TorchDevice.dtype_avoiding_float16`). A configured fp32 stays fp32."""
+    """A standalone FLUX.1 or FLUX.2 VAE, and the FLUX.1 VAE Z-Image decodes with (`TorchDevice.autoencoder_dtype`):
+    fp32 under `precise_image_storage`, else the configured dtype except fp16."""
     z_image_pipeline: str
-    """The VAE of a Z-Image Diffusers pipeline: `TorchDevice.choose_bfloat16_safe_dtype`."""
+    """The VAE of a Z-Image Diffusers pipeline: `TorchDevice.choose_bfloat16_safe_dtype`, fp32 under
+    `precise_image_storage`."""
     sdnq_quantized_vae: Callable[[Any], bool]
     """Whether the VAE folder of a FLUX.1 SDNQ pipeline holds SDNQ weights, as `FluxSDNQDiffusersModel._load_vae`
     tells (`is_sdnq_folder`)."""
+    flux2_pipeline: str
+    """The VAE of a FLUX.2 Diffusers pipeline, which `Flux2DiffusersModel` loads in bf16 whatever the configured dtype:
+    fp32 under `precise_image_storage`."""
 
-
-FLUX2_PIPELINE_VAE_DTYPE: Final = "bf16"
-"""The VAE of a FLUX.2 Diffusers pipeline, which `Flux2DiffusersModel` loads in bf16 whatever the configured dtype."""
 
 SDNQ_PIPELINE_VAE_DTYPE: Final = "fp32"
 """The VAE of a self-contained SDNQ pipeline, which `Flux2SDNQCheckpointModel._load_vae`,
@@ -329,7 +335,11 @@ def vae_source(model: ModelConfig, models: Sequence[ModelConfig]) -> Optional[Mo
 def own_vae_dtype(pipeline: ModelConfig, vae: VaeDtypes) -> str:
     """The dtype a pipeline's own VAE loads in (`vae_source`), as its loader yields it."""
     if _is_diffusers(pipeline):
-        return vae.z_image_pipeline if pipeline.base == BaseModelType.ZImage else FLUX2_PIPELINE_VAE_DTYPE
+        if pipeline.base == BaseModelType.ZImage:
+            return vae.z_image_pipeline
+        if pipeline.base == BaseModelType.Ideogram4:
+            return IDEOGRAM4_PIPELINE_VAE_DTYPE
+        return vae.flux2_pipeline
     if pipeline.base == BaseModelType.Flux and vae.sdnq_quantized_vae(pipeline):
         return SDNQ_QUANTIZED_VAE_DTYPE
     return SDNQ_PIPELINE_VAE_DTYPE

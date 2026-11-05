@@ -276,14 +276,16 @@ class VAELoader(GenericDiffusersLoader):
             from diffusers import AutoencoderKLQwenImage21
 
             return AutoencoderKLQwenImage21.from_pretrained(
-                model_path, torch_dtype=_wan_family_dtype(self._torch_dtype), local_files_only=True
+                model_path,
+                torch_dtype=self._autoencoder_dtype(otherwise=_wan_family_dtype(self._torch_dtype)),
+                local_files_only=True,
             )
 
         if isinstance(config, VAE_Diffusers_FLUX_Config):
             # In the dtype every other FLUX.1 VAE path uses: the generic loader below would take float16,
             # which `precision: auto` picks on CUDA and MPS and which this autoencoder is broken in.
             return AutoencoderKL.from_pretrained(
-                model_path, torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                model_path, torch_dtype=self._autoencoder_dtype(), local_files_only=True
             )
 
         # The FLUX, Z-Image and SD3 model loaders ask for a standalone VAE as `SubModelType.VAE`, the
@@ -298,8 +300,8 @@ class VAELoader(GenericDiffusersLoader):
 
         Builds `AutoencoderKLQwenImage21()` from its defaults, which are the released config. The ComfyUI
         export stores the 2-D convolutions 5-D and the norms' gammas with an extra axis; both are reshaped
-        to the module's own shapes. It belongs to the Wan 2.2 family and shares its precision policy: the
-        configured dtype, except float16 -- see `_wan_family_dtype`.
+        to the module's own shapes. Under `precise_image_storage` it runs in float32, else in the Wan family's
+        precision: the configured dtype, except float16 -- see `_wan_family_dtype`.
         """
         from diffusers import AutoencoderKLQwenImage21
 
@@ -310,7 +312,7 @@ class VAELoader(GenericDiffusersLoader):
         )
 
         name = Path(config.path).name
-        dtype = _wan_family_dtype(self._torch_dtype)
+        dtype = self._autoencoder_dtype(otherwise=_wan_family_dtype(self._torch_dtype))
         sd = _read_checkpoint(config.path)
         reject_quantized_side_channel(sd, f"Qwen-Image-2.1 VAE checkpoint {name}")
         if is_comfy_vae_layout(sd):

@@ -840,6 +840,35 @@ def test_a_large_flux_fp32_encode_reserves_its_floor(on) -> None:
     assert result.reservation_bytes == int(_floor(VAE_FLUX_SPEC, platform, "encode", 24576, 24576, 512, "fp32"))
 
 
+@pytest.mark.parametrize(
+    "estimator, spec, vae_class, latent_channels",
+    [
+        (estimate_vae_working_memory_flux, VAE_FLUX_SPEC, AutoencoderKL, 16),
+        (estimate_vae_working_memory_flux2, VAE_FLUX2_SPEC, AutoencoderKLFlux2, 32),
+    ],
+    ids=["flux1", "flux2"],
+)
+@pytest.mark.parametrize("operation", ["decode", "encode"])
+@pytest.mark.parametrize("tile", [None, 512], ids=["untiled", "tiled"])
+def test_a_float32_flux_vae_is_priced_in_float32_not_in_the_bfloat16_it_ran_in_before(
+    on, estimator, spec, vae_class, latent_channels, operation, tile
+) -> None:
+    """`precise_image_storage` loads these autoencoders in float32: the estimate prices that run, the way the nodes'
+    pretiling decision and OOM retry read it, and a float32 run costs more than the bfloat16 one."""
+    platform = Platform("cudnn", "native", "linux")
+    size = 1024
+    x = _image(operation, size, size, latent_channels)
+
+    fp32 = estimator(operation, x, _vae(vae_class, torch.float32), tile, on(platform))
+    bf16 = estimator(operation, x, _vae(vae_class, torch.bfloat16), tile, on(platform))
+
+    assert fp32.features["dtype"] == "fp32"
+    assert fp32.reservation_bytes > bf16.reservation_bytes
+    if tile is None:
+        line = shipped_coefficients(spec, platform).values
+        assert fp32.reservation_bytes >= line[f"k_{operation}_fp32"] * size * size + line[f"b_{operation}_fp32"]
+
+
 def test_a_non_square_decode_counts_the_clipped_edge_tiles_it_decodes(on) -> None:
     """At a 512 px tile the latents are stepped 48 at a time: 16392 px is 2049 latents, so the last row of tiles is
     33 latents tall, and 24584 px is 3073, so the last column is 49 wide. The buffers count those as they are decoded,

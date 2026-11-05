@@ -10,6 +10,7 @@ A FLUX.1 folder is read by `from_pretrained`, but not in the dtype the generic l
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import accelerate
 import pytest
@@ -64,6 +65,7 @@ def _loader() -> VAELoader:
     loader = VAELoader.__new__(VAELoader)
     loader._torch_dtype = torch.bfloat16
     loader._torch_device = torch.device("cpu")
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
     return loader
 
 

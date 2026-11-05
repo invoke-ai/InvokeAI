@@ -47,6 +47,11 @@ class _DecodeSpy:
 
 def _run(precise_world, vae: AutoencoderKLFlux2) -> str:
     info = MagicMock()
+    info.model = vae
+    info.compute_device = torch.device("cpu")
+    precise_world.context.config = SimpleNamespace(
+        get=lambda: SimpleNamespace(force_tiled_decode=False, auto_tiled_decode=False)
+    )
 
     @contextmanager
     def model_on_device(working_memory=None):
@@ -149,3 +154,25 @@ def test_non_finite_decoder_output_falls_back_to_the_ordinary_png_and_warns(prec
     assert precise_world.database.queries.image_precise_assets.get(name) is None
     warning.assert_called_once()
     assert "not finite" in warning.call_args.args[0]
+
+
+def test_an_untiled_decode_that_runs_out_of_memory_is_retried_tiled_and_the_tiling_state_restored(
+    precise_world,
+) -> None:
+    vae = _vae()
+    real = vae.decode
+    tiling_seen: list[bool] = []
+
+    def decode(*args, **kwargs):
+        tiling_seen.append(vae.use_tiling)
+        if len(tiling_seen) == 1:
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+        return real(*args, **kwargs)
+
+    vae.decode = decode
+
+    _run(precise_world, vae)
+
+    assert tiling_seen == [False, True]
+    assert vae.use_tiling is False
+    precise_world.context.util.signal_progress.assert_any_call("VAE decode ran out of memory, retrying tiled")

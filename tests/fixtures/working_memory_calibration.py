@@ -27,7 +27,9 @@ from invokeai.backend.working_memory.probe import MeasuredWindow, Reason
 
 GPU = torch.device("cuda:0")
 GPU_CLASS = DeviceClass(vendor="nvidia", name="Test GPU 24GB", total_mib=24564, backend="cuda", arch="sm_89")
-GPU_VAE_DTYPES = VaeDtypes(standalone_flux="bf16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
+GPU_VAE_DTYPES = VaeDtypes(
+    standalone_flux="bf16", z_image_pipeline="bf16", flux2_pipeline="bf16", sdnq_quantized_vae=lambda config: False
+)
 OTHER_CLASS = DeviceClass(vendor="amd", name="Test GPU 16GB", total_mib=16304, backend="hip", arch="gfx1200")
 
 
@@ -76,7 +78,7 @@ def calibration_service(
         device_memory=(lambda device: DeviceMemory(device_class.total_mib * 2**20, 0))
         if device_memory == "whole card"
         else device_memory,
-        vae_dtypes=lambda device, models_path: vae_dtypes,
+        vae_dtypes=lambda device, models_path, precise: vae_dtypes,
         **extra,
     )
 

@@ -26,7 +26,7 @@ cannot see it. These can.
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from types import ModuleType
+from types import ModuleType, SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -137,6 +137,7 @@ def prepare(
     loader._ram_cache = MagicMock(make_room=make_room)
     loader._logger = MagicMock()
     loader._torch_device = torch.device("cpu")
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
     if seam.sets_torch_dtype:
         loader._torch_dtype = seam.compute_dtype
     if seam.casts_fp8_storage:

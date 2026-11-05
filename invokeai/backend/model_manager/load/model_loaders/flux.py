@@ -211,7 +211,7 @@ class FluxVAELoader(ModelLoader):
             raise ValueError(f"{model_path.name} is not a FLUX.1 autoencoder: it has no '{_FLUX_VAE_BFL_MARKER}'.")
 
         load_state_dict_ignoring_extras(model, payload, source="FLUX VAE checkpoint", assign=True)
-        model.to(self._torch_dtype_avoiding_float16())
+        model.to(self._autoencoder_dtype())
 
         return model
 
@@ -229,7 +229,7 @@ class Flux2VAEDiffusersLoader(ModelLoader):
 
         model_path = Path(config.path)
 
-        vae_dtype = self._torch_dtype_avoiding_float16()
+        vae_dtype = self._autoencoder_dtype()
 
         model = AutoencoderKLFlux2.from_pretrained(
             model_path,
@@ -316,13 +316,15 @@ class Flux2VAELoader(ModelLoader):
                         mid_block_add_attention=cfg.mid_block_add_attention,
                     )
 
-        # Convert to bfloat16 and load
-        for k in sd.keys():
-            sd[k] = sd[k].to(torch.bfloat16)
+        # Rounded to bfloat16 first, unless this VAE serves a precise image: rounding the weights and widening them
+        # after would give a float32 VAE of bfloat16 weights.
+        if not self._app_config.precise_image_storage:
+            for k in sd.keys():
+                sd[k] = sd[k].to(torch.bfloat16)
 
         load_state_dict_ignoring_extras(model, sd, source="FLUX.2 VAE checkpoint", assign=True)
 
-        model.to(self._torch_dtype_avoiding_float16())
+        model.to(self._autoencoder_dtype())
 
         model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
@@ -1121,7 +1123,7 @@ class FluxDiffusersModel(GenericDiffusersLoader):
         model_path = model_path / submodel_type.value
 
         # We force bfloat16 for FLUX models. This is required for correct inference.
-        dtype = torch.bfloat16
+        dtype = self._submodel_dtype(submodel_type, torch.bfloat16)
         try:
             result: AnyModel = load_class.from_pretrained(
                 model_path,
@@ -1168,7 +1170,7 @@ class Flux2DiffusersModel(GenericDiffusersLoader):
         # won't be in the checkpoint but the model class still creates them.
         # We use SilenceWarnings to suppress the "guidance_embeds is not expected" warning
         # from diffusers Flux2Transformer2DModel.
-        dtype = torch.bfloat16
+        dtype = self._submodel_dtype(submodel_type, torch.bfloat16)
         with SilenceWarnings():
             try:
                 result: AnyModel = load_class.from_pretrained(

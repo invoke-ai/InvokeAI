@@ -276,3 +276,38 @@ def test_an_image_with_a_precise_asset_encodes_its_unclamped_values(z_image_vae,
     np.testing.assert_array_equal(latents.numpy(), _reference_latents(vae, _chw(array)).numpy())
     clamped = _reference_latents(vae, _chw(np.clip(array, 0, 1)))
     assert not torch.allclose(latents, clamped)
+
+
+def test_an_untiled_encode_that_runs_out_of_memory_is_retried_tiled_and_the_tiling_state_restored(z_image_vae) -> None:
+    vae = z_image_vae()
+    real = vae.encode
+    tiling_seen: list[bool] = []
+
+    def encode(*args, **kwargs):
+        tiling_seen.append(vae.use_tiling)
+        if len(tiling_seen) == 1:
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+        return real(*args, **kwargs)
+
+    vae.encode = encode
+    context = MagicMock()
+
+    ZImageImageToLatentsInvocation.vae_encode_or_retry_tiled(
+        context, _loaded(vae), torch.zeros(1, 3, 64, 64), tiled=False, deterministic=True
+    )
+
+    assert tiling_seen == [False, True]
+    assert vae.use_tiling is False
+    context.util.signal_progress.assert_any_call("VAE encode ran out of memory, retrying tiled")
+
+
+def test_an_encode_that_runs_out_of_memory_while_already_tiled_is_raised(z_image_vae) -> None:
+    vae = z_image_vae()
+    vae.encode = MagicMock(side_effect=torch.cuda.OutOfMemoryError("CUDA out of memory"))
+
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        ZImageImageToLatentsInvocation.vae_encode_or_retry_tiled(
+            MagicMock(), _loaded(vae), torch.zeros(1, 3, 64, 64), tiled=True
+        )
+
+    assert vae.encode.call_count == 1

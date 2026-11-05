@@ -21,6 +21,7 @@ Two things can break silently and are pinned here:
 
 import os
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -64,6 +65,7 @@ def _loader(dtype: torch.dtype = torch.bfloat16) -> FluxVAELoader:
     loader = FluxVAELoader.__new__(FluxVAELoader)
     loader._torch_dtype = dtype
     loader._torch_device = torch.device("cpu")
+    loader._app_config = SimpleNamespace(precise_image_storage=False)
     return loader
 
 
@@ -273,3 +275,34 @@ class TestTheFamilyGuard:
         from invokeai.backend.flux.util import is_flux_family_vae
 
         assert is_flux_family_vae(object()) is False
+
+
+_LDM_LISTING = (
+    Path(__file__).parents[3]
+    / "model_identification"
+    / "stripped_models"
+    / "4f7a0a7f-c823-494d-94d4-dbbec6ea6ef6"
+    / "FLUX.1-schnell_ae.safetensors"
+)
+
+
+@pytest.mark.parametrize("precise, expected", [(True, torch.float32), (False, torch.bfloat16)], ids=["on", "off"])
+def test_the_standalone_checkpoint_loads_in_float32_only_under_precise_storage(monkeypatch, precise, expected):
+    """`ae.safetensors` (BFL layout) at its real shapes on the meta device, with `precision: auto` on CUDA (float16)."""
+    import json
+
+    from invokeai.backend.model_manager.load.model_loaders import flux as flux_module
+
+    listing = json.loads(_LDM_LISTING.read_text())
+    weights = {
+        key: torch.empty(entry["shape"], dtype=torch.float32, device="meta")
+        for key, entry in listing.items()
+        if "shape" in entry
+    }
+    monkeypatch.setattr(flux_module, "load_file", lambda _path: dict(weights))
+    loader = _loader(torch.float16)
+    loader._app_config = SimpleNamespace(precise_image_storage=precise)
+
+    model = loader._load_model(_config_for(Path("ae.safetensors")))
+
+    assert {p.dtype for p in model.parameters()} == {expected}

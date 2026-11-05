@@ -715,8 +715,13 @@ class ZImageDenoiseInvocation(BaseInvocation):
         tiled = field.tiled or context.config.get().force_tiled_decode
 
         def encode(pixels: torch.Tensor) -> torch.Tensor:
-            return ZImageImageToLatentsInvocation.vae_encode(
-                vae_info=vae_info, image_tensor=pixels, tiled=tiled, tile_size=field.tile_size, deterministic=True
+            return ZImageImageToLatentsInvocation.vae_encode_or_retry_tiled(
+                context,
+                vae_info=vae_info,
+                image_tensor=pixels,
+                tiled=tiled,
+                tile_size=field.tile_size,
+                deterministic=True,
             )
 
         image = context.images.get_pil(field.image_name).convert("RGB")

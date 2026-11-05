@@ -81,10 +81,37 @@ Turning the setting off therefore stops new precise saves only. Existing precise
 
 Nodes that run a model (VAE decode and encode, upscalers, depth) share one policy in `invokeai/app/invocations/vae/precise_io.py`:
 
-- The model output is saved as a float raster when precise storage is on. The unclamped decoder output is kept, in the precision the decoder produced it or in float32.
-- The gallery image is the node's legacy 8-bit conversion, so turning the setting on does not change what the gallery shows.
+- The model output is saved as a float raster when precise storage is on: the unclamped decoder output, in the dtype the decoder produced it (float16 or float32 for SD 1.5 and SDXL) or widened to float32.
+- A float32 file holds more than 8 bits only if the VAE decoder ran above bfloat16 precision: a bfloat16 decode carries about 8 bits of mantissa, and widening it afterwards adds nothing. So with `precise_image_storage` on, the covered VAEs load and run in float32 (see Autoencoder dtype below).
+- The gallery image is the node's legacy 8-bit conversion of its output. For a decoder whose VAE runs in float32 only under the setting, the decode itself differs, so the gallery image can differ slightly from the setting off.
 - If the output is not finite or exceeds the asset bounds, the node logs a warning and saves the ordinary 8-bit image instead of failing. A decode that used to yield a black image (an fp16 overflow) must not start to raise.
 - As model input, an image with a precise file is fed with its unclamped precise pixels. Images without one are encoded exactly as before. Where the input is resized on encode, the precise path resizes antialiased bicubic where the 8-bit path uses Lanczos.
+
+### Autoencoder dtype
+
+`TorchDevice.autoencoder_dtype(configured dtype, device, precise_image_storage, otherwise=None)` (`invokeai/backend/util/devices.py`) is the rule for a VAE decoder covered by the setting: float32 when `precise_image_storage` is on, else `otherwise` (the dtype the loader gave that VAE before the setting existed), else the configured dtype except float16, which breaks these VAEs. Model loaders reach it through `ModelLoader._autoencoder_dtype(otherwise=None)` and, in a pipeline loader that gives every submodel one dtype, through `ModelLoader._submodel_dtype(submodel_type, otherwise)`, which changes the VAE submodel only. The loader reads the setting from `self._app_config`. The working-memory calibration plan calls the same function for the dtypes it sizes decodes by. The setting is read at startup, so the dtype follows it after a restart.
+
+Covered (float32 under the setting):
+
+- the FLUX.1 and FLUX.2 VAEs: standalone checkpoint, standalone diffusers folder, and the VAE submodel of a Diffusers pipeline (also the FLUX.1 VAE that Z-Image decodes with and the FLUX.2 VAE that ERNIE-Image uses);
+- the VAE submodels of the Z-Image, ERNIE-Image, FLUX.3 and MOSS-Image pipelines;
+- the Qwen-Image-2.1 VAE: standalone checkpoint, standalone folder, and the pipeline's submodel.
+
+Not covered (they keep the dtype they have):
+
+- The VAE bundled in an Ideogram 4 pipeline (a vendored `AutoEncoder`). It cannot decode in tiles, so a float32 decode would have no low-VRAM fallback. A standalone FLUX.2 VAE used with Ideogram 4 is a covered FLUX.2 VAE, and the Ideogram 4 decode node gives it the pretile and out-of-memory retry (`AutoencoderKLFlux2` only).
+- Anima, Qwen Image (Krea-2) and Wan 2.2, which share `_wan_family_dtype` in `vae.py`, and MiniMax H3.
+- Self-contained SDNQ pipelines, whose VAE already loads in float32 (an SDNQ-quantized FLUX.1 VAE dequantizes to bfloat16).
+- SD 1.5 and SDXL, which cast their VAE per run by the node's `fp32` field; SD3 and CogView4 do not produce precise output.
+
+A new VAE loader for a covered family takes its dtype from these functions, and a transformer or text encoder never does. The rules that keep the float32 real:
+
+- The weights load straight into float32, not rounded to a narrower dtype first. A loader that rounds a checkpoint (the FLUX.2 VAE checkpoint loader rounds to bfloat16) skips that step under the setting.
+- Whatever consumes the VAE follows the dtype it holds: decode and encode nodes cast to the VAE's parameter dtype going in, and every place that hands a VAE-encoded tensor to a transformer casts it to the transformer's dtype (FLUX Fill and Control LoRA conditioning are cast at the source in `flux_denoise.py`).
+- The working-memory estimator prices the dtype that runs (it reads the VAE's parameters, and the FLUX.1 and FLUX.2 estimators have float32 lines), and the calibration plan sizes by `TorchDevice.autoencoder_dtype`.
+- A node that runs a covered VAE has a low-VRAM fallback: the FLUX.1, FLUX.2, Z-Image, ERNIE-Image and Ideogram 4 (standalone VAE) decode nodes tile up front when the estimate would not fit and retry tiled after an out-of-memory error; the encode nodes retry after an out-of-memory error. The Qwen-Image-2.1 nodes tile up front but have no retry. A new covered VAE needs a fallback of its own.
+
+With the setting on, the gallery PNG of the covered decoders comes from the float32 decode, so it can differ slightly from the setting off; where float32 pushes a decode over the pretile threshold, the tiled decode is the larger difference (measured figures in the [configuration reference](/configuration/invokeai-yaml/#precise-image-storage)). Encoding with them runs in float32 too, so their latents differ slightly, and the BatchNorm statistics of the FLUX.2, FLUX.3 and MOSS-Image VAEs are read in float32, which changes denoised latents slightly.
 
 ### Masks and visibility
 

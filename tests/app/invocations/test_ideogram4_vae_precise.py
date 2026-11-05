@@ -46,11 +46,17 @@ class _DecodeSpy:
         vae.decode = decode
 
 
-def _run(precise_world, vae: AutoencoderKLFlux2, monkeypatch) -> str:
+def _run(precise_world, vae: AutoencoderKLFlux2, monkeypatch, standalone: bool = False) -> str:
     # The estimate is about CUDA memory; this test is about what the node does with the decoded tensor.
     monkeypatch.setattr(module, "estimate_vae_working_memory_flux2", lambda **_: None)
     info = MagicMock()
     info.compute_device = torch.device("cpu")
+    # A standalone `AutoencoderKLFlux2` can decode in tiles; the MagicMock stands in for the pipeline's vendored VAE.
+    if standalone:
+        info.model = vae
+    precise_world.context.config = SimpleNamespace(
+        get=lambda: SimpleNamespace(force_tiled_decode=False, auto_tiled_decode=False)
+    )
 
     @contextmanager
     def model_on_device(working_memory=None):
@@ -153,3 +159,36 @@ def test_non_finite_decoder_output_falls_back_to_the_ordinary_png_and_warns(prec
     assert precise_world.database.queries.image_precise_assets.get(name) is None
     warning.assert_called_once()
     assert "not finite" in warning.call_args.args[0]
+
+
+def test_a_standalone_vae_that_runs_out_of_memory_is_retried_tiled_and_the_tiling_state_restored(
+    precise_world, monkeypatch
+) -> None:
+    vae = _vae()
+    real = vae.decode
+    tiling_seen: list[bool] = []
+
+    def decode(*args, **kwargs):
+        tiling_seen.append(vae.use_tiling)
+        if len(tiling_seen) == 1:
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+        return real(*args, **kwargs)
+
+    vae.decode = decode
+
+    _run(precise_world, vae, monkeypatch, standalone=True)
+
+    assert tiling_seen == [False, True]
+    assert vae.use_tiling is False
+    precise_world.context.util.signal_progress.assert_any_call("VAE decode ran out of memory, retrying tiled")
+
+
+def test_the_pipelines_vendored_vae_has_no_tiled_retry(precise_world, monkeypatch) -> None:
+    """Not an `AutoencoderKLFlux2`, so it cannot tile: an out-of-memory error is raised as it was."""
+    vae = _vae()
+    vae.decode = MagicMock(side_effect=torch.cuda.OutOfMemoryError("CUDA out of memory"))
+
+    with pytest.raises(torch.cuda.OutOfMemoryError):
+        _run(precise_world, vae, monkeypatch, standalone=False)
+
+    assert vae.decode.call_count == 1

@@ -206,7 +206,7 @@ class MossImageDiffusersModel(_MossImageTransformerLoading):
 
                 # The FLUX.2 VAE loaders' dtype: never float16, in which the FLUX autoencoders break.
                 return AutoencoderKLFlux2.from_pretrained(
-                    model_path / "vae", torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+                    model_path / "vae", torch_dtype=self._autoencoder_dtype(), local_files_only=True
                 )
 
         raise ValueError(

@@ -399,6 +399,18 @@ def test_the_flux_vae_dtype_replaces_float16_with_bfloat16_or_else_float32(monke
     assert TorchDevice.dtype_avoiding_float16(torch.float16, torch.device("cuda")) is expected
 
 
+@pytest.mark.parametrize("configured", [torch.float16, torch.bfloat16, torch.float32])
+def test_the_autoencoder_dtype_is_float32_under_precise_storage_whatever_the_configured_dtype(configured):
+    assert TorchDevice.autoencoder_dtype(configured, torch.device("cpu"), precise_image_storage=True) is torch.float32
+
+
+@pytest.mark.parametrize("configured", [torch.float16, torch.bfloat16, torch.float32])
+def test_the_autoencoder_dtype_without_precise_storage_is_the_configured_one_but_never_float16(configured):
+    expected = torch.bfloat16 if configured is torch.float16 else configured
+
+    assert TorchDevice.autoencoder_dtype(configured, torch.device("cpu"), precise_image_storage=False) is expected
+
+
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
 
 
