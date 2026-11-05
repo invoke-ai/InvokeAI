@@ -61,12 +61,10 @@ registerAccountOwnedResource({
   name: 'invocation-preparation',
 });
 
-/** Capture after async prerequisites, immediately before the synchronous submission command. */
+/** Capture after async prerequisites; the template owner replaces snapshots, so its published value is safe to share. */
 export const captureInvocationRuntimeInputs = (sourceId: InvocationSourceId): InvocationRuntimeInputs => ({
   noiseDevice: resolveRandDeviceMetadata(false, getGenerationDevicesSnapshot().options),
   templates:
-    sourceId === 'workflow'
-      ? structuredClone(getInvocationTemplatesSnapshot())
-      : { error: null, status: 'idle', templates: {} },
+    sourceId === 'workflow' ? getInvocationTemplatesSnapshot() : { error: null, status: 'idle', templates: {} },
   boardDestinationIds: getGalleryBoardDestinationIds(),
 });

@@ -447,7 +447,7 @@ type WorkbenchReducerAction =
   | {
       /** The image menu's one-click upscale: queued at once, leaving the Upscale widget and the route as they are. */
       type: 'submitModelOnlyUpscale';
-      runtime: InvocationRuntimeInputs;
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       projectId: string;
       image: ImageWithDims;
       upscaleModel: SpandrelModelConfig;
@@ -584,7 +584,7 @@ type WorkbenchReducerAction =
   | { type: 'commitCanvasEdit'; projectId: string; intent: CanvasEditIntent }
   | ({
       type: 'submitCanvasInvocationSnapshot';
-      runtime: InvocationRuntimeInputs;
+      runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>;
       backendSupportsCancellation: boolean;
       canvas: CanvasStateContractV3;
       destination: ResultDestination;
@@ -3955,7 +3955,7 @@ const enqueueCompiledSnapshot = (
   project: Project,
   defaults: ScopedDefaults,
   route: InvocationRoute,
-  runtime: InvocationRuntimeInputs,
+  runtime: Pick<InvocationRuntimeInputs, 'boardDestinationIds'>,
   compiled: Partial<ExpandedPositivePrompts> & {
     generate?: QueueGenerateSnapshot;
     graph: GraphContract;

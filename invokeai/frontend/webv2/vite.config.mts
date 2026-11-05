@@ -221,6 +221,8 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/generation/core/projectPromptDraft.ts',
   '/features/generation/core/prompt/compel.ts',
   '/features/queue/core/deviceLabels.ts',
+  // The shared device entry otherwise becomes an imports-only boot request beside its labels and hook.
+  '/features/queue/devices.ts',
   '/features/queue/core/graphInputMedia.ts',
   '/features/queue/data/activeProgressTargetStore.ts',
   '/features/queue/data/progressImageStore.ts',

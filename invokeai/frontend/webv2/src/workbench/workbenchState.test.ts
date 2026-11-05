@@ -609,7 +609,13 @@ describe('explicit submission runtime inputs', () => {
     listGalleryBoardsInCache('captured-board');
     generationDeviceMock.options = [{ device: 'xpu:0', name: 'Arc' }];
     const runtime = captureInvocationRuntimeInputs('generate');
-    const action = { backendSupportsCancellation: true, runtime, type: 'submitInvocationSnapshot' as const };
+    const action = {
+      backendSupportsCancellation: true,
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
+      runtime,
+      type: 'submitResolvedInvocationSnapshot' as const,
+    };
     // Hold incidental graph identities stable; stepping seeds still come from the project.
     const time = vi.spyOn(Date, 'now').mockReturnValue(1_000);
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.25);
@@ -647,8 +653,10 @@ describe('explicit submission runtime inputs', () => {
     state = workbenchReducer(state, { settings: { useCpuNoise: true }, type: 'setActiveProjectSettings' });
     const next = workbenchReducer(state, {
       backendSupportsCancellation: true,
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
       runtime,
-      type: 'submitInvocationSnapshot',
+      type: 'submitResolvedInvocationSnapshot',
     });
     expect(getQueuedRandDevice(next)).toBe('cpu');
   });
@@ -4724,7 +4732,6 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     it('validates and compiles with captured templates after the template store changes', () => {
       const state = primeWorkflow(42, 'increment');
       const runtime = captureInvocationRuntimeInputs('workflow');
-      delete workflowTemplatesMock.snapshot.templates.noise;
       workflowTemplatesMock.snapshot = { error: 'reloading', status: 'error', templates: {} };
       const next = workbenchReducer(state, {
         backendSupportsCancellation: true,
@@ -4744,8 +4751,10 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       const rejected = workbenchReducer(state, {
         backendSupportsCancellation: true,
+        projectId: state.activeProjectId,
+        route: getActiveProject(state).invocation,
         runtime: { ...runtime, templates: { error: null, status: 'loading', templates: {} } },
-        type: 'submitInvocationSnapshot',
+        type: 'submitResolvedInvocationSnapshot',
       });
       expect(getActiveProject(rejected).queue.items).toEqual([]);
       expect(readNodeSeed(rejected)).toBe(42);

@@ -8,6 +8,7 @@ import {
   type GalleryImage,
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
+import { getGalleryBoardDestinationIds } from '@features/gallery/queries';
 import { recordLogEvent } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { createExternalStore } from '@platform/state/externalStore';
@@ -17,7 +18,6 @@ import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integ
 import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
 
-import { captureInvocationRuntimeInputs } from './invocationPreparation';
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
 import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
@@ -313,11 +313,15 @@ const createCommands = (
       submitCanvas: (payload: Omit<ActionPayload<'submitCanvasInvocationSnapshot'>, 'runtime'>) =>
         dispatch({
           ...payload,
-          runtime: captureInvocationRuntimeInputs('canvas'),
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
           type: 'submitCanvasInvocationSnapshot',
         }),
       submitModelOnlyUpscale: (payload: Omit<ActionPayload<'submitModelOnlyUpscale'>, 'runtime'>) =>
-        dispatch({ ...payload, runtime: captureInvocationRuntimeInputs('upscale'), type: 'submitModelOnlyUpscale' }),
+        dispatch({
+          ...payload,
+          runtime: { boardDestinationIds: getGalleryBoardDestinationIds() },
+          type: 'submitModelOnlyUpscale',
+        }),
       submitResolved: command('submitResolvedInvocationSnapshot'),
       toggleDestinationLock: command('toggleDestinationLock'),
       toggleRoutingLock: command('toggleRoutingLock'),
