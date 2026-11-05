@@ -965,6 +965,8 @@ def _get_source_activation_dependencies_for_preparation(
                 for owner_index, source_index in shared_axis_indices
             )
         ]
+        if not matching_frames and iteration_path and candidate_frames == ((),):
+            matching_frames = [()]
         if not matching_frames:
             resolved_dependencies.append(dependency)
             continue

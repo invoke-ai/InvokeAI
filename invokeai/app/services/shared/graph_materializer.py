@@ -1235,7 +1235,12 @@ class _ExecutionNodeBuilder:
                 return
         self._state._enqueue_if_ready(exec_node_id)
 
-    def _get_collect_group_axes(self, edge: Edge, prepared_id: Optional[str] = None) -> tuple[str, ...]:
+    def _get_collect_group_axes(
+        self,
+        edge: Edge,
+        prepared_id: Optional[str] = None,
+        context_deepest_path_depth_by_axes_prefix: Optional[dict[tuple[str, ...], int]] = None,
+    ) -> tuple[str, ...]:
         source_node = self._state.graph.get_node(edge.source.node_id)
         if prepared_id is None:
             prepared_ids = self._get_ordered_prepared_nodes_for_edge(edge)
@@ -1292,7 +1297,33 @@ class _ExecutionNodeBuilder:
             other_axes = tuple(self._get_collect_source_iterator_ids(other_edge.source.node_id))
             if len(other_axes) > len(axes) and other_axes[: len(axes)] == axes:
                 return axes
+        if context_deepest_path_depth_by_axes_prefix is None:
+            context_deepest_path_depth_by_axes_prefix = self._get_collect_deepest_path_depth_by_axes_prefix(
+                edge.destination.node_id
+            )
+        context_depth = context_deepest_path_depth_by_axes_prefix.get(axes)
+        if context_depth is not None and context_depth > len(self._get_prepared_edge_iteration_path(edge, prepared_id)):
+            return axes
         return axes[:-1]
+
+    def _get_collect_deepest_path_depth_by_axes_prefix(self, collect_node_id: str) -> dict[tuple[str, ...], int]:
+        context_depth_by_axes_prefix: dict[tuple[str, ...], int] = {}
+        for context_edge in self._state.graph._get_input_edges(collect_node_id, ITEM_FIELD):
+            prepared_ids = self._get_ordered_prepared_nodes_for_edge(context_edge)
+            if not prepared_ids:
+                continue
+            prepared_paths = [
+                (candidate_id, self._get_prepared_edge_iteration_path(context_edge, candidate_id))
+                for candidate_id in prepared_ids
+            ]
+            deepest_id, deepest_path = max(prepared_paths, key=lambda candidate: (len(candidate[1]), candidate[1]))
+            deepest_axes = self._get_prepared_edge_iteration_axes(context_edge, deepest_id)
+            for prefix_length in range(len(deepest_axes)):
+                prefix = deepest_axes[:prefix_length]
+                context_depth_by_axes_prefix[prefix] = max(
+                    len(deepest_path), context_depth_by_axes_prefix.get(prefix, 0)
+                )
+        return context_depth_by_axes_prefix
 
     def _get_static_collect_group_axes(self, edge: Edge) -> tuple[str, ...]:
         iterator_node_ids = self._get_collect_source_iterator_ids(edge.source.node_id)
@@ -1341,7 +1372,8 @@ class _ExecutionNodeBuilder:
                     visited.add(parent_id)
                     pending.append((parent_id, distance + 1))
 
-        static_axes = self._get_collect_source_iterator_ids(edge.source.node_id)
+        static_axes = tuple(self._get_collect_source_iterator_ids(edge.source.node_id))
+        edge_axes: Optional[tuple[str, ...]] = None
         axes: list[str] = []
         for axis_index in range(len(path)):
             axis_candidates = candidates.get(axis_index, [])
@@ -1350,10 +1382,21 @@ class _ExecutionNodeBuilder:
                 None,
             )
             axis_id = preferred_axis or (min(axis_candidates)[1] if axis_candidates else None)
-            axes.append(
-                axis_id
-                or (static_axes[axis_index] if len(static_axes) >= len(path) else f"{edge.source.node_id}:{axis_index}")
-            )
+            if axis_id is None:
+                if axis_index < len(static_axes):
+                    axis_id = static_axes[axis_index]
+                else:
+                    if edge_axes is None:
+                        iterator_ancestry = _IteratorAncestry(self._state, iterator_graph=self.iterator_graph())
+                        edge_axes = (
+                            graph_if_runtime._get_edge_frame_axes(
+                                self._state, iterator_ancestry, edge, {}, use_runtime_if_selection=True
+                            )
+                            or ()
+                        )
+                    axis_id = edge_axes[axis_index] if axis_index < len(edge_axes) else None
+            if axis_id is not None:
+                axes.append(axis_id)
         return tuple(axes)
 
     def _get_collect_source_iterator_ids(
@@ -1553,21 +1596,14 @@ class _ExecutionNodeBuilder:
         iterator_node_ids = self._get_collect_source_iterator_ids(source_node_id)
         group_axes = group_axes if group_axes is not None else self._get_collect_group_axes(edge)
         group_depth = len(group_axes)
+        prepared_ids = self._get_ordered_prepared_nodes_for_edge(edge)
         if group_depth == 0:
+            if prepared_ids:
+                return {((), ())}
             group_keys = {((), ())}
             for iterator_node_id in iterator_node_ids:
-                iterator_axes = tuple(self._get_collect_source_iterator_ids(iterator_node_id))
-                for source_id, input_axes, input_path in self._get_iterator_input_iteration_groups(iterator_node_id):
+                for _, input_axes, input_path in self._get_iterator_input_iteration_groups(iterator_node_id):
                     candidate_axes = list(input_axes[: len(input_path)])
-                    for axis_index in range(len(candidate_axes), len(input_path)):
-                        if axis_index >= len(iterator_axes):
-                            break
-                        candidate_axes.append(iterator_axes[axis_index])
-                    for axis_index, axis_id in enumerate(candidate_axes):
-                        if axis_id == f"{source_id}:{axis_index}":
-                            candidate_axes[axis_index] = (
-                                group_axes[axis_index] if axis_index < len(group_axes) else iterator_axes[axis_index]
-                            )
                     if input_path and len(candidate_axes) == len(input_path):
                         group_keys.add((tuple(candidate_axes), input_path))
             return group_keys
@@ -1588,21 +1624,35 @@ class _ExecutionNodeBuilder:
                         and group_axes[: len(candidate_axes)] == candidate_axes
                     ):
                         group_keys.add((candidate_axes, iteration_path))
-            for input_source_id, input_axes, input_path in self._get_iterator_input_iteration_groups(iterator_node_id):
+            for _, input_axes, input_path in self._get_iterator_input_iteration_groups(iterator_node_id):
                 candidate_path = input_path[:group_depth]
-                candidate_axes = list(input_axes[: len(candidate_path)])
-                for axis_index in range(len(candidate_axes), len(candidate_path)):
-                    candidate_axes.append(group_axes[axis_index])
-                for axis_index, axis_id in enumerate(candidate_axes):
-                    if axis_id == f"{input_source_id}:{axis_index}":
-                        candidate_axes[axis_index] = group_axes[axis_index]
-                candidate_axes = tuple(candidate_axes)
+                candidate_axes = input_axes[: len(candidate_path)]
                 if (
                     candidate_path
                     and len(candidate_axes) == len(candidate_path)
                     and group_axes[: len(candidate_axes)] == candidate_axes
                 ):
                     group_keys.add((candidate_axes, candidate_path))
+
+        prepared_contexts = [
+            (
+                self._get_prepared_edge_iteration_axes(edge, prepared_id),
+                self._get_prepared_edge_iteration_path(edge, prepared_id),
+            )
+            for prepared_id in prepared_ids
+        ]
+        if prepared_contexts:
+            group_keys = {
+                (candidate_axes, candidate_path)
+                for candidate_axes, candidate_path in group_keys
+                if not candidate_path
+                or any(
+                    candidate_axes == source_axes[: len(candidate_axes)]
+                    for source_axes, source_path in prepared_contexts
+                    if candidate_path == source_path[: len(candidate_path)]
+                )
+                or not any(candidate_path == source_path[: len(candidate_path)] for _, source_path in prepared_contexts)
+            }
 
         return group_keys
 
@@ -1611,24 +1661,29 @@ class _ExecutionNodeBuilder:
     ) -> list[tuple[tuple[str, ...], tuple[int, ...], list[tuple[str, str]]]]:
         prepared_inputs: list[tuple[Edge, str, str, tuple[str, ...], tuple[int, ...], bool]] = []
         group_keys: set[tuple[tuple[str, ...], tuple[int, ...]]] = set()
+        context_deepest_path_depth_by_axes_prefix = (
+            self._get_collect_deepest_path_depth_by_axes_prefix(input_edges[0].destination.node_id)
+            if input_edges
+            else {}
+        )
         for edge in input_edges:
             prepared_ids = self._get_ordered_prepared_nodes_for_edge(edge)
-            edge_group_axes = list(self._get_collect_group_axes(edge))
+            edge_group_axes = list(
+                self._get_collect_group_axes(
+                    edge, context_deepest_path_depth_by_axes_prefix=context_deepest_path_depth_by_axes_prefix
+                )
+            )
             prepared_group_axes_by_id = {
-                prepared_id: self._get_collect_group_axes(edge, prepared_id) for prepared_id in prepared_ids
+                prepared_id: self._get_collect_group_axes(edge, prepared_id, context_deepest_path_depth_by_axes_prefix)
+                for prepared_id in prepared_ids
             }
             known_axes: list[Optional[str]] = []
             for prepared_group_axes in prepared_group_axes_by_id.values():
                 for axis_index, axis_id in enumerate(prepared_group_axes):
-                    if axis_id == f"{edge.source.node_id}:{axis_index}":
-                        continue
                     if axis_index >= len(known_axes):
                         known_axes.extend([None] * (axis_index + 1 - len(known_axes)))
                     if known_axes[axis_index] is None:
                         known_axes[axis_index] = axis_id
-            for axis_index, axis_id in enumerate(edge_group_axes):
-                if axis_id == f"{edge.source.node_id}:{axis_index}" and axis_index < len(known_axes):
-                    edge_group_axes[axis_index] = known_axes[axis_index] or axis_id
             if len(edge_group_axes) < len(known_axes):
                 edge_group_axes.extend(axis_id for axis_id in known_axes[len(edge_group_axes) :] if axis_id is not None)
             edge_group_axes = tuple(edge_group_axes)
@@ -1636,6 +1691,7 @@ class _ExecutionNodeBuilder:
             for prepared_id in prepared_ids:
                 prepared_group_axes = list(prepared_group_axes_by_id[prepared_id])
                 prepared_path = self._get_prepared_edge_iteration_path(edge, prepared_id)
+                # Different prepared contexts can traverse different real axes at the same path depth.
                 for axis_index in range(min(len(prepared_path), max(len(edge_group_axes), len(known_axes)))):
                     if axis_index >= len(prepared_group_axes):
                         fallback_axis = (
@@ -1644,13 +1700,8 @@ class _ExecutionNodeBuilder:
                         if fallback_axis is None:
                             break
                         prepared_group_axes.append(fallback_axis)
-                    elif prepared_group_axes[axis_index] == f"{edge.source.node_id}:{axis_index}":
-                        fallback_axis = (
-                            edge_group_axes[axis_index] if axis_index < len(edge_group_axes) else known_axes[axis_index]
-                        )
-                        if fallback_axis is not None:
-                            prepared_group_axes[axis_index] = fallback_axis
-                prepared_group_axes = tuple(prepared_group_axes[: len(prepared_path)])
+                prepared_group_axes = prepared_group_axes[: len(prepared_path)]
+                prepared_group_axes = tuple(prepared_group_axes)
                 group_path = prepared_path[: len(prepared_group_axes)]
                 group_key = (prepared_group_axes, group_path)
                 group_keys.add(group_key)
