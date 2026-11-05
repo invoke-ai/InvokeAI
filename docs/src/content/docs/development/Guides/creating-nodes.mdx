@@ -53,6 +53,40 @@ Because the whole node is moved to another device, only mark a node `idle_gpu_of
 If a node that also runs the denoiser, VAE, or other session-GPU work is marked `idle_gpu_offloadable=True`, that work will be re-pinned to the wrong GPU and can misplace tensors or raise device-mismatch errors. When in doubt, leave it unset (the default is `False`) — the node will still work correctly, just without the offload optimization.
 :::
 
+### Preserving metadata provenance in modifier nodes
+
+When writing nodes that accept and modify fields such as conditioning (`ConditioningField`, `FluxConditioningField`, etc.), avoid instantiating a fresh object from scratch (e.g. `ConditioningField(conditioning_name=...)`). Creating a new instance drops all upstream provenance metadata (such as prompt text, text encoder models, text-encoder LoRAs, and preceding modifier settings) from the conditioning field, preventing it from reaching downstream denoisers and being stored in generated image metadata.
+
+Instead, use Pydantic v2's `.model_copy(update={...})` method to preserve all upstream attributes and override only the fields your node modified:
+
+```python
+from invokeai.app.invocations.baseinvocation import BaseInvocation, invocation
+from invokeai.app.invocations.fields import ConditioningField, InputField
+from invokeai.app.invocations.primitives import ConditioningOutput
+from invokeai.app.services.shared.invocation_context import InvocationContext
+
+
+@invocation(
+    "custom_conditioning_modifier",
+    title="Custom Conditioning Modifier",
+    category="conditioning",
+    version="1.0.0",
+)
+class CustomConditioningModifierInvocation(BaseInvocation):
+    """Modifies a conditioning tensor while preserving upstream metadata."""
+
+    conditioning: ConditioningField = InputField(description="Input conditioning to modify")
+
+    def invoke(self, context: InvocationContext) -> ConditioningOutput:
+        # Perform your tensor transformation...
+        new_tensor_name = context.tensors.save(tensor=modified_tensor)
+
+        # Preserve upstream prompt, LoRAs, and text encoder metadata:
+        output_cond = self.conditioning.model_copy(update={"conditioning_name": new_tensor_name})
+        return ConditioningOutput(conditioning=output_cond)
+```
+
+
 ### Listing your node pack
 
 Each pack on the [Community Nodes](/users-guide/workflows/community-nodes/) page is one YAML file in

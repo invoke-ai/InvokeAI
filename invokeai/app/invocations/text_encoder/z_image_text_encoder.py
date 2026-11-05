@@ -13,6 +13,7 @@ from invokeai.app.invocations.fields import (
     UIComponent,
     ZImageConditioningField,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model, extract_loras_metadata
 from invokeai.app.invocations.model import Qwen3EncoderField
 from invokeai.app.invocations.primitives import ZImageConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -63,8 +64,16 @@ class ZImageTextEncoderInvocation(BaseInvocation):
         prompt_embeds = prompt_embeds.detach().to("cpu")
         conditioning_data = ConditioningFieldData(conditionings=[ZImageConditioningInfo(prompt_embeds=prompt_embeds)])
         conditioning_name = context.conditioning.save(conditioning_data)
+        loras = extract_loras_metadata(getattr(self.qwen3_encoder, "loras", None))
         return ZImageConditioningOutput(
-            conditioning=ZImageConditioningField(conditioning_name=conditioning_name, mask=self.mask)
+            conditioning=ZImageConditioningField(
+                conditioning_name=conditioning_name,
+                mask=self.mask,
+                prompt=self.prompt,
+                qwen3_encoder=extract_encoder_model(self.qwen3_encoder),
+                qwen3_source=getattr(self, "qwen3_source", None),
+                loras=loras,
+            )
         )
 
     def _encode_prompt(self, context: InvocationContext, max_seq_len: int) -> torch.Tensor:

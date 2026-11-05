@@ -17,6 +17,7 @@ from invokeai.app.invocations.fields import (
     OutputField,
     UIComponent,
 )
+from invokeai.app.invocations.metadata import extract_encoder_model
 from invokeai.app.invocations.model import LTX2TextEncoderField
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.ltx2.constants import LTX2_DEFAULT_NEGATIVE_PROMPT, LTX2_MAX_SEQUENCE_LENGTH
@@ -108,9 +109,27 @@ class LTX2TextEncoderInvocation(BaseInvocation):
                 for state in hidden_states
             ]
 
+        encoder_model = extract_encoder_model(self.text_encoder)
+        component_source = getattr(self, "ltx2_component_source", None)
+        cond = LTX2ConditioningField(
+            conditioning_name=names[0],
+            prompt=self.prompt,
+            ltx2_text_encoder_model=encoder_model,
+            ltx2_component_source=component_source,
+        )
+        neg_cond = (
+            LTX2ConditioningField(
+                conditioning_name=names[1],
+                prompt=self.negative_prompt,
+                ltx2_text_encoder_model=encoder_model,
+                ltx2_component_source=component_source,
+            )
+            if len(names) > 1
+            else None
+        )
         return LTX2TextEncoderOutput(
-            conditioning=LTX2ConditioningField(conditioning_name=names[0]),
-            negative_conditioning=LTX2ConditioningField(conditioning_name=names[1]) if len(names) > 1 else None,
+            conditioning=cond,
+            negative_conditioning=neg_cond,
         )
 
     def _encode_with_tower(
