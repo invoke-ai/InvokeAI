@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import type { ComponentProps, ReactNode, Ref } from 'react';
+import type { ComponentProps, MouseEvent, ReactNode, Ref } from 'react';
 
 import {
   Box,
@@ -15,14 +15,20 @@ import {
 } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { createExternalStore } from '@platform/state/externalStore';
-import { createContext, useCallback, useContext, useId, useMemo } from 'react';
+import { createContext, useCallback, useContext, useId, useMemo, useRef } from 'react';
 
 import { IconButton, useUnavailableControl } from './Button';
 import { MiddleTruncate } from './MiddleTruncate';
 import { Tooltip } from './Tooltip';
 import { useRegisterWidgetOverlay } from './widgetOverlays';
 
-type MenuContentProps = ComponentProps<typeof Menu.Content>;
+type MenuContentProps = Omit<ComponentProps<typeof Menu.Content>, 'ref'>;
+
+/** Zag's cancelable event on the content for a press outside it; cancelling it keeps the menu open. */
+const POINTER_DOWN_OUTSIDE_EVENT = 'pointerdown.outside';
+
+/** The arrow takes no focus: a press on its tip would otherwise move focus to the page and end keyboard navigation. */
+const keepFocus = (event: MouseEvent<HTMLElement>) => event.preventDefault();
 
 /** A menu rooted inside another menu's content is its submenu, which opens flush beside its item. */
 const InsideMenuContentContext = createContext(false);
@@ -40,6 +46,22 @@ export const MenuContent = ({ children, ...props }: MenuContentProps) => {
   const menu = useMenuContext();
   const isSubmenu = useContext(InsideMenuContentContext);
   const stale = useRegisterWidgetOverlay(menu.open, menu.setOpen);
+  const arrowRef = useRef<HTMLDivElement>(null);
+  // Zag dismisses on a press outside the content, and the arrow, a sibling, counts as outside: a click on the visible
+  // tip would close the menu. Ark exposes the dismissal hook only on Menu.Root, so this listens for Zag's outside event
+  // by name on the content instead. Zag adds its own listener just before dispatching, so this one runs first.
+  const keepOpenOnArrow = useCallback((content: HTMLDivElement | null) => {
+    const handlePointerDownOutside = (event: Event) => {
+      const target = event instanceof CustomEvent ? (event.detail as { target?: unknown } | null)?.target : null;
+
+      if (target instanceof Node && arrowRef.current?.contains(target)) {
+        event.preventDefault();
+      }
+    };
+
+    content?.addEventListener(POINTER_DOWN_OUTSIDE_EVENT, handlePointerDownOutside);
+    return () => content?.removeEventListener(POINTER_DOWN_OUTSIDE_EVENT, handlePointerDownOutside);
+  }, []);
   if (stale) {
     return null;
   }
@@ -47,12 +69,17 @@ export const MenuContent = ({ children, ...props }: MenuContentProps) => {
   const { 'data-placement': placement } = menu.getContentProps() as { 'data-placement'?: string };
   return (
     <>
-      <Menu.Content {...props}>
+      <Menu.Content ref={keepOpenOnArrow} {...props}>
         <InsideMenuContentContext value>{children}</InsideMenuContentContext>
       </Menu.Content>
       {isSubmenu ? null : (
         // The content's own state and placement, so the recipe animates the arrow as Chakra animates the content.
-        <Menu.Arrow data-placement={placement} data-state={menu.open ? 'open' : 'closed'}>
+        <Menu.Arrow
+          ref={arrowRef}
+          data-placement={placement}
+          data-state={menu.open ? 'open' : 'closed'}
+          onMouseDown={keepFocus}
+        >
           <Menu.ArrowTip />
         </Menu.Arrow>
       )}

@@ -79,4 +79,25 @@ describe('PopoverContent arrow', () => {
 
     expect(document.elementFromPoint(box.left + box.width / 2, y)).toBe(inside);
   });
+
+  it('stays open when its visible tip is clicked, as a click on the content would', async () => {
+    const { content, tip } = await renderPopover('bottom');
+    const tipBox = tip.getBoundingClientRect();
+    // On the tip's outer half, above the content's edge: the part a user sees.
+    const point = { x: (tipBox.left + tipBox.right) / 2, y: content.getBoundingClientRect().top - 3 };
+    expect(document.elementFromPoint(point.x, point.y)).toBe(tip);
+
+    const body = document.body.getBoundingClientRect();
+    await act(() =>
+      userEvent.click(page.elementLocator(document.body), {
+        position: { x: point.x - body.left, y: point.y - body.top },
+      })
+    );
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 100);
+    });
+
+    expect(content.dataset.state).toBe('open');
+    expect(page.getByRole('button', { name: 'Open' }).element().getAttribute('aria-expanded')).toBe('true');
+  });
 });

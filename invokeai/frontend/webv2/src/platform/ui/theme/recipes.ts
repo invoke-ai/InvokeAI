@@ -66,12 +66,15 @@ const arrowOnContentBorderEdge = {
 /**
  * Zag rotates the tip so its bordered top-left corner points out of the content. Clipped to that outer half plus the
  * content's 1px border, which it covers so tip and panel share one outline, it never draws over the content or its
- * items. A tip of no size draws no border either.
+ * items. A tip of no size draws no border either. The clip bounds hit testing as well: unlike its click-through arrow
+ * box, the visible tip takes the pointer as part of the surface, so resting on it keeps a hover card open and a click
+ * on it never reaches whatever lies beneath.
  */
 const arrowTipOutsideContent = {
   borderLeftWidth: 'min(1px, var(--arrow-visible-size))',
   borderTopWidth: 'min(1px, var(--arrow-visible-size))',
   clipPath: 'polygon(0 0, calc(100% + 1.5px) 0, 0 calc(100% + 1.5px))',
+  pointerEvents: 'auto',
 };
 
 /** Extend the tooltip recipe; replacing it drops arrow size/background variables. */
@@ -129,8 +132,6 @@ export const hoverCardSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.hoverCard.base?.arrowTip,
       borderColor: 'border.emphasized',
       ...arrowTipOutsideContent,
-      // The visible tip is part of the card: resting the pointer on it keeps the card open.
-      pointerEvents: 'auto',
     },
   },
   defaultVariants: { size: 'xs' },

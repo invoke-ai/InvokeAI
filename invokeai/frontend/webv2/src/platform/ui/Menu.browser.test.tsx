@@ -288,6 +288,44 @@ describe('menu arrows', () => {
     expect(tipStyle.borderTopWidth).toBe(contentStyle.borderTopWidth);
   });
 
+  it('stays open, with keyboard navigation intact, when its tip is clicked; a click beside the menu still closes it', async () => {
+    await renderTriggerMenu('bottom-start', true);
+    const trigger = page.getByRole('button', { name: 'Open' }).element();
+    const menu = page.getByRole('menu').element();
+    const [arrow] = arrowsIn(menu.parentElement);
+    await vi.waitFor(() => expect(menu.dataset.side).toBe('bottom'));
+    await Promise.all([...menu.getAnimations(), ...arrow!.getAnimations()].map((animation) => animation.finished));
+    const tipBox = arrow!.querySelector<HTMLElement>('[data-part="arrow-tip"]')!.getBoundingClientRect();
+    const content = menu.getBoundingClientRect();
+    const body = document.body.getBoundingClientRect();
+    const clickAt = (x: number, y: number) =>
+      act(() =>
+        userEvent.click(page.elementLocator(document.body), { position: { x: x - body.left, y: y - body.top } })
+      );
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await vi.waitFor(() => expect(item('rename').hasAttribute('data-highlighted')).toBe(true));
+
+    // On the tip's outer half, above the content's edge.
+    await clickAt((tipBox.left + tipBox.right) / 2, content.top - 3);
+    await new Promise((resolve) => {
+      globalThis.setTimeout(resolve, 100);
+    });
+    expect(trigger.getAttribute('aria-expanded')).toBe('true');
+    expect(menu.contains(document.activeElement)).toBe(true);
+    await act(() => userEvent.keyboard('{ArrowDown}'));
+    await vi.waitFor(() =>
+      expect(page.getByRole('menuitem', { name: 'Move to' }).element()).toHaveAttribute('data-highlighted')
+    );
+
+    // The arrow's transparent clearance beside the tip lets the click through, to the page outside the menu.
+    const arrowBox = arrow!.getBoundingClientRect();
+    const clearance = { x: tipBox.right + 2, y: content.top - 3 };
+    expect(clearance.x).toBeLessThan(arrowBox.right);
+    expect(arrow!.contains(document.elementFromPoint(clearance.x, clearance.y))).toBe(false);
+    await clickAt(clearance.x, clearance.y);
+    await vi.waitFor(() => expect(trigger.getAttribute('aria-expanded')).toBe('false'));
+  });
+
   it('leaves submenus, which open flush beside their item, without one', async () => {
     await renderTriggerMenu('bottom-start', true);
     await act(() => userEvent.click(page.getByRole('menuitem', { name: 'Move to' })));
