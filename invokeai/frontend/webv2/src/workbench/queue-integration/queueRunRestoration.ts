@@ -2,7 +2,7 @@ import type { QueueSubmissionRetry } from '@features/queue/contracts';
 import type { WorkbenchQueueItem } from '@workbench/queueHistoryContracts';
 
 import { cloneGenerateWidgetValues, normalizeGenerateWidgetValues } from '@features/generation/settings';
-import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
+import { boundSubmissionRetryMessage, MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { cloneVideoWidgetValues, normalizeVideoWidgetValues } from '@features/video';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -15,14 +15,18 @@ const isBackendItemIdList = (value: unknown): value is number[] =>
   new Set(value).size === value.length &&
   value.every((item) => Number.isSafeInteger(item) && item > 0);
 
-/** A retry record only means something with its invariants intact; anything else is dropped, never the run. */
+/**
+ * A retry record only means something with its invariants intact; anything else, including a reason a later build
+ * added, is dropped, never the run. Its message is bounded again, as records from before the bound may hold a whole
+ * response body.
+ */
 const normalizeSubmissionRetry = (value: unknown): QueueSubmissionRetry | undefined => {
   if (!isRecord(value)) {
     return undefined;
   }
   const { failedAt, failureCount, message, reason, serverErrorCount, serverErrorSince, status } = value;
   if (
-    (reason !== 'server-error' && reason !== 'unavailable' && reason !== 'unreachable') ||
+    (reason !== 'error' && reason !== 'server-error' && reason !== 'unavailable' && reason !== 'unreachable') ||
     typeof message !== 'string' ||
     !isFiniteNumber(failedAt) ||
     (status !== null && !(Number.isSafeInteger(status) && (status as number) >= 100 && (status as number) <= 599)) ||
@@ -41,7 +45,7 @@ const normalizeSubmissionRetry = (value: unknown): QueueSubmissionRetry | undefi
   return {
     failedAt,
     failureCount: failureCount as number,
-    message,
+    message: boundSubmissionRetryMessage(message),
     reason,
     serverErrorCount: serverErrorCount as number,
     serverErrorSince: serverErrorSince as number | null,

@@ -47,9 +47,10 @@ export interface QueueSubmissionSnapshot {
 export interface QueueSubmissionRetry {
   /**
    * 'server-error': a 5xx other than 502/503/504, counted toward the failure budget. 'unavailable': 408, 429, 502,
-   * 503 or 504. 'unreachable': no usable answer (network error or lost response).
+   * 503 or 504. 'unreachable': the request never got an answer (network failure or timeout). 'error': anything else,
+   * such as an answer that could not be read; the batch may have been accepted, so the run is reconciled and retried.
    */
-  reason: 'server-error' | 'unavailable' | 'unreachable';
+  reason: 'error' | 'server-error' | 'unavailable' | 'unreachable';
   /** Consecutive failed submissions so far, whatever their reason; at least 1. Paces the next attempt. */
   failureCount: number;
   /** Consecutive server-error answers so far; 0 when the latest failure was another reason. */

@@ -311,7 +311,34 @@ describe('IndexedDB queue run journal', () => {
       status: 'running',
       submissionRetry: retry,
     });
-    for (const item of [retrying, miscounted, backwards, undercounted, accepted]) {
+    // A failure that is neither a server error nor a transport failure keeps its own reason.
+    const otherError = {
+      ...retry,
+      message: 'Invalid queue enqueue response',
+      reason: 'error' as const,
+      serverErrorCount: 0,
+      serverErrorSince: null,
+      status: null,
+    };
+    const unreadable = createItem({ id: 'queue-item-6', submissionRetry: otherError });
+    // A reason this build does not know, as a later build might write it.
+    const unknownReason = createItem({
+      id: 'queue-item-7',
+      submissionRetry: { ...otherError, reason: 'throttled' } as unknown as WorkbenchQueueItem['submissionRetry'],
+    });
+    // Written before messages were bounded: a whole HTML error page.
+    const page = `<html>${'x'.repeat(5_000)}</html>`;
+    const longMessage = createItem({ id: 'queue-item-8', submissionRetry: { ...retry, message: page } });
+    for (const item of [
+      retrying,
+      miscounted,
+      backwards,
+      undercounted,
+      accepted,
+      unreadable,
+      unknownReason,
+      longMessage,
+    ]) {
       await journal.record(projectId, item);
     }
 
@@ -327,7 +354,12 @@ describe('IndexedDB queue run journal', () => {
       status: 'pending',
       submissionRetry: retry,
     });
-    for (const item of [miscounted, backwards, undercounted, accepted]) {
+    expect(restored.find((item) => item.id === unreadable.id)).toMatchObject({ submissionRetry: otherError });
+    expect(restored.find((item) => item.id === longMessage.id)?.submissionRetry).toEqual({
+      ...retry,
+      message: `${page.slice(0, 499)}…`,
+    });
+    for (const item of [miscounted, backwards, undercounted, accepted, unknownReason]) {
       const restoredItem = restored.find((candidate) => candidate.id === item.id);
       expect(restoredItem).toMatchObject({ status: item.status });
       expect(restoredItem).not.toHaveProperty('submissionRetry');

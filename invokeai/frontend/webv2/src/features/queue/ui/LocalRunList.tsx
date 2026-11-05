@@ -9,6 +9,7 @@ import { Scrollable } from '@platform/ui/Scrollable';
 import { segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import {
   ChevronRightIcon,
+  CircleAlertIcon,
   CloudOffIcon,
   HourglassIcon,
   SendIcon,
@@ -27,9 +28,10 @@ import { useQueueUi, type QueueLocalRun } from './QueueUiContext';
 
 const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
 
-type LocalRunState = 'offline' | 'server-error' | 'submitting' | 'unavailable' | 'unreachable';
+type LocalRunState = NonNullable<QueueLocalRun['retry']>['reason'] | 'offline' | 'submitting';
 
 const STATE_META: Record<LocalRunState, { color: string; icon: LucideIcon; labelKey: string }> = {
+  error: { color: 'fg.warning', icon: CircleAlertIcon, labelKey: 'widgets.queue.localRuns.state.error' },
   offline: { color: 'fg.warning', icon: CloudOffIcon, labelKey: 'widgets.queue.localRuns.state.offline' },
   'server-error': {
     color: 'fg.warning',

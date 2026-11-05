@@ -14,7 +14,7 @@ import { activeProgressTargetStore } from '@features/queue/data/activeProgressTa
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { ApiError } from '@platform/transport/http';
 import { createInitialWorkbenchState, type WorkbenchAction, workbenchReducer } from '@workbench/workbenchState.testing';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createQueueItemBackendSubmission,
@@ -236,6 +236,12 @@ const runtimeServices = {
     started: vi.fn(),
   },
 };
+
+// A failing assertion must not leave fake timers or a stubbed Math.random to the next test.
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('queue runtime', () => {
   it('turns a malformed legacy submission into a failed request instead of throwing', () => {
@@ -647,7 +653,6 @@ describe('queue runtime', () => {
       expect(commands.refreshBoardDestinations).toHaveBeenCalledTimes(refreshes);
       expect(commands.refreshBackendData).not.toHaveBeenCalled();
       await runtime.dispose();
-      vi.useRealTimers();
     }
   );
 
@@ -689,7 +694,6 @@ describe('queue runtime', () => {
       expect(commands.setStatus).not.toHaveBeenCalled();
     }
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('fails a run whose queued request is invalid with a code its notice can translate, without enqueueing', async () => {
@@ -722,7 +726,6 @@ describe('queue runtime', () => {
       status: 'failed',
     });
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('fails a run the server queue accepted none of with a code its notice can translate', async () => {
@@ -1447,7 +1450,6 @@ describe('queue runtime', () => {
     expect(settle).toHaveBeenCalledTimes(2);
     await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1));
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('restores a durable cancellation intent and retries cancellation before settling it', async () => {
@@ -1858,7 +1860,6 @@ describe('queue runtime', () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(enqueueGenerate).toHaveBeenCalledTimes(5);
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('continues the 500 budget of a run restored after a reload instead of starting it over', async () => {
@@ -1900,7 +1901,6 @@ describe('queue runtime', () => {
     await vi.advanceTimersByTimeAsync(30_000);
     expect(enqueueGenerate).toHaveBeenCalledTimes(3);
     await afterReload.dispose();
-    vi.useRealTimers();
   });
 
   it('recovers from 500s that stop within a few seconds instead of failing the run', async () => {
@@ -1931,7 +1931,6 @@ describe('queue runtime', () => {
     expect(workbench.getRun()).toMatchObject({ backendItemIds: [88], status: 'running' });
     expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('adopts a run the server accepted before its last 500 instead of failing it', async () => {
@@ -1963,7 +1962,6 @@ describe('queue runtime', () => {
     expect(workbench.getRun()).toMatchObject({ backendItemIds: [88], status: 'running' });
     expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('keeps retrying an unavailable server without counting it toward the 500 budget', async () => {
@@ -2009,7 +2007,6 @@ describe('queue runtime', () => {
     expect(workbench.getRun()).toMatchObject({ backendItemIds: [88], status: 'running' });
     expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('paces a run through a long outage by its own failures, whatever the reconciles in between find', async () => {
@@ -2031,54 +2028,61 @@ describe('queue runtime', () => {
     expect(enqueueGenerate).toHaveBeenCalledTimes(11);
     expect(workbench.getRun()).toMatchObject({ status: 'pending', submissionRetry: { failureCount: 11 } });
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
-  it('lets a waiting run submit at once when the connection comes back', async () => {
-    vi.useFakeTimers();
-    const workbench = createWorkbenchQueueHistory();
-    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('unavailable', 503));
-    let setConnection: (status: BackendConnectionStatus) => void = () => undefined;
-    const runtime = createQueueRuntime({
-      ...runtimeServices,
-      backend: createTestBackend({
-        enqueueGenerate,
-        listItems: vi.fn().mockResolvedValue([]),
-        onConnectionChange: (listener) => {
-          setConnection = listener;
-          listener('connected');
-          return vi.fn();
-        },
-      }),
-      history: workbench.history,
-      journal: createTestJournal(),
-    });
+  it.each([
+    { disconnectedMs: 500, name: 'a random share of two seconds', random: 0.25, waitMs: 500 },
+    { disconnectedMs: 2_000, name: 'no longer than the rest of its own wait', random: 0.99, waitMs: 1_000 },
+  ])(
+    'lets a waiting run submit within $name when the connection comes back',
+    async ({ disconnectedMs, random, waitMs }) => {
+      vi.useFakeTimers();
+      vi.spyOn(Math, 'random').mockReturnValue(random);
+      const workbench = createWorkbenchQueueHistory();
+      const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('unavailable', 503));
+      let setConnection: (status: BackendConnectionStatus) => void = () => undefined;
+      const runtime = createQueueRuntime({
+        ...runtimeServices,
+        backend: createTestBackend({
+          enqueueGenerate,
+          listItems: vi.fn().mockResolvedValue([]),
+          onConnectionChange: (listener) => {
+            setConnection = listener;
+            listener('connected');
+            return vi.fn();
+          },
+        }),
+        history: workbench.history,
+        journal: createTestJournal(),
+      });
 
-    runtime.start();
-    // Attempts at 0, 1 and 3 s; the next waits until 7 s.
-    await vi.advanceTimersByTimeAsync(4_000);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+      runtime.start();
+      // Attempts at 0, 1 and 3 s; the next waits until 7 s.
+      await vi.advanceTimersByTimeAsync(4_000);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(3);
 
-    setConnection('disconnected');
-    await vi.advanceTimersByTimeAsync(500);
-    setConnection('connected');
-    await vi.advanceTimersByTimeAsync(10);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(4);
+      setConnection('disconnected');
+      await vi.advanceTimersByTimeAsync(disconnectedMs);
+      setConnection('connected');
+      await vi.advanceTimersByTimeAsync(waitMs - 10);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(3);
+      await vi.advanceTimersByTimeAsync(20);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(4);
 
-    // The clock then steps back a minute. That attempt failed too, so the run waits 8 s from it again, and the
-    // failures after it, recorded before the reconnect by the clock, keep their pace.
-    vi.setSystemTime(Date.now() - 60_000);
-    await vi.advanceTimersByTimeAsync(7_900);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(4);
-    await vi.advanceTimersByTimeAsync(200);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(5);
-    await vi.advanceTimersByTimeAsync(14_800);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(5);
-    await vi.advanceTimersByTimeAsync(200);
-    expect(enqueueGenerate).toHaveBeenCalledTimes(6);
-    await runtime.dispose();
-    vi.useRealTimers();
-  });
+      // The clock then steps back a minute. That attempt failed too, so the run waits 8 s from it again, and the
+      // failures after it, recorded before the reconnect by the clock, keep their pace.
+      vi.setSystemTime(Date.now() - 60_000);
+      await vi.advanceTimersByTimeAsync(7_900);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(4);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(5);
+      await vi.advanceTimersByTimeAsync(14_800);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(5);
+      await vi.advanceTimersByTimeAsync(200);
+      expect(enqueueGenerate).toHaveBeenCalledTimes(6);
+      await runtime.dispose();
+    }
+  );
 
   it.each([
     { clockShiftMs: 0, name: 'the rest of its wait' },
@@ -2110,7 +2114,6 @@ describe('queue runtime', () => {
     await vi.advanceTimersByTimeAsync(200);
     expect(enqueueGenerate).toHaveBeenCalledTimes(4);
     await afterReload.dispose();
-    vi.useRealTimers();
   });
 
   it.each([
@@ -2118,7 +2121,12 @@ describe('queue runtime', () => {
     { error: new ApiError('too many requests', 429), reason: 'unavailable', status: 429 },
     { error: new ApiError('bad gateway', 502), reason: 'unavailable', status: 502 },
     { error: new ApiError('gateway timeout', 504), reason: 'unavailable', status: 504 },
-    { error: new Error('response lost'), reason: 'unreachable', status: null },
+    // What `fetch` rejects with when the request gets no answer, or is aborted or times out.
+    { error: new TypeError('Failed to fetch'), reason: 'unreachable', status: null },
+    { error: new DOMException('The operation timed out.', 'TimeoutError'), reason: 'unreachable', status: null },
+    // An answer arrived but could not be read; the batch may have been accepted, so the run is reconciled and retried.
+    { error: new SyntaxError('Unexpected token < in JSON'), reason: 'error', status: null },
+    { error: new Error('Invalid queue enqueue response'), reason: 'error', status: null },
   ])('keeps retrying, paced, while an enqueue fails with $error.message', async ({ error, reason, status }) => {
     vi.useFakeTimers();
     const workbench = createWorkbenchQueueHistory();
@@ -2140,7 +2148,6 @@ describe('queue runtime', () => {
       submissionRetry: { failureCount: 7, message: error.message, reason, serverErrorCount: 0, status },
     });
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('stops retrying a run cancelled while it waits to submit again', async () => {
@@ -2169,7 +2176,256 @@ describe('queue runtime', () => {
     expect(workbench.getRun()?.error).toBeUndefined();
     expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
     await runtime.dispose();
-    vi.useRealTimers();
+  });
+
+  it('neither revives nor fails a run cancelled while its enqueue is in flight when a late 500 answers it', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    let answer: (error: unknown) => void = () => undefined;
+    const enqueueGenerate = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('graph validation crashed', 500))
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            answer = reject;
+          })
+      )
+      .mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    // A 500 at 0 s; the second attempt, at 1 s, is still waiting for its answer.
+    await vi.advanceTimersByTimeAsync(1_500);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(2);
+
+    workbench.cancel();
+    answer(new ApiError('graph validation crashed', 500));
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(enqueueGenerate).toHaveBeenCalledTimes(2);
+    expect(workbench.getRun()).toMatchObject({ status: 'cancelled' });
+    expect(workbench.getRun()?.error).toBeUndefined();
+    expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
+    expect(workbench.history.commands.setStatus).not.toHaveBeenCalledWith(
+      expect.objectContaining({ status: 'failed' })
+    );
+    await runtime.dispose();
+  });
+
+  it('needs three fresh 500s over ten seconds after an unavailable answer breaks the streak', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const startedAt = Date.now();
+    // 500s at 0 and 1 s, a 503 at 3 s, then 500s from 7 s on.
+    const enqueueGenerate = vi.fn(() =>
+      Promise.reject(
+        enqueueGenerate.mock.calls.length === 3
+          ? new ApiError('unavailable', 503)
+          : new ApiError('graph validation crashed', 500)
+      )
+    );
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+
+    // Five 500s by 15 s would have spent an unbroken budget; this streak has two, since 7 s.
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(5);
+    expect(workbench.getRun()).toMatchObject({
+      status: 'pending',
+      submissionRetry: { reason: 'server-error', serverErrorCount: 2, serverErrorSince: startedAt + 7_000 },
+    });
+
+    // The third, at 30 s, is 23 s after the streak began.
+    await vi.advanceTimersByTimeAsync(15_000);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(6);
+    expect(workbench.getRun()).toMatchObject({ error: 'graph validation crashed', status: 'failed' });
+    await runtime.dispose();
+  });
+
+  it('restarts the 500 window at now, keeping the count, when the clock is set back before the streak began', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    await vi.advanceTimersByTimeAsync(500);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(1);
+
+    // The streak now began a minute ahead of the clock. The wait, due 0.5 s later, finds its due time a minute away
+    // and waits its 1 s delay once more instead.
+    vi.setSystemTime(Date.now() - 60_000);
+    const steppedBackAt = Date.now();
+    await vi.advanceTimersByTimeAsync(1_400);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(200);
+    expect(enqueueGenerate).toHaveBeenCalledTimes(2);
+    const retry = workbench.getRun()?.submissionRetry;
+    expect(retry).toMatchObject({ reason: 'server-error', serverErrorCount: 2 });
+    expect(retry?.serverErrorSince).toBe(retry?.failedAt);
+    expect(retry!.failedAt - steppedBackAt).toBeLessThan(1_600);
+
+    // Neither failed at once nor stalled: the third 500 fails the run once ten seconds have passed since the restart.
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(workbench.getRun()).toMatchObject({ status: 'pending', submissionRetry: { serverErrorCount: 3 } });
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(workbench.getRun()).toMatchObject({ error: 'graph validation crashed', status: 'failed' });
+    await runtime.dispose();
+  });
+
+  it.each([
+    { accepted: false, name: 'fails it with the server error' },
+    { accepted: true, name: 'adopts what the server accepted' },
+  ])('reconciles a run reloaded after its last 500 and $name, without submitting it again', async ({ accepted }) => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const journal = createMemoryJournal();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    // The server answers the final reconcile only after the reload.
+    let reloaded = false;
+    const listItems = vi.fn(() => Promise.resolve(reloaded && accepted ? [workbench.acceptedItem] : []));
+    const backend = createTestBackend({
+      enqueueGenerate,
+      getItem: vi.fn().mockResolvedValue(workbench.acceptedItem),
+      listItems,
+    });
+    const createRuntime = () =>
+      createQueueRuntime({ ...runtimeServices, backend, history: workbench.history, journal });
+
+    const beforeReload = createRuntime();
+    beforeReload.start();
+    // The fifth 500, at 15 s, spends the budget; the page goes before its final reconcile.
+    while (enqueueGenerate.mock.calls.length < 5) {
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    const reconcilesBefore = listItems.mock.calls.length;
+    await beforeReload.dispose();
+    expect(workbench.getRun()).toMatchObject({ status: 'pending', submissionRetry: { serverErrorCount: 5 } });
+
+    reloaded = true;
+    workbench.reload();
+    const afterReload = createRuntime();
+    afterReload.start();
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    expect(enqueueGenerate).toHaveBeenCalledTimes(5);
+    expect(listItems.mock.calls.length).toBeGreaterThan(reconcilesBefore);
+    expect(workbench.getRun()).toMatchObject(
+      accepted ? { backendItemIds: [88], status: 'running' } : { error: 'graph validation crashed', status: 'failed' }
+    );
+    expect(workbench.getRun()).not.toHaveProperty('submissionRetry');
+    await afterReload.dispose();
+  });
+
+  it('starts a new 500 streak for a run last failed more than five minutes before its next attempt', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const journal = createMemoryJournal();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError('graph validation crashed', 500));
+    const backend = createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) });
+    const createRuntime = () =>
+      createQueueRuntime({ ...runtimeServices, backend, history: workbench.history, journal });
+
+    const beforeReload = createRuntime();
+    beforeReload.start();
+    while (enqueueGenerate.mock.calls.length < 2) {
+      await vi.advanceTimersByTimeAsync(10);
+    }
+    await beforeReload.dispose();
+    expect(workbench.getRun()).toMatchObject({ submissionRetry: { failureCount: 2, serverErrorCount: 2 } });
+
+    // The page comes back a day later, and the server answers with one more 500.
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60_000);
+    workbench.reload();
+    const afterReload = createRuntime();
+    const reloadedAt = Date.now();
+    afterReload.start();
+    while (enqueueGenerate.mock.calls.length < 3) {
+      await vi.advanceTimersByTimeAsync(10);
+    }
+
+    // Without the restart, three 500s spread over a day would have failed the run at once.
+    expect(workbench.getRun()).toMatchObject({
+      status: 'pending',
+      submissionRetry: { failureCount: 3, serverErrorCount: 1 },
+    });
+    expect(workbench.getRun()?.submissionRetry?.serverErrorSince).toBeGreaterThanOrEqual(reloadedAt);
+    await afterReload.dispose();
+  });
+
+  it('keeps the 500 streak of a run whose answer took longer than five minutes to come', async () => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const startedAt = Date.now();
+    const slowServerError = () =>
+      new Promise((_resolve, reject) => {
+        setTimeout(() => reject(new ApiError('graph validation crashed', 500)), 6 * 60_000);
+      });
+    const enqueueGenerate = vi
+      .fn()
+      .mockRejectedValueOnce(new ApiError('graph validation crashed', 500))
+      .mockImplementation(slowServerError);
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    // The second attempt starts at 1 s and its 500 arrives six minutes later.
+    await vi.advanceTimersByTimeAsync(6 * 60_000 + 2_000);
+
+    expect(enqueueGenerate).toHaveBeenCalledTimes(2);
+    expect(workbench.getRun()).toMatchObject({
+      status: 'pending',
+      submissionRetry: { failureCount: 2, serverErrorCount: 2, serverErrorSince: startedAt },
+    });
+    await runtime.dispose();
+  });
+
+  it.each([
+    {
+      name: 'a long error page',
+      page: `<html><body><h1>503 Service Unavailable</h1>${'<p>trace</p>\n'.repeat(1_000)}</body></html>`,
+      kept: `<html><body><h1>503 Service Unavailable</h1>${'<p>trace</p>\n'.repeat(1_000)}`.slice(0, 499),
+    },
+    // The cut would fall inside the emoji; it drops the emoji rather than keep half of it.
+    { name: 'a cut through an emoji', page: `${'x'.repeat(498)}😀${'y'.repeat(100)}`, kept: 'x'.repeat(498) },
+  ])('keeps the start of $name as the message of a failed submission', async ({ kept, page }) => {
+    vi.useFakeTimers();
+    const workbench = createWorkbenchQueueHistory();
+    const enqueueGenerate = vi.fn().mockRejectedValue(new ApiError(page, 503));
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({ enqueueGenerate, listItems: vi.fn().mockResolvedValue([]) }),
+      history: workbench.history,
+      journal: createTestJournal(),
+    });
+
+    runtime.start();
+    await vi.advanceTimersByTimeAsync(500);
+
+    expect(workbench.getRun()?.submissionRetry?.message).toBe(`${kept}…`);
+    await runtime.dispose();
   });
 
   it('owns and journals a fresh pending run while offline, then submits it after reconnect', async () => {
@@ -2306,7 +2562,6 @@ describe('queue runtime', () => {
     expect(enqueueGenerate).toHaveBeenCalledTimes(1);
     expect(queueItem.cancellationPending).toBeUndefined();
     await runtime.dispose();
-    vi.useRealTimers();
   });
 
   it('adopts a partially accepted enqueue instead of abandoning its backend items', async () => {

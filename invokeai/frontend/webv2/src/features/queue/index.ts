@@ -41,6 +41,7 @@ export {
 } from './core/historySummary';
 export {
   BACKEND_SUBMITTABLE_SOURCE_IDS,
+  boundSubmissionRetryMessage,
   getQueueSourceResultSelection,
   isBackendSubmittableSourceId,
   shouldSubmitPendingQueueItem,

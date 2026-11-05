@@ -21,7 +21,11 @@ import {
   MAX_QUEUE_BATCH_ITEMS,
   type QueueWorkflowSeed,
 } from '@features/queue/core/promptBatch';
-import { QUEUE_SOURCE_RESULT_NODE_IDS, shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
+import {
+  boundSubmissionRetryMessage,
+  QUEUE_SOURCE_RESULT_NODE_IDS,
+  shouldSubmitPendingQueueItem,
+} from '@features/queue/core/submissionRules';
 import {
   buildQueueItemOrigin,
   isTerminalBackendStatus,
@@ -435,59 +439,85 @@ const getJournalSignature = (item: QueueItem): string =>
  */
 const MAX_SERVER_ERROR_SUBMISSIONS = 3;
 const MIN_SERVER_ERROR_WINDOW_MS = 10_000;
+/**
+ * An attempt starting this long after the run's previous failure begins a new 500 streak, so 500s from an earlier
+ * session do not spend the budget of a later one. Minutes rather than a few retry delays: a hidden tab's timers can
+ * fire only about once a minute, and that must not reset a streak.
+ */
+const SERVER_ERROR_STREAK_GAP_MS = 5 * 60_000;
 const UNAVAILABLE_STATUSES = [408, 429, 502, 503, 504];
 /**
  * A run waits before each resubmission, 1 s after its first failed submission and doubling up to 15 s, whatever the
- * reason; its 500 budget is then spent after five attempts over about 15 s. The wait runs from the recorded failure,
- * so a reload keeps it, and a reconnect lifts it for the runs waiting then, as the server is likely back.
+ * reason; its 500 budget is then spent after five attempts over about 15 s. When the connection comes back, each run
+ * waiting then submits within a random RECONNECT_SPREAD_MS instead (never later than its own wait), so a restarting
+ * server, and every tab, does not get all of them at once.
+ *
+ * Clock rules, for the wall clock the recorded times use:
+ * - A wait runs from the recorded failure (`failedAt`), so a reload keeps it.
+ * - A wait is never longer than the run's delay: a failure recorded ahead of the clock (set back since) waits the
+ *   delay from now (`getSubmissionWaitMs`), and a due time the clock has since moved more than a delay away is fixed
+ *   again (`getRemainingSubmissionWaitMs`). A clock set back delays a run once by at most its delay.
+ * - A 500 streak whose start reads after now restarts its window at now and keeps its count, so the run neither waits
+ *   for the clock to catch up nor fails at once; a clock set forward can only shorten the window, and the run still
+ *   takes MAX_SERVER_ERROR_SUBMISSIONS 500s to fail (`getSubmissionRetry`). A clock set back never starts a new streak
+ *   by SERVER_ERROR_STREAK_GAP_MS; one set forward past it does, which only gives the run a fresh budget.
+ * - Whether the budget is spent is judged from the recorded times alone (`isSubmissionRetryExhausted`).
  */
 const SUBMISSION_RETRY_BASE_MS = 1_000;
 const SUBMISSION_RETRY_MAX_MS = 15_000;
+const RECONNECT_SPREAD_MS = 2_000;
 const getSubmissionRetryDelayMs = (failureCount: number): number =>
   Math.min(SUBMISSION_RETRY_BASE_MS * 2 ** Math.max(failureCount - 1, 0), SUBMISSION_RETRY_MAX_MS);
-/** Never longer than the delay itself, so a failure recorded ahead of the clock (set back since) cannot stall a run. */
 const getSubmissionWaitMs = (retry: QueueSubmissionRetry, now: number): number => {
   const delayMs = getSubmissionRetryDelayMs(retry.failureCount);
   return Math.min(Math.max(retry.failedAt + delayMs - now, 0), delayMs);
 };
 const isDeterministicServerError = (error: unknown): error is ApiError =>
   error instanceof ApiError && error.status >= 500 && !UNAVAILABLE_STATUSES.includes(error.status);
+/** `fetch` rejects with a TypeError when the request gets no answer, and a DOMException when it is aborted. */
+const isTransportFailure = (error: unknown): boolean =>
+  error instanceof TypeError ||
+  (error instanceof DOMException && ['AbortError', 'NetworkError', 'TimeoutError'].includes(error.name));
+
+const getRetryReason = (error: unknown): Exclude<QueueSubmissionRetry['reason'], 'server-error'> => {
+  if (error instanceof ApiError) {
+    return UNAVAILABLE_STATUSES.includes(error.status) ? 'unavailable' : 'error';
+  }
+  return isTransportFailure(error) ? 'unreachable' : 'error';
+};
 
 /**
- * The retry a failed submission leaves, continuing the run's consecutive server errors. When the clock now reads
- * before the first of them (it was set back), the window restarts at now and the count stays, so the run neither
- * waits for the clock to catch up nor fails at once. A clock set forward can only shorten the window; the run still
- * takes MAX_SERVER_ERROR_SUBMISSIONS server errors to fail.
+ * The retry a failed submission leaves, continuing the run's consecutive server errors unless the attempt started
+ * more than SERVER_ERROR_STREAK_GAP_MS after the previous failure. The gap is measured from the attempt's start, so
+ * a slow answer cannot reset its own streak.
  */
 const getSubmissionRetry = (
   error: unknown,
   previous: QueueSubmissionRetry | undefined,
-  now: number
+  { attemptStartedAt, now }: { attemptStartedAt: number; now: number }
 ): QueueSubmissionRetry => {
   const base = {
     failedAt: now,
     failureCount: (previous?.failureCount ?? 0) + 1,
-    message: toErrorMessage(error),
+    message: boundSubmissionRetryMessage(toErrorMessage(error)),
     status: error instanceof ApiError ? error.status : null,
   };
   if (!isDeterministicServerError(error)) {
-    return {
-      ...base,
-      reason: error instanceof ApiError && UNAVAILABLE_STATUSES.includes(error.status) ? 'unavailable' : 'unreachable',
-      serverErrorCount: 0,
-      serverErrorSince: null,
-    };
+    return { ...base, reason: getRetryReason(error), serverErrorCount: 0, serverErrorSince: null };
   }
-  const since = previous?.reason === 'server-error' ? previous.serverErrorSince : null;
+  const streak =
+    previous?.reason === 'server-error' && attemptStartedAt - previous.failedAt <= SERVER_ERROR_STREAK_GAP_MS
+      ? previous
+      : undefined;
+  const since = streak?.serverErrorSince ?? null;
   return {
     ...base,
     reason: 'server-error',
-    serverErrorCount: (previous?.reason === 'server-error' ? previous.serverErrorCount : 0) + 1,
+    serverErrorCount: (streak?.serverErrorCount ?? 0) + 1,
     serverErrorSince: since !== null && since <= now ? since : now,
   };
 };
 
-/** Judged from the recorded times alone, so a reload or a later clock change cannot alter the verdict. */
 const isSubmissionRetryExhausted = (retry: QueueSubmissionRetry): boolean =>
   retry.reason === 'server-error' &&
   retry.serverErrorSince !== null &&
@@ -577,15 +607,10 @@ export const createQueueRuntime = ({
   /** Wakes the runtime when the earliest waiting run may submit again. */
   let submissionTimer: { dueAt: number; timer: ReturnType<typeof setTimeout> } | undefined;
   /**
-   * When each waiting run may submit again, fixed when its failure is first seen, so a clock that reads before the
-   * failure delays the run once by at most its delay instead of moving the time along with it.
+   * When each waiting run may submit again, by the failure it waits on; fixed when that failure is first seen and
+   * shortened on reconnect. See the clock rules at SUBMISSION_RETRY_BASE_MS.
    */
   const submissionDueTimes = new Map<string, { dueAt: number; failedAt: number }>();
-  /**
-   * Runs that were waiting when the connection came back, by the failure they waited on: they submit without waiting,
-   * and a later failure waits again. Keyed by failure rather than by time, so a clock change cannot widen the lift.
-   */
-  const liftedSubmissionWaits = new Map<string, number>();
   let sawDisconnect = false;
   let renewTimer: ReturnType<typeof setInterval> | undefined;
   let hasInitialized = false;
@@ -896,7 +921,6 @@ export const createQueueRuntime = ({
     cancelRequestedRunKeys.delete(key);
     reportedCancelFailures.delete(key);
     submissionDueTimes.delete(key);
-    liftedSubmissionWaits.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -1946,6 +1970,7 @@ export const createQueueRuntime = ({
       return;
     }
 
+    const attemptStartedAt = Date.now();
     const request =
       submission.kind === 'generate'
         ? coordinator.submitGenerate(currentQueueItem.id, submission.request)
@@ -2037,7 +2062,7 @@ export const createQueueRuntime = ({
           retry: getSubmissionRetry(
             error,
             failedTarget?.project.id === project.id ? failedTarget.queueItem?.submissionRetry : undefined,
-            Date.now()
+            { attemptStartedAt, now: Date.now() }
           ),
         });
         startedRunKeys.delete(runKey);
@@ -2100,7 +2125,6 @@ export const createQueueRuntime = ({
           reconcileRetryRunKeys.delete(key);
           reportedCancelFailures.delete(key);
           submissionDueTimes.delete(key);
-          liftedSubmissionWaits.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }
@@ -2188,6 +2212,24 @@ export const createQueueRuntime = ({
     return Math.max(due.dueAt - now, 0);
   };
 
+  /** Each waiting run's remaining wait becomes a random share of RECONNECT_SPREAD_MS, never longer than it was. */
+  const spreadSubmissionWaits = (): void => {
+    const now = Date.now();
+    for (const project of history.getSnapshot().projects) {
+      for (const item of project.queue.items) {
+        const key = getRunKey(project.id, item.id);
+        if (item.status !== 'pending' || !item.submissionRetry || !trackedRuns.has(key)) {
+          continue;
+        }
+        const waitMs = Math.min(
+          getRemainingSubmissionWaitMs(key, item.submissionRetry, now),
+          Math.random() * RECONNECT_SPREAD_MS
+        );
+        submissionDueTimes.set(key, { dueAt: now + waitMs, failedAt: item.submissionRetry.failedAt });
+      }
+    }
+  };
+
   const scheduleSubmissionWake = (waitMs: number): void => {
     const dueAt = Date.now() + waitMs;
     if (submissionTimer && submissionTimer.dueAt <= dueAt) {
@@ -2230,16 +2272,12 @@ export const createQueueRuntime = ({
           !startedRunKeys.has(runKey)
         ) {
           const retry = queueItem.submissionRetry;
-          const waitMs =
-            retry && liftedSubmissionWaits.get(runKey) !== retry.failedAt
-              ? getRemainingSubmissionWaitMs(runKey, retry, now)
-              : 0;
+          const waitMs = retry ? getRemainingSubmissionWaitMs(runKey, retry, now) : 0;
           if (waitMs > 0) {
             nextWaitMs = Math.min(nextWaitMs ?? waitMs, waitMs);
             continue;
           }
           submissionDueTimes.delete(runKey);
-          liftedSubmissionWaits.delete(runKey);
           startedRunKeys.add(runKey);
           void submitQueueItem(project, queueItem, beginAttempt(project.id, queueItem.id));
         }
@@ -2651,17 +2689,9 @@ export const createQueueRuntime = ({
         if (status === 'disconnected') {
           sawDisconnect = true;
         } else if (status === 'connected' && sawDisconnect) {
-          // The server is likely back: the runs waiting now may submit at once.
+          // The server is likely back: the runs this tab is waiting to submit go soon, spread out.
           sawDisconnect = false;
-          for (const project of history.getSnapshot().projects) {
-            for (const item of project.queue.items) {
-              if (item.status === 'pending' && item.submissionRetry) {
-                const key = getRunKey(project.id, item.id);
-                submissionDueTimes.delete(key);
-                liftedSubmissionWaits.set(key, item.submissionRetry.failedAt);
-              }
-            }
-          }
+          spreadSubmissionWaits();
         }
         if (status === 'connected') {
           for (const runKey of reconcileRetryRunKeys) {
@@ -2735,7 +2765,6 @@ export const createQueueRuntime = ({
     reconcileRetryRunKeys.clear();
     pendingReconcileRunKeys.clear();
     submissionDueTimes.clear();
-    liftedSubmissionWaits.clear();
     trackedRuns.clear();
     activeAttempts.clear();
     ownershipEpochs.clear();

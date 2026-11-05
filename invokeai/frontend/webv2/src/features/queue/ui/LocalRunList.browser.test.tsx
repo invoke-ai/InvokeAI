@@ -123,6 +123,11 @@ describe('runs this tab is still submitting', () => {
           label: 'Lost network',
           retry: { failureCount: 1234, message: 'Failed to fetch', reason: 'unreachable' },
         }),
+        createTestLocalRun({
+          id: 'e',
+          label: 'Unreadable answer',
+          retry: { failureCount: 2, message: 'Unexpected end of JSON input', reason: 'error' },
+        }),
       ],
     });
 
@@ -131,6 +136,55 @@ describe('runs this tab is still submitting', () => {
     expect(rowFor('Broken graph').textContent).toContain('Internal Server Error');
     expect(rowFor('Busy server').textContent).toContain('Server busy or unavailable, retrying (attempt 2)');
     expect(rowFor('Lost network').textContent).toContain("Can't reach the server, retrying (attempt 1,235)");
+    expect(rowFor('Unreadable answer').textContent).toContain("Couldn't submit, retrying (attempt 3)");
+    expect(rowFor('Unreadable answer').textContent).not.toContain("Can't reach the server");
+  });
+
+  it('announces why a run retries when that starts or its reason changes, not on every further attempt', async () => {
+    const retrying = (failureCount: number, reason: NonNullable<QueueLocalRun['retry']>['reason']) =>
+      createTestLocalRun({ label: 'Broken graph', retry: { failureCount, message: 'Bad answer', reason } });
+    await render({ localRuns: [createTestLocalRun({ label: 'Broken graph' })] });
+    // The region exists before there is news: one inserted along with its text is not announced.
+    const region = host.querySelector<HTMLElement>('[role="status"][aria-live="polite"]')!;
+    const lines = () => [...region.children].map((line) => line.textContent);
+    let changeCount = 0;
+    const changes = new MutationObserver((records) => {
+      changeCount += records.length;
+    });
+    changes.observe(region, { characterData: true, childList: true, subtree: true });
+    const takeChanges = () => {
+      const count = changeCount + changes.takeRecords().length;
+      changeCount = 0;
+      return count;
+    };
+
+    expect(lines()).toEqual([]);
+
+    await render({ localRuns: [retrying(1, 'unreachable')] });
+    expect(lines()).toEqual(["Broken graph: Can't reach the server, retrying"]);
+    expect(takeChanges()).toBeGreaterThan(0);
+
+    // Another attempt failing the same way changes the row's attempt number, but leaves the region as it was.
+    await render({ localRuns: [retrying(2, 'unreachable')] });
+    expect(rowFor('Broken graph').textContent).toContain('(attempt 3)');
+    expect(takeChanges()).toBe(0);
+
+    await render({ localRuns: [retrying(3, 'server-error')] });
+    expect(lines()).toEqual(['Broken graph: Server error, retrying']);
+    expect(takeChanges()).toBeGreaterThan(0);
+
+    // Switching to a filter that hides the section is no news either, and the region keeps announcing under it.
+    await act(() => tab('Done').click());
+    expect(takeChanges()).toBe(0);
+
+    await render({ localRuns: [retrying(4, 'unavailable')] }, 0);
+    expect(region.isConnected).toBe(true);
+    expect(lines()).toEqual(['Broken graph: Server busy or unavailable, retrying']);
+    expect(takeChanges()).toBeGreaterThan(0);
+
+    await act(() => tab('All').click());
+    expect(takeChanges()).toBe(0);
+    changes.disconnect();
   });
 
   it('waits for the connection while offline, whatever the last failure was', async () => {

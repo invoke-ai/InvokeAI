@@ -1,6 +1,7 @@
 import type { QueueActivity } from '@features/queue/core/queueActivity';
 
-import { Stack } from '@chakra-ui/react';
+import { Stack, VisuallyHidden } from '@chakra-ui/react';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
 import { RetryBoundary } from '@platform/ui/RetryBoundary';
 import { Scrollable } from '@platform/ui/Scrollable';
@@ -104,12 +105,6 @@ const QueueContent = () => {
   const revealRequest = usePendingQueueItemReveal();
   const { localRuns } = useQueueUi();
   const shownLocalRuns = useShownLocalRuns();
-
-  // Fetch the rows with the first unaccepted run, shown or not, while the server that serves them likely still answers.
-  // Idempotent, so it may run during render.
-  if (localRuns.length > 0) {
-    localRunList.preload();
-  }
   const [handledRevealRequestId, setHandledRevealRequestId] = useState<number | null>(null);
 
   // Adjust the active tab during render so it cannot hide a requested item.
@@ -121,6 +116,7 @@ const QueueContent = () => {
   // The counted filters stay put while the item lists scroll on their own.
   return (
     <Stack gap="3" h="full" minH="0" pt="3">
+      {localRuns.length > 0 ? <LocalRunListPreload rows={localRunList} /> : null}
       <Stack flexShrink={0} gap="3" px="3">
         <QueueFilterTabs localRunCount={shownLocalRuns.length} value={filter} onChange={setFilter} />
       </Stack>
@@ -133,6 +129,15 @@ const QueueContent = () => {
       </Scrollable>
     </Stack>
   );
+};
+
+/**
+ * Fetches the rows with the first unaccepted run, shown or not, while the server that serves them likely still answers.
+ * Mounted while there is one; mounting again later reuses the import, or keeps a failed one failed until Retry.
+ */
+const LocalRunListPreload = ({ rows }: { rows: LocalRunListLoader }) => {
+  useMountEffect(rows.preload);
+  return null;
 };
 
 /**
@@ -152,25 +157,58 @@ export const LocalRunsSection = ({
 }) => {
   const { t } = useTranslation();
   const current = useSyncExternalStore(rows.subscribe, rows.getSnapshot, rows.getSnapshot);
-
-  if (runs.length === 0 || (filter !== 'all' && filter !== 'active')) {
-    return null;
-  }
+  const isListed = runs.length > 0 && (filter === 'all' || filter === 'active');
 
   return (
-    // Row surfaces bleed into the widget padding so their content lines up with the controls above.
-    <Stack gap="1" mx="-2">
-      <ListSectionHeader count={runs.length} label={t('widgets.queue.localRuns.title')} />
-      <RetryBoundary
-        message={t('widgets.queue.localRuns.loadFailed')}
-        retry={rows.retry}
-        retryLabel={t('common.retry')}
-      >
-        <Suspense fallback={null}>
-          <current.Rows filter={filter} runs={runs} />
-        </Suspense>
-      </RetryBoundary>
-    </Stack>
+    <>
+      <LocalRunAnnouncements runs={runs} />
+      {isListed ? (
+        // Row surfaces bleed into the widget padding so their content lines up with the controls above.
+        <Stack gap="1" mx="-2">
+          <ListSectionHeader count={runs.length} label={t('widgets.queue.localRuns.title')} />
+          <RetryBoundary
+            message={t('widgets.queue.localRuns.loadFailed')}
+            retry={rows.retry}
+            retryLabel={t('common.retry')}
+          >
+            <Suspense fallback={null}>
+              <current.Rows filter={filter} runs={runs} />
+            </Suspense>
+          </RetryBoundary>
+        </Stack>
+      ) : null}
+    </>
+  );
+};
+
+const RETRY_ANNOUNCEMENT_KEYS = {
+  error: 'widgets.queue.localRuns.announcement.error',
+  'server-error': 'widgets.queue.localRuns.announcement.serverError',
+  unavailable: 'widgets.queue.localRuns.announcement.unavailable',
+  unreachable: 'widgets.queue.localRuns.announcement.unreachable',
+} satisfies Record<NonNullable<QueueLocalRun['retry']>['reason'], string>;
+
+/**
+ * Tells screen readers why a run retries. Each retried run has one line keyed by its reason and naming no attempt, so a
+ * line is added, and spoken, only when a run starts retrying or its reason changes, never on another attempt. It
+ * stays mounted, whatever the filter, because a region inserted with its text is not announced, and switching tabs is
+ * no news. Being offline, and the final failure that removes the run, are left to their own notices.
+ */
+const LocalRunAnnouncements = ({ runs }: { runs: readonly QueueLocalRun[] }) => {
+  const { t } = useTranslation();
+
+  return (
+    <VisuallyHidden aria-atomic="false" aria-live="polite" as="div" role="status">
+      {runs.map((run) =>
+        run.retry ? (
+          <div key={`${run.projectId}:${run.id}:${run.retry.reason}`}>
+            {t(RETRY_ANNOUNCEMENT_KEYS[run.retry.reason], {
+              name: run.label || t('widgets.queue.localRuns.untitled'),
+            })}
+          </div>
+        ) : null
+      )}
+    </VisuallyHidden>
   );
 };
 

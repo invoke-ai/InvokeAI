@@ -3961,7 +3961,14 @@
           "serverError": "Server error, retrying (attempt {{attempt, number}})",
           "unavailable": "Server busy or unavailable, retrying (attempt {{attempt, number}})",
           "unreachable": "Can't reach the server, retrying (attempt {{attempt, number}})",
+          "error": "Couldn't submit, retrying (attempt {{attempt, number}})",
           "offline": "Offline, waiting for the connection…"
+        },
+        "announcement": {
+          "serverError": "{{name}}: Server error, retrying",
+          "unavailable": "{{name}}: Server busy or unavailable, retrying",
+          "unreachable": "{{name}}: Can't reach the server, retrying",
+          "error": "{{name}}: Couldn't submit, retrying"
         }
       },
       "itemNumber": "#{{id}}",
