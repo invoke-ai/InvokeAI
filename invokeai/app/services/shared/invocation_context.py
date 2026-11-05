@@ -373,6 +373,8 @@ class ImagesInterface(InvocationContextInterface):
                 self._services.logger.warning(
                     f"Could not convert image from {image.mode} to {mode}. Using original mode instead."
                 )
+                # the service hands out its cached object: the fallback must not return it
+                image = image.copy()
         else:
             # copy the image to prevent the user from modifying the original
             image = image.copy()

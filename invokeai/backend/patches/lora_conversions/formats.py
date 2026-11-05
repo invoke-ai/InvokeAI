@@ -1,6 +1,7 @@
 from typing import Any
 
 from invokeai.backend.model_manager.taxonomy import FluxLoRAFormat
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import has_flux3_lora_keys
 from invokeai.backend.patches.lora_conversions.flux_aitoolkit_lora_conversion_utils import (
     is_state_dict_likely_in_flux_aitoolkit_format,
 )
@@ -29,6 +30,10 @@ def flux_format_from_state_dict(
     state_dict: dict[str | int, Any],
     metadata: dict[str, Any] | None = None,
 ) -> FluxLoRAFormat | None:
+    # FLUX.3's native keys start `diffusion_model.single_blocks.N.`, as FLUX.1's and FLUX.2's BFL layout does, and the
+    # ai-toolkit and BFL-PEFT probes below look no further than that, so a FLUX.3 LoRA would identify as theirs too.
+    if has_flux3_lora_keys(state_dict):
+        return None
     if is_state_dict_likely_in_flux_kohya_format(state_dict):
         return FluxLoRAFormat.Kohya
     elif is_state_dict_likely_in_flux_onetrainer_bfl_format(state_dict, metadata):
