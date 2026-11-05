@@ -352,15 +352,24 @@ describe('canvas schema compatibility declarations', () => {
     const random = vi.spyOn(Math, 'random').mockReturnValue(0);
     transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockRejectedValueOnce(busy);
     transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockRejectedValueOnce(busy);
-    transport.apiFetchJson.mockRejectedValueOnce(busy).mockRejectedValueOnce(busy).mockResolvedValueOnce({
-      project_id: 'project-1',
-    });
+    transport.apiFetchJson
+      .mockRejectedValueOnce(busy)
+      .mockRejectedValueOnce(busy)
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            setTimeout(() => resolve({ project_id: 'project-1' }), 2_000);
+          })
+      );
 
-    const write = updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' });
+    const write = expect(
+      updateProject('project-1', { data: {}, expected_revision: 1, name: 'Project' })
+    ).resolves.toMatchObject({ project_id: 'project-1' });
     await vi.advanceTimersByTimeAsync(123_999);
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(8);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(write).resolves.toMatchObject({ project_id: 'project-1' });
+    await vi.advanceTimersByTimeAsync(2_000);
+    await write;
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(9);
     vi.useRealTimers();
     random.mockRestore();
@@ -674,13 +683,37 @@ describe('project request deadlines', () => {
         }
       );
 
-      await vi.advanceTimersByTimeAsync(31_000);
+      await vi.advanceTimersByTimeAsync(151_000);
       const statusAtDeadline = status;
       finish();
       await result;
 
       expect(statusAtDeadline).toBe('pending');
       expect(status).toBe('resolved');
+    }
+  );
+
+  it.each(['content', 'workspace', 'read'] as const)(
+    'allows a slow %s transfer within the server upload contract',
+    async (kind) => {
+      let requestSignal!: AbortSignal;
+      transport.apiFetchJson.mockImplementationOnce((_path, init) => {
+        requestSignal = init.signal;
+        return new Promise((resolve) => {
+          setTimeout(() => resolve({ revision: 2 }), 120_000);
+        });
+      });
+      const result = expect(
+        kind === 'read'
+          ? getProject('p')
+          : kind === 'workspace'
+            ? saveProjectWorkspace('p', { data: {}, expected_revision: 1 })
+            : updateProject('p', { data: {}, expected_revision: 1, name: 'P' })
+      ).resolves.toMatchObject({ revision: 2 });
+      await vi.advanceTimersByTimeAsync(120_000);
+      await result;
+      expect(requestSignal.aborted).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
     }
   );
 
@@ -703,7 +736,7 @@ describe('project request deadlines', () => {
             ? saveProjectWorkspace('p', { data: {}, expected_revision: 1 })
             : updateProject('p', { data: {}, expected_revision: 1, name: 'P' });
       const first = expect(run()).rejects.toBeInstanceOf(RequestDeadlineError);
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(150_000);
       await first;
       expect(stalledSignal.aborted).toBe(true);
       await expect(run()).resolves.toMatchObject({ revision: 2 });
@@ -720,14 +753,12 @@ describe('project request deadlines', () => {
             /* Simulate an unresponsive request. */
           })
       )
-      .mockRejectedValueOnce(new ApiError('already created', 409))
       .mockResolvedValueOnce({ ...request, minimum_canvas_schema_version: 3, minimum_document_schema_version: 4 });
     const result = createProjectSettled(request, captureAccountScope());
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(150_000);
     await expect(result).resolves.toMatchObject({ project_id: 'reserved' });
-    expect(JSON.parse(transport.apiFetchJson.mock.calls[0]![1].body)).toEqual(
-      JSON.parse(transport.apiFetchJson.mock.calls[1]![1].body)
-    );
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(2);
+    expect(transport.apiFetchJson.mock.calls[1]![0]).toContain('/projects/reserved?');
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -741,9 +772,9 @@ describe('project request deadlines', () => {
     const result = expect(
       createProjectSettled({ data: {}, name: 'P', project_id: 'reserved' }, captureAccountScope())
     ).rejects.toBeInstanceOf(RequestDeadlineError);
-    await vi.advanceTimersByTimeAsync(90_000);
+    await vi.advanceTimersByTimeAsync(300_000);
     await result;
-    expect(transport.apiFetchJson).toHaveBeenCalledTimes(3);
+    expect(transport.apiFetchJson).toHaveBeenCalledTimes(2);
     expect(vi.getTimerCount()).toBe(0);
   });
 
@@ -755,9 +786,9 @@ describe('project request deadlines', () => {
             /* Simulate an unresponsive request. */
           })
       )
-      .mockRejectedValueOnce(new ApiError('gone', 404));
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     const result = deleteProject('reserved', undefined, 'delete');
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(150_000);
     await expect(result).resolves.toBeUndefined();
     expect(transport.apiFetch.mock.calls.map(([url]) => url)).toEqual([
       '/api/v1/projects/reserved?boards=delete',

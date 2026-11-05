@@ -106,6 +106,35 @@ describe('models store loading', () => {
     }
   );
 
+  it('discards an obsolete list error after a mutation and still reads the authoritative trailing result', async () => {
+    const original = { key: 'a', name: 'Before' } as ModelConfig;
+    let rejectOld!: (error: Error) => void;
+    let finishFresh!: (models: ModelConfig[]) => void;
+    api.listModels
+      .mockReturnValueOnce(
+        new Promise((_resolve, reject) => {
+          rejectOld = reject;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          finishFresh = resolve;
+        })
+      );
+    const store = await import('./modelsStore');
+    store.setModelsSnapshotForTests({ models: [original], status: 'loaded' });
+    const refresh = store.refreshModels();
+    store.replaceModelInStore({ ...original, name: 'Confirmed' });
+    rejectOld(new Error('Obsolete failure'));
+    await refresh;
+    expect(store.getModelsSnapshot()).toMatchObject({ error: null, status: 'loaded' });
+    expect(store.getModelsSnapshot().modelsByKey.get('a')?.name).toBe('Confirmed');
+    expect(api.listModels).toHaveBeenCalledTimes(2);
+    finishFresh([{ ...original, name: 'Confirmed' }, { key: 'b', name: 'Unrelated' } as ModelConfig]);
+    await store.ensureModelsLoaded();
+    expect(store.getModelsSnapshot().modelsByKey.get('b')?.name).toBe('Unrelated');
+  });
+
   it('accepts authoritative data after an optimistic change rolls back', async () => {
     const model = { key: 'a', name: 'Before', cpu_only: null } as ModelConfig;
     let finishOld!: (models: ModelConfig[]) => void;

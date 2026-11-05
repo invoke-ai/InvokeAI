@@ -22,8 +22,9 @@ import { PROJECT_SPLIT_DOCUMENT_SCHEMA_VERSION } from './documentSchemaVersion';
 const PROJECTS_BASE = '/api/v1/projects';
 const PROJECT_WRITE_MAX_ATTEMPTS = 9;
 const PROJECT_WRITE_RETRY_WINDOW_MS = 125_000;
-// Leave room for busy retries without allowing one request/body to monopolize the serialized save queue.
-const PROJECT_REQUEST_TIMEOUT_MS = 30_000;
+// The server permits 120 seconds to receive a project body; allow another 30 for processing and the response.
+const PROJECT_REQUEST_TIMEOUT_MS = 150_000;
+const CLIENT_STATE_READ_TIMEOUT_MS = 30_000;
 // The path's queue segment is ignored by the backend (kept for compatibility).
 const CLIENT_STATE_BASE = '/api/v1/client_state/default';
 
@@ -190,11 +191,7 @@ const requestProjectWrite = async <T>(
       if (Date.now() >= budget.deadline) {
         throw new RequestDeadlineError();
       }
-      return await withRequestDeadline(
-        request,
-        Math.min(PROJECT_REQUEST_TIMEOUT_MS, budget.deadline - Date.now()),
-        requestSignal
-      );
+      return await withRequestDeadline(request, PROJECT_REQUEST_TIMEOUT_MS, requestSignal);
     } catch (error) {
       if (!isProjectWriteBusyError(error) || budget.attempts >= PROJECT_WRITE_MAX_ATTEMPTS) {
         throw error;
@@ -332,18 +329,12 @@ export const deleteProject = async (
     if (!(error instanceof RequestDeadlineError)) {
       throw error;
     }
-    // Repeat the same identity/policy: a settled 404 also proves the first delete committed.
-    try {
-      await withRequestDeadline(
-        (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
-        PROJECT_REQUEST_TIMEOUT_MS,
-        signal
-      );
-    } catch (retryError) {
-      if (!isProjectNotFoundError(retryError)) {
-        throw retryError;
-      }
-    }
+    // Deletion is idempotent: a settled repeat returns 204 even when the first request already removed the project.
+    await withRequestDeadline(
+      (signal) => apiFetch(`${PROJECTS_BASE}/${encodeURIComponent(projectId)}${query}`, { method: 'DELETE', signal }),
+      PROJECT_REQUEST_TIMEOUT_MS,
+      signal
+    );
   }
 };
 
@@ -599,7 +590,7 @@ export const getClientStateValue = (key: string, signal?: AbortSignal): Promise<
   withRequestDeadline(
     (signal) =>
       apiFetchJson<string | null>(`${CLIENT_STATE_BASE}/get_by_key?key=${encodeURIComponent(key)}`, { signal }),
-    PROJECT_REQUEST_TIMEOUT_MS,
+    CLIENT_STATE_READ_TIMEOUT_MS,
     signal
   );
 

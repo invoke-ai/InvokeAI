@@ -1,6 +1,7 @@
 import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
 import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import i18next from 'i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./deploymentBase', () => ({
@@ -441,6 +442,26 @@ describe('request deadline cancellation', () => {
     await rejected;
     expect(requestSignal.aborted).toBe(true);
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('uses the active language when a deadline surfaces an error', async () => {
+    await i18next.init({
+      lng: 'es',
+      fallbackLng: false,
+      resources: {
+        es: { translation: { common: { requestTimedOut: 'Tiempo agotado. Vuelva a intentarlo.' } } },
+      },
+    });
+    try {
+      const result = expect(withRequestDeadline(() => new Promise(() => {}), 100)).rejects.toThrow(
+        'Tiempo agotado. Vuelva a intentarlo.'
+      );
+      await vi.advanceTimersByTimeAsync(100);
+      await result;
+    } finally {
+      i18next.removeResourceBundle('es', 'translation');
+      await i18next.changeLanguage('en');
+    }
   });
 
   it('consumes a late rejection after the deadline has already ended the wait', async () => {

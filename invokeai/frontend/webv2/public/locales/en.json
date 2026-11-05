@@ -171,6 +171,7 @@
     }
   },
   "common": {
+    "requestTimedOut": "The request timed out. Retry the operation.",
     "donateToInvokeAI": "Donate to Invoke",
     "actions": "Actions",
     "active": "Active",

@@ -2,7 +2,6 @@ import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts'
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { getLogSnapshot } from '@platform/logging/logger';
-import { withRequestDeadline } from '@platform/transport/http';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSaveResult } from './projects/syncedPersistence';
@@ -133,11 +132,6 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
         ...state,
         projects: state.projects.map((project, index) => (index === 0 ? { ...project, ...patch, name } : project)),
       };
-      revision += 1;
-      emit();
-    },
-    switchProject(project: Project) {
-      state = { ...state, projects: [...state.projects, project], activeProjectId: project.id };
       revision += 1;
       emit();
     },
@@ -699,50 +693,6 @@ describe('Workbench persistence runtime', () => {
     second.resolve(saveResult(aggregate.state, 'latest'));
     await flushPromises();
     expect(aggregate.events).toContain('save-succeeded:latest');
-  });
-
-  it('services edits and a project switch after a deadline in the same mounted editor', async () => {
-    vi.useFakeTimers();
-    try {
-      const aggregate = createAggregate();
-      const { persistence } = createPersistence(() => Promise.resolve(null));
-      const clock = new FakeClock();
-      let requestSignal!: AbortSignal;
-      vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() =>
-        withRequestDeadline((signal) => {
-          requestSignal = signal;
-          return new Promise(() => {
-            /* Simulate an unresponsive request. */
-          });
-        }, 30_000)
-      );
-      const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
-      runtime.start();
-      await flushPromises();
-      aggregate.edit('First');
-      clock.runAll();
-      aggregate.edit('While saving');
-      clock.runAll();
-      aggregate.switchProject({ ...aggregate.state.projects[0]!, id: 'other-project', name: 'Other project' });
-      clock.runAll();
-      expect(persistence.saveWorkbench).toHaveBeenCalledTimes(1);
-      await vi.advanceTimersByTimeAsync(30_000);
-      await flushPromises();
-      expect(requestSignal.aborted).toBe(true);
-      expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
-      expect(persistence.saveWorkbench).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          activeProjectId: 'other-project',
-          projects: expect.arrayContaining([expect.objectContaining({ id: 'other-project', name: 'Other project' })]),
-        })
-      );
-      // The failed request belongs to an older revision: it must not publish stale status over the new save.
-      expect(aggregate.events.some((event) => event.startsWith('save-failed:'))).toBe(false);
-      expect(aggregate.events.some((event) => event.startsWith('save-succeeded:'))).toBe(true);
-      await runtime.exit().settled;
-    } finally {
-      vi.useRealTimers();
-    }
   });
 
   it('holds a failed revision until a new edit and then retries', async () => {

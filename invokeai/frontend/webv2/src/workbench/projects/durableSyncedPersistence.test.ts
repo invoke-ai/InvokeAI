@@ -2,10 +2,15 @@ import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
-import { ApiError, RequestDeadlineError } from '@platform/transport/http';
+import { ApiError, RequestDeadlineError, withRequestDeadline } from '@platform/transport/http';
 import { stackTopAnchor } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { MAX_SUPPORTED_CANVAS_SCHEMA_VERSION } from '@workbench/canvasSchemaVersion';
+import {
+  createWorkbenchPersistenceRuntime,
+  type PersistenceAggregatePort,
+  type PersistenceClock,
+} from '@workbench/persistenceRuntime';
 import { createAccountOwnedQueueRunJournal } from '@workbench/queue-integration/queueRunJournal';
 import { createEmptyPaintLayer } from '@workbench/widgets/layers/layerOps';
 import {
@@ -13,7 +18,7 @@ import {
   createInitialWorkbenchState,
   withAuthoritativeProjectBoard,
 } from '@workbench/workbenchState';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 import type { ProjectSummaryDTO, ProjectWithWorkspaceDTO } from './api';
 import type { ProjectDraftStore } from './draftStore';
@@ -1687,6 +1692,295 @@ describe('durable project persistence', () => {
       kind: 'found',
     });
     expect(service.hasPendingChanges()).toBe(true);
+  });
+
+  it.each([false, true])(
+    'recovers a real mounted runtime and durable service after a hung save (queued edits: %s)',
+    async (queuedEdits) => {
+      vi.useFakeTimers();
+      const owner = captureAccountScope();
+      const api = createApi();
+      const original = createDraftProject([]);
+      const other = createDraftProject([original]);
+      api.records.set(original.id, toSplitRecord(original));
+      api.records.set(other.id, toSplitRecord(other));
+      vi.mocked(api.loadSession).mockResolvedValue({
+        account: createInitialWorkbenchState().account,
+        activeProjectId: original.id,
+        openProjectIds: [original.id],
+      });
+      const service = createService(owner, api);
+      let state = stateWith([original]);
+      let revision = 0;
+      let hydrated = false;
+      const events: string[] = [];
+      const listeners = new Set<() => void>();
+      const emit = () => {
+        for (const listener of listeners) {
+          listener();
+        }
+      };
+      const aggregate: PersistenceAggregatePort = {
+        assignProjectBoard: () => {},
+        getPersistedRevision: () => revision,
+        getState: () => state,
+        hydrate: (next) => {
+          state = next;
+          revision += 1;
+          emit();
+        },
+        notifyProjectNotFound: () => {},
+        reportLoadAvailable: () => {},
+        reportRefusedProjects: () => {},
+        reportLoadError: () => {},
+        reportLoadUnavailable: () => {},
+        saveFailed: () => events.push('failed'),
+        saveNeedsAttention: () => events.push('attention'),
+        savePending: () => events.push('pending'),
+        saveScheduled: () => {},
+        saveStarted: () => events.push('started'),
+        saveSucceeded: () => events.push('saved'),
+        setHasHydrated: (next) => {
+          hydrated = next;
+          emit();
+        },
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => {
+            listeners.delete(listener);
+          };
+        },
+      };
+      const callbacks = new Map<number, () => void>();
+      let clockId = 0;
+      const clock: PersistenceClock = {
+        clearTimeout: (id) => {
+          callbacks.delete(id as number);
+        },
+        setTimeout: (callback) => {
+          callbacks.set(++clockId, callback);
+          return clockId;
+        },
+      };
+      const runScheduled = () => {
+        const pending = [...callbacks.values()];
+        callbacks.clear();
+        for (const callback of pending) {
+          callback();
+        }
+      };
+      const runtime = createWorkbenchPersistenceRuntime({
+        aggregate,
+        clock,
+        persistence: service,
+        signal: owner.signal,
+      });
+      try {
+        runtime.start();
+        await vi.waitFor(() => expect(hydrated).toBe(true));
+        let stalledSignal!: AbortSignal;
+        vi.mocked(api.updateProject).mockImplementationOnce((_id, _request, signal) =>
+          withRequestDeadline(
+            (requestSignal) => {
+              stalledSignal = requestSignal;
+              vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+              return new Promise(() => {});
+            },
+            150_000,
+            signal
+          )
+        );
+        state = { ...state, projects: [{ ...state.projects[0]!, name: 'First edit' }] };
+        revision += 1;
+        emit();
+        runScheduled();
+        await vi.waitFor(() => expect(api.updateProject).toHaveBeenCalledTimes(1));
+        const switchAndEdit = () => {
+          state = {
+            ...state,
+            activeProjectId: other.id,
+            projects: [
+              { ...state.projects[0]!, name: 'After timeout' },
+              withAuthoritativeProjectBoard(other, `board-${other.id}`),
+            ],
+          };
+          revision += 1;
+          emit();
+          runScheduled();
+        };
+        if (queuedEdits) {
+          switchAndEdit();
+        }
+        await vi.advanceTimersByTimeAsync(150_000);
+        expect(stalledSignal.aborted).toBe(true);
+        if (!queuedEdits) {
+          await vi.waitFor(() => expect(events).toContain('pending'));
+          switchAndEdit();
+        }
+        await vi.waitFor(() => expect(api.records.get(original.id)?.name).toBe('After timeout'));
+        await vi.waitFor(() => expect(events).toContain('saved'));
+        expect(events).not.toContain('failed');
+        expect(events).not.toContain('attention');
+        expect(api.saveSession).toHaveBeenLastCalledWith(
+          expect.objectContaining({ activeProjectId: other.id }),
+          'editor-1',
+          expect.anything(),
+          owner.signal
+        );
+        expect(service.hasPendingChanges()).toBe(false);
+      } finally {
+        await runtime.exit().settled;
+        await service.close();
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('keeps a late content commit followed by a retry conflict recoverable while workspace is still owed', async () => {
+    const api = createApi();
+    const original = createDraftProject([]);
+    api.records.set(original.id, toSplitRecord(original));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: original.id,
+      openProjectIds: [original.id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const loaded = (await service.loadWorkbench()).state.projects[0]!;
+    const changed = {
+      ...loaded,
+      name: 'Late content',
+      promptHistory: [{ negativePrompt: null, positivePrompt: 'Workspace owed' }],
+    };
+    const write = vi.mocked(api.updateProject).getMockImplementation()!;
+    let lateCommit!: () => Promise<unknown>;
+    vi.mocked(api.updateProject)
+      .mockImplementationOnce((...args) => {
+        lateCommit = () => write(...args);
+        return Promise.reject(new RequestDeadlineError());
+      })
+      .mockImplementationOnce(async (...args) => {
+        await lateCommit();
+        return write(...args);
+      });
+    const result = await service.saveWorkbench(stateWith([changed]));
+    expect(result).toMatchObject({ conflicts: [], hasPendingChanges: true, shouldRetry: true });
+    const next = await service.saveWorkbench(stateWith([changed]));
+    expect(next).toMatchObject({ conflicts: [], hasPendingChanges: false });
+    expect(api.records.get(original.id)?.workspace?.data).toMatchObject({ promptHistory: changed.promptHistory });
+  });
+
+  it('retains unanswered state across saves when late own bytes cause repeated conflicts', async () => {
+    const api = createApi();
+    const original = createDraftProject([]);
+    api.records.set(original.id, toSplitRecord(original));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: original.id,
+      openProjectIds: [original.id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const loaded = (await service.loadWorkbench()).state.projects[0]!;
+    const write = vi.mocked(api.updateProject).getMockImplementation()!;
+    let lateCommit!: () => Promise<unknown>;
+    vi.mocked(api.updateProject).mockImplementationOnce((...args) => {
+      lateCommit = () => write(...args);
+      vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+      return Promise.reject(new RequestDeadlineError());
+    });
+    expect(await service.saveWorkbench(stateWith([{ ...loaded, name: 'Unanswered' }]))).toMatchObject({
+      shouldRetry: true,
+    });
+    await lateCommit();
+    vi.mocked(api.updateProject)
+      .mockRejectedValueOnce(new ApiError('conflict', 409))
+      .mockRejectedValueOnce(new ApiError('conflict', 409));
+    expect(await service.saveWorkbench(stateWith([loaded]))).toMatchObject({ shouldRetry: true, conflicts: [] });
+    expect(await service.saveWorkbench(stateWith([loaded]))).toMatchObject({ hasPendingChanges: false, conflicts: [] });
+    expect(api.records.get(original.id)?.name).toBe(loaded.name);
+  });
+
+  it.each(['content', 'workspace'] as const)(
+    'fences an undo against an unanswered %s write that commits after the undo',
+    async (half) => {
+      const api = createApi();
+      const original = createDraftProject([]);
+      api.records.set(original.id, toSplitRecord(original));
+      vi.mocked(api.loadSession).mockResolvedValue({
+        account: createInitialWorkbenchState().account,
+        activeProjectId: original.id,
+        openProjectIds: [original.id],
+      });
+      const service = createService(captureAccountScope(), api);
+      const loaded = (await service.loadWorkbench()).state.projects[0]!;
+      const changed =
+        half === 'content'
+          ? { ...loaded, name: 'Undone content' }
+          : { ...loaded, promptHistory: [{ negativePrompt: null, positivePrompt: 'Undone workspace' }] };
+      let lateCommit!: () => Promise<unknown>;
+      if (half === 'content') {
+        const write = vi.mocked(api.updateProject).getMockImplementation()!;
+        vi.mocked(api.updateProject)
+          .mockImplementationOnce((...args) => {
+            lateCommit = () => write(...args);
+            vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+            return Promise.reject(new RequestDeadlineError());
+          })
+          .mockImplementationOnce(async (...args) => {
+            await lateCommit();
+            return write(...args);
+          });
+      } else {
+        const write = vi.mocked(api.saveProjectWorkspace).getMockImplementation()!;
+        vi.mocked(api.saveProjectWorkspace)
+          .mockImplementationOnce((...args) => {
+            lateCommit = () => write(...args);
+            vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+            return Promise.reject(new RequestDeadlineError());
+          })
+          .mockImplementationOnce(async (...args) => {
+            await lateCommit();
+            return write(...args);
+          });
+      }
+      expect(await service.saveWorkbench(stateWith([changed]))).toMatchObject({ shouldRetry: true, conflicts: [] });
+      expect(await service.saveWorkbench(stateWith([loaded]))).toMatchObject({
+        hasPendingChanges: false,
+        conflicts: [],
+      });
+      const server = deserializeProjectRecord(api.records.get(original.id)!);
+      expect(server.status).toBe('loaded');
+      if (server.status === 'loaded') {
+        expect(server.project.name).toBe(loaded.name);
+        expect(server.project.promptHistory).toEqual(loaded.promptHistory);
+      }
+      expect(await service.saveWorkbench(stateWith([{ ...loaded, name: 'After undo' }]))).toMatchObject({
+        hasPendingChanges: false,
+        conflicts: [],
+      });
+    }
+  );
+
+  it('returns a project board assignment when a create is acknowledged through reconciliation', async () => {
+    const { queryClient } = await import('@platform/query/client');
+    const { galleryKeys } = await import('@features/gallery/queries');
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries');
+    onTestFinished(() => invalidate.mockRestore());
+    const owner = captureAccountScope();
+    const api = createApi();
+    const project = createDraftProject([]);
+    const create = vi.mocked(api.createProject).getMockImplementation()!;
+    vi.mocked(api.createProject).mockImplementationOnce(async (...args) => {
+      await create(...args);
+      throw new RequestDeadlineError();
+    });
+    const result = await createService(owner, api).saveWorkbench(stateWith([project]));
+    await vi.waitFor(() => expect(invalidate).toHaveBeenCalledWith({ queryKey: galleryKeys.boardsForAccount(owner) }));
+    expect(result).toMatchObject({
+      hasPendingChanges: false,
+      conflicts: [],
+      projectBoardAssignments: [{ projectId: project.id, boardId: `board-${project.id}` }],
+    });
   });
 
   it.each(['committed', 'uncommitted', 'diverged', 'unavailable', 'repeated-timeout', 'missing'] as const)(
@@ -5044,6 +5338,32 @@ describe('a project from before the split whose workflow repeats an item id', ()
     const result = await service.saveWorkbench(stateWith([{ ...project, name: 'Committed whole' }]));
     expect(result).toMatchObject({ hasPendingChanges: false, conflicts: [] });
     expect(api.updateProject).toHaveBeenCalledTimes(1);
+    expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
+  });
+
+  it('fences a whole-document undo against an unanswered save that commits later', async () => {
+    const { api, project, service } = await open(toRecord(withRepeatedNode(createDraftProject([]))));
+    const write = vi.mocked(api.updateProject).getMockImplementation()!;
+    let lateCommit!: () => Promise<unknown>;
+    vi.mocked(api.updateProject)
+      .mockImplementationOnce((...args) => {
+        lateCommit = () => write(...args);
+        vi.mocked(api.getProject).mockRejectedValueOnce(new RequestDeadlineError());
+        return Promise.reject(new RequestDeadlineError());
+      })
+      .mockImplementationOnce(async (...args) => {
+        await lateCommit();
+        return write(...args);
+      });
+    expect(await service.saveWorkbench(stateWith([{ ...project, name: 'Undone whole' }]))).toMatchObject({
+      shouldRetry: true,
+      conflicts: [],
+    });
+    expect(await service.saveWorkbench(stateWith([project]))).toMatchObject({
+      hasPendingChanges: false,
+      conflicts: [],
+    });
+    expect(api.records.get(project.id)?.name).toBe(project.name);
     expect(api.saveProjectWorkspace).not.toHaveBeenCalled();
   });
 

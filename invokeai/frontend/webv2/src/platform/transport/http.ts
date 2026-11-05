@@ -5,6 +5,7 @@
 
 import { recordLogEvent } from '@platform/logging/logger';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
+import i18next from 'i18next';
 
 import { getDeploymentBasePath, getDeploymentBaseUrl } from './deploymentBase';
 
@@ -358,41 +359,28 @@ export const withRequestDeadline = async <T>(
   signal?: AbortSignal
 ): Promise<T> => {
   const controller = new AbortController();
-  const sources = new Set([captureAccountScope().signal, ...(signal ? [signal] : [])]);
-  const onAbort = (): void => {
-    const aborted = [...sources].find((source) => source.aborted);
-    if (aborted) {
-      controller.abort(aborted.reason);
-    }
-  };
-  for (const source of sources) {
-    source.addEventListener('abort', onAbort, { once: true });
-  }
-  onAbort();
+  const requestSignal = AbortSignal.any([controller.signal, captureAccountScope().signal, ...(signal ? [signal] : [])]);
   const timer = setTimeout(() => controller.abort(new RequestDeadlineError()), Math.max(0, timeoutMs));
   let rejectAborted: (() => void) | undefined;
   try {
-    controller.signal.throwIfAborted();
+    requestSignal.throwIfAborted();
     return await new Promise<T>((resolve, reject) => {
-      rejectAborted = () => reject(controller.signal.reason);
-      controller.signal.addEventListener('abort', rejectAborted, { once: true });
+      rejectAborted = () => reject(requestSignal.reason);
+      requestSignal.addEventListener('abort', rejectAborted, { once: true });
       // Attach both handlers even if cancellation wins, so a late rejection is always consumed.
-      request(controller.signal).then(resolve, reject);
+      request(requestSignal).then(resolve, reject);
     });
   } finally {
     clearTimeout(timer);
-    for (const source of sources) {
-      source.removeEventListener('abort', onAbort);
-    }
     if (rejectAborted) {
-      controller.signal.removeEventListener('abort', rejectAborted);
+      requestSignal.removeEventListener('abort', rejectAborted);
     }
   }
 };
 
 export class RequestDeadlineError extends Error {
   constructor() {
-    super('The request timed out. Retry the operation.');
+    super(i18next.t('common.requestTimedOut', { defaultValue: 'The request timed out. Retry the operation.' }));
     this.name = 'RequestDeadlineError';
   }
 }

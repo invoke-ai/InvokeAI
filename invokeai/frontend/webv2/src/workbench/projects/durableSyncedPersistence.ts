@@ -55,6 +55,7 @@ import {
   getProjectCanvasSchemaCompatibilityRefusal,
   getProjectDocumentSchemaRefusal,
   getProjectWriteSizeRefusal,
+  invalidateBoardLists,
   isProjectConflictError,
   isProjectNotFoundError,
   listProjects,
@@ -1093,12 +1094,17 @@ export const createDurableSyncedWorkbenchPersistence = (
       projectsRequiringDocumentUpgrade.has(project.id) && !conflicts.has(project.id) && !schemaRefusals.has(project.id);
     const needsStage =
       needsDocumentUpgrade ||
+      (sentHalves.has(project.id) && existingDraft?.documentJson !== serialized.documentJson) ||
       (!entry && existingDraft?.documentJson !== serialized.documentJson) ||
       (entry !== undefined &&
         entry.pushedDoc !== serialized.documentJson &&
         existingDraft?.documentJson !== serialized.documentJson);
     const needsPush =
-      needsStage || pendingProjectIds.has(project.id) || conflicts.has(project.id) || schemaRefusals.has(project.id);
+      needsStage ||
+      sentHalves.has(project.id) ||
+      pendingProjectIds.has(project.id) ||
+      conflicts.has(project.id) ||
+      schemaRefusals.has(project.id);
     return { existingDraft, needsPush, needsStage, project, serialized };
   };
   type ProjectSavePlan = ReturnType<typeof createProjectSavePlan>;
@@ -1393,12 +1399,21 @@ export const createDurableSyncedWorkbenchPersistence = (
       hasPending = true;
       return { documentJson, kind: 'conflicted' };
     }
-    if (entry?.pushedDoc === documentJson && !projectsRequiringDocumentUpgrade.has(project.id)) {
+    if (
+      entry?.pushedDoc === documentJson &&
+      !sentHalves.has(project.id) &&
+      !projectsRequiringDocumentUpgrade.has(project.id)
+    ) {
       await settleAck(project, generation, entry, document, documentJson, store, editorSessionId);
       return { documentJson, kind: 'acknowledged' };
     }
 
     const halves = splitProjectDocument(document);
+    const previousSent = sentHalves.get(project.id);
+    // Undo must write a revision fence: an unanswered older body can still commit after an unchanged read.
+    let fenceContent =
+      previousSent?.content.some((body) => body !== halves.contentJson && body !== documentJson) === true;
+    let fenceWorkspace = previousSent?.workspace.some((body) => body !== halves.workspaceJson) === true;
     // Split content that repeats an item id would be refused by every later load, so such a project, which only a
     // build before the split could have written, is created whole and keeps saving whole (see `toProjectCreation`).
     const keepsWhole = findRepeatedWorkflowItem(halves.content.workflows.entries) !== null;
@@ -1473,6 +1488,7 @@ export const createDurableSyncedWorkbenchPersistence = (
      */
     const pushHalves = async (base: SyncEntry | undefined): Promise<Omit<SyncEntry, 'pushedDoc'> | 'conflicted'> => {
       if (keepsWhole && !base) {
+        noteSent('content', documentJson);
         const created = await api.createProject(
           {
             data: document as unknown as Record<string, unknown>,
@@ -1494,6 +1510,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           );
           return 'conflicted';
         }
+        fenceContent = false;
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
         return record({
           minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
@@ -1504,6 +1521,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         });
       }
       if (keepsWhole && base) {
+        noteSent('content', documentJson);
         const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
         const updated = await api.updateProject(
           project.id,
@@ -1516,6 +1534,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
+        fenceContent = false;
         // Never splitting, it needs no upgrade: the shortcut for an unchanged document applies again.
         projectsRequiringDocumentUpgrade.delete(project.id);
         return record({
@@ -1553,6 +1572,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           );
           return 'conflicted';
         }
+        fenceContent = false;
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
         // The answer names the workspace it stored, which is this save's only when it is what this save sent: a
         // create settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace,
@@ -1560,6 +1580,9 @@ export const createDurableSyncedWorkbenchPersistence = (
         // next against the revision the answer named; a server that stored none leaves it owed the same way.
         const workspaceStored =
           created.workspace !== null && JSON.stringify(created.workspace.data) === halves.workspaceJson;
+        if (workspaceStored) {
+          fenceWorkspace = false;
+        }
         acknowledged = record({
           minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
           pushedContent: halves.contentJson,
@@ -1594,7 +1617,11 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
+        fenceContent = false;
         projectsRequiringDocumentUpgrade.delete(project.id);
+        if (updated.workspace) {
+          fenceWorkspace = false;
+        }
         // The answer names the workspace it stored; a server that stored none leaves it owed, and it is sent next.
         acknowledged = record({
           minimumCanvasSchemaVersion: updated.minimum_canvas_schema_version,
@@ -1609,7 +1636,11 @@ export const createDurableSyncedWorkbenchPersistence = (
             baseRevision: updated.revision,
           });
         }
-      } else if (projectsRequiringDocumentUpgrade.has(project.id) || base.pushedContent !== halves.contentJson) {
+      } else if (
+        projectsRequiringDocumentUpgrade.has(project.id) ||
+        fenceContent ||
+        base.pushedContent !== halves.contentJson
+      ) {
         const raisedFloor = getRaisedCanvasSchemaFloor(document, base.minimumCanvasSchemaVersion);
         noteSent('content', halves.contentJson);
         const updated = await api.updateProject(
@@ -1625,6 +1656,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
+        fenceContent = false;
         projectsRequiringDocumentUpgrade.delete(project.id);
         acknowledged = record({
           ...base,
@@ -1641,7 +1673,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       } else {
         acknowledged = base;
       }
-      if (acknowledged.pushedWorkspace !== halves.workspaceJson) {
+      if (fenceWorkspace || acknowledged.pushedWorkspace !== halves.workspaceJson) {
         noteSent('workspace', halves.workspaceJson);
         const saved = await api.saveProjectWorkspace(
           project.id,
@@ -1652,6 +1684,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
+        fenceWorkspace = false;
         acknowledged = record({
           ...acknowledged,
           pushedWorkspace: halves.workspaceJson,
@@ -1680,16 +1713,20 @@ export const createDurableSyncedWorkbenchPersistence = (
       const serverHalves = splitProjectDocument(server.document);
       const split = isSplitProjectRecord(latest);
       const base = syncEntries.get(project.id);
-      const contentHeld = split
-        ? serverHalves.contentJson === halves.contentJson
-        : keepsWhole && server.documentJson === documentJson;
+      const createdContentHeld = !entry && JSON.stringify(latest.data) === (split ? halves.contentJson : documentJson);
+      const contentHeld =
+        createdContentHeld ||
+        (split ? serverHalves.contentJson === halves.contentJson : keepsWhole && server.documentJson === documentJson);
       const sent = sentHalves.get(project.id);
       // Unmoved: still what this page last had acknowledged, or what it sent and never heard back about.
       const contentUnmoved = split
         ? base?.pushedContent === serverHalves.contentJson || sent?.content.includes(serverHalves.contentJson) === true
-        : base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson;
+        : (base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson) ||
+          sent?.content.includes(server.documentJson) === true;
       const workspaceHeld =
-        (!split && keepsWhole) || (Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson);
+        (!entry && Boolean(latest.workspace) && JSON.stringify(latest.workspace?.data) === halves.workspaceJson) ||
+        (!split && keepsWhole) ||
+        (Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson);
       const workspaceUnmoved = latest.workspace
         ? base?.pushedWorkspace === serverHalves.workspaceJson ||
           sent?.workspace.includes(serverHalves.workspaceJson) === true
@@ -1700,20 +1737,25 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (!(workspaceHeld || workspaceUnmoved)) {
         return { half: 'workspace', kind: 'diverged', serverRevision: latest.revision };
       }
-      const entry = {
+      const reconciledEntry = {
         minimumCanvasSchemaVersion: latest.minimum_canvas_schema_version,
-        pushedContent: split ? serverHalves.contentJson : null,
-        pushedWorkspace: latest.workspace ? serverHalves.workspaceJson : null,
+        pushedContent: split ? (contentHeld ? halves.contentJson : serverHalves.contentJson) : null,
+        pushedWorkspace: latest.workspace ? (workspaceHeld ? halves.workspaceJson : serverHalves.workspaceJson) : null,
         revision: latest.revision,
         workspaceRevision: latest.workspace?.revision ?? null,
       };
+      if (createdContentHeld) {
+        pendingBoardAssignments.set(project.id, { boardId: latest.board_id, projectId: project.id });
+        invalidateBoardLists(owner);
+      }
       return {
-        entry: { ...entry, pushedDoc: split ? acknowledgedDocument(entry) : server.documentJson },
-        kind: contentHeld && workspaceHeld ? 'acknowledged' : 'retry',
+        entry: { ...reconciledEntry, pushedDoc: split ? acknowledgedDocument(reconciledEntry) : server.documentJson },
+        kind: contentHeld && workspaceHeld && !fenceContent && !fenceWorkspace ? 'acknowledged' : 'retry',
       };
     };
 
     let base = entry;
+    let unanswered = previousSent !== undefined;
     // One retry: a second conflict means someone is saving this project now, which is a divergence to resolve.
     for (let attempt = 0; ; attempt += 1) {
       try {
@@ -1745,6 +1787,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           return conflicted({ kind: 'deleted' });
         }
         const timedOut = error instanceof RequestDeadlineError;
+        unanswered ||= timedOut;
         if (!isStatus(error, 409) && !timedOut) {
           if (isDeterministicClientError(error)) {
             throw error;
@@ -1765,10 +1808,10 @@ export const createDurableSyncedWorkbenchPersistence = (
           if (readRefusal) {
             return settleRefusal(readRefusal);
           }
-          if (isStatus(readError, 404) && !timedOut) {
+          if (isStatus(readError, 404) && !unanswered) {
             return conflicted({ kind: 'deleted' });
           }
-          if (isDeterministicClientError(readError) && !(timedOut && isStatus(readError, 404))) {
+          if (isDeterministicClientError(readError) && !(unanswered && isStatus(readError, 404))) {
             throw readError;
           }
           hasPending = true;
@@ -1778,7 +1821,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           await settleAck(project, generation, settled.entry, document, documentJson, store, editorSessionId);
           return { documentJson, kind: 'acknowledged' };
         }
-        if (settled.kind === 'retry' && attempt > 0 && timedOut) {
+        if (settled.kind === 'retry' && attempt > 0 && unanswered) {
           hasPending = true;
           return { documentJson, kind: 'unsynced' };
         }
