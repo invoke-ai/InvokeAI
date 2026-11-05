@@ -4,7 +4,7 @@ const html = Object.values(
   import.meta.glob('/index.html', { eager: true, query: '?raw', import: 'default' })
 )[0] as string;
 
-const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1]?.replace('__READY_CONTENT_LANGUAGES__', '["en"]');
+const script = html.match(/<script>([\s\S]*?)<\/script>/i)?.[1]?.replace('__READY_CONTENT_LANGUAGES__', '["en"]');
 
 describe('before-paint language hint', () => {
   it.each(['ar', 'he', 'fr', 'ua', 'obsolete'])('does not label fallback English as %s', (language) => {
