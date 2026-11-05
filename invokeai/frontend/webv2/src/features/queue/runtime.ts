@@ -376,6 +376,8 @@ export interface QueueHistoryPort {
     isHydrated: boolean;
     projects: QueueHistoryProject[];
   };
+  /** Existing Canvas candidates, including those restored by project recovery; no new persistence schema. */
+  listStagedResults?(): Array<{ backendItemId: number; projectId: string; queueItemId: string }>;
   subscribe(listener: () => void): () => void;
 }
 
@@ -1167,8 +1169,22 @@ export const createQueueRuntime = ({
         return;
       }
 
+      if (images.length > 0) {
+        markAdoptedRerunsStaged(projectId, queueItem, backendItemIds);
+      }
+      try {
+        commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
+      } catch (error) {
+        for (const backendItemId of backendItemIds) {
+          const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+          if (claim) {
+            claim.isStaged = false;
+          }
+        }
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, backendItemIds);
-      commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1254,7 +1270,7 @@ export const createQueueRuntime = ({
       }
 
       // A renewal may have found the claim lost while the results loaded; another claimant stages the rerun then.
-      const visibleImages = isAdoptedRerunDecidedHere(projectId, queueItem, backendItemId)
+      const visibleImages = (await isAdoptedRerunStagedHere(projectId, queueItem, backendItemId))
         ? await deliverVisibleImages(queueItem, images)
         : [];
       // Never throws — a board-attach hiccup must not block routePartialResults below.
@@ -1270,14 +1286,26 @@ export const createQueueRuntime = ({
         queueItem.id,
         visibleImages.map((image) => image.imageName)
       );
+      if (visibleImages.length > 0) {
+        markAdoptedRerunsStaged(projectId, queueItem, [backendItemId]);
+      }
+      try {
+        commands.routePartialResults({
+          backendItemId,
+          images: visibleImages,
+          projectId,
+          queueItemId: queueItem.id,
+          videos,
+        });
+      } catch (error) {
+        const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
+        if (claim) {
+          claim.isStaged = false;
+        }
+        releaseAdoptedReruns(projectId, queueItem.id);
+        throw error;
+      }
       confirmAdoptedReruns(projectId, queueItem, [backendItemId]);
-      commands.routePartialResults({
-        backendItemId,
-        images: visibleImages,
-        projectId,
-        queueItemId: queueItem.id,
-        videos,
-      });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1358,7 +1386,11 @@ export const createQueueRuntime = ({
       if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
         return [];
       }
-      return runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      const images = await runResultRead(() => backend.getResultImages(itemId, localQueueItemId, ...rest));
+      if (target?.queueItem && !(await isAdoptedRerunStagedHere(target.project.id, target.queueItem, itemId))) {
+        return [];
+      }
+      return images;
     },
   };
   const coordinator = createQueueCoordinator(
@@ -1427,15 +1459,16 @@ export const createQueueRuntime = ({
   const rerunWaits = new AbortController();
   const waitForRerunRetry = (delayMs: number): Promise<void> =>
     new Promise((resolve) => {
-      const timer = setTimeout(resolve, delayMs);
-      rerunWaits.signal.addEventListener(
-        'abort',
-        () => {
-          clearTimeout(timer);
-          resolve();
-        },
-        { once: true }
-      );
+      const finish = (): void => {
+        clearTimeout(timer);
+        rerunWaits.signal.removeEventListener('abort', finish);
+        resolve();
+      };
+      const timer = setTimeout(finish, delayMs);
+      rerunWaits.signal.addEventListener('abort', finish, { once: true });
+      if (rerunWaits.signal.aborted) {
+        finish();
+      }
     });
   /** This tab, as the claimant of the reruns it stages outside any run. */
   const tabClaimant = `tab:${createUuid()}`;
@@ -1450,6 +1483,9 @@ export const createQueueRuntime = ({
    */
   const claimRerunDelivery = async (itemId: number, claimant: string, canDeliver: () => boolean): Promise<boolean> => {
     for (let failures = 0; ;) {
+      if (!isActive()) {
+        return false;
+      }
       let claim: QueueItemDeliveryClaim;
       try {
         claim = await backend.claimItemDelivery(itemId, 'claim', claimant);
@@ -1464,7 +1500,7 @@ export const createQueueRuntime = ({
         claim = { kind: 'held', retryInMs: RERUN_CLAIM_POLL_MS };
       }
       if (claim.kind !== 'held') {
-        return claim.kind === 'claimed';
+        return canDeliver() && claim.kind === 'claimed';
       }
       // Soon enough to see the holder confirm, and spread out so claimants turned away together do not ask together.
       await waitForRerunRetry(Math.min(claim.retryInMs, RERUN_CLAIM_POLL_MS) * (1 + Math.random() / 2));
@@ -1475,14 +1511,63 @@ export const createQueueRuntime = ({
   };
   /** Whether this claimant still holds an item it claimed, renewing the claim; a server that cannot answer keeps it. */
   const isRerunClaimHeld = async (itemId: number, claimant: string): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     try {
       return (await backend.claimItemDelivery(itemId, 'claim', claimant)).kind === 'claimed';
     } catch {
       return true;
     }
   };
+  const pendingDeliveryConfirmations = new Map<string, { timer?: ReturnType<typeof setTimeout> }>();
   const settleRerunClaim = (itemId: number, action: 'confirm' | 'release', claimant: string): void => {
-    void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+    if (!isActive()) {
+      return;
+    }
+    if (action === 'release') {
+      void backend.claimItemDelivery(itemId, action, claimant).catch(() => undefined);
+      return;
+    }
+    const key = JSON.stringify([itemId, claimant]);
+    if (pendingDeliveryConfirmations.has(key)) {
+      return;
+    }
+    const pending: { timer?: ReturnType<typeof setTimeout> } = {};
+    pendingDeliveryConfirmations.set(key, pending);
+    let attempts = 0;
+    const confirm = async (): Promise<void> => {
+      if (!isActive() || pendingDeliveryConfirmations.get(key) !== pending) {
+        pendingDeliveryConfirmations.delete(key);
+        return;
+      }
+      try {
+        attempts += 1;
+        const result = await backend.claimItemDelivery(itemId, 'confirm', claimant);
+        if (result.kind === 'delivered') {
+          pendingDeliveryConfirmations.delete(key);
+          return;
+        }
+      } catch (error) {
+        // An older backend has no acknowledgements. Keep the documented availability fallback.
+        if (error instanceof ApiError && error.status < 500 && error.status !== 408 && error.status !== 429) {
+          pendingDeliveryConfirmations.delete(key);
+          return;
+        }
+      }
+      if (isActive() && attempts < 5) {
+        // Server confirmation is claimant-independent, including after lease changes. Never release staged work.
+        pending.timer = setTimeout(
+          () => {
+            void confirm();
+          },
+          1_000 * 2 ** (attempts - 1)
+        );
+      } else {
+        pendingDeliveryConfirmations.delete(key);
+      }
+    };
+    void confirm();
   };
 
   /**
@@ -1492,7 +1577,7 @@ export const createQueueRuntime = ({
   interface AdoptedRerunClaim {
     decision: Promise<boolean>;
     isClaimed: boolean;
-    isConfirmed: boolean;
+    isStaged: boolean;
   }
   const adoptedRerunClaims = new Map<string, AdoptedRerunClaim>();
   const getAdoptedRerunKey = (projectId: string, queueItemId: string, backendItemId: number): string =>
@@ -1518,7 +1603,7 @@ export const createQueueRuntime = ({
         return isClaimed;
       }),
       isClaimed: false,
-      isConfirmed: false,
+      isStaged: false,
     };
     adoptedRerunClaims.set(key, claim);
     return claim;
@@ -1533,15 +1618,22 @@ export const createQueueRuntime = ({
   };
   /** Keep the claims of runs still going from lapsing; a claim lost meanwhile leaves its rerun out of the run. */
   const renewAdoptedRerunClaims = (): void => {
+    if (!isActive()) {
+      return;
+    }
+    for (const key of pendingDeliveryConfirmations.keys()) {
+      const [itemId, claimant] = JSON.parse(key) as [number, string];
+      void backend.claimItemDelivery(itemId, 'claim', claimant).catch(() => undefined);
+    }
     for (const [key, claim] of adoptedRerunClaims) {
-      if (!claim.isClaimed || claim.isConfirmed) {
+      if (!claim.isClaimed || claim.isStaged) {
         continue;
       }
       const [projectId, queueItemId, backendItemId] = JSON.parse(key) as [string, string, number];
       void backend
         .claimItemDelivery(backendItemId, 'claim', getRunClaimant(projectId, queueItemId))
         .then((renewal) => {
-          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isConfirmed) {
+          if (renewal.kind !== 'claimed' && adoptedRerunClaims.get(key) === claim && !claim.isStaged) {
             claim.isClaimed = false;
           }
         })
@@ -1557,11 +1649,17 @@ export const createQueueRuntime = ({
     queueItem: QueueItem,
     backendItemId: number
   ): Promise<boolean> => {
+    if (!isActive()) {
+      return false;
+    }
     if (!isAdoptedRerun(queueItem, backendItemId)) {
       return true;
     }
     const claim = claimAdoptedRerun(projectId, queueItem.id, backendItemId);
     await claim.decision;
+    if (claim.isClaimed && !claim.isStaged) {
+      claim.isClaimed = await isRerunClaimHeld(backendItemId, getRunClaimant(projectId, queueItem.id));
+    }
     return claim.isClaimed;
   };
   /**
@@ -1572,15 +1670,40 @@ export const createQueueRuntime = ({
     !isAdoptedRerun(queueItem, backendItemId) ||
     adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId))?.isClaimed === true;
   /**
-   * Confirm the reruns a run is about to stage. Called just before their results are routed, since routing them can
-   * finish the run, and a finished run gives back the claims it did not confirm.
+   * Protect claims during synchronous routing, which may finish the run and release its unstaged claims.
+   * Only a successful routing call may then start confirmation; failures roll this reservation back.
    */
-  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+  const markAdoptedRerunsStaged = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
     for (const backendItemId of backendItemIds) {
       const claim = adoptedRerunClaims.get(getAdoptedRerunKey(projectId, queueItem.id, backendItemId));
-      if (claim?.isClaimed && !claim.isConfirmed) {
-        claim.isConfirmed = true;
+      if (claim?.isClaimed && !claim.isStaged) {
+        claim.isStaged = true;
+      }
+    }
+  };
+  const confirmAdoptedReruns = (projectId: string, queueItem: QueueItem, backendItemIds: number[]): void => {
+    for (const backendItemId of backendItemIds) {
+      const key = getAdoptedRerunKey(projectId, queueItem.id, backendItemId);
+      const claim = adoptedRerunClaims.get(key);
+      if (
+        claim?.isStaged &&
+        history.listStagedResults &&
+        !history
+          .listStagedResults()
+          .some(
+            (result) =>
+              result.backendItemId === backendItemId &&
+              result.projectId === projectId &&
+              result.queueItemId === queueItem.id
+          )
+      ) {
+        claim.isStaged = false;
+        releaseAdoptedReruns(projectId, queueItem.id);
+        continue;
+      }
+      if (claim?.isStaged) {
         settleRerunClaim(backendItemId, 'confirm', getRunClaimant(projectId, queueItem.id));
+        adoptedRerunClaims.delete(key);
       }
     }
   };
@@ -1594,8 +1717,8 @@ export const createQueueRuntime = ({
       if (keyProjectId !== projectId || keyQueueItemId !== queueItemId) {
         continue;
       }
-      adoptedRerunClaims.delete(key);
-      if (!claim.isConfirmed) {
+      if (!claim.isStaged) {
+        adoptedRerunClaims.delete(key);
         void claim.decision.then((isClaimed) => {
           if (isClaimed) {
             settleRerunClaim(backendItemId, 'release', getRunClaimant(projectId, queueItemId));
@@ -1794,7 +1917,16 @@ export const createQueueRuntime = ({
         // A read slower than the claim lasts may have let another claimant stage it meanwhile.
         if (images.length > 0 && canStage() && (await isRerunClaimHeld(event.item_id, tabClaimant)) && canStage()) {
           commands.stageRetriedCanvasResults({ backendItemId: event.item_id, images, projectId, queueItemId });
-          isStaged = true;
+          isStaged =
+            !history.listStagedResults ||
+            history
+              .listStagedResults()
+              .some(
+                (result) =>
+                  result.backendItemId === event.item_id &&
+                  result.projectId === projectId &&
+                  result.queueItemId === queueItemId
+              );
         }
       } finally {
         settleRerunClaim(event.item_id, isStaged ? 'confirm' : 'release', tabClaimant);
@@ -1984,12 +2116,28 @@ export const createQueueRuntime = ({
       });
   };
 
+  let recoveredStagedItemIds = new Set<number>();
   const synchronizeRunPersistence = (): void => {
     if (!hasInitialized || !isActive()) {
       return;
     }
-    const activeKeys = new Set<string>();
     const projects = history.getSnapshot().projects;
+    const ordinaryBackendIds = new Set(
+      projects.flatMap((project) =>
+        project.queue.items.flatMap((item) => (item.retriedBackendItemIds?.length ? [] : (item.backendItemIds ?? [])))
+      )
+    );
+    const stagedResults = (history.listStagedResults?.() ?? []).filter(
+      (result) => !ordinaryBackendIds.has(result.backendItemId)
+    );
+    const currentStagedIds = new Set(stagedResults.map((result) => result.backendItemId));
+    for (const result of stagedResults) {
+      if (!recoveredStagedItemIds.has(result.backendItemId)) {
+        settleRerunClaim(result.backendItemId, 'confirm', getRunClaimant(result.projectId, result.queueItemId));
+      }
+    }
+    recoveredStagedItemIds = currentStagedIds;
+    const activeKeys = new Set<string>();
     const openProjectIds = new Set(projects.map((project) => project.id));
     for (const project of projects) {
       for (const item of project.queue.items) {
@@ -2556,6 +2704,12 @@ export const createQueueRuntime = ({
   const dispose = async (): Promise<void> => {
     isDisposed = true;
     rerunWaits.abort();
+    for (const pending of pendingDeliveryConfirmations.values()) {
+      clearTimeout(pending.timer);
+    }
+    pendingDeliveryConfirmations.clear();
+    adoptedRerunClaims.clear();
+    recoveredStagedItemIds.clear();
     if (retryTimer !== undefined) {
       clearTimeout(retryTimer);
       retryTimer = undefined;

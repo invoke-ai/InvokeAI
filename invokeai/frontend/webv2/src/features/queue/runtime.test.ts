@@ -20,6 +20,7 @@ import {
   createQueueItemBackendSubmission,
   createQueueRuntime,
   type QueueHistoryCommands,
+  type QueueHistoryPort,
   type QueueRunJournalPort,
   type QueueRunLock,
   type QueueRunLockPort,
@@ -3158,7 +3159,12 @@ describe('queue runtime retries', () => {
   const createRetryHarness = (
     queueItem: QueueItem,
     backendOverrides: Partial<QueueBackendPort> = {},
-    services: { journal?: QueueRunJournalPort; locks?: QueueRunLockPort; viewerUserId?: string | null } = {}
+    services: {
+      journal?: QueueRunJournalPort;
+      locks?: QueueRunLockPort;
+      viewerUserId?: string | null;
+      listStagedResults?: QueueHistoryPort['listStagedResults'];
+    } = {}
   ) => {
     const project = { id: 'project-1', queue: { items: [queueItem] } };
     const projects = [project];
@@ -3190,6 +3196,7 @@ describe('queue runtime retries', () => {
       backend,
       history: {
         commands,
+        listStagedResults: services.listStagedResults,
         getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects }),
         subscribe: (listener) => {
           listeners.add(listener);
@@ -3624,6 +3631,295 @@ describe('queue runtime retries', () => {
     new Promise((resolve) => {
       setTimeout(resolve);
     });
+
+  it.each(['empty', 'delivered elsewhere'] as const)(
+    'retains backend provenance through full Workbench routing when the first adopted item is %s',
+    async (firstResult) => {
+      const { getResultImages } = await import('./data/submissionApi');
+      const imageNames = firstResult === 'empty' ? ['first.png'] : ['first.png', 'second.png'];
+      let state = createInitialWorkbenchState();
+      const projectId = state.activeProjectId;
+      const { canvas } = state.projects.find((project) => project.id === projectId)!;
+      const queueItem: WorkbenchQueueItem = {
+        ...createPendingQueueItem(),
+        backendItemIds: [41, 42],
+        snapshot: {
+          ...createPendingQueueItem().snapshot,
+          canvas: {
+            document: { bbox: canvas.document.bbox, height: canvas.document.height, width: canvas.document.width },
+            documentRevision: canvas.documentRevision,
+          },
+        },
+        status: 'failed',
+      };
+      state = { ...state, projects: state.projects.map((project) => ({ ...project, queue: { items: [queueItem] } })) };
+      const listeners = new Set<() => void>();
+      const dispatch = (action: WorkbenchAction): void => {
+        state = workbenchReducer(state, action);
+        listeners.forEach((listener) => listener());
+      };
+      const server = createDeliveryServer();
+      if (firstResult === 'delivered elsewhere') {
+        server.claims.set(99, { claimant: 'other-browser', claimedAt: Date.now(), isDelivered: true });
+      }
+      const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+        const url = String(input);
+        const data = url.includes('/queue/default/i/')
+          ? {
+              item_id: Number(url.split('/').at(-1)),
+              status: 'completed',
+              session: {
+                results: url.endsWith('/99')
+                  ? {}
+                  : { canvas_output: { collection: imageNames.map((image_name) => ({ image_name })) } },
+              },
+            }
+          : {
+              image_name: url.split('/').at(-1),
+              image_url: '/result.png',
+              thumbnail_url: '/result.png',
+              width: 64,
+              height: 64,
+              is_intermediate: false,
+            };
+        return Promise.resolve(new Response(JSON.stringify(data)));
+      });
+      // A slow partial-route lease check must not force the full route to infer ids by image position.
+      let completePartialClaim!: (claim: { kind: 'claimed' }) => void;
+      const partialClaim = new Promise<{ kind: 'claimed' }>((resolve) => {
+        completePartialClaim = resolve;
+      });
+      let claimChecks = 0;
+      const handlers = new Map<string, (payload: never) => void>();
+      const backend = createTestBackend({
+        claimItemDelivery: (id, action, claimant) => {
+          if (id === 100 && action === 'claim' && ++claimChecks === 2) {
+            return partialClaim;
+          }
+          return server.claimItemDelivery(id, action, claimant);
+        },
+        getItem: (id) =>
+          Promise.resolve({
+            id,
+            batchId: 'batch',
+            origin: buildQueueItemOrigin(queueItem.id, projectId),
+            status: 'completed',
+          }),
+        getResultImages,
+        on: (event, handler) => {
+          handlers.set(event, handler as (payload: never) => void);
+          return () => handlers.delete(event);
+        },
+      });
+      const runtime = createQueueRuntime({
+        ...runtimeServices,
+        backend,
+        history: {
+          commands: createTestCommands({
+            reopenForRetry: (payload) => dispatch({ ...payload, type: 'reopenQueueItemForRetry' }),
+            routePartialResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemPartialResults' }),
+            routeResults: (payload) => dispatch({ ...payload, type: 'routeQueueItemResults' }),
+            setStatus: (payload) => dispatch({ ...payload, type: 'setQueueItemStatus' }),
+          }),
+          getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: state.projects }),
+          listStagedResults: () =>
+            state.projects.flatMap((project) =>
+              project.canvas.stagingArea.pendingImages.map((candidate) => ({
+                backendItemId: candidate.sourceBackendItemId!,
+                projectId: project.id,
+                queueItemId: candidate.sourceQueueItemId,
+              }))
+            ),
+          subscribe: (listener) => {
+            listeners.add(listener);
+            return () => listeners.delete(listener);
+          },
+        },
+      });
+      try {
+        runtime.start();
+        handlers.get('queue_items_retried')?.(
+          retriedEvent([
+            { item_id: 99, source_item_id: 41 },
+            { item_id: 100, source_item_id: 42 },
+          ]) as never
+        );
+        await vi.waitFor(() => expect(server.claims.get(100)?.isDelivered).toBe(true));
+        const candidates = state.projects.find((project) => project.id === projectId)!.canvas.stagingArea.pendingImages;
+        expect(candidates.map(({ imageName, sourceBackendItemId }) => ({ imageName, sourceBackendItemId }))).toEqual(
+          imageNames.map((imageName) => ({ imageName, sourceBackendItemId: 100 }))
+        );
+        expect(
+          vi.mocked(server.claimItemDelivery).mock.calls.some(([id, action]) => id === 100 && action === 'release')
+        ).toBe(false);
+        const stale = openCanvasTab(server);
+        stale.runtime.start();
+        emitReruns(stale, [100]);
+        stale.emit(
+          'queue_item_status_changed',
+          completedEvent(100, buildQueueItemOrigin('gone', stale.project.id), 'canvas')
+        );
+        await settleEvents();
+        expect(stagedItemIds(stale)).toEqual([]);
+        await stale.runtime.dispose();
+      } finally {
+        completePartialClaim({ kind: 'claimed' });
+        await runtime.dispose();
+        fetch.mockRestore();
+      }
+    }
+  );
+
+  it('retries a lost confirmation response without staging again, including after the run ends', async () => {
+    vi.useFakeTimers();
+    const server = createDeliveryServer(120_000);
+    const original = server.claimItemDelivery;
+    let confirmations = 0;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>(async (id, action, claimant) => {
+      if (action === 'confirm' && ++confirmations === 1) {
+        await original(id, action, claimant);
+        throw new TypeError('successful response lost');
+      }
+      return original(id, action, claimant);
+    });
+    const adopting = openAdoptingTab(server);
+    adopting.runtime.start();
+    adopting.emit('queue_items_retried', retriedEvent([{ item_id: 99, source_item_id: 41 }]));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedImageNames(adopting)).toContain('rerun-99.png');
+    expect(server.claims.get(99)?.isDelivered).toBe(true);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'confirm')).toHaveLength(2);
+    const later = openCanvasTab(server);
+    later.runtime.start();
+    emitReruns(later, [99]);
+    later.emit(
+      'queue_item_status_changed',
+      completedEvent(99, buildQueueItemOrigin('gone', later.project.id), 'canvas')
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(later)).toEqual([]);
+    await adopting.runtime.dispose();
+    await later.runtime.dispose();
+    vi.useRealTimers();
+  });
+
+  it('confirms an already staged candidate recovered from the project without staging it again', async () => {
+    const server = createDeliveryServer();
+    const tab = createRetryHarness(
+      { ...createPendingQueueItem(), backendItemIds: [99], retriedBackendItemIds: [41], status: 'completed' },
+      { claimItemDelivery: server.claimItemDelivery },
+      { listStagedResults: () => [{ backendItemId: 99, projectId: 'project-1', queueItemId: 'recovered-run' }] }
+    );
+    tab.runtime.start();
+    await vi.waitFor(() => expect(server.claims.get(99)?.isDelivered).toBe(true));
+    expect(stagedItemIds(tab)).toEqual([]);
+    await tab.runtime.dispose();
+  });
+
+  it('keeps an unadopted staged delivery pending after confirmation failure and stops retries on disposal', async () => {
+    vi.useFakeTimers();
+    const server = createDeliveryServer(120_000);
+    const original = server.claimItemDelivery;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) =>
+      action === 'confirm' ? Promise.reject(new TypeError('offline')) : original(id, action, claimant)
+    );
+    const tab = openCanvasTab(server);
+    tab.runtime.start();
+    emitReruns(tab, [99]);
+    tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(0);
+    await tab.runtime.dispose();
+    const requests = vi.mocked(server.claimItemDelivery).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(120_000);
+    expect(server.claimItemDelivery).toHaveBeenCalledTimes(requests);
+    vi.useRealTimers();
+  });
+
+  it.each([403, 422, 503, 'held'] as const)(
+    'bounds unsuccessful confirmation retries (%s) without releasing staged work',
+    async (failure) => {
+      vi.useFakeTimers();
+      const server = createDeliveryServer(120_000);
+      const original = server.claimItemDelivery;
+      server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) => {
+        if (action === 'confirm') {
+          return failure === 'held'
+            ? Promise.resolve({ kind: 'held', retryInMs: 120_000 })
+            : Promise.reject(new ApiError('confirmation failed', failure));
+        }
+        return original(id, action, claimant);
+      });
+      const tab = openCanvasTab(server);
+      tab.runtime.start();
+      emitReruns(tab, [99]);
+      tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+      await vi.advanceTimersByTimeAsync(180_000);
+      const confirmations = vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'confirm');
+      expect(confirmations).toHaveLength(failure === 403 || failure === 422 ? 1 : 5);
+      const requests = vi.mocked(server.claimItemDelivery).mock.calls.length;
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(server.claimItemDelivery).toHaveBeenCalledTimes(requests);
+      expect(stagedItemIds(tab)).toEqual([99]);
+      expect(vi.mocked(server.claimItemDelivery).mock.calls.filter(([, action]) => action === 'release')).toHaveLength(
+        0
+      );
+      await tab.runtime.dispose();
+      vi.useRealTimers();
+    }
+  );
+
+  it('removes settled retry-wait listeners and aborts the pending wait on disposal', async () => {
+    vi.useFakeTimers();
+    const added = vi.spyOn(AbortSignal.prototype, 'addEventListener');
+    const removed = vi.spyOn(AbortSignal.prototype, 'removeEventListener');
+    const server = createDeliveryServer();
+    const original = server.claimItemDelivery;
+    let waits = 0;
+    server.claimItemDelivery = vi.fn<QueueBackendPort['claimItemDelivery']>((id, action, claimant) => {
+      if (action === 'claim' && waits++ < 25) {
+        return Promise.resolve({ kind: 'held', retryInMs: 1 } as const);
+      }
+      return original(id, action, claimant);
+    });
+    const tab = openCanvasTab(server);
+    tab.runtime.start();
+    emitReruns(tab, [99]);
+    tab.emit('queue_item_status_changed', completedEvent(99, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(stagedItemIds(tab)).toEqual([99]);
+    const waitRegistrations = () =>
+      added.mock.calls.flatMap(([event, listener, options], index) =>
+        event === 'abort' && typeof options === 'object' && options.once
+          ? [{ signal: added.mock.contexts[index], listener }]
+          : []
+      );
+    const unremovedWaits = () =>
+      waitRegistrations().filter(
+        ({ signal, listener }) =>
+          !removed.mock.calls.some(
+            ([event, removedListener], index) =>
+              event === 'abort' && removedListener === listener && removed.mock.contexts[index] === signal
+          )
+      );
+    expect(waitRegistrations().length).toBeGreaterThanOrEqual(25);
+    expect(unremovedWaits()).toHaveLength(0);
+    vi.mocked(server.claimItemDelivery).mockResolvedValue({ kind: 'held', retryInMs: 10_000 });
+    emitReruns(tab, [100]);
+    tab.emit('queue_item_status_changed', completedEvent(100, buildQueueItemOrigin('gone', tab.project.id), 'canvas'));
+    await vi.advanceTimersByTimeAsync(0);
+    expect(unremovedWaits()).toHaveLength(1);
+    await tab.runtime.dispose();
+    expect(unremovedWaits()).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+    added.mockRestore();
+    removed.mockRestore();
+    vi.useRealTimers();
+  });
 
   it('stages a Canvas rerun once across tabs and browsers, however late another sees it and after the first closed', async () => {
     const server = createDeliveryServer();
