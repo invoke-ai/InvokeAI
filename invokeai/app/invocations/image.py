@@ -871,7 +871,7 @@ class ImageHueAdjustmentInvocation(BaseInvocation, WithMetadata, WithBoard):
         hue = int(256 * ((self.hue % 360) / 360))
 
         # Increment each hue and wrap around at 255
-        hsv_image[:, :, 0] = (hsv_image[:, :, 0] + hue) % 256
+        hsv_image[:, :, 0] = (hsv_image[:, :, 0].astype(numpy.uint16) + hue) % 256
 
         # Convert back to PIL format and to original color mode
         pil_image = Image.fromarray(hsv_image, mode="HSV").convert("RGBA")

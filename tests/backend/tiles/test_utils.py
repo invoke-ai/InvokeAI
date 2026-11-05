@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from invokeai.backend.tiles.utils import TBLR, paste
+from invokeai.backend.tiles.utils import TBLR, paste, seam_blend
 
 
 def test_paste_no_mask_success():
@@ -99,3 +99,37 @@ def test_paste_mask_does_not_match_src_image():
 
     with pytest.raises(ValueError):
         paste(dst_image=dst_image, src_image=src_image, box=box, mask=mask)
+
+
+@pytest.mark.parametrize("x_seam", [True, False])
+def test_seam_blend_flat_overlap(x_seam: bool):
+    """A flat overlap has zero energy everywhere, so the seam hugs the left edge; this must not raise."""
+    a = np.full((64, 32, 3), 128.0)
+
+    result = seam_blend(a, a.copy(), 16, x_seam=x_seam)
+
+    np.testing.assert_array_equal(result, a)
+
+
+@pytest.mark.parametrize("x_seam", [True, False])
+def test_seam_blend_identical_noisy_overlap(x_seam: bool):
+    a = np.random.RandomState(0).uniform(0, 255, (64, 32, 3))
+
+    result = seam_blend(a, a.copy(), 16, x_seam=x_seam)
+
+    np.testing.assert_allclose(result, a)
+
+
+@pytest.mark.parametrize("x_seam", [True, False])
+def test_seam_blend_selects_each_pixel_from_one_input(x_seam: bool):
+    """Without blur the mask is binary, so every output pixel must equal the pixel of exactly one input."""
+    rng = np.random.RandomState(1)
+    a = rng.uniform(0, 255, (64, 32, 3))
+    b = rng.uniform(0, 255, (64, 32, 3))
+
+    result = seam_blend(a, b, 0, x_seam=x_seam)
+
+    from_a = np.all(result == a, axis=-1)
+    from_b = np.all(result == b, axis=-1)
+    assert np.all(from_a | from_b)
+    assert from_a.any() and from_b.any()
