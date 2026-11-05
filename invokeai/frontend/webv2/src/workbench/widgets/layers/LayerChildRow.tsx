@@ -2,11 +2,15 @@ import type { CSSProperties, FocusEvent, KeyboardEvent, MouseEvent } from 'react
 
 import { Box, HStack, Icon, Input, Text } from '@chakra-ui/react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
+import { IconButton } from '@platform/ui/Button';
+import { Tooltip } from '@platform/ui/Tooltip';
 import {
   ApertureIcon,
   WandSparklesIcon,
   ContrastIcon,
   DropletIcon,
+  EyeIcon,
+  EyeOffIcon,
   FilmIcon,
   FingerprintPatternIcon,
   FocusIcon,
@@ -25,12 +29,10 @@ import { useTranslation } from 'react-i18next';
 
 import type { LayerRowCommands } from './layerRowCommands';
 
-import { LayerActiveDot, TREE_ROW_FOCUS } from './LayerActiveDot';
 import { childRowNameKey, isOrderedChildKind, type LayerChildRowKind, type ProjectedChildRow } from './layerChildRows';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
-import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { anchorFromPoint } from './layerRowCommands';
-import { LayerRowSurface } from './LayerRowSurface';
+import { LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
 
 const THUMBNAIL_IMG_STYLE: CSSProperties = { height: '100%', objectFit: 'cover', width: '100%' };
 
@@ -135,14 +137,19 @@ const LayerChildRowComponent = ({
     ? [child.detail, t(child.detailLabelKey)].filter((part) => part !== null).join(' · ')
     : child.detail;
 
-  const indentStyle = useMemo(() => ({ paddingLeft: `${child.depth * LAYER_TREE_INDENT_PX}px` }), [child.depth]);
   const handleSelect = useCallback(() => commands.selectChild(child), [child, commands]);
   const handleFocus = useCallback(() => commands.focus(child.key), [child.key, commands]);
   const keepRowFocus = useCallback((event: MouseEvent<HTMLElement>) => {
     event.preventDefault();
     rowElement.current?.focus();
   }, []);
-  const handleToggle = useCallback((checked: boolean) => commands.setChildEnabled(child, checked), [child, commands]);
+  const handleToggle = useCallback(
+    (event: { stopPropagation: () => void }) => {
+      event.stopPropagation();
+      commands.setChildEnabled(child, !child.isEnabled);
+    },
+    [child, commands]
+  );
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (event.target !== event.currentTarget) {
@@ -260,16 +267,7 @@ const LayerChildRowComponent = ({
       onFocus={handleFocus}
       onKeyDown={handleKeyDown}
     >
-      <LayerRowSurface active={selected ? 'emphasized' : undefined} indentStyle={indentStyle}>
-        <LayerActiveDot
-          checked={child.isEnabled}
-          disabled={editingLocked}
-          gated={!child.parentContributing}
-          label={t('widgets.layers.modifiers.toggleActive')}
-          tooltip={child.parentContributing ? undefined : t('widgets.layers.modifiers.parentDisabled')}
-          onCheckedChange={handleToggle}
-          onKeepRowFocus={keepRowFocus}
-        />
+      <LayerRowSurface active={selected ? 'emphasized' : undefined} depth={child.depth}>
         <Box
           alignItems="center"
           bg="bg.muted"
@@ -312,6 +310,32 @@ const LayerChildRowComponent = ({
             {detail}
           </Text>
         ) : null}
+        {/* The layer rows' trailing cluster: the eye shares their eye column, and the blank slot holds the lock column
+            a child row has no use for. */}
+        <HStack flexShrink="0" gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepRowFocus}>
+          <Tooltip
+            content={
+              child.parentContributing
+                ? t('widgets.layers.modifiers.toggleActive')
+                : t('widgets.layers.modifiers.parentDisabled')
+            }
+          >
+            <IconButton
+              aria-label={t('widgets.layers.modifiers.toggleActive')}
+              aria-pressed={child.isEnabled}
+              color={muted ? 'fg.subtle' : 'fg.muted'}
+              disabled={editingLocked}
+              size="sm"
+              tabIndex={-1}
+              variant="ghost"
+              onClick={handleToggle}
+              onPointerDown={stopPropagation}
+            >
+              {child.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
+            </IconButton>
+          </Tooltip>
+          <Box boxSize="6" flexShrink={0} />
+        </HStack>
       </LayerRowSurface>
     </Box>
   );
