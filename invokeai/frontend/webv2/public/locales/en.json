@@ -5517,7 +5517,7 @@
       "modifiers": {
         "disable": "Disable",
         "enable": "Enable",
-        "parentDisabled": "Layer is disabled",
+        "parentDisabled": "The layer is hidden, so this has no effect.",
         "toggleActive": "Enable/disable",
         "denoise": "Denoise limit",
         "denoiseHelp": "Caps how strongly generation may repaint the masked area.",
