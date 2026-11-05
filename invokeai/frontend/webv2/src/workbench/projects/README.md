@@ -34,6 +34,11 @@ Workflow reads the active workflow through the App-composed port and edits, publ
 
 Workbench persistence is scoped to one mounted Workbench and its account lifetime. `createWorkbenchPersistenceRuntime` owns hydration ordering, debounced autosave, hidden-page saves, revision/generation checks, conflict application, reconnect replay, status publication, exit checkpoint, without importing React. `createSyncedWorkbenchPersistence` builds local/remote project sync state for one mounted Workbench; no process-wide maps, sets, flags, or caches hold that state. It also owns the unload journal: runtime asks it, via its persistence port, to journal unsaved state synchronously when page is hidden or unloads, and its load reconciles the journal into the draft store under the draft store's fencing rules. `WorkbenchProvider` constructs these lifetimes, starts the runtime and ends it with its exit checkpoint through the mount lifecycle adapter, and selects aggregate hydration state. Checkpoint and persistence lease outlive the unmount until it settles. Provider also hands the checkpoint to the account lifetime's next editor through a module-level map keyed by account scope; that editor loads after it, waiting at most 10 seconds; the tab's editor session is reference-counted across the two. Project transition commands commit pending editor drafts themselves, so callers do not flush before creating, opening, switching, or closing a project.
 
+Save and project-flush requests capture the current journal identity before queuing. A distinct held edit journaled
+after that intent cannot be superseded by the older request's stage or retired as an undo; it stays pending while
+older acknowledgements may rebase it. A journal of the same document can still be covered by the save, and an
+explicit later save or undo can replace an already existing journal.
+
 ## Browser recovery
 
 - Account-owned IndexedDB stores only unacknowledged project drafts, unload journal entries, active queue runs, receipt acknowledgements, bounded recall values. Clean server documents not mirrored. Journal has its own database, deleted with the workbench database by account cleanup and by clearing workspace data.

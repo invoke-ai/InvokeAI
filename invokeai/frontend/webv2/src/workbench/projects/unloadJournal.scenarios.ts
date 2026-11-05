@@ -655,6 +655,101 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(server.records.get(project.id)).toMatchObject({ name: 'Saved', revision: 2 });
   });
 
+  it('keeps an edit journaled while an older save is still staging before its push begins', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staged = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async (input) => {
+      const result = await stage(input);
+      started();
+      await gate;
+      return result;
+    };
+    const saving = tab.saveWorkbench(prompted(loaded.state, 'Captured before the edit'));
+    await staged;
+    try {
+      const journal = tab.journalBeforeUnload(prompted(loaded.state, 'Held edit during stage'));
+      expect(journal.kind).toBe('journaled');
+      if (journal.kind === 'journaled') {
+        expect(await journal.written).toBe(true);
+      }
+    } finally {
+      store.stage = stage;
+      release();
+    }
+    await saving;
+
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.conflicts).toEqual([]);
+    expect(recovered.state.projects).toMatchObject([
+      { id: project.id, promptHistory: [{ positivePrompt: 'Held edit during stage' }] },
+    ]);
+  });
+
+  it.each(['workbench save', 'project flush'] as const)(
+    'keeps a newer held edit when an older %s was queued before its journal',
+    async (request) => {
+      const tab = openTab();
+      const loaded = await tab.loadWorkbench();
+      let release!: () => void;
+      server.gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const first = tab.saveWorkbench(prompted(loaded.state, 'First save'));
+      await vi.waitFor(() => expect(server.workspaceUpdates).toBe(1));
+      const queuedState = prompted(loaded.state, 'Queued before the edit');
+      const queued =
+        request === 'workbench save'
+          ? tab.saveWorkbench(queuedState)
+          : tab.flushProjectToServer(queuedState.projects[0]!);
+      try {
+        const journal = tab.journalBeforeUnload(prompted(loaded.state, 'Held edit after queueing'));
+        expect(journal.kind).toBe('journaled');
+        if (journal.kind === 'journaled') {
+          expect(await journal.written).toBe(true);
+        }
+      } finally {
+        server.gate = null;
+        release();
+      }
+      await Promise.all([first, queued]);
+
+      const recovered = await openTab().loadWorkbench();
+      expect(recovered.conflicts).toEqual([]);
+      expect(recovered.state.projects).toMatchObject([
+        { id: project.id, promptHistory: [{ positivePrompt: 'Held edit after queueing' }] },
+      ]);
+    }
+  );
+
+  it('finishes a save when the same document is journaled during its asynchronous setup', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const edited = prompted(loaded.state, 'The same held edit');
+    const saving = tab.saveWorkbench(edited);
+    const journal = tab.journalBeforeUnload(edited);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    const result = await saving;
+    expect(result.hasPendingChanges).toBe(false);
+    expect(result.shouldRetry).toBe(false);
+    expect(await store.peekUnloadJournalProjectIds(1)).toMatchObject({ kind: 'available', projectIds: [] });
+    const recovered = await openTab().loadWorkbench();
+    expect(recovered.state.projects).toMatchObject([
+      { id: project.id, promptHistory: [{ positivePrompt: 'The same held edit' }] },
+    ]);
+  });
+
   it('keeps a newer journal across an older acknowledgement, rebased onto it', async () => {
     const tab = openTab();
     const loaded = await tab.loadWorkbench();

@@ -5,7 +5,7 @@ import process from 'node:process';
 import { chromium, firefox, webkit } from 'playwright';
 import { expect } from 'playwright/test';
 
-import { isExpectedWebKitUnloadError } from './browser-smoke-expectations.mjs';
+import { isExpectedWebKitUnloadError, isQueueReadRequest } from './browser-smoke-expectations.mjs';
 import { assertRetirement, observeBrowserDiagnostics, waitForRenderedMedia } from './browser-validation.mjs';
 import { fixturePng } from './mock-media.mjs';
 import { executeProjectFileJourney } from './run-project-file-journey.mjs';
@@ -63,11 +63,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
                     new URL(event.url).pathname === '/ws/socket.io/' &&
                     new URL(event.url).searchParams.get('transport') === 'polling') ||
                   // Queue reads combine query.signal with owner.signal: remount retires both old scope readers.
-                  (changingEditorRoute &&
-                    event.method === 'GET' &&
-                    /^\/api\/v1\/queue\/default\/(?:status|current|next|item_ids)$/.test(
-                      new URL(event.url).pathname
-                    )))),
+                  (changingEditorRoute && isQueueReadRequest(event, origin)))),
           });
           const navigate = async (action) => {
             navigating = true;

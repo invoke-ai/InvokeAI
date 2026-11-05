@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { crc32, inflateSync } from 'node:zlib';
 
-import { isExpectedWebKitUnloadError } from './browser-smoke-expectations.mjs';
+import { isExpectedWebKitUnloadError, isQueueReadRequest } from './browser-smoke-expectations.mjs';
 import { assertRetirement, distribution, observeBrowserDiagnostics } from './browser-validation.mjs';
 import { createMockBackendFixture } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
@@ -169,4 +169,82 @@ test('WebKit native unload-denial expectation is limited to the exact fixture op
   }
   assert.equal(isExpectedWebKitUnloadError(workspace, { ...phase, navigating: false }), false);
   assert.equal(isExpectedWebKitUnloadError(workspace, { ...phase, engine: 'firefox' }), false);
+});
+
+test('Queue read-model hydration denied during WebKit document exit is expected without waiving writes or live-page errors', () => {
+  const phase = { engine: 'webkit', navigating: true, origin: 'http://127.0.0.1:4180' };
+  const event = {
+    kind: 'pageerror',
+    message:
+      'Fetch API cannot load http://127.0.0.1:4180/api/v1/queue/default/items_by_ids due to access control checks.\n    at queryFn',
+  };
+  assert.equal(isExpectedWebKitUnloadError(event, phase), true);
+  for (const path of ['enqueue_batch', 'cancel', 'clear', 'prune', 'item_summaries_by_ids']) {
+    assert.equal(
+      isExpectedWebKitUnloadError({ ...event, message: event.message.replace('items_by_ids', path) }, phase),
+      false
+    );
+  }
+  assert.equal(isExpectedWebKitUnloadError(event, { ...phase, navigating: false }), false);
+  assert.equal(isExpectedWebKitUnloadError({ ...event, kind: 'response', status: 500 }, phase), false);
+  assert.equal(
+    isExpectedWebKitUnloadError(
+      { ...event, message: event.message.replace('127.0.0.1:4180', 'another-origin:4180') },
+      phase
+    ),
+    false
+  );
+});
+
+test('Queue remount cancellation attribution covers the read pipeline with its actual GET and POST methods', () => {
+  const origin = 'http://127.0.0.1:4180';
+  for (const [operation, method] of [
+    ['status', 'GET'],
+    ['current', 'GET'],
+    ['next', 'GET'],
+    ['item_ids', 'GET'],
+    ['items_by_ids', 'POST'],
+  ]) {
+    const event = { method, url: `${origin}/api/v1/queue/default/${operation}` };
+    assert.equal(isQueueReadRequest(event, origin), true);
+    assert.equal(isQueueReadRequest({ ...event, method: method === 'GET' ? 'POST' : 'GET' }, origin), false);
+    assert.equal(
+      isExpectedWebKitUnloadError(
+        { kind: 'pageerror', message: `Fetch API cannot load ${event.url} due to access control checks.` },
+        { engine: 'webkit', navigating: true, origin }
+      ),
+      true
+    );
+  }
+  assert.equal(
+    isQueueReadRequest({ method: 'POST', url: `${origin}/api/v1/queue/default/enqueue_batch` }, origin),
+    false
+  );
+  assert.equal(
+    isQueueReadRequest({ method: 'POST', url: 'http://another-origin:4180/api/v1/queue/default/items_by_ids' }, origin),
+    false
+  );
+  assert.equal(isQueueReadRequest({ url: `${origin}/api/v1/queue/default/unexpected` }, origin), false);
+});
+
+test('nominal diagnostics still reject a real Queue HTTP failure after an expected WebKit unload denial', async () => {
+  const page = new EventEmitter();
+  const phase = { engine: 'webkit', navigating: true, origin: 'http://127.0.0.1:4180' };
+  const diagnostics = observeBrowserDiagnostics(page, {
+    expected: (event) => isExpectedWebKitUnloadError(event, phase),
+  });
+  const url = `${phase.origin}/api/v1/queue/default/items_by_ids`;
+  const message = `Fetch API cannot load ${url} due to access control checks.`;
+  const nativeError = { message, stack: `${message}\n    at queryFn` };
+  page.emit('pageerror', nativeError);
+  await diagnostics.assertHealthy();
+  page.emit('response', { url: () => url, status: () => 500 });
+  await assert.rejects(() => diagnostics.assertHealthy(), /500/);
+  phase.navigating = false;
+  page.emit('pageerror', nativeError);
+  assert.equal(
+    diagnostics.errors.length,
+    2,
+    'A live-page native error and real HTTP failure must both remain critical'
+  );
 });

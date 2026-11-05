@@ -130,10 +130,10 @@ IndexedDB journal transaction started in `pagehide`, even after explicit commit.
 Firefox BFCache eligibility; restoring from the cache is reported only when the engine actually does so.
 
 During the deliberate WebKit reload, native `Fetch API`/`XMLHttpRequest` access-control diagnostics can describe
-old-document requests denied before dispatch. Only the exact fixture workspace-save and mock Socket.IO polling
-messages, from the same origin while document navigation is active, are expected by that scenario. Other runtime
+old-document requests denied before dispatch. Only native messages for the fixture workspace-save, the finite Queue read-model pipeline, and mock Socket.IO polling, from the same origin while document navigation is active, are expected by that scenario. Other runtime
 errors and every real HTTP failure remain critical. Queue reader cancellations during route re-entry are limited
-to the known read endpoints whose query/owner signals are retired; the fault probes use independent strict diagnostics.
+to the same Queue read interface whose query/owner signals are retired: status, current, next and item IDs (GET),
+then bounded item hydration (`items_by_ids`, read-only POST); the fault probes use independent strict diagnostics.
 
 Accessibility runner failures retain nested aggregate diagnostics in `artifacts/accessibility/failure.txt`; the
 settings journey also captures its failing page as text and a screenshot before the browser context closes.

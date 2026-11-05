@@ -1081,7 +1081,23 @@ export const createDurableSyncedWorkbenchPersistence = (
     }
   };
 
-  const createProjectSavePlan = (inputProject: Project) => {
+  type JournalIdentity = Pick<ProjectUnloadJournalEntry, 'editorSessionId' | 'generation'>;
+  const captureJournalIdentity = (projectId: string): JournalIdentity | undefined => {
+    const journal = journaledDocuments.get(resolveProjectId(projectId));
+    return journal ? { editorSessionId: journal.editorSessionId, generation: journal.generation } : undefined;
+  };
+  const isSameJournal = (journal: ProjectUnloadJournalEntry, expected: JournalIdentity | undefined): boolean =>
+    journal.editorSessionId === expected?.editorSessionId && journal.generation === expected?.generation;
+  const isSupersededByJournal = (
+    projectId: string,
+    documentJson: string,
+    expected: JournalIdentity | undefined
+  ): boolean => {
+    const journal = journaledDocuments.get(projectId);
+    return journal !== undefined && !isSameJournal(journal, expected) && journal.documentJson !== documentJson;
+  };
+
+  const createProjectSavePlan = (inputProject: Project, journalAtRequest: JournalIdentity | undefined) => {
     const project = resolveInputProject(inputProject);
     const serialized = serializeProjectDocumentV3Json(project);
     serializedDocumentBytes.set(project.id, serialized.byteSize);
@@ -1098,16 +1114,23 @@ export const createDurableSyncedWorkbenchPersistence = (
         existingDraft?.documentJson !== serialized.documentJson);
     const needsPush =
       needsStage || pendingProjectIds.has(project.id) || conflicts.has(project.id) || schemaRefusals.has(project.id);
-    return { existingDraft, needsPush, needsStage, project, serialized };
+    return { existingDraft, journalAtRequest, needsPush, needsStage, project, serialized };
   };
   type ProjectSavePlan = ReturnType<typeof createProjectSavePlan>;
 
   const stageProject = async (
     project: Project,
-    serialized: ReturnType<typeof serializeProjectDocumentV3Json> = serializeProjectDocumentV3Json(project)
+    serialized: ReturnType<typeof serializeProjectDocumentV3Json>,
+    journalAtRequest: JournalIdentity | undefined
   ) => {
     const store = await getDraftStore();
     const session = await getEditorSessionForService();
+    // An old queued request must not allocate a generation above a later held edit's journal.
+    if (isSupersededByJournal(project.id, serialized.documentJson, journalAtRequest)) {
+      pendingProjectIds.add(project.id);
+      hasPending = true;
+      return null;
+    }
     if (serialized.byteSize > PROJECT_DOCUMENT_MAX_BYTES) {
       pendingProjectIds.add(project.id);
       hasPending = true;
@@ -1371,7 +1394,7 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const pushStagedProject = async (
     project: Project,
-    staged: Awaited<ReturnType<typeof stageProject>>
+    staged: NonNullable<Awaited<ReturnType<typeof stageProject>>>
   ): Promise<ProjectPushOutcome> => {
     assertNotCleared();
     assertOwner();
@@ -1787,14 +1810,21 @@ export const createDurableSyncedWorkbenchPersistence = (
     plan: ProjectSavePlan,
     staged?: Awaited<ReturnType<typeof stageProject>>
   ): Promise<ProjectPushOutcome> => {
-    // The document went back to what recovery holds (an undo, say): the journal of a later state must not return.
-    if (journaledDocuments.has(plan.project.id) && isInRecovery(plan.project.id, plan.serialized.documentJson)) {
-      await settleJournaledDocument(plan.project.id, await getDraftStore());
-    }
     if (deletedProjectIds.has(plan.project.id)) {
       // A pending push that the deletion overtook would otherwise keep every later save pending.
       pendingProjectIds.delete(plan.project.id);
       return { documentJson: plan.serialized.documentJson, kind: 'superseded' };
+    }
+    if (isSupersededByJournal(plan.project.id, plan.serialized.documentJson, plan.journalAtRequest)) {
+      pendingProjectIds.add(plan.project.id);
+      hasPending = true;
+      return { documentJson: plan.serialized.documentJson, kind: 'unsynced' };
+    }
+    // Only an undo requested after this journal, or the same document already in recovery, can retire it.
+    // Capture the target before the store await; a later hidden edit is a different intent.
+    const journalToRetire = captureJournalIdentity(plan.project.id);
+    if (journalToRetire && isInRecovery(plan.project.id, plan.serialized.documentJson)) {
+      await settleJournaledDocument(plan.project.id, await getDraftStore(), journalToRetire);
     }
     if (!plan.needsPush) {
       return { documentJson: plan.serialized.documentJson, kind: 'acknowledged' };
@@ -1807,7 +1837,10 @@ export const createDurableSyncedWorkbenchPersistence = (
       return { documentJson: plan.serialized.documentJson, kind: 'conflicted' };
     }
     if (plan.needsStage) {
-      return pushStagedProject(plan.project, staged ?? (await stageProject(plan.project, plan.serialized)));
+      const capture = staged ?? (await stageProject(plan.project, plan.serialized, plan.journalAtRequest));
+      return capture
+        ? pushStagedProject(plan.project, capture)
+        : { documentJson: plan.serialized.documentJson, kind: 'unsynced' };
     }
     if (!plan.existingDraft) {
       return { documentJson: plan.serialized.documentJson, kind: 'unsynced' };
@@ -1821,8 +1854,10 @@ export const createDurableSyncedWorkbenchPersistence = (
     });
   };
 
-  const pushProject = (inputProject: Project): Promise<ProjectPushOutcome> =>
-    pushProjectPlan(createProjectSavePlan(inputProject));
+  const pushProject = (
+    inputProject: Project,
+    journalAtRequest: JournalIdentity | undefined
+  ): Promise<ProjectPushOutcome> => pushProjectPlan(createProjectSavePlan(inputProject, journalAtRequest));
 
   const getRecoverableDraftSummaries = () =>
     [...unopenableDrafts.values()]
@@ -1998,11 +2033,16 @@ export const createDurableSyncedWorkbenchPersistence = (
   /**
    * Settles this writer's journal of a project in its lineage's claim (the mark makes a deletion that fails moot), then
    * deletes it. The record is kept, for a later retry, until the mark commits. A fenced lineage needs no mark: its
-   * entries are discarded anyway. False while the journal could still come back.
+   * entries are discarded anyway. False while the targeted journal could still come back; a replacement belongs to
+   * a newer intent and is left untouched.
    */
-  const settleJournaledDocument = async (projectId: string, store: ProjectDraftStore): Promise<boolean> => {
+  const settleJournaledDocument = async (
+    projectId: string,
+    store: ProjectDraftStore,
+    expected?: JournalIdentity
+  ): Promise<boolean> => {
     const journaled = journaledDocuments.get(projectId);
-    if (!journaled) {
+    if (!journaled || (expected && !isSameJournal(journaled, expected))) {
       return true;
     }
     settlingJournalProjectIds.add(projectId);
@@ -2088,7 +2128,14 @@ export const createDurableSyncedWorkbenchPersistence = (
       conflicts.delete(projectId);
       schemaRefusals.delete(projectId);
       volatileDrafts.set(projectId, resumed.draft);
-      const staged = await stageProject(merged.project);
+      const staged = await stageProject(
+        merged.project,
+        serializeProjectDocumentV3Json(merged.project),
+        captureJournalIdentity(projectId)
+      );
+      if (!staged) {
+        throw new Error('The project changed while its workspace was being recovered. Retry with the current project.');
+      }
       const rebased = await store.rebaseDraft(projectId, editorSessionId, writerToken, staged.generation, {
         baseMinimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
         baseRevision: record.revision,
@@ -2550,6 +2597,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         }
       }),
     ensureProjectOnServer: (project) => {
+      const journalAtRequest = captureJournalIdentity(project.id);
       const assertProjectIdentityCurrent = () => {
         assertNotCleared();
         assertOwner();
@@ -2579,7 +2627,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         ensure = enqueue(async () => {
           assertProjectIdentityCurrent();
           if (!syncEntries.has(project.id)) {
-            assertProjectFlushed(await pushProject(project));
+            assertProjectFlushed(await pushProject(project, journalAtRequest));
           }
         }).then(
           () => {
@@ -2600,7 +2648,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (isTerminallyCleared) {
         return Promise.reject(new Error('Workbench persistence was cleared and must be reloaded.'));
       }
-      return enqueue(() => pushProject(project));
+      const journalAtRequest = captureJournalIdentity(project.id);
+      return enqueue(() => pushProject(project, journalAtRequest));
     },
     getProjectDraftDocument: async (projectId) => {
       const { draft } = await requireDraft(projectId);
@@ -3411,7 +3460,10 @@ export const createDurableSyncedWorkbenchPersistence = (
           owned.draft.documentJson !== currentDocument.documentJson &&
           owned.draft.generation <= invocationGeneration
         ) {
-          await stageProject(inputProject, currentDocument);
+          const staged = await stageProject(inputProject, currentDocument, captureJournalIdentity(projectId));
+          if (!staged) {
+            throw new Error('The project changed while its copy was being prepared. Retry with the current project.');
+          }
           owned = await requireDraft(projectId);
         }
         const { editorSessionId, store } = owned;
@@ -3778,16 +3830,20 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
       assertOwner();
       lastKnownState = applyProjectResolutionFences(state);
+      // Fence against journals created while this request waits in the queue or stages its snapshot.
+      const journalsAtRequest = new Map(
+        state.projects.map((project) => [resolveProjectId(project.id), captureJournalIdentity(project.id)] as const)
+      );
       const capture = mapConcurrent(
         state.projects.filter((project) => copyCaptureProjectIds.has(project.id)),
         2,
         async (inputProject) => {
-          const plan = createProjectSavePlan(inputProject);
+          const plan = createProjectSavePlan(inputProject, journalsAtRequest.get(resolveProjectId(inputProject.id)));
           if (!plan.needsStage) {
             return;
           }
           try {
-            await stageProject(plan.project, plan.serialized);
+            await stageProject(plan.project, plan.serialized, plan.journalAtRequest);
           } catch {
             return;
           }
@@ -3799,14 +3855,19 @@ export const createDurableSyncedWorkbenchPersistence = (
         assertOwner();
         hasPending = sessionSavePending;
         const currentState = lastKnownState ?? state;
-        const plans = currentState.projects.map(createProjectSavePlan);
+        const plans = currentState.projects.map((project) =>
+          createProjectSavePlan(project, journalsAtRequest.get(resolveProjectId(project.id)))
+        );
         const stagedProjects = new Map<string, Awaited<ReturnType<typeof stageProject>>>();
         await mapConcurrent(plans, 2, async (plan) => {
           if (!plan.needsStage || deletedProjectIds.has(plan.project.id)) {
             return;
           }
           try {
-            stagedProjects.set(plan.project.id, await stageProject(plan.project, plan.serialized));
+            stagedProjects.set(
+              plan.project.id,
+              await stageProject(plan.project, plan.serialized, plan.journalAtRequest)
+            );
           } catch {
             return;
           }
