@@ -18,6 +18,7 @@ import type * as RasterControllerModule from './controllers/rasterController';
 import type { RasterController } from './controllers/rasterController';
 
 import { createCanvasEngine } from './engine';
+import * as psdExport from './export/psdExport';
 
 const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: null, previews: null };
 
@@ -209,6 +210,50 @@ describe('engine raster resource lifecycle', () => {
     expect(raster.layers.peek('layer')).toBeDefined();
     expect(raster.memory.snapshot().baseBytes).toBe(400);
     engine.lifecycle.dispose();
+  });
+
+  it('holds PSD execution bytes through cooldown and reactivation until a pending download settles', async () => {
+    const { engine, raster } = createEngine();
+    let finishDownload!: () => void;
+    let downloadStarted!: () => void;
+    const downloading = new Promise<void>((resolve) => {
+      downloadStarted = resolve;
+    });
+    const download = new Promise<void>((resolve) => {
+      finishDownload = resolve;
+    });
+    const execute = psdExport.executePsdExport;
+    const execution = vi.spyOn(psdExport, 'executePsdExport').mockImplementation((plan, fileName, deps) =>
+      execute(plan, fileName, {
+        ...deps,
+        writePsd: () => Promise.resolve(new ArrayBuffer(8)),
+        download: () => {
+          downloadStarted();
+          return download;
+        },
+      })
+    );
+    const pending = engine.exports.exportRasterLayersToPsd('pending.psd');
+    try {
+      await downloading;
+      const reserved = raster.memory.snapshot().reservedBytes;
+      expect(reserved).toBeGreaterThan(0);
+      expect(raster.memory.snapshot().detachedBytes).toBeGreaterThan(0);
+
+      await expect(engine.lifecycle.beginCooldown()).resolves.toBe('cooled');
+      expect(raster.memory.snapshot().reservedBytes).toBe(reserved);
+      engine.lifecycle.activate();
+      expect(raster.memory.snapshot().reservedBytes).toBe(reserved);
+
+      finishDownload();
+      await expect(pending).resolves.toBe('aborted');
+      expect(raster.memory.snapshot()).toMatchObject({ reservedBytes: 0, detachedBytes: 0 });
+    } finally {
+      finishDownload();
+      await pending;
+      execution.mockRestore();
+      engine.lifecycle.dispose();
+    }
   });
 
   it('releases every resource category deterministically on disposal', async () => {

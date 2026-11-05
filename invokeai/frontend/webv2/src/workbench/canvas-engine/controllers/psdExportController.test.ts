@@ -12,7 +12,7 @@ import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentInd
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
-import { derivePsdPixelAreaLimit, PSD_ALLOCATION_BYTES_PER_PIXEL, PsdExportController } from './psdExportController';
+import { getPsdRequiredBytes, PsdExportController } from './psdExportController';
 
 const document: CanvasDocumentContractV3 = {
   background: 'transparent',
@@ -57,11 +57,6 @@ const canvasWithDocument = (nextDocument: CanvasDocumentContractV3): CanvasState
 });
 
 describe('PsdExportController', () => {
-  it('derives the PSD allocation pixel-area limit from currently available reserved bytes', () => {
-    expect(derivePsdPixelAreaLimit(159_999)).toBe(19_999);
-    expect(derivePsdPixelAreaLimit(160_000)).toBe(20_000);
-  });
-
   it('executes from one immutable raster snapshot instead of live layer pixels', async () => {
     const backend = createTestStubRasterBackend();
     const detached = backend.createSurface(100, 100);
@@ -88,7 +83,7 @@ describe('PsdExportController', () => {
       captureDocumentSnapshot: () => documentSnapshot,
       captureRasterSnapshot,
       execute,
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: () => ({ lease: { release: vi.fn() }, status: 'ok' }),
     });
@@ -142,7 +137,7 @@ describe('PsdExportController', () => {
           status: 'ok',
         }),
       execute,
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: () => ({ lease: { release: vi.fn() }, status: 'ok' }),
     });
@@ -164,7 +159,7 @@ describe('PsdExportController', () => {
     const grownCanvas = canvasWithDocument(smallDocument);
     const documentSnapshot: CanvasDocumentSnapshot = { canvas: grownCanvas, documentGeneration: 7 };
     const grownRect = { height: 40, width: 30, x: -12, y: -8 };
-    const reserve = vi.fn(() => ({ lease: { release: vi.fn() }, status: 'ok' as const }));
+    const reserve = vi.fn((_bytes: number) => ({ lease: { release: vi.fn() }, status: 'ok' as const }));
     const execute = vi.fn((plan) => {
       expect(plan).toMatchObject({ height: 40, status: 'ok', width: 30 });
       if (plan.status !== 'ok') {
@@ -187,13 +182,16 @@ describe('PsdExportController', () => {
           status: 'ok',
         }),
       execute,
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve,
     });
 
     await expect(controller.export('grown.psd')).resolves.toBe('exported');
-    expect(reserve).toHaveBeenCalledWith(30 * 40 * 2 * PSD_ALLOCATION_BYTES_PER_PIXEL);
+    const plan = execute.mock.calls[0]![0] as Extract<PsdExportPlan, { status: 'ok' }>;
+    expect(reserve).toHaveBeenCalledWith(getPsdRequiredBytes(plan));
+    // Raster-only accounting misses writer growth and the output/download overlap.
+    expect(reserve.mock.calls[0]![0]).toBeGreaterThan(30 * 40 * 8 * 2);
   });
 
   it('exports valid captured pixels while skipping a confirmed-empty paint layer', async () => {
@@ -236,7 +234,7 @@ describe('PsdExportController', () => {
           status: 'ok',
         }),
       execute,
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: () => ({ lease: { release: vi.fn() }, status: 'ok' }),
     });
@@ -270,7 +268,7 @@ describe('PsdExportController', () => {
           status: 'ok',
         }),
       execute: vi.fn(),
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: vi.fn(),
     });
@@ -279,7 +277,7 @@ describe('PsdExportController', () => {
     expect(release).toHaveBeenCalledOnce();
   });
 
-  it('derives the execution limit after detached capture and releases the snapshot when over budget', async () => {
+  it('refuses writer allocations even when raster-only bytes fit, releasing the snapshot', async () => {
     const backend = createTestStubRasterBackend();
     const snapshotRelease = vi.fn();
     const reserve = vi.fn();
@@ -304,7 +302,7 @@ describe('PsdExportController', () => {
         documentGeneration: 1,
       }),
       captureRasterSnapshot,
-      getAvailableBytes: () => 0,
+      getAvailableBytes: () => 160_001,
       isDocumentSnapshotCurrent: () => true,
       reserve,
     });
@@ -323,7 +321,7 @@ describe('PsdExportController', () => {
         documentGeneration: 1,
       }),
       captureRasterSnapshot: () => Promise.resolve({ status: 'over-budget' }),
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: () => ({ lease: { release: vi.fn() }, status: 'ok' }),
     });
@@ -353,7 +351,7 @@ describe('PsdExportController', () => {
           status: 'ok',
         }),
       execute: vi.fn(),
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent,
       reserve: vi.fn(),
     });
@@ -394,7 +392,7 @@ describe('PsdExportController', () => {
             once: true,
           });
         }),
-      getAvailableBytes: () => 1_000_000,
+      getAvailableBytes: () => 10_000_000,
       isDocumentSnapshotCurrent: () => true,
       reserve: () => ({ lease: { release: reservationRelease }, status: 'ok' }),
     });

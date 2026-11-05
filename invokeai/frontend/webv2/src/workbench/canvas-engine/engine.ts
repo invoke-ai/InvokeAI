@@ -2512,8 +2512,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     captureRasterSnapshot,
     getAvailableBytes: () => rasterController.memory.getAvailableBytes(),
     isDocumentSnapshotCurrent,
-    reserve: (bytes) =>
-      rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' }),
+    reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'psd-export' }),
     runSpatial: (request) => rasterController.spatial.run(request),
   });
   const exportRasterLayersToPsd = (fileName: string): Promise<PsdExportResult> => psdExportController.export(fileName);

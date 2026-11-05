@@ -47,9 +47,6 @@ export interface PsdExportControllerOptions {
 
 export const PSD_ALLOCATION_BYTES_PER_PIXEL = 8;
 
-export const derivePsdPixelAreaLimit = (availableBytes: number): number =>
-  Math.max(0, Math.floor(availableBytes / PSD_ALLOCATION_BYTES_PER_PIXEL));
-
 const countIsolatedFolders = (nodes: readonly PsdPlanNode[]): number =>
   nodes.reduce(
     (total, node) =>
@@ -70,6 +67,37 @@ const getRequiredAllocationPixelArea = (plan: Extract<PsdExportPlan, { status: '
       layer.adjustments ? Math.max(largest, layer.contentRect.width * layer.contentRect.height) : largest,
     0
   );
+
+/** ag-psd 31 default RLE path; see ARCHITECTURE.md for the allocation derivation. */
+export const getPsdRequiredBytes = (plan: Extract<PsdExportPlan, { status: 'ok' }>): number => {
+  const compositeArea = plan.width * plan.height;
+  let encodedLayers = 0;
+  let metadata = 4096;
+  const visit = (nodes: readonly PsdPlanNode[]): void => {
+    for (const node of nodes) {
+      // Folders generate two records. Includes fixed record/resource overhead and Unicode/Pascal names.
+      metadata += (node.kind === 'folder' ? 2 : 1) * (1024 + 6 * node.name.length);
+      if (node.kind === 'folder') {
+        visit(node.children);
+      } else {
+        encodedLayers += 8 * node.worldRect.height * (node.worldRect.width + 1);
+      }
+    }
+  };
+  visit(plan.tree);
+  const encodedComposite = 8 * plan.height * (plan.width + 1);
+  const outputBound = metadata + encodedLayers + encodedComposite;
+  // Raster surfaces/readback + retained layer channels + scratch + composite copy + encoded composite.
+  // Six output bounds cover geometric writer buffers (including obsolete growth buffers), final slice and Blob.
+  return (
+    getRequiredAllocationPixelArea(plan) * PSD_ALLOCATION_BYTES_PER_PIXEL +
+    encodedLayers +
+    encodedComposite +
+    12 * compositeArea +
+    2 * plan.height +
+    6 * outputBound
+  );
+};
 
 /** Owns immutable PSD snapshot capture, budget reservation, execution, and cancellation. */
 export class PsdExportController {
@@ -186,9 +214,8 @@ export class PsdExportController {
         if (plan.status === 'too-large') {
           return 'too-large';
         }
-        const requestedPixelArea = getRequiredAllocationPixelArea(plan);
-        const requestedBytes = requestedPixelArea * PSD_ALLOCATION_BYTES_PER_PIXEL;
-        if (requestedPixelArea > derivePsdPixelAreaLimit(this.deps.getAvailableBytes())) {
+        const requestedBytes = getPsdRequiredBytes(plan);
+        if (requestedBytes > this.deps.getAvailableBytes()) {
           return 'over-budget';
         }
         const reservation = this.deps.reserve(requestedBytes);
