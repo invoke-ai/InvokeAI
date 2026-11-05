@@ -4461,9 +4461,11 @@
         "lockedMessage": "Unlock the layer to edit it.",
         "lockedOfferMessage": "Unlock the layer to paint on it, or paint on a new layer above it.",
         "alphaLocked": "“{{name}}” has its transparency locked",
-        "alphaLockedMessage": "The eraser can’t remove pixels while transparency is locked.",
+        "alphaLockedMessage": "Unlock its transparency to remove pixels from it.",
         "loading": "“{{name}}” is still loading",
         "loadingMessage": "Its pixels are on their way. Try again in a moment.",
+        "noCutoutTarget": "Nothing to cut the shape out of",
+        "noCutoutTargetMessage": "Select a paint layer or mask to cut the shape out of it.",
         "paintOnNewLayer": "Paint on a new layer"
       },
       "restorePoints": {
@@ -6840,6 +6842,8 @@
         "subtractSelection": "Subtract (hold at completion)",
         "draw": "Draw shape",
         "constrain": "Constrain proportions",
+        "drawFromCenter": "Draw from center",
+        "cutOutShape": "Cut out of the selected layer",
         "smaller": "Smaller brush",
         "larger": "Larger brush",
         "deselect": "Deselect",

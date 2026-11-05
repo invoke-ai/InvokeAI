@@ -37,8 +37,11 @@ export interface StrokeCommittedEvent {
   beforeImageData: ImageData;
   /** Cache pixels within `dirtyRect` after the stroke. */
   afterImageData: ImageData;
-  /** Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer. */
-  tool: 'brush' | 'eraser' | 'shape';
+  /**
+   * Which tool produced the stroke; a `shape` is one drawn as pixels onto a paint layer or mask, a `shape-cutout` one
+   * whose footprint was erased from it.
+   */
+  tool: 'brush' | 'eraser' | 'shape' | 'shape-cutout';
   /** Optional auto-created layer and insertion placement let stroke history remove/recreate both layer and pixels. */
   createdLayer?: { layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor };
 }
@@ -224,17 +227,19 @@ export interface Tool {
   /** The active gesture was cancelled (Esc, pointercancel, focus loss). */
   onPointerCancel?(ctx: ToolContext): void;
   /**
-   * Optional session commands from the pipeline; tools may apply/cancel while gesture cancellation remains
-   * separate.
+   * Session commands: `apply` from Enter on the surface, `cancel` from the engine's Escape ladder once no
+   * engine-owned session (text edit, transform, float) took it. Returns whether the tool had an open session the
+   * command applied or dropped: a handled cancel ends the ladder, so that Escape never also clears the selection.
+   * Gesture cancellation stays separate (`onPointerCancel`) and runs first when Escape lands mid-press.
    */
-  onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): void;
+  onKeyCommand?(ctx: ToolContext, command: 'apply' | 'cancel'): boolean;
   /** Wheel over the canvas; `screenAnchor` is the CSS-pixel cursor position. */
   onWheel?(ctx: ToolContext, deltaY: number, screenAnchor: { x: number; y: number }, modifiers: PointerModifiers): void;
   /** The CSS cursor to show while this tool is active. */
   cursor?(ctx: ToolContext): string;
   /**
-   * Alt is one of this tool's gesture modifiers (selection ops, grid bypass, scaling about the centre), so the
-   * pointer pipeline must not turn an alt-hold into the temporary color picker.
+   * Alt is one of this tool's gesture modifiers (selection ops, grid bypass, scaling or drawing about the centre), so
+   * the pointer pipeline must not turn an alt-hold into the temporary color picker.
    */
   readonly usesAltKey?: boolean;
 }

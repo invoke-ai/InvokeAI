@@ -20297,8 +20297,17 @@ describe('edit feedback on the surface', () => {
     );
     vi.stubGlobal('removeEventListener', (type: string) => windowListeners.delete(type));
     const { dispatch, projectId, store } = createReducerBackedStore(document);
+    const stubBackend = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: {
+        ...stubBackend,
+        createSurface: (width: number, height: number) => {
+          const surface = stubBackend.createSurface(width, height);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
       bitmapStore: createSpyBitmapStore(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId,
@@ -20310,10 +20319,10 @@ describe('edit feedback on the surface', () => {
     engine.tools.onEditRefused((refusal) => refusals.push(refusal));
     const key = (type: 'keydown' | 'keyup', code: string) =>
       windowListeners.get(type)?.({ code, key: code, preventDefault: () => {}, target: null });
-    return { dispatch, engine, key, overlay, refusals };
+    return { dispatch, engine, key, overlay, refusals, surfaces };
   };
 
-  it.each(['transform', 'bbox', 'move'] as const)(
+  it.each(['transform', 'bbox', 'move', 'shape'] as const)(
     'keeps %s when Alt is held before the drag, since Alt modifies its gesture',
     (tool) => {
       const h = attachEngine({ ...makeDoc(), selectedLayerId: 'a' });
@@ -20351,5 +20360,213 @@ describe('edit feedback on the surface', () => {
     h.dispatch({ id: 'paint', patch: { isLocked: false }, type: 'updateCanvasLayer' });
     expect(h.engine.stores.cursor.get()).toBe('crosshair');
     h.engine.lifecycle.dispose();
+  });
+
+  describe('shape tool through the pointer pipeline', () => {
+    const paintDoc = (): CanvasDocumentContractV3 => ({
+      ...makeDoc(),
+      selectedLayerId: 'paint',
+      stacks: stacksFrom([
+        { ...(rasterLayer('paint') as CanvasRasterLayerContractV2), source: { bitmap: null, type: 'paint' as const } },
+      ]),
+    });
+    const maskDoc = (): CanvasDocumentContractV3 => ({
+      ...makeDoc(),
+      selectedLayerId: 'mask',
+      stacks: stacksFrom([
+        {
+          blendMode: 'normal',
+          id: 'mask',
+          isEnabled: true,
+          isLocked: false,
+          mask: { bitmap: null, fill: { color: '#e07575', style: 'diagonal' } },
+          name: 'Mask',
+          opacity: 1,
+          transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+          type: 'inpaint_mask',
+        },
+      ]),
+    });
+    /** `mod` holds both Ctrl and ⌘, so the platform's cutout key is down whichever platform runs the test. */
+    const at = (x: number, y: number, opts: { buttons?: number; mod?: boolean; timeStamp?: number } = {}) => ({
+      ...pointerAt(x, y, { buttons: opts.buttons }),
+      ctrlKey: opts.mod ?? false,
+      metaKey: opts.mod ?? false,
+      timeStamp: opts.timeStamp ?? 0,
+    });
+    const shapeEngine = (document: CanvasDocumentContractV3, kind: 'rect' | 'polygon') => {
+      const h = attachEngine(document);
+      const strokes: StrokeCommittedEvent[] = [];
+      h.engine.tools.onStrokeCommitted((event) => strokes.push(event));
+      h.engine.tools.setTool('shape');
+      h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), kind });
+      h.overlay.fire('pointerenter', at(0, 0));
+      const click = (x: number, y: number, opts: { mod?: boolean; timeStamp?: number } = {}) => {
+        h.overlay.fire('pointerdown', at(x, y, opts));
+        h.overlay.fire('pointerup', at(x, y, { ...opts, buttons: 0 }));
+      };
+      const drag = (from: number, to: number, opts: { mod?: boolean } = {}) => {
+        h.overlay.fire('pointerdown', at(from, from));
+        h.overlay.fire('pointermove', at(to, to));
+        h.overlay.fire('pointerup', at(to, to, { ...opts, buttons: 0 }));
+      };
+      /** Places a triangle's three vertices at 10..50 × 10..40, a second apart so none reads as a double-click. */
+      const placeTriangle = (start: number) => {
+        click(10, 10, { timeStamp: start });
+        click(50, 10, { timeStamp: start + 1000 });
+        click(50, 40, { timeStamp: start + 2000 });
+      };
+      const leaves = () => getDocumentLeaves(h.engine.document.getDocument());
+      return { ...h, click, drag, leaves, placeTriangle, strokes };
+    };
+
+    it('adds a polygon closed by a first-vertex click or a double-click as a new layer, one undo step each', async () => {
+      const h = shapeEngine({ ...makeDoc(), stacks: stacksFrom([]) }, 'polygon');
+      h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), target: 'new' });
+
+      h.placeTriangle(0);
+      h.click(11, 11, { timeStamp: 3000 });
+      expect(h.leaves()).toEqual([
+        expect.objectContaining({ source: expect.objectContaining({ height: 30, kind: 'polygon', width: 40 }) }),
+      ]);
+
+      h.placeTriangle(4000);
+      h.click(50, 40, { timeStamp: 6100 });
+      expect(h.leaves()).toHaveLength(2);
+      expect(h.refusals).toEqual([]);
+
+      await h.engine.history.undo();
+      await h.engine.history.undo();
+      expect(h.leaves()).toHaveLength(0);
+      h.engine.lifecycle.dispose();
+    });
+
+    it('draws a click-closed polygon onto the selected paint layer as one stroke', () => {
+      const h = shapeEngine(paintDoc(), 'polygon');
+
+      h.placeTriangle(0);
+      h.click(10, 10, { timeStamp: 3000 });
+
+      expect(h.leaves()).toHaveLength(1);
+      expect(h.strokes).toEqual([expect.objectContaining({ layerId: 'paint', tool: 'shape' })]);
+      expect(h.engine.stores.canUndo.get()).toBe(true);
+      h.engine.lifecycle.dispose();
+    });
+
+    it.each([
+      ['paint layer', paintDoc, 'paint'],
+      ['mask', maskDoc, 'mask'],
+    ] as const)(
+      'cuts a shape out of the selected %s with the mod key, and undo puts the pixels back',
+      async (_l, doc, id) => {
+        const h = shapeEngine(doc(), 'rect');
+        h.drag(10, 60);
+        h.drag(20, 40, { mod: true });
+
+        expect(h.leaves()).toHaveLength(1);
+        expect(h.strokes.map((stroke) => [stroke.layerId, stroke.tool])).toEqual([
+          [id, 'shape'],
+          [id, 'shape-cutout'],
+        ]);
+        const cutout = h.strokes[1]!;
+        expect(cutout.dirtyRect).toEqual({ height: 20, width: 20, x: 20, y: 20 });
+
+        await h.engine.history.undo();
+        expect(h.engine.stores.canRedo.get()).toBe(true);
+        // Undo writes the pixels the cutout removed back where it removed them: the cache starts at the first shape.
+        expect(putImageDataCalls(h.surfaces)).toContainEqual({ image: cutout.beforeImageData, x: 10, y: 10 });
+        expect(h.leaves()).toHaveLength(1);
+        h.engine.lifecycle.dispose();
+      }
+    );
+
+    it('says why a cutout did nothing when no paint layer or mask is selected, adding no layer', () => {
+      const h = shapeEngine({ ...makeDoc(), stacks: stacksFrom([]) }, 'rect');
+      h.drag(10, 60, { mod: true });
+
+      expect(h.refusals).toEqual([{ status: 'cutout-no-target' }]);
+      expect(h.leaves()).toHaveLength(0);
+      expect(h.engine.stores.canUndo.get()).toBe(false);
+      h.engine.lifecycle.dispose();
+    });
+
+    describe('Escape', () => {
+      /** Shape or Lasso in polygon mode over an empty document with everything selected. */
+      const polygonEngine = (tool: 'shape' | 'lasso') => {
+        const h = shapeEngine({ ...makeDoc(), stacks: stacksFrom([]) }, 'polygon');
+        h.engine.stores.lassoOptions.set({ ...h.engine.stores.lassoOptions.get(), shape: 'polygon' });
+        h.engine.tools.setTool(tool);
+        h.engine.selection.selectAll();
+        const preview = () => h.engine.stores.lassoPreview.get();
+        return { ...h, preview };
+      };
+
+      it.each(['shape', 'lasso'] as const)(
+        'drops a %s polygon between clicks, keeping the selection and adding nothing',
+        (tool) => {
+          const h = polygonEngine(tool);
+          h.placeTriangle(0);
+          expect(h.preview()).toMatchObject({ points: [{}, {}, {}] });
+
+          h.key('keydown', 'Escape');
+          expect(h.preview()).toBeNull();
+          expect(h.engine.stores.hasSelection.get()).toBe(true);
+          expect(h.leaves()).toHaveLength(0);
+
+          // The next click starts a new polygon rather than extending the dropped one.
+          h.click(70, 70, { timeStamp: 5000 });
+          expect(h.preview()).toMatchObject({ points: [{ x: 70, y: 70 }] });
+          h.engine.lifecycle.dispose();
+        }
+      );
+
+      it.each(['shape', 'lasso'] as const)('drops a %s polygon once when Escape lands during a held press', (tool) => {
+        const h = polygonEngine(tool);
+        h.placeTriangle(0);
+        h.overlay.fire('pointerdown', at(30, 60, { timeStamp: 3000 }));
+
+        h.key('keydown', 'Escape');
+        h.overlay.fire('pointerup', at(30, 60, { buttons: 0, timeStamp: 3000 }));
+        expect(h.preview()).toBeNull();
+        expect(h.engine.stores.hasSelection.get()).toBe(true);
+        expect(h.leaves()).toHaveLength(0);
+        h.engine.lifecycle.dispose();
+      });
+
+      it('drops the polygon of the tool a Space-held pan will return to', () => {
+        const h = polygonEngine('shape');
+        h.placeTriangle(0);
+        h.key('keydown', 'Space');
+        expect(h.engine.stores.activeTool.get()).toBe('view');
+
+        h.key('keydown', 'Escape');
+        h.key('keyup', 'Space');
+        expect(h.engine.stores.activeTool.get()).toBe('shape');
+        expect(h.preview()).toBeNull();
+        expect(h.engine.stores.hasSelection.get()).toBe(true);
+        h.engine.lifecycle.dispose();
+      });
+
+      it('still clears the selection when no tool session is open', () => {
+        const h = polygonEngine('shape');
+        h.key('keydown', 'Escape');
+        expect(h.engine.stores.hasSelection.get()).toBe(false);
+        h.engine.lifecycle.dispose();
+      });
+    });
+
+    it('refreshes the cursor when Place on changes whether the selected layer would refuse the shape', () => {
+      const locked = paintDoc();
+      const h = shapeEngine(
+        { ...locked, stacks: stacksFrom([{ ...getDocumentLeaves(locked)[0]!, isLocked: true }]) },
+        'rect'
+      );
+      h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), target: 'new' });
+      expect(h.engine.stores.cursor.get()).toBe('crosshair');
+
+      h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), target: 'selected' });
+      expect(h.engine.stores.cursor.get()).toBe('not-allowed');
+      h.engine.lifecycle.dispose();
+    });
   });
 });
