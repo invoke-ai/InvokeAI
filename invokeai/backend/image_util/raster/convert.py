@@ -154,13 +154,6 @@ def decoded_unit_raster(unit_chw: torch.Tensor, alpha: bool = False) -> RasterIm
     return raster_from_torch(sample, srgb_descriptor(RasterChannels.RGBA if alpha else RasterChannels.RGB, None))
 
 
-def raster_to_torch(raster: RasterImage, device: torch.device | str | None = None) -> torch.Tensor:
-    """CHW tensor holding a copy of the pixels, optionally moved to `device`."""
-    chw = np.array(raster.view().transpose(2, 0, 1), order="C", copy=True)
-    tensor = torch.from_numpy(chw)
-    return tensor if device is None else tensor.to(device)
-
-
 def _map_row_blocks(source: np.ndarray, dtype: np.dtype, convert) -> np.ndarray:
     """Apply `convert` to row blocks of `source`, writing a new C-contiguous array of `dtype`."""
     out = np.empty(source.shape, dtype)

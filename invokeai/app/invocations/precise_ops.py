@@ -37,17 +37,23 @@ def unit_float32(raster: RasterImage) -> RasterImage:
     return raster if raster.dtype == numpy.float32 else to_unit_float(raster, numpy.float32)
 
 
+def precise_shape_fits(context: InvocationContext, height: int, width: int, channels: int, itemsize: int) -> bool:
+    """Whether a node should keep a precise result of this shape: precise storage is on and the shape is within the
+    precise asset bounds. When the bounds refuse, this logs the skip warning and the node runs its ordinary 8-bit path."""
+    if not context.images.precise_storage_enabled:
+        return False
+    try:
+        check_precise_shape_bounds(height, width, channels, itemsize)
+    except PreciseAssetError as error:
+        context.logger.warning(f"Precise image storage skipped: {error}; saving the ordinary 8-bit image.")
+        return False
+    return True
+
+
 def save_precise(context: InvocationContext, raster: RasterImage) -> ImageDTO:
     """Saves a float-path result: precise when precise storage is on and the result fits the precise asset bounds,
     else explicitly display-quantized to 8 bits (with a warning when the bounds are the reason)."""
-    keep_precise = context.images.precise_storage_enabled
-    if keep_precise:
-        try:
-            check_precise_shape_bounds(raster.height, raster.width, raster.channel_count, raster.dtype.itemsize)
-        except PreciseAssetError as error:
-            context.logger.warning(f"Precise image storage skipped: {error}; saving the ordinary 8-bit image.")
-            keep_precise = False
-    if not keep_precise:
+    if not precise_shape_fits(context, raster.height, raster.width, raster.channel_count, raster.dtype.itemsize):
         raster = quantize_unit(raster, numpy.uint8)
     return context.images.save_raster(raster)
 

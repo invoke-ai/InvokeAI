@@ -3,7 +3,6 @@ from invokeai.backend.image_util.raster.convert import (
     raster_from_pil,
     raster_from_torch,
     raster_to_pil,
-    raster_to_torch,
     to_unit_float,
 )
 from invokeai.backend.image_util.raster.descriptor import (
@@ -32,6 +31,5 @@ __all__ = [
     "raster_from_pil",
     "raster_from_torch",
     "raster_to_pil",
-    "raster_to_torch",
     "to_unit_float",
 ]

@@ -9,6 +9,7 @@ import numpy as np
 import torch
 from PIL.Image import Image as PILImage
 
+from invokeai.app.invocations.precise_ops import precise_shape_fits
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.image_util.raster.convert import decoded_unit_raster, srgb_descriptor
@@ -18,7 +19,6 @@ from invokeai.backend.image_util.raster.descriptor import (
 from invokeai.backend.image_util.raster.precise_asset import (
     PreciseAssetError,
     check_precise_asset_bounds,
-    check_precise_shape_bounds,
 )
 from invokeai.backend.image_util.raster.raster import RasterImage
 from invokeai.backend.stable_diffusion.diffusers_pipeline import (
@@ -72,14 +72,7 @@ def float_output_fits(context: InvocationContext, height: int, width: int, chann
     """Whether a node should keep a float32 HxWxC output for a precise save: precise storage is on and the output is
     within the precise asset bounds. Ask before allocating the buffer; when the bounds refuse, this logs the skip
     warning and the node runs exactly its ordinary 8-bit path."""
-    if not context.images.precise_storage_enabled:
-        return False
-    try:
-        check_precise_shape_bounds(height, width, channels, np.dtype(np.float32).itemsize)
-    except PreciseAssetError as error:
-        context.logger.warning(f"Precise image storage skipped: {error}; saving the ordinary 8-bit image.")
-        return False
-    return True
+    return precise_shape_fits(context, height, width, channels, np.dtype(np.float32).itemsize)
 
 
 def float_output_raster(context: InvocationContext, buffer: np.ndarray) -> RasterImage | None:

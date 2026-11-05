@@ -17,7 +17,6 @@ from invokeai.backend.image_util.raster import (
     raster_from_pil,
     raster_from_torch,
     raster_to_pil,
-    raster_to_torch,
     to_unit_float,
 )
 from invokeai.backend.image_util.raster.convert import pil_refusal
@@ -258,9 +257,8 @@ def test_torch_round_trip_keeps_axes_and_values(dtype):
     assert (converted.height, converted.width, converted.channel_count) == (5, 7, 3)
     for c, y, x in [(0, 0, 0), (1, 4, 6), (2, 0, 6), (0, 3, 1)]:
         assert converted.view()[y, x, c] == chw[c, y, x].item()
-    back = raster_to_torch(converted)
-    assert back.dtype == dtype and back.shape == chw.shape and back.is_contiguous()
-    assert torch.equal(back, chw)
+    assert converted.dtype == chw.numpy().dtype
+    assert torch.equal(torch.from_numpy(converted.view().transpose(2, 0, 1).copy()), chw)
 
 
 def test_torch_import_copies_detaches_and_never_aliases():
@@ -270,14 +268,6 @@ def test_torch_import_copies_detaches_and_never_aliases():
     with torch.no_grad():
         chw.zero_()
     np.testing.assert_array_equal(converted.view(), expected)
-
-
-def test_torch_export_never_aliases_the_raster():
-    source = raster(pattern(1, 6, 1))  # C == 1 makes the transposed view contiguous: it must still be copied
-    expected = source.view().copy()
-    tensor = raster_to_torch(source)
-    tensor.fill_(99)
-    np.testing.assert_array_equal(source.view(), expected)
 
 
 def test_torch_import_accepts_non_contiguous_tensors():
@@ -475,12 +465,7 @@ def test_torch_uint16_round_trip():
     chw = torch.tensor([[[0, 1, 65535], [256, 40001, 7]]], dtype=torch.uint16)
     converted = raster_from_torch(chw, descriptor(1))
     assert converted.dtype == np.uint16 and converted.view()[1, 1, 0] == 40001
-    assert torch.equal(raster_to_torch(converted), chw)
-
-
-def test_raster_to_torch_honours_device():
-    assert raster_to_torch(raster(pattern(2, 3, 3)), device="meta").device.type == "meta"
-    assert raster_to_torch(raster(pattern(2, 3, 3))).device.type == "cpu"
+    assert torch.equal(torch.from_numpy(converted.view().transpose(2, 0, 1).copy()), chw)
 
 
 @pytest.mark.parametrize("mode", ["L", "1", "I;16", "I;16B", "RGB"])
