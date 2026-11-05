@@ -921,6 +921,7 @@ def download_images_from_list(
         board_id,
         bulk_download_item_id,
         current_user.user_id,
+        uncategorized_owner_id=None if current_user.is_admin else current_user.user_id,
     )
     return ImagesDownloaded(bulk_download_item_name=bulk_download_item_id + ".zip")
 
