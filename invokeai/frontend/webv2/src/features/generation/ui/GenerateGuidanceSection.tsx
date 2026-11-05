@@ -33,7 +33,12 @@ interface GenerateGuidanceSectionProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
-const selectGuidanceSettings = pickGenerateSettings(['loras', 'qwen3VLEncoderModel', 'referenceImages']);
+const selectGuidanceSettings = pickGenerateSettings([
+  'loras',
+  'qwen3VLEncoderModel',
+  'qwen3VLVisionTowerModel',
+  'referenceImages',
+]);
 
 export const GenerateGuidanceSection = ({
   draft,
@@ -47,7 +52,7 @@ export const GenerateGuidanceSection = ({
 }: GenerateGuidanceSectionProps) => {
   const { t } = useTranslation();
   const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectGuidanceSettings);
-  const referenceImagesSupported = isReferenceImageSupported(selectedModel, settings.qwen3VLEncoderModel);
+  const referenceImagesSupported = isReferenceImageSupported(selectedModel, settings);
   const referenceImageCount = settings.referenceImages.length;
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
@@ -87,7 +92,7 @@ export const GenerateGuidanceSection = ({
       <Stack gap="2" p="2">
         <GenerateReferenceImagesContent
           models={models}
-          qwen3VLEncoderModel={settings.qwen3VLEncoderModel}
+          visionComponents={settings}
           referenceImages={settings.referenceImages}
           selectedModel={selectedModel}
           onCommit={onReferenceCommit}
@@ -101,7 +106,7 @@ export const GenerateGuidanceSection = ({
         ) : null}
         {referenceImagesSupported ||
         referenceImageCount > 0 ||
-        getReferenceImageUnavailableReason(selectedModel, settings.qwen3VLEncoderModel) ? (
+        getReferenceImageUnavailableReason(selectedModel, settings) ? (
           <Separator borderColor="bg.subtle" />
         ) : null}
         <GenerateConceptsContent

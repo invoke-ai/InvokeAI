@@ -666,6 +666,7 @@ export const cloneGenerateWidgetValues = (
   qwen3EncoderModel: values.qwen3EncoderModel ? { ...values.qwen3EncoderModel } : null,
   qwenVLEncoderModel: values.qwenVLEncoderModel ? { ...values.qwenVLEncoderModel } : null,
   qwen3VLEncoderModel: values.qwen3VLEncoderModel ? { ...values.qwen3VLEncoderModel } : null,
+  qwen3VLVisionTowerModel: values.qwen3VLVisionTowerModel ? { ...values.qwen3VLVisionTowerModel } : null,
   qwen35EncoderModel: values.qwen35EncoderModel ? { ...values.qwen35EncoderModel } : null,
   animaInpaintAdapterModel: values.animaInpaintAdapterModel ? { ...values.animaInpaintAdapterModel } : null,
   wanT5EncoderModel: values.wanT5EncoderModel ? { ...values.wanT5EncoderModel } : null,
@@ -764,6 +765,8 @@ export const syncGenerateWidgetValuesWithModels = (
     mistralEncoderModel: syncModelIdentifierWithModels(values.mistralEncoderModel, modelsByKey),
     qwen3EncoderModel: syncModelIdentifierWithModels(values.qwen3EncoderModel, modelsByKey),
     qwenVLEncoderModel: syncModelIdentifierWithModels(values.qwenVLEncoderModel, modelsByKey),
+    qwen3VLEncoderModel: syncModelIdentifierWithModels(values.qwen3VLEncoderModel, modelsByKey),
+    qwen3VLVisionTowerModel: syncModelIdentifierWithModels(values.qwen3VLVisionTowerModel, modelsByKey),
     qwen35EncoderModel: syncModelIdentifierWithModels(values.qwen35EncoderModel, modelsByKey),
     animaInpaintAdapterModel: syncModelIdentifierWithModels(values.animaInpaintAdapterModel, modelsByKey),
     referenceImages: syncReferenceImagesWithModels(values.referenceImages, models),
@@ -782,6 +785,8 @@ export const syncGenerateWidgetValuesWithModels = (
     nextValues.mistralEncoderModel === values.mistralEncoderModel &&
     nextValues.qwen3EncoderModel === values.qwen3EncoderModel &&
     nextValues.qwenVLEncoderModel === values.qwenVLEncoderModel &&
+    nextValues.qwen3VLEncoderModel === values.qwen3VLEncoderModel &&
+    nextValues.qwen3VLVisionTowerModel === values.qwen3VLVisionTowerModel &&
     nextValues.qwen35EncoderModel === values.qwen35EncoderModel &&
     nextValues.animaInpaintAdapterModel === values.animaInpaintAdapterModel &&
     nextValues.referenceImages === values.referenceImages &&
@@ -974,6 +979,7 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     qwen3EncoderModel: getModelIdentifierOrNull(values.qwen3EncoderModel),
     qwenVLEncoderModel: getModelIdentifierOrNull(values.qwenVLEncoderModel),
     qwen3VLEncoderModel: getModelIdentifierOrNull(values.qwen3VLEncoderModel),
+    qwen3VLVisionTowerModel: getModelIdentifierOrNull(values.qwen3VLVisionTowerModel),
     qwen35EncoderModel: getModelIdentifierOrNull(values.qwen35EncoderModel),
     animaInpaintAdapterModel: getModelIdentifierOrNull(values.animaInpaintAdapterModel),
     // Projects saved before the toggle existed wired the adapter whenever one was selected.

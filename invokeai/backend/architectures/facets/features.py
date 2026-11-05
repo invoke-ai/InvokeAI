@@ -125,7 +125,8 @@ class FeaturesFacet(Facet):
     takes them only as `edit`, Anima only on its Qwen3-conditioned releases."""
     reference_images_require_vision_tower: bool = False
     """Reference images are read by the Qwen3-VL vision tower: the effective encoder must carry one. Qwen-Image-2.1
-    gets it from a Diffusers pipeline's own encoder or a safetensors Qwen3-VL encoder; a GGUF encoder has none.
+    gets it from a Diffusers pipeline's own encoder or a safetensors Qwen3-VL encoder; a GGUF encoder has none of its
+    own and takes the llama.cpp mmproj file as a separate vision tower model.
     The frontend's encoder filter for this flag is Qwen3-VL 8B, Qwen-Image-2.1's; another base that sets it with a
     different encoder needs its own filter there."""
 

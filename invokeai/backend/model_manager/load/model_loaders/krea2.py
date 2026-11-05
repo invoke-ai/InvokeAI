@@ -974,7 +974,7 @@ def _reject_incomplete_load(model: Any, *, what: str) -> None:
 
 QWEN3VL_GGUF_HAS_NO_VISION_TOWER = (
     "The GGUF Qwen3-VL encoder '{name}' has no vision tower (llama.cpp keeps it in a separate mmproj file, which "
-    "is not supported), so it cannot read reference images. Use a Qwen3-VL encoder file that includes the vision "
+    "only Qwen-Image-2.1 edits take), so it cannot read reference images. Use a Qwen3-VL encoder file that includes the vision "
     "tower, or a Diffusers model's own encoder."
 )
 

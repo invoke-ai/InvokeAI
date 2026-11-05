@@ -235,7 +235,7 @@ export const useImageActions = ({
 
       return {
         canUseAsReferenceImage: Boolean(
-          values && values.referenceImages.length < getMaxReferenceImages(values.model, values.qwen3VLEncoderModel)
+          values && values.referenceImages.length < getMaxReferenceImages(values.model, values)
         ),
         currentGenerateValues: values,
       };

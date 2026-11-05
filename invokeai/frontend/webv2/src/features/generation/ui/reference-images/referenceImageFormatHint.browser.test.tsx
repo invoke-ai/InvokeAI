@@ -1,8 +1,5 @@
-import type {
-  ComponentModelConfig,
-  GenerateModelConfig,
-  GenerateReferenceImage,
-} from '@features/generation/core/types';
+import type { ReferenceVisionComponents } from '@features/generation/core/baseGenerationPolicies';
+import type { GenerateModelConfig, GenerateReferenceImage } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
@@ -44,7 +41,16 @@ const QWEN21_CHECKPOINT: GenerateModelConfig = { ...QWEN21_GGUF, format: 'checkp
 const ENCODER_8B = { base: 'any', key: 'enc', name: 'Qwen3-VL 8B', type: 'qwen3_vl_encoder', variant: 'qwen3_vl_8b' };
 const NO_MODELS: [] = [];
 const HINT =
-  'Reference images need a Qwen3-VL 8B encoder that is not GGUF. Select one under Components (e.g. Qwen3-VL 8B Encoder), or use a Diffusers Qwen-Image-2.1 model.';
+  'Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.';
+const GGUF_HINT = "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.";
+const TOWER_8B = {
+  base: 'any',
+  format: 'gguf_quantized',
+  key: 'mmproj',
+  name: 'mmproj',
+  type: 'qwen3_vl_vision_tower',
+  variant: 'qwen3_vl_8b',
+};
 const COGVIEW4: GenerateModelConfig = { base: 'cogview4', key: 'cogview4', name: 'CogView4', type: 'main' };
 const QWEN21_REFERENCE: GenerateReferenceImage = {
   config: {
@@ -64,7 +70,7 @@ let root: Root | null = null;
 const render = async (
   selectedModel: GenerateModelConfig,
   referenceImages: GenerateReferenceImage[] = [],
-  qwen3VLEncoderModel: ComponentModelConfig | null = null
+  visionComponents: ReferenceVisionComponents = {}
 ) => {
   await act(() =>
     root?.render(
@@ -75,7 +81,7 @@ const render = async (
               <div data-testid="section">
                 <GenerateReferenceImagesContent
                   models={NO_MODELS}
-                  qwen3VLEncoderModel={qwen3VLEncoderModel}
+                  visionComponents={visionComponents}
                   referenceImages={referenceImages}
                   selectedModel={selectedModel}
                   onCommit={vi.fn()}
@@ -119,16 +125,26 @@ describe('reference image vision tower hint', () => {
   });
 
   it('offers references for a single-file model once a safetensors encoder is selected', async () => {
-    await render(QWEN21_CHECKPOINT, [], { ...ENCODER_8B, format: 'checkpoint' });
+    await render(QWEN21_CHECKPOINT, [], { qwen3VLEncoderModel: { ...ENCODER_8B, format: 'checkpoint' } });
 
     expect(section()?.textContent).not.toContain(HINT);
     expect(section()?.querySelector('button')).not.toBeNull();
   });
 
-  it('keeps the hint when the selected encoder is GGUF', async () => {
-    await render(QWEN21_CHECKPOINT, [], { ...ENCODER_8B, format: 'gguf_quantized' });
+  it('asks for the Vision Tower when the selected encoder is GGUF', async () => {
+    await render(QWEN21_CHECKPOINT, [], { qwen3VLEncoderModel: { ...ENCODER_8B, format: 'gguf_quantized' } });
 
-    expect(section()?.textContent).toBe(HINT);
+    expect(section()?.textContent).toBe(GGUF_HINT);
+  });
+
+  it('offers references again once the GGUF encoder has its vision tower', async () => {
+    await render(QWEN21_CHECKPOINT, [], {
+      qwen3VLEncoderModel: { ...ENCODER_8B, format: 'gguf_quantized' },
+      qwen3VLVisionTowerModel: TOWER_8B,
+    });
+
+    expect(section()?.textContent).not.toContain(HINT);
+    expect(section()?.querySelector('button')).not.toBeNull();
   });
 
   it('renders nothing for a model whose base takes no references in any format', async () => {

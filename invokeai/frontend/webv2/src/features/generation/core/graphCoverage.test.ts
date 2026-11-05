@@ -46,7 +46,7 @@ const compileForShape = (
         projectSettings: { useCpuNoise: true, useNsfwChecker: false, useWatermark: false },
       };
   // One enabled reference image wherever the model takes one, so reference nodes and their fields enter the contract.
-  const settings = isReferenceImageSupported(model, satisfied.qwen3VLEncoderModel)
+  const settings = isReferenceImageSupported(model, satisfied)
     ? {
         ...satisfied,
         referenceImages: withAddedReferenceImages(

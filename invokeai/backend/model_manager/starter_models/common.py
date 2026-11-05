@@ -416,6 +416,18 @@ qwen3_vl_encoder_8b = StarterModel(
     format=ModelFormat.Checkpoint,
 )
 
+# llama.cpp keeps a GGUF Qwen3-VL encoder's vision tower in this companion file, which Qwen-Image-2.1 edits read
+# reference images through. Standalone: no starter depends on it.
+qwen3_vl_vision_tower_8b = StarterModel(
+    name="Qwen3-VL 8B Vision Tower",
+    base=BaseModelType.Any,
+    source="https://huggingface.co/Qwen/Qwen3-VL-8B-Instruct-GGUF/resolve/main/mmproj-Qwen3VL-8B-Instruct-F16.gguf",
+    description="The vision tower (llama.cpp mmproj, F16) of Qwen3-VL 8B. Select it as the Vision Tower beside a GGUF "
+    "Qwen3-VL 8B encoder so Qwen-Image-2.1 can read reference images. Not needed with other encoders. ~1.1GB",
+    type=ModelType.Qwen3VLVisionTower,
+    format=ModelFormat.GGUFQuantized,
+)
+
 # region Wan 2.2 (local)
 # Shared components — all Wan 2.2 variants use the UMT5-XXL text encoder. A14B
 # (both T2V and I2V) uses a 16-channel VAE; TI2V-5B uses a 48-channel VAE. The

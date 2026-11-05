@@ -1,8 +1,8 @@
 import type { GalleryItem } from '@features/gallery';
 import type { GalleryPickerSelection } from '@features/gallery/picker';
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
+import type { ReferenceVisionComponents } from '@features/generation/core/baseGenerationPolicies';
 import type {
-  ComponentModelConfig,
   GenerateModelConfig,
   GenerateReferenceImage,
   GenerateReferenceImageAsset,
@@ -52,10 +52,10 @@ const preventPickerOpen = (event: MouseEvent) => event.preventDefault();
 
 interface GenerateReferenceImagesContentProps {
   models: readonly ModelConfig[];
-  /** The selected Qwen3-VL encoder: for some bases it decides whether the references can be read. */
-  qwen3VLEncoderModel: ComponentModelConfig | null;
   referenceImages: GenerateReferenceImage[];
   selectedModel: GenerateModelConfig | undefined;
+  /** The selected Qwen3-VL encoder and vision tower: for some bases they decide whether the references can be read. */
+  visionComponents: ReferenceVisionComponents;
   onCommit: (update: GenerateSettingsUpdate) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
@@ -64,15 +64,15 @@ export const GenerateReferenceImagesContent = ({
   models,
   onCommit,
   onCommitImmediate,
-  qwen3VLEncoderModel,
   referenceImages,
   selectedModel,
+  visionComponents,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
   const { gallery, notifications, project, settings } = useGenerationUi();
-  const isSupported = isReferenceImageSupported(selectedModel, qwen3VLEncoderModel);
-  const unavailableReason = getReferenceImageUnavailableReason(selectedModel, qwen3VLEncoderModel);
-  const maxReferenceImages = getMaxReferenceImages(selectedModel, qwen3VLEncoderModel);
+  const isSupported = isReferenceImageSupported(selectedModel, visionComponents);
+  const unavailableReason = getReferenceImageUnavailableReason(selectedModel, visionComponents);
+  const maxReferenceImages = getMaxReferenceImages(selectedModel, visionComponents);
   const referenceImageCount = referenceImages.length;
   const freeSlots = Math.max(0, maxReferenceImages - referenceImageCount);
   const canAdd = freeSlots > 0;
@@ -97,8 +97,7 @@ export const GenerateReferenceImagesContent = ({
       // The commit applies the update at once (a later flush may replay it), so `added` is set when this returns.
       onCommit((currentSettings) => {
         const remaining =
-          getMaxReferenceImages(selectedModel, currentSettings.qwen3VLEncoderModel) -
-          currentSettings.referenceImages.length;
+          getMaxReferenceImages(selectedModel, currentSettings) - currentSettings.referenceImages.length;
 
         added = Math.max(0, Math.min(remaining, images.length));
 
@@ -172,8 +171,8 @@ export const GenerateReferenceImagesContent = ({
         const restored = [...removed, ...current.filter((referenceImage) => !removedIds.has(referenceImage.id))];
         // A model that takes references gets no more running than it takes: the rest come back turned off.
         const limit =
-          values && isReferenceImageSupported(values.model, values.qwen3VLEncoderModel)
-            ? getMaxReferenceImages(values.model, values.qwen3VLEncoderModel)
+          values && isReferenceImageSupported(values.model, values)
+            ? getMaxReferenceImages(values.model, values)
             : null;
         let running = 0;
 
@@ -279,9 +278,12 @@ export const GenerateReferenceImagesContent = ({
   });
 
   // A model whose encoder lacks the vision tower says what would take references.
-  const unsupportedMessage = unavailableReason
-    ? t('widgets.generate.referenceImagesNeedVisionTower')
-    : t('widgets.generate.referenceImagesUnsupported');
+  const unsupportedMessage =
+    unavailableReason === 'ggufVisionTower'
+      ? t('widgets.generate.referenceImagesNeedGgufVisionTower')
+      : unavailableReason
+        ? t('widgets.generate.referenceImagesNeedVisionTower')
+        : t('widgets.generate.referenceImagesUnsupported');
 
   if (!isSupported && referenceImageCount === 0) {
     return unavailableReason ? (

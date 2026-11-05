@@ -19,7 +19,6 @@ import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { SEED_MAX } from '@platform/core/seed';
 
 import type {
-  ComponentModelConfig,
   ExpandPromptSuggestion,
   ExternalGenerationMode,
   GenerateLora,
@@ -47,7 +46,9 @@ import {
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
   isFlux2Qwen3EncoderForModel,
+  isGgufQwen3Vl8bEncoder,
   isQwen3Vl8bEncoder,
+  isQwen3Vl8bVisionTower,
   isIdeogram4UnconditionalBranch,
   isMossImageQwen35Encoder,
   isQwen3Vl4bEncoder,
@@ -554,6 +555,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen3VLVisionTowerModel: null,
     qwen35EncoderModel: null,
     animaInpaintAdapterModel: null,
     animaInpaintAdapterEnabled: true,
@@ -650,6 +652,7 @@ export type GenerateComponentValueKey =
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen3VLVisionTowerModel'
   | 'qwen35EncoderModel'
   | 'animaInpaintAdapterModel'
   | 'wanT5EncoderModel'
@@ -661,7 +664,10 @@ export type GenerateComponentValueKey =
   | 'vae';
 
 /** The settings component slot rules read beyond the selected components themselves. */
-export type ComponentPolicySettings = Pick<GenerateSettings, 'componentSourceModel' | 'pidMode'>;
+export type ComponentPolicySettings = Pick<
+  GenerateSettings,
+  'componentSourceModel' | 'pidMode' | 'qwen3VLEncoderModel'
+>;
 
 export interface ComponentPolicyContext {
   model: GenerateModelConfig;
@@ -738,6 +744,7 @@ const TYPE_MISTRAL: ModelTaxonomyType[] = ['mistral_encoder'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
+const TYPE_QWEN3_VL_VISION_TOWER: ModelTaxonomyType[] = ['qwen3_vl_vision_tower'];
 const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_CONTROLNET: ModelTaxonomyType[] = ['controlnet'];
@@ -802,6 +809,18 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     valueKind: 'component',
     helpText,
     filter,
+  });
+
+/** Optional; only a GGUF 8B encoder needs it, so the slot appears with such an encoder alone. */
+const qwen3VlVisionTowerSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'qwen3VLVisionTowerModel',
+    label: 'Vision Tower',
+    modelTypes: TYPE_QWEN3_VL_VISION_TOWER,
+    valueKind: 'component',
+    helpText,
+    placeholder: 'None',
+    filter: isQwen3Vl8bVisionTower,
   });
 
 const qwen35EncoderSlot = (helpText: string, filter: GenerateComponentFilter): ComponentSlotPolicy =>
@@ -1041,7 +1060,7 @@ const EMPTY_COMPONENT_POLICY: ComponentSectionPolicy = createPolicy(false, []);
 
 const getBaseComponentSectionPolicy = (
   model: GenerateModelConfig | undefined,
-  _settings: ComponentPolicySettings
+  settings: ComponentPolicySettings
 ): ComponentSectionPolicy => {
   if (!model || model.type === 'external_image_generator') {
     return EMPTY_COMPONENT_POLICY;
@@ -1226,12 +1245,22 @@ const getBaseComponentSectionPolicy = (
           ...qwen3VlEncoderSlot(
             'Qwen-Image-2.1 conditions on the Qwen3-VL 8B encoder, not the 4B one Krea-2 uses. Required for ' +
               "non-Diffusers Qwen-Image-2.1 models. On a Diffusers model it replaces the model's own encoder. Reference " +
-              'images are read by its vision tower, which a GGUF encoder lacks.',
+              'images are read by its vision tower; a GGUF encoder needs the separate Vision Tower below for that.',
             isQwen3Vl8bEncoder
           ),
           required: (ctx) => ctx.model.format !== 'diffusers',
           missingMessage: 'Generate needs a Qwen3-VL 8B Encoder for non-Diffusers Qwen-Image-2.1 models.',
         },
+        // The loader rejects a tower beside any other encoder, so the slot (and with it a stale pick) goes with it.
+        ...(settings.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(settings.qwen3VLEncoderModel)
+          ? [
+              qwen3VlVisionTowerSlot(
+                'The mmproj file of the GGUF encoder (for example mmproj-Qwen3VL-8B-Instruct-F16.gguf from ' +
+                  'Qwen/Qwen3-VL-8B-Instruct-GGUF). It lets the GGUF encoder read reference images; ' +
+                  'text-to-image works without it. Install it from the Model Manager.'
+              ),
+            ]
+          : []),
       ]);
     case 'ernie-image':
       // Bundled ERNIE models supply components; standalone models need explicit components.
@@ -1390,6 +1419,7 @@ export const getComponentPolicyContext = (
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    qwen3VLVisionTowerModel: settings.qwen3VLVisionTowerModel,
     qwen35EncoderModel: settings.qwen35EncoderModel,
     animaInpaintAdapterModel: settings.animaInpaintAdapterModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
@@ -1411,6 +1441,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwen3EncoderModel: 'Qwen3 encoder',
   qwenVLEncoderModel: 'Qwen VL encoder',
   qwen3VLEncoderModel: 'Qwen3-VL encoder',
+  qwen3VLVisionTowerModel: 'Qwen3-VL vision tower',
   qwen35EncoderModel: 'Qwen3.5 encoder',
   animaInpaintAdapterModel: 'Inpaint adapter',
   wanT5EncoderModel: 'Wan T5 encoder',
@@ -1494,17 +1525,28 @@ const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>
 export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
   Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
 
+/** The component picks that decide which vision tower reads the references; callers pass their settings or values. */
+export type ReferenceVisionComponents = Partial<
+  Pick<GenerateSettings, 'qwen3VLEncoderModel' | 'qwen3VLVisionTowerModel'>
+>;
+
 /**
  * The encoder that reads the references is the selected Qwen3-VL 8B encoder when there is one, else the model's own.
- * Only a Diffusers main brings its own; a GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj file).
- * The 8B filter is Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base that sets the
- * flag with another encoder size needs its own filter here.
+ * Only a Diffusers main brings its own. A GGUF encoder keeps no vision tower (llama.cpp splits it into an mmproj
+ * file), so it reads references only beside a separately selected 8B tower; a tower beside any other encoder is
+ * never sent. The 8B filters are Qwen-Image-2.1's, the only base with `reference_images_require_vision_tower`; a base
+ * that sets the flag with another encoder size needs its own filters here.
  */
 const hasReferenceVisionTower = (
   model: Exclude<GenerateModelConfig, { type: 'external_image_generator' }>,
-  encoder: ComponentModelConfig | null | undefined
-): boolean =>
-  encoder && isQwen3Vl8bEncoder(encoder) ? encoder.format !== 'gguf_quantized' : model.format === 'diffusers';
+  { qwen3VLEncoderModel: encoder, qwen3VLVisionTowerModel: tower }: ReferenceVisionComponents
+): boolean => {
+  if (!encoder || !isQwen3Vl8bEncoder(encoder)) {
+    return model.format === 'diffusers';
+  }
+
+  return isGgufQwen3Vl8bEncoder(encoder) ? Boolean(tower && isQwen3Vl8bVisionTower(tower)) : true;
+};
 
 /**
  * Whether the base and variant take references at all, whichever encoder reads them. Model switches and recall use
@@ -1532,12 +1574,12 @@ export const takesReferenceImages = (model: GenerateModelConfig | undefined): bo
 };
 
 /**
- * Picker and validation must agree on compatibility, including required variants. `encoder` is the selected
- * Qwen3-VL encoder (`settings.qwen3VLEncoderModel`); it matters only for bases whose references the encoder reads.
+ * Picker and validation must agree on compatibility, including required variants. `components` carries the selected
+ * Qwen3-VL encoder and vision tower; they matter only for bases whose references the encoder reads.
  */
 export const isReferenceImageSupported = (
   model: GenerateModelConfig | undefined,
-  encoder?: ComponentModelConfig | null
+  components: ReferenceVisionComponents = {}
 ): boolean => {
   if (!model || !takesReferenceImages(model)) {
     return false;
@@ -1549,7 +1591,7 @@ export const isReferenceImageSupported = (
 
   return (
     !getArchitectureFeatures(model.base)?.reference_images_require_vision_tower ||
-    hasReferenceVisionTower(model, encoder)
+    hasReferenceVisionTower(model, components)
   );
 };
 
@@ -1559,13 +1601,19 @@ export const isReferenceImageSupported = (
  */
 export const getReferenceImageUnavailableReason = (
   model: GenerateModelConfig | undefined,
-  encoder?: ComponentModelConfig | null
-): 'visionTower' | null => {
-  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, encoder)) {
+  components: ReferenceVisionComponents = {}
+): 'visionTower' | 'ggufVisionTower' | null => {
+  if (!model || model.type === 'external_image_generator' || isReferenceImageSupported(model, components)) {
     return null;
   }
 
-  return takesReferenceImages(model) ? 'visionTower' : null;
+  if (!takesReferenceImages(model)) {
+    return null;
+  }
+
+  return components.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(components.qwen3VLEncoderModel)
+    ? 'ggufVisionTower'
+    : 'visionTower';
 };
 
 /** The base's limit, whichever encoder reads the references. */
@@ -1583,8 +1631,8 @@ export const getReferenceImageLimit = (model: GenerateModelConfig | undefined): 
 
 export const getMaxReferenceImages = (
   model: GenerateModelConfig | undefined,
-  encoder?: ComponentModelConfig | null
-): number => (isReferenceImageSupported(model, encoder) ? getReferenceImageLimit(model) : 0);
+  components: ReferenceVisionComponents = {}
+): number => (isReferenceImageSupported(model, components) ? getReferenceImageLimit(model) : 0);
 
 const IP_ADAPTER_BASES: ReadonlySet<string> = new Set(['sd-1', 'sdxl', 'flux', 'anima']);
 
@@ -2397,9 +2445,16 @@ const getPidValidationIssues = (model: GenerateModelConfig, settings: GenerateSe
   return settings.pidSteps < 1 ? [issue('advanced:pidSteps', 'pidSteps', 'PiD steps must be at least 1.', target)] : [];
 };
 
-/** The vision tower that reads references comes with a Diffusers pipeline's encoder or a non-GGUF Qwen3-VL one. */
+/** The vision tower that reads references comes with a Diffusers pipeline's encoder, a non-GGUF Qwen3-VL one, or a GGUF encoder's mmproj file. */
 export const QWEN_IMAGE_21_NO_VISION_TOWER_REASON =
-  'Reference images need a Qwen3-VL 8B encoder that is not GGUF. Select one under Components (e.g. Qwen3-VL 8B Encoder), or use a Diffusers Qwen-Image-2.1 model.';
+  'Reference images need a Qwen3-VL 8B encoder with a vision tower. Select one under Components, or use a Diffusers Qwen-Image-2.1 model.';
+
+/** The same, for a selected GGUF 8B encoder, which only needs its mmproj file added. */
+export const QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON =
+  "Reference images need this encoder's Vision Tower (the mmproj file). Select it under Components.";
+
+const QWEN_IMAGE_21_VISION_TOWER_CPU_ONLY_REASON =
+  'The Vision Tower and the encoder must have the same CPU Only setting. Change it in the Model Manager.';
 
 const getReferenceImageValidationIssues = (
   model: GenerateModelConfig,
@@ -2526,26 +2581,49 @@ const getReferenceImageValidationIssues = (
     }
   });
 
-  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
-  // inherit one that cannot read the references. Clearing it helps only where the model brings its own encoder.
-  if (
+  const hasQwen21References =
     model.base === 'qwen-image-2-1' &&
-    !isReferenceImageSupported(model, settings.qwen3VLEncoderModel) &&
     settings.referenceImages.some(
       (referenceImage) => referenceImage.isEnabled && referenceImage.config.type === 'qwen_image_2_1_reference_image'
-    )
+    );
+
+  // The encoder slot stays filled across models (Ideogram 4 and the GGUF builds share it), so a Diffusers model can
+  // inherit one that cannot read the references. Clearing it helps only where the model brings its own encoder.
+  if (hasQwen21References && !isReferenceImageSupported(model, settings)) {
+    issues.push(
+      // A GGUF 8B encoder is fixed by adding its tower, so the issue points at that slot. Otherwise a single-file main
+      // has to swap the encoder and the issue points at its slot; a Diffusers one clears it from the references.
+      createUntranslatedGenerationIssue(
+        getReferenceImageUnavailableReason(model, settings) === 'ggufVisionTower'
+          ? QWEN_IMAGE_21_GGUF_VISION_TOWER_REASON
+          : QWEN_IMAGE_21_NO_VISION_TOWER_REASON,
+        settings.qwen3VLEncoderModel && isGgufQwen3Vl8bEncoder(settings.qwen3VLEncoderModel)
+          ? { field: 'qwen3VLVisionTowerModel', section: 'components' }
+          : model.format === 'diffusers'
+            ? REFERENCE_IMAGES_TARGET
+            : { field: 'qwen3VLEncoderModel', section: 'components' },
+        model.format === 'diffusers' ? { key: 'qwen3VLEncoderModel', kind: 'clearModel' } : undefined
+      )
+    );
+  }
+
+  // The tower runs beside the encoder in one forward pass, so a device split between them cannot read references.
+  const encoder = settings.qwen3VLEncoderModel;
+  const tower = settings.qwen3VLVisionTowerModel;
+
+  if (
+    hasQwen21References &&
+    encoder &&
+    tower &&
+    isGgufQwen3Vl8bEncoder(encoder) &&
+    isQwen3Vl8bVisionTower(tower) &&
+    (encoder.cpu_only === true) !== (tower.cpu_only === true)
   ) {
     issues.push(
-      // A single-file main has to swap the encoder, so the issue points at its slot; a Diffusers one clears it.
-      model.format === 'diffusers'
-        ? createUntranslatedGenerationIssue(QWEN_IMAGE_21_NO_VISION_TOWER_REASON, REFERENCE_IMAGES_TARGET, {
-            key: 'qwen3VLEncoderModel',
-            kind: 'clearModel',
-          })
-        : createUntranslatedGenerationIssue(QWEN_IMAGE_21_NO_VISION_TOWER_REASON, {
-            field: 'qwen3VLEncoderModel',
-            section: 'components',
-          })
+      createUntranslatedGenerationIssue(QWEN_IMAGE_21_VISION_TOWER_CPU_ONLY_REASON, {
+        field: 'qwen3VLVisionTowerModel',
+        section: 'components',
+      })
     );
   }
 
