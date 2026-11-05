@@ -186,20 +186,8 @@ const FilmstripLiveThumb = ({
       if (isFollowed) {
         node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       }
-      const region = node.closest<HTMLElement>('[role="region"]');
 
-      // React re-runs this cleanup when `isFollowed` flips while the node is
-      // still mounted — exactly the click that focused it — so only a node
-      // that really left the document gives focus away.
-      return () => {
-        if (document.activeElement === node) {
-          queueMicrotask(() => {
-            if (!node.isConnected) {
-              region?.focus({ preventScroll: true });
-            }
-          });
-        }
-      };
+      return releaseFocusOnRemoval(node);
     },
     [isFollowed]
   );
@@ -285,20 +273,31 @@ const FilmstripThumb = memo(function FilmstripThumb({
     },
     [item, onContextMenu]
   );
-  const scrollIntoView = useCallback(
+  // A deletion can take the thumb away while it holds focus, in whatever later render its listing drops it.
+  const thumbRef = useCallback(
     (node: HTMLElement | null) => {
       setNodeRef(node);
 
-      if (node && isSelected) {
+      if (!node) {
+        return;
+      }
+      if (isSelected) {
         node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
       }
+
+      const releaseFocus = releaseFocusOnRemoval(node);
+
+      return () => {
+        setNodeRef(null);
+        releaseFocus();
+      };
     },
     [isSelected, setNodeRef]
   );
 
   return (
     <Box
-      ref={scrollIntoView}
+      ref={thumbRef}
       {...listeners}
       as="button"
       aria-current={isSelected || undefined}
@@ -325,6 +324,30 @@ const FilmstripThumb = memo(function FilmstripThumb({
     </Box>
   );
 });
+
+/**
+ * A thumb's ref cleanup: one that leaves the document while it holds focus hands focus to Preview's region, so the
+ * keys keep working, unless something else has taken focus since. React also runs the cleanup when the ref callback
+ * changes on a node that stays (the selection or follow flipping on the click that focused it), so only a node really
+ * gone gives focus away.
+ */
+const releaseFocusOnRemoval = (node: HTMLElement): (() => void) => {
+  const region = node.closest<HTMLElement>('[role="region"]');
+
+  return () => {
+    if (document.activeElement !== node) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      const { activeElement } = document;
+
+      if (!node.isConnected && (activeElement === null || activeElement === document.body)) {
+        region?.focus({ preventScroll: true });
+      }
+    });
+  };
+};
 
 const EMPTY_SESSIONS: readonly QueueProgressSession[] = [];
 

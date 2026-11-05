@@ -79,6 +79,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -510,11 +511,24 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     [contextMenuItem, showContextMenu]
   );
   const closeContextMenu = useCallback(() => {
-    setContextMenuTarget(null);
-
     // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps
     // it there.
-    if (document.activeElement?.closest('[role="menu"]')) {
+    const shouldReturnFocus = Boolean(document.activeElement?.closest('[role="menu"]'));
+
+    // Committed before the target is resolved: Delete without a confirmation clears the shown item in the same click,
+    // taking the header's ⋮ and the item's thumb with it, and until React commits that the opener still looks
+    // connected. A thumb that a later render removes hands focus on by itself.
+    flushSync(() => setContextMenuTarget(null));
+
+    // Unless that commit gave focus somewhere on purpose, such as a control in a dialog the action opened.
+    const { activeElement } = document;
+    const isFocusUnclaimed =
+      activeElement === null ||
+      activeElement === document.body ||
+      !activeElement.isConnected ||
+      activeElement.closest('[role="menu"]') !== null;
+
+    if (shouldReturnFocus && isFocusUnclaimed) {
       getContextMenuReturnFocus()?.focus({ preventScroll: true });
     }
   }, [getContextMenuReturnFocus]);

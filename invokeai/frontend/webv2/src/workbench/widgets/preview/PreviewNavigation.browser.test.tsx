@@ -4008,6 +4008,8 @@ describe('preview item menu focus', () => {
 
     if (asks) {
       const confirm = await findByText('[role="alertdialog"] button', 'widgets.gallery.deleteConfirmLabel');
+      // The closing menu hands focus back without taking it from the confirmation.
+      await expect.poll(() => document.activeElement?.closest('[role="alertdialog"]')).not.toBeNull();
       await act(() => userEvent.click(confirm));
     }
 
@@ -4039,29 +4041,74 @@ describe('preview item menu focus', () => {
     expect(document.activeElement).toBe(getBoundary());
   });
 
-  it('gives focus to Preview after a confirmed Delete takes away the filmstrip thumb the menu opened from', async () => {
-    await renderWithItemMenu();
-    const thumb = shownThumb();
+  // Without a confirmation the removal lands in the same click that closes the menu.
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])(
+    'gives focus to Preview after Delete takes away the filmstrip thumb the menu opened from ($preference)',
+    async ({ asks }) => {
+      await renderWithItemMenu({ asks });
+      const thumb = shownThumb();
+
+      thumb.focus();
+      await openMenuOn(thumb);
+      await deleteThroughMenu(asks);
+
+      expect(thumb.isConnected).toBe(false);
+      expect(document.activeElement).toBe(getBoundary());
+    }
+  );
+
+  it.each([
+    { asks: true, preference: 'deletions confirmed' },
+    { asks: false, preference: "don't ask again chosen" },
+  ])(
+    "gives focus to Preview after Delete from the header's ⋮, which remounts with the next item ($preference)",
+    async ({ asks }) => {
+      showsHeaderMenuButton = true;
+      await renderWithItemMenu({ asks });
+      const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
+
+      await act(() => userEvent.click(menuButton));
+      await deleteThroughMenu(asks);
+
+      expect(menuButton.isConnected).toBe(false);
+      expect(host!.querySelector('button[aria-label="Item actions"]')).not.toBeNull();
+      expect(document.activeElement).toBe(getBoundary());
+    }
+  );
+
+  it('gives focus to Preview after Delete without a confirmation takes away a neighbouring thumb', async () => {
+    const [firstPage] = mocks.galleryItemPages;
+    const listed = { ...firstPage!.items[1]!, name: 'listed', thumbnailUrl: '/images/listed/thumbnail' };
+
+    mocks.galleryItemPages = [{ ...firstPage!, items: [...firstPage!.items, listed], total: 3 }];
+    // As the shared actions remove an item only the listing holds: through the query cache, whose observers hear of
+    // it only after the menu has closed.
+    const deleteItems = vi.fn<ImageActions['deleteItems']>(() => {
+      queryClient!.setQueriesData<GalleryItemsPage>({ queryKey: ['test-items-page'] }, (page) =>
+        page ? { ...page, items: page.items.filter((item) => item.name !== listed.name), total: page.total - 1 } : page
+      );
+      return Promise.resolve();
+    });
+
+    mocks.imageActions = createItemMenuActions({ deleteItems });
+    await render();
+    const thumb = await vi.waitFor(() => {
+      const element = host!.querySelector<HTMLButtonElement>(`button[aria-label="${listed.name}"]`);
+
+      expect(element).not.toBeNull();
+      return element!;
+    });
 
     thumb.focus();
     await openMenuOn(thumb);
-    await deleteThroughMenu(true);
+    await chooseMenuItem('widgets.gallery.itemMenu.deleteImage');
+    await expect.poll(() => thumb.isConnected).toBe(false);
 
-    expect(thumb.isConnected).toBe(false);
-    expect(document.activeElement).toBe(getBoundary());
-  });
-
-  it("gives focus to Preview after a confirmed Delete from the header's ⋮, which remounts with the next item", async () => {
-    showsHeaderMenuButton = true;
-    await renderWithItemMenu();
-    const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
-
-    await act(() => userEvent.click(menuButton));
-    await deleteThroughMenu(true);
-
-    expect(menuButton.isConnected).toBe(false);
-    expect(host!.querySelector('button[aria-label="Item actions"]')).not.toBeNull();
-    expect(document.activeElement).toBe(getBoundary());
+    expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: listed.name }], expect.anything());
+    await expect.poll(() => document.activeElement).toBe(getBoundary());
   });
 
   it('gives focus back to the thumb the menu opened from when closing leaves it in place', async () => {
