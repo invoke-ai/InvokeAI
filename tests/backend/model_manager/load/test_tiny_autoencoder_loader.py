@@ -1,4 +1,4 @@
-"""Loading a Tiny AutoEncoder: the decoder a file holds, from either layout or a ComfyUI `.pth`."""
+"""Loading a Tiny AutoEncoder: the decoder a file holds, from any published layout or a ComfyUI `.pth`."""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,10 +13,18 @@ from invokeai.backend.model_manager.configs.tiny_autoencoder import (
     TinyAutoencoder_Checkpoint_FLUX_Config,
     TinyAutoencoder_Checkpoint_QwenImage21_Config,
     TinyAutoencoder_Checkpoint_SD1_Config,
+    TinyAutoencoder_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loaders.tiny_autoencoder import TinyAutoencoderLoader
 from invokeai.backend.tiny_autoencoder.taesd import TaesdDecoder
-from tests.fixtures.tiny_autoencoders import TAEQI2_1, TAESD, TAESD3, diffusers_weights, native_weights
+from tests.fixtures.tiny_autoencoders import (
+    TAEQI2_1,
+    TAESD,
+    TAESD3,
+    diffusers_weights,
+    native_weights,
+    taehv_weights,
+)
 
 
 def _load(
@@ -68,6 +76,28 @@ def test_an_f16_rgba_checkpoint_published_in_half_precision_loads_at_the_loader_
     _assert_holds(decoder, native)
     assert all(p.dtype == torch.float32 for p in decoder.parameters())
     assert decoder.spatial_compression == 16
+
+
+@pytest.mark.parametrize("suffix", [".safetensors", ".pth"])
+def test_a_taehv_checkpoint_loads_its_image_decoder_from_the_last_timestep_weights(tmp_path: Path, suffix: str) -> None:
+    combined = taehv_weights(dtype=torch.float16)
+    path = tmp_path / f"taew2_1{suffix}"
+    if suffix == ".pth":
+        torch.save(combined, path)
+    else:
+        save_file(combined, path)
+
+    decoder = _load(path, TinyAutoencoder_Checkpoint_Wan_Config)
+
+    loaded = decoder.state_dict()
+    assert not any(key.startswith(("encoder.", "decoder.")) for key in loaded)
+    for key, value in combined.items():
+        if key.startswith("decoder."):
+            stripped = key.removeprefix("decoder.")
+            expected = value[-loaded[stripped].shape[0] :]  # a stride-2 TGrow keeps its last-timestep half
+            torch.testing.assert_close(loaded[stripped], expected.float(), rtol=0, atol=0)
+    assert decoder.latent_channels == 16 and decoder.spatial_compression == 8
+    assert all(p.dtype == torch.float32 for p in decoder.parameters())
 
 
 def test_a_comfyui_pth_decoder_loads(tmp_path: Path) -> None:

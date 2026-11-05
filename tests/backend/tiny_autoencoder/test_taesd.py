@@ -1,9 +1,16 @@
-"""The vendored TAESD decoders: key layout against the released checkpoints, and the IO contract."""
+"""The vendored TAESD and TAEHV decoders: key layout against the released checkpoints, and the IO contract."""
 
 import pytest
 import torch
 
+from invokeai.backend.tiny_autoencoder.checkpoint import (
+    build_taesd_decoder,
+    detect_taesd_layout,
+    taesd_decoder_state_dict,
+)
+from invokeai.backend.tiny_autoencoder.taehv import ImageDecoder
 from invokeai.backend.tiny_autoencoder.taesd import Decoder, F16Decoder, TaesdDecoder
+from tests.fixtures.taehv_upstream import UpstreamTaehvDecoder
 
 
 def _conv(index: int, n_out: int, n_in: int, bias: bool = True) -> dict[str, tuple[int, ...]]:
@@ -61,6 +68,26 @@ RELEASED_LAYOUTS = {
 }
 
 
+def _taehv_stages(latent: int) -> dict[str, tuple[int, ...]]:
+    """Transcribed from madebyollin/taehv@011dfc2 taew2_1.safetensors, `decoder.` stripped: 64 decoder tensors.
+
+    The file's `TGrow`s 13 and 19 are stride 2, `(2 n, n, 1, 1)`; the image decoder holds one group of 19.
+    """
+    shapes = _conv(1, 256, latent)
+    for stage, (n_in, n_out) in enumerate(((256, 128), (128, 64), (64, 64))):
+        start = 3 + 6 * stage
+        for i in range(start, start + 3):
+            for conv in (0, 2, 4):
+                shapes[f"{i}.conv.{conv}.weight"] = (n_in, 2 * n_in if conv == 0 else n_in, 3, 3)
+                shapes[f"{i}.conv.{conv}.bias"] = (n_in,)
+        shapes[f"{start + 4}.conv.weight"] = (2 * n_in if stage == 1 else n_in, n_in, 1, 1)
+        shapes |= _conv(start + 5, n_out, n_in, bias=False)
+    return shapes | _conv(22, 3, 64)
+
+
+RELEASED_LAYOUTS["taew2_1"] = (ImageDecoder(16), _taehv_stages(latent=16))
+
+
 @pytest.mark.parametrize("name", RELEASED_LAYOUTS)
 def test_decoder_keys_and_shapes_match_the_released_checkpoint(name: str) -> None:
     decoder, expected = RELEASED_LAYOUTS[name]
@@ -76,6 +103,7 @@ def test_decoder_keys_and_shapes_match_the_released_checkpoint(name: str) -> Non
         (Decoder(4), 4, 3, 8),
         (Decoder(32, use_midblock_gn=True), 32, 3, 8),
         (F16Decoder(64, image_channels=4), 64, 4, 16),
+        (ImageDecoder(16), 16, 3, 8),
     ],
 )
 def test_decoder_upscales_by_its_declared_compression(
@@ -113,3 +141,23 @@ def test_midblock_pooling_takes_part_in_the_flux_2_decode() -> None:
         unpooled = decoder(latents)
 
     assert not torch.allclose(pooled, unpooled)
+
+
+def test_a_taehv_image_decode_is_upstreams_last_decoded_frame_for_each_latent_of_a_batch() -> None:
+    """From an upstream-format state dict through identification and a strict load, against upstream's own decoder."""
+    torch.manual_seed(0)
+    upstream = UpstreamTaehvDecoder().eval()
+    checkpoint = {key: value.clone() for key, value in upstream.state_dict().items()}
+    state_dict = taesd_decoder_state_dict(checkpoint)
+    layout = detect_taesd_layout(state_dict)
+    assert layout is not None
+    decoder = build_taesd_decoder(layout).eval()
+    decoder.load_state_dict(state_dict, strict=True)
+    latents = torch.randn(3, 16, 3, 5, generator=torch.Generator().manual_seed(1))
+
+    with torch.inference_mode():
+        expected = upstream.decode_video(latents[:, None])
+        actual = decoder(latents).clamp(0, 1)
+
+    assert expected.shape == (3, 1, 3, 24, 40)
+    torch.testing.assert_close(actual, expected[:, -1])

@@ -3,7 +3,8 @@
 Files are written at the published shapes, so every other config class -- the VAEs, Spandrel, the
 LoRA and main-model heuristics -- also gets its say, and "exactly one match" proves they stay out.
 The weights decide the latent space; within the two spaces two bases share (4 channels: SD 1 / SDXL,
-16: SD3 / FLUX.1) the base override, then the TAE's published name, decides, and nothing else may.
+16: SD3 / FLUX.1) the base override, then the TAE's published name, decides, and nothing else may. A TAEHV
+video decoder needs that name (or the override) even alone: other video TAEs share taew2_1's shapes.
 """
 
 from pathlib import Path
@@ -13,9 +14,11 @@ import pytest
 import torch
 from safetensors.torch import save_file
 
+from invokeai.backend.architectures import latent_space_with_channels
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import ModelClassificationResult, ModelConfigFactory
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError
+from invokeai.backend.model_manager.configs.tiny_autoencoder import TinyAutoencoder_Checkpoint_Config_Base
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders.tiny_autoencoder import TinyAutoencoderLoader
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS, StarterModel
@@ -26,8 +29,10 @@ from tests.fixtures.tiny_autoencoders import (
     TAEQI2_1,
     TAESD,
     TAESD3,
+    TAEW2_1,
     diffusers_weights,
     native_weights,
+    taehv_weights,
     tinier_weights,
 )
 
@@ -49,6 +54,9 @@ def _zeros(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
 
 
 def _write(path: Path, layout: TaesdLayout, combined: bool) -> Path:
+    if layout.arch == "taehv":
+        save_file(_zeros(taehv_weights(layout.latent_channels)), path)
+        return path
     native = native_weights(layout)
     save_file(_zeros(diffusers_weights(native) if combined else native), path)
     return path
@@ -76,6 +84,7 @@ def _single_tae(result: ModelClassificationResult) -> Any:
         # The two families no other base shares need no name at all.
         ("preview.safetensors", TAEF2, True, BaseModelType.Flux2),
         ("preview.safetensors", TAEQI2_1, True, BaseModelType.QwenImage21),
+        ("taew2_1.safetensors", TAEW2_1, True, BaseModelType.Wan),
     ],
 )
 def test_each_published_tae_is_filed_under_its_base_and_nothing_else_matches(
@@ -151,6 +160,43 @@ def test_a_shared_family_file_nothing_names_is_refused_not_guessed(
     assert all("starter models" in str(e) for e in result.invalid_matches)
 
 
+@pytest.mark.parametrize(
+    "filename",
+    [
+        "preview.safetensors",
+        # HunyuanVideo's TAE: shape for shape a taew2_1, decoding a different latent space.
+        "taehv.safetensors",
+        "taeos1_3.safetensors",
+    ],
+)
+def test_a_taehv_decoder_not_named_taew2_1_is_refused_not_filed_under_wan(tmp_path: Path, filename: str) -> None:
+    result = _identify(_write(tmp_path / filename, TAEW2_1, combined=True))
+
+    assert result.config is None
+    assert result.invalid_matches
+    assert all("taew2_1" in str(e) for e in result.invalid_matches)
+
+
+def test_a_wan_base_override_files_an_unnamed_taehv_decoder(tmp_path: Path) -> None:
+    path = _write(tmp_path / "preview.safetensors", TAEW2_1, combined=True)
+
+    assert _single_tae(_identify(path, base=BaseModelType.Wan.value)).base is BaseModelType.Wan
+
+
+def test_a_taehv_decoder_installed_from_a_url_naming_taew2_1_is_filed_under_wan(tmp_path: Path) -> None:
+    path = _write(tmp_path / "model.safetensors", TAEW2_1, combined=True)
+    source = "https://github.com/madebyollin/taehv/raw/main/safetensors/taew2_1.safetensors"
+
+    assert _single_tae(_identify(path, source=source, source_type="url")).base is BaseModelType.Wan
+
+
+def test_a_taehv_pth_is_identified(tmp_path: Path) -> None:
+    path = tmp_path / "taew2_1.pth"
+    torch.save(taehv_weights(), path)
+
+    assert _single_tae(_identify(path)).base is BaseModelType.Wan
+
+
 def test_the_tinier_taeqi2_1_is_refused_with_the_file_to_install(tmp_path: Path) -> None:
     path = tmp_path / "taeqi2_1_tinier.safetensors"
     save_file(tinier_weights(), path)
@@ -198,12 +244,31 @@ _PUBLISHED_TAES: dict[str, tuple[BaseModelType, TaesdLayout, bool]] = {
     "taef1": (BaseModelType.Flux, TAESD3, True),
     "taef2": (BaseModelType.Flux2, TAEF2, True),
     "taeqi2_1": (BaseModelType.QwenImage21, TAEQI2_1, True),
+    "taew2_1": (BaseModelType.Wan, TAEW2_1, True),
 }
 _TAE_STARTERS = [m for m in STARTER_MODELS if m.type is ModelType.TinyAutoencoder]
 
 
 def _repo(starter: StarterModel) -> str:
+    """The TAE's name: its Hugging Face repo, or its file in the GitHub repo holding the TAEHV builds."""
+    if starter.source.startswith("https://github.com/madebyollin/taehv/"):
+        return starter.source.rsplit("/", 1)[-1].removesuffix(".safetensors")
     return starter.source.removeprefix("https://huggingface.co/madebyollin/").split("/", 1)[0]
+
+
+_TAE_CONFIGS = sorted(
+    (c for c in Config_Base.CONFIG_CLASSES if c.model_fields["type"].default is ModelType.TinyAutoencoder),
+    key=lambda c: c.__name__,
+)
+
+
+@pytest.mark.parametrize("config", _TAE_CONFIGS, ids=lambda c: c.__name__)
+def test_each_tae_config_decodes_a_space_its_base_denoises_in(
+    config: type[TinyAutoencoder_Checkpoint_Config_Base],
+) -> None:
+    base = config.model_fields["base"].default
+
+    assert latent_space_with_channels(base, config.LATENT_SPACE.channels) is config.LATENT_SPACE
 
 
 def test_every_tae_config_has_exactly_one_starter() -> None:

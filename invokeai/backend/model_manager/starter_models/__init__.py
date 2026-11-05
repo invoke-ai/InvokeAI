@@ -328,6 +328,7 @@ from invokeai.backend.model_manager.starter_models.types import (
     StarterModelWithoutDependencies,
 )
 from invokeai.backend.model_manager.starter_models.wan import (
+    taew2_1,
     wan_22_5b_vae,
     wan_22_a14b_vae,
     wan_22_i2v_a14b_diffusers,
@@ -571,6 +572,7 @@ STARTER_MODELS: list[StarterModel] = [
     wan_22_t5_encoder,
     wan_22_a14b_vae,
     wan_22_5b_vae,
+    taew2_1,
     wan_22_t2v_a14b_diffusers,
     wan_22_t2v_a14b_low_gguf_q4_k_m,
     wan_22_t2v_a14b_gguf_q4_k_m,

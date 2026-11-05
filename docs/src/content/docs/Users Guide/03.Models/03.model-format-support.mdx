@@ -1,7 +1,7 @@
 ---
 title: Model Format Support
 description: Which file formats and quantizations InvokeAI loads for every model family, text encoder, VAE and adapter.
-lastUpdated: 2026-10-31
+lastUpdated: 2026-11-01
 sidebar:
   order: 3
 ---
@@ -156,19 +156,28 @@ and nothing else. Each one is a single file, a `.safetensors`, `.pth` or `.pt`.
 | TAEF1 | `diffusion_pytorch_model.safetensors` from `madebyollin/taef1` | FLUX.1 | FLUX.1, Z-Image |
 | TAEF2 | `taef2.safetensors` | FLUX.2 | FLUX.2, FLUX.3, ERNIE-Image |
 | TAEQI2.1 | `taeqi2_1.safetensors` | Qwen-Image-2.1 | Qwen-Image-2.1 |
+| TAEW2.1 | `taew2_1.safetensors` or `taew2_1.pth` from `madebyollin/taehv` | Wan | Wan 2.2 A14B, Qwen-Image, Qwen-Image Edit, Krea-2, Anima |
 
-Both published layouts load: the decoder-only files (the `*_decoder.safetensors` files above, and the
+All published layouts load: the decoder-only files (the `*_decoder.safetensors` files above, and the
 `*_decoder.pth` files ComfyUI keeps in `models/vae_approx/`) and the files that hold encoder and decoder together
-(`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`).
+(`diffusion_pytorch_model.safetensors`, `taef2.safetensors`, `taeqi2_1.safetensors`, `taew2_1.safetensors`).
+TAEW2.1 is a video decoder; InvokeAI runs it on one latent frame at a time.
 
 TAESD and TAESDXL read the same 4-channel latents with the same network, and so do TAESD3 and TAEF1 with
 16 channels. For these four the file name, its folder name or the download source has to name the TAE (`taesd`,
 `taesdxl`, `taesd3` or `taef1`); a file that names none of them is refused (**R**). The starter models set the base
 themselves.
 
+TAEW2.1 has the same network and latent width as other TAEHV video decoders for latent spaces InvokeAI does not
+generate in, such as `taehv` (HunyuanVideo). Its file name, folder name or download source has to name `taew2_1`
+(or the base set to Wan); any other file of that shape is refused (**R**).
+
 - **R:** the "tinier" TAEQI2.1 (`taeqi2_1_tinier`); the message asks for `taeqi2_1.safetensors` instead.
-- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder and the TAEHV video decoders
-  (`taew2_1`, `taew2_2`, `taeltx_2`). They install as unknown models.
+- **R:** `taehv` (HunyuanVideo) and the other TAEHV decoders shaped like TAEW2.1 (`taeos1_3`, `taecvx`), and
+  lightx2v's `lighttaew2_1` (45 MB), which has TAEW2.1's network and shapes stored in 32-bit floats. Setting the
+  base to Wan installs `lighttaew2_1`; InvokeAI has not tested its previews.
+- **Not recognized:** other Tiny AutoEncoders, such as the 32× Sana decoder and the remaining TAEHV video decoders
+  (`taew2_2`, `taeh3`, `taehv1_5`, `taeltx_2`, and the `_super` builds). They install as unknown models.
 - A Diffusers `AutoencoderTiny` folder (for example the `madebyollin/taesdxl` repository as a whole) installs as a
   VAE and is not used for previews. Install the single file instead.
 
