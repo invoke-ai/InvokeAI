@@ -1,4 +1,4 @@
-import type { PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { ElementType, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 
 import { Badge, chakra, Flex, Grid, Icon, Stack, Switch, Text } from '@chakra-ui/react';
 import { SegmentedControl } from '@platform/ui/SegmentedControl';
@@ -148,7 +148,7 @@ export const PropertyGroup = ({
   );
 };
 
-/** A labelled choice row rendered as a full-width segmented control (≤5 options). */
+/** A labelled choice row rendered as a full-width segmented control: up to 5 text options, or more as icons. */
 export const PropertySegmentedRow = <Value extends string>({
   disabled,
   label,
@@ -159,7 +159,7 @@ export const PropertySegmentedRow = <Value extends string>({
   disabled?: boolean;
   label: string;
   onValueChange: (value: Value) => void;
-  options: readonly { value: Value; label: string }[];
+  options: readonly { value: Value; label: string; icon?: ElementType }[];
   value: Value;
 }) => {
   const handleChange = useCallback(

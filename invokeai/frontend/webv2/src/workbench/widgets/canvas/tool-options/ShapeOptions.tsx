@@ -1,11 +1,17 @@
-import type { CanvasLayerSourceContract, ShapeToolOptions } from '@workbench/canvas-engine/api';
+import type { CanvasLayerSourceContract, ShapeToolKind, ShapeToolOptions } from '@workbench/canvas-engine/api';
 import type { ToolFormProps, ToolPropertyForm } from '@workbench/widgets/canvas/tool-presentation/toolFormContracts';
 
 import { Text } from '@chakra-ui/react';
 import { ToggleIconButton } from '@platform/ui/Button';
 import { ColorPicker } from '@platform/ui/ColorPicker';
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { DEFAULT_SHAPE_OPTIONS, MAX_SHAPE_STROKE_WIDTH, getDocumentLayer } from '@workbench/canvas-engine/api';
+import {
+  DEFAULT_SHAPE_OPTIONS,
+  MAX_SHAPE_STROKE_WIDTH,
+  getDocumentLayer,
+  shapeDrawsOnLayer,
+} from '@workbench/canvas-engine/api';
+import { SHAPE_KIND_ORDER, SHAPE_KIND_PRESENTATION } from '@workbench/widgets/canvas/canvasToolCommands';
 import { useActiveColorCommands, useActiveColorPair } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useShapeOptions } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useSliderGesture } from '@workbench/widgets/canvas/tool-presentation/FormControls';
@@ -22,7 +28,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type ShapeSource = Extract<CanvasLayerSourceContract, { type: 'shape' }>;
-type ShapeKind = ShapeToolOptions['kind'];
+type ShapeStylePatch = Partial<Pick<ShapeSource, 'fill' | 'stroke' | 'strokeWidth'>>;
 
 interface SelectedShape {
   id: string;
@@ -33,11 +39,85 @@ interface SelectedShape {
 const FALLBACK_COLOR = '#000000';
 const formatPx = (value: number): string => `${value}px`;
 
+/** Where Place on = Selected layer sends the next shape, given the selection. */
+type SelectedPlacement = 'none' | 'layer' | 'mask' | 'new-layer';
+
+const setShapeOptions = (engine: ToolFormProps['engine'], patch: Partial<ShapeToolOptions>): void => {
+  engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
+};
+
+/** Settings for the next shape: what it is and where it lands. They never touch a selected layer. */
+const ShapeToolSettings = ({ engine }: ToolFormProps) => {
+  const { t } = useTranslation();
+  const options = useShapeOptions(engine);
+  const placement = useActiveProjectSelector((project): SelectedPlacement => {
+    const { document } = project.canvas;
+    const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
+    if (!layer) {
+      return 'none';
+    }
+    if (layer.type === 'inpaint_mask' || layer.type === 'regional_guidance') {
+      return 'mask';
+    }
+    return shapeDrawsOnLayer(layer) ? 'layer' : 'new-layer';
+  });
+  const kindOptions = useMemo(
+    () =>
+      SHAPE_KIND_ORDER.map((value) => ({
+        icon: SHAPE_KIND_PRESENTATION[value].icon,
+        label: t(SHAPE_KIND_PRESENTATION[value].labelKey),
+        value,
+      })),
+    [t]
+  );
+  const onKindChange = useCallback((kind: ShapeToolKind) => setShapeOptions(engine, { kind }), [engine]);
+  const targetOptions = useMemo(
+    () => [
+      { label: t('widgets.canvas.toolOptions.shapeTargetSelected'), value: 'selected' as const },
+      { label: t('widgets.canvas.toolOptions.shapeTargetNew'), value: 'new' as const },
+    ],
+    [t]
+  );
+  const onTargetChange = useCallback(
+    (target: ShapeToolOptions['target']) => setShapeOptions(engine, { target }),
+    [engine]
+  );
+  const hintKey =
+    options.target !== 'selected'
+      ? null
+      : placement === 'mask'
+        ? 'widgets.canvas.toolOptions.shapeMaskHint'
+        : placement === 'new-layer'
+          ? 'widgets.canvas.toolOptions.shapeTargetFallbackHint'
+          : null;
+  return (
+    <>
+      <PropertySegmentedRow
+        label={t('widgets.properties.rows.kind')}
+        options={kindOptions}
+        value={options.kind}
+        onValueChange={onKindChange}
+      />
+      <PropertySegmentedRow
+        label={t('widgets.canvas.toolOptions.shapeTarget')}
+        options={targetOptions}
+        value={options.target}
+        onValueChange={onTargetChange}
+      />
+      {hintKey ? (
+        <Text color="fg.muted" fontSize="xs">
+          {t(hintKey)}
+        </Text>
+      ) : null}
+    </>
+  );
+};
+
 /**
- * Edit selected shape content or tool defaults with pair colors. Color gestures commit once; without a selected
- * shape they edit the shared pair.
+ * Edit the selected shape layer's fill and stroke, or the tool defaults with pair colors when no shape layer is
+ * selected. Each gesture on a selected shape commits one undoable step.
  */
-const useShapeEditor = (engine: ToolFormProps['engine']) => {
+const useShapeAppearance = (engine: ToolFormProps['engine']) => {
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
   const options = useShapeOptions(engine);
@@ -53,7 +133,6 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
     },
     (a, b) => a?.id === b?.id && a?.name === b?.name && a?.source === b?.source
   );
-  const kind: ShapeKind = selected ? selected.source.kind : options.kind;
   const fill = selected ? selected.source.fill : options.fillEnabled ? pair.foreground : null;
   const stroke = selected ? selected.source.stroke : options.strokeEnabled ? pair.background : null;
   const strokeWidth = selected ? selected.source.strokeWidth : options.strokeWidth;
@@ -62,7 +141,7 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
   // Scrubbers keep the handler a gesture started with, so writes patch the live source and options: an undo or
   // hotkey landing mid-drag survives the release.
   const commitSource = useCallback(
-    (patch: Partial<ShapeSource>) => {
+    (patch: ShapeStylePatch) => {
       if (!selectedId) {
         return;
       }
@@ -71,52 +150,32 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
         if (layer?.type !== 'raster' || layer.source.type !== 'shape') {
           return { ids: [selectedId], status: 'missing' };
         }
-        // Vertices belong to polygons only; a box kind never carries stale ones.
-        const { points, ...merged } = { ...layer.source, ...patch };
-        const after: ShapeSource = merged.kind === 'polygon' ? { ...merged, points } : merged;
-        return model.prepare({ id: selectedId, source: after, type: 'patch-source' });
+        return model.prepare({ id: selectedId, source: { ...layer.source, ...patch }, type: 'patch-source' });
       });
     },
     [commitPrepared, selectedId, t]
   );
-  const setOptions = useCallback(
-    (patch: Partial<ShapeToolOptions>) => {
-      engine.interaction.set('shapeOptions', { ...engine.interaction.get('shapeOptions'), ...patch });
-    },
-    [engine]
-  );
-  const setKind = useCallback(
-    (next: ShapeKind) => {
-      setOptions({ kind: next });
-      // Creation-only kinds never rewrite a selected layer; a box kind drops a polygon's points.
-      if (next !== 'freehand' && next !== 'polygon') {
-        commitSource({ kind: next });
-      }
-    },
-    [commitSource, setOptions]
-  );
-  const setTarget = useCallback((next: ShapeToolOptions['target']) => setOptions({ target: next }), [setOptions]);
-  const previewStrokeWidth = useCallback((value: number) => setOptions({ strokeWidth: value }), [setOptions]);
+  const previewStrokeWidth = useCallback((value: number) => setShapeOptions(engine, { strokeWidth: value }), [engine]);
   const setStrokeWidth = useCallback(
     (value: number) => {
-      setOptions({ strokeWidth: value });
+      setShapeOptions(engine, { strokeWidth: value });
       commitSource({ strokeWidth: value });
     },
-    [commitSource, setOptions]
+    [commitSource, engine]
   );
   const setFillEnabled = useCallback(
     (checked: boolean) => {
-      setOptions({ fillEnabled: checked });
+      setShapeOptions(engine, { fillEnabled: checked });
       commitSource({ fill: checked ? (selected?.source.fill ?? pair.foreground) : null });
     },
-    [commitSource, pair.foreground, selected, setOptions]
+    [commitSource, engine, pair.foreground, selected]
   );
   const setStrokeEnabled = useCallback(
     (checked: boolean) => {
-      setOptions({ strokeEnabled: checked });
+      setShapeOptions(engine, { strokeEnabled: checked });
       commitSource({ stroke: checked ? (selected?.source.stroke ?? pair.background) : null });
     },
-    [commitSource, pair.background, selected, setOptions]
+    [commitSource, engine, pair.background, selected]
   );
   const setFillColor = useCallback(
     (hex: string, commit: boolean) => {
@@ -144,59 +203,23 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
   );
   return {
     fill,
-    kind,
-    selectedIsPolygon: selected?.source.kind === 'polygon',
+    previewStrokeWidth,
     selectedName: selected?.name ?? null,
-    setTarget,
-    target: options.target,
     setFillColor,
     setFillEnabled,
-    setKind,
-    previewStrokeWidth,
     setStrokeColor,
     setStrokeEnabled,
     setStrokeWidth,
     stroke,
     strokeWidth,
-    toolKind: options.kind,
   };
 };
 
-const ShapeSettings = ({ engine }: ToolFormProps) => {
+/** Fill and stroke: the selected shape layer's own when one is selected (the chip names it), else the defaults. */
+const ShapeAppearanceSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
-  const editor = useShapeEditor(engine);
-  const selectsMask = useActiveProjectSelector((project) => {
-    const { document } = project.canvas;
-    const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
-    return layer?.type === 'inpaint_mask' || layer?.type === 'regional_guidance';
-  });
+  const editor = useShapeAppearance(engine);
   const sampleColor = useColorSampler(engine);
-  // A selected layer shows its own kind and can only switch among the box
-  // kinds (a box has no vertices to become a polygon; a polygon switched to a
-  // box drops its points). Polygon and freehand are creation gestures, offered
-  // while nothing is selected.
-  const kindOptions = useMemo(
-    () => [
-      { label: t('widgets.canvas.toolOptions.shapeRect'), value: 'rect' as const },
-      { label: t('widgets.canvas.toolOptions.shapeEllipse'), value: 'ellipse' as const },
-      { label: t('widgets.canvas.toolOptions.shapeTriangle'), value: 'triangle' as const },
-      { label: t('widgets.canvas.toolOptions.shapeStar'), value: 'star' as const },
-      ...(editor.selectedName === null || editor.selectedIsPolygon
-        ? [{ label: t('widgets.canvas.toolOptions.shapePolygon'), value: 'polygon' as const }]
-        : []),
-      ...(editor.selectedName === null
-        ? [{ label: t('widgets.canvas.toolOptions.shapeFreehand'), value: 'freehand' as const }]
-        : []),
-    ],
-    [editor.selectedIsPolygon, editor.selectedName, t]
-  );
-  const targetOptions = useMemo(
-    () => [
-      { label: t('widgets.canvas.toolOptions.shapeTargetSelected'), value: 'selected' as const },
-      { label: t('widgets.canvas.toolOptions.shapeTargetNew'), value: 'new' as const },
-    ],
-    [t]
-  );
   const onFillChange = useCallback((hex: string) => editor.setFillColor(hex, false), [editor]);
   const onFillChangeEnd = useCallback((hex: string) => editor.setFillColor(hex, true), [editor]);
   const onStrokeChange = useCallback((hex: string) => editor.setStrokeColor(hex, false), [editor]);
@@ -211,25 +234,6 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
   return (
     <>
       <EditTargetChip layerName={editor.selectedName} />
-      <PropertySegmentedRow
-        label={t('widgets.properties.rows.kind')}
-        options={kindOptions}
-        value={editor.kind}
-        onValueChange={editor.setKind}
-      />
-      {editor.selectedName === null ? (
-        <PropertySegmentedRow
-          label={t('widgets.canvas.toolOptions.shapeTarget')}
-          options={targetOptions}
-          value={editor.target}
-          onValueChange={editor.setTarget}
-        />
-      ) : null}
-      {selectsMask && editor.target === 'selected' ? (
-        <Text color="fg.muted" fontSize="xs">
-          {t('widgets.canvas.toolOptions.shapeMaskHint')}
-        </Text>
-      ) : null}
       {/* The chip stays enabled-looking but inert when the slot is off; the toggle owns enablement. */}
       <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeFill')}>
         <ColorPicker
@@ -280,7 +284,10 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
 };
 
 export const shapeForm: ToolPropertyForm = {
-  groups: [{ body: ShapeSettings, id: 'shape', labelKey: 'widgets.properties.groups.shape' }],
+  groups: [
+    { body: ShapeToolSettings, id: 'shape', labelKey: 'widgets.properties.groups.shape' },
+    { body: ShapeAppearanceSettings, id: 'shape-appearance', labelKey: 'widgets.properties.groups.appearance' },
+  ],
   id: 'shape',
   paintsLeaf: true,
 };
