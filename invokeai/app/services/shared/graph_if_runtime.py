@@ -954,6 +954,19 @@ def _get_source_activation_dependencies_for_preparation(
         shared_axis_indices = [
             (owner_axes.index(axis_id), source_axes.index(axis_id)) for axis_id in owner_axes if axis_id in source_axes
         ]
+        if not shared_axis_indices and owner_axes and iteration_path:
+            iterator_ancestry = runtime._iterator_ancestry
+            edge_axes = list(
+                dict.fromkeys(
+                    axis_id
+                    for edge in state.graph._get_input_edges(source_node_id)
+                    for axis_id in iterator_ancestry.get_frame_axes_for_edge(edge)
+                    if axis_id in owner_axes
+                )
+            )
+            shared_axis_indices = [
+                (owner_axes.index(axis_id), edge_axes.index(axis_id)) for axis_id in owner_axes if axis_id in edge_axes
+            ]
         candidate_frames = state._prepared_if_exec_frames(dependency.owner_id)
         matching_frames = [
             frame
@@ -1084,6 +1097,12 @@ def _is_source_inactive(
     dependencies = _get_source_activation_dependencies_for_preparation(state, source_node_id, iteration_path)
     if not dependencies:
         return False
+
+    if any(
+        axis_id in state.executed and not state.source_prepared_mapping.get(axis_id)
+        for axis_id in state._runtime()._get_ordered_iterator_sources(source_node_id)
+    ):
+        return True
     if iteration_path:
         return any(state._is_activation_dependency_rejected(dependency) for dependency in dependencies)
 
@@ -1096,7 +1115,7 @@ def _is_source_inactive(
             for dependency in dependencies
         ):
             return True
-        return all(_has_empty_if_frame(state, dependency.owner_id) for dependency in dependencies)
+        return any(_has_empty_if_frame(state, dependency.owner_id) for dependency in dependencies)
 
     source_axes = set(state._runtime()._get_ordered_iterator_sources(source_node_id))
     for dependency in dependencies:
@@ -1104,11 +1123,31 @@ def _is_source_inactive(
             if axis_source_id not in source_axes and not _is_activation_axis_complete(state, axis_source_id):
                 return False
 
-    return all(
-        (prepared_dependencies := _get_source_activation_dependencies_for_preparation(state, source_node_id, frame))
-        and any(state._is_activation_dependency_rejected(dependency) for dependency in prepared_dependencies)
-        for frame in frames
-    )
+    materializer = state._materializer()
+    source_iterator_axes = materializer._get_collect_source_iterator_ids(source_node_id)
+
+    def is_inactive_at_frame(frame: tuple[int, ...]) -> bool:
+        prepared_dependencies = _get_source_activation_dependencies_for_preparation(state, source_node_id, frame)
+        if not prepared_dependencies:
+            return False
+        if any(state._is_activation_dependency_rejected(dependency) for dependency in prepared_dependencies):
+            return True
+        if not all(state._is_activation_dependency_satisfied(dependency) for dependency in prepared_dependencies):
+            return False
+
+        for dependency in prepared_dependencies:
+            owner_axes = tuple(state._runtime()._get_ordered_iterator_sources(dependency.owner_id))
+            if (
+                len(source_iterator_axes) > len(owner_axes)
+                and tuple(source_iterator_axes[: len(owner_axes)]) == owner_axes
+                and materializer._has_empty_iterate_parent_group(
+                    source_iterator_axes[len(owner_axes)], owner_axes, dependency.frame
+                )
+            ):
+                return True
+        return False
+
+    return all(is_inactive_at_frame(frame) for frame in frames)
 
 
 def _has_empty_if_frame(state: "GraphExecutionState", if_node_id: str) -> bool:
@@ -1315,6 +1354,9 @@ def _resolve_activation_gate(state: "GraphExecutionState", exec_node_id: str, br
         if materializer is not None:
             source_if_id = state._prepared_registry().get_source_node_id(exec_node_id)
             materializer._queue_rejected_activation_branch(source_if_id, branch)
+            materializer._queue_selected_empty_iterate_branch_retirements(
+                source_if_id, branch, gate.frame.iteration_path
+            )
     return changed
 
 

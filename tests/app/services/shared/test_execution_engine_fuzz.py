@@ -322,174 +322,30 @@ def build(seed):
     return desc, (lambda: G(list(nodes), list(edges)))
 
 
-# These seeds stall on the exact main base aec2360a8e. Keep them explicit and
-# narrow; every other generated graph must complete or raise known axis validation.
-_BASELINE_STALL_SEEDS = frozenset(
+_KNOWN_VALID_SEEDS = frozenset(
     {
         3,
-        39,
-        59,
-        101,
-        119,
-        165,
-        179,
-        187,
-        203,
-        204,
         233,
-        234,
-        263,
-        307,
         333,
-        384,
-        404,
-        420,
-        424,
-        428,
-        506,
-        507,
-        524,
         573,
-        586,
         630,
-        656,
-        683,
-        687,
-        711,
-        758,
-        770,
-        802,
-        817,
-        820,
-        844,
-        860,
-        865,
-        868,
-        872,
         880,
-        884,
-        907,
-        948,
-        963,
-        971,
-        976,
         992,
-        1006,
-        1017,
-        1027,
-        1041,
-        1082,
-        1085,
-        1097,
-        1111,
-        1117,
-        1156,
-        1162,
-        1163,
-        1173,
-        1179,
-        1206,
-        1235,
-        1244,
-        1247,
         1300,
-        1308,
-        1324,
-        1325,
         1331,
-        1349,
-        1366,
-        1384,
-        1410,
-        1451,
-        1476,
-        1490,
-        1504,
-        1508,
-        1531,
-        1534,
-        1538,
-        1548,
-        1554,
-        1588,
-        1591,
-        1597,
-        1642,
-        1654,
-        1659,
-        1662,
-        1666,
-        1710,
         1728,
-        1735,
-        1752,
-        1803,
-        1808,
-        1822,
-        1831,
         1836,
-        1843,
-        1856,
-        1874,
-        1895,
         1906,
         1940,
-        1948,
         1970,
-        1986,
-        2033,
-        2046,
         2047,
         2057,
-        2058,
-        2080,
-        2119,
-        2124,
-        2174,
-        2197,
-        2202,
-        2218,
-        2220,
-        2230,
-        2238,
-        2264,
-        2274,
-        2280,
-        2305,
         2355,
-        2366,
-        2379,
         2382,
         2394,
-        2419,
-        2497,
-        2504,
-        2516,
-        2520,
-        2523,
-        2535,
         2575,
-        2592,
-        2662,
-        2707,
-        2715,
         2775,
-        2813,
-        2816,
         2829,
-        2857,
-        2870,
-        2871,
-        2886,
-        2907,
-        2920,
-        2944,
-        2948,
-        2952,
-        2958,
-        2974,
-        2977,
-        2998,
     }
 )
 
@@ -651,12 +507,12 @@ def _run(
 @pytest.mark.slow
 @pytest.mark.parametrize("seed", range(3000), ids=lambda seed: f"seed{seed}")
 def test_execution_engine_fuzz_routes_and_snapshots(seed: int) -> None:
-    if seed in _BASELINE_STALL_SEEDS:
-        pytest.skip("known to stall on exact main base aec2360a8e")
     try:
         desc, graph_factory = build(seed)
         graph_factory().validate_self()
     except UnsupportedIfIterationAxesError as error:
+        if seed in _KNOWN_VALID_SEEDS:
+            pytest.fail(f"seed={seed} graph={desc}: known-valid seed rejected before invocation: {error}")
         pytest.skip(f"seed={seed} graph={desc}: expected pre-invocation axis rejection: {error}")
 
     results = {}
@@ -666,6 +522,11 @@ def test_execution_engine_fuzz_routes_and_snapshots(seed: int) -> None:
             try:
                 results[(route_name, checkpoint)] = _run(seed, forced_compatibility=forced, roundtrip_at=checkpoint)
             except UnsupportedIfIterationAxesError as error:
+                if seed in _KNOWN_VALID_SEEDS:
+                    pytest.fail(
+                        f"seed={seed} graph={desc} route={route_name} checkpoint={checkpoint}: "
+                        f"known-valid seed rejected before invocation: {error}"
+                    )
                 pytest.skip(
                     f"seed={seed} graph={desc} route={route_name} checkpoint={checkpoint}: "
                     f"expected pre-invocation axis rejection: {error}"
@@ -685,3 +546,8 @@ def test_execution_engine_fuzz_routes_and_snapshots(seed: int) -> None:
 
     for key, result in results.items():
         assert result == reference, f"seed={seed} graph={desc} route={key}: expected {reference}, got {result}"
+
+
+def test_seed_2220_rejects_unsupported_axes_before_invocation() -> None:
+    with pytest.raises(UnsupportedIfIterationAxesError):
+        _run(2220, forced_compatibility=False, roundtrip_at=None)
