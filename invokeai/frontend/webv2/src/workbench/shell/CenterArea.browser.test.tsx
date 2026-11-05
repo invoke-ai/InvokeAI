@@ -118,7 +118,12 @@ vi.mock('@workbench/widgetRegistry', () => ({
     typeId === 'preview' ? { manifest: { id: 'preview', label: 'Preview' }, status: 'enabled' } : undefined,
   getWidgetsForRegion: () => [],
 }));
+const recoveryOwner = vi.hoisted(() => ({
+  widgetRecovery: new Map(),
+  getSnapshot: () => ({ activeProject: { id: 'test-project', widgetInstances: { 'test-instance': {} } } }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchInternalStore: () => recoveryOwner,
   useActiveProjectId: () => centerAreaMocks.project.id,
   useActiveProjectSelector: (selector: (project: typeof centerAreaMocks.project) => unknown) =>
     selector(centerAreaMocks.project),
@@ -132,7 +137,10 @@ vi.mock('@workbench/widget-frame', () => ({
   // Loading state is not what this suite measures; the real component would
   // suspend on a chunk that does not exist under the mocked registry.
   WidgetIdentityIcon: () => <Box boxSize="3.5" />,
-  WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' }) => {
+  WidgetChromeSlotById: ({ slot }: { slot: 'actions' | 'label' | 'icon' }) => {
+    if (slot === 'icon') {
+      return <Box boxSize="3.5" />;
+    }
     const Slot = centerAreaMocks.chromeSlots?.[slot];
 
     if (Slot) {
@@ -212,6 +220,7 @@ const render = async (children: ReactNode, width = 571) => {
 };
 
 afterEach(async () => {
+  recoveryOwner.widgetRecovery.clear();
   await act(async () => {
     root?.unmount();
     await Promise.resolve();

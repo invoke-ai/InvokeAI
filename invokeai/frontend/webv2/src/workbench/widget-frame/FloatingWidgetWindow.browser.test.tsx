@@ -61,7 +61,12 @@ const project = {
   },
 };
 
+const recoveryOwner = vi.hoisted(() => ({
+  widgetRecovery: new Map(),
+  getSnapshot: () => ({ activeProject: project }),
+}));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchInternalStore: () => recoveryOwner,
   useActiveProjectSelector: (selector: (project: unknown) => unknown) => selector(project),
   useActiveProjectId: () => project.id,
   useWorkbenchQueries: () => ({
@@ -278,6 +283,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  recoveryOwner.widgetRecovery.clear();
   await act(() => root?.unmount());
   host?.remove();
   host = null;

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatBytes, formatCount } from './languages';
+import {
+  formatBytes,
+  formatCount,
+  getEffectiveWorkbenchLanguage,
+  getWorkbenchLanguageAvailability,
+  getWorkbenchLanguageDirection,
+  normalizeWorkbenchLanguage,
+} from './languages';
 
 describe('formatBytes', () => {
   it('renders a dash for missing or invalid sizes', () => {
@@ -35,5 +42,22 @@ describe('formatCount', () => {
   it('groups digits for the locale', () => {
     expect(formatCount(12_345, 'en')).toBe('12,345');
     expect(formatCount(12_345, 'de')).toBe('12.345');
+  });
+});
+
+describe('content language availability', () => {
+  it('keeps saved unavailable and incomplete choices while serving English', () => {
+    for (const language of ['ar', 'fr', 'ua']) {
+      const normalized = normalizeWorkbenchLanguage(language)!;
+      expect(normalized).toBe(language === 'ua' ? 'uk' : language);
+      const effective = getEffectiveWorkbenchLanguage(normalized);
+      expect(effective).toBe('en');
+      expect(getWorkbenchLanguageDirection(effective)).toBe('ltr');
+    }
+    expect(getWorkbenchLanguageAvailability('ar')).toBe('unavailable');
+    expect(getWorkbenchLanguageAvailability('fr')).toBe('incomplete');
+  });
+  it('inherits available English content for regional preferences', () => {
+    expect(getEffectiveWorkbenchLanguage('en-GB')).toBe('en-GB');
   });
 });

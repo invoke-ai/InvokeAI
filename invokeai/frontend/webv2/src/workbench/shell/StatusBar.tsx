@@ -6,6 +6,7 @@ import { Box, Flex, Icon, Popover, Portal } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { PopoverContent, Row, Tooltip } from '@platform/ui';
+import { Button } from '@platform/ui/Button';
 import { isModalPresent, subscribeModalPresence } from '@platform/ui/modalPresence';
 import { useHighlightedRegion } from '@workbench/focusRegions';
 import { useShortcutFocusRestore } from '@workbench/hotkeys/hintSources';
@@ -25,6 +26,7 @@ import {
   createCompactWidgetCapacity,
   useCompactWidgetCapacityResource,
 } from '@workbench/widget-frame/compactWidgetCapacity';
+import { useWidgetRecovery } from '@workbench/widget-frame/widgetRecovery';
 import {
   getWidgetRegionDropId,
   getWidgetRegionEndDropData,
@@ -284,6 +286,7 @@ const CompactBottomWidget = ({
     region: 'bottom',
     typeId: item.typeId,
   });
+  const { t } = useTranslation();
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
   const restoreShortcutFocus = useShortcutFocusRestore();
   const capacity = useCompactWidgetCapacityResource();
@@ -299,10 +302,13 @@ const CompactBottomWidget = ({
     },
     [capacity, item.widget.manifest.compactSizing, setNodeRef]
   );
-  const isActivatable = item.isExpandable || item.isPopover;
-  const rowDragHandleProps = isActivatable
-    ? Object.fromEntries(Object.entries(dragHandleProps).filter(([key]) => key !== 'onKeyDown'))
-    : dragHandleProps;
+  const recovery = useWidgetRecovery(item.id, item.widget);
+  const isActivatable = !recovery.error && (item.isExpandable || item.isPopover);
+  const rowDragHandleProps = recovery.error
+    ? {}
+    : isActivatable
+      ? Object.fromEntries(Object.entries(dragHandleProps).filter(([key]) => key !== 'onKeyDown'))
+      : dragHandleProps;
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (item.widget.manifest.preserveWorkbenchFocus) {
@@ -340,10 +346,23 @@ const CompactBottomWidget = ({
     [handleKeyDown, isActivatable]
   );
   const handleClick = useCallback(() => {
+    if (item.isExpandable && !recovery.error) {
+      onSelect(item.id);
+    }
+  }, [item.id, item.isExpandable, onSelect, recovery.error]);
+  const openFailedPanel = useCallback(() => {
     if (item.isExpandable) {
       onSelect(item.id);
     }
   }, [item.id, item.isExpandable, onSelect]);
+  const failureOpenButton = useMemo(
+    () => (
+      <Button aria-label={`${t('common.open')}: ${item.label}`} size="xs" variant="ghost" onClick={openFailedPanel}>
+        {t('common.open')}
+      </Button>
+    ),
+    [item.label, openFailedPanel, t]
+  );
   const handleContextMenu = useCallback((event: MouseEvent) => onContextMenu(item, event), [item, onContextMenu]);
   const handlePopoverOpenChange = useCallback((event: { open: boolean }) => setIsPopoverOpen(event.open), []);
   const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
@@ -354,7 +373,7 @@ const CompactBottomWidget = ({
   const row = (
     <Row
       {...rowDragHandleProps}
-      aria-pressed={item.isPopover ? undefined : isRowActive}
+      aria-pressed={item.isPopover || recovery.error ? undefined : isRowActive}
       color={isRowActive ? undefined : 'fg.muted'}
       cursor={isDragging ? 'grabbing' : 'default'}
       px={item.widget.manifest.compactSizing === 'remaining-space' ? '1.5' : undefined}
@@ -377,17 +396,28 @@ const CompactBottomWidget = ({
   const content = (
     <Box
       ref={bindWrapper}
+      display="flex"
       data-status-bar-widget={item.id}
       data-workbench-focus-preserve={item.widget.manifest.preserveWorkbenchFocus || undefined}
       h="full"
       style={style}
     >
-      {item.isPopover ? <Popover.Trigger asChild>{row}</Popover.Trigger> : row}
+      {item.isPopover && !recovery.error ? <Popover.Trigger asChild>{row}</Popover.Trigger> : row}
+      {recovery.error && (item.isExpandable || item.isPopover) ? (
+        item.isPopover ? (
+          <Popover.Trigger asChild>{failureOpenButton}</Popover.Trigger>
+        ) : (
+          failureOpenButton
+        )
+      ) : null}
     </Box>
   );
+  // Recovery owns error details; retaining the outer root preserves the row's focus when it finishes.
   const labelTooltip = (
     <Tooltip
       closeDelay={80}
+      disabled={!!recovery.error}
+      keepsRootWhenDisabled
       content={item.failureMessage ? `${item.label}: ${item.failureMessage}` : item.label}
       openDelay={250}
       positioning={TOOLTIP_POSITIONING}
@@ -442,7 +472,14 @@ const CompactBottomWidget = ({
   }
 
   return (
-    <Tooltip closeDelay={80} content={tooltipContent} openDelay={250} positioning={TOOLTIP_POSITIONING}>
+    <Tooltip
+      closeDelay={80}
+      disabled={!!recovery.error}
+      keepsRootWhenDisabled
+      content={tooltipContent}
+      openDelay={250}
+      positioning={TOOLTIP_POSITIONING}
+    >
       {content}
     </Tooltip>
   );

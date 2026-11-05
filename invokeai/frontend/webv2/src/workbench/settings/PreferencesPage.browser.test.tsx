@@ -106,6 +106,23 @@ afterEach(async () => {
 });
 
 describe('Launchpad preferences page', () => {
+  it('keeps an unavailable language selected and explains the English content', async () => {
+    await patchWorkbenchPreferences({ language: 'ar' });
+    await render('/preferences/appearance');
+    await expect
+      .element(
+        page.getByText(
+          'Unavailable and incomplete translations display English content. Your language choice is kept.',
+          { exact: true }
+        )
+      )
+      .toBeVisible();
+    await expect
+      .element(page.getByRole('combobox', { name: 'Language', exact: true }))
+      .toHaveTextContent('العربية — Unavailable; English content');
+    expect(getWorkbenchPreferences().language).toBe('ar');
+  });
+
   it('lists every section, per-project ones as defaults, and follows the route', async () => {
     const router = await render('/preferences/behavior');
 

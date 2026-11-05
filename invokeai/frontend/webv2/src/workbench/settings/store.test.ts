@@ -87,6 +87,17 @@ beforeEach(async () => {
 });
 
 describe('loadWorkbenchSettings', () => {
+  it.each(['ar', 'fr', 'en-GB'])(
+    'preserves requested %s content through backend load, save and reload',
+    async (language) => {
+      seedBackendPreferences({ language });
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+      await store.patchWorkbenchPreferences({ reduceMotion: true });
+      expect(readBackendPreferences().language).toBe(language);
+      expect((await store.loadWorkbenchSettings()).language).toBe(language);
+    }
+  );
+
   it('migrates a preference stored under a renamed theme id', async () => {
     seedBackendPreferences({ themeId: 'forest' });
 

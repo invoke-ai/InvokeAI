@@ -168,14 +168,17 @@ const frames = (count: number) =>
   });
 
 describe('focusRegion', () => {
-  const renderHarness = async (onOpen: (open: () => void, focusRegion: FocusRegion) => void = (open) => open()) => {
+  const renderHarness = async (
+    onOpen: (open: () => void, focusRegion: FocusRegion) => void = (open) => open(),
+    controller = createTestFocusController()
+  ) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider controller={createTestFocusController()}>
+          <FocusRegionProvider controller={controller}>
             <OpeningHarness onOpen={onOpen} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -186,6 +189,34 @@ describe('focusRegion', () => {
       opener: [...host.querySelectorAll('button')].find((button) => button.textContent === 'Open editor')!,
     };
   };
+
+  it.each(['navigation', 'project', 'clear'] as const)(
+    'cancels recovery focus on %s while its resource is pending',
+    async (cancel) => {
+      let projectId = 'project-1';
+      const controller = createTestFocusController({ getProjectId: () => projectId });
+      let settle!: () => void;
+      const ready = new Promise<void>((resolve) => {
+        settle = resolve;
+      });
+      const { opener } = await renderHarness(
+        (_open, focusRegion) => focusRegion('center', undefined, undefined, ready),
+        controller
+      );
+      opener.focus();
+      await act(() => opener.click());
+      if (cancel === 'navigation') {
+        controller.activate({ kind: 'region', region: 'left' }, { byPointer: true });
+      } else if (cancel === 'project') {
+        projectId = 'project-2';
+      } else {
+        controller.clear();
+      }
+      await act(() => settle());
+      await frames(4);
+      expect(document.activeElement).toBe(opener);
+    }
+  );
 
   it('moves focus and the highlight to the region once the opened widget shows', async () => {
     const { center, opener } = await renderHarness();

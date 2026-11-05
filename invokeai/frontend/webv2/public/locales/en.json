@@ -764,7 +764,8 @@
     "updated": "User updated",
     "user": "User",
     "you": "You",
-    "manageIntermediatesNamed": "Manage intermediates of {{name}}"
+    "manageIntermediatesNamed": "Manage intermediates of {{name}}",
+    "loadFailed": "Unable to load users"
   },
   "fonts": {
     "title": "Fonts",
@@ -2624,7 +2625,10 @@
         "description": "Version, build, and server information."
       },
       "language": {
-        "label": "Language"
+        "label": "Language",
+        "description": "Unavailable and incomplete translations display English content. Your language choice is kept.",
+        "incomplete": "{{label}} — Incomplete; English content",
+        "unavailable": "{{label}} — Unavailable; English content"
       },
       "workflowEdgeStyle": {
         "label": "Connection style",
@@ -6284,8 +6288,8 @@
       "conditioningClipBlocked": "Clear the Initial Video and References to use a conditioning clip.",
       "twoStageConditioningBlocked": "A conditioning clip cannot run a two-stage resolution. Pick a single-stage one.",
       "conditioningRole": "Use from this clip",
-      "conditioningRoleAudio": "Its soundtrack \u2014 generate the picture",
-      "conditioningRoleVideo": "Its picture \u2014 generate the soundtrack",
+      "conditioningRoleAudio": "Its soundtrack — generate the picture",
+      "conditioningRoleVideo": "Its picture — generate the soundtrack",
       "conditioningRoleVideoBlocked": "Clear the First Frame and Last Frame to use this clip's picture.",
       "conditioningRoleVideoHelp": "The clip is re-encoded at the generation's canvas, so the picture comes back cropped and recompressed.",
       "conditioningDerivedAudio": "{{frames}} frames at {{fps}} FPS, from the soundtrack's length.",
@@ -6607,7 +6611,7 @@
       "clusterStrength": "Clustering strength",
       "clusterStrengthHint": "Higher values create larger clusters",
       "clusterStrengthAuto": "auto",
-      "clusterStrengthIncomplete": "Not a number yet \u2014 the clustering strength is unchanged.",
+      "clusterStrengthIncomplete": "Not a number yet — the clustering strength is unchanged.",
       "clusterStrengthRange": "Clustering strength must be between {{min}} and {{max}}."
     },
     "defaultsNote": "Defaults for every project. A project can pin its own value.",

@@ -47,6 +47,22 @@ export const normalizeWorkbenchLanguage = (value: unknown): WorkbenchLanguage | 
 export const getWorkbenchLanguageDirection = (language: WorkbenchLanguage): WorkbenchLanguageDirection =>
   WORKBENCH_LANGUAGE_OPTIONS.find((option) => option.value === language)?.direction ?? 'ltr';
 
+const catalogs = JSON.parse(import.meta.env.LOCALE_AVAILABILITY) as Record<
+  string,
+  { translated: number; ready?: boolean }
+>;
+
+/** Requested codes remain preferences even when their catalogs cannot yet serve application content. */
+export const getWorkbenchLanguageAvailability = (language: WorkbenchLanguage) => {
+  const exact = catalogs[language];
+  const base = catalogs[language.split('-')[0] ?? ''];
+  const catalog = exact?.ready ? exact : base?.ready ? base : exact;
+  return catalog?.ready ? 'available' : catalog?.translated ? 'incomplete' : 'unavailable';
+};
+
+export const getEffectiveWorkbenchLanguage = (language: WorkbenchLanguage): WorkbenchLanguage =>
+  getWorkbenchLanguageAvailability(language) === 'available' ? language : 'en';
+
 const BYTE_UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte', 'petabyte'] as const;
 const BINARY_BYTE_UNITS = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'] as const;
 

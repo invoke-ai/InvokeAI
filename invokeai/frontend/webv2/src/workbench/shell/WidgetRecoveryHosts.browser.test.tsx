@@ -1,0 +1,327 @@
+import type { WidgetRegion } from '@workbench/layoutContracts';
+/* oxlint-disable react-perf/jsx-no-new-object-as-prop */
+import type { Project, WorkbenchState } from '@workbench/projectContracts';
+import type { RegisteredWidget, WidgetImplementation, WidgetViewProps } from '@workbench/widgetContracts';
+import type * as WidgetRegistry from '@workbench/widgetRegistry';
+import type * as WorkbenchContext from '@workbench/WorkbenchContext';
+import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { DndContext } from '@dnd-kit/core';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { useExternalStoreSelector } from '@platform/state/selectors';
+import { system } from '@theme/system';
+import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { FloatingWidgetWindow } from '@workbench/widget-frame/FloatingWidgetWindow';
+import { WidgetRendererById } from '@workbench/widget-frame/WidgetRenderer';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
+import { createWorkbenchStore } from '@workbench/workbenchStore';
+import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
+import { createInstance } from 'i18next';
+import { CircleIcon } from 'lucide-react';
+import { act, useState, useSyncExternalStore, useCallback } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
+
+import { CenterArea } from './CenterArea';
+import { StatusBar } from './StatusBar';
+
+const runtime = vi.hoisted(() => ({
+  store: null as unknown as WorkbenchInternalStore,
+  widgets: [] as RegisteredWidget[],
+}));
+(globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+const extensions = createExtensionRegistry();
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchContext>()),
+  useWorkbenchInternalStore: () => runtime.store,
+  useWorkbenchCommands: () => runtime.store.commands,
+  useOptionalWorkbenchCommands: () => runtime.store.commands,
+  useWorkbenchQueries: () => runtime.store.queries,
+  useOptionalWorkbenchQueries: () => runtime.store.queries,
+  useWorkbenchExtensions: () => extensions,
+  useOptionalWorkbenchExtensions: () => extensions,
+  useActiveProjectId: () =>
+    useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => s.activeProject.id),
+  useActiveProjectSelector: <T,>(select: (project: Project) => T, equal?: (a: T, b: T) => boolean) =>
+    useExternalStoreSelector(runtime.store.subscribe, runtime.store.getSnapshot, (s) => select(s.activeProject), equal),
+}));
+vi.mock('@workbench/widgetRegistry', async (importOriginal) => ({
+  ...(await importOriginal<typeof WidgetRegistry>()),
+  getWidgetById: (id: string) => runtime.widgets.find((widget) => widget.manifest.id === id),
+  getWidgetsForRegion: (region: WidgetRegion) =>
+    runtime.widgets.filter((widget) => widget.manifest.allowedRegions.includes(region)),
+}));
+const { registerWidgets } = await import('@workbench/widgetRegistry');
+const getWidgetById = (id: string) => runtime.widgets.find((widget) => widget.manifest.id === id);
+const getWidgetsForRegion = (region: WidgetRegion) =>
+  runtime.widgets.filter((widget) => widget.manifest.allowedRegions.includes(region));
+const i18n = createInstance();
+await i18n
+  .use(initReactI18next)
+  .init({ lng: 'en', resources: { en: { translation: await fetch('/locales/en.json').then((r) => r.json()) } } });
+const Neighbor = () => {
+  const [count, setCount] = useState(0);
+  const increment = useCallback(() => setCount((value) => value + 1), []);
+  return (
+    <button type="button" onClick={increment}>
+      Neighbor {count}
+    </button>
+  );
+};
+const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
+type Host = 'center' | 'floating' | 'status';
+type Failure = 'lazy' | 'label' | 'actions' | 'body';
+let host: HTMLDivElement;
+let root: Root;
+let mode: Host;
+let broken: boolean;
+let releaseLoad: (() => void) | null;
+let attempts: number;
+let failure: Failure;
+const FixtureBody = ({ presentation }: WidgetViewProps) => {
+  if (broken && failure === 'body') {
+    throw new Error('body failed');
+  }
+  return presentation === 'compact' ? <span>Fixture ready</span> : <button type="button">Fixture ready</button>;
+};
+const FixtureLabel = () => {
+  if (broken && failure === 'label') {
+    throw new Error('label failed');
+  }
+  return <span>Fixture label</span>;
+};
+const FixtureActions = () => {
+  if (broken && failure === 'actions') {
+    throw new Error('actions failed');
+  }
+  return <button type="button">Fixture action</button>;
+};
+const implementation: WidgetImplementation = {
+  view: FixtureBody,
+  headerLabel: FixtureLabel,
+  headerActions: FixtureActions,
+};
+const load = () => {
+  attempts += 1;
+  if (failure === 'lazy' && attempts === 1) {
+    return Promise.reject(new Error('chunk failed'));
+  }
+  if (releaseLoad) {
+    return new Promise<WidgetImplementation>((resolve) => {
+      releaseLoad = () => resolve(implementation);
+    });
+  }
+  return Promise.resolve(implementation);
+};
+const ActualHost = () => {
+  const snapshot = useSyncExternalStore(runtime.store.subscribe, runtime.store.getSnapshot);
+  if (mode === 'center') {
+    return <CenterArea />;
+  }
+  if (mode === 'status') {
+    return <StatusBar dropState={DROP_STATE} />;
+  }
+  const window = snapshot.activeProject.floatingWidgets?.fixture;
+  return window ? <FloatingWidgetWindow instanceId="fixture" stackRank={0} state={window} /> : null;
+};
+const makeState = (hostMode: Host): WorkbenchState => {
+  const state = createInitialWorkbenchState();
+  const project = state.projects[0]!;
+  project.widgetInstances = Object.fromEntries(
+    ['fixture', 'neighbor'].map((id) => [
+      id,
+      { id, typeId: id, createdAt: '2026-11-05', state: { id, label: id, values: {}, version: 1 } },
+    ])
+  );
+  for (const region of Object.values(project.widgetRegions)) {
+    region.instanceIds = [];
+    region.activeInstanceId = '';
+  }
+  project.widgetRegions.left.sizePx = 300;
+  project.widgetRegions.left.isCollapsed = false;
+  project.widgetRegions.left.instanceIds = ['neighbor'];
+  project.widgetRegions.left.activeInstanceId = 'neighbor';
+  const region = project.widgetRegions[hostMode === 'center' ? 'center' : hostMode === 'status' ? 'bottom' : 'right'];
+  region.instanceIds = ['fixture'];
+  region.activeInstanceId = 'fixture';
+  region.isCollapsed = false;
+  return state;
+};
+const render = async (accountKey = 'recovery-hosts') => {
+  const focus = createTestFocusController({
+    getProjectId: () => runtime.store.getSnapshot().activeProject.id,
+    isFloating: (id) => !!runtime.store.getSnapshot().activeProject.floatingWidgets?.[id],
+  });
+  await act(() =>
+    root.render(
+      <I18nextProvider key={accountKey} i18n={i18n}>
+        <ChakraProvider value={system}>
+          <FocusRegionProvider controller={focus}>
+            <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
+              <DndContext>
+                <div style={{ width: 300, height: 150, flexShrink: 0 }}>
+                  <WidgetRendererById instanceId="neighbor" region="left" widget={runtime.widgets[1]!} />
+                </div>
+                <div style={{ display: 'flex', flex: 1, minWidth: 0, height: '100%' }}>
+                  <ActualHost />
+                </div>
+              </DndContext>
+            </WorkbenchWidgetRegistryProvider>
+          </FocusRegionProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    )
+  );
+};
+beforeEach(async () => {
+  await page.viewport(1280, 900);
+  accountLifecycle.activate('recovery-hosts', ':user:recovery-hosts');
+  broken = true;
+  attempts = 0;
+  releaseLoad = null;
+  runtime.widgets = registerWidgets([
+    {
+      id: 'fixture',
+      label: 'Fixture',
+      version: 1,
+      icon: CircleIcon,
+      allowedRegions: ['left', 'right', 'bottom', 'center'],
+      allowFloating: true,
+      allowMultiple: false,
+      bottomPanel: 'expandable',
+      load,
+      failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
+    },
+    {
+      id: 'neighbor',
+      allowMultiple: false,
+      label: 'Neighbor',
+      version: 1,
+      icon: CircleIcon,
+      allowedRegions: ['left'],
+      load: () => Promise.resolve({ view: Neighbor }),
+      failurePolicy: { isolateRenderFailure: true, onRegistrationFailure: 'disable' },
+    },
+  ]);
+  host = document.createElement('div');
+  host.style.cssText = 'display:flex;height:600px;width:1200px';
+  document.body.append(host);
+  root = createRoot(host);
+});
+afterEach(async () => {
+  await act(() => root.unmount());
+  host.remove();
+  accountLifecycle.invalidate();
+});
+describe('real shell recovery hosts', () => {
+  it.each([
+    ['center', 'lazy', 'expandable'],
+    ['center', 'label', 'expandable'],
+    ['center', 'actions', 'expandable'],
+    ['center', 'body', 'expandable'],
+    ['floating', 'lazy', 'expandable'],
+    ['floating', 'actions', 'expandable'],
+    ['floating', 'body', 'expandable'],
+    ['status', 'lazy', 'expandable'],
+    ['status', 'body', 'expandable'],
+    ['status', 'lazy', 'tooltip'],
+    ['status', 'body', 'tooltip'],
+  ] as const)(
+    '%s contains %s failure (%s) and retries once without replacing its neighbor',
+    async (hostMode, failureMode, bottomPanel) => {
+      mode = hostMode;
+      failure = failureMode;
+      runtime.widgets[0]!.manifest.bottomPanel = bottomPanel;
+      runtime.store = createWorkbenchStore(makeState(mode));
+      if (mode === 'floating') {
+        runtime.store.commands.widgets.float('fixture', 'right');
+        runtime.store.commands.widgets.setFloatingGeometry('fixture', { x: 500, y: 200, widthPx: 600, heightPx: 400 });
+      }
+      await render();
+      await expect.poll(() => host.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      await userEvent.click(
+        [...host.querySelectorAll('button')].find((button) => button.textContent === 'Neighbor 0')!
+      );
+      expect(host.textContent).toContain('Neighbor 1');
+      if (mode === 'floating') {
+        expect(host.querySelector('[data-floating-controls] button')).not.toBeNull();
+      }
+      const retry = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (button) => button.getAttribute('aria-label') === 'Retry: Fixture' || button.textContent === 'Retry'
+      )!;
+      expect(retry.closest('button button, [role="button"] button')).toBeNull();
+      const compactHost = retry.closest('[data-status-bar-widget]');
+      if (mode === 'status' && failureMode === 'body') {
+        for (let tab = 0; tab < 10 && document.activeElement !== retry; tab++) {
+          await userEvent.keyboard('{Tab}');
+        }
+        expect(document.activeElement).toBe(retry);
+        await expect.poll(() => document.querySelector('[role="tooltip"]')?.textContent).toContain('body failed');
+        // Let the outer tooltip's delayed focus/hover activation run before checking the winner.
+        await new Promise((resolve) => {
+          setTimeout(resolve, 350);
+        });
+        const visibleTooltips = [...document.querySelectorAll<HTMLElement>('[role="tooltip"]')].filter(
+          (tooltip) => tooltip.getBoundingClientRect().height > 0
+        );
+        expect(visibleTooltips).toHaveLength(1);
+        expect(visibleTooltips[0]!.textContent).toBe('Error: body failed');
+        await expect
+          .poll(() => {
+            const bounds = document.querySelector('[role="tooltip"]')?.getBoundingClientRect();
+            return !!bounds && bounds.height > 0 && bounds.top >= 0 && bounds.bottom <= window.innerHeight;
+          })
+          .toBe(true);
+      }
+      broken = false;
+      if (mode === 'status' && failureMode === 'body') {
+        await userEvent.keyboard('[Space]');
+      } else {
+        await userEvent.click(retry);
+      }
+      await expect.poll(() => host.querySelector('[data-testid="widget-failure"]')).toBeNull();
+      await expect.poll(() => host.textContent).toContain('Fixture ready');
+      expect(host.textContent).toContain('Neighbor 1');
+      if (mode === 'status' && failureMode === 'body') {
+        expect(document.activeElement).toBe(compactHost);
+      }
+      expect(attempts).toBe(failureMode === 'lazy' ? 2 : 1);
+    }
+  );
+  it.each(['remove', 'account', 'unmount'] as const)(
+    'does not revive a pending status recovery after %s',
+    async (transition) => {
+      mode = 'status';
+      failure = 'lazy';
+      runtime.store = createWorkbenchStore(makeState(mode));
+      await render();
+      await expect.poll(() => host.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
+      releaseLoad = () => {};
+      await userEvent.click(host.querySelector<HTMLButtonElement>('button[aria-label="Retry: Fixture"]')!);
+      await expect.poll(() => attempts).toBe(2);
+      if (transition === 'remove') {
+        await act(() => runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' }));
+      } else if (transition === 'account') {
+        accountLifecycle.activate('replacement-account', ':user:replacement');
+        runtime.store = createWorkbenchStore(makeState(mode));
+        runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' });
+        await render('replacement-account');
+      } else {
+        await act(() => root.unmount());
+      }
+      await act(async () => {
+        releaseLoad?.();
+        await Promise.resolve();
+      });
+      expect(host.textContent).not.toContain('Fixture ready');
+      if (transition !== 'unmount') {
+        expect(host.textContent).toContain('Neighbor 0');
+      }
+    }
+  );
+});

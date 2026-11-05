@@ -33,6 +33,8 @@ const readAppVersion = (): string => {
 
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
+  // Launchpad deactivation and editor transitions both flush drafts; this must not load editor runtimes on Home.
+  '/platform/react/draftRegistry.ts',
   '/features/fonts/data/keys.ts',
   // Launchpad entry points and the intermediates settings metadata both read it.
   '/features/intermediates/data/focus.ts',
@@ -63,6 +65,19 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
+  // Sign-in and deferred user management share session/form primitives. Keep the already-eager code together;
+  // splitting by the new importer sets would add a startup request on both routes.
+  '/features/identity/core/schemas.ts',
+  '/features/identity/core/sessionPolicy.ts',
+  '/features/identity/core/storedCredential.ts',
+  '/features/identity/core/tokenStorage.ts',
+  '/features/identity/data/api.ts',
+  '/features/identity/session.ts',
+  '/features/identity/ui/AuthScreen.tsx',
+  '/features/identity/ui/PasswordInput.tsx',
+  '/features/identity/ui/useIdentityNotify.ts',
+  '/platform/react/useZodForm.ts',
+  '/platform/ui/InvokeMark.tsx',
   // The boot load-error panels and lazy empty states share it; alone it costs a startup request.
   '/platform/ui/EmptyState.tsx',
   // Boot notifications and the lazy queue item details share the toaster, tabs and copy controls; alone they cost a
@@ -241,7 +256,6 @@ const WORKBENCH_RUNTIME_SHARED_MODULES = [
   '/features/video/ui/VideoUiContext.tsx',
   '/features/workflow/core/buildGraph.ts',
   '/features/workflow/core/formFieldSettings.ts',
-  '/platform/react/draftRegistry.ts',
   '/platform/react/useDebouncedValue.ts',
 ] as const;
 

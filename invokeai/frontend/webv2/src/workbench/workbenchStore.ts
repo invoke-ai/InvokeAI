@@ -16,6 +16,7 @@ import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integ
 
 import type { CanvasEditIntent } from './autoRoutePolicy';
 import type { CanvasProjectMutation } from './canvasProjectMutations';
+import type { WidgetRecoveryStore } from './widget-frame/widgetRecovery';
 
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
@@ -738,6 +739,7 @@ export interface WorkbenchQueries {
 }
 
 export interface WorkbenchInternalStore {
+  widgetRecovery: Map<string, WidgetRecoveryStore>;
   commands: WorkbenchCommands;
   getPersistedRevision: () => number;
   getSnapshot: () => WorkbenchSnapshot;
@@ -950,6 +952,7 @@ export const createWorkbenchStore = (
   // Seeded so a workbench created after settings load reads the user's defaults on its first render; the runtime's
   // settings subscription keeps the mirror current from then on.
   let state: WorkbenchState = { ...initialState, scopedDefaults: getWorkbenchPreferences().scopedDefaults };
+  const widgetRecovery = new Map<string, WidgetRecoveryStore>();
   let hasHydrated = false;
   let persistedRevision = 0;
   let invalidateLayoutPresetActivation = (): void => undefined;
@@ -965,6 +968,16 @@ export const createWorkbenchStore = (
       persistedRevision += 1;
     }
 
+    const project = getActiveProject(nextState);
+    const previousProject = getActiveProject(state);
+    if (project.id !== previousProject.id || project.widgetInstances !== previousProject.widgetInstances) {
+      for (const key of widgetRecovery.keys()) {
+        const [projectId, instanceId] = JSON.parse(key) as [string, string];
+        if (projectId !== project.id || !project.widgetInstances[instanceId]) {
+          widgetRecovery.delete(key);
+        }
+      }
+    }
     state = nextState;
     hasHydrated = nextHasHydrated;
     snapshotStore.setSnapshot(createSnapshot(state, hasHydrated));
@@ -1029,6 +1042,7 @@ export const createWorkbenchStore = (
 
   return {
     commands,
+    widgetRecovery,
     getPersistedRevision: () => persistedRevision,
     getSnapshot: snapshotStore.getSnapshot,
     getState,

@@ -717,6 +717,9 @@ export const loadWorkbenchSettings = (): Promise<WorkbenchPreferences> => {
   });
 };
 
+export const getWorkbenchSettingsSnapshot = store.getSnapshot;
+export const subscribeWorkbenchSettings = store.subscribe;
+
 export const useWorkbenchSettings = (): WorkbenchSettingsSnapshot => store.useSnapshot();
 
 export const useWorkbenchPreferences = (): WorkbenchPreferences =>

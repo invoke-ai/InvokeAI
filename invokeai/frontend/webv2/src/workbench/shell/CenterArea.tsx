@@ -31,7 +31,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, use, useCallback, useMemo, useRef } from 'react';
+import { Activity, Suspense, useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { ChromeIsland, getChromeIslandMinWidth } from './ChromeIsland';
@@ -329,7 +329,7 @@ const CenterViewMenu = ({
             variant="ghost"
           >
             <HStack css={VIEW_MENU_CONTENT_CSS} minW="0">
-              {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
+              {activeItem ? <CenterViewIcon instanceId={activeItem.id} widget={activeItem.widget} /> : null}
               <Text ref={labelRef} css={VIEW_MENU_LABEL_CSS} fontWeight="700" truncate>
                 {label}
               </Text>
@@ -389,7 +389,7 @@ const CenterViewMenu = ({
  * Use Suspense for the center icon's loading state because DeferredResource has no subscription and center widgets
  * lack frame headers.
  */
-const CenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
+const CenterViewIcon = ({ instanceId, widget }: { instanceId: string; widget: RegisteredWidget }) => {
   const fallback = useMemo(
     () => <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} isLoading />,
     [widget.manifest.icon]
@@ -397,15 +397,9 @@ const CenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
 
   return (
     <Suspense fallback={fallback}>
-      <LoadedCenterViewIcon widget={widget} />
+      <WidgetChromeSlotById instanceId={instanceId} widget={widget} slot="icon" />
     </Suspense>
   );
-};
-
-const LoadedCenterViewIcon = ({ widget }: { widget: RegisteredWidget }) => {
-  use(widget.implementation.load());
-
-  return <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} />;
 };
 
 const CenterViewMenuRow = ({

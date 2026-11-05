@@ -26,7 +26,9 @@ import { useTranslation } from 'react-i18next';
 import { useWidgetRuntime } from './createWidgetRuntime';
 import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 import { WidgetHeader, WidgetHeaderActionsGroup, WidgetPanelFrame, WidgetTooltipFrame } from './WidgetFrames';
+import { WidgetIdentityIcon } from './WidgetIdentityIcon';
 import { WidgetLoadingFallback } from './WidgetLoadingFallback';
+import { useWidgetRecovery } from './widgetRecovery';
 import { areProjectWidgetRenderInstancesEqual } from './widgetRenderInstance';
 
 interface WidgetRendererProps extends Omit<WidgetViewProps, 'manifest' | 'runtime'> {
@@ -45,7 +47,7 @@ interface WidgetRendererByIdProps extends Omit<WidgetViewProps, 'instance' | 'ma
  * `viewActions` contains widget actions and settings, for chrome that already
  * carries its own layout controls.
  */
-type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions';
+type WidgetChromeSlotName = 'actions' | 'label' | 'viewActions' | 'icon';
 
 interface WidgetChromeSlotByIdProps {
   instanceId: string;
@@ -77,9 +79,30 @@ export const WidgetChromeSlotById = ({ instanceId, region = 'center', slot, widg
     areProjectWidgetRenderInstancesEqual
   );
 
+  const failureFallback = useMemo(
+    () => (slot === 'icon' ? <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} /> : undefined),
+    [slot, widget.manifest.icon]
+  );
   return selection.instance ? (
-    <WidgetChromeSlot instance={selection.instance} region={region} slot={slot} widget={widget} />
+    <WidgetRecoveryBoundary
+      instance={selection.instance}
+      presentation="compact"
+      region={region}
+      widget={widget}
+      fallback={failureFallback}
+    >
+      {slot === 'icon' ? (
+        <WidgetImplementationIcon widget={widget} />
+      ) : (
+        <WidgetChromeSlot instance={selection.instance} region={region} slot={slot} widget={widget} />
+      )}
+    </WidgetRecoveryBoundary>
   ) : null;
+};
+
+const WidgetImplementationIcon = ({ widget }: { widget: RegisteredWidget }) => {
+  use(widget.implementation.load());
+  return <WidgetIdentityIcon boxSize="3.5" icon={widget.manifest.icon} />;
 };
 
 const WidgetChromeSlot = ({
@@ -161,33 +184,50 @@ const WidgetChromeSlot = ({
 };
 
 export const WidgetRenderer = ({ instance, presentation, region, widget }: WidgetRendererProps) => {
-  const projectId = useActiveProjectId();
   const loadingFallback = useMemo(
     () => <WidgetLoadingFallback instance={instance} presentation={presentation} region={region} widget={widget} />,
     [instance, presentation, region, widget]
   );
-  const content = (
-    <Suspense fallback={loadingFallback}>
-      <LoadedWidgetRenderer instance={instance} presentation={presentation} region={region} widget={widget} />
-    </Suspense>
+  return (
+    <WidgetRecoveryBoundary instance={instance} presentation={presentation} region={region} widget={widget}>
+      <Suspense fallback={loadingFallback}>
+        <LoadedWidgetRenderer instance={instance} presentation={presentation} region={region} widget={widget} />
+      </Suspense>
+    </WidgetRecoveryBoundary>
   );
+};
 
+const FailedSlot = ({ error }: { error: Error }) => {
+  throw error;
+};
+
+const WidgetRecoveryBoundary = ({
+  children,
+  fallback,
+  instance,
+  presentation,
+  region,
+  widget,
+}: WidgetRendererProps & { children: React.ReactNode; fallback?: React.ReactNode }) => {
+  const projectId = useActiveProjectId();
+  const recovery = useWidgetRecovery(instance.id, widget);
   if (!widget.manifest.failurePolicy.isolateRenderFailure) {
-    return content;
+    return children;
   }
-
   return (
     <WidgetFailureBoundary
+      fallback={fallback}
       instance={instance}
       presentation={presentation}
       projectId={projectId}
       region={region}
-      resetKey={instance.id}
+      resetKey={`${projectId}:${instance.id}:${recovery.generation}`}
       widget={widget}
       widgetId={widget.manifest.id}
-      onRetry={widget.implementation.retry}
+      onRetry={recovery.retry}
+      onFailure={recovery.fail}
     >
-      {content}
+      {recovery.error ? <FailedSlot error={recovery.error} /> : children}
     </WidgetFailureBoundary>
   );
 };

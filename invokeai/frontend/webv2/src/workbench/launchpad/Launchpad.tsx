@@ -1,10 +1,14 @@
 import { Box, Flex, VisuallyHidden, type SystemStyleObject } from '@chakra-ui/react';
 import { FontsPage } from '@features/fonts/launchpad';
-import { useCapabilities, UsersPage } from '@features/identity';
+import { useCapabilities } from '@features/identity';
+import { UsersPage } from '@features/identity/launchpad';
 import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
-import { useLocation, useNavigate } from '@tanstack/react-router';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
+import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
 import { PreferencesPage } from '@workbench/settings/launchpad';
 import {
@@ -17,7 +21,7 @@ import {
   UsersIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Activity, useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav, type LaunchpadNavGroupId } from './LaunchpadNav';
@@ -175,6 +179,8 @@ export const Launchpad = () => {
 
 const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
   const location = useLocation();
+  const router = useRouter();
+  useMountEffect(() => router.subscribe('onBeforeNavigate', flushWorkbenchDrafts));
   const requestedSectionId = getRequestedSectionId(location.pathname);
   const activeSectionId = getActiveSectionId(sections, requestedSectionId);
   const activeSectionLabel = sections.find((section) => section.id === activeSectionId)?.label ?? activeSectionId;
@@ -182,7 +188,7 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
     () => sections.map((section) => ({ ...section, to: SECTION_PATHS[section.id] })),
     [sections]
   );
-  // Visited pages stay mounted (hidden) so returning to one keeps its state, as the former lazily mounted tabs did.
+  // Activity retains view state while disconnecting inactive observers and registrations.
   const [visitedIds, setVisitedIds] = useState<ReadonlySet<LaunchpadSectionId>>(() => new Set([activeSectionId]));
 
   if (!visitedIds.has(activeSectionId)) {
@@ -199,11 +205,27 @@ const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
         {sections
           .filter((section) => visitedIds.has(section.id))
           .map((section) => (
-            <Box key={section.id} h="full" hidden={section.id !== activeSectionId} minH="0">
-              {section.render()}
-            </Box>
+            <Activity key={section.id} mode={section.id === activeSectionId ? 'visible' : 'hidden'}>
+              <RetainedSection>{section.render()}</RetainedSection>
+            </Activity>
           ))}
       </Box>
     </Flex>
+  );
+};
+
+const RetainedSection = ({ children }: { children: ReactNode }) => {
+  useMountEffect(() => {
+    const owner = captureAccountScope();
+    return () => {
+      if (isAccountScopeCurrent(owner)) {
+        flushWorkbenchDrafts();
+      }
+    };
+  });
+  return (
+    <Box h="full" minH="0">
+      {children}
+    </Box>
   );
 };

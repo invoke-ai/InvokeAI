@@ -2,12 +2,12 @@
 import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 import type * as openProjects from '@workbench/projects/openProjects';
-import type { ReactNode } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { closeModelDetail } from '@features/models/ui/uiStore';
 import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
+import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -19,7 +19,7 @@ import {
 } from '@tanstack/react-router';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME_ID, system } from '@theme/system';
-import { act } from 'react';
+import { type ReactNode, act, useState, useCallback, type ChangeEvent } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -37,6 +37,7 @@ vi.mock('@features/identity', async (importOriginal) => ({
   useCapabilities: () => ({ canManageModels: true, canManageNodes: true, canManageUsers: true }),
   UsersPage: () => null,
 }));
+vi.mock('@features/identity/launchpad', () => ({ UsersPage: () => null }));
 vi.mock('@features/intermediates', () => ({ INTERMEDIATES_SETTING_ID: 'x', requestIntermediatesFocus: () => {} }));
 vi.mock('@features/fonts/launchpad', () => ({ FontsPage: () => null }));
 vi.mock('@features/nodes', () => ({ NodesPage: () => null }));
@@ -59,7 +60,7 @@ vi.mock('@features/models/data/relationshipsApi', () => ({
 vi.mock('@workbench/settings/launchpad', () => ({ PreferencesPage: () => null }));
 vi.mock('@workbench/palette/LaunchpadCommandPalette', () => ({ LaunchpadCommandPalette: () => null }));
 vi.mock('./LaunchpadTopBar', () => ({ LaunchpadTopBar: () => <div style={{ flexShrink: 0, height: 48 }} /> }));
-vi.mock('./pages/HomePage', () => ({ HomePage: () => null }));
+vi.mock('./pages/HomePage', () => ({ HomePage: () => <HeldDraft /> }));
 vi.mock('./pages/ProjectsPage', () => ({ ProjectsPage: () => null }));
 vi.mock('./projects/ProjectActionsMenuHost', () => ({
   ProjectActionsMenuProvider: ({ children }: { children: ReactNode }) => children,
@@ -79,6 +80,17 @@ vi.mock('@workbench/projects/library', () => ({
       ],
     }),
 }));
+
+const heldDraft = vi.hoisted(() => ({ committed: '' }));
+const HeldDraft = () => {
+  const [value, setValue] = useState('');
+  const commit = useCallback(() => {
+    heldDraft.committed = value;
+  }, [value]);
+  useRegisterDraftFlusher(commit);
+  const change = useCallback((event: ChangeEvent<HTMLInputElement>) => setValue(event.target.value), []);
+  return <input aria-label="Held draft" value={value} onChange={change} />;
+};
 
 const { Launchpad } = await import('./Launchpad');
 
@@ -168,6 +180,30 @@ afterEach(async () => {
 });
 
 describe('Launchpad shell', () => {
+  it('flushes held drafts before deactivation and on exit while preserving the retained field', async () => {
+    heldDraft.committed = '';
+    await render();
+    await page.getByRole('link', { name: 'launchpad.sections.home' }).click();
+    await page.getByRole('textbox', { name: 'Held draft' }).fill('Before leaving');
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    expect(heldDraft.committed).toBe('Before leaving');
+    await page.getByRole('link', { name: 'launchpad.sections.home' }).click();
+    await expect.element(page.getByRole('textbox', { name: 'Held draft' })).toHaveValue('Before leaving');
+    await page.getByRole('textbox', { name: 'Held draft' }).fill('On exit');
+    await act(() => root.unmount());
+    expect(heldDraft.committed).toBe('On exit');
+  });
+
+  it('retains selected model details across section deactivation', async () => {
+    await render();
+    await vi.waitFor(() => expect(row('b')).not.toBeNull(), { timeout: 10_000 });
+    await userEvent.click(row('b'));
+    await page.getByRole('link', { name: 'launchpad.sections.fonts' }).click();
+    await page.getByRole('link', { name: 'launchpad.sections.models' }).click();
+    await expect.element(page.getByRole('button', { name: 'common.edit', exact: true })).toBeVisible();
+    expect(host.textContent).toContain('Lora b');
+  });
+
   it('keeps the model manager usable at 720×450 (a 1440×900 window at 200%) beside an icon rail', async () => {
     await page.viewport(720, 450);
     await render();
