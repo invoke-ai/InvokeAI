@@ -14,6 +14,8 @@ import { useTranslation } from 'react-i18next';
 import { FieldInsideLabel, INSIDE_LABEL_INSET, useInsideFieldLabel } from './Field';
 import { Scrollable } from './Scrollable';
 
+type PointerDownOutsideEvent = Parameters<NonNullable<ComboboxRootProps['onPointerDownOutside']>>[0];
+
 const COMBOBOX_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
 // Zag scrolls its content element by default; the Scrollable viewport is the scroll container here.
@@ -97,6 +99,7 @@ export const Combobox = ({
   options,
   onInputValueChange,
   onListScrollToBottom,
+  onPointerDownOutside,
   searchPlaceholder,
   value,
   ...rootProps
@@ -113,6 +116,7 @@ export const Combobox = ({
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const lastNotifiedInputValue = useRef('');
+  const controlRef = useRef<HTMLDivElement>(null);
   const selectedLabel = options.find((option) => option.value === value)?.label ?? '';
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const selectedValues = useMemo(() => (value ? [value] : []), [value]);
@@ -195,6 +199,18 @@ export const Combobox = ({
     },
     [onValueChange]
   );
+  // Zag's dismiss layer spares only the input and the triggers. A press elsewhere in the box, such as on an inside
+  // label, would close the list and clear the query, and the label's click would then reopen it unfiltered.
+  const handlePointerDownOutside = useCallback(
+    (event: PointerDownOutsideEvent) => {
+      onPointerDownOutside?.(event);
+
+      if (event.detail.target instanceof Node && controlRef.current?.contains(event.detail.target)) {
+        event.preventDefault();
+      }
+    },
+    [onPointerDownOutside]
+  );
   const handleSelect = useCallback(
     ({ itemValue }: { itemValue: string }) => {
       if (itemValue === value) {
@@ -224,10 +240,11 @@ export const Combobox = ({
       value={selectedValues}
       onInputValueChange={handleInputValueChange}
       onOpenChange={handleOpenChange}
+      onPointerDownOutside={handlePointerDownOutside}
       onSelect={onItemReselect ? handleSelect : undefined}
       onValueChange={handleValueChange}
     >
-      <ChakraCombobox.Control css={insideLabel ? INSIDE_CONTROL_CSS : undefined}>
+      <ChakraCombobox.Control ref={controlRef} css={insideLabel ? INSIDE_CONTROL_CSS : undefined}>
         {insideLabel && field ? <FieldInsideLabel htmlFor={field.ids.control} label={insideLabel} /> : null}
         <ChakraCombobox.Input
           css={insideLabel ? INSIDE_INPUT_CSS : undefined}

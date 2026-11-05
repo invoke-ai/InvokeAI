@@ -47,6 +47,14 @@ const interact = (action: () => void): Promise<void> =>
     });
   });
 
+/** Long enough for a dismiss-and-reopen to land, and for the theme's `fast` colour transitions to finish. */
+const settleFrames = (): Promise<void> =>
+  act(async () => {
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 250);
+    });
+  });
+
 const Harness = ({
   disabled = false,
   filterOptions = false,
@@ -307,6 +315,32 @@ describe('Combobox', () => {
       expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
       await interact(() => document.querySelector<HTMLElement>('[role="option"]')?.click());
       expect(onChange).toHaveBeenLastCalledWith('dpmpp_2m');
+    });
+
+    it('keeps the list open and its filter when the label is clicked while open', async () => {
+      const { input, label } = await renderInField({});
+
+      await userEvent.click(label);
+      await expect.poll(() => input.getAttribute('aria-expanded')).toBe('true');
+      await userEvent.type(input, 'dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+
+      await userEvent.click(label);
+      await settleFrames();
+      expect(input.getAttribute('aria-expanded')).toBe('true');
+      expect(input.value).toBe('dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+      await expect.element(page.getByRole('combobox', { exact: true, name: 'Scheduler' })).toHaveFocus();
+    });
+
+    it('tints only the box, not the input inside it, when an invalid field is hovered', async () => {
+      const { control, input } = await renderInField({ error: 'Pick a scheduler' });
+      const restingBg = getComputedStyle(control).backgroundColor;
+
+      await userEvent.hover(input);
+      await expect.poll(() => getComputedStyle(control).backgroundColor).not.toBe(restingBg);
+      await settleFrames();
+      expect(getComputedStyle(input).backgroundColor).toBe('rgba(0, 0, 0, 0)');
     });
 
     it('opens from a click anywhere in the box, its inset and the gap before the value included', async () => {
