@@ -202,6 +202,8 @@ class TypeFormCollectionTestInvocationOutput(BaseInvocationOutput):
     nested_items: list[list[int]] = OutputField(default=[])
     optional_nested_items: list[Optional[list[int]]] = OutputField(default=[])
     literal_items: list[Literal["a", "b"]] = OutputField(default=[])
+    mixed_literal_items: list[Literal["a", 1]] = OutputField(default=[])
+    true_literal_items: list[Literal[True]] = OutputField(default=[])
 
 
 @invocation("test_type_form_collection", version="1.0.0")

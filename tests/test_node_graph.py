@@ -1288,24 +1288,48 @@ def test_graph_collector_rejects_unrelated_type_form_items_as_mixed_types(
         _collect_type_form_items(graph, type_form_field, other_item)
 
 
-def _collect_literal_collection(graph: Graph) -> None:
+def _collect_type_form_collection(graph: Graph, type_form_field: str = "literal_items") -> None:
     graph.add_node(TypeFormCollectionTestInvocation(id="type_forms"))
     graph.add_node(CollectInvocation(id="collect"))
-    graph.add_edge(create_edge("type_forms", "literal_items", "collect", "collection"))
+    graph.add_edge(create_edge("type_forms", type_form_field, "collect", "collection"))
 
 
 @pytest.mark.parametrize(
-    ("consumer", "field"),
+    ("type_form_field", "consumer", "field"),
     [
-        pytest.param(TypeFormCollectionTestInvocation(id="consumer"), "wider_literal_items", id="literal-superset"),
-        pytest.param(StringCollectionInvocation(id="consumer"), "collection", id="class-of-every-value"),
+        pytest.param(
+            "literal_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "wider_literal_items",
+            id="literal-superset",
+        ),
+        pytest.param(
+            "literal_items", StringCollectionInvocation(id="consumer"), "collection", id="class-of-every-value"
+        ),
+        # Each value of `Literal["a", 1]` fits a different member of `int | str`.
+        pytest.param(
+            "mixed_literal_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "union_items",
+            id="literal-values-across-union-members",
+        ),
+        # bool subclasses int, and pydantic accepts `True` for `int`.
+        pytest.param(
+            "true_literal_items", IntegerCollectionInvocation(id="consumer"), "collection", id="bool-into-int"
+        ),
+        pytest.param(
+            "nested_items",
+            TypeFormCollectionTestInvocation(id="consumer"),
+            "nested_items",
+            id="same-parameterized-generic",
+        ),
     ],
 )
-def test_graph_collector_accepts_literal_collection_items_for_a_collection_holding_every_value(
-    consumer: BaseInvocation, field: str
+def test_graph_collector_accepts_collection_items_for_a_collection_holding_every_value(
+    type_form_field: str, consumer: BaseInvocation, field: str
 ):
     graph = Graph()
-    _collect_literal_collection(graph)
+    _collect_type_form_collection(graph, type_form_field)
     graph.add_node(consumer)
     graph.add_edge(create_edge("collect", "collection", "consumer", field))
     assert graph.is_valid()
@@ -1313,7 +1337,7 @@ def test_graph_collector_accepts_literal_collection_items_for_a_collection_holdi
 
 def test_graph_collector_rejects_literal_collection_items_for_a_collection_missing_a_value():
     graph = Graph()
-    _collect_literal_collection(graph)
+    _collect_type_form_collection(graph)
     graph.add_node(TypeFormCollectionTestInvocation(id="consumer"))
     with pytest.raises(InvalidEdgeError, match="matching type"):
         graph.add_edge(create_edge("collect", "collection", "consumer", "narrower_literal_items"))
@@ -1321,7 +1345,7 @@ def test_graph_collector_rejects_literal_collection_items_for_a_collection_missi
 
 def test_graph_collector_accepts_literal_collection_items_with_an_item_of_their_values_type():
     graph = Graph()
-    _collect_literal_collection(graph)
+    _collect_type_form_collection(graph)
     graph.add_node(StringInvocation(id="string"))
     graph.add_node(StringCollectionInvocation(id="strings"))
     graph.add_edge(create_edge("string", "value", "collect", "item"))
