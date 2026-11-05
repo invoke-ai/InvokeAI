@@ -152,6 +152,55 @@ def test_heading_inside_code_fence_is_ignored(monkeypatch, capsys, fence):
     assert "## Review" in out
 
 
+def missing(name: str) -> str:
+    return f"missing the `## {name}` section"
+
+
+def test_all_required_headings_commented_out_fail_multiline(monkeypatch, capsys):
+    text = "<!--\n" + body(*REQUIRED) + "-->\n"
+    code, out = run(monkeypatch, capsys, GOOD_TITLE, text)
+    assert code == 1
+    assert all(missing(name) in out for name in REQUIRED)
+
+
+def test_all_required_headings_commented_out_fail_single_line(monkeypatch, capsys):
+    text = "\n".join(f"<!-- ## {name} -->" for name in REQUIRED)
+    code, out = run(monkeypatch, capsys, GOOD_TITLE, text)
+    assert code == 1
+    assert all(missing(name) in out for name in REQUIRED)
+
+
+def test_fence_marker_inside_comment_does_not_hide_later_headings(monkeypatch, capsys):
+    text = "<!--\n```\n-->\n" + body(*REQUIRED)
+    assert run(monkeypatch, capsys, GOOD_TITLE, text)[0] == 0
+
+
+def test_comment_opener_inside_fence_does_not_hide_later_headings(monkeypatch, capsys):
+    text = "```\n<!--\n```\n" + body(*REQUIRED)
+    assert run(monkeypatch, capsys, GOOD_TITLE, text)[0] == 0
+
+
+def test_unclosed_comment_hides_later_headings(monkeypatch, capsys):
+    text = body("Summary", "QA Instructions") + "<!-- never closed\n" + body("Review", "Checklist")
+    code, out = run(monkeypatch, capsys, GOOD_TITLE, text)
+    assert code == 1
+    assert missing("Review") in out
+    assert missing("Checklist") in out
+    assert missing("Summary") not in out
+
+
+def test_text_after_comment_end_on_closing_line_is_not_a_heading(monkeypatch, capsys):
+    text = body("Summary", "QA Instructions", "Checklist") + "<!--\nnote\n--> ## Review\n"
+    code, out = run(monkeypatch, capsys, GOOD_TITLE, text)
+    assert code == 1
+    assert missing("Review") in out
+
+
+def test_mid_line_comment_opener_does_not_hide_next_heading(monkeypatch, capsys):
+    text = "## Summary\ntext <!-- start\n" + body("QA Instructions", "Review", "Checklist")
+    assert run(monkeypatch, capsys, GOOD_TITLE, text)[0] == 0
+
+
 def test_shorter_fence_line_does_not_close_longer_fence(monkeypatch, capsys):
     text = body("Summary", "QA Instructions", "Checklist") + "\n````\n```\n## Review\n````\n"
     code, out = run(monkeypatch, capsys, GOOD_TITLE, text)

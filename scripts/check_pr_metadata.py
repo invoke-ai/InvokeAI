@@ -28,6 +28,7 @@ SECTIONS = (
 REVERT_RE = re.compile(r'^Revert ".+"$')
 TITLE_RE = re.compile(r"^(?P<type>[a-z]+)(\([^()\s][^()]*\))?(?P<breaking>!)?:(?: (?P<subject>.*))?$")
 FENCE_RE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+COMMENT_START_RE = re.compile(r"^ {0,3}<!--")
 FORBIDDEN_TITLE_WORD = "webv2"
 
 
@@ -52,10 +53,23 @@ def check_title(title: str) -> list[str]:
 
 
 def body_headings(body: str) -> list[str]:
-    """Return the text of every `## ` heading outside fenced code blocks, in order."""
+    """Return the text of every `## ` heading that renders as a heading, in order.
+
+    Line by line, as CommonMark: fenced code blocks and HTML comment blocks hide their lines. A comment block
+    starts at a line beginning with `<!--` (up to three spaces of indent) and ends with the first line containing
+    `-->`, which belongs to the block; an unclosed one runs to the end. A fence is literal inside a comment
+    and `<!--` is literal inside a fence.
+    """
     headings = []
     fence = None
+    in_comment = False
     for line in body.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if in_comment:
+            in_comment = "-->" not in line
+            continue
+        if fence is None and COMMENT_START_RE.match(line):
+            in_comment = "-->" not in line
+            continue
         fence_match = FENCE_RE.match(line)
         if fence_match:
             marker = fence_match[1]
