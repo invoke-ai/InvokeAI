@@ -15914,12 +15914,41 @@ describe('overview: composites the fit-to-view extent', () => {
 // ---- transform session: param commit (image) + pixel bake (paint) ----------
 
 describe('masks while a result is staged', () => {
-  it('hides masks and region tints only under a shown preview, and shows them while a mask is being edited', async () => {
+  const candidate: CanvasStagingCandidateContract = {
+    height: 20,
+    imageName: 'staged.png',
+    imageUrl: '/staged.png',
+    placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
+    queuedAt: '2026-07-16T00:00:00.000Z',
+    sourceQueueItemId: 'queue',
+    thumbnailUrl: '/staged-thumb.png',
+    width: 20,
+  };
+  const MASKED = { drawn: ['a', 'm'], regionOverlays: true };
+  const UNMASKED = { drawn: ['a'], regionOverlays: false };
+
+  /** An attached engine over `stacks` (a mask `m` above a raster `a` by default), hovered, with frames on demand. */
+  const setup = (stacks = stacksFrom([maskLayer('m'), rasterLayer('a')])) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    // The window key listeners attach adds, so a test can hold Space as the browser would deliver it.
+    const windowListeners = new Map<string, (event: unknown) => void>();
+    vi.stubGlobal('addEventListener', (type: string, listener: (event: unknown) => void) =>
+      windowListeners.set(type, listener)
+    );
+    vi.stubGlobal('removeEventListener', () => {});
     const composite = vi.spyOn(compositor, 'compositeDocument');
-    let canvas = makeCanvas({ ...makeDoc(), stacks: stacksFrom([maskLayer('m'), rasterLayer('a')]) });
+    let canvas = makeCanvas({ ...makeDoc(), stacks });
     const listeners = new Set<() => void>();
     const store: EngineStore = {
       dispatch: vi.fn(),
@@ -15929,75 +15958,253 @@ describe('masks while a result is staged', () => {
         return () => listeners.delete(listener);
       },
     };
-    const update = (next: typeof canvas): void => {
-      canvas = next;
+    const update = (next: Partial<typeof canvas>): void => {
+      canvas = { ...canvas, ...next };
       for (const listener of listeners) {
         listener();
       }
     };
+    const select = (selectedLayerId: string): void => update({ document: { ...canvas.document, selectedLayerId } });
     const engine = createCanvasEngine({
       backend: {
         ...createTestStubRasterBackend(),
         createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 20, width: 20 } as unknown as ImageBitmap),
       },
+      bitmapStore: createSpyBitmapStore(),
       imageResolver: () => Promise.resolve(new Blob()),
       projectId: 'p1',
       store,
     });
-    engine.surface.attach(createInputCanvas().element, createInputCanvas().element);
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    overlay.fire('pointerenter', pointerAt(5, 5));
+    /** The frame's composites: how many repainted in full, and what the last one drew. */
     const frame = () => {
       composite.mockClear();
       raf.flush();
       const options = composite.mock.calls.at(-1)?.[4];
       return {
-        damage: options?.damage?.kind,
         drawn: options?.preparation?.leaves.map((leaf) => leaf.id),
+        full: composite.mock.calls.filter((call) => call[4]?.damage?.kind === 'full').length,
         regionOverlays: options?.regionOverlays,
       };
     };
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
+    const showPreview = async (): Promise<void> => {
+      update({ stagingArea: { ...canvas.stagingArea, isVisible: true, pendingImages: [candidate] } });
+      engine.previews.setStagedPreview({ imageName: candidate.imageName, placement: candidate.placement });
+      await flushMicrotasks();
+    };
+    const useTool = (tool: ToolId): void => {
+      engine.tools.setTool(tool);
+      raf.flush();
+    };
+    const key = (type: 'keydown' | 'keyup', code: string): void =>
+      windowListeners.get(type)?.({ code, key: code === 'Space' ? ' ' : code, preventDefault: () => {}, target: null });
+    /** A press that must leave the masks hidden, whatever else its frames repaint. */
+    const expectPressHidden = (): void => {
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      const pressed = frame();
+      expect(pressed.drawn ?? []).not.toContain('m');
+      expect(pressed.regionOverlays).not.toBe(true);
+      overlay.fire('pointerup', pointerAt(5, 5, { buttons: 0 }));
+      expect(frame().drawn ?? []).not.toContain('m');
+    };
+    const dispose = (): void => {
+      composite.mockRestore();
+      engine.lifecycle.dispose();
+    };
+    return { dispose, engine, expectPressHidden, frame, key, overlay, select, showPreview, update, useTool };
+  };
+
+  it('hides masks and region tints under a shown preview, showing them only while a gesture edits a mask', async () => {
+    const h = setup();
+    const { frame, overlay } = h;
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
 
     // A staged candidate whose preview is off hides nothing, so staging it repaints nothing either.
-    const candidate: CanvasStagingCandidateContract = {
-      height: 20,
-      imageName: 'staged.png',
-      imageUrl: '/staged.png',
-      placement: { height: 20, opacity: 1, width: 20, x: 0, y: 0 },
-      queuedAt: '2026-07-16T00:00:00.000Z',
-      sourceQueueItemId: 'queue',
-      thumbnailUrl: '/staged-thumb.png',
-      width: 20,
-    };
-    update({ ...canvas, stagingArea: { ...canvas.stagingArea, isVisible: false, pendingImages: [candidate] } });
+    h.update({ stagingArea: { ...makeCanvas(makeDoc()).stagingArea, isVisible: false, pendingImages: [candidate] } });
     expect(frame().drawn).toBeUndefined();
 
     // Showing it hides masks and the region tint, so the result reads as it would be accepted.
-    engine.previews.setStagedPreview({ imageName: candidate.imageName, placement: candidate.placement });
+    await h.showPreview();
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // Selecting the mask alone (as after painting it, before Invoke) keeps the result unmasked.
+    h.select('m');
+    expect(frame()).toMatchObject({ full: 0 });
+
+    // A brush stroke on it shows the masks over the preview for the stroke: one full repaint as it starts, then the
+    // stroke's own damage, and one full repaint hiding them as it lands.
+    h.useTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
+    overlay.fire('pointermove', pointerAt(15, 15));
+    expect(frame()).toEqual({ ...MASKED, full: 0 });
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // A cancelled stroke hides them again too.
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
+    overlay.fire('pointercancel', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    // A move click edits nothing, so it shows nothing, even with a wobble under the drag threshold.
+    h.useTool('move');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toMatchObject({ full: 0 });
+    overlay.fire('pointermove', pointerAt(6, 6));
+    overlay.fire('pointerup', pointerAt(6, 6, { buttons: 0 }));
+    expect(frame().drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+
+    // A move drag shows them from the move that crosses the threshold until it lands or is cancelled.
+    for (const end of ['pointerup', 'pointercancel'] as const) {
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      expect(frame()).toMatchObject({ full: 0 });
+      overlay.fire('pointermove', pointerAt(15, 15));
+      expect(frame()).toEqual({ ...MASKED, full: 1 });
+      overlay.fire('pointermove', pointerAt(16, 16));
+      expect(frame()).toMatchObject(MASKED);
+      overlay.fire(end, pointerAt(16, 16, { buttons: 0 }));
+      expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+    }
+
+    // Panning and sampling colors edit nothing, so the masks stay hidden from the press on.
+    for (const tool of ['view', 'colorPicker'] as const) {
+      h.useTool(tool);
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      expect(frame()).toMatchObject({ full: 0 });
+      overlay.fire('pointermove', pointerAt(15, 15));
+      overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+      const after = frame();
+      expect(after.drawn ?? UNMASKED.drawn).toEqual(UNMASKED.drawn);
+      // Only the pan itself repaints the view.
+      expect(after.full).toBe(tool === 'view' ? 1 : 0);
+    }
+
+    // Without a shown preview the masks always draw, and a stroke on one adds no full repaints.
+    h.engine.previews.setStagedPreview(null);
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
+    h.useTool('brush');
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    overlay.fire('pointermove', pointerAt(15, 15));
+    expect(frame()).toEqual({ ...MASKED, full: 0 });
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(frame()).toMatchObject(MASKED);
+    h.dispose();
+  });
+
+  it('keeps the selected mask loaded while hidden, so a stroke on it starts at once', async () => {
+    const h = setup(stacksFrom([rasterLayer('a')]));
+    await h.showPreview();
+    h.frame();
+    // A mask with durable pixels arrives while the preview hides its stack, and is selected; nothing else (no
+    // Layers-panel thumbnail) asks for its pixels.
+    const mask: CanvasInpaintMaskLayerContract = {
+      ...maskLayer('m'),
+      mask: { ...maskLayer('m').mask, bitmap: { height: 20, imageName: 'mask.png', width: 20 } },
+    };
+    h.update({ document: { ...makeDoc(), selectedLayerId: 'm', stacks: stacksFrom([mask, rasterLayer('a')]) } });
+    expect(h.frame().drawn).toEqual(UNMASKED.drawn);
     await flushMicrotasks();
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
+    h.frame();
 
-    // Selecting the mask to paint it shows the masks again, over the preview, in one full repaint.
-    update({ ...canvas, document: { ...canvas.document, selectedLayerId: 'm' } });
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
-    update({ ...canvas, document: { ...canvas.document, selectedLayerId: 'a' } });
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
+    const refusals: CanvasEditRefusal[] = [];
+    h.engine.tools.onEditRefused((refusal) => refusals.push(refusal));
+    const strokes: StrokeCommittedEvent[] = [];
+    h.engine.tools.onStrokeCommitted((event) => strokes.push(event));
+    h.useTool('brush');
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(h.frame()).toEqual({ ...MASKED, full: 1 });
+    h.overlay.fire('pointermove', pointerAt(15, 15));
+    h.overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(refusals).toEqual([]);
+    expect(strokes.map((stroke) => stroke.layerId)).toEqual(['m']);
+    h.dispose();
+  });
 
-    // Converting the selected raster to a mask in place (same id) turns it into mask editing: one full repaint too.
-    update({
-      ...canvas,
-      document: { ...canvas.document, stacks: stacksFrom([maskLayer('m'), maskLayer('a')]) },
-    });
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
-    update({
-      ...canvas,
-      document: { ...canvas.document, stacks: stacksFrom([maskLayer('m'), rasterLayer('a')]) },
-    });
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a'], regionOverlays: false });
+  it('keeps them hidden through a Space pan held over the brush', async () => {
+    const h = setup();
+    await h.showPreview();
+    h.select('m');
+    h.useTool('brush');
+    h.frame();
+    h.key('keydown', 'Space');
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+    h.overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(h.frame()).toMatchObject({ full: 0 });
+    h.overlay.fire('pointermove', pointerAt(15, 15));
+    h.overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(h.frame()).toEqual({ ...UNMASKED, full: 1 });
+    h.key('keyup', 'Space');
+    expect(h.engine.stores.activeTool.get()).toBe('brush');
+    h.dispose();
+  });
 
-    engine.previews.setStagedPreview(null);
-    expect(frame()).toEqual({ damage: 'full', drawn: ['a', 'm'], regionOverlays: true });
-    composite.mockRestore();
-    engine.lifecycle.dispose();
+  it('shows them for a shape dragged into the mask, not for a new shape layer or polygon vertices', async () => {
+    const h = setup();
+    const { frame, overlay } = h;
+    await h.showPreview();
+    h.select('m');
+    h.useTool('shape');
+    frame();
+    overlay.fire('pointerdown', pointerAt(5, 5));
+    expect(frame()).toEqual({ ...MASKED, full: 1 });
+    overlay.fire('pointermove', pointerAt(15, 15));
+    overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+    expect(frame()).toEqual({ ...UNMASKED, full: 1 });
+
+    h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), target: 'new' });
+    h.expectPressHidden();
+
+    h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), kind: 'polygon', target: 'selected' });
+    h.expectPressHidden();
+    h.dispose();
+  });
+
+  it.each([
+    ['a locked mask, which refuses every edit', [{ ...maskLayer('m'), isLocked: true }, rasterLayer('a')], 'm', false],
+    [
+      'a disabled mask, which refuses every edit',
+      [{ ...maskLayer('m'), isEnabled: false }, rasterLayer('a')],
+      'm',
+      false,
+    ],
+    [
+      'a group in the mask stack, which paints a new layer but moves its masks',
+      [groupContract('g', [maskLayer('m')]), rasterLayer('a')],
+      'g',
+      true,
+    ],
+  ])('keeps them hidden for a press that edits no mask on %s', async (_, layers, selected, moveReveals) => {
+    const h = setup(stacksFrom(layers));
+    await h.showPreview();
+    h.select(selected);
+    // Move first: the layers a paint or shape press adds never land in this store, yet the panel would select them.
+    for (const tool of ['move', 'brush', 'eraser', 'shape'] as const) {
+      h.useTool(tool);
+      h.frame();
+      h.expectPressHidden();
+      if (tool !== 'move') {
+        continue;
+      }
+      // A move drag is refused on a locked or disabled mask, but moves a group's masks, showing them from the
+      // threshold on.
+      h.overlay.fire('pointerdown', pointerAt(5, 5));
+      h.overlay.fire('pointermove', pointerAt(15, 15));
+      const dragged = h.frame();
+      h.overlay.fire('pointerup', pointerAt(15, 15, { buttons: 0 }));
+      if (moveReveals) {
+        expect(dragged).toMatchObject({ full: 1, regionOverlays: true });
+        expect(h.frame()).toMatchObject({ full: 1, regionOverlays: false });
+      } else {
+        // The refused drag repaints nothing, so neither the drag nor its release shows or hides a stack.
+        expect(dragged).toMatchObject({ full: 0 });
+        expect(dragged.regionOverlays).not.toBe(true);
+        expect(h.frame()).toMatchObject({ full: 0 });
+      }
+    }
+    h.dispose();
   });
 });
 
