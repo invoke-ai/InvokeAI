@@ -21,7 +21,7 @@ import {
   coerceSchedulerForGraph,
   getExternalModeReason,
   getExternalProviderNodeType,
-  getFlux2DiffusersComponentSource,
+  getFlux2ComponentSource,
   getGenerationDimensions,
   getGenerationValidationReasons,
   isStrengthOnlyIPAdapterBase,
@@ -31,6 +31,7 @@ import {
   getCompatibleDiffusersComponentSource,
   isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
+  isBundledFlux2Main,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
   isFlux2MistralEncoder,
@@ -760,8 +761,8 @@ const buildFlux2Graph = (
   projectSettings: GenerationProjectSettings
 ): BackendGraphContract => {
   const isDev = model.variant === 'dev';
-  const sourceModel = getFlux2DiffusersComponentSource(model, settings);
-  const hasBundledComponents = isBundledMainForBase('flux2')(model) || sourceModel;
+  const sourceModel = getFlux2ComponentSource(model, settings);
+  const hasBundledComponents = isBundledFlux2Main(model) || sourceModel;
   const mistralEncoderModel =
     settings.mistralEncoderModel && isFlux2MistralEncoder(settings.mistralEncoderModel)
       ? settings.mistralEncoderModel
@@ -775,7 +776,7 @@ const buildFlux2Graph = (
 
   if (!hasBundledComponents && (!vaeModel || !encoderModel)) {
     throw new Error(
-      `FLUX.2 non-Diffusers models require a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a compatible Diffusers component source.`
+      `This FLUX.2 model needs a VAE and ${isDev ? 'Mistral' : 'Qwen3'} Encoder, or a FLUX.2 pipeline its loader can take them from.`
     );
   }
 
@@ -1727,6 +1728,13 @@ const buildFlux3Graph = (
     type: 'flux3_model_loader',
     vae_model: vaeModel ?? undefined,
   });
+  // FLUX.3 LoRAs change the transformer only. Klein and Klein Base share it, so either variant's LoRAs apply.
+  const activeLoras = getActiveCompatibleLoras(settings, model);
+  const loraSource = activeLoras.length
+    ? addTransformerLoraCollectionLoader(graph, activeLoras, 'flux3_lora_collection_loader', modelLoader, [
+        'transformer',
+      ])
+    : modelLoader;
   // Canvas regions become a box table at the end of the prompt here, at run time, so batch prompt variation still
   // flows through `positive_prompt`. Without regions the prompt passes through unchanged.
   const layoutPrompt: BackendInvocationContract = addNode(graph, { id: 'layout_prompt', type: 'flux3_layout_prompt' });
@@ -1756,7 +1764,7 @@ const buildFlux3Graph = (
     vaeSource: modelLoader,
   });
 
-  addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+  addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
   addEdge(graph, modelLoader, 'vae', denoise, 'vae');
   addEdge(graph, positivePrompt, 'value', layoutPrompt, 'prompt');

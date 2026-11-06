@@ -15,11 +15,12 @@ subprocess isolation, same reserved-delta method, same output shape, so the numb
 
 What it measures that its ancestors did not
 -------------------------------------------
-The **tiled** rows. FLUX.1 gained a tiled encode when its VAE became a diffusers ``AutoencoderKL``,
-and the estimator's tiled branch adds a residual term for what tiling does not bound -- the input
-image and the assembled moments for an encode, several copies of the assembled image for a decode.
-Those residuals are derived from shapes rather than fitted, so the thing worth checking is not a
-constant but the estimator's own answer, which is what this compares against.
+The **tiled** rows. FLUX.1 gained a tiled encode when its VAE became a diffusers ``AutoencoderKL``.
+The estimator prices a tiled operation on its tile, on the untiled line, plus a fitted tiled line in
+the image's pixels, and a tiled decode on the larger of that and a fitted assembly line
+(`vae_working_memory._tiled_convolutions`); `scripts/calibrate_vae_tiling_working_memory.py` measures
+the points they are fitted on. What this checks is the estimator's own answer on this machine, which
+is what it compares against.
 
 Runs on CUDA and on ROCm/HIP unchanged (``torch.cuda.*`` covers both). Two cautions on ROCm/Windows,
 both measured on an RX 9060 XT: ``max_memory_reserved`` counts host memory the driver silently pages
