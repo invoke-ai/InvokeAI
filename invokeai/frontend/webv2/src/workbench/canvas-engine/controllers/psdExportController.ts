@@ -127,16 +127,14 @@ export class PsdExportController {
 
   constructor(private readonly deps: PsdExportControllerOptions) {}
 
-  async export(fileName: string, options: { signal?: AbortSignal } = {}): Promise<PsdExportResult> {
-    if (this.disposed || options.signal?.aborted) {
+  async export(fileName: string): Promise<PsdExportResult> {
+    if (this.disposed) {
       return 'aborted';
     }
     if (this.active) {
       return 'busy';
     }
     const abortController = new AbortController();
-    const abort = (): void => abortController.abort(options.signal?.reason);
-    options.signal?.addEventListener('abort', abort, { once: true });
     this.active = abortController;
     this.setStatus('preparing');
     try {
@@ -309,7 +307,6 @@ export class PsdExportController {
     } finally {
       this.active = null;
       this.setStatus('idle');
-      options.signal?.removeEventListener('abort', abort);
     }
   }
 

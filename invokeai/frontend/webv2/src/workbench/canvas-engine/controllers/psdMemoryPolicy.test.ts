@@ -146,39 +146,66 @@ describe('installed ag-psd memory policy', () => {
     }
   );
 
-  it('refuses an unsupported serialization size before allocating executor surfaces', async () => {
-    const backend = createTestStubRasterBackend();
-    const canvas = {
-      ...createInitialWorkbenchState().projects[0]!.canvas,
-      document: documentFrom([layerContract('0')]),
-    };
-    const execute = vi.fn();
-    const reserve = vi.fn();
-    const release = vi.fn();
-    const controller = new PsdExportController({
-      backend,
-      captureDocumentSnapshot: () => ({ canvas, documentGeneration: 1 }),
-      captureRasterSnapshot: () =>
-        Promise.resolve({
-          status: 'ok' as const,
-          snapshot: {
-            canvas,
-            documentGeneration: 1,
-            emptyLayerIds: new Set<string>(),
-            release,
-            layerSurfaces: new Map([
-              ['0', { rect: { x: 0, y: 0, width: 8192, height: 8192 }, surface: backend.createSurface(8192, 8192) }],
-            ]),
-          },
-        }),
-      execute,
-      reserve,
-      getAvailableBytes: () => 512 * 1024 * 1024,
-      isDocumentSnapshotCurrent: () => true,
-    });
-    await expect(controller.export('unsupported')).resolves.toBe('too-large');
-    expect(execute).not.toHaveBeenCalled();
-    expect(reserve).not.toHaveBeenCalled();
-    expect(release).toHaveBeenCalledOnce();
-  });
+  it.each([
+    [4429, 1, 1, 1_342_003_772, 'exported'],
+    [4430, 1, 1, 1_342_608_010, 'too-large'],
+    [4608, 1, 1, 1_452_550_174, 'too-large'],
+    [64, 2, 64, 1_620_973_628, 'too-large'],
+    [8192, 1, 1, 4_589_790_238, 'too-large'],
+  ] as const)(
+    'enforces the serialization ceiling for %i² content, %i layers at scale %i before executor allocation',
+    async (size, count, scale, expectedBytes, result) => {
+      const backend = createTestStubRasterBackend();
+      const memory = new RasterMemoryBudgetController();
+      const snapshot = memory.trackDetached(size * size * count * 4);
+      const canvas = {
+        ...createInitialWorkbenchState().projects[0]!.canvas,
+        document: documentFrom(
+          Array.from({ length: count }, (_, i) =>
+            layerContract(String(i), 'raster', {
+              name: String(i),
+              transform: { x: 0, y: 0, scaleX: scale, scaleY: scale, rotation: 0 },
+            })
+          )
+        ),
+      };
+      // These admission fixtures never read pixels; even the 8192² surface holds only dimensions and call logs.
+      const surfaces = new Map(
+        Array.from({ length: count }, (_, i) => [
+          String(i),
+          { rect: { x: 0, y: 0, width: size, height: size }, surface: backend.createSurface(size, size) },
+        ])
+      );
+      const execute = vi.fn(() => Promise.resolve());
+      const reserve = vi.fn((bytes: number) => memory.reserveOperation(bytes, { purpose: 'psd-export' }));
+      const release = vi.fn(snapshot.release);
+      const controller = new PsdExportController({
+        backend,
+        captureDocumentSnapshot: () => ({ canvas, documentGeneration: 1 }),
+        captureRasterSnapshot: () =>
+          Promise.resolve({
+            status: 'ok' as const,
+            snapshot: {
+              canvas,
+              documentGeneration: 1,
+              emptyLayerIds: new Set<string>(),
+              release,
+              layerSurfaces: surfaces,
+            },
+          }),
+        execute,
+        reserve,
+        getAvailableBytes: () => memory.getAvailableBytes(),
+        isDocumentSnapshotCurrent: () => true,
+      });
+      expect(getPsdSerializationBudget(planFor(size * scale, size * scale, count)).requiredBytes).toBe(expectedBytes);
+      await expect(controller.export('serialization-limit')).resolves.toBe(result);
+      expect(execute).toHaveBeenCalledTimes(result === 'exported' ? 1 : 0);
+      expect(reserve).toHaveBeenCalledTimes(result === 'exported' ? 1 : 0);
+      expect(release).toHaveBeenCalledOnce();
+      expect(memory.snapshot()).toMatchObject({ reservedBytes: 0, detachedBytes: 0 });
+      controller.dispose();
+      memory.dispose();
+    }
+  );
 });
