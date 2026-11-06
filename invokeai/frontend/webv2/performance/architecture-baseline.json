@@ -546,6 +546,7 @@
           "source:src/features/gallery/ui/GalleryDragCursor.tsx",
           "source:src/features/gallery/ui/GalleryItemSearch.tsx",
           "source:src/features/gallery/ui/GalleryLoadError.tsx",
+          "source:src/features/gallery/ui/GalleryMediaUsagePanel.tsx",
           "source:src/features/gallery/ui/GallerySearchField.tsx",
           "source:src/features/gallery/ui/GallerySearchHelp.tsx",
           "source:src/features/gallery/ui/GalleryTileFrame.tsx",

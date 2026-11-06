@@ -40,6 +40,12 @@ vi.mock('@workbench/widgets/preview/livePreviewFollow', () => ({
   }),
 }));
 const session = vi.hoisted(() => ({ multiuserEnabled: false }));
+const usage = vi.hoisted(() => ({ check: vi.fn() }));
+// The server is doubled; the resolver runs for real over the store's projects.
+vi.mock('@features/gallery/mediaUsage', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  checkGalleryMediaUsage: (...args: unknown[]) => usage.check(...args),
+}));
 vi.mock('@features/identity', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useAuthSession: () => session,
@@ -138,4 +144,47 @@ describe('board sharing', () => {
       expect(adapter.boardSharing).toBe(multiuser);
     }
   );
+});
+
+describe('board media usage', () => {
+  it("narrows a board's report by the open project's own state, read from the store", async () => {
+    await renderAdapter();
+    const projectId = store.getSnapshot().activeProject.id;
+    // Saved earlier with both; the project now uses only a.png.
+    await act(() =>
+      store.commands.widgets.patchValues('generate', {
+        referenceImages: [{ config: { image: { image_name: 'a.png' } } }],
+      })
+    );
+    usage.check.mockResolvedValue({
+      checkedImageCount: 3,
+      checkedVideoCount: 0,
+      documents: [
+        {
+          id: projectId,
+          imageCount: 2,
+          imageNames: ['a.png', 'b.png'],
+          kind: 'project',
+          name: 'Open',
+          videoCount: 0,
+          videoNames: [],
+        },
+      ],
+      documentsTotal: 1,
+      inUseImageCount: 2,
+      inUseVideoCount: 0,
+      otherAccounts: { documentCount: 0, imageCount: 0, queueItemCount: 0, videoCount: 0 },
+      queue: { imageCount: 0, imageNames: [], itemCount: 0, videoCount: 0, videoNames: [] },
+    });
+
+    const report = await adapter.getBoardMediaUsage('board-1', new AbortController().signal);
+
+    expect(usage.check).toHaveBeenCalledWith({ boardId: 'board-1', kind: 'board' }, expect.any(AbortSignal));
+    expect(report).toMatchObject({
+      checkedCount: 3,
+      groups: [{ count: 1, kind: 'openProject', surfaces: [{ count: 1, surface: 'generateReferenceImages' }] }],
+      inUseCount: 1,
+      scope: 'board',
+    });
+  });
 });
