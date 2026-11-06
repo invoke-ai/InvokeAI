@@ -19,9 +19,10 @@ speeds are on each family's own page.
 - ✗ not supported
 - – no such build exists
 
-How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model,
-with the reason only in the server log: the Diffusers layout of LTX-2, the GGUF builds of MiniMax H3, and llama.cpp
-GGUFs of Mistral Small 3's shape that declare scaled RoPE or an attention temperature, such as Devstral Small 2.
+How an unsupported file fails depends on the file. Some are not recognized at all and install as an unknown model, with
+the reason only in the server log: the Diffusers layout of LTX-2, Diffusers-named FLUX.3 single files that are not
+torchao exports, the GGUF builds of MiniMax H3, and llama.cpp GGUFs of Mistral Small 3's shape that declare scaled RoPE
+or an attention temperature, such as Devstral Small 2.
 Others are recognized by their layer names and fail, or misbehave, only when they load.
 
 ## Main models
