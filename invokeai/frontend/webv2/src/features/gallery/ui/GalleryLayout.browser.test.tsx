@@ -17,14 +17,26 @@ import type { GalleryStateView } from './galleryStateView';
 import type { GalleryWidgetContextValue } from './GalleryWidgetContext';
 
 import { GALLERY_PINNED_FOOTER_PX, GALLERY_STARRED_HEADER_HEIGHT_PX } from './galleryGridLayout';
+import { GalleryLayout } from './GalleryLayout';
 import { GalleryStackedLayout } from './GalleryStackedLayout';
 import { GalleryWideLayout } from './GalleryWideLayout';
+import { GalleryWidgetLabel } from './GalleryWidgetChrome';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
 import { EMPTY_GALLERY_STARRED_STRIP } from './useGalleryStarredStrip';
 
 vi.mock('@features/queue/react', () => ({
   useItemProgress: () => null,
   useQueueItemProgressImage: () => null,
+}));
+
+// The header label lists boards itself; the shells read them from the widget context.
+vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  galleryBoardsOptions: () => ({
+    queryFn: () => Promise.resolve([board]),
+    queryKey: ['test-gallery-boards'],
+    staleTime: Infinity,
+  }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -176,6 +188,28 @@ const renderLayout = async (Layout: typeof GalleryStackedLayout | typeof Gallery
                 <Layout />
               </DndContext>
             </GalleryWidgetContext>
+          </GalleryUiProvider>
+        </QueryClientProvider>
+      </ChakraProvider>
+    )
+  );
+};
+
+/** Header and body as the workbench places them: siblings under one Gallery UI host. */
+const renderBottomPlacement = async ({ withBody = true }: { withBody?: boolean } = {}) => {
+  await act(() =>
+    root?.render(
+      <ChakraProvider value={system}>
+        <QueryClientProvider client={queryClient!}>
+          <GalleryUiProvider adapter={adapter}>
+            <GalleryWidgetLabel region="bottom" />
+            {withBody ? (
+              <GalleryWidgetContext value={{ ...createContextValue(), region: 'bottom' }}>
+                <DndContext>
+                  <GalleryLayout region="bottom" />
+                </DndContext>
+              </GalleryWidgetContext>
+            ) : null}
           </GalleryUiProvider>
         </QueryClientProvider>
       </ChakraProvider>
@@ -566,5 +600,45 @@ describe('gallery layout shells', () => {
       expect(host?.querySelector('[role="separator"]')).toBeNull();
       expect(host?.querySelector('[role="list"]'), 'the grid still renders').not.toBeNull();
     }
+  });
+});
+
+describe('gallery header boards toggle', () => {
+  const getToggle = () => host!.querySelector<HTMLButtonElement>('button[aria-expanded]')!;
+  const getToggleIcon = () =>
+    getToggle().querySelector('svg.lucide-panel-left-close')
+      ? 'sidebar'
+      : getToggle().querySelector('svg.lucide-chevrons-down-up')
+        ? 'stacked'
+        : null;
+  const getBoardsSeparatorOrientation = () =>
+    host!.querySelector<HTMLElement>('[role="separator"]')?.getAttribute('aria-orientation');
+
+  it('follows the layout the bottom panel renders as it narrows and widens again', async () => {
+    await renderBottomPlacement();
+
+    // The wide shell divides boards from the grid with a column handle; the stacked one with a row handle.
+    await expect.poll(getBoardsSeparatorOrientation).toBe('vertical');
+    expect(getToggleIcon()).toBe('sidebar');
+
+    host!.style.width = '400px';
+    await expect.poll(getBoardsSeparatorOrientation).toBe('horizontal');
+    await expect.poll(getToggleIcon).toBe('stacked');
+    expect(getToggle().getAttribute('aria-expanded')).toBe('true');
+
+    host!.style.width = '900px';
+    await expect.poll(getBoardsSeparatorOrientation).toBe('vertical');
+    await expect.poll(getToggleIcon).toBe('sidebar');
+  });
+
+  it('returns the header to the placement default once the body unmounts', async () => {
+    host!.style.width = '400px';
+    await renderBottomPlacement();
+    await expect.poll(getToggleIcon).toBe('stacked');
+
+    await renderBottomPlacement({ withBody: false });
+
+    expect(getBoardsSeparatorOrientation()).toBeUndefined();
+    await expect.poll(getToggleIcon).toBe('sidebar');
   });
 });

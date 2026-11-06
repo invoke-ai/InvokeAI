@@ -9,12 +9,12 @@ import type { CanvasScaleMethod, CanvasScalingSettings, PidMode } from '@feature
 import type { CanvasRenderSizeProps } from '@features/generation/react';
 import type { Project } from '@workbench/projectContracts';
 
-import { Box, chakra, createListCollection, Grid, HStack, NumberInput, Text } from '@chakra-ui/react';
+import { Box, createListCollection, HStack, NumberInput, Stack, Text } from '@chakra-ui/react';
 import { resolveCanvasProcessingSize } from '@features/generation/canvasProcessingSize';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { clampDimension, getGenerationDimensions, isGenerateModelConfig } from '@features/generation/settings';
 import { useExternalStoreSelector } from '@platform/state/selectors';
-import { FieldLabel, Select, Tooltip } from '@platform/ui';
+import { Field, Select, Tooltip } from '@platform/ui';
 import {
   CANVAS_SCALE_METHODS,
   CANVAS_SCALING_KEYS,
@@ -23,12 +23,11 @@ import {
 } from '@workbench/widgets/canvas/invoke/canvasScaling';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { type MouseEvent, useCallback, useId, useMemo } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const SIDE_INPUT_CSS = { flex: '1', minW: '0' } as const;
-const VALUE_TEXT_PROPS = { truncate: true } as const;
 
 const selectScaling = (project: Project): CanvasScalingSettings =>
   readCanvasScaling(getProjectWidgetValues(project, 'canvas'));
@@ -181,46 +180,30 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
   const label = t('widgets.generate.renderSize.label');
   // The tooltip's trigger is the wrapper, so the select points at an always-present copy of the tip itself.
   const descriptionId = useId();
-  const triggerId = useId();
-  const selectIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const triggerProps = useMemo(() => ({ 'aria-describedby': descriptionId }), [descriptionId]);
   const description = t('widgets.generate.renderSize.description');
-  // Like a native select's label, a click focuses the select rather than activating (opening) it.
-  const focusSelect = useCallback(
-    (event: MouseEvent<HTMLLabelElement>) => {
-      event.preventDefault();
-      document.getElementById(triggerId)?.focus();
-    },
-    [triggerId]
-  );
-  // Custom's sides sit under the select they belong to, so the grid keeps the label in its own column.
   const controls = (
-    <Grid alignItems="center" columnGap="2" rowGap="1.5" templateColumns="fit-content(40%) minmax(0, 1fr)">
-      {/* The select carries the same name for assistive technology; this copy is what sighted people read and click. */}
-      <chakra.label aria-hidden cursor="default" htmlFor={triggerId} onClick={focusSelect}>
-        <FieldLabel>{label}</FieldLabel>
-      </chakra.label>
+    <Stack gap="1.5" minW="0">
       {/* The legacy name for this setting lives in the tooltip, so people who knew it can still find it. */}
       <Tooltip content={description} placement="top">
         <Box minW="0">
           <Text id={descriptionId} srOnly>
             {description}
           </Text>
-          <Select
-            aria-label={label}
-            collection={methodCollection}
-            ids={selectIds}
-            positioning={SELECT_POSITIONING}
-            triggerProps={triggerProps}
-            value={methodValue}
-            valueText={methodLabel(scaling.method)}
-            valueTextProps={VALUE_TEXT_PROPS}
-            onValueChange={handleMethodChange}
-          />
+          <Field label={label} labelPlacement="inside">
+            <Select
+              collection={methodCollection}
+              positioning={SELECT_POSITIONING}
+              triggerProps={triggerProps}
+              value={methodValue}
+              valueText={methodLabel(scaling.method)}
+              onValueChange={handleMethodChange}
+            />
+          </Field>
         </Box>
       </Tooltip>
       {scaling.method === 'manual' ? (
-        <HStack gap="1" gridColumn="2" minW="0">
+        <HStack gap="1" minW="0">
           {sideInput(t('widgets.generate.renderSize.width'), scaling.width ?? context.bbox.width, widthHandlers)}
           <Text aria-hidden color="fg.muted" flexShrink="0" fontSize="xs">
             ×
@@ -228,7 +211,7 @@ export const GenerateCanvasRenderSize = ({ children, frame }: CanvasRenderSizePr
           {sideInput(t('widgets.generate.renderSize.height'), scaling.height ?? context.bbox.height, heightHandlers)}
         </HStack>
       ) : null}
-    </Grid>
+    </Stack>
   );
 
   return children({ controls, size: processingSize });

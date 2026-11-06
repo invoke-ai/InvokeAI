@@ -208,12 +208,13 @@ export const GenerateAdvancedFields = ({
         <GenerateIssueNotes section="advanced" />
       </Stack>
       {policy.sdVaeVisible || policy.vaePrecisionVisible ? (
-        <HStack alignItems="flex-start" gap="2" p="2">
+        // Stacked: side by side, two inside labels would leave each value too little room.
+        <Stack gap="2" p="2">
           {policy.sdVaeVisible ? (
             <Field
-              flex="2"
               hint="vae"
               label={t('widgets.generate.vae')}
+              labelPlacement="inside"
               helpText={settings.vae ? undefined : t('widgets.generate.usingBundledVae')}
             >
               <HStack gap="1">
@@ -234,7 +235,7 @@ export const GenerateAdvancedFields = ({
             </Field>
           ) : null}
           {policy.vaePrecisionVisible ? (
-            <Field flex="1" hint="vaePrecision" label={t('widgets.generate.vaePrecision')}>
+            <Field hint="vaePrecision" label={t('widgets.generate.vaePrecision')} labelPlacement="inside">
               <HStack gap="1">
                 <Select
                   aria-label={t('widgets.generate.vaePrecision')}
@@ -258,7 +259,7 @@ export const GenerateAdvancedFields = ({
               </HStack>
             </Field>
           ) : null}
-        </HStack>
+        </Stack>
       ) : null}
 
       {policy.clipSkipMax || policy.cfgRescaleVisible ? (
@@ -419,7 +420,7 @@ export const GenerateAdvancedFields = ({
 
       {policy.pidVisible ? (
         <Stack gap="2" p="2">
-          <Field hint="pidMode" label={t('widgets.generate.pid')} helpText={pidHelpText}>
+          <Field hint="pidMode" label={t('widgets.generate.pid')} labelPlacement="inside" helpText={pidHelpText}>
             <Select
               aria-label={t('widgets.generate.pid')}
               collection={pidModeCollection}
@@ -451,6 +452,7 @@ export const GenerateAdvancedFields = ({
         <Field
           hint="encoderQuantization"
           label={t('widgets.generate.encoderQuantization')}
+          labelPlacement="inside"
           helpText={t('widgets.generate.encoderQuantizationHelp')}
           p="2"
         >

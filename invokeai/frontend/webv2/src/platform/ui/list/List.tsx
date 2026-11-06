@@ -93,6 +93,11 @@ export interface ListProps<T> {
   renderItem: (item: T, rowProps: ListRowProps) => ReactNode;
   /** Key of the row whose detail is open; it is the initial keyboard target. */
   activeKey?: string | null;
+  /**
+   * Keyboard target while no row has been focused and none is active, such as the first row that can be used when
+   * earlier ones are disabled; without it, the first row.
+   */
+  defaultFocusKey?: string | null;
   /** Row pitch; fixed for the list's lifetime, so change it with a keyed remount. */
   density?: ListDensity;
   /**
@@ -144,6 +149,7 @@ const primaryOf = (viewport: HTMLElement, key: string): HTMLElement | null =>
  */
 export const List = <T,>({
   activeKey = null,
+  defaultFocusKey = null,
   density = 'regular',
   dividers = false,
   emptyState,
@@ -197,14 +203,16 @@ export const List = <T,>({
   const isMeasured = rowHeight === 'measured';
   const hasHeaders = headerIndexes.length > 0;
 
-  // The roving target survives filtering: fall back to the active row, then the first item.
+  // The roving target survives filtering: fall back to the active row, then the default one, then the first item.
   const focusKeyIsStale = focusKey !== null && !indexByKey.has(focusKey);
   const resolvedFocusKey =
     !focusKeyIsStale && focusKey !== null
       ? focusKey
       : activeKey !== null && indexByKey.has(activeKey)
         ? activeKey
-        : firstItemKey;
+        : defaultFocusKey !== null && indexByKey.has(defaultFocusKey)
+          ? defaultFocusKey
+          : firstItemKey;
   const focusIndex = resolvedFocusKey === null ? -1 : (indexByKey.get(resolvedFocusKey) ?? -1);
 
   // Keep the pinned header and the focused row mounted whatever the scroll position: focus must never fall off

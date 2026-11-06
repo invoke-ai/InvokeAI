@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 
 import { Flex, HStack } from '@chakra-ui/react';
+import { HIDDEN_SCROLLBAR_CSS } from '@platform/ui/scrollStripEdges';
 import { useTranslation } from 'react-i18next';
 
-import { CUE_WIDTH, HIDDEN_SCROLLBAR_CSS, OverflowCue, ROW_PADDING_X, useOverflowEdges } from './overflowEdges';
+import { CUE_WIDTH, OverflowCue, ROW_PADDING_X, useOverflowEdges } from './overflowEdges';
 
 /**
  * The narrowest island that still shows `controlWidth` of its row's start clear of the end cue: border, start padding,

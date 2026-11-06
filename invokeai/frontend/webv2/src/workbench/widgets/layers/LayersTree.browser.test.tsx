@@ -110,12 +110,21 @@ vi.mock('./LayerSurfaceHost', () => ({
     surface,
   }: {
     commands: LayerRowCommands;
-    surface: { kind: string; id?: string; child?: { key: string } } | null;
+    surface: {
+      kind: string;
+      id?: string;
+      child?: { key: string };
+      anchor: { height: number; width: number; x: number; y: number };
+    } | null;
   }) => {
     surfaceCommands.current = commands;
     return (
       // Hidden like the harness outputs so the tree's scroll geometry doesn't depend on this stand-in's line height.
-      <output data-testid="surface" style={{ display: 'none' }}>
+      <output
+        data-anchor={surface ? JSON.stringify(surface.anchor) : undefined}
+        data-testid="surface"
+        style={{ display: 'none' }}
+      >
         {surface ? `${surface.kind}:${surface.child?.key ?? surface.id}` : 'none'}
       </output>
     );
@@ -586,6 +595,14 @@ describe('LayersTree keyboard and accessibility', () => {
     expect(document.activeElement).toBe(treeitem('Top'));
     await act(() => userEvent.keyboard('{Shift>}{F10}{/Shift}'));
     expect(output('surface')).toBe('menu:top');
+    // Opened where a right-click would be, at a point under the row, so it shows no arrow as a context menu.
+    const row = treeitem('Top').closest('[data-layer-row-id]')!.getBoundingClientRect();
+    expect(JSON.parse(host!.querySelector<HTMLElement>('[data-testid="surface"]')!.dataset.anchor!)).toEqual({
+      height: 1,
+      width: 1,
+      x: row.left,
+      y: row.bottom,
+    });
   });
 
   it('frames the keyboard-focused row surface with its ring, not the gap below it or the guides beside it', async () => {

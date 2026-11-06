@@ -880,6 +880,20 @@ describe('GalleryPickerPopover', () => {
     expect(galleryCommands.selectBoard).not.toHaveBeenCalled();
   });
 
+  // Popover content sets a larger text style than the workbench body the Gallery widget's rows sit in.
+  it("lists boards at the Gallery widget's board label size", async () => {
+    const { dialog } = await openPicker();
+
+    await act(() => dialog.querySelector<HTMLButtonElement>('[aria-expanded]')?.click());
+    const label = await vi.waitFor(() => {
+      const found = getBoardRow(dialog, 'Dogs')?.querySelector('p');
+      expect(found).toBeTruthy();
+      return found!;
+    });
+
+    expect(getComputedStyle(label).fontSize).toBe(getComputedStyle(document.body).fontSize);
+  });
+
   // Assert video acceptance through the rendered picker; the regression was view wiring rather than the
   // accept-list builder.
   it('offers the full video and audio list on a video-kind picker', async () => {

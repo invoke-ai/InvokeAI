@@ -62,7 +62,7 @@ import {
 } from './layerPanelRows';
 import { clearLayerPropertiesRequest, useCurrentLayerPropertiesRequest } from './layerPropertiesRequestStore';
 import { LayerDragGhost, LayerRow, type LayerRowDragState } from './LayerRow';
-import { anchorFromRect } from './layerRowCommands';
+import { anchorFromPoint } from './layerRowCommands';
 import { LayerStackHeader } from './LayerStackHeader';
 import { LayerSurfaceHost, type LayerSurfaceEngine, type LayerSurfaceRequest } from './LayerSurfaceHost';
 import { createLayerTreeAutoScroller, type LayerTreeAutoScroller } from './layerTreeAutoScroll';
@@ -145,10 +145,13 @@ const reparentCommandForTarget = (target: LayerDropTarget): ReparentCommand => (
 const isMenuKey = (event: KeyboardEvent<HTMLElement>): boolean =>
   event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey);
 
-/** The viewport box of a rendered item, the anchor a keyboard-opened menu uses. */
+/**
+ * A keyboard-opened menu anchors where a right-click would: a point, at the rendered item's bottom-left corner. A point
+ * keeps it a context menu, without the arrow a menu anchored to a box gets.
+ */
 const anchorOfItem = (host: HTMLElement | null, key: string): LayerSurfaceAnchor | null => {
-  const element = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`);
-  return element ? anchorFromRect(element.getBoundingClientRect()) : null;
+  const rect = host?.querySelector<HTMLElement>(`[data-layer-row-id="${CSS.escape(key)}"]`)?.getBoundingClientRect();
+  return rect ? anchorFromPoint(rect.left, rect.bottom) : null;
 };
 
 /** One absolutely positioned slot of the virtual list; the style object is built once per offset. */

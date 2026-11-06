@@ -24,6 +24,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent, MenuHeadingGroup } from '@platform/ui/Menu';
+import { HIDDEN_SCROLLBAR_CSS } from '@platform/ui/scrollStripEdges';
 import { Tabs } from '@platform/ui/Tabs';
 import { Tooltip, TooltipGroup } from '@platform/ui/Tooltip';
 import { getPlacedWidgetTypeIds, graphWidgetSources } from '@workbench/graphWidgets';
@@ -32,7 +33,7 @@ import { preloadLayoutPresetWidgets } from '@workbench/layoutPresetActivation';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';
 import { getLayoutPresetLabel } from '@workbench/layoutPresets';
 import { findLayoutPresetWorkingCopy } from '@workbench/layoutPresetSnapshots';
-import { CUE_WIDTH, HIDDEN_SCROLLBAR_CSS, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
+import { CUE_WIDTH, OverflowCue, useOverflowEdges } from '@workbench/shell/overflowEdges';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowRightIcon,

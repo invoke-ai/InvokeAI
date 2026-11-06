@@ -7,6 +7,7 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import {
   ImageContinueGroup,
   ImageUseGroups,
@@ -23,7 +24,7 @@ import {
   StarIcon,
   type LucideIcon,
 } from 'lucide-react';
-import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent, type Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
@@ -42,6 +43,7 @@ const STAR_LABEL_KEYS = {
 export const PreviewActionStrip = ({
   actions,
   density,
+  getRegion,
   isVideoFrameCopyAvailable = false,
   item,
   onCopyCurrentFrame,
@@ -49,6 +51,8 @@ export const PreviewActionStrip = ({
 }: {
   actions: ImageActions;
   density: PreviewDensity;
+  /** Preview's focusable region, which takes focus from the ⋮ when a later render removes it. */
+  getRegion?: () => HTMLElement | null;
   isVideoFrameCopyAvailable?: boolean;
   item: GalleryItem;
   onCopyCurrentFrame?: () => void;
@@ -80,8 +84,18 @@ export const PreviewActionStrip = ({
       </IconButton>
     </Tooltip>
   );
+  // Focus comes back to the ⋮ when its menu closes, and the strip goes with the selection.
+  const menuButtonRef = useCallback(
+    (node: HTMLButtonElement | null) => (node && getRegion ? releaseFocusOnRemoval(node, getRegion) : undefined),
+    [getRegion]
+  );
   const menuButton = onOpenMenu ? (
-    <StripIconButton icon={EllipsisVerticalIcon} label={t('widgets.preview.imageActions')} onClick={openMenu} />
+    <StripIconButton
+      ref={menuButtonRef}
+      icon={EllipsisVerticalIcon}
+      label={t('widgets.preview.imageActions')}
+      onClick={openMenu}
+    />
   ) : null;
 
   if (density === 'compact') {
@@ -270,16 +284,19 @@ const StripIconButton = ({
   disabled,
   icon,
   label,
+  ref,
   unavailableReason,
   onClick,
 }: {
   disabled?: boolean;
   icon: LucideIcon;
   label: string;
+  ref?: Ref<HTMLButtonElement>;
   unavailableReason?: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
 }) => (
   <IconButton
+    ref={ref}
     aria-label={label}
     color="fg.muted"
     disabled={disabled}

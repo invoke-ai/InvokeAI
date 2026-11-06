@@ -948,10 +948,13 @@ const runVideoPreviewJourney = async (browser) => {
     const rightPanel = page.getByRole('complementary', { exact: true, name: 'right widget panel' });
     await rightPanel.locator('button:not([aria-expanded])').filter({ hasText: 'Uncategorized' }).click();
     const gallery = rightPanel.getByRole('list', { exact: true, name: 'Gallery items' });
-    const selectVideo = rightPanel.getByRole('button', {
-      exact: true,
-      name: `Select video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}, duration 0:01, for preview`,
-    });
+    const selectVideoName = `Select video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}, duration 0:01, for preview`;
+    const selectVideo = rightPanel.getByRole('button', { exact: true, name: selectVideoName });
+    // Tile badges sit on the cell's corners, outside the bordered image box that holds the button. The panel-wide
+    // lookup covers both the starred strip and the main list.
+    const videoTile = rightPanel
+      .getByRole('listitem')
+      .filter({ has: page.getByRole('button', { exact: true, name: selectVideoName }) });
 
     try {
       await gallery.waitFor();
@@ -964,7 +967,7 @@ const runVideoPreviewJourney = async (browser) => {
     await selectVideo.waitFor();
     await selectVideo.focus();
     await expectFocused(selectVideo, 'The video gallery item must be keyboard focusable.');
-    assert.equal(await selectVideo.locator('xpath=..').locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
+    assert.equal(await videoTile.locator('svg.lucide-play').getAttribute('aria-hidden'), 'true');
     await selectVideo.press('Enter');
 
     const video = centerRegion(page).locator(`video[aria-label="Video ${MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME}"]`);

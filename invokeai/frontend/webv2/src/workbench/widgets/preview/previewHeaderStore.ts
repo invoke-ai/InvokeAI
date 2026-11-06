@@ -56,6 +56,8 @@ export interface PreviewHeaderContext {
   actions: ImageActions | null;
   boardName: string | null;
   copyCurrentVideoFrame: (() => void) | null;
+  /** Preview's focusable region, where a header control removed while it holds focus hands it on. */
+  getRegion: (() => HTMLElement | null) | null;
   isVideoFrameCopyAvailable: boolean;
   itemName: string | null;
   /**
@@ -73,6 +75,7 @@ const emptyContext: PreviewHeaderContext = {
   actions: null,
   boardName: null,
   copyCurrentVideoFrame: null,
+  getRegion: null,
   isVideoFrameCopyAvailable: false,
   itemName: null,
   openItemMenu: null,

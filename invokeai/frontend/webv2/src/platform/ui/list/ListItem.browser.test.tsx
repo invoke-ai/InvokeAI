@@ -107,6 +107,81 @@ describe('ListItem', () => {
     expect(surface()).not.toBe(resting);
   });
 
+  it('keeps a disabled row focusable but inert: no press, checkbox, menu, intent, actions, or hover fill', async () => {
+    const onAction = vi.fn();
+    const onCheckedChange = vi.fn();
+    const onContextMenu = vi.fn();
+    const onIntent = vi.fn();
+    const onPress = vi.fn();
+    const surface = () => getComputedStyle(primary().parentElement!).backgroundColor;
+
+    // Transitions finish within a frame, so a hover fill would already show when the background is read.
+    document.documentElement.dataset.reduceMotion = 'true';
+    try {
+      await userEvent.unhover(document.body);
+      await render(
+        <ListItem
+          actions={
+            <button type="button" onClick={onAction}>
+              Install
+            </button>
+          }
+          isDisabled
+          title="Too new"
+          onCheckedChange={onCheckedChange}
+          onContextMenu={onContextMenu}
+          onIntent={onIntent}
+          onPress={onPress}
+        />
+      );
+      const resting = surface();
+
+      expect(primary().getAttribute('aria-disabled')).toBe('true');
+      expect(primary().hasAttribute('aria-haspopup')).toBe(false);
+      await act(() => primary().focus());
+      expect(document.activeElement).toBe(primary());
+
+      // Force past Playwright's actionability checks: disabled and inert controls are exactly what is under test.
+      await userEvent.hover(primary(), { force: true });
+      await new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+      });
+      expect(surface()).toBe(resting);
+      await userEvent.click(primary(), { force: true });
+      await userEvent.keyboard('{Enter}');
+      await act(() => primary().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+      await userEvent.click(host.querySelector<HTMLElement>('[data-part="control"]')!, { force: true });
+      await userEvent.click(
+        [...host.querySelectorAll('button')].find((button) => button.textContent === 'Install')!,
+        { force: true }
+      );
+
+      expect(onPress).not.toHaveBeenCalled();
+      expect(onCheckedChange).not.toHaveBeenCalled();
+      expect(onContextMenu).not.toHaveBeenCalled();
+      expect(onIntent).not.toHaveBeenCalled();
+      expect(onAction).not.toHaveBeenCalled();
+    } finally {
+      delete document.documentElement.dataset.reduceMotion;
+    }
+  });
+
+  it('dims a disabled row’s content but draws its keyboard focus ring at full strength', async () => {
+    await render(<ListItem isDisabled title="Too new" onCheckedChange={vi.fn()} onPress={vi.fn()} />);
+    const row = primary().parentElement!;
+
+    // Tab past the disabled checkbox onto the row button, so the ring is keyboard focus-visible.
+    await act(() => (document.activeElement as HTMLElement | null)?.blur());
+    await userEvent.keyboard('{Tab}');
+    expect(document.activeElement).toBe(primary());
+
+    expect(getComputedStyle(row).outlineStyle).toBe('solid');
+    expect(getComputedStyle(row).outlineWidth).toBe('2px');
+    expect(getComputedStyle(row).opacity).toBe('1');
+    // Checkbox slot and primary button: everything the row shows.
+    expect([...row.children].map((slot) => getComputedStyle(slot).opacity)).toEqual(['0.5', '0.5']);
+  });
+
   it('renders a static row without a press handler as plain content, not a button', async () => {
     await render(<ListItem title="Read only" />);
 

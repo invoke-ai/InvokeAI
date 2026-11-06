@@ -11,6 +11,7 @@ import { useExternalStoreSelector } from '@platform/state/selectors';
 import { system } from '@theme/system';
 import { canvasWidgetManifest } from '@workbench/widgets/canvas/manifest';
 import { generateWidgetManifest } from '@workbench/widgets/generate/manifest';
+import { imageMapWidgetManifest } from '@workbench/widgets/image-map/manifest';
 import { getResolvedProjectWidgetValues, resolveWidgetValues } from '@workbench/widgetState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
@@ -238,4 +239,40 @@ it("shows the project's generation flags behind the Generate cog, and pins and f
   await expect
     .element(page.getByRole('checkbox', { name: i18n.t('settings.catalog.useNsfwChecker.label'), exact: true }))
     .not.toBeChecked();
+});
+
+it('pins the Image Map clustering strength and cluster click behavior from its gear', async () => {
+  const store = storeRef.current!;
+  const project = store.getSnapshot().activeProject;
+  const imageMap = Object.values(project.widgetInstances).find((instance) => instance.typeId === 'image-map')!;
+  const values = () => store.getSnapshot().activeProject.widgetInstances[imageMap.id]!.state.values;
+  await act(() =>
+    root.render(
+      <ChakraProvider value={system}>
+        <I18nextProvider i18n={i18n}>
+          <WidgetSettingsButton
+            {...widgetProps}
+            instance={{ ...imageMap, title: 'Image Map' }}
+            manifest={imageMapWidgetManifest}
+          />
+        </I18nextProvider>
+      </ChakraProvider>
+    )
+  );
+  await act(() => page.getByRole('button', { name: 'Image Map settings', exact: true }).click());
+  // The custom clustering-strength editor renders in the popover like the shared controls around it.
+  const strength = page.getByRole('spinbutton', { name: i18n.t('settingsDialog.fields.clusterStrength'), exact: true });
+  await expect.element(strength).toBeVisible();
+  await act(() => strength.fill('0.25'));
+  await expect.poll(() => values().clusterEps, { timeout: 3000 }).toBe(0.25);
+
+  const clickSelects = page.getByRole('checkbox', {
+    name: i18n.t('settingsDialog.fields.clickSelectsCluster'),
+    exact: true,
+  });
+  await expect.element(clickSelects).toBeVisible();
+  const wasChecked = (clickSelects.element() as HTMLInputElement).checked;
+  await act(() => page.getByText(i18n.t('settingsDialog.fields.clickSelectsCluster'), { exact: true }).click());
+  await expect.poll(() => values().clickSelectsCluster).toBe(!wasChecked);
+  expect(settingsDialogStore.getSnapshot().isOpen).toBe(false);
 });

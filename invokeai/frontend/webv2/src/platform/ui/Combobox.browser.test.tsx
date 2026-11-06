@@ -6,8 +6,10 @@ import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
 
 import { Combobox, type ComboboxOption } from './Combobox';
+import { Field } from './Field';
 
 const options: ComboboxOption[] = [
   { label: 'Euler Ancestral', value: 'euler_a' },
@@ -42,6 +44,14 @@ const interact = (action: () => void): Promise<void> =>
     action();
     await new Promise<void>((resolve) => {
       globalThis.setTimeout(resolve, 50);
+    });
+  });
+
+/** Long enough for a dismiss-and-reopen to land, and for the theme's `fast` colour transitions to finish. */
+const settleFrames = (): Promise<void> =>
+  act(async () => {
+    await new Promise<void>((resolve) => {
+      globalThis.setTimeout(resolve, 250);
     });
   });
 
@@ -249,5 +259,137 @@ describe('Combobox', () => {
     expect(input.disabled).toBe(true);
     await interact(() => input.click());
     expect(input.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  describe('under an inside Field label', () => {
+    const renderInField = async (field: { disabled?: boolean; error?: string; helpText?: string }) => {
+      host = document.createElement('div');
+      host.style.width = '240px';
+      document.body.append(host);
+      root = createRoot(host);
+      const onChange = vi.fn();
+
+      await interact(() => {
+        root?.render(
+          <I18nextProvider i18n={i18n}>
+            <ChakraProvider value={system}>
+              <Field id="scheduler-field" label="Scheduler" labelPlacement="inside" {...field}>
+                <Combobox options={options} value="euler_a" onValueChange={onChange} />
+              </Field>
+            </ChakraProvider>
+          </I18nextProvider>
+        );
+      });
+
+      const control = host.querySelector<HTMLElement>('[data-scope="combobox"][data-part="control"]')!;
+      return {
+        control,
+        input: control.querySelector<HTMLInputElement>('input[role="combobox"]')!,
+        label: control.querySelector<HTMLLabelElement>('label')!,
+        onChange,
+      };
+    };
+
+    it('names the input with the label at the start of its box and describes it with the help text', async () => {
+      const { control, input, label } = await renderInField({ helpText: 'Sampler for each step' });
+
+      expect(label.id).toBe('scheduler-field-label');
+      expect(label.getBoundingClientRect().right).toBeLessThanOrEqual(input.getBoundingClientRect().left);
+      expect(input.value).toBe('Euler Ancestral');
+      expect(getComputedStyle(input).textAlign).toBe('end');
+      // The box is the control, so the border runs around the label as well as the input.
+      expect(getComputedStyle(control).borderTopWidth).toBe('1px');
+      expect(getComputedStyle(input).borderTopWidth).toBe('0px');
+      const scheduler = page.getByRole('combobox', { exact: true, name: 'Scheduler' });
+      await expect.element(scheduler).toHaveAccessibleDescription('Sampler for each step');
+    });
+
+    it('opens from a click on the label, then filters and commits as usual', async () => {
+      const { input, label, onChange } = await renderInField({});
+
+      await userEvent.click(label);
+      await expect.element(page.getByRole('combobox', { exact: true, name: 'Scheduler' })).toHaveFocus();
+      expect(input.getAttribute('aria-expanded')).toBe('true');
+
+      await setInputValue(input, 'dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+      await interact(() => document.querySelector<HTMLElement>('[role="option"]')?.click());
+      expect(onChange).toHaveBeenLastCalledWith('dpmpp_2m');
+    });
+
+    it('keeps the list open and its filter when the label is clicked while open', async () => {
+      const { input, label } = await renderInField({});
+
+      await userEvent.click(label);
+      await expect.poll(() => input.getAttribute('aria-expanded')).toBe('true');
+      await userEvent.type(input, 'dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+
+      await userEvent.click(label);
+      await settleFrames();
+      expect(input.getAttribute('aria-expanded')).toBe('true');
+      expect(input.value).toBe('dpm');
+      expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
+      await expect.element(page.getByRole('combobox', { exact: true, name: 'Scheduler' })).toHaveFocus();
+    });
+
+    it('tints only the box, not the input inside it, when an invalid field is hovered', async () => {
+      const { control, input } = await renderInField({ error: 'Pick a scheduler' });
+      const restingBg = getComputedStyle(control).backgroundColor;
+
+      await userEvent.hover(input);
+      await expect.poll(() => getComputedStyle(control).backgroundColor).not.toBe(restingBg);
+      await settleFrames();
+      expect(getComputedStyle(input).backgroundColor).toBe('rgba(0, 0, 0, 0)');
+    });
+
+    it('opens from a click anywhere in the box, its inset and the gap before the value included', async () => {
+      const { control, input, label } = await renderInField({});
+      const box = control.getBoundingClientRect();
+      const labelBox = label.getBoundingClientRect();
+      const close = () =>
+        interact(() => input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+
+      // The strip inside the left border, before the label's text.
+      await userEvent.click(control, { position: { x: 3, y: box.height / 2 } });
+      await expect.poll(() => input.getAttribute('aria-expanded')).toBe('true');
+      await close();
+      await expect.poll(() => input.getAttribute('aria-expanded')).toBe('false');
+
+      // The gap between the label's text and the value.
+      const range = document.createRange();
+      range.selectNodeContents(label);
+      const textRight = range.getBoundingClientRect().right;
+      expect(labelBox.right - textRight).toBeGreaterThan(4);
+      await userEvent.click(control, { position: { x: (textRight + labelBox.right) / 2 - box.left, y: 3 } });
+      await expect.poll(() => input.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('describes the input with an invalid field error and marks the whole box invalid', async () => {
+      const valid = await renderInField({});
+      const validBorder = getComputedStyle(valid.control).borderTopColor;
+      await interact(() => root?.unmount());
+      host?.remove();
+
+      const { control, input } = await renderInField({ error: 'Pick a scheduler' });
+
+      expect(input.getAttribute('aria-invalid')).toBe('true');
+      expect(input.getAttribute('aria-errormessage')).toBe('scheduler-field-error');
+      await expect
+        .element(page.getByRole('combobox', { exact: true, name: 'Scheduler' }))
+        .toHaveAccessibleDescription('Pick a scheduler');
+      expect(control.hasAttribute('data-invalid')).toBe(true);
+      expect(getComputedStyle(control).borderTopColor).not.toBe(validBorder);
+    });
+
+    it('dims the whole box once when the field is disabled', async () => {
+      const { control, input, label } = await renderInField({ disabled: true });
+
+      expect(input.disabled).toBe(true);
+      expect(getComputedStyle(control).opacity).toBe('0.5');
+      expect(getComputedStyle(input).opacity).toBe('1');
+      await interact(() => label.click());
+      expect(input.getAttribute('aria-expanded')).toBe('false');
+    });
   });
 });

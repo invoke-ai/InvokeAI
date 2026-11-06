@@ -145,7 +145,7 @@ export const GenerateCanvasCompositingSection = () => {
       sectionId="canvas-fill"
     >
       <Stack gap="2" p="2">
-        <Field label={opt('infillMethod')}>
+        <Field label={opt('infillMethod')} labelPlacement="inside">
           <Select
             aria-label={opt('infillMethod')}
             collection={infillCollection}
@@ -166,7 +166,7 @@ export const GenerateCanvasCompositingSection = () => {
             />
           </Field>
         ) : null}
-        <Field label={opt('coherenceMode')}>
+        <Field label={opt('coherenceMode')} labelPlacement="inside">
           <Select
             aria-label={opt('coherenceMode')}
             collection={coherenceCollection}
