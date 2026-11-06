@@ -16,11 +16,14 @@ class BulkDownloadBase(ABC):
         bulk_download_item_id: str,
         user_id: str,
         export_format: Optional[ImageExportFormat] = None,
+        uncategorized_owner_id: Optional[str] = None,
     ) -> None:
         """
         Register the download, so the fetch endpoint can answer for it at once (building, owner), and build it on a
         thread the service owns, which `stop` ends between two images. Raises BulkDownloadBusyError for a `png16`
         download while another one is being built.
+
+        `uncategorized_owner_id` is passed on to `handler`.
         """
 
     @abstractmethod
@@ -39,6 +42,7 @@ class BulkDownloadBase(ABC):
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
         export_format: Optional[ImageExportFormat] = None,
+        uncategorized_owner_id: Optional[str] = None,
     ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -51,6 +55,7 @@ class BulkDownloadBase(ABC):
             `<category>/<stem>-16bit.png` (the bytes of the single-image export) instead of its gallery file.
             An image whose export fails keeps its gallery file and one warning is logged. None stores the
             gallery files.
+        :param uncategorized_owner_id: For board_id "none", include only this user's uncategorized images. None includes every account's (admins).
         """
 
     @abstractmethod
