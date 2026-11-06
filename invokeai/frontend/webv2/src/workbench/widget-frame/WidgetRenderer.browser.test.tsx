@@ -708,6 +708,7 @@ describe('shared widget recovery', () => {
   it.each(['project', 'account', 'hide-and-reveal'] as const)(
     'fences a reload confirmation after %s changes',
     async (transition) => {
+      const toast = vi.spyOn(toaster, 'create').mockImplementation(() => 'inactive-reload');
       const { widget } = createDeferredWidget();
       widget.implementation = createWidgetImplementationResource('test', () =>
         Promise.reject(new Error('unavailable'))
@@ -751,6 +752,14 @@ describe('shared widget recovery', () => {
       }
       await page.getByRole('alertdialog').getByRole('button', { name: 'Reload editor', exact: true }).click();
       expect(workbenchMocks.reload).not.toHaveBeenCalled();
+      if (transition === 'hide-and-reveal') {
+        expect(toast).toHaveBeenCalledWith(
+          expect.objectContaining({ description: recoveryCopy.reloadReasons.inactive })
+        );
+      } else {
+        expect(toast).not.toHaveBeenCalled();
+      }
+      toast.mockRestore();
       workbenchMocks.project.id = 'test-project';
     }
   );

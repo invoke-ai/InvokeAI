@@ -119,7 +119,6 @@ const TOOLTIP_POSITIONING = { placement: 'top' } as const;
 export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) => {
   const [capacity] = useState(createCompactWidgetCapacity);
   const bindSpacer = useCallback((element: HTMLDivElement | null) => capacity.bindSpacer(element), [capacity]);
-  const modal = useSyncExternalStore(subscribeModalPresence, isModalPresent, isModalPresent);
   const { t } = useTranslation();
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const bottomRegion = useActiveProjectSelector((project) => project.widgetRegions.bottom);
@@ -139,7 +138,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   });
   const items = getWidgetRegionItems(bottomRegionViewModel);
   const compactItems = items.flatMap((item): BottomWidgetItem[] => {
-    if (!isCompactBottomItem(item) || (modal && item.widget.manifest.preserveWorkbenchFocus)) {
+    if (!isCompactBottomItem(item)) {
       return [];
     }
 
@@ -284,7 +283,11 @@ const CompactBottomWidget = ({
   onContextMenu: (item: BottomWidgetItem, event: MouseEvent) => void;
   onSelect: (widgetId: WidgetInstanceId) => void;
 }) => {
+  const recovery = useWidgetRecovery(item.id, item.widget);
+  const modal = useSyncExternalStore(subscribeModalPresence, isModalPresent, isModalPresent);
+  const suppressed = modal && item.widget.manifest.preserveWorkbenchFocus && !recovery.hasFailure;
   const { dragHandleProps, isDragging, setNodeRef, style } = useWidgetSortable({
+    disabled: suppressed,
     instanceId: item.id,
     region: 'bottom',
     typeId: item.typeId,
@@ -315,7 +318,6 @@ const CompactBottomWidget = ({
     },
     [capacity, item.widget.manifest.compactSizing, setNodeRef]
   );
-  const recovery = useWidgetRecovery(item.id, item.widget);
   const tooltipError = recovery.getError('tooltip');
   const isActivatable = !recovery.error && (item.isExpandable || item.isPopover);
   const rowDragHandleProps = recovery.error
@@ -395,6 +397,14 @@ const CompactBottomWidget = ({
   const handlePopoverOpenChange = useCallback((event: { open: boolean }) => setIsPopoverOpen(event.open), []);
   const tooltipContent = useMemo(() => (item.instance ? <BottomWidgetTooltipContent item={item} /> : null), [item]);
   const isRowActive = item.isPopover ? isPopoverOpen : isActive;
+
+  // Keep failed recovery mounted through its own modal; healthy guides close and release their measured DOM.
+  if (suppressed) {
+    if (isPopoverOpen) {
+      setIsPopoverOpen(false);
+    }
+    return null;
+  }
 
   // Named by its compact content, which shows (or visually hides) the widget's name: an aria-label would
   // replace the visible status text that speech-input users read off the chip (WCAG 2.5.3).

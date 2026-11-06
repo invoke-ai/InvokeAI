@@ -6,10 +6,14 @@ import type * as WidgetRegistry from '@workbench/widgetRegistry';
 import type * as WorkbenchContext from '@workbench/WorkbenchContext';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
-import { ChakraProvider } from '@chakra-ui/react';
+import { ChakraProvider, Portal } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { useExternalStoreSelector } from '@platform/state/selectors';
+import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Dialog } from '@platform/ui/Dialog';
+import { isModalPresent } from '@platform/ui/modalPresence';
+import { toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { FocusRegionProvider } from '@workbench/focusRegions';
@@ -78,7 +82,7 @@ const Neighbor = () => {
 };
 const DROP_STATE = { helperText: '', isActive: false, isAllowed: false };
 const NEIGHBOR_PANEL_WIDTH_PX = getPanelSizeBounds('left').min;
-type Host = 'center' | 'floating' | 'status';
+type Host = 'center' | 'floating' | 'status' | 'dialog';
 type Failure = 'lazy' | 'label' | 'actions' | 'body' | 'tooltip' | 'compact';
 let host: HTMLDivElement;
 let root: Root;
@@ -146,6 +150,25 @@ const ActualHost = () => {
   if (mode === 'center') {
     return <CenterArea />;
   }
+  if (mode === 'dialog') {
+    return (
+      <Dialog.Root defaultOpen>
+        <Portal>
+          <Dialog.Backdrop />
+          <Dialog.Positioner>
+            <Dialog.Content>
+              <Dialog.Header>
+                <Dialog.Title>Fixture host</Dialog.Title>
+              </Dialog.Header>
+              <Dialog.Body>
+                <WidgetRendererById instanceId="fixture" region="dialog" widget={runtime.widgets[0]!} />
+              </Dialog.Body>
+            </Dialog.Content>
+          </Dialog.Positioner>
+        </Portal>
+      </Dialog.Root>
+    );
+  }
   if (mode === 'status') {
     return (
       <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column' }}>
@@ -184,7 +207,7 @@ const makeState = (hostMode: Host): WorkbenchState => {
   region.isCollapsed = false;
   return state;
 };
-const render = async (accountKey = 'recovery-hosts') => {
+const render = async (accountKey = 'recovery-hosts', extra?: React.ReactNode) => {
   const focus = createTestFocusController({
     getProjectId: () => runtime.store.getSnapshot().activeProject.id,
     isFloating: (id) => !!runtime.store.getSnapshot().activeProject.floatingWidgets?.[id],
@@ -196,6 +219,7 @@ const render = async (accountKey = 'recovery-hosts') => {
           <FocusRegionProvider controller={focus}>
             <WorkbenchWidgetRegistryProvider getWidgetById={getWidgetById} getWidgetsForRegion={getWidgetsForRegion}>
               <DndContext>
+                {extra}
                 <div style={{ width: NEIGHBOR_PANEL_WIDTH_PX, height: 150, flexShrink: 0 }}>
                   <WidgetRendererById instanceId="neighbor" region="left" widget={runtime.widgets[1]!} />
                 </div>
@@ -214,7 +238,7 @@ beforeEach(async () => {
   await page.viewport(1280, 900);
   accountLifecycle.activate('recovery-hosts', ':user:recovery-hosts');
   broken = true;
-  runtime.reload.mockClear();
+  runtime.reload.mockReset().mockResolvedValue(undefined);
   attempts = 0;
   releaseLoad = null;
   runtime.widgets = registerWidgets([
@@ -407,6 +431,188 @@ describe('real shell recovery hosts', () => {
     expect(host.querySelector('[data-testid="widget-failure"]')).toBeNull();
     expect(host.textContent).toContain('Fixture ready 0');
   });
+
+  it('suppresses a healthy preserve-focus guide under an unrelated modal without reopening its popover', async () => {
+    mode = 'status';
+    failure = 'lazy';
+    broken = false;
+    Object.assign(runtime.widgets[0]!.manifest, {
+      bottomPanel: 'popover',
+      compactSizing: 'remaining-space',
+      preserveWorkbenchFocus: true,
+    });
+    runtime.widgets[0]!.implementation = createWidgetImplementationResource('fixture', () =>
+      Promise.resolve(implementation)
+    );
+    runtime.store = createWorkbenchStore(makeState(mode));
+    const UnrelatedModal = () => {
+      const [open, setOpen] = useState(false);
+      const openModal = useCallback(() => setOpen(true), []);
+      const close = useCallback(() => setOpen(false), []);
+      return (
+        <>
+          <button type="button" data-open-unrelated onClick={openModal}>
+            Open unrelated modal
+          </button>
+          <ConfirmDialog
+            isOpen={open}
+            title="Unrelated modal"
+            body="Unrelated action"
+            confirmLabel="Confirm"
+            onClose={close}
+            onConfirm={close}
+          />
+        </>
+      );
+    };
+    await render(undefined, <UnrelatedModal />);
+    const chip = page.getByRole('button', { name: 'Fixture ready', exact: true });
+    (chip.element() as HTMLElement).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect.element(page.getByRole('dialog')).toBeVisible();
+    await act(() => host.querySelector<HTMLButtonElement>('[data-open-unrelated]')!.click());
+    await expect.poll(() => isModalPresent()).toBe(true);
+    await expect.element(page.getByRole('alertdialog', { name: 'Unrelated modal' })).toBeVisible();
+    expect(host.querySelector('[data-status-bar-widget="fixture"]')).toBeNull();
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect.element(chip).toBeVisible();
+    await expect.poll(() => isModalPresent()).toBe(false);
+    await expect.element(page.getByRole('dialog')).not.toBeInTheDocument();
+    expect(runtime.reload).not.toHaveBeenCalled();
+  });
+
+  it.each(['status', 'floating', 'dialog'] as const)(
+    'keeps confirmation consent and focus inside the %s host',
+    async (hostMode) => {
+      mode = hostMode;
+      failure = 'lazy';
+      runtime.widgets[0]!.manifest.bottomPanel = 'popover';
+      runtime.widgets[0]!.implementation = createWidgetImplementationResource('fixture', () =>
+        Promise.reject(new Error('repeat import failure'))
+      );
+      runtime.store = createWorkbenchStore(makeState(mode));
+      if (mode === 'floating') {
+        runtime.store.commands.widgets.float('fixture', 'right');
+        runtime.store.commands.widgets.setFloatingGeometry('fixture', { x: 500, y: 200, widthPx: 600, heightPx: 400 });
+      }
+      await render();
+      if (mode === 'status') {
+        await page.getByRole('button', { name: 'Fixture failed — Open', exact: true }).click();
+        await expect.element(page.getByRole('dialog')).toBeVisible();
+      }
+      const parentDialog = document.querySelector('[role="dialog"]');
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
+      const reload = page.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.click();
+      const confirm = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+      await expect.element(confirm).toBeVisible();
+      await expect.poll(() => isModalPresent()).toBe(true);
+      expect(runtime.reload).not.toHaveBeenCalled();
+      await userEvent.keyboard('{Escape}');
+      await expect.element(confirm).not.toBeInTheDocument();
+      await expect.element(reload).toHaveFocus();
+      if (parentDialog) {
+        expect(parentDialog.isConnected).toBe(true);
+      }
+      expect(isModalPresent()).toBe(mode === 'dialog');
+      await reload.click();
+      await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect.element(reload).toHaveFocus();
+      expect(runtime.reload).not.toHaveBeenCalled();
+      expect(document.querySelector('button button, [role="button"] button')).toBeNull();
+      await reload.click();
+      await confirm.getByRole('button', { name: 'Reload editor', exact: true }).click();
+      expect(runtime.reload).toHaveBeenCalledOnce();
+      await expect.element(confirm).not.toBeInTheDocument();
+      expect(isModalPresent()).toBe(mode === 'dialog');
+      if (parentDialog) {
+        expect(parentDialog.isConnected).toBe(true);
+      }
+    }
+  );
+
+  it('keeps a failed preserve-focus status item mounted through its own confirmation', async () => {
+    mode = 'status';
+    failure = 'lazy';
+    Object.assign(runtime.widgets[0]!.manifest, {
+      bottomPanel: 'popover',
+      compactSizing: 'remaining-space',
+      preserveWorkbenchFocus: true,
+    });
+    runtime.widgets[0]!.implementation = createWidgetImplementationResource('fixture', () =>
+      Promise.reject(new Error('repeat import failure'))
+    );
+    runtime.store = createWorkbenchStore(makeState(mode));
+    await render();
+    await page.getByRole('button', { name: 'Fixture failed — select to retry', exact: true }).click();
+    const reload = page.getByRole('button', { name: 'Fixture failed — Reload editor', exact: true });
+    await reload.click();
+    const confirm = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+    await expect.poll(() => isModalPresent()).toBe(true);
+    await expect.element(confirm).toBeVisible();
+    await expect.element(confirm.getByRole('button', { name: 'Cancel', exact: true })).toHaveFocus();
+    expect(runtime.reload).not.toHaveBeenCalled();
+    await confirm.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect.element(reload).toHaveFocus();
+    await expect.poll(() => isModalPresent()).toBe(false);
+    await reload.click();
+    await expect.element(confirm).toBeVisible();
+    await userEvent.keyboard('{Escape}');
+    await expect.element(confirm).not.toBeInTheDocument();
+    await expect.element(reload).toHaveFocus();
+    expect(runtime.reload).not.toHaveBeenCalled();
+    await reload.click();
+    await confirm.getByRole('button', { name: 'Reload editor', exact: true }).click();
+    expect(runtime.reload).toHaveBeenCalledOnce();
+    await expect.poll(() => isModalPresent()).toBe(false);
+  });
+
+  it.each(['account', 'project', 'remove', 'unmount'] as const)(
+    'keeps a pending reload refusal silent after %s departure',
+    async (transition) => {
+      mode = 'status';
+      failure = 'lazy';
+      const toast = vi.spyOn(toaster, 'create').mockImplementation(() => 'departed-reload');
+      let reject!: (error: Error) => void;
+      runtime.reload.mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, rejectRun) => {
+            reject = rejectRun;
+          })
+      );
+      runtime.widgets[0]!.implementation = createWidgetImplementationResource('fixture', () =>
+        Promise.reject(new Error('repeat import failure'))
+      );
+      runtime.store = createWorkbenchStore(makeState(mode));
+      const project = runtime.store.getSnapshot().activeProject.id;
+      await render();
+      await page.getByRole('button', { name: 'Fixture failed — select to retry', exact: true }).click();
+      await page.getByRole('button', { name: 'Fixture failed — Reload editor', exact: true }).click();
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Reload editor', exact: true }).click();
+      expect(runtime.reload).toHaveBeenCalledOnce();
+      if (transition === 'account') {
+        accountLifecycle.activate('replacement', ':user:replacement');
+      } else if (transition === 'project') {
+        await act(() => {
+          runtime.store.commands.projects.create();
+        });
+        expect(runtime.store.getSnapshot().activeProject.id).not.toBe(project);
+      } else if (transition === 'remove') {
+        await act(() => runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' }));
+        expect(host.querySelector('[data-status-bar-widget="fixture"]')).toBeNull();
+      } else {
+        await act(() => root.unmount());
+      }
+      await act(async () => {
+        reject(new Error('Late save refusal'));
+        await Promise.resolve();
+      });
+      expect(runtime.reload).toHaveBeenCalledOnce();
+      expect(toast).not.toHaveBeenCalled();
+      toast.mockRestore();
+    }
+  );
 
   it.each(['center', 'status'] as const)(
     'cancels explicit %s reload without losing open projects’ edit histories',

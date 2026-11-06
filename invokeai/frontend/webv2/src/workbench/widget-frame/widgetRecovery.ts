@@ -3,7 +3,7 @@ import type { RegisteredWidget } from '@workbench/widgetContracts';
 import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';
-import { describeWorkbenchReloadError } from '@workbench/projects/reloadWorkbench';
+import { describeWorkbenchReloadError, WorkbenchReloadError } from '@workbench/projects/reloadWorkbench';
 import { useActiveProjectSelector, useWorkbenchInternalStore, useWorkbenchReload } from '@workbench/WorkbenchContext';
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -69,30 +69,37 @@ export const useWidgetRecovery = (
         isCurrent() &&
         recovery.getSnapshot().generation === retryGeneration;
       return async () => {
-        if (!current()) {
+        let refusal: { error: unknown } | undefined;
+        if (current()) {
+          try {
+            await recovery.reload(() => reload(current));
+          } catch (error) {
+            refusal = { error };
+          }
+        }
+        // An expired request can explain itself only to the same owner after its view is visible again.
+        if (!lease.current.active || !isCurrent()) {
           return;
         }
-        await recovery.reload(async () => {
-          try {
-            await reload(current);
-          } catch (error) {
-            if (!current()) {
-              return;
-            }
-            createLogger({ area: 'widget-recovery', namespace: 'system' })
-              .child({ projectId })
-              .error({
-                error,
-                context: error instanceof AggregateError ? { pixelFailures: error.errors } : undefined,
-                message: 'Editor reload was refused',
-                name: 'widget.reload-refused',
-              });
-            toaster.create({
-              type: 'error',
-              title: t('widgets.failure.reloadFailed'),
-              description: describeWorkbenchReloadError(error, t),
-            });
-          }
+        if (!current()) {
+          refusal = { error: new WorkbenchReloadError('inactive') };
+        }
+        if (!refusal) {
+          return;
+        }
+        const { error } = refusal;
+        createLogger({ area: 'widget-recovery', namespace: 'system' })
+          .child({ projectId })
+          .error({
+            error,
+            context: error instanceof AggregateError ? { pixelFailures: error.errors } : undefined,
+            message: 'Editor reload was refused',
+            name: 'widget.reload-refused',
+          });
+        toaster.create({
+          type: 'error',
+          title: t('widgets.failure.reloadFailed'),
+          description: describeWorkbenchReloadError(error, t),
         });
       };
     },
