@@ -450,10 +450,11 @@ const CompactBottomWidget = ({
       {recovery.error && (item.isExpandable || item.isPopover) ? failureOpenButton : null}
       {!recovery.error && tooltipError ? (
         <CompactWidgetFailure
-          isRetrying={recovery.retrying}
+          isRetrying={recovery.retrying || recovery.reloading}
           label={item.label}
           message={tooltipError.message}
           onRetry={recovery.retry}
+          onRequestReload={recovery.reloadAvailable ? recovery.requestReload : undefined}
         />
       ) : null}
     </Box>

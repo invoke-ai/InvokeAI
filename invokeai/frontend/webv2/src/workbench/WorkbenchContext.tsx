@@ -28,7 +28,7 @@ import {
   type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
-import { reloadWorkbench } from './projects/reloadWorkbench';
+import { reloadWorkbench, WorkbenchReloadError } from './projects/reloadWorkbench';
 import {
   createSyncedWorkbenchPersistence,
   type SyncedWorkbenchPersistence,
@@ -427,7 +427,7 @@ export const useWorkbenchReload = () => {
   const owner = captureAccountScope();
   return async (isCurrent: () => boolean) => {
     if (!store || !persistence || !engines) {
-      throw new Error('Workbench persistence is unavailable.');
+      throw new WorkbenchReloadError('unavailable');
     }
     const current = () => isAccountScopeCurrent(owner) && isCurrent();
     if (!current()) {

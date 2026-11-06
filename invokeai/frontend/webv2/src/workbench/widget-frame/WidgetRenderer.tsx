@@ -238,7 +238,7 @@ const WidgetRecoveryBoundary = ({
           : fallback
       }
       framed={framed}
-      isRetrying={recovery.retrying}
+      isRetrying={recovery.retrying || recovery.reloading}
       instance={instance}
       presentation={presentation}
       projectId={projectId}
@@ -247,6 +247,9 @@ const WidgetRecoveryBoundary = ({
       widget={widget}
       widgetId={widget.manifest.id}
       onRetry={recovery.retry}
+      onRequestReload={
+        recovery.reloadAvailable && (slot === presentation || slot === 'body') ? recovery.requestReload : undefined
+      }
       onFailure={recovery.fail}
       onRecovered={recovery.recover}
     >

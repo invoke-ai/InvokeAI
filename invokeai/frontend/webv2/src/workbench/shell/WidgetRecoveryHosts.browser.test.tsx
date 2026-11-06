@@ -16,6 +16,7 @@ import { FocusRegionProvider } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { FloatingWidgetWindow } from '@workbench/widget-frame/FloatingWidgetWindow';
 import { WidgetRendererById } from '@workbench/widget-frame/WidgetRenderer';
+import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import { createInitialWorkbenchState, getPanelSizeBounds } from '@workbench/workbenchState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { WorkbenchWidgetRegistryProvider } from '@workbench/WorkbenchWidgetRegistryContext';
@@ -33,12 +34,14 @@ import { StatusBar } from './StatusBar';
 const runtime = vi.hoisted(() => ({
   store: null as unknown as WorkbenchInternalStore,
   widgets: [] as RegisteredWidget[],
+  reload: vi.fn(() => Promise.resolve()),
 }));
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const extensions = createExtensionRegistry();
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof WorkbenchContext>()),
   useWorkbenchInternalStore: () => runtime.store,
+  useWorkbenchReload: () => runtime.reload,
   useWorkbenchCommands: () => runtime.store.commands,
   useOptionalWorkbenchCommands: () => runtime.store.commands,
   useWorkbenchQueries: () => runtime.store.queries,
@@ -145,12 +148,14 @@ const ActualHost = () => {
   }
   if (mode === 'status') {
     return (
-      <>
+      <div style={{ display: 'flex', flex: 1, minWidth: 0, flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flex: 1, minHeight: 0, justifyContent: 'flex-end' }}>
+          {failure === 'tooltip' ? (
+            <WidgetRendererById instanceId="fixture" region="right" widget={runtime.widgets[0]!} />
+          ) : null}
+        </div>
         <StatusBar dropState={DROP_STATE} />
-        {failure === 'tooltip' ? (
-          <WidgetRendererById instanceId="fixture" region="right" widget={runtime.widgets[0]!} />
-        ) : null}
-      </>
+      </div>
     );
   }
   const window = snapshot.activeProject.floatingWidgets?.fixture;
@@ -209,6 +214,7 @@ beforeEach(async () => {
   await page.viewport(1280, 900);
   accountLifecycle.activate('recovery-hosts', ':user:recovery-hosts');
   broken = true;
+  runtime.reload.mockClear();
   attempts = 0;
   releaseLoad = null;
   runtime.widgets = registerWidgets([
@@ -400,6 +406,127 @@ describe('real shell recovery hosts', () => {
     expect(host.querySelector('button[aria-label="Fixture failed — select to retry"]')).not.toBeNull();
     expect(host.querySelector('[data-testid="widget-failure"]')).toBeNull();
     expect(host.textContent).toContain('Fixture ready 0');
+  });
+
+  it.each(['center', 'status'] as const)(
+    'cancels explicit %s reload without losing open projects’ edit histories',
+    async (hostMode) => {
+      mode = hostMode;
+      failure = 'lazy';
+      if (hostMode === 'status') {
+        runtime.widgets[0]!.manifest.bottomPanel = 'popover';
+      }
+      runtime.widgets[0]!.implementation = createWidgetImplementationResource('fixture', () =>
+        Promise.reject(new Error('deterministic import failure'))
+      );
+      runtime.store = createWorkbenchStore(makeState(mode));
+      const first = runtime.store.getSnapshot().activeProject.id;
+      runtime.store.commands.projects.create();
+      for (const project of runtime.store.getSnapshot().projects) {
+        runtime.store.commands.workflows.editGraph(
+          { patch: { name: `Edited ${project.id}` }, type: 'setMetadata' },
+          { projectId: project.id, workflowId: project.workflows.activeWorkflowId }
+        );
+      }
+      runtime.store.commands.projects.switchTo(first);
+      const histories = runtime.store.getSnapshot().projects.map((project) => project.workflowHistories);
+      expect(histories.every((history) => Object.values(history).some((entry) => entry.past.length > 0))).toBe(true);
+      await render();
+      const selector =
+        hostMode === 'status'
+          ? 'button[aria-label="Fixture failed — select to retry"]'
+          : '[data-testid="widget-failure"] button';
+      await expect.poll(() => host.querySelector(selector)).not.toBeNull();
+      const row = host.querySelector('[data-status-bar-widget="fixture"] [data-scope="popover"][data-part="trigger"]');
+      if (hostMode === 'status') {
+        expect(row).not.toBeNull();
+      }
+      await userEvent.click(host.querySelector<HTMLButtonElement>(selector)!);
+      const reload =
+        hostMode === 'status'
+          ? page.getByRole('button', { name: 'Fixture failed — Reload editor', exact: true })
+          : page.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.click();
+      const dialog = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+      await expect.element(dialog).toBeVisible();
+      expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('ALL open projects');
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect.element(reload).toHaveFocus();
+      expect(runtime.reload).not.toHaveBeenCalled();
+      expect(host.querySelector('button button')).toBeNull();
+      expect(host.querySelector('[data-status-bar-widget="fixture"] [data-scope="popover"][data-part="trigger"]')).toBe(
+        row
+      );
+      runtime.store.getSnapshot().projects.forEach((project, index) => {
+        expect(project.workflowHistories).toBe(histories[index]);
+        runtime.store.commands.workflows.undo({
+          projectId: project.id,
+          workflowId: project.workflows.activeWorkflowId,
+        });
+        expect(runtime.store.queries.getProject(project.id)?.workflows.entries[0]!.document.name).toBe(
+          'Untitled Workflow'
+        );
+      });
+    }
+  );
+
+  it('retires a tooltip failure when Retry succeeds with its tooltip closed', async () => {
+    mode = 'status';
+    failure = 'tooltip';
+    runtime.widgets[0]!.manifest.bottomPanel = 'tooltip';
+    runtime.store = createWorkbenchStore(makeState(mode));
+    await render();
+    const row = host.querySelector<HTMLElement>('[data-status-bar-widget="fixture"] [role="button"]')!;
+    await userEvent.hover(row);
+    await expect.poll(() => document.querySelector('[role="tooltip"] [data-testid="widget-failure"]')).not.toBeNull();
+    await userEvent.unhover(row);
+    await expect.poll(() => document.querySelector('[role="tooltip"] [data-testid="widget-failure"]')).toBeNull();
+    broken = false;
+    await userEvent.click(
+      host.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — select to retry"]')!
+    );
+    await expect.poll(() => host.querySelector('button[aria-label="Fixture failed — select to retry"]')).toBeNull();
+    await expect
+      .poll(() => host.querySelector('[data-status-bar-widget="fixture"] [role="status"]')?.textContent)
+      .toBe('Fixture recovered');
+    expect(host.querySelector('[data-status-bar-widget="fixture"] [role="button"]')).toBe(row);
+    expect(runtime.store.widgetRecovery.get('fixture')!.getSnapshot().errors).toEqual({});
+  });
+
+  it('retires an unmounted tooltip generation when a surviving panel retries the same instance', async () => {
+    mode = 'status';
+    failure = 'tooltip';
+    runtime.widgets[0]!.manifest.bottomPanel = 'tooltip';
+    const state = makeState(mode);
+    state.projects[0]!.widgetRegions.right.instanceIds = ['fixture'];
+    state.projects[0]!.widgetRegions.right.activeInstanceId = 'fixture';
+    runtime.store = createWorkbenchStore(state);
+    await render();
+    const row = host.querySelector<HTMLElement>('[data-status-bar-widget="fixture"] [role="button"]')!;
+    await userEvent.hover(row);
+    await expect.poll(() => document.querySelector('[role="tooltip"] [data-testid="widget-failure"]')).not.toBeNull();
+    await userEvent.unhover(row);
+    await expect.poll(() => document.querySelector('[role="tooltip"] [data-testid="widget-failure"]')).toBeNull();
+    await act(() => runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' }));
+    expect(host.querySelector('[data-status-bar-widget="fixture"]')).toBeNull();
+    const panel = host.querySelector<HTMLElement>('[data-focus-region="right"]')!;
+    await userEvent.click(
+      [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fixture action')!
+    );
+    broken = false;
+    await userEvent.click(
+      panel.querySelector<HTMLButtonElement>('button[aria-label="Fixture failed — select to retry"]')!
+    );
+    await expect.poll(() => runtime.store.widgetRecovery.get('fixture')!.getSnapshot().errors).toEqual({});
+    await expect
+      .poll(
+        () =>
+          host.querySelector('[data-focus-region="right"]')?.parentElement?.querySelector('[role="status"]')
+            ?.textContent
+      )
+      .toBe('Fixture recovered');
+    await act(() => runtime.store.commands.widgets.toggle({ region: 'bottom', widgetId: 'fixture' }));
+    expect(host.querySelector('button[aria-label="Fixture failed — select to retry"]')).toBeNull();
   });
 
   it('keeps a stable status popover trigger and named focus host through failure and retry', async () => {

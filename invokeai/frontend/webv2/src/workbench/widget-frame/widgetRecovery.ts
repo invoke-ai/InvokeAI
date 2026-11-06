@@ -1,7 +1,9 @@
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 
+import { createLogger } from '@platform/logging/logger';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { toaster } from '@platform/ui/toaster';
+import { describeWorkbenchReloadError } from '@workbench/projects/reloadWorkbench';
 import { useActiveProjectSelector, useWorkbenchInternalStore, useWorkbenchReload } from '@workbench/WorkbenchContext';
 import { useCallback, useRef, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,20 +18,22 @@ export const useWidgetRecovery = (
   const account = captureAccountScope();
   const projectId = useActiveProjectSelector((project) => project.id);
   const recovery = owner.widgetRecovery.get(instanceId)!;
-  const key = (name: string) => `${region}:${name}`;
+  const prefix = `${region}:`;
+  const slotKey = prefix + slot;
+  const key = (name: string) => prefix + name;
   // The registry resource can outlive this view; a reload requested here cannot.
   const lease = useRef({ active: true, generation: 0 });
   const subscribe = useCallback(
     (listener: () => void) => {
       lease.current.active = true;
-      const unsubscribe = recovery.subscribe(listener);
+      const unsubscribe = recovery.subscribe(listener, slotKey);
       return () => {
         lease.current.active = false;
         lease.current.generation += 1;
         unsubscribe();
       };
     },
-    [recovery]
+    [recovery, slotKey]
   );
   const snapshot = useSyncExternalStore(subscribe, recovery.getSnapshot);
   const reload = useWorkbenchReload();
@@ -50,23 +54,47 @@ export const useWidgetRecovery = (
     getError: (name: string) => snapshot.errors[key(name)],
     retry: () => {
       if (isCurrent() && lease.current.active) {
-        const generation = lease.current.generation;
-        const current = () => lease.current.active && lease.current.generation === generation && isCurrent();
-        recovery.retry(widget, async () => {
-          if (current()) {
-            await reload(current).catch((error: unknown) => {
-              if (!current()) {
-                return;
-              }
-              toaster.create({
-                type: 'error',
-                title: t('widgets.failure.reloadFailed'),
-                description: error instanceof Error ? error.message : String(error),
+        recovery.retry(widget);
+      }
+    },
+    requestReload: () => {
+      if (!isCurrent() || !lease.current.active || !snapshot.reloadAvailable) {
+        return;
+      }
+      const generation = lease.current.generation;
+      const retryGeneration = snapshot.generation;
+      const current = () =>
+        lease.current.active &&
+        lease.current.generation === generation &&
+        isCurrent() &&
+        recovery.getSnapshot().generation === retryGeneration;
+      return async () => {
+        if (!current()) {
+          return;
+        }
+        await recovery.reload(async () => {
+          try {
+            await reload(current);
+          } catch (error) {
+            if (!current()) {
+              return;
+            }
+            createLogger({ area: 'widget-recovery', namespace: 'system' })
+              .child({ projectId })
+              .error({
+                error,
+                context: error instanceof AggregateError ? { pixelFailures: error.errors } : undefined,
+                message: 'Editor reload was refused',
+                name: 'widget.reload-refused',
               });
+            toaster.create({
+              type: 'error',
+              title: t('widgets.failure.reloadFailed'),
+              description: describeWorkbenchReloadError(error, t),
             });
           }
         });
-      }
+      };
     },
     recover: () => {
       if (

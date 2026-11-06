@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSaveResult } from './syncedPersistence';
 
-import { reloadWorkbench } from './reloadWorkbench';
+import { reloadWorkbench, WorkbenchReloadError, describeWorkbenchReloadError } from './reloadWorkbench';
 
 beforeEach(() => {
   accountLifecycle.activate('reload-test', ':user:reload-test');
@@ -156,7 +156,7 @@ it('saves an expected first board assignment on the next attempt without bypassi
   const f = fixture();
   const projectId = f.store.getSnapshot().activeProject.id;
   f.result.projectBoardAssignments = [{ projectId, boardId: 'new-inbox' }];
-  await expect(reloadWorkbench(f)).rejects.toThrow('The workspace changed during recovery.');
+  await expect(reloadWorkbench(f)).rejects.toMatchObject({ reason: 'changed' });
   expect(f.reload).not.toHaveBeenCalled();
   expect(getProjectWidgetValues(f.store.getSnapshot().activeProject, 'gallery').projectBoardId).toBe('new-inbox');
   f.result.projectBoardAssignments = [];
@@ -173,7 +173,7 @@ it('does not apply a first-save board assignment after the captured account has 
     accountLifecycle.activate('replacement-account', ':user:replacement-account');
     return Promise.resolve(f.result);
   });
-  await expect(reloadWorkbench(f)).rejects.toThrow('The recovery owner is no longer active.');
+  await expect(reloadWorkbench(f)).rejects.toMatchObject({ reason: 'inactive' });
   expect(f.store.getState()).toBe(before);
   expect(f.reload).not.toHaveBeenCalled();
 });
@@ -193,7 +193,7 @@ it('stops applying assignments if publishing one ends the captured account', asy
     }
   });
   try {
-    await expect(reloadWorkbench(f)).rejects.toThrow('The recovery owner is no longer active.');
+    await expect(reloadWorkbench(f)).rejects.toMatchObject({ reason: 'inactive' });
     const projects = f.store.getSnapshot().projects;
     expect(getProjectWidgetValues(projects[0]!, 'gallery').projectBoardId).toBe('first-board');
     expect(getProjectWidgetValues(projects[1]!, 'gallery').projectBoardId).toBeUndefined();
@@ -201,4 +201,29 @@ it('stops applying assignments if publishing one ends the captured account', asy
   } finally {
     unsubscribe();
   }
+});
+
+it('localizes refusal reasons while retaining pixel failure diagnostics', async () => {
+  const translate = (key: string) => `localized:${key}`;
+  for (const reason of ['inactive', 'unsaved', 'changed', 'unavailable'] as const) {
+    expect(describeWorkbenchReloadError(new WorkbenchReloadError(reason), translate)).toBe(
+      `localized:widgets.failure.reloadReasons.${reason}`
+    );
+  }
+  const f = fixture();
+  const failure = new Error('Pixel encoder diagnostic');
+  f.engines.flushPendingPixels.mockRejectedValueOnce(failure);
+  let caught: unknown;
+  try {
+    await reloadWorkbench(f);
+  } catch (error) {
+    caught = error;
+  }
+  expect(caught).toBeInstanceOf(AggregateError);
+  expect((caught as AggregateError).errors).toEqual([failure]);
+  expect(describeWorkbenchReloadError(caught, translate)).toBe('localized:widgets.failure.reloadReasons.pixels');
+  expect(describeWorkbenchReloadError(new Error('Untranslated backend detail'), translate)).toBe(
+    'localized:widgets.failure.reloadReasons.failed'
+  );
+  expect(f.reload).not.toHaveBeenCalled();
 });

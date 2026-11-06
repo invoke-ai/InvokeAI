@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
+import { createServer, request as requestHttp } from 'node:http';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
@@ -1567,32 +1568,111 @@ const runHiddenMaintenanceJourney = async (browser) => {
   };
 };
 
-/** Fault the actual first-party production module request; cover in-place retry and repeated rejection recovery. */
-const runNativeWidgetRecoveryJourney = async (browser, failures) => {
-  const id = failures === 1 ? 'workbench-native-import-recovery' : 'workbench-native-import-repeated-recovery';
+/** Fault on the wire so the default production worker, not a page interception, handles these responses. */
+const startAssetFaultProxy = async (chunk, failures) => {
+  const requests = [];
+  const server = createServer((incoming, outgoing) => {
+    if (incoming.url === `/${chunk}` && requests.length < failures) {
+      requests.push(503);
+      outgoing.writeHead(503, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
+      outgoing.end('Temporary module outage');
+      return;
+    }
+    const upstream = requestHttp(
+      new URL(incoming.url, origin),
+      {
+        method: incoming.method,
+        headers: { ...incoming.headers, host: new URL(origin).host },
+      },
+      (response) => {
+        if (incoming.url === `/${chunk}`) {
+          requests.push(response.statusCode);
+        }
+        outgoing.writeHead(response.statusCode, response.headers);
+        response.pipe(outgoing);
+      }
+    );
+    upstream.on('error', (error) => outgoing.destroy(error));
+    incoming.pipe(upstream);
+  });
+  await new Promise((resolveListen, reject) => {
+    server.once('error', reject);
+    server.listen(0, '127.0.0.1', resolveListen);
+  });
+  return {
+    origin: `http://127.0.0.1:${server.address().port}`,
+    requests,
+    close: () =>
+      new Promise((resolveClose) => {
+        server.closeAllConnections();
+        server.close(resolveClose);
+      }),
+  };
+};
+
+/** Fault the actual first-party production module request; Retry never silently reloads the editor. */
+const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = false) => {
+  const id = activeWorker
+    ? 'workbench-native-import-active-worker-recovery'
+    : failures === 1
+      ? 'workbench-native-import-recovery'
+      : 'workbench-native-import-repeated-recovery';
   await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
   const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
   const chunk = manifest['src/workbench/widgets/preview/implementation.ts'].file;
+  const proxy = activeWorker ? await startAssetFaultProxy(chunk, failures) : null;
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce',
-    serviceWorkers: 'block',
+    ...(activeWorker ? {} : { serviceWorkers: 'block' }),
   });
   const page = await context.newPage();
   let remainingFailures = failures;
-  const requests = [];
-  await page.route(`**/${chunk}`, async (route) => {
-    const blocked = remainingFailures-- > 0;
-    requests.push(blocked ? 503 : 200);
-    if (blocked) {
-      await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
-    } else {
-      await route.continue();
+  const requests = proxy?.requests ?? [];
+  const workerResponses = [];
+  page.on('response', (response) => {
+    if (new URL(response.url()).pathname === `/${chunk}`) {
+      workerResponses.push({ status: response.status(), fromServiceWorker: response.fromServiceWorker() });
     }
   });
+  if (!activeWorker) {
+    await page.route(`**/${chunk}`, async (route) => {
+      const blocked = remainingFailures-- > 0;
+      requests.push(blocked ? 503 : 200);
+      if (blocked) {
+        await route.fulfill({ status: 503, contentType: 'text/javascript', body: 'Temporary module outage' });
+      } else {
+        await route.continue();
+      }
+    });
+  }
   try {
-    await page.goto(`${origin}${representativeProjectPath}`);
+    if (activeWorker) {
+      await page.goto(proxy.origin);
+      await page.evaluate(async () => {
+        await navigator.serviceWorker.ready;
+        if (!navigator.serviceWorker.controller) {
+          await new Promise((resolveController) => {
+            navigator.serviceWorker.addEventListener('controllerchange', resolveController, { once: true });
+          });
+        }
+      });
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      assert.equal(await page.evaluate(() => new URL(navigator.serviceWorker.controller.scriptURL).pathname), '/sw.js');
+      assert.deepEqual(requests, [], 'The lazy target must not already be cached before the fault.');
+    }
+    await page.goto(`${proxy?.origin ?? origin}${representativeProjectPath}`);
     await waitForWorkbench(page);
+    let canvasUndoName;
+    if (failures > 1) {
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      await page.getByRole('button', { name: 'Add layer', exact: true }).click();
+      await page.getByRole('menuitem', { name: 'Raster layer', exact: true }).click();
+      const undo = page.getByRole('button', { name: /^Undo: / });
+      await undo.waitFor();
+      canvasUndoName = await undo.getAttribute('aria-label');
+      assert.equal(await undo.isEnabled(), true);
+    }
     await selectLayoutPreset(page, 'Compose', 'Preview');
     const card = centerRegion(page).locator('[data-testid="widget-failure"]');
     await card.getByRole('button', { name: 'Retry', exact: true }).waitFor();
@@ -1614,6 +1694,35 @@ const runNativeWidgetRecoveryJourney = async (browser, failures) => {
     await retry.focus();
     await retry.press('Enter');
     if (failures > 1) {
+      const reload = card.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.waitFor();
+      assert.equal(
+        await page.evaluate(() => performance.timeOrigin),
+        before,
+        'Ordinary Retry must keep the document and its undo histories.'
+      );
+      await reload.click();
+      const dialog = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+      await dialog.waitFor();
+      assert.match(await dialog.textContent(), /ALL open projects.*Canvas undo and per-workflow edit histories/);
+      await waitForSettledDocument(page);
+      await assertNoAxeViolations(page, `${id}:confirmation`);
+      await page.screenshot({ path: resolve(output, `${id}-confirmation.png`) });
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      assert.equal(await page.evaluate(() => performance.timeOrigin), before);
+      assert.equal(await prompt.inputValue(), draft);
+      await selectLayoutPreset(page, 'Edit', 'Canvas');
+      const retainedUndo = page.getByRole('button', { name: canvasUndoName, exact: true });
+      assert.equal(await retainedUndo.isEnabled(), true, 'Cancel must retain real Canvas undo, across layout hiding.');
+      await selectLayoutPreset(page, 'Compose', 'Preview');
+      // A new held draft proves confirmation saves the current editor, not just the earlier Retry's checkpoint.
+      await prompt.fill(`${draft} after cancel`);
+      const beforeConfirm = await fetch(`${backendOrigin}/api/v1/projects/fixture-project-001`).then((response) =>
+        response.json()
+      );
+      assert.equal(JSON.stringify(beforeConfirm).includes(`${draft} after cancel`), false);
+      await reload.click();
+      await dialog.getByRole('button', { name: 'Reload editor', exact: true }).click();
       await page.waitForFunction((previous) => performance.timeOrigin > previous, before);
     }
     await waitForWorkbench(page);
@@ -1625,8 +1734,22 @@ const runNativeWidgetRecoveryJourney = async (browser, failures) => {
     await centerRegion(page).locator('[data-widget-loading]').waitFor({ state: 'detached' });
     await centerRegion(page).locator('[data-testid="widget-failure"]').waitFor({ state: 'detached' });
     await page.getByLabel('Positive prompt', { exact: true }).waitFor();
-    assert.equal(await page.getByLabel('Positive prompt', { exact: true }).inputValue(), draft);
+    assert.equal(
+      await page.getByLabel('Positive prompt', { exact: true }).inputValue(),
+      failures > 1 ? `${draft} after cancel` : draft
+    );
     assert.deepEqual(requests, [...Array(failures).fill(503), 200]);
+    if (activeWorker) {
+      assert.deepEqual(
+        workerResponses,
+        requests.map((status) => ({ status, fromServiceWorker: true }))
+      );
+      assert.equal(await page.evaluate(() => navigator.serviceWorker.controller.state), 'activated');
+      await page.waitForFunction(
+        async (asset) => !!(await caches.match(new URL(asset, location.origin).href, { cacheName: 'invokeai-assets' })),
+        chunk
+      );
+    }
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:recovered`);
     await page.screenshot({ path: resolve(output, `${id}-recovered.png`) });
@@ -1638,9 +1761,12 @@ const runNativeWidgetRecoveryJourney = async (browser, failures) => {
       freshDocument: await page.evaluate((previous) => performance.timeOrigin > previous, before),
       draftInitiallyUnsaved: true,
       promptPreserved: true,
+      ...(failures > 1 ? { canvasUndoRetainedOnCancel: true } : {}),
+      ...(activeWorker ? { workerResponses, workerActiveBeforeFault: true, recoveredAssetCached: true } : {}),
     };
   } finally {
     await context.close();
+    await proxy?.close();
   }
 };
 
@@ -1757,6 +1883,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-native-import-repeated-recovery') {
     reports.push(await runNativeWidgetRecoveryJourney(browser, 2));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-native-import-active-worker-recovery') {
+    reports.push(await runNativeWidgetRecoveryJourney(browser, 2, true));
   }
   if (!requestedJourney || requestedJourney === 'launchpad-users-native-import-recovery') {
     reports.push(await runNativeUsersRecoveryJourney(browser));

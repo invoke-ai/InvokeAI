@@ -7,6 +7,22 @@ import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import type { LiveCanvasEngines } from './projectAssets';
 import type { SyncedWorkbenchPersistence } from './syncedPersistence';
 
+export class WorkbenchReloadError extends Error {
+  constructor(
+    readonly reason: 'inactive' | 'unsaved' | 'changed' | 'unavailable',
+    options?: ErrorOptions
+  ) {
+    super(`Workbench reload refused: ${reason}`, options);
+    this.name = 'WorkbenchReloadError';
+  }
+}
+
+/** User-facing recovery copy is localized; diagnostic causes stay on the thrown error. */
+export const describeWorkbenchReloadError = (error: unknown, t: (key: string) => string): string =>
+  t(
+    `widgets.failure.reloadReasons.${error instanceof WorkbenchReloadError ? error.reason : error instanceof AggregateError ? 'pixels' : 'failed'}`
+  );
+
 /** A fresh document re-reads the deployment's module graph after a repeated import rejection. Never leave edits behind to obtain it. */
 export const reloadWorkbench = async ({
   owner,
@@ -25,7 +41,7 @@ export const reloadWorkbench = async ({
 }) => {
   const assertCurrent = () => {
     if (!isAccountScopeCurrent(owner) || !isCurrent() || persistence.hasClosedSession()) {
-      throw new Error('The recovery owner is no longer active.');
+      throw new WorkbenchReloadError('inactive');
     }
   };
   assertCurrent();
@@ -55,7 +71,7 @@ export const reloadWorkbench = async ({
     }
     assertCurrent();
     if (result.error || result.hasPendingChanges || result.awaitsDecision) {
-      throw new Error(result.error ?? 'Save or resolve the pending project changes, then retry recovery.');
+      throw new WorkbenchReloadError('unsaved', { cause: result.error });
     }
     // Like project close, cross the paint barrier again after the push. The visible project is last so a held
     // gesture cannot start there while another project's barrier is pending, then disappear into a reload.
@@ -65,12 +81,16 @@ export const reloadWorkbench = async ({
       .sort((a, b) => Number(a === activeProject.id) - Number(b === activeProject.id));
     for (const id of ids) {
       assertCurrent();
-      await engines.flushPendingPixels(id);
+      try {
+        await engines.flushPendingPixels(id);
+      } catch (error) {
+        throw new AggregateError([error], 'Unsaved Canvas pixels could not be persisted.');
+      }
     }
     assertCurrent();
     flushWorkbenchDrafts();
     if (canvasChanged || store.getPersistedRevision() !== revision) {
-      throw new Error('The workspace changed during recovery. Retry once editing has finished.');
+      throw new WorkbenchReloadError('changed');
     }
     reload();
   } finally {

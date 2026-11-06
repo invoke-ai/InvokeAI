@@ -8,10 +8,13 @@ import type {
 import type * as workbenchContext from '@workbench/WorkbenchContext';
 
 import { Box, ChakraProvider, Stack, Text } from '@chakra-ui/react';
+import { getLogSnapshot } from '@platform/logging/logger';
 import { StatusWidgetChip } from '@platform/ui';
+import { toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
 import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { WorkbenchReloadError } from '@workbench/projects/reloadWorkbench';
 import { createWidgetRecovery } from '@workbench/widget-frame/widgetRecoveryStore';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
@@ -20,7 +23,7 @@ import { act, Activity, useState, type ReactNode, type SVGProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 const workbenchMocks = vi.hoisted(() => ({
   project: {
@@ -72,6 +75,7 @@ vi.mock('./createWidgetRuntime', () => ({
 
 import { WidgetChromeSlotById, WidgetRenderer } from './WidgetRenderer';
 
+const recoveryCopy = (await fetch('/locales/en.json').then((r) => r.json())).widgets.failure;
 const i18n = i18next.createInstance();
 await i18n.use(initReactI18next).init({
   fallbackLng: 'en',
@@ -79,9 +83,11 @@ await i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
+        common: { cancel: 'Cancel' },
         widgets: {
           actionsLabel: '{{label}} actions',
           failure: {
+            ...recoveryCopy,
             compactLabel: '{{label}} failed — select to retry',
             copyError: 'Copy Error',
             retry: 'Retry',
@@ -216,6 +222,7 @@ const getIdentityGeometry = ({ loadedIcon = false } = {}) => {
 };
 
 beforeEach(() => {
+  workbenchMocks.project.id = 'test-project';
   workbenchMocks.reload.mockReset().mockResolvedValue(undefined);
   recoveryOwner.widgetRecovery.set('test-instance', createWidgetRecovery());
 });
@@ -613,7 +620,7 @@ describe('shared widget recovery', () => {
     }
   );
 
-  it('marks a repeated import retry busy while reload preparation is pending', async () => {
+  it('keeps Retry in place and requires a separately confirmed editor reload', async () => {
     let finish!: () => void;
     workbenchMocks.reload.mockImplementationOnce(
       () =>
@@ -622,25 +629,131 @@ describe('shared widget recovery', () => {
         })
     );
     const { widget } = createDeferredWidget();
-    const load = vi.fn().mockRejectedValue(new Error('cached import rejection'));
+    const load = vi.fn().mockRejectedValue(new Error('deterministic import rejection'));
     widget.implementation = createWidgetImplementationResource('test', load);
     await render(
       <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
     );
-    await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
-    await userEvent.click(
-      [...host!.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Retry')!
+    const retry = page.getByRole('button', { name: 'Retry', exact: true });
+    await retry.click();
+    await expect.poll(() => load.mock.calls.length).toBe(2);
+    await expect.element(page.getByRole('button', { name: 'Reload editor', exact: true })).toBeVisible();
+    expect(workbenchMocks.reload).not.toHaveBeenCalled();
+    await retry.click();
+    await expect.poll(() => load.mock.calls.length).toBe(3);
+    expect(workbenchMocks.reload).not.toHaveBeenCalled();
+    const reloadButton = page.getByRole('button', { name: 'Reload editor', exact: true });
+    await reloadButton.click();
+    const dialog = page.getByRole('alertdialog', { name: 'Reload the editor?' });
+    await expect.element(dialog).toBeVisible();
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('ALL open projects');
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain(
+      'Canvas undo and per-workflow edit histories'
     );
+    await expect.element(dialog.getByRole('button', { name: 'Cancel', exact: true })).toHaveFocus();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    expect(workbenchMocks.reload).not.toHaveBeenCalled();
+    await expect.element(reloadButton).toHaveFocus();
+    await reloadButton.click();
+    const confirm = dialog.getByRole('button', { name: 'Reload editor', exact: true });
+    await confirm.click();
     await expect.poll(() => workbenchMocks.reload.mock.calls.length).toBe(1);
-    await expect.poll(() => host!.querySelector('button[aria-busy="true"]')).not.toBeNull();
-    const retry = host!.querySelector<HTMLButtonElement>('button[aria-busy="true"]')!;
-    expect(retry.disabled).toBe(true);
-    expect(retry.getAttribute('aria-busy')).toBe('true');
-    retry.click();
-    expect(load).toHaveBeenCalledTimes(2);
+    await expect.element(confirm).toBeDisabled();
+    expect(load).toHaveBeenCalledTimes(3);
     await act(() => finish());
-    await expect.poll(() => retry.disabled).toBe(false);
+    await expect.element(dialog).not.toBeInTheDocument();
   });
+
+  it.each(['changed', 'pixels'] as const)(
+    'reports a %s refusal in localized copy and restores focus to the explicit action',
+    async (reason) => {
+      const toast = vi.spyOn(toaster, 'create').mockImplementation(() => 'reload-error');
+      workbenchMocks.reload.mockRejectedValueOnce(
+        reason === 'changed'
+          ? new WorkbenchReloadError('changed')
+          : new AggregateError([new Error('Pixel encoder diagnostic')], 'Unsaved Canvas pixels could not be persisted.')
+      );
+      const { widget } = createDeferredWidget();
+      widget.implementation = createWidgetImplementationResource('test', () =>
+        Promise.reject(new Error('unavailable'))
+      );
+      await render(
+        <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
+      );
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
+      const reload = page.getByRole('button', { name: 'Reload editor', exact: true });
+      await reload.click();
+      const dialog = page.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Reload editor', exact: true }).click();
+      await expect.element(dialog).not.toBeInTheDocument();
+      await expect.element(reload).toHaveFocus();
+      expect(toast).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          title: recoveryCopy.reloadFailed,
+          description: recoveryCopy.reloadReasons[reason],
+        })
+      );
+      expect(recoveryCopy.reloadReasons.changed).toContain('background updates');
+      if (reason === 'pixels') {
+        const entry = getLogSnapshot().entries.find((entry) => entry.name === 'widget.reload-refused');
+        expect(entry?.context).toMatchObject({
+          pixelFailures: [{ name: 'Error', message: 'Pixel encoder diagnostic' }],
+        });
+      }
+      toast.mockRestore();
+    }
+  );
+
+  it.each(['project', 'account', 'hide-and-reveal'] as const)(
+    'fences a reload confirmation after %s changes',
+    async (transition) => {
+      const { widget } = createDeferredWidget();
+      widget.implementation = createWidgetImplementationResource('test', () =>
+        Promise.reject(new Error('unavailable'))
+      );
+      const content = (
+        <WidgetRenderer instance={createInstance()} presentation="expanded" region="center" widget={widget} />
+      );
+      const Retained = ({ children }: { children: ReactNode }) => {
+        const [visible, setVisible] = useState(true);
+        return (
+          <>
+            <button type="button" onClick={() => setVisible(false)}>
+              Hide confirmation owner
+            </button>
+            <button type="button" onClick={() => setVisible(true)}>
+              Show confirmation owner
+            </button>
+            <Activity mode={visible ? 'visible' : 'hidden'}>{children}</Activity>
+          </>
+        );
+      };
+      await render(<Retained>{content}</Retained>);
+      await page.getByRole('button', { name: 'Retry', exact: true }).click();
+      await page.getByRole('button', { name: 'Reload editor', exact: true }).click();
+      if (transition === 'hide-and-reveal') {
+        await act(() =>
+          [...host!.querySelectorAll<HTMLButtonElement>('button')]
+            .find((button) => button.textContent === 'Hide confirmation owner')!
+            .click()
+        );
+        await act(() =>
+          [...host!.querySelectorAll<HTMLButtonElement>('button')]
+            .find((button) => button.textContent === 'Show confirmation owner')!
+            .click()
+        );
+      } else if (transition === 'project') {
+        workbenchMocks.project.id = 'replacement-project';
+      } else {
+        const { accountLifecycle } = await import('@platform/state/accountLifecycle');
+        accountLifecycle.activate('replacement', ':user:replacement');
+      }
+      await page.getByRole('alertdialog').getByRole('button', { name: 'Reload editor', exact: true }).click();
+      expect(workbenchMocks.reload).not.toHaveBeenCalled();
+      workbenchMocks.project.id = 'test-project';
+    }
+  );
 
   it('lets non-activation workbench chords bubble from compact Retry', async () => {
     const { widget, resolve } = createDeferredWidget();
