@@ -119,9 +119,10 @@ it('round-trips nested mixed visibility and a transformed leaf through the seria
       id: 'outer',
       name: 'outer',
       isEnabled: true,
+      opacity: 0.5,
       children: [
         { type: 'group', id: 'hidden', name: 'hidden', isEnabled: false, children: [leaf('blue')] },
-        { ...leaf('red'), transform: { x: 3, y: 1, rotation: 0, scaleX: 2, scaleY: 1 } },
+        { ...leaf('red'), opacity: 0.5, transform: { x: 3, y: 1, rotation: 0, scaleX: 2, scaleY: 1 } },
       ],
     },
     { ...leaf('base'), contentRect: { x: 0, y: 0, width: 8, height: 4 } },
@@ -143,6 +144,8 @@ it('round-trips nested mixed visibility and a transformed leaf through the seria
   expect(psd.children!.map((node) => node.name)).toEqual(['base', 'outer']);
   const outer = psd.children![1]!;
   expect(outer.hidden).toBe(false);
+  expect(outer.opacity).toBeCloseTo(0.5, 2);
+  expect(outer.children![0]!.opacity).toBeCloseTo(0.5, 2);
   expect(outer.children!.map((node) => node.name)).toEqual(['red', 'hidden']);
   expect(outer.children![0]).toMatchObject({ left: 3, top: 1, right: 7, bottom: 3, hidden: false });
   const hidden = outer.children![1]!;
@@ -152,7 +155,7 @@ it('round-trips nested mixed visibility and a transformed leaf through the seria
   const expected: number[] = [];
   for (let y = 0; y < 4; y += 1) {
     for (let x = 0; x < 8; x += 1) {
-      expected.push(...(x >= 3 && x < 7 && y >= 1 && y < 3 ? [255, 0, 0, 255] : [0, 255, 0, 255]));
+      expected.push(...(x >= 3 && x < 7 && y >= 1 && y < 3 ? [64, 191, 0, 255] : [0, 255, 0, 255]));
     }
   }
   expect(Array.from(psd.imageData!.data)).toEqual(expected);

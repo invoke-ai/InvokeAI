@@ -456,6 +456,8 @@ describe('PSD execution resource ownership', () => {
             height: rect.height,
           }) as ImageData,
         writePsd: () => {
+          expect(temporary.length).toBeGreaterThan(0);
+          expect(temporary.every((surface) => surface.width === 0 && surface.height === 0)).toBe(true);
           if (outcome === 'failure') {
             throw new Error('writer failed');
           }

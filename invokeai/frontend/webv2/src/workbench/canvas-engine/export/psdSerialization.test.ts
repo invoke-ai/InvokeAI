@@ -87,3 +87,11 @@ describe('operation-owned PSD serialization worker', () => {
     expect(TestWorker.instances).toHaveLength(0);
   });
 });
+
+it('reports request deserialization failure through the private worker protocol', async () => {
+  const scope = { postMessage: vi.fn(), onmessage: null, onmessageerror: null as null | (() => void) };
+  vi.stubGlobal('self', scope);
+  await import('./psdSerialization.worker');
+  scope.onmessageerror!();
+  expect(scope.postMessage).toHaveBeenCalledWith({ id: 1, error: 'PSD serialization request could not be read.' });
+});

@@ -32,9 +32,30 @@ describe('real PSD serialization lifecycle', () => {
   it('releases workers after failure and repeated success; transfers only owned pixels', async () => {
     const NativeWorker = globalThis.Worker;
     const active = new Set<Worker>();
+    const received: unknown[] = [];
     class TrackedWorker extends NativeWorker {
       constructor(url: string | URL, options?: WorkerOptions) {
-        super(url, options);
+        const bootstrap = URL.createObjectURL(
+          new Blob(
+            [
+              `self.onmessage = async (event) => {
+          await import(${JSON.stringify(new URL(url, location.href).href)});
+          if (event.data.psd.imageData) self.postMessage({ id: 0, received: { plain: Object.getPrototypeOf(event.data.psd.imageData) === Object.prototype,
+            bytes: event.data.psd.imageData.data.buffer.byteLength,
+            first: Array.from(event.data.psd.imageData.data.subarray(0,4)) } });
+          self.onmessage(event);
+        };`,
+            ],
+            { type: 'text/javascript' }
+          )
+        );
+        super(bootstrap, options);
+        URL.revokeObjectURL(bootstrap);
+        this.addEventListener('message', ({ data }) => {
+          if (data.id === 0) {
+            received.push(data.received);
+          }
+        });
         active.add(this);
       }
       override terminate(): void {
@@ -47,12 +68,16 @@ describe('real PSD serialization lifecycle', () => {
     expect(active.size).toBe(0);
     for (let i = 0; i < 2; i += 1) {
       const psd = document(8);
+      const expected = new Uint8Array(writePsd(psd));
       const result = serializePsd(psd);
       expect(psd.imageData!.data.byteLength).toBe(0);
-      const parsed = readPsd(await result, { useImageData: true });
+      const bytes = await result;
+      expect(new Uint8Array(bytes)).toEqual(expected);
+      const parsed = readPsd(bytes, { useImageData: true });
       expect(parsed.children).toHaveLength(3);
       expect(Array.from(parsed.imageData!.data.subarray(0, 4))).toEqual([186, 189, 32, 255]);
       expect(active.size).toBe(0);
+      expect(received.at(-1)).toEqual({ plain: true, bytes: 8 * 8 * 4, first: [186, 189, 32, 255] });
     }
   });
 
@@ -144,7 +169,7 @@ describe('real PSD serialization lifecycle', () => {
       ]);
       expect(finished).toBe(false);
       expect(active.size).toBe(1);
-      expect(memory.snapshot().reservedBytes).toBeGreaterThan(0);
+      expect(memory.snapshot().reservedBytes).toBe(0);
 
       controller.cancel();
       expect(active.size).toBe(0);

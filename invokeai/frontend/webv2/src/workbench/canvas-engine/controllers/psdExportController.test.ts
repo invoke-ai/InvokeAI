@@ -12,7 +12,7 @@ import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentInd
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
-import { getPsdRequiredBytes, PsdExportController } from './psdExportController';
+import { PsdExportController } from './psdExportController';
 
 const document: CanvasDocumentContractV3 = {
   background: 'transparent',
@@ -189,9 +189,8 @@ describe('PsdExportController', () => {
 
     await expect(controller.export('grown.psd')).resolves.toBe('exported');
     const plan = execute.mock.calls[0]![0] as Extract<PsdExportPlan, { status: 'ok' }>;
-    expect(reserve).toHaveBeenCalledWith(getPsdRequiredBytes(plan));
-    // Raster-only accounting misses writer growth and the output/download overlap.
-    expect(reserve.mock.calls[0]![0]).toBeGreaterThan(30 * 40 * 8 * 2);
+    expect(reserve).toHaveBeenCalledWith(30 * 40 * 8 * 2);
+    expect(plan.width).toBe(30);
   });
 
   it('exports valid captured pixels while skipping a confirmed-empty paint layer', async () => {
@@ -302,7 +301,7 @@ describe('PsdExportController', () => {
         documentGeneration: 1,
       }),
       captureRasterSnapshot,
-      getAvailableBytes: () => 160_001,
+      getAvailableBytes: () => 159_999,
       isDocumentSnapshotCurrent: () => true,
       reserve,
     });
@@ -542,5 +541,61 @@ describe('PsdExportController — spatial adjustments', () => {
       status: 'adjustment-refused',
     });
     expect(runSpatial).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('PSD operation lifetime', () => {
+  it('rejects concurrent starts, releases on execute failure, rethrows and permits a fresh retry', async () => {
+    const backend = createTestStubRasterBackend();
+    const snapshotRelease = vi.fn();
+    const leaseRelease = vi.fn();
+    let fail!: (error: Error) => void;
+    const execute = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            fail = reject;
+          })
+      )
+      .mockResolvedValue(undefined);
+    const onStatus = vi.fn();
+    const capture = vi.fn(() =>
+      Promise.resolve({
+        status: 'ok' as const,
+        snapshot: {
+          canvas,
+          documentGeneration: 1,
+          emptyLayerIds: new Set<string>(),
+          layerSurfaces: new Map([
+            ['layer', { rect: { x: 0, y: 0, width: 100, height: 100 }, surface: backend.createSurface(100, 100) }],
+          ]),
+          release: snapshotRelease,
+        },
+      })
+    );
+    const controller = new PsdExportController({
+      backend,
+      captureDocumentSnapshot: () => ({ canvas, documentGeneration: 1 }),
+      captureRasterSnapshot: capture,
+      execute,
+      onStatus,
+      getAvailableBytes: () => 10_000_000,
+      reserve: () => ({ status: 'ok', lease: { release: leaseRelease } }),
+      isDocumentSnapshotCurrent: () => true,
+    });
+    const pending = controller.export('failure');
+    await vi.waitFor(() => expect(execute).toHaveBeenCalledOnce());
+    await expect(controller.export('duplicate')).resolves.toBe('busy');
+    expect(capture).toHaveBeenCalledOnce();
+    const failure = new Error('allocation failed');
+    fail(failure);
+    await expect(pending).rejects.toBe(failure);
+    expect(snapshotRelease).toHaveBeenCalledOnce();
+    expect(leaseRelease).toHaveBeenCalledOnce();
+    expect(onStatus).toHaveBeenLastCalledWith('idle');
+    await expect(controller.export('retry')).resolves.toBe('exported');
+    expect(snapshotRelease).toHaveBeenCalledTimes(2);
+    expect(leaseRelease).toHaveBeenCalledTimes(2);
   });
 });

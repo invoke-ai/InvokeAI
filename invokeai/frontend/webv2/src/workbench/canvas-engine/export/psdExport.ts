@@ -13,6 +13,7 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { BlendMode, Layer as AgPsdLayer, Psd } from 'ag-psd';
 
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
@@ -377,14 +378,22 @@ export const serializePsd = (psd: Psd, signal?: AbortSignal): Promise<ArrayBuffe
     signal?.addEventListener('abort', abort, { once: true });
     try {
       const buffers: Transferable[] = [];
-      const collect = (node: AgPsdLayer): void => {
-        if (node.imageData) {
-          buffers.push(node.imageData.data.buffer);
+      const toWire = (node: AgPsdLayer): AgPsdLayer => {
+        const { imageData, children, ...metadata } = node;
+        // ImageData itself is cloned even with its buffer transferred. Transfer plain PixelData instead.
+        if (imageData) {
+          buffers.push(imageData.data.buffer);
         }
-        node.children?.forEach((child) => collect(child));
+        return {
+          ...metadata,
+          ...(imageData
+            ? { imageData: { width: imageData.width, height: imageData.height, data: imageData.data } }
+            : {}),
+          ...(children ? { children: children.map(toWire) } : {}),
+        };
       };
-      collect(psd);
-      worker.postMessage({ id: 1, psd } satisfies PsdSerializationRequest, buffers);
+      const wire = toWire(psd) as Psd;
+      worker.postMessage({ id: 1, psd: wire } satisfies PsdSerializationRequest, buffers);
     } catch (error) {
       fail(error instanceof Error ? error : new Error(String(error)));
     }
@@ -403,23 +412,7 @@ const defaultWriteImageData = (surface: RasterSurface, imageData: ImageData, x: 
 
 /** Triggers a browser download of the PSD bytes (Blob + anchor click). */
 const defaultDownload = async (data: ArrayBuffer, fileName: string): Promise<void> => {
-  const url = URL.createObjectURL(new Blob([data], { type: 'image/vnd.adobe.photoshop' }));
-  const anchor = document.createElement('a');
-  try {
-    anchor.href = url;
-    anchor.download = fileName;
-    anchor.rel = 'noopener';
-    anchor.style.display = 'none';
-    document.body.append(anchor);
-    anchor.click();
-  } finally {
-    anchor.remove();
-    // A task lets the browser consume the click, including in background tabs where animation frames stop.
-    await new Promise<void>((resolve) => {
-      setTimeout(resolve, 0);
-    });
-    URL.revokeObjectURL(url);
-  }
+  await downloadBlob(new Blob([data], { type: 'image/vnd.adobe.photoshop' }), fileName);
 };
 
 /** Injected dependencies for {@link executePsdExport}. */
@@ -428,6 +421,7 @@ export interface ExecutePsdExportDeps {
   backend: { createSurface(width: number, height: number): RasterSurface };
   /** Cancels before the next background allocation or side effect. */
   signal?: AbortSignal;
+  onStage?(stage: 'serializing' | 'downloading'): void;
   /**
    * Evaluates spatial adjustment runs; without it a spatial stack throws {@link AdjustmentRefusedError} rather than
    * bake without its spatial entries.
@@ -643,9 +637,16 @@ export const executePsdExport = async (
       width: plan.width,
     };
 
+    for (const surface of surfaces) {
+      surface.resize(0, 0);
+    }
+    surfaces.length = 0;
+    deps.onStage?.('serializing');
     throwIfAborted(deps.signal);
     const bytes = await writePsdFn(psd);
     throwIfAborted(deps.signal);
+    // Once the browser accepts the click, cancellation cannot retract the download.
+    deps.onStage?.('downloading');
     await download(bytes, fileName);
   } finally {
     for (const surface of surfaces) {

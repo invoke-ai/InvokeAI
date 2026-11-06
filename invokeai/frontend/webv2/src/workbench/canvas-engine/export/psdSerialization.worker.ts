@@ -11,3 +11,7 @@ self.onmessage = ({ data }: MessageEvent<PsdSerializationRequest>): void => {
     self.postMessage({ id: data.id, error: String(error) } satisfies PsdSerializationResponse);
   }
 };
+
+self.onmessageerror = (): void => {
+  self.postMessage({ id: 1, error: 'PSD serialization request could not be read.' } satisfies PsdSerializationResponse);
+};
