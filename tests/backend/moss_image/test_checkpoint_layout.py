@@ -88,25 +88,22 @@ def test_a_one_element_scale_is_shared_not_cut() -> None:
 
 
 def test_dense_and_int8_parts_own_their_storage() -> None:
-    """A view would keep the whole fused tensor alive for as long as any one projection lives."""
+    """A view would keep the whole fused tensor alive for as long as any one projection lives.
+
+    Ownership is read off the storage size, not its address: a view reports the whole fused storage, and the allocator
+    may reuse the fused tensor's address for a part once the split has freed it."""
     sd = {
         "layers.0.proj.qkv.weight": torch.zeros(6, 4, dtype=torch.int8),
         "layers.0.proj.qkv.weight_scale": torch.ones(6, 1),
         "layers.1.proj.qkv.weight": torch.zeros(6, 4, dtype=torch.bfloat16),
     }
-    fused = {key: value.untyped_storage().data_ptr() for key, value in sd.items()}
 
     split_fused_qkv(sd)
 
-    for layer in (0, 1):
-        pointers = {sd[f"layers.{layer}.proj.{name}.weight"].untyped_storage().data_ptr() for name in "qkv"}
-        assert len(pointers) == 3
-        assert pointers.isdisjoint(fused.values())
-        assert all(
-            sd[f"layers.{layer}.proj.{name}.weight"].untyped_storage().nbytes()
-            == sd[f"layers.{layer}.proj.{name}.weight"].nbytes
-            for name in "qkv"
-        )
+    parts = [value for key, value in sd.items() if key.split(".")[3] in "qkv"]
+    assert len(parts) == 9
+    for part in parts:
+        assert part.untyped_storage().nbytes() == part.nbytes
 
 
 @pytest.mark.parametrize(
