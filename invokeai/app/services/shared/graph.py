@@ -313,6 +313,10 @@ class _GraphExecutionStateRuntime:
         self.if_iteration_axes_validated = False
 
 
+class GraphExecutionStalledError(RuntimeError):
+    """Raised when an incomplete graph has no ready or in-flight work."""
+
+
 class GraphExecutionState(BaseModel):
     """Tracks source-graph expansion, execution progress, and runtime results."""
 
@@ -4018,6 +4022,14 @@ class GraphExecutionState(BaseModel):
         if next_node is None:
             next_node = self._prepare_until_node_ready()
 
+        if next_node is None and not self.is_complete():
+            scheduler = self._scheduler()
+            if isinstance(scheduler, _GenericGraphSchedulerAdapter) and scheduler._scheduler._claimed:
+                return None
+            raise GraphExecutionStalledError(
+                f"Execution state {self.id} is incomplete, but no invocation is ready or in flight."
+            )
+
         # Get values from edges
         if next_node is not None:
             try:
@@ -4025,7 +4037,6 @@ class GraphExecutionState(BaseModel):
             except ValidationError as e:
                 raise NodeInputError(next_node, e)
 
-        # If next is still none, there's no next node, return None
         return next_node
 
     def complete(self, node_id: str, output: BaseInvocationOutput) -> list[tuple[BaseInvocation, BaseInvocationOutput]]:

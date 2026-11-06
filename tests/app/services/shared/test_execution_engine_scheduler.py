@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation
 from invokeai.app.invocations.collections import CollectionConcatInvocation
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.invocations.math import AddInvocation, MultiplyInvocation
@@ -19,6 +20,7 @@ from invokeai.app.services.shared.graph import (
     Edge,
     EdgeConnection,
     Graph,
+    GraphExecutionStalledError,
     GraphExecutionState,
     IterateInvocation,
     _ExecutionScheduler,
@@ -113,6 +115,36 @@ def test_generic_plan_rejects_malformed_activation_dependency_snapshot() -> None
         ExecutionPlan.from_snapshot(snapshot)
 
 
+def test_graph_state_next_returns_none_while_generic_invocation_is_claimed() -> None:
+    graph = Graph()
+    graph.add_node(BooleanInvocation(id="only", value=True))
+    state = GraphExecutionState(graph=graph)
+
+    node = state.next()
+    assert node is not None
+    assert isinstance(state._scheduler(), _GenericGraphSchedulerAdapter)
+    assert state.next() is None
+    assert not state.is_complete()
+
+    state.complete(node.id, node.invoke(Mock()))
+
+    assert state.is_complete()
+    assert state.next() is None
+
+
+def test_graph_state_next_returns_none_while_waiting_on_workflow_call() -> None:
+    graph = Graph()
+    graph.add_node(CallSavedWorkflowInvocation(id="call", workflow_id="workflow"))
+    state = GraphExecutionState(graph=graph)
+
+    call = state.next()
+    assert isinstance(call, CallSavedWorkflowInvocation)
+    state.begin_waiting_on_workflow_call(state.build_workflow_call_frame(call.id, call.workflow_id))
+
+    assert state.next() is None
+    assert not state.is_complete()
+
+
 def test_graph_state_generic_if_readiness_uses_activation_dependency_records(monkeypatch: pytest.MonkeyPatch) -> None:
     graph = Graph()
     graph.add_node(BooleanInvocation(id="condition", value=True))
@@ -183,7 +215,8 @@ def test_graph_state_generic_if_readiness_uses_activation_dependency_records(mon
 
     monkeypatch.setattr(GraphExecutionState, "_is_deferred_by_unresolved_if", fail_if_topology_is_consulted)
     state._generic_graph_scheduler._scheduler.rebuild_ready()
-    assert state.next() is None
+    with pytest.raises(GraphExecutionStalledError, match="no invocation is ready or in flight"):
+        state.next()
 
     stale_token = activation_token.model_copy(update={"reference_id": "stale-reference"})
     state.execution_tokens[activation_token_id] = stale_token

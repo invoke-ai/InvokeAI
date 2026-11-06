@@ -878,8 +878,12 @@ This behavior is implemented in the runtime scheduler, not in the invocation bod
    - `node = state.next()` -> may trigger `_prepare()` expansion.
    - Execute node externally -> `run_result`.
    - `state.apply(execution_ref, run_result)` -> updates indegrees, `If` state, ready queues, and the execution ledger.
+   - Apply each result before requesting the next node; the compatibility scheduler is sequential. The generic scheduler
+     may return `None` while a previously returned invocation is still claimed and in flight.
 
-1. Finish when `next()` returns `None` and the execution state is not paused waiting on a workflow call boundary.
+1. `next()` returns `None` when the graph is complete, when workflow-call/lifecycle work is suspended externally, or
+   while the generic scheduler has claimed in-flight work. If preparation finds no ready invocation for an incomplete
+   state with no such pending work, it raises `GraphExecutionStalledError`.
 
 When an invocation reuses cached media, `BaseInvocation.invoke_internal()` registers a temporary hold for the consuming
 queue session before returning the cached output. The intermediates service checks that every referenced image/video
