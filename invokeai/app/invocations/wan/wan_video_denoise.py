@@ -37,7 +37,7 @@ from invokeai.app.invocations.wan.wan_denoise import (
     _validate_spatial_dimensions,
 )
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, WanVariantType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, WanVariantType
 from invokeai.backend.patches.layer_patcher import PatchSpec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
@@ -274,7 +274,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
 
         high_model = self.transformer.transformer
         low_model = self.transformer.transformer_low_noise
-        low_config = context.models.get_config(low_model) if low_model is not None else None
         num_train_timesteps = int(scheduler.config.num_train_timesteps)
         boundary_timestep = self.transformer.boundary_ratio * num_train_timesteps if low_model is not None else None
 
@@ -282,9 +281,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
         # wan_denoise: an empty low list means "no LoRAs on the low expert".
         high_loras = self.transformer.loras
         low_loras = self.transformer.loras_low_noise
-        high_config = context.models.get_config(high_model)
-        high_is_quantized = high_config.format == ModelFormat.GGUFQuantized
-        low_is_quantized = low_config.format == ModelFormat.GGUFQuantized if low_config is not None else False
 
         def high_lora_factory() -> Iterable[PatchSpec]:
             return proxy._lora_iterator(context, high_loras)
@@ -304,8 +300,6 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                 inference_dtype=inference_dtype,
                 high_lora_factory=high_lora_factory if high_loras else None,
                 low_lora_factory=low_lora_factory if low_loras else None,
-                high_is_quantized=high_is_quantized,
-                low_is_quantized=low_is_quantized,
                 working_mem_bytes=working_mem_bytes,
                 max_resident_model_bytes=(
                     WAN_MAX_RESIDENT_TRANSFORMER_BYTES if working_mem_bytes is not None else None

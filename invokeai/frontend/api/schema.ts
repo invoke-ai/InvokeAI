@@ -32803,7 +32803,9 @@ export type components = {
          *     Hugging Face repos: one ``.safetensors`` per transformer, in either the native
          *     upstream key layout or the diffusers one, optionally under a
          *     ``model.diffusion_model.`` prefix, and optionally ComfyUI ``fp8_scaled``
-         *     quantized. The loader normalises all of those.
+         *     quantized, or ComfyUI ``int8_tensorwise`` (convrot) quantized, which stays int8 in memory. The loader
+         *     normalises all of those. An int8 weight without a decodable ``int8_tensorwise`` marker (a bare
+         *     ``{"convrot": true}``, int4) is refused at install.
          *
          *     As with GGUF, A14B's MoE arrives as two files (one per expert); ``expert``
          *     records which one this is so the Wan model loader invocation can pair them.
