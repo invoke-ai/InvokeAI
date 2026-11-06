@@ -21,10 +21,6 @@ afterEach(() => {
   }
 });
 
-const delay = (ms: number) =>
-  new Promise<void>((resolve) => {
-    setTimeout(resolve, ms);
-  });
 const item = (name: string, boardId: string): GalleryItem => ({
   boardId,
   category: 'general',
@@ -43,6 +39,13 @@ it('refreshes two independent listings over browser completion events without st
   accountLifecycle.activate('realtime-browser');
   let savedName = 'before.png';
   let slow = false;
+  const pendingReads: Array<() => void> = [];
+  const releaseReads = () => {
+    for (const resolve of pendingReads.splice(0)) {
+      resolve();
+    }
+  };
+  cleanup.push(releaseReads);
   const completed = new Map<string, number>();
   const canceled = vi.fn();
   transport.listItems.mockReset().mockImplementation(async ({ boardId, signal }) => {
@@ -50,7 +53,9 @@ it('refreshes two independent listings over browser completion events without st
     signal.addEventListener('abort', canceled, { once: true });
     try {
       if (slow) {
-        await delay(1300);
+        await new Promise<void>((resolve) => {
+          pendingReads.push(resolve);
+        });
       }
       signal.throwIfAborted();
       completed.set(boardId, (completed.get(boardId) ?? 0) + 1);
@@ -75,12 +80,14 @@ it('refreshes two independent listings over browser completion events without st
     cleanup.push(() => receiver.close());
     const reveal = vi.fn();
     const invalidate = vi.fn(() => invalidateGallery(client));
+    let delivered = 0;
     const runtime = createGalleryRealtimeRuntime({
       backend: {
         on: (event, handler) => {
           const listener = ({ data }: MessageEvent) => {
             if (data.event === event) {
               handler(data.payload as never);
+              delivered += 1;
             }
           };
           receiver.addEventListener('message', listener);
@@ -95,7 +102,15 @@ it('refreshes two independent listings over browser completion events without st
     });
     runtime.start();
     cleanup.push(runtime.dispose);
-    return { boardId, observer, reveal, invalidate };
+    return {
+      boardId,
+      observer,
+      reveal,
+      invalidate,
+      get delivered() {
+        return delivered;
+      },
+    };
   });
   await vi.waitFor(() => expect(sessions.every(({ observer }) => observer.getCurrentResult().isSuccess)).toBe(true));
   expect(transport.listItems).toHaveBeenCalledTimes(2);
@@ -106,14 +121,26 @@ it('refreshes two independent listings over browser completion events without st
     });
   slow = true;
   savedName = 'new-output.png';
-  for (let i = 0; i < 20; i += 1) {
-    completion();
-  }
-  // Continue beyond the one-second coalescing interval while the 1.3-second reads are still running.
-  for (let i = 0; i < 12; i += 1) {
-    await delay(100);
-    completion();
-  }
+  completion();
+  await vi.waitFor(() => expect(pendingReads).toHaveLength(2));
+  // Hold both reads past the runtime's coalescing interval, until another delivered event requests a trailing pass.
+  completion();
+  await vi.waitFor(
+    () => {
+      for (const { invalidate } of sessions) {
+        expect(invalidate).toHaveBeenCalledTimes(2);
+      }
+    },
+    { timeout: 4000 }
+  );
+  expect(transport.listItems).toHaveBeenCalledTimes(4);
+  expect(canceled).not.toHaveBeenCalled();
+  releaseReads();
+  await vi.waitFor(() => {
+    expect(transport.listItems).toHaveBeenCalledTimes(6);
+    expect(pendingReads).toHaveLength(2);
+  });
+  releaseReads();
   await vi.waitFor(
     () => {
       for (const { boardId, observer } of sessions) {
@@ -132,6 +159,6 @@ it('refreshes two independent listings over browser completion events without st
     expect(invalidate).toHaveBeenCalledTimes(2);
   }
   completion('bob');
-  await delay(300);
+  await vi.waitFor(() => expect(sessions.every((session) => session.delivered === 3)).toBe(true));
   expect(transport.listItems).toHaveBeenCalledTimes(6);
 });

@@ -1458,6 +1458,24 @@ export const createDurableSyncedWorkbenchPersistence = (
         [half]: [...sent[half].filter((body) => body !== json), json].slice(-SENT_HALVES_KEPT),
       });
     };
+    /** A newer authoritative revision fences every older send of this half, even while its sibling is pending. */
+    const acknowledgeHalf = (half: 'content' | 'workspace'): void => {
+      if (half === 'content') {
+        fenceContent = false;
+      } else {
+        fenceWorkspace = false;
+      }
+      const sent = sentHalves.get(project.id);
+      if (!sent) {
+        return;
+      }
+      const remaining = { ...sent, [half]: [] };
+      if (remaining.content.length === 0 && remaining.workspace.length === 0) {
+        sentHalves.delete(project.id);
+      } else {
+        sentHalves.set(project.id, remaining);
+      }
+    };
     /**
      * The lineage rebased onto the content just acknowledged, before the workspace is sent: should that save fail or
      * the page go, recovery builds on the content the server now holds rather than conflicting with its own save.
@@ -1510,7 +1528,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           );
           return 'conflicted';
         }
-        fenceContent = false;
+        acknowledgeHalf('content');
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
         return record({
           minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
@@ -1534,7 +1552,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
-        fenceContent = false;
+        acknowledgeHalf('content');
         // Never splitting, it needs no upgrade: the shortcut for an unchanged document applies again.
         projectsRequiringDocumentUpgrade.delete(project.id);
         return record({
@@ -1572,7 +1590,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           );
           return 'conflicted';
         }
-        fenceContent = false;
+        acknowledgeHalf('content');
         pendingBoardAssignments.set(project.id, { boardId: created.board_id, projectId: project.id });
         // The answer names the workspace it stored, which is this save's only when it is what this save sent: a
         // create settled by a read of an earlier attempt that committed unanswered carries that attempt's workspace,
@@ -1581,7 +1599,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         const workspaceStored =
           created.workspace !== null && JSON.stringify(created.workspace.data) === halves.workspaceJson;
         if (workspaceStored) {
-          fenceWorkspace = false;
+          acknowledgeHalf('workspace');
         }
         acknowledged = record({
           minimumCanvasSchemaVersion: created.minimum_canvas_schema_version,
@@ -1617,10 +1635,10 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
-        fenceContent = false;
+        acknowledgeHalf('content');
         projectsRequiringDocumentUpgrade.delete(project.id);
         if (updated.workspace) {
-          fenceWorkspace = false;
+          acknowledgeHalf('workspace');
         }
         // The answer names the workspace it stored; a server that stored none leaves it owed, and it is sent next.
         acknowledged = record({
@@ -1656,7 +1674,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
-        fenceContent = false;
+        acknowledgeHalf('content');
         projectsRequiringDocumentUpgrade.delete(project.id);
         acknowledged = record({
           ...base,
@@ -1684,7 +1702,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           owner.signal
         );
         assertOwner();
-        fenceWorkspace = false;
+        acknowledgeHalf('workspace');
         acknowledged = record({
           ...acknowledged,
           pushedWorkspace: halves.workspaceJson,
@@ -1705,6 +1723,10 @@ export const createDurableSyncedWorkbenchPersistence = (
     > => {
       const latest = await api.getProject(project.id, owner.signal);
       assertOwner();
+      // A first create must match both name channels, as the API's create reconciliation requires.
+      if (!entry && latest.name !== latest.data.name) {
+        return { kind: 'diverged', serverRevision: latest.revision };
+      }
       const loaded = deserializeProjectRecord(latest);
       if (loaded.status !== 'loaded') {
         return { kind: 'diverged', serverRevision: latest.revision };
@@ -1713,24 +1735,38 @@ export const createDurableSyncedWorkbenchPersistence = (
       const serverHalves = splitProjectDocument(server.document);
       const split = isSplitProjectRecord(latest);
       const base = syncEntries.get(project.id);
-      const createdContentHeld = !entry && JSON.stringify(latest.data) === (split ? halves.contentJson : documentJson);
+      // Hydration assigns the new inbox locally; compare first-create sends against the original wire bodies too.
+      const createdContentJson = entry ? null : JSON.stringify(latest.data);
+      const createdWorkspaceJson = !entry && latest.workspace ? JSON.stringify(latest.workspace.data) : null;
+      const createdContentHeld = createdContentJson === (split ? halves.contentJson : documentJson);
       const contentHeld =
         createdContentHeld ||
         (split ? serverHalves.contentJson === halves.contentJson : keepsWhole && server.documentJson === documentJson);
       const sent = sentHalves.get(project.id);
       // Unmoved: still what this page last had acknowledged, or what it sent and never heard back about.
-      const contentUnmoved = split
-        ? base?.pushedContent === serverHalves.contentJson || sent?.content.includes(serverHalves.contentJson) === true
-        : (base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson) ||
-          sent?.content.includes(server.documentJson) === true;
+      const contentUnmoved =
+        (createdContentJson !== null && sent?.content.includes(createdContentJson) === true) ||
+        (split
+          ? base?.pushedContent === serverHalves.contentJson ||
+            sent?.content.includes(serverHalves.contentJson) === true
+          : (base !== undefined && base.pushedContent === null && base.pushedDoc === server.documentJson) ||
+            sent?.content.includes(server.documentJson) === true);
       const workspaceHeld =
-        (!entry && Boolean(latest.workspace) && JSON.stringify(latest.workspace?.data) === halves.workspaceJson) ||
+        createdWorkspaceJson === halves.workspaceJson ||
         (!split && keepsWhole) ||
         (Boolean(latest.workspace) && serverHalves.workspaceJson === halves.workspaceJson);
       const workspaceUnmoved = latest.workspace
         ? base?.pushedWorkspace === serverHalves.workspaceJson ||
-          sent?.workspace.includes(serverHalves.workspaceJson) === true
+          sent?.workspace.includes(serverHalves.workspaceJson) === true ||
+          (createdWorkspaceJson !== null && sent?.workspace.includes(createdWorkspaceJson) === true)
         : (base?.workspaceRevision ?? null) === null;
+      // Retire a proven half even when its sibling needs conflict resolution.
+      if (contentHeld && latest.revision > (base?.revision ?? 0)) {
+        acknowledgeHalf('content');
+      }
+      if (workspaceHeld && (latest.workspace?.revision ?? 0) > (base?.workspaceRevision ?? 0)) {
+        acknowledgeHalf('workspace');
+      }
       if (!(contentHeld || contentUnmoved)) {
         return { kind: 'diverged', serverRevision: latest.revision };
       }
@@ -1744,7 +1780,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         revision: latest.revision,
         workspaceRevision: latest.workspace?.revision ?? null,
       };
-      if (createdContentHeld) {
+      if (!entry && (contentHeld || contentUnmoved)) {
         pendingBoardAssignments.set(project.id, { boardId: latest.board_id, projectId: project.id });
         invalidateBoardLists(owner);
       }
@@ -2173,6 +2209,15 @@ export const createDurableSyncedWorkbenchPersistence = (
       throw error;
     }
     pendingProjectIds.add(projectId);
+    const sent = sentHalves.get(projectId);
+    if (sent) {
+      // The server workspace replaces this tab's workspace sends; pending authored content remains local.
+      if (sent.content.length > 0) {
+        sentHalves.set(projectId, { ...sent, workspace: [] });
+      } else {
+        sentHalves.delete(projectId);
+      }
+    }
     hasPending = true;
     resolveProjectSyncConflict(projectId, { projectId, revision: record.revision }, hasPending);
     projectResolutionFences.set(projectId, { kind: 'replace', project: merged.project });
@@ -3740,6 +3785,7 @@ export const createDurableSyncedWorkbenchPersistence = (
         }
         await deleteDraft(projectId);
         syncEntries.set(projectId, toSyncEntry(record, result.project));
+        sentHalves.delete(projectId);
         if (recordRequiresDocumentUpgrade(record, result.project)) {
           projectsRequiringDocumentUpgrade.add(projectId);
         } else {
