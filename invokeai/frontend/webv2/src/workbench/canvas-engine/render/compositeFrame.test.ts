@@ -1,11 +1,15 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+  CanvasNodeContract,
+} from '@workbench/canvas-engine/contracts';
 import type { SamPreviewState } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { LayerCacheEntry } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { PreviewStateController } from '@workbench/canvas-engine/controllers/previewStateController';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import * as compositor from '@workbench/canvas-engine/render/compositor';
@@ -13,7 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 
-import { createCompositeFrame, type CreateCompositeFrameDeps } from './compositeFrame';
+import { createCompositeFrame, type CreateCompositeFrameDeps, isStagingHiddenStackSelected } from './compositeFrame';
 
 const VIEW = [1, 0, 0, 1, 0, 0] as unknown as Mat2d;
 
@@ -36,7 +40,7 @@ const layer = (id: string, overrides: Record<string, unknown> = {}): CanvasLayer
     ...overrides,
   }) as unknown as CanvasLayerContract;
 
-const documentOf = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 =>
+const documentOf = (layers: CanvasNodeContract[]): CanvasDocumentContractV3 =>
   ({
     bbox: { height: 32, width: 32, x: 4, y: 6 },
     height: 64,
@@ -54,6 +58,8 @@ interface Harness {
   rasterizeLayer: ReturnType<typeof vi.fn>;
   beginFrame: ReturnType<typeof vi.fn>;
   enforce: ReturnType<typeof vi.fn>;
+  /** What the engine reports for a gesture editing a mask or region. */
+  editingHiddenStack: boolean;
 }
 
 let harness: Harness;
@@ -83,6 +89,7 @@ const makeHarness = (): Harness => {
       getCheckerboardTile: () => surface(8, 8),
       getControlView: () => harness.controlView,
       getMaskPatternTile: () => null,
+      isEditingStagingHiddenStack: () => harness.editingHiddenStack,
       layerCache: {
         byteSize: () => 0,
         get: (id: string) => entries.get(id),
@@ -101,6 +108,7 @@ const makeHarness = (): Harness => {
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
       } as unknown as CreateCompositeFrameDeps['viewport'],
     },
+    editingHiddenStack: false,
     enforce,
     entries,
     overrides,
@@ -331,11 +339,12 @@ describe('the surface budget', () => {
 });
 
 describe('masks while a result is staged', () => {
-  const mask = (id: string) =>
+  const mask = (id: string, overrides: Record<string, unknown> = {}) =>
     layer(id, {
       mask: { bitmap: { height: 8, imageName: `${id}.png`, width: 8 }, fill: { color: '#e07575', style: 'solid' } },
       source: undefined,
       type: 'inpaint_mask',
+      ...overrides,
     });
   const region = (id: string) => ({ ...mask(id), type: 'regional_guidance' }) as unknown as CanvasLayerContract;
   const control = (id: string) => layer(id, { type: 'control' });
@@ -382,15 +391,75 @@ describe('masks while a result is staged', () => {
     expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
   });
 
-  it.each(['m', 'r'])('shows them over the preview while %s, a mask or region, is selected for editing', (id) => {
+  it('shows them over the preview only while a gesture edits a mask or region, whatever is selected', () => {
+    const frame = createCompositeFrame(harness.deps);
     publishPreview();
-    draw({ ...doc, selectedLayerId: id });
+    // Selecting a mask alone keeps the result unmasked.
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
+    expect(drawnIds()).toEqual(['a', 'c']);
+
+    harness.editingHiddenStack = true;
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(drawnIds()).toEqual(['a', 'c', 'm', 'r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
     expect(lastCompositeOptions().regionOverlays).toBe(true);
     expect(lastCompositeOptions().stagedPreview).not.toBeNull();
 
-    // Selecting raster or control work hides them again.
-    draw({ ...doc, selectedLayerId: 'c' });
+    harness.editingHiddenStack = false;
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
     expect(drawnIds()).toEqual(['a', 'c']);
+    expect(lastCompositeOptions().regionOverlays).toBe(false);
+  });
+
+  it('keeps the selected mask or region loaded and demanded while hidden, and nothing else', () => {
+    const frame = createCompositeFrame(harness.deps);
+    publishPreview();
+    const drawSelected = (selectedLayerId: string, document = doc) => {
+      harness.rasterizeLayer.mockClear();
+      frame.draw(surface(), { ...document, selectedLayerId }, VIEW, null, null);
+      return harness.rasterizeLayer.mock.calls.map(([layer]) => (layer as CanvasLayerContract).id);
+    };
+
+    // A stale cache starts loading, and the frame protects the leaf from eviction though it draws none.
+    harness.entries.set('m', entryFor(undefined, true));
+    harness.entries.set('r', entryFor(undefined, true));
+    expect(drawSelected('m')).toEqual(['m']);
+    expect(drawnIds()).toEqual(['a', 'c']);
+    expect(demandedIds()).toEqual(['a', 'c', 'm']);
+    expect(drawSelected('r')).toEqual(['r']);
+    expect(demandedIds()).toEqual(['a', 'c', 'r']);
+
+    // A disabled mask draws nowhere, and a selected group's brush or shape paints a new layer instead.
+    const disabled = documentOf([layer('a'), control('c'), { ...mask('m'), isEnabled: false }, region('r')]);
+    expect(drawSelected('m', disabled)).toEqual([]);
+    expect(demandedIds()).toEqual(['a', 'c']);
+    const grouped = documentOf([layer('a'), control('c'), groupContract('g', [mask('m')]), region('r')]);
+    expect(drawSelected('g', grouped)).toEqual([]);
+    expect(demandedIds()).toEqual(['a', 'c']);
+
+    // Off screen it is left on demand, as a drawn leaf would be.
+    const offscreen = documentOf([
+      layer('a'),
+      control('c'),
+      mask('m', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 500, y: 0 } }),
+      region('r'),
+    ]);
+    expect(drawSelected('m', offscreen)).toEqual([]);
+    expect(demandedIds()).toEqual(['a', 'c']);
+
+    // Without a shown preview the stacks draw, so their leaves are demanded as usual.
+    harness.previews.clearStaged();
+    frame.draw(surface(), { ...doc, selectedLayerId: 'm' }, VIEW, null, null);
+    expect(demandedIds()).toEqual(['a', 'c', 'm', 'r']);
+  });
+
+  it.each([
+    ['m', true],
+    ['r', true],
+    ['c', false],
+    ['a', false],
+    [null, false],
+  ])('counts selecting %s as selecting a stack the staged view hides: %s', (id, hidden) => {
+    expect(isStagingHiddenStackSelected({ ...doc, selectedLayerId: id })).toBe(hidden);
   });
 });
