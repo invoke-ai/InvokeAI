@@ -1730,9 +1730,6 @@
         "vae"
       ],
       "literalInputs": {
-        "color_compensation": [
-          "None"
-        ],
         "fp32": [
           true
         ],
