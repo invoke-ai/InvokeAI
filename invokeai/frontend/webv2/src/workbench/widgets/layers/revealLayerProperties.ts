@@ -27,3 +27,27 @@ export const useRevealLayerProperties = (): ((layerId: string) => void) => {
     [registry, widgets]
   );
 };
+
+/** How long a reveal waits for the Properties pane, just opened, to render the Layer section. */
+const REVEAL_WAIT_MS = 1500;
+
+/**
+ * Scrolls the Properties pane to its Layer section, which sits below the active tool's settings and often starts out of
+ * view. The caller opens the pane first; a reveal whose pane never renders gives up quietly.
+ */
+export const revealLayerSection = (): void => {
+  const deadline = performance.now() + REVEAL_WAIT_MS;
+
+  const attempt = () => {
+    const section = [...document.querySelectorAll<HTMLElement>('[data-properties-section="layer"]')].find(
+      (element) => element.getClientRects().length > 0
+    );
+    if (section) {
+      section.scrollIntoView({ block: 'nearest' });
+    } else if (performance.now() < deadline) {
+      requestAnimationFrame(attempt);
+    }
+  };
+
+  requestAnimationFrame(attempt);
+};

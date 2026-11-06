@@ -487,6 +487,7 @@ describe('getLayerContextActions', () => {
       'duplicate',
       'group',
       'remove-from-group',
+      'open-properties',
       'rename',
       'transform',
       'fit-to-bbox',
@@ -938,6 +939,21 @@ describe('getLayerContextActions', () => {
     expect(idsFor(upper, [upper, createInpaintMaskLayer('Mask', 'mask-below')])).toEqual(
       expect.not.arrayContaining(operations)
     );
+  });
+});
+
+describe('open-properties', () => {
+  it('offers Layer properties on every layer type and opens the Properties pane through its effect', () => {
+    for (const type of ['raster', 'control', 'inpaint_mask', 'regional_guidance'] as const) {
+      const action = byId(getLayerContextActions(makeState(makeLayer(type))), 'open-properties');
+      expect(action.isDisabled, type).toBe(false);
+    }
+    expect(getEnglishTranslation('widgets.layers.actions.properties')).toBe('Layer properties');
+
+    const effects = makeEffects();
+    getLayerContextActionDefinition('open-properties').handler(makeRuntimeContext(rasterLayer, { effects }));
+
+    expect(Object.values(effects).filter((effect) => effect.mock.calls.length > 0)).toEqual([effects.openProperties]);
   });
 });
 

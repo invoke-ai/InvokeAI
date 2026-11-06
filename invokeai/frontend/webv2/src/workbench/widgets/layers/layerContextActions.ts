@@ -48,6 +48,7 @@ import {
   MergeIcon,
   PencilIcon,
   SaveIcon,
+  Settings2Icon,
   ContrastIcon,
   RainbowIcon,
   ScanSearchIcon,
@@ -90,6 +91,7 @@ export type LayerContextActionId =
   | 'duplicate'
   | 'group'
   | 'remove-from-group'
+  | 'open-properties'
   | 'rename'
   | 'transform'
   | 'fit-to-bbox'
@@ -516,6 +518,18 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     labelKey: 'widgets.layers.actions.removeFromGroup',
     order: 21,
     section: 'quick',
+    supportedLayerTypes: ALL_LAYER_TYPES,
+  },
+  {
+    defaultLabel: 'Layer properties',
+    handler: ({ effects }) => effects.openProperties(),
+    icon: Settings2Icon,
+    id: 'open-properties',
+    isEnabled: isOperationFree,
+    isVisible: alwaysVisible,
+    labelKey: 'widgets.layers.actions.properties',
+    order: 5,
+    section: 'primary',
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
