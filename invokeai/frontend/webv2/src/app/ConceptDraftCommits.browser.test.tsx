@@ -4,6 +4,7 @@ import type { Project } from '@workbench/projectContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { DndContext } from '@dnd-kit/core';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { GenerationUiProvider, type GenerationUiAdapter } from '@features/generation/ui/GenerationUiContext';
 import { createDefaultUpscaleWidgetValues } from '@features/upscale';
@@ -17,7 +18,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
-import { act, useSyncExternalStore } from 'react';
+import { act, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -38,6 +39,7 @@ const model = (key: string, base: string, type: string, name = key): ModelConfig
 });
 const models = [
   { ...model('video-main', 'minimax-h3', 'main'), variant: 'fl2va' },
+  { ...model('unknown-h3', 'minimax-h3', 'main', 'Unknown H3'), format: 'checkpoint', variant: 'novel_task' },
   model('video-first', 'minimax-h3', 'lora', 'MiniMax H3 Turbo LoRA'),
   model('video-second', 'minimax-h3', 'lora', 'Video Ink Wash'),
   model('upscale-main', 'sdxl', 'main'),
@@ -79,15 +81,65 @@ vi.mock('@features/models', async (importOriginal) => ({
 // The concept picker hands over `picker.pick` unfiltered, as a stale picker would.
 vi.mock('@features/models/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  ModelSelect: ({ modelTypes, onChange }: { modelTypes?: readonly string[]; onChange: (model: unknown) => void }) =>
-    modelTypes?.includes('lora') ? (
-      <button
-        aria-label="Add concept"
-        data-testid="concept-picker"
-        type="button"
-        onClick={() => onChange(picker.pick)}
-      />
-    ) : null,
+  ModelSelect: ({
+    modelTypes,
+    onChange,
+    pickerHeader,
+    onPickerClose,
+  }: {
+    modelTypes?: readonly string[];
+    onChange: (model: unknown) => void;
+    pickerHeader?: ReactNode;
+    onPickerClose?: () => void;
+  }) => {
+    const [open, setOpen] = useState(false);
+    if (modelTypes?.includes('lora')) {
+      return (
+        <button
+          aria-label="Add concept"
+          data-testid="concept-picker"
+          type="button"
+          onClick={() => onChange(picker.pick)}
+        />
+      );
+    }
+    if (!modelTypes?.includes('main')) {
+      return null;
+    }
+    return (
+      <>
+        <button type="button" data-testid="open-model" onClick={() => setOpen(true)}>
+          Open
+        </button>
+        {open && (
+          <div>
+            {pickerHeader}
+            <button
+              type="button"
+              data-testid="dismiss-model"
+              onClick={() => {
+                setOpen(false);
+                onPickerClose?.();
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-testid="pick-unknown"
+              onClick={() => {
+                onChange(models.find((item) => item.key === 'unknown-h3'));
+                setOpen(false);
+                onPickerClose?.();
+              }}
+            >
+              Unknown H3
+            </button>
+          </div>
+        )}
+      </>
+    );
+  },
 }));
 vi.mock('@features/gallery/mediaSlot', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -141,12 +193,14 @@ const render = async (widget: Widget) => {
       <QueryClientProvider client={queryClient}>
         <ChakraProvider value={system}>
           <GenerationUiProvider adapter={generationAdapter}>
-            <VideoUiAdapterProvider>
-              <UpscaleUiAdapterProvider>
-                <CaptureAdapters />
-                {widget === 'video' ? <VideoWidgetView /> : <UpscaleWidgetView />}
-              </UpscaleUiAdapterProvider>
-            </VideoUiAdapterProvider>
+            <DndContext>
+              <VideoUiAdapterProvider>
+                <UpscaleUiAdapterProvider>
+                  <CaptureAdapters />
+                  {widget === 'video' ? <VideoWidgetView /> : <UpscaleWidgetView />}
+                </UpscaleUiAdapterProvider>
+              </VideoUiAdapterProvider>
+            </DndContext>
           </GenerationUiProvider>
         </ChakraProvider>
       </QueryClientProvider>
@@ -290,4 +344,82 @@ describe('concept drafts through widget adapters', () => {
       expect(store.getSnapshot().activeProject).toBe(project);
     }
   );
+  it('resets the picker choice on dismiss and selects unknown detected H3 as FL2VA', async () => {
+    await render('video');
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="open-model"]')!.click());
+    const ref = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Ref2VA')!;
+    await act(() => ref.click());
+    expect(ref.getAttribute('aria-pressed')).toBe('true');
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="dismiss-model"]')!.click());
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="open-model"]')!.click());
+    expect(
+      [...host.querySelectorAll('button')]
+        .find((button) => button.textContent === 'widgets.video.h3Detected')
+        ?.getAttribute('aria-pressed')
+    ).toBe('true');
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="pick-unknown"]')!.click());
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
+      h3SelectedTask: 'fl2va',
+      h3ModeOverride: false,
+      model: { variant: 'fl2va' },
+    });
+  });
+
+  it('flushes pending concept edits and preserves a same-turn edit when switching H3 task', async () => {
+    await render('video');
+    const checkpoint = models.find((item) => item.key === 'unknown-h3')!;
+    await act(() =>
+      store.commands.widgets.patchValues('video', {
+        model: checkpoint,
+        modelKey: checkpoint.key,
+        h3SelectedTask: 'fl2va',
+        componentSourceModel: models[0],
+      })
+    );
+    const currentRows = [...host.querySelectorAll<HTMLElement>('[role="listitem"]')];
+    expect(currentRows.length).toBe(2);
+    await act(() => step(currentRows[1]!));
+    await act(() => {
+      store.commands.widgets.patchValues('video', { positivePrompt: 'newest prompt' });
+      const label = [...host.querySelectorAll('label')].find((item) =>
+        item.textContent?.includes('widgets.video.h3SwitchMode')
+      );
+      expect(label).toBeTruthy();
+      label!.querySelector<HTMLInputElement>('input')!.click();
+    });
+    const current = getProjectWidgetValues(store.getSnapshot().activeProject, 'video');
+    expect(current).toMatchObject({
+      positivePrompt: 'newest prompt',
+      h3SelectedTask: 'ref2va',
+      h3ModeOverride: true,
+      acceleratorEnabled: false,
+    });
+    expect(currentLoras('video').find((lora) => lora.model.key === 'video-second')?.weight).toBe(0.55);
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ description: 'widgets.video.h3TurboRemoved' }));
+  });
+  it('blocks a stale switch callback when a reference was just added', async () => {
+    await render('video');
+    const checkpoint = models.find((item) => item.key === 'unknown-h3')!;
+    await act(() =>
+      store.commands.widgets.patchValues('video', {
+        model: checkpoint,
+        modelKey: checkpoint.key,
+        h3SelectedTask: 'fl2va',
+        componentSourceModel: models[0],
+      })
+    );
+    const reference = { kind: 'image', detail: 'match', image: { image_name: 'new.png', width: 512, height: 512 } };
+    await act(() => {
+      store.commands.widgets.patchValues('video', { references: [reference] });
+      const label = [...host.querySelectorAll('label')].find((item) =>
+        item.textContent?.includes('widgets.video.h3SwitchMode')
+      )!;
+      label.querySelector<HTMLInputElement>('input')!.click();
+    });
+    expect(getProjectWidgetValues(store.getSnapshot().activeProject, 'video')).toMatchObject({
+      h3SelectedTask: 'fl2va',
+      references: [reference],
+    });
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ title: 'widgets.video.h3ClearModeInputs' }));
+  });
 });

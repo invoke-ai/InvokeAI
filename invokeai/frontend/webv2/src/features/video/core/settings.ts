@@ -355,17 +355,24 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     isVideoSourceClip(values.sourceVideo) ? values.sourceVideo.video_name : undefined
   );
   const hasReferences = references.length > 0;
-  const firstFrameImage = !hasReferences && isImageWithDims(values.firstFrameImage) ? values.firstFrameImage : null;
+  // Defer healing a conflicting legacy override until the user resolves it; migration needs both inputs.
+  const preserveLegacyConflict =
+    values.h3ModeOverride === true && values.h3SelectedTask !== 'fl2va' && values.h3SelectedTask !== 'ref2va';
+  const firstFrameImage =
+    (!hasReferences || preserveLegacyConflict) && isImageWithDims(values.firstFrameImage)
+      ? values.firstFrameImage
+      : null;
+  const effectiveFirstFrame = hasReferences ? null : firstFrameImage;
   // A first frame and a source video are mutually exclusive; if a stale
   // project somehow holds both, the first frame wins deterministically.
-  const sourceVideo = !firstFrameImage && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
+  const sourceVideo = !effectiveFirstFrame && isVideoSourceClip(values.sourceVideo) ? values.sourceVideo : null;
   // One conditioning clip at a time, and never alongside an initial video. A first frame excludes it
   // only in the picture role, where both would hold the same frames; a soundtrack holds the other
   // stream, so a first frame can anchor the picture generated for it.
   const conditioningClip =
     !sourceVideo &&
     isVideoConditioningClip(values.conditioningClip) &&
-    (!firstFrameImage || !isConditioningClipExcludingFrames(values.conditioningClip))
+    (!effectiveFirstFrame || !isConditioningClipExcludingFrames(values.conditioningClip))
       ? values.conditioningClip
       : null;
   const loras = Array.isArray(values.loras) ? values.loras.filter(isVideoLora) : [];
@@ -395,6 +402,9 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     stgScale: hasFiniteNumber(values, 'stgScale') ? (values.stgScale as number) : null,
     firstFrameImage,
     fps: hasFiniteNumber(values, 'fps') ? (values.fps as number) : SETTINGS_FALLBACKS.fps,
+    h3ModeOverride: values.h3ModeOverride === true,
+    h3SelectedTask:
+      values.h3SelectedTask === 'fl2va' || values.h3SelectedTask === 'ref2va' ? values.h3SelectedTask : undefined,
     h3HybridBaseModel: isMainModelConfig(values.h3HybridBaseModel) ? values.h3HybridBaseModel : null,
     h3HybridStartBlock: Math.round(
       getClampedNumber(
@@ -412,7 +422,10 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     autoDuration,
     acceleratorEnabled,
     acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
-    lastFrameImage: !hasReferences && isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
+    lastFrameImage:
+      (!hasReferences || preserveLegacyConflict) && isImageWithDims(values.lastFrameImage)
+        ? values.lastFrameImage
+        : null,
     loras,
     modelKey: typeof values.modelKey === 'string' ? values.modelKey : '',
     negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : '',
@@ -534,7 +547,17 @@ export const normalizeVideoWidgetValues = (values: unknown): VideoWidgetValues |
     return null;
   }
 
-  return { ...settings, model: isMainModelConfig(values.model) ? values.model : null };
+  const model = isMainModelConfig(values.model) ? values.model : null;
+  return {
+    ...settings,
+    model:
+      model?.base === 'minimax-h3' &&
+      model.format === 'checkpoint' &&
+      settings.h3SelectedTask &&
+      model.variant !== settings.h3SelectedTask
+        ? { ...model, variant: settings.h3SelectedTask }
+        : model,
+  };
 };
 
 export const isVideoWidgetValues = (values: unknown): values is VideoWidgetValues => {

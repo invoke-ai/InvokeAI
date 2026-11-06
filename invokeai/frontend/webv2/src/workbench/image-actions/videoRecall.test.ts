@@ -1725,3 +1725,41 @@ describe('recall of what the video graphs record', () => {
     expect(result?.mediaNames.conditioningClip).toEqual({ name: 'song.mp4', role: 'audio' });
   });
 });
+
+describe('H3 overridden task recall', () => {
+  it('restores the effective task from generation_mode for the same checkpoint', () => {
+    const model = { ...h3Model('hybrid'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([model]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        model: { base: 'minimax-h3', key: model.key, name: model.name, type: 'main' },
+      },
+      models: [model],
+    });
+    expect(result?.values.h3ModeOverride).toBe(true);
+    expect(result?.values.h3SelectedTask).toBe('ref2va');
+    expect(result?.values.model?.variant).toBe('ref2va');
+    expect(model.variant).toBe('fl2va');
+  });
+
+  it('does not apply the recorded task to an unrelated model when the recorded model is unavailable', () => {
+    const current = { ...h3Model('current'), format: 'checkpoint', variant: 'fl2va' };
+    const values = createDefaultVideoWidgetValues([current]);
+    const result = buildVideoRecallSettings({
+      currentValues: values,
+      kind: 'all',
+      metadata: {
+        generation_mode: 'minimax_h3_ref2v',
+        positive_prompt: 'test scene',
+        model: { base: 'minimax-h3', key: 'uninstalled', name: 'Missing model', type: 'main' },
+      },
+      models: [current],
+    });
+    expect(result?.values.h3ModeOverride).toBe(false);
+    expect(result?.values.h3SelectedTask).toBe('fl2va');
+    expect(result?.values.model?.variant).toBe('fl2va');
+  });
+});

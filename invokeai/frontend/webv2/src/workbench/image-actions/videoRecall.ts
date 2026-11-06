@@ -708,6 +708,22 @@ export const buildVideoRecallSettings = ({
     return fields.length > 0 ? { fields, mediaNames, values: { ...values, ...promptPatch } } : null;
   }
 
+  // The existing generation_mode records the effective H3 task, including an override.
+  // Compare it with the installed model, not a stale synthetic panel model.
+  const recordedMode = isRecord(metadata) ? getString(metadata, 'generation_mode') : null;
+  const registeredModel = recalledModel;
+  if (
+    model?.base === 'minimax-h3' &&
+    model.format === 'checkpoint' &&
+    registeredModel &&
+    recordedMode?.startsWith('minimax_h3_')
+  ) {
+    const task = recordedMode === 'minimax_h3_ref2v' ? 'ref2va' : 'fl2va';
+    const h3ModeOverride = task !== (registeredModel.variant === 'ref2va' ? 'ref2va' : 'fl2va');
+    model = { ...model, variant: task };
+    values = { ...values, model, h3ModeOverride, h3SelectedTask: task };
+  }
+
   const { numFrames } = record;
 
   if (numFrames !== null) {

@@ -17,6 +17,7 @@ import {
   getAcceleratorLoraChangeResult,
   getAcceleratorSteps,
   getAcceleratorToggleResult,
+  getH3ModeSwitchSettings,
   findLtx2DistilledLora,
   getDefaultVideoSettings,
   getEffectiveVideoTiming,
@@ -2815,5 +2816,71 @@ describe('what a model switch discards', () => {
 
     expect(result.losses).toEqual([]);
     expect(result.adjustments).toEqual(expect.arrayContaining(['targetResolution', 'frames', 'fps']));
+  });
+});
+
+describe('H3 picker preselection', () => {
+  it.each(['fl2va', 'ref2va'])('restores normal sampling after switching a Turbo %s task', (variant) => {
+    const model: MainModelConfig = { ...h3Model('checkpoint', `h3-${variant}`), variant };
+    const owned = {
+      model: { base: 'minimax-h3', key: 'turbo', name: 'Turbo', type: 'lora' as const },
+      weight: 1,
+      isEnabled: true,
+    };
+    const settings = {
+      ...getDefaultVideoSettings(model),
+      acceleratorEnabled: true,
+      acceleratorLoraKeys: ['turbo'],
+      loras: [owned],
+      steps: 8,
+    };
+    const switched = getH3ModeSwitchSettings(settings, model, [model, owned.model], true);
+    expect(switched).toMatchObject({
+      acceleratorEnabled: false,
+      acceleratorLoraKeys: [],
+      loras: [],
+      steps: 50,
+      h3ModeOverride: true,
+    });
+  });
+
+  it('preserves three references when a detected-FL2VA hybrid is selected as Ref2VA', () => {
+    const previous: MainModelConfig = { ...h3Model('checkpoint', 'old-ref'), variant: 'ref2va' };
+    const candidate: MainModelConfig = { ...h3Model('checkpoint', 'hybrid'), variant: 'fl2va' };
+    const references = [1, 2, 3].map((n) => ({
+      kind: 'image' as const,
+      detail: 'match' as const,
+      image: { image_name: `ref${n}.png`, width: 512, height: 512 },
+    }));
+    const settings = { ...getDefaultVideoSettings(previous), references };
+    const switched = getVideoModelSelectionResult({
+      currentSettings: settings,
+      model: { ...candidate, variant: 'ref2va' },
+      models: [previous, candidate],
+    });
+    expect(switched.settings.references).toEqual(references);
+    expect(switched.losses.some((loss) => loss.key === 'references')).toBe(false);
+    const defaultSwitch = getVideoModelSelectionResult({
+      currentSettings: settings,
+      model: candidate,
+      models: [previous, candidate],
+    });
+    expect(defaultSwitch.losses.some((loss) => loss.key === 'references')).toBe(true);
+  });
+
+  it('reports a selected overlay as lost before applying a task override', () => {
+    const previous: MainModelConfig = { ...h3Model('checkpoint', 'old-ref'), variant: 'ref2va', pruned: true };
+    const target: MainModelConfig = { ...h3Model('checkpoint', 'hybrid'), variant: 'fl2va', pruned: true };
+    const base: MainModelConfig = { ...h3Model('checkpoint', 'quality-base'), variant: 'fl2va', pruned: true };
+    const settings = { ...getDefaultVideoSettings(previous), h3HybridBaseModel: base };
+    const result = getVideoModelSelectionResult({
+      currentSettings: settings,
+      model: { ...target, variant: 'ref2va' },
+      models: [previous, target, base],
+      h3TargetOverride: true,
+    });
+    expect(result.settings.h3ModeOverride).toBe(true);
+    expect(result.settings.h3HybridBaseModel).toBeNull();
+    expect(result.losses).toContainEqual({ key: 'h3HybridBaseModel', count: 1 });
   });
 });
