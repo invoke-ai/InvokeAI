@@ -113,11 +113,11 @@ class InfillPatchMatchInvocation(InfillImageProcessorInvocation):
         width = int(image.width / self.downscale)
         height = int(image.height / self.downscale)
 
-        infilled = image.resize(
+        downscaled = image.resize(
             (width, height),
             resample=resample_mode,
         )
-        infilled = infill_patchmatch(image)
+        infilled = infill_patchmatch(downscaled)
         infilled = infilled.resize(
             (image.width, image.height),
             resample=resample_mode,
