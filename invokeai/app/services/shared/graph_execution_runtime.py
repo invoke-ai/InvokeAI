@@ -225,7 +225,14 @@ class _ExecutionRuntime:
 
     def _prepare_if_inputs(self, node: IfInvocation, input_edges: list[Edge]) -> None:
         selected_field = self._state._resolved_if_exec_branches.get(node.id)
-        allowed_fields = {"condition", selected_field} if selected_field is not None else {"condition"}
+        if selected_field is None:
+            allowed_fields = {"condition"}
+        elif self._state._legacy_snapshot_loaded:
+            allowed_fields = {"condition", selected_field}
+        elif self._state._is_fresh_lazy_if_candidate(self._state.prepared_source_mapping[node.id]):
+            allowed_fields = {"condition", selected_field}
+        else:
+            allowed_fields = {"condition", "true_input", "false_input"}
 
         for edge in input_edges:
             if edge.destination.field not in allowed_fields:

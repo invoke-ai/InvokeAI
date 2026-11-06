@@ -1880,7 +1880,22 @@ class _ExecutionNodeBuilder:
         self, next_node_id: str, input_edges: Optional[list[Edge]] = None
     ) -> list[list[tuple[str, str]]]:
         input_edges = input_edges or self._state.graph._get_input_edges(next_node_id)
-        parent_node_ids = list(dict.fromkeys(edge.source.node_id for edge in input_edges))
+        empty_if_item_sources = {
+            edge.source.node_id
+            for edge in input_edges
+            if isinstance(self._state.graph.get_node(next_node_id), CollectInvocation)
+            and edge.destination.field == ITEM_FIELD
+            and isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
+            and edge.source.node_id in self._state.executed
+            and not self._state.source_prepared_mapping.get(edge.source.node_id)
+        }
+        parent_node_ids = [
+            node_id
+            for node_id in dict.fromkeys(edge.source.node_id for edge in input_edges)
+            if node_id not in empty_if_item_sources
+        ]
+        if not parent_node_ids:
+            return [[]]
         parent_prepared_nodes = {
             node_id: list(
                 dict.fromkeys(
@@ -2187,6 +2202,17 @@ class _ExecutionNodeBuilder:
     ) -> bool:
         if not self._has_if_nodes:
             return True
+        if isinstance(self._state.graph.get_node(node_id), CollectInvocation):
+            if any(
+                edge.destination.field == ITEM_FIELD
+                and isinstance(self._state.graph.get_node(edge.source.node_id), IfInvocation)
+                and any(
+                    self._state._prepared_registry().get_source_node_id(exec_node_id) == edge.source.node_id
+                    for exec_node_id in self._state._pending_if_exec_nodes
+                )
+                for edge in self._state.graph._get_input_edges(node_id)
+            ):
+                return False
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
             condition_edges = self._state.graph._get_input_edges(node_id, "condition")
             if not condition_edges:
@@ -2492,7 +2518,7 @@ class _ExecutionNodeBuilder:
         return self._get_sibling_iterate_if_collect_branches().get(iterate_node_id)
 
     def _attach_pending_if_inputs(self, *, enqueue: bool = True) -> None:
-        """Attach only the selected branch edge to condition-ready If executions."""
+        """Resolve fresh If conditions before admitting branches; attach only the selected value input."""
 
         source_graph = self._state._get_source_graph_flat()
         self._ensure_activation_candidate_index(source_graph)
@@ -2509,35 +2535,71 @@ class _ExecutionNodeBuilder:
             ),
         )
         for exec_node_id in pending_exec_nodes:
+            source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
+            fresh_if = not self._state._legacy_snapshot_loaded
             self._state._try_resolve_if_node(exec_node_id, enqueue=False)
-            selected_field = self._state._resolved_if_exec_branches.get(exec_node_id)
-            if selected_field is None:
-                continue
-            if any(
-                edge.destination.field == selected_field
-                for edge in self._state.execution_graph._get_input_edges(exec_node_id)
+            if fresh_if:
+                selected_field = self._state._resolved_if_exec_branches.get(exec_node_id)
+                if selected_field is None:
+                    continue
+                required_branch_fields = (
+                    (selected_field,)
+                    if self._state._is_fresh_lazy_if_candidate(source_if_id)
+                    else ("true_input", "false_input")
+                )
+                branch_fields = (selected_field,)
+                if any(
+                    edge.source.node_id not in self._state.executed
+                    for branch_field in required_branch_fields
+                    for edge in self._state.graph._get_input_edges(source_if_id, branch_field)
+                ):
+                    continue
+            else:
+                selected_field = self._state._resolved_if_exec_branches.get(exec_node_id)
+                if selected_field is None:
+                    continue
+                required_branch_fields = (selected_field,)
+                branch_fields = (selected_field,)
+            if all(
+                not self._state.graph._get_input_edges(source_if_id, branch_field)
+                or any(
+                    edge.destination.field == branch_field
+                    for edge in self._state.execution_graph._get_input_edges(exec_node_id)
+                )
+                for branch_field in branch_fields
             ):
+                if fresh_if:
+                    self._state._try_resolve_if_node(exec_node_id, enqueue=False)
+                    if exec_node_id not in self._state._resolved_if_exec_branches:
+                        continue
                 if enqueue:
                     self._state._tx_discard_set(self._state._pending_if_exec_nodes, exec_node_id)
                 continue
 
-            source_if_id = self._state._prepared_registry().get_source_node_id(exec_node_id)
             target_path = self._state._get_iteration_path(exec_node_id)
-            selected_edges = self._state.graph._get_input_edges(source_if_id, selected_field)
+            branch_edges = [
+                (branch_field, edge)
+                for branch_field in branch_fields
+                for edge in self._state.graph._get_input_edges(source_if_id, branch_field)
+            ]
             if any(
                 isinstance(source_node := self._state.graph.get_node(edge.source.node_id), ForInvocation)
                 and get_output_field_scope(source_node, edge.source.field) == OutputScope.Final
                 and not self._state._all_for_contexts_finalized(source_node.id)
-                for edge in selected_edges
+                for _, edge in branch_edges
             ):
                 continue
-            if selected_edges and all(
-                source_edge.source.node_id in self._state.executed
-                and not self._state.source_prepared_mapping.get(source_edge.source.node_id)
-                for source_edge in selected_edges
+            if (
+                selected_field is not None
+                and self._state.graph._get_input_edges(source_if_id, selected_field)
+                and all(
+                    source_edge.source.node_id in self._state.executed
+                    and not self._state.source_prepared_mapping.get(source_edge.source.node_id)
+                    for source_edge in self._state.graph._get_input_edges(source_if_id, selected_field)
+                )
             ):
-                # A selected branch can be a completed nested If with no executions. Retire this
-                # If only after that branch is known empty; unresolved conditions remain pending.
+                # A selected branch can be a completed nested If with no executions. Eagerly running
+                # the other branch must not turn that empty selected value into a None result.
                 self._mark_source_node_empty(source_if_id)
                 self._state._mark_exec_node_executed(exec_node_id)
                 self._state._set_prepared_exec_state(exec_node_id, "skipped")
@@ -2546,7 +2608,7 @@ class _ExecutionNodeBuilder:
                 continue
             attached_edges: list[Edge] = []
             selected_exec_ids: list[str] = []
-            for source_edge in selected_edges:
+            for branch_field, source_edge in branch_edges:
                 if source_edge.source.node_id not in self._state.source_prepared_mapping:
                     continue
                 edge_key = (source_edge.source.node_id, source_edge.source.field)
@@ -2572,10 +2634,10 @@ class _ExecutionNodeBuilder:
                 attached_edges.append(
                     Edge(
                         source=EdgeConnection(node_id=selected_exec_id, field=source_edge.source.field),
-                        destination=EdgeConnection(node_id=exec_node_id, field=selected_field),
+                        destination=EdgeConnection(node_id=exec_node_id, field=branch_field),
                     )
                 )
-            if not attached_edges or any(
+            if any(
                 self._state._is_pending_if(candidate_id)
                 or (
                     isinstance(self._state.execution_graph.get_node(candidate_id), IfInvocation)
@@ -2585,7 +2647,21 @@ class _ExecutionNodeBuilder:
             ):
                 continue
 
-            self._attach_execution_edges(exec_node_id, attached_edges)
+            if attached_edges:
+                self._attach_execution_edges(exec_node_id, attached_edges)
+            if fresh_if and any(
+                self._state.graph._get_input_edges(source_if_id, branch_field)
+                and not any(
+                    edge.destination.field == branch_field
+                    for edge in self._state.execution_graph._get_input_edges(exec_node_id)
+                )
+                for branch_field in branch_fields
+            ):
+                continue
+            if fresh_if:
+                self._state._try_resolve_if_node(exec_node_id, enqueue=False)
+                if exec_node_id not in self._state._resolved_if_exec_branches:
+                    continue
             input_edges = self._state.execution_graph._get_input_edges(exec_node_id)
             unmet = sum(1 for edge in input_edges if edge.source.node_id not in self._state.executed)
             self._state._tx_set_mapping(self._state.indegree, exec_node_id, unmet)

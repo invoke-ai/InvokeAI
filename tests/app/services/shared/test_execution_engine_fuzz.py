@@ -325,14 +325,17 @@ def build(seed):
 _KNOWN_VALID_SEEDS = frozenset(
     {
         3,
+        52,
         233,
         333,
         573,
         630,
         880,
+        887,
         992,
         1300,
         1331,
+        1593,
         1728,
         1836,
         1906,
@@ -344,10 +347,23 @@ _KNOWN_VALID_SEEDS = frozenset(
         2382,
         2394,
         2575,
+        2667,
         2775,
         2829,
     }
 )
+
+
+@pytest.mark.parametrize("seed", [52, 887, 1593, 2667], ids=lambda seed: f"seed{seed}")
+def test_empty_nested_if_frames_retire_branch_descendants(seed: int) -> None:
+    desc, graph_factory = build(seed)
+    graph_factory().validate_self()
+    results = {
+        (forced, checkpoint): _run(seed, forced_compatibility=forced, roundtrip_at=checkpoint)
+        for forced in (False, True)
+        for checkpoint in (None, 3, 4, 5)
+    }
+    assert all(result == results[(False, None)] for result in results.values()), f"seed={seed} graph={desc}"
 
 
 def _canonical_result(graph: Graph, node_id: str, value: Any) -> Any:

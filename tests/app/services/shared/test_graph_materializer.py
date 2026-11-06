@@ -71,7 +71,7 @@ def test_materializer_preserves_execution_edges_and_source_nodes() -> None:
     assert state.is_complete()
 
 
-def test_prepare_admits_only_selected_frame_after_unresolved_conditions() -> None:
+def test_prepare_waits_for_both_branches_with_unresolved_conditions() -> None:
     from invokeai.app.invocations.logic import IfInvocation
     from invokeai.app.services.shared.graph_validation import IterateInvocation, nx
 
@@ -106,8 +106,11 @@ def test_prepare_admits_only_selected_frame_after_unresolved_conditions() -> Non
     # Keep condition sources outside this preparation view; their If nodes stay unresolved.
     preparation_graph = nx.subgraph_view(graph, filter_node=lambda node_id: not node_id.startswith("condition-"))
     prepared_id = state._materializer().prepare(preparation_graph)
-    assert prepared_id in state.source_prepared_mapping["selected"]
-    assert len(state.source_prepared_mapping["selected"]) == 1
+    assert prepared_id is not None
+    assert state.prepared_source_mapping[prepared_id] == "selected"
+    assert state._is_pending_if(prepared_id)
+    assert state._resolved_if_exec_branches[prepared_id] == "true_input"
+    assert set(state.source_prepared_mapping) == {"selected"}
     assert "blocked-a" not in state.source_prepared_mapping
     assert "blocked-b" not in state.source_prepared_mapping
     assert "inner-a" not in state.source_prepared_mapping

@@ -1106,10 +1106,29 @@ def _is_source_inactive(
     if iteration_path:
         return any(state._is_activation_dependency_rejected(dependency) for dependency in dependencies)
 
+    def has_completed_empty_if(dependency: ActivationDependency) -> bool:
+        owner_id = dependency.owner_id
+        if (
+            state._legacy_snapshot_loaded
+            or not isinstance(state.graph.nodes.get(owner_id), IfInvocation)
+            or state._is_fresh_lazy_if_candidate(owner_id)
+            or owner_id not in state.executed
+            or owner_id not in state.source_prepared_mapping
+            or state.source_prepared_mapping[owner_id]
+        ):
+            return False
+        return not any(
+            source_id == owner_id and isinstance(state.execution_graph.nodes.get(exec_node_id), IfInvocation)
+            for exec_node_id, source_id in state.prepared_source_mapping.items()
+        )
+
     frames = {frame for dependency in dependencies for frame in state._prepared_if_exec_frames(dependency.owner_id)}
     if not frames:
+        if any(has_completed_empty_if(dependency) for dependency in dependencies):
+            return True
         if any(
             isinstance((owner := state.graph.get_node(dependency.owner_id)), IfInvocation)
+            and state._is_fresh_lazy_if_candidate(dependency.owner_id)
             and not state.graph._get_input_edges(dependency.owner_id, "condition")
             and dependency.branch != ("true_input" if owner.condition else "false_input")
             for dependency in dependencies
@@ -1130,6 +1149,8 @@ def _is_source_inactive(
         prepared_dependencies = _get_source_activation_dependencies_for_preparation(state, source_node_id, frame)
         if not prepared_dependencies:
             return False
+        if any(has_completed_empty_if(dependency) for dependency in prepared_dependencies):
+            return True
         if any(state._is_activation_dependency_rejected(dependency) for dependency in prepared_dependencies):
             return True
         if not all(state._is_activation_dependency_satisfied(dependency) for dependency in prepared_dependencies):
@@ -1282,7 +1303,19 @@ def _record_compatibility_activation_token(
 
 def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency: ActivationDependency) -> bool:
     """Check one opaque plan requirement against durable gate and token state."""
-    matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
+    lazy_candidate = not state._legacy_snapshot_loaded and state._is_fresh_lazy_if_candidate(dependency.owner_id)
+    if lazy_candidate:
+        matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
+    else:
+        matching_gate_ids = tuple(
+            exec_node_id
+            for exec_node_id in state.source_prepared_mapping.get(dependency.owner_id, ())
+            if isinstance(state.execution_graph.nodes.get(exec_node_id), IfInvocation)
+            if (
+                (frame := state._get_iteration_path(exec_node_id)) is not None
+                and (frame[: len(dependency.frame)] == dependency.frame or dependency.frame[: len(frame)] == frame)
+            )
+        )
     if not matching_gate_ids:
         return False
 
@@ -1294,19 +1327,24 @@ def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency
             or gate.frame.frame_id != expected_ref.frame.frame_id
             or gate.frame.iteration_path != expected_ref.frame.iteration_path
             or gate.frame.workflow_call_depth != expected_ref.frame.workflow_call_depth
-            or gate.frame.iteration_path != dependency.frame
+            or (lazy_candidate and gate.frame.iteration_path != dependency.frame)
         ):
             return False
-        if not gate.is_active(dependency.branch, owner_id=gate_id, frame=gate.frame):
+        activation_branch = dependency.branch
+        if not state._legacy_snapshot_loaded:
+            if not gate.resolved or gate.selected_branch is None:
+                return False
+            activation_branch = gate.selected_branch
+        if not gate.is_active(activation_branch, owner_id=gate_id, frame=gate.frame):
             return False
-        token = state.execution_tokens.get(f"{expected_ref.reference_id}:activation:{dependency.branch}")
+        token = state.execution_tokens.get(f"{expected_ref.reference_id}:activation:{activation_branch}")
         if token is None or not (
-            token.token_id == f"{expected_ref.reference_id}:activation:{dependency.branch}"
+            token.token_id == f"{expected_ref.reference_id}:activation:{activation_branch}"
             and token.reference_id == expected_ref.reference_id
             and token.owner_node_id == gate_id
             and token.token_kind == "activation"
-            and token.port == dependency.branch
-            and token.value == dependency.branch
+            and token.port == activation_branch
+            and token.value == activation_branch
             and token.frame.state_id == expected_ref.frame.state_id
             and token.frame.frame_id == expected_ref.frame.frame_id
             and token.frame.iteration_path == expected_ref.frame.iteration_path
@@ -1318,6 +1356,9 @@ def _is_activation_dependency_satisfied(state: "GraphExecutionState", dependency
 
 def _is_activation_dependency_rejected(state: "GraphExecutionState", dependency: ActivationDependency) -> bool:
     """Return whether a resolved gate explicitly selected another branch."""
+
+    if not state._legacy_snapshot_loaded and not state._is_fresh_lazy_if_candidate(dependency.owner_id):
+        return False
 
     matching_gate_ids = state._prepared_if_exec_ids(dependency.owner_id, dependency.frame)
     for gate_id in matching_gate_ids:
@@ -1351,7 +1392,7 @@ def _resolve_activation_gate(state: "GraphExecutionState", exec_node_id: str, br
         state._completed_source_ids_cache = None
         state._tx_record(lambda: runtime.replace_gate(previous))
         materializer = state.__pydantic_private__["_runtime_state"].execution_materializer
-        if materializer is not None:
+        if materializer is not None and state._legacy_snapshot_loaded:
             source_if_id = state._prepared_registry().get_source_node_id(exec_node_id)
             materializer._queue_rejected_activation_branch(source_if_id, branch)
             materializer._queue_selected_empty_iterate_branch_retirements(

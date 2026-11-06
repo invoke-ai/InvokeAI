@@ -244,6 +244,7 @@ class _GraphExecutionStateRuntime:
         "final_prepared_for_index",
         "prepared_for_index_by_exec",
         "source_graph_flat",
+        "if_graph_analysis",
         "execution_graph_flat",
         "completed_source_ids_cache",
         "unexecuted_prepared_counts",
@@ -295,6 +296,7 @@ class _GraphExecutionStateRuntime:
         self.final_prepared_for_index: Optional[dict[tuple[str, tuple[int, ...]], str]] = None
         self.prepared_for_index_by_exec: dict[str, tuple[str, tuple[int, ...], tuple[int, ...]]] = {}
         self.source_graph_flat: Any | None = None
+        self.if_graph_analysis: Any | None = None
         self.execution_graph_flat: Any | None = None
         self.completed_source_ids_cache: Optional[set[str]] = None
         self.unexecuted_prepared_counts: Optional[dict[str, int]] = None
@@ -559,6 +561,7 @@ class GraphExecutionState(BaseModel):
         self._if_activation_controller_instance = None
         self._pending_if_exec_nodes = set()
         self._if_branch_sources_cache = {}
+        self._if_graph_analysis = None
         self._if_activation_dependencies_by_source = {}
         self._if_activation_dependencies_by_exec = {}
         self._if_activation_dependents_by_dependency = {}
@@ -673,6 +676,9 @@ class GraphExecutionState(BaseModel):
 
     def _can_use_fresh_mixed_if_iterate_collect(self) -> bool:
         return graph_if_dependencies._can_use_fresh_mixed_if_iterate_collect(self)
+
+    def _is_fresh_lazy_if_candidate(self, if_node_id: str) -> bool:
+        return graph_if_dependencies._is_fresh_lazy_if_candidate(self, if_node_id)
 
     def _get_fresh_if_branch_sources(self, if_node_id: str, branch_field: str) -> set[str]:
         return graph_if_dependencies._get_fresh_if_branch_sources(self, if_node_id, branch_field)
@@ -849,6 +855,7 @@ class GraphExecutionState(BaseModel):
         runtime = self.__pydantic_private__["_runtime_state"]
         self._invalidate_selected_if_frames_for_preparation()
         runtime.source_graph_flat = None
+        runtime.if_graph_analysis = None
         runtime.loop_topology = None
         runtime.fresh_flat_if_activation = None
         runtime.if_iteration_axes_validated = False
@@ -3459,14 +3466,48 @@ class GraphExecutionState(BaseModel):
         node = self.execution_graph.nodes.get(exec_node_id)
         if not isinstance(node, IfInvocation):
             return False
+        if not self._legacy_snapshot_loaded and not self._if_branch_inputs_attached(exec_node_id):
+            return True
         selected_field = self._resolved_if_exec_branches.get(exec_node_id)
         if selected_field is None:
             return True
         source_node_id = self.prepared_source_mapping.get(exec_node_id)
         if source_node_id is None or not self.graph._get_input_edges(source_node_id, selected_field):
             return False
+        selected_edges = self.graph._get_input_edges(source_node_id, selected_field)
+        if not self._legacy_snapshot_loaded and all(edge.source.node_id in self.executed for edge in selected_edges):
+            return False
         return not any(
             edge.destination.field == selected_field for edge in self.execution_graph._get_input_edges(exec_node_id)
+        )
+
+    def _if_branch_inputs_attached(self, exec_node_id: str) -> bool:
+        source_node_id = self.prepared_source_mapping.get(exec_node_id)
+        if source_node_id is None:
+            return False
+        attached_fields = {edge.destination.field for edge in self.execution_graph._get_input_edges(exec_node_id)}
+        target_path = self._get_iteration_path(exec_node_id)
+        materializer = self._materializer()
+        selected_field = self._resolved_if_exec_branches.get(exec_node_id)
+        branches = (selected_field,) if selected_field is not None else ("true_input", "false_input")
+        return all(
+            not (edges := self.graph._get_input_edges(source_node_id, branch))
+            or branch in attached_fields
+            or all(
+                edge.source.node_id in self.executed
+                and not (
+                    not self._legacy_snapshot_loaded
+                    and isinstance(self.graph.get_node(edge.source.node_id), IfInvocation)
+                    and not self.source_prepared_mapping.get(edge.source.node_id)
+                )
+                and not any(
+                    target_path[: len(path)] == path or path[: len(target_path)] == target_path
+                    for prepared_id in materializer._get_ordered_prepared_nodes_for_edge(edge)
+                    if (path := materializer._get_prepared_edge_iteration_path(edge, prepared_id)) is not None
+                )
+                for edge in edges
+            )
+            for branch in branches
         )
 
     def set_ready_order(self, order: Iterable[Type[BaseInvocation] | str]) -> None:
@@ -4352,6 +4393,7 @@ _GRAPH_RUNTIME_ATTRIBUTE_NAMES = (
     "final_prepared_for_index",
     "prepared_for_index_by_exec",
     "source_graph_flat",
+    "if_graph_analysis",
     "execution_graph_flat",
     "completed_source_ids_cache",
     "unexecuted_prepared_counts",
