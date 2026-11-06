@@ -614,10 +614,10 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    // Queue counts settle asynchronously; layout readiness must accept the hydrated queue as well as an idle one.
+    // The representative queue is populated; measure the hydrated counter rather than its transient idle state.
     await page
       .locator('header')
-      .getByRole('button', { name: /\. Open queue$/ })
+      .getByRole('button', { name: /^[1-9]\d* (images? remaining|items? waiting for the connection)\. Open queue$/ })
       .waitFor();
 
     for (const width of [1_024, 900]) {

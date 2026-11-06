@@ -1994,6 +1994,60 @@ describe('durable project persistence', () => {
     expect(api.updateProject).toHaveBeenCalledTimes(writes);
   });
 
+  it('retains unanswered content when using the server workspace before a late content commit', async () => {
+    const api = createApi();
+    const original = createDraftProject([]);
+    api.records.set(original.id, toSplitRecord(original));
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: original.id,
+      openProjectIds: [original.id],
+    });
+    const service = createService(captureAccountScope(), api);
+    const loaded = (await service.loadWorkbench()).state.projects[0]!;
+    const write = vi.mocked(api.updateProject).getMockImplementation()!;
+    let commitLate!: () => Promise<unknown>;
+    vi.mocked(api.updateProject).mockImplementationOnce((...args) => {
+      commitLate = () => write(...args);
+      api.records.set(
+        original.id,
+        toSplitRecord(
+          { ...loaded, promptHistory: [{ negativePrompt: null, positivePrompt: 'Server workspace' }] },
+          1,
+          2
+        )
+      );
+      return Promise.reject(new RequestDeadlineError());
+    });
+    const pending = {
+      ...loaded,
+      name: 'Unanswered content',
+      promptHistory: [{ negativePrompt: null, positivePrompt: 'Local workspace' }],
+    };
+    expect((await service.saveWorkbench(stateWith([pending]))).conflicts).toEqual([
+      expect.objectContaining({ half: 'workspace' }),
+    ]);
+    await service.saveWorkbench(stateWith([{ ...pending, name: 'Newer content' }]));
+    const resolved = await service.resolveConflictUseServer(original.id);
+    service.acknowledgeProjectResolution(original.id);
+    if (resolved.status !== 'loaded') {
+      throw new Error('Expected the workspace resolution to load.');
+    }
+    expect(resolved.project).toMatchObject({
+      name: 'Newer content',
+      promptHistory: [{ positivePrompt: 'Server workspace' }],
+    });
+    await commitLate();
+    expect(await service.saveWorkbench(stateWith([resolved.project]))).toMatchObject({
+      conflicts: [],
+      hasPendingChanges: false,
+    });
+    expect(api.records.get(original.id)?.name).toBe('Newer content');
+    expect(api.records.get(original.id)?.workspace?.data).toMatchObject({
+      promptHistory: [{ positivePrompt: 'Server workspace' }],
+    });
+  });
+
   it('assigns the board after a late create when a newer edit must still be saved', async () => {
     const owner = captureAccountScope();
     const { queryClient } = await import('@platform/query/client');

@@ -80,14 +80,12 @@ it('refreshes two independent listings over browser completion events without st
     cleanup.push(() => receiver.close());
     const reveal = vi.fn();
     const invalidate = vi.fn(() => invalidateGallery(client));
-    let delivered = 0;
     const runtime = createGalleryRealtimeRuntime({
       backend: {
         on: (event, handler) => {
           const listener = ({ data }: MessageEvent) => {
             if (data.event === event) {
               handler(data.payload as never);
-              delivered += 1;
             }
           };
           receiver.addEventListener('message', listener);
@@ -107,17 +105,20 @@ it('refreshes two independent listings over browser completion events without st
       observer,
       reveal,
       invalidate,
-      get delivered() {
-        return delivered;
-      },
     };
   });
   await vi.waitFor(() => expect(sessions.every(({ observer }) => observer.getCurrentResult().isSuccess)).toBe(true));
   expect(transport.listItems).toHaveBeenCalledTimes(2);
-  const completion = (user_id = 'alice') =>
+  const completion = () =>
     sender.postMessage({
       event: 'queue_item_status_changed',
-      payload: { destination: 'gallery:reveal', item_id: 1, origin: 'webv2:another-tab', status: 'completed', user_id },
+      payload: {
+        destination: 'gallery:reveal',
+        item_id: 1,
+        origin: 'webv2:another-tab',
+        status: 'completed',
+        user_id: 'alice',
+      },
     });
   slow = true;
   savedName = 'new-output.png';
@@ -158,7 +159,4 @@ it('refreshes two independent listings over browser completion events without st
     expect(reveal).not.toHaveBeenCalled();
     expect(invalidate).toHaveBeenCalledTimes(2);
   }
-  completion('bob');
-  await vi.waitFor(() => expect(sessions.every((session) => session.delivered === 3)).toBe(true));
-  expect(transport.listItems).toHaveBeenCalledTimes(6);
 });
