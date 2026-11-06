@@ -67,7 +67,7 @@ MOSS-Image needs three components:
 
 | Component                 | Diffusers install | Single-file install  |
 | ------------------------- | ----------------- | -------------------- |
-| Transformer               | bundled           | the `.safetensors` file, such as the ComfyUI export `moss-image-dit.safetensors` |
+| Transformer               | bundled           | a `.safetensors` or `.gguf` file, such as the ComfyUI export `moss-image-dit.safetensors` (see [Transformer formats](#transformer-formats)) |
 | Text encoder (Qwen3.5 9B) | bundled           | installed separately |
 | VAE (FLUX.2)              | bundled           | installed separately |
 
@@ -84,9 +84,38 @@ When a single-file MOSS-Image model is selected, the **Components** section next
   `moss-image-vae.safetensors`); it installs under the FLUX.2 base. Any other FLUX.2 VAE works too, for
   example the **FLUX.2 VAE** starter model.
 
-Quantized MOSS-Image transformers (fp8, int8, nvfp4, MXFP8 and GGUF) are not supported yet and are
-refused at install with a message saying so. Install the bf16 file, and to save VRAM turn on **FP8
-Storage** in the model's **Default Settings**.
+### Transformer formats
+
+A single-file transformer comes in these forms; the model type, not the file name, decides how it loads.
+
+| Form | Examples | Notes |
+| ---- | -------- | ----- |
+| bf16 safetensors | `moss-image-dit.safetensors`, Comfy-Org's `moss_image_base_bf16.safetensors` | Either key layout (see below). |
+| int8 convrot safetensors | Comfy-Org's `moss_image_base_int8_convrot.safetensors` | `int8_tensorwise` with convrot. The attention, output and feed-forward projections stay int8 in memory and are dequantized for each step. |
+| GGUF | `unsloth/MOSS-Image-Base-GGUF`, `leejet/MOSS-Image-SFT-GGUF` | The K-quants and `Q8_0` and the other llama.cpp types. The packed weights are dequantized for each step. |
+
+The community files come in two key layouts, and both install and load:
+
+- **Split**: each block has separate `proj.q`, `proj.k` and `proj.v` weights, as in OpenMOSS's Diffusers folder and
+  unsloth's GGUFs.
+- **Fused**: each block has one `proj.qkv` weight, as in Comfy-Org's single files and leejet's GGUFs. InvokeAI
+  splits it into its three parts when the model loads. A GGUF's packed rows are cut without being dequantized.
+
+A few layers stay in the compute dtype in every form, because the model reads their weight dtype to pick the
+dtype of the activations it passes on: the first layer of the image and time embeddings, the modulation and output
+layers, the text projection and the `q` projection of every block. For a quantized file this means they are
+dequantized when the model loads. The 42 `q` projections alone occupy about 0.74 GiB dense (bf16), so a Q4 GGUF takes
+more memory than its file size suggests.
+
+Not supported, and refused at install with a message saying so: fp8 transformers (scaled or not), torchao exports
+such as unsloth's FP8 and INT8 builds (`_weight_qdata`), nvfp4 and w4a8 builds, and the ComfyUI-GGUF `Q8_CR` and `Q4_CR`
+files. Install the
+bf16 file, the int8 build or a GGUF instead. To save VRAM with a bf16 file, turn on **FP8 Storage** in the model's
+**Default Settings**. FP8 Storage does nothing for a GGUF, and for the int8 build it applies only to the layers
+that are not already int8.
+
+The int8 build and the GGUFs save memory; they are not faster. In InvokeAI's measurements on an RTX 4090 they took
+3-15 % longer per image than bf16. Int8 and Q8_0 keep the scene of a bf16 image and shift its details.
 
 ## Generation settings
 
@@ -258,7 +287,7 @@ drafts are often invalid.
 ## Limitations
 
 - LoRA is not supported.
-- Quantized transformers are refused at install (see [Installing](#installing)).
+- fp8, nvfp4, w4a8 and ComfyUI-GGUF `Q8_CR`/`Q4_CR` transformers are refused at install (see [Installing](#installing)).
 - ControlNet, reference images and seamless tiling are not available.
 - Regional guidance places boxes in a layout; it has no regional negative prompts or regional reference images.
 - MOSS-Image is not offered in the [Upscale panel](/users-guide/image-generation/upscale/).
