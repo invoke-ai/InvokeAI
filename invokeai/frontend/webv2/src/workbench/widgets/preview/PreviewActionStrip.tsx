@@ -7,6 +7,7 @@ import { canCopyImage } from '@platform/browser/clipboard';
 import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import { ImageContinueGroup, ImageUseGroups, useImageRecallCapabilities } from '@workbench/image-actions';
 import {
   ChevronDownIcon,
@@ -22,8 +23,6 @@ import { useCallback, useMemo, useState, type ComponentProps, type MouseEvent, t
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
-
-import { releaseFocusOnRemoval } from './releaseFocusOnRemoval';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const STAR_LABEL_KEYS = {

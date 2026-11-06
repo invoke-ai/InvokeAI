@@ -9,6 +9,7 @@ import { getAuthSession, refreshProtectedMediaCookie } from '@features/identity'
 import { canCopyImage, copyImage } from '@platform/browser/clipboard';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import { GripHorizontalIcon } from 'lucide-react';
 import {
   useCallback,
@@ -30,7 +31,6 @@ import { useTranslation } from 'react-i18next';
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { FittedFrame, PreviewStage } from './PreviewStage';
 import { PreviewSwipeNeighbors } from './PreviewSwipeNeighbor';
-import { releaseFocusOnRemoval } from './releaseFocusOnRemoval';
 import {
   clearVideoSpanPlaybackState,
   consumeVideoSpanPlaybackRequest,

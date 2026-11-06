@@ -12,13 +12,12 @@ import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
+import { releaseFocusOnRemoval } from '@workbench/focusRegions';
 import { PinIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
-
-import { releaseFocusOnRemoval } from './releaseFocusOnRemoval';
 
 /**
  * Render board thumbnails below the stage in the gallery's order: the starred strip, the live GPU slots, then the
