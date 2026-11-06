@@ -31,6 +31,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { commands, userEvent } from 'vitest/browser';
 
 import { LivePreviewFollowProvider, useLivePreviewFollow } from './livePreviewFollow';
+import { PreviewActionStrip } from './PreviewActionStrip';
 import { usePreviewHeaderContext, type PreviewItemPosition } from './previewHeaderStore';
 import { PREVIEW_NAV_ATTRIBUTE } from './PreviewNavButtons';
 import { PreviewWidgetLabel } from './PreviewWidgetChrome';
@@ -492,6 +493,7 @@ vi.mock('@workbench/image-actions', async () => ({
     mocks.imageActionOptions = options;
     return mocks.imageActions ?? {};
   },
+  useImageRecallCapabilities: () => ({ capabilities: {}, isLoading: false }),
 }));
 
 vi.mock('@features/generation/react', () => ({
@@ -524,6 +526,7 @@ await i18n.use(initReactI18next).init({
           gallery: { commands: { clearSelection: 'Clear gallery selection' } },
           preview: {
             commands: { nextItem: 'Show next item', previousItem: 'Show previous item' },
+            imageActions: 'Item actions',
             noGallerySelection: 'No gallery selection',
             showGallery: 'Show Gallery',
             framesPerSecond: '{{count}} fps',
@@ -614,12 +617,16 @@ const HeaderPositionProbe = () => {
 // Off unless a test renders it: the header's ⋮ as the chrome shows it, only while Preview publishes an item to act on.
 let showsHeaderMenuButton = false;
 const HeaderMenuButton = () => {
-  const { actionItem, openItemMenu } = usePreviewHeaderContext();
+  const { actionItem, actions, getRegion, openItemMenu } = usePreviewHeaderContext();
 
-  return actionItem && openItemMenu ? (
-    <button aria-label="Item actions" type="button" onClick={() => openItemMenu(10, 10, 'housekeeping')}>
-      ⋮
-    </button>
+  return actionItem && actions ? (
+    <PreviewActionStrip
+      actions={actions}
+      density="minimal"
+      getRegion={getRegion ?? undefined}
+      item={actionItem}
+      onOpenMenu={openItemMenu}
+    />
   ) : null;
 };
 
@@ -4108,6 +4115,28 @@ describe('preview item menu focus', () => {
     await expect.poll(() => thumb.isConnected).toBe(false);
 
     expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: listed.name }], expect.anything());
+    await expect.poll(() => document.activeElement).toBe(getBoundary());
+  });
+
+  it("gives focus to Preview when the header's ⋮ that focus went back to goes in a later render", async () => {
+    showsHeaderMenuButton = true;
+    await renderWithItemMenu();
+    const menuButton = host!.querySelector<HTMLButtonElement>('button[aria-label="Item actions"]')!;
+
+    await act(() => userEvent.click(menuButton));
+    await findByText('[role="menuitem"]', 'widgets.gallery.itemMenu.deleteImage');
+    await expect.poll(() => document.activeElement?.closest('[role="menu"]')).not.toBeNull();
+    await act(() => userEvent.keyboard('{Escape}'));
+    await expect.poll(() => document.querySelector('[role="menu"]')).toBeNull();
+    expect(document.activeElement).toBe(menuButton);
+
+    // The selection goes from elsewhere, as when the Gallery deletes the shown item, and the ⋮ goes with it.
+    await act(async () => {
+      publishGalleryValues({ selectedImage: null, selectedImageName: null });
+      await Promise.resolve();
+    });
+
+    expect(menuButton.isConnected).toBe(false);
     await expect.poll(() => document.activeElement).toBe(getBoundary());
   });
 

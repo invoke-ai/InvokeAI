@@ -30,6 +30,7 @@ import { useTranslation } from 'react-i18next';
 import { PreviewCompareDropZone } from './PreviewCompareDropZone';
 import { FittedFrame, PreviewStage } from './PreviewStage';
 import { PreviewSwipeNeighbors } from './PreviewSwipeNeighbor';
+import { releaseFocusOnRemoval } from './releaseFocusOnRemoval';
 import {
   clearVideoSpanPlaybackState,
   consumeVideoSpanPlaybackRequest,
@@ -459,14 +460,26 @@ const PreviewVideo = ({
   const publishCopyAvailability = useCallback(() => {
     onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(videoRef.current));
   }, [onCopyAvailabilityChange, source.itemKey]);
+  // The video can hold focus (its native controls, and the context menu key opens Preview's menu from it), so it hands
+  // focus on when a later render removes it.
   const setVideoRef = useCallback(
     (video: HTMLVideoElement | null) => {
-      videoRef.current = video;
-      if (video) {
-        video.muted = previewVideoAudio.muted;
-        video.volume = previewVideoAudio.volume;
+      if (!video) {
+        return;
       }
+
+      videoRef.current = video;
+      video.muted = previewVideoAudio.muted;
+      video.volume = previewVideoAudio.volume;
       onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(video));
+
+      const releaseFocus = releaseFocusOnRemoval(video);
+
+      return () => {
+        videoRef.current = null;
+        onCopyAvailabilityChange?.(source.itemKey, false);
+        releaseFocus();
+      };
     },
     [onCopyAvailabilityChange, source.itemKey]
   );

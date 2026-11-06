@@ -79,7 +79,6 @@ import {
   type ReactNode,
   type Ref,
 } from 'react';
-import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewLoupeControls } from './usePreviewLoupe';
@@ -480,14 +479,16 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     setContextMenuVariant(variant);
     setContextMenuTarget(target);
   }, []);
+  const getNavigationBoundary = useCallback(() => navigationBoundaryRef.current, []);
   // Resolved when focus returns, from the menu or from a deletion confirmation it opened: the opener while it is still
-  // there, else Preview itself, so its keys keep working. A deletion can take the opener with it (the deleted item's
-  // filmstrip thumb; the header's ⋮, which remounts once the next item is selected), and a point opening had none.
+  // there, else Preview itself, so its keys keep working; a point opening had no opener. An opener a deletion takes away
+  // only after focus is back on it (the item's filmstrip thumb, the video, the header's ⋮) hands focus to Preview
+  // itself as it goes, so the target never has to wait for that render.
   const getContextMenuReturnFocus = useCallback((): HTMLElement | null => {
     const opener = contextMenuOpenerRef.current;
 
-    return opener?.isConnected ? opener : navigationBoundaryRef.current;
-  }, []);
+    return opener?.isConnected ? opener : getNavigationBoundary();
+  }, [getNavigationBoundary]);
   const openFilmstripItemContextMenu = useCallback(
     (item: GalleryItem, x: number, y: number) =>
       showContextMenu({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }, 'full'),
@@ -513,24 +514,11 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   const closeContextMenu = useCallback(() => {
     // Only while the closing menu still holds focus: an action that moved it on (into a dialog it opened, say) keeps
     // it there.
-    const shouldReturnFocus = Boolean(document.activeElement?.closest('[role="menu"]'));
-
-    // Committed before the target is resolved: Delete without a confirmation clears the shown item in the same click,
-    // taking the header's ⋮ and the item's thumb with it, and until React commits that the opener still looks
-    // connected. A thumb that a later render removes hands focus on by itself.
-    flushSync(() => setContextMenuTarget(null));
-
-    // Unless that commit gave focus somewhere on purpose, such as a control in a dialog the action opened.
-    const { activeElement } = document;
-    const isFocusUnclaimed =
-      activeElement === null ||
-      activeElement === document.body ||
-      !activeElement.isConnected ||
-      activeElement.closest('[role="menu"]') !== null;
-
-    if (shouldReturnFocus && isFocusUnclaimed) {
+    if (document.activeElement?.closest('[role="menu"]')) {
       getContextMenuReturnFocus()?.focus({ preventScroll: true });
     }
+
+    setContextMenuTarget(null);
   }, [getContextMenuReturnFocus]);
   const headerItemName = shouldFollowLive ? null : (selectedItem?.name ?? null);
 
@@ -576,6 +564,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       actions: shouldFollowLive ? null : imageActions,
       boardName: headerItemName === null ? null : boardName,
       copyCurrentVideoFrame: !shouldFollowLive && contextMenuItem?.kind === 'video' ? copyCurrentVideoFrame : null,
+      getRegion: getNavigationBoundary,
       isVideoFrameCopyAvailable: !shouldFollowLive && isVideoFrameCopyAvailable,
       itemName: headerItemName,
       openItemMenu: shouldFollowLive ? null : openItemContextMenu,
@@ -590,6 +579,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     boardName,
     contextMenuItem,
     copyCurrentVideoFrame,
+    getNavigationBoundary,
     hasHeaderItem,
     headerItemName,
     imageActions,

@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
 
+import { releaseFocusOnRemoval } from './releaseFocusOnRemoval';
+
 /**
  * Render board thumbnails below the stage in the gallery's order: the starred strip, the live GPU slots, then the
  * listing, where each slot's result lands beside it. Reserve height outside media; item drag payloads work with
@@ -324,30 +326,6 @@ const FilmstripThumb = memo(function FilmstripThumb({
     </Box>
   );
 });
-
-/**
- * A thumb's ref cleanup: one that leaves the document while it holds focus hands focus to Preview's region, so the
- * keys keep working, unless something else has taken focus since. React also runs the cleanup when the ref callback
- * changes on a node that stays (the selection or follow flipping on the click that focused it), so only a node really
- * gone gives focus away.
- */
-const releaseFocusOnRemoval = (node: HTMLElement): (() => void) => {
-  const region = node.closest<HTMLElement>('[role="region"]');
-
-  return () => {
-    if (document.activeElement !== node) {
-      return;
-    }
-
-    queueMicrotask(() => {
-      const { activeElement } = document;
-
-      if (!node.isConnected && (activeElement === null || activeElement === document.body)) {
-        region?.focus({ preventScroll: true });
-      }
-    });
-  };
-};
 
 const EMPTY_SESSIONS: readonly QueueProgressSession[] = [];
 
