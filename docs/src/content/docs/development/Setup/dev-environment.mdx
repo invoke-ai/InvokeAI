@@ -1,6 +1,6 @@
 ---
 title: Development Environment
-lastUpdated: 2026-07-14
+lastUpdated: 2026-11-06
 ---
 
 import { LinkCard, Steps, Tabs, TabItem, FileTree, LinkButton } from '@astrojs/starlight/components'
@@ -65,7 +65,15 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
         ```
 
       :::note[Linux ARM64 / aarch64]
-        On Linux ARM64 devices (e.g. Raspberry Pi 5), use `--extra cpu` and omit `--extra xformers`. torch and torchvision are installed from PyPI (CPU-only wheels) — CUDA and ROCm acceleration are not available on this platform.
+        On Linux ARM64 devices without NVIDIA CUDA support (e.g. Raspberry Pi 5), use `--extra cpu` and omit `--extra xformers`. On NVIDIA Spark running Linux, run this after `uv sync` to install CUDA-enabled PyTorch:
+
+        ```sh
+        uv pip install \
+          --python .venv/bin/python \
+          --torch-backend=cu130 \
+          "torch==2.13.0+cu130" \
+          "torchvision==0.28.0+cu130"
+        ```
       :::
 
       :::note[Windows on ARM64 (RTX Spark)]
