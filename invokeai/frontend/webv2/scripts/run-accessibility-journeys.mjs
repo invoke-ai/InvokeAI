@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import { mkdir, readFile } from 'node:fs/promises';
-import { createServer, request as requestHttp } from 'node:http';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
+import { startAssetFaultProxy } from './asset-fault-proxy.mjs';
 import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -1568,48 +1568,6 @@ const runHiddenMaintenanceJourney = async (browser) => {
   };
 };
 
-/** Fault on the wire so the default production worker, not a page interception, handles these responses. */
-const startAssetFaultProxy = async (chunk, failures) => {
-  const requests = [];
-  const server = createServer((incoming, outgoing) => {
-    if (incoming.url === `/${chunk}` && requests.length < failures) {
-      requests.push(503);
-      outgoing.writeHead(503, { 'Content-Type': 'text/javascript', 'Cache-Control': 'no-store' });
-      outgoing.end('Temporary module outage');
-      return;
-    }
-    const upstream = requestHttp(
-      new URL(incoming.url, origin),
-      {
-        method: incoming.method,
-        headers: { ...incoming.headers, host: new URL(origin).host },
-      },
-      (response) => {
-        if (incoming.url === `/${chunk}`) {
-          requests.push(response.statusCode);
-        }
-        outgoing.writeHead(response.statusCode, response.headers);
-        response.pipe(outgoing);
-      }
-    );
-    upstream.on('error', (error) => outgoing.destroy(error));
-    incoming.pipe(upstream);
-  });
-  await new Promise((resolveListen, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', resolveListen);
-  });
-  return {
-    origin: `http://127.0.0.1:${server.address().port}`,
-    requests,
-    close: () =>
-      new Promise((resolveClose) => {
-        server.closeAllConnections();
-        server.close(resolveClose);
-      }),
-  };
-};
-
 /** Fault the actual first-party production module request; Retry never silently reloads the editor. */
 const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = false) => {
   const id = activeWorker
@@ -1620,7 +1578,7 @@ const runNativeWidgetRecoveryJourney = async (browser, failures, activeWorker = 
   await fetch(`${backendOrigin}/__reset?profile=representative`, { method: 'POST' });
   const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
   const chunk = manifest['src/workbench/widgets/preview/implementation.ts'].file;
-  const proxy = activeWorker ? await startAssetFaultProxy(chunk, failures) : null;
+  const proxy = activeWorker ? await startAssetFaultProxy(origin, chunk, failures) : null;
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce',
