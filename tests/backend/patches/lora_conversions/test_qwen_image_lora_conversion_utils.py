@@ -1,5 +1,7 @@
 """Tests for Qwen Image LoRA conversion utilities."""
 
+import logging
+
 import pytest
 import torch
 
@@ -167,3 +169,24 @@ def test_peft_dora_magnitude_is_kept_as_a_dora_layer():
     assert isinstance(layer, DoRALayer)
     assert layer.magnitude_is_out_dim
     assert torch.equal(layer.dora_scale, magnitude)
+
+
+@pytest.mark.parametrize(
+    ("transformer_prefix", "text_encoder_prefix"),
+    [
+        ("lora_unet_transformer_blocks_0_attn_to_q", "lora_te_model_language_model_layers_0_mlp_down_proj"),
+        ("transformer.transformer_blocks.0.attn.to_q", "text_encoder.model.language_model.layers.0.mlp.down_proj"),
+    ],
+)
+def test_text_encoder_layers_are_dropped_with_one_warning(
+    transformer_prefix: str, text_encoder_prefix: str, caplog: pytest.LogCaptureFixture
+):
+    state_dict = {
+        f"{prefix}.lora_down.weight": torch.randn(4, 64) for prefix in (transformer_prefix, text_encoder_prefix)
+    } | {f"{prefix}.lora_up.weight": torch.randn(64, 4) for prefix in (transformer_prefix, text_encoder_prefix)}
+
+    with caplog.at_level(logging.WARNING):
+        model = lora_model_from_qwen_image_state_dict(state_dict, alpha=None)
+
+    assert list(model.layers) == [f"{QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"]
+    assert caplog.text.count("text-encoder layers") == 1

@@ -18,6 +18,22 @@ from invokeai.backend.patches.lora_conversions.qwen_image_lora_constants import 
     QWEN_IMAGE_EDIT_LORA_TRANSFORMER_PREFIX,
 )
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.util.logging import InvokeAILogger
+
+logger = InvokeAILogger.get_logger(__name__)
+
+# Text-encoder key prefixes: Kohya (`lora_te_...`, `lora_te1_...`) and Diffusers/PEFT (`text_encoder.`).
+_TEXT_ENCODER_KEY_PREFIXES = ("lora_te", "text_encoder.")
+
+
+def _warn_text_encoder_layers_ignored(layer_names: list[str]) -> None:
+    """The Qwen Image text-encoder node applies no LoRA, so text-encoder layers have nothing to patch."""
+    if layer_names:
+        logger.warning(
+            f"Qwen Image LoRA has {len(layer_names)} text-encoder layers, which are not supported and will be ignored. "
+            "Only the transformer layers are applied."
+        )
+
 
 # Regex for Kohya-format Qwen Image LoRA keys.
 # Example: lora_unet_transformer_blocks_0_attn_to_k
@@ -110,6 +126,8 @@ def _convert_kohya_format(state_dict: Dict[str, torch.Tensor], alpha: float | No
             grouped[layer_name] = {}
         grouped[layer_name][param_name] = value
 
+    _warn_text_encoder_layers_ignored([name for name in grouped if name.startswith(_TEXT_ENCODER_KEY_PREFIXES)])
+
     for kohya_layer, layer_dict in grouped.items():
         model_path = _convert_kohya_key(kohya_layer)
         if model_path is None:
@@ -131,7 +149,12 @@ def _convert_diffusers_format(state_dict: Dict[str, torch.Tensor], alpha: float 
 
     grouped = _group_by_layer(state_dict)
 
+    text_encoder_layers = [name for name in grouped if name.startswith(_TEXT_ENCODER_KEY_PREFIXES)]
+    _warn_text_encoder_layers_ignored(text_encoder_layers)
+
     for layer_key, layer_dict in grouped.items():
+        if layer_key in text_encoder_layers:
+            continue
         values = _normalize_lora_keys(layer_dict, alpha)
         layer = any_lora_layer_from_state_dict(values)
         clean_key = layer_key
