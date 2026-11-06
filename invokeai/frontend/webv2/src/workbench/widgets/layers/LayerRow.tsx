@@ -26,20 +26,17 @@ import type { LayerTreeRow } from './layerTreeRows';
 import { AdjustmentStatusIcon, useAdjustmentStatus } from './AdjustmentStatusIcon';
 import { colorLabelHex } from './colorLabels';
 import { ControlLayerStatusIcon } from './ControlLayerStatusIcon';
-import { TREE_ROW_FOCUS } from './LayerActiveDot';
 import { recordLayerRowCommit } from './layerPanelDiagnostics';
-import { LAYER_TREE_INDENT_PX } from './layerPanelRows';
 import { anchorFromPoint } from './layerRowCommands';
 import { layerRowSummary } from './layerRowSummary';
-import { LayerRowSurface } from './LayerRowSurface';
+import { LAYER_LEADING_BOX_PX, LAYER_PANEL_CONTROL_GAP, LayerRowSurface, TREE_ROW_FOCUS } from './LayerRowSurface';
 import { LayerThumbnail, type LayerThumbnailEngine } from './LayerThumbnail';
 import { layerTypeIcon } from './layerTypeIcon';
 
 const CHEVRON_HOVER = { bg: 'bg.muted', color: 'fg' };
 
-const THUMBNAIL_SIZE = '8';
+const THUMBNAIL_SIZE = `${LAYER_LEADING_BOX_PX}px`;
 const GROUP_PILE_OFFSET_PX = 4;
-const GROUP_PILE_CARD_PX = 24;
 
 /** How a row takes part in the current drag. */
 export type LayerRowDragState = 'source' | 'travelling' | null;
@@ -128,8 +125,6 @@ const LayerRowComponent = ({
   useLayoutEffect(() => {
     recordLayerRowCommit(row.id);
   });
-
-  const indentStyle = useMemo(() => ({ paddingLeft: `${vm.depth * LAYER_TREE_INDENT_PX}px` }), [vm.depth]);
 
   const handleSelect = useCallback(
     (event: MouseEvent<HTMLElement>) =>
@@ -333,33 +328,7 @@ const LayerRowComponent = ({
           w="2px"
         />
       ) : null}
-      <LayerRowSurface active={tone} cursor={drag === 'source' ? 'grabbing' : 'default'} indentStyle={indentStyle}>
-        {/* One visibility control: a hidden layer is off the canvas and out of generation alike. */}
-        <Box display="flex" flexShrink={0} onClick={stopPropagation} onMouseDown={keepRowFocus}>
-          <Tooltip
-            content={
-              disabledByAncestor
-                ? t('widgets.layers.actions.groupDisabled')
-                : node.isEnabled
-                  ? t('widgets.layers.actions.hideLayerTooltip')
-                  : t('widgets.layers.actions.showLayerTooltip')
-            }
-          >
-            <IconButton
-              aria-label={t('widgets.layers.actions.toggleActive')}
-              aria-pressed={node.isEnabled}
-              color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
-              disabled={editingLocked}
-              size="sm"
-              tabIndex={-1}
-              variant="ghost"
-              onClick={handleToggleVisible}
-              onPointerDown={stopPropagation}
-            >
-              {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
-            </IconButton>
-          </Tooltip>
-        </Box>
+      <LayerRowSurface active={tone} cursor={drag === 'source' ? 'grabbing' : 'default'} depth={vm.depth}>
         {group ? (
           <GroupPreview engine={engine} expanded={row.expanded} node={node} thumbnails={thumbnails} />
         ) : !thumbnails ? (
@@ -466,11 +435,12 @@ const LayerRowComponent = ({
         {layer?.type === 'control' ? (
           <ControlLayerStatusIcon contributing={vm.contributionEnabled} engine={engine} layer={layer} />
         ) : null}
-        {/* One control cluster on the same rhythm as the stack header; slots a row cannot use are held open. */}
-        <HStack flexShrink="0" gap="0.5" onClick={stopPropagation} onMouseDown={keepRowFocus}>
+        {/* Trailing cluster on the stack header's rhythm: the eye sits left of the lock as an overlay header's eye sits
+            left of its New button, so eyes and locks each form one column at every depth. */}
+        <HStack flexShrink="0" gap={LAYER_PANEL_CONTROL_GAP} onClick={stopPropagation} onMouseDown={keepRowFocus}>
           {hideable && vm.documentHidden && vm.contributionEnabled ? (
             // Hidden on the canvas only (an overlay put out of the way): it still shapes generation. The row menu
-            // sets it; this says so and brings it back.
+            // sets it; this says so and brings it back. Rendered only when it applies, left of the eye column.
             <Tooltip
               content={
                 hiddenByAncestor
@@ -491,9 +461,31 @@ const LayerRowComponent = ({
                 <EyeClosedIcon />
               </IconButton>
             </Tooltip>
-          ) : (
-            <Box boxSize="6" />
-          )}
+          ) : null}
+          {/* One visibility control: a hidden layer is off the canvas and out of generation alike. */}
+          <Tooltip
+            content={
+              disabledByAncestor
+                ? t('widgets.layers.actions.groupDisabled')
+                : node.isEnabled
+                  ? t('widgets.layers.actions.hideLayerTooltip')
+                  : t('widgets.layers.actions.showLayerTooltip')
+            }
+          >
+            <IconButton
+              aria-label={t('widgets.layers.actions.toggleActive')}
+              aria-pressed={node.isEnabled}
+              color={vm.contributionEnabled ? 'fg.muted' : 'fg.subtle'}
+              disabled={editingLocked}
+              size="sm"
+              tabIndex={-1}
+              variant="ghost"
+              onClick={handleToggleVisible}
+              onPointerDown={stopPropagation}
+            >
+              {node.isEnabled ? <EyeIcon /> : <EyeOffIcon />}
+            </IconButton>
+          </Tooltip>
           <Tooltip
             content={
               lockedByAncestor ? t('widgets.layers.actions.groupLocked') : t('widgets.layers.actions.toggleLock')
@@ -555,14 +547,14 @@ const GroupPreview = ({
   thumbnails: boolean;
 }) => {
   const leaves = useMemo(() => (thumbnails ? groupLeafPreviews(node) : []), [node, thumbnails]);
-  const cardStyles = useMemo(
-    () =>
-      leaves.map((_, index): CSSProperties => {
-        const offset = index * GROUP_PILE_OFFSET_PX;
-        return { height: GROUP_PILE_CARD_PX, left: offset, top: offset, width: GROUP_PILE_CARD_PX };
-      }),
-    [leaves]
-  );
+  // Cards shrink by one offset per extra card so the pile always spans the whole leading box; one card fills it.
+  const cardStyles = useMemo(() => {
+    const card = LAYER_LEADING_BOX_PX - (leaves.length - 1) * GROUP_PILE_OFFSET_PX;
+    return leaves.map((_, index): CSSProperties => {
+      const offset = index * GROUP_PILE_OFFSET_PX;
+      return { height: card, left: offset, top: offset, width: card };
+    });
+  }, [leaves]);
   if (leaves.length === 0) {
     return (
       <Box
