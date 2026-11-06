@@ -610,6 +610,18 @@ const getMetadataModelTuning = (
     };
   }
 
+  if (model.base === 'wan') {
+    // Null means "inherit the main guidance". Graphs omit the key in that case, so a Wan record without it ran the
+    // default and must clear a toggle turned on since.
+    const lowNoiseGuidance = recordedOrDefault(
+      'wan_guidance_scale_low_noise',
+      getBoundedNumber(metadata, 'wan_guidance_scale_low_noise', 1, 20) ?? undefined,
+      null
+    );
+
+    return lowNoiseGuidance === undefined ? {} : { wanGuidanceScaleLowNoise: lowNoiseGuidance };
+  }
+
   if (model.base === 'krea-2') {
     // Recorded only when the switch was sent: with edit references and a LoRA. A record without it says nothing
     // about the switch, so the user's setting stays.

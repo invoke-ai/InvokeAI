@@ -1707,6 +1707,29 @@ describe('model-family tuning recall', () => {
     expect(unchanged?.fields).not.toContain('modelTuning');
   });
 
+  it('restores the Wan low-noise guidance and clears it for a record that ran the default', () => {
+    const wanModel: MainModelConfig = { base: 'wan', key: 'wan-model', name: 'Wan', type: 'main' };
+    const wanRecord = (extra: Record<string, unknown> = {}) => ({
+      generation_mode: 'wan_txt2img',
+      model: { base: 'wan', key: wanModel.key, name: wanModel.name, type: 'main' },
+      ...extra,
+    });
+    const restored = recall(wanRecord({ wan_guidance_scale_low_noise: 3.5 }), wanModel);
+
+    expect(restored?.values.wanGuidanceScaleLowNoise).toBe(3.5);
+    expect(restored?.fields).toContain('modelTuning');
+    // Graphs omit the key when the toggle is off: such a record ran the default, so recall turns the toggle off.
+    const cleared = recall(wanRecord(), wanModel, 'all', { wanGuidanceScaleLowNoise: 4 });
+
+    expect(cleared?.values.wanGuidanceScaleLowNoise).toBeNull();
+    // Another family's record never touches it.
+    const wrongFamily = recall({ wan_guidance_scale_low_noise: 3.5 }, fluxModel, 'all', {
+      wanGuidanceScaleLowNoise: 4,
+    });
+
+    expect(wrongFamily?.values.wanGuidanceScaleLowNoise).toBe(4);
+  });
+
   it('restores the Krea-2 reference K/V cache only from a record that has it', () => {
     const krea2: MainModelConfig = { base: 'krea-2', key: 'krea2-tuning', name: 'Krea-2', type: 'main' };
     const krea2Record = (extra: Record<string, unknown> = {}) => ({
