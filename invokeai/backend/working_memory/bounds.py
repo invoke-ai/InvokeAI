@@ -170,6 +170,18 @@ UPPER_BOUND_EXCEPTIONS: Final[Mapping[str, float]] = MappingProxyType(
         "denoise.krea2-cudnn,native-denoise-fp16-4096+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.35,
         "denoise.krea2-cudnn,cudaMallocAsync-denoise-bf16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
         "denoise.krea2-cudnn,cudaMallocAsync-denoise-fp16-9216+77tok-NVIDIAGeForceRTX4090-demand_peak": 1.33,
+        # Qwen-Image-2.1's one tiled line per dtype on the W7900.
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-1536x1536-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.35,
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-2048x2048-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.71,
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-3072x3072-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.35,
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-2048x2048-tile768-AMDRadeonProW7900DualSlot-reserved_peak": 1.32,
+        "vae.qwen_image_2_1-miopen,native-decode-bf16-3072x3072-tile768-AMDRadeonProW7900DualSlot-reserved_peak": 1.31,
+        "vae.qwen_image_2_1-miopen,native-decode-fp32-2048x2048-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.69,
+        "vae.qwen_image_2_1-miopen,native-decode-fp32-3072x3072-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.69,
+        "vae.qwen_image_2_1-miopen,native-encode-fp32-2048x2048-tile512-AMDRadeonProW7900DualSlot-reserved_peak": 1.81,
+        # And on the RX 9060 XT with the native allocator.
+        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-2048x2048-tile512-RX9060XT-reserved_peak": 1.50,
+        "vae.qwen_image_2_1-miopen,native,windows-decode-bf16-512x1536-tile1024-RX9060XT-reserved_peak": 1.48,
     }
 )
 """In-fit points, by `point_id`, whose envelope sits more than 1.3x above them, with the ratio they are held to: their
@@ -249,7 +261,17 @@ own, rounded up to two decimals, so a refit that moves one shows in the data tes
   77-token forward at 4096 image tokens sits 1.35x below it. Under `cudaMallocAsync` a caption token reserves about
   twice an image token (1856 against 1680 MiB at 9216 image tokens), and the line is held up by a forward whose warm
   run read 18% above its cold one (one 1024px joint reference at 1024px: 1984 against 1680 MiB), which puts the
-  77-token forward at 9216 image tokens 1.32x below it."""
+  77-token forward at 9216 image tokens 1.32x below it.
+- The Qwen-Image-2.1 points are its VAE's 512 and 768 px tiles on the W7900, where one tiled line serves every tile, so
+  the largest jump above the untiled demand sets the base for all. In bf16 the 768 px tile of a 1536 px frame took 9.04
+  GiB against 6.68 untiled, and 7.39-7.71 GiB at 1792-3072 px: the flat 2.48 GiB holds the 768 px tile at 2048 and 3072
+  px at 1.31-1.32x and the 512 px tile at 1.34-1.35x where the allocator jumps to 4.25 GiB, at 1.71x at 2048 px where it
+  has not yet (3.35 GiB). In fp32 the 1024 px tile of a 2048 px frame took 22.20 GiB against 18.81 untiled, which holds
+  the 512 px decode tile, 5.64 GiB at 2048 and 3072 px alike, at 1.69x; its encode took 6.32 GiB against 4.63, which holds the 512 px encode tile, 1.66 GiB,
+  at 1.81x: 3.00 GiB, about what the cache reserves by default anyway.
+  On the RX 9060 XT with the native allocator the 512 px tile of a 1536 px frame took 4.24 GiB against 3.00 untiled, and
+  3.35 GiB at 2048 px: the flat 1.30 GiB holds the latter at 1.50x, and a 512x1536 frame in 1024 px tiles, 5.91 GiB, at
+  1.48x, whose tiles nobody measured untiled."""
 
 
 def point_id(point: MeasuredPoint, spec: "EstimatorSpec") -> str:
