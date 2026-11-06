@@ -93,7 +93,7 @@ Browser reports keep API media requests and decoded dimensions separate from sta
 Failures retain diagnostics, screenshots and the existing diagnostic traces under `artifacts/architecture-performance`.
 
 Both routine resource observations and full profiles run a bounded Gallery quick-settings workload after startup and return-switch measurements on the
-representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle waits for the close animation and two rendering frames, then samples owner portal identities.
+representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle arms the pinned Chakra presence owner’s native `exitcomplete` event before closing, waits at most five seconds for it, then samples owner portal identities at the next rendering opportunity. Animation-finished promises alone do not establish presence completion.
 Retained popover count must be zero; the runner fails immediately on a retained portal instead of waiting it away.
 Routine resource observations also run this bounded correctness phase, independently of report-only timing.
 DOM nodes, Canvas elements and request counts are diagnostic observations, not universal lifetime bounds. The
@@ -117,7 +117,7 @@ The required localhost capabilities are IndexedDB and Web Locks. Each engine hol
 leaves for a neutral same-origin document immediately. Before any editor can reconcile it, the suite proves the
 committed journal has the new marker while the staged draft, held PUT bodies and server do not. Reopening must
 recover that marker. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
-checker-only thumbnail and empty Canvas, and injects retained portal DOM into the real sustained-workload collector.
+checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, and injects retained portal DOM into the real sustained-workload collector.
 Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
 across route re-entry, advance keyboard focus, and disable copy controls with an explanation when clipboard is
 unavailable. This is targeted current-engine coverage, with no minimum-version support promise. Missing engines or

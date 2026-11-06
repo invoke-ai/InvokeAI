@@ -211,7 +211,6 @@ export const distribution = (values) => {
 /** Warm one quick-settings popover, then six complete open/interact/close cycles. Portals must retire each time. */
 export const runSustainedWorkload = async (page) => {
   const gear = page.getByRole('button', { exact: true, name: 'Gallery settings' });
-  const popup = page.locator('[data-scope="popover"][data-part="content"][data-state="open"]');
   const requests = [];
   const onRequest = (request) => requests.push(request.url());
   page.on('request', onRequest);
@@ -235,22 +234,33 @@ export const runSustainedWorkload = async (page) => {
       }
       await page.getByRole('slider', { exact: true, name: 'Image size' }).focus();
       await page.keyboard.press(cycle % 2 ? 'ArrowLeft' : 'ArrowRight');
-      await page.keyboard.press('Escape');
-      await popup.waitFor({ state: 'hidden' });
-      // Allow the close animation and React's removal to finish, then inspect rather than wait away leaks.
-      await page.evaluate(async () => {
-        await Promise.allSettled(
-          document
-            .getAnimations()
-            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
-            .map((animation) => animation.finished)
-        );
-        await new Promise((resolve) => {
-          requestAnimationFrame(() => {
+      // Chakra presence waits for native animationend; animation.finished can resolve before that owner transition.
+      const exitState = await page.evaluateHandle((id) => {
+        const state = { completed: false };
+        const content = document.getElementById(id);
+        const onExit = () => {
+          state.completed = true;
+        };
+        content.addEventListener('exitcomplete', onExit, { once: true });
+        state.cleanup = () => content.removeEventListener('exitcomplete', onExit);
+        return state;
+      }, popupId);
+      currentCycle = { cycle, popoverId: popupId, phase: 'waiting-for-exit' };
+      try {
+        await page.keyboard.press('Escape');
+        await page.waitForFunction((state) => state.completed, exitState, { timeout: 5000 });
+      } finally {
+        // A retired document can invalidate handles; cleanup must preserve the original journey failure.
+        await exitState.evaluate((state) => state.cleanup()).catch(() => {});
+        await exitState.dispose().catch(() => {});
+      }
+      // exitcomplete precedes React's removal commit; sample at its next rendering opportunity, without polling DOM absence.
+      await page.evaluate(
+        () =>
+          new Promise((resolve) => {
             requestAnimationFrame(resolve);
-          });
-        });
-      });
+          })
+      );
       const retained = await page.evaluate(
         (ids) => ({
           domNodes: document.querySelectorAll('*').length,
@@ -259,7 +269,13 @@ export const runSustainedWorkload = async (page) => {
         }),
         ownedPopoverIds
       );
-      currentCycle = { ...retained, cycle, latencyMs: performance.now() - start, requests: requests.length };
+      currentCycle = {
+        ...retained,
+        cycle,
+        popoverId: popupId,
+        latencyMs: performance.now() - start,
+        requests: requests.length,
+      };
       assertRetirement([currentCycle], { popovers: 0 });
       if (cycle > 0) {
         samples.push(currentCycle);

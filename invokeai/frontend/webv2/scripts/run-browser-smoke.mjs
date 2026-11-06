@@ -196,7 +196,64 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               .getByRole('tablist', { exact: true, name: 'Layout preset' })
               .getByRole('tab', { name: /^Compose(, unsaved changes)?$/ })
               .click();
-            report.sustained = await runSustainedWorkload(page);
+            // Hold native exit delivery after the browser finishes its animation: presence still owns the popup.
+            await page.getByRole('button', { exact: true, name: 'Gallery settings' }).evaluate((trigger) => {
+              window.__heldPopoverEnds = [];
+              window.__holdPopoverEnd = (event) => {
+                if (
+                  event.target.id === trigger.getAttribute('aria-controls') &&
+                  event.target.matches?.('[data-scope="popover"][data-part="content"][data-state="closed"]')
+                ) {
+                  event.stopImmediatePropagation();
+                  window.__heldPopoverEnds.push({
+                    target: event.target,
+                    animationName: event.animationName,
+                    elapsedTime: event.elapsedTime,
+                  });
+                }
+              };
+              document.addEventListener('animationend', window.__holdPopoverEnd, true);
+            });
+            let workloadSettled = false;
+            const workload = runSustainedWorkload(page);
+            void workload.then(
+              () => {
+                workloadSettled = true;
+              },
+              () => {
+                workloadSettled = true;
+              }
+            );
+            try {
+              await Promise.race([
+                workload,
+                page.waitForFunction(() => window.__heldPopoverEnds.length > 0, null, { timeout: 10_000 }),
+              ]);
+              // Keep the owner event withheld across rendering turns, beyond the old animation-snapshot sampler.
+              await page.evaluate(async () => {
+                for (let frame = 0; frame < 4; frame += 1) {
+                  await new Promise((resolve) => {
+                    requestAnimationFrame(resolve);
+                  });
+                }
+              });
+              assert.equal(workloadSettled, false, 'Retirement must wait for the owner exit event');
+            } finally {
+              await page
+                .evaluate(() => {
+                  document.removeEventListener('animationend', window.__holdPopoverEnd, true);
+                  for (const { target, animationName, elapsedTime } of window.__heldPopoverEnds) {
+                    target.dispatchEvent(
+                      new AnimationEvent('animationend', { animationName, elapsedTime, bubbles: true })
+                    );
+                  }
+                  delete window.__heldPopoverEnds;
+                  delete window.__holdPopoverEnd;
+                })
+                .catch(() => {});
+            }
+            report.sustained = await workload;
+            report.delayedExitProbe = 'passed';
             // Inject retained owner DOM into the real collector/runner, rather than fabricated counts.
             await page.evaluate(() => {
               window.__retentionProbe = new MutationObserver((records) => {
@@ -393,6 +450,7 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               .screenshot({ path: resolve(artifacts, `${engine}-failure.png`), fullPage: true })
               .catch(() => {});
             report.diagnostics = diagnostics.errors;
+            report.sustained = error.sustained ?? report.sustained;
             throw error;
           } finally {
             await context.tracing.stop({ path: resolve(artifacts, `${engine}.zip`) });
