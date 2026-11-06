@@ -129,7 +129,6 @@ const browse = vi.hoisted(() => ({
   ensureWorkflowLibraryBrowseLoaded: vi.fn(() => Promise.resolve()),
   // Assigned by the module factory below, which owns the store instance.
   getSnapshot: null as null | (() => WorkflowLibraryBrowseSnapshot),
-  loadNextWorkflowLibraryPage: vi.fn(),
   loadWorkflowLibraryRange: vi.fn((_start: number, _end: number) => Promise.resolve(true)),
   setSnapshot: null as null | ((snapshot: WorkflowLibraryBrowseSnapshot) => void),
   setWorkflowLibraryBrowseFilter: vi.fn(),
@@ -157,7 +156,6 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
     selectWorkflowLibraryEntry,
     ensureWorkflowLibraryBrowseLoaded: browse.ensureWorkflowLibraryBrowseLoaded,
     getWorkflowLibraryBrowseSnapshot: store.getSnapshot,
-    loadNextWorkflowLibraryPage: browse.loadNextWorkflowLibraryPage,
     loadWorkflowLibraryRange: browse.loadWorkflowLibraryRange,
     rememberWorkflowLibraryScroll: vi.fn(),
     setWorkflowLibraryVisibleDemand: vi.fn(),
@@ -220,7 +218,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.installModels_one': 'Install 1 model',
   'workflowLibrary.installModels_other': 'Install {{count}} models',
   'workflowLibrary.loading': 'Loading workflows…',
-  'workflowLibrary.loadingMore': 'Loading more…',
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.newWorkflow': 'New workflow',
   'workflowLibrary.nodeCount_one': '{{count}} node',
@@ -572,7 +569,6 @@ describe('WorkflowLibraryDialog', () => {
     onOpenChange = vi.fn((_isOpen: boolean) => {});
     identity.session = { multiuserEnabled: false, phase: 'ready', user: null };
     browse.ensureWorkflowLibraryBrowseLoaded.mockClear();
-    browse.loadNextWorkflowLibraryPage.mockClear();
     browse.setWorkflowLibraryBrowseFilter.mockClear();
     loader.open.mockClear();
     loader.resume.mockClear();

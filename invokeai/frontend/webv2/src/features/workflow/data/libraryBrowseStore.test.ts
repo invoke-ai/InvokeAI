@@ -196,7 +196,12 @@ describe('workflow library page fetching', () => {
     api.getAllWorkflowTags.mockResolvedValue(['shared-tag']);
     api.getWorkflowTagCounts.mockResolvedValue({ 'shared-tag': 2 });
     api.listLibraryWorkflows.mockImplementation(({ isPublic, page }: { isPublic?: boolean; page: number }) =>
-      Promise.resolve(buildPage([buildItem(isPublic ? `shared-${page}` : 'yours')], { page, pages: 2, total: 2 }))
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: 20 }, (_, i) => buildItem(`${isPublic ? 'shared' : 'yours'}-${page * 20 + i}`)),
+          { page, pages: 2, total: 40 }
+        )
+      )
     );
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
     demandEntries();
@@ -226,8 +231,7 @@ describe('workflow library page fetching', () => {
       expect.objectContaining({ categories: ['user'], isPublic: true, tags: ['shared-tag'] })
     );
 
-    browse.loadNextWorkflowLibraryPage();
-    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().page).toBe(1));
+    await browse.loadWorkflowLibraryRange(20, 20);
     expect(api.listLibraryWorkflows).toHaveBeenCalledWith(
       expect.objectContaining({ category: 'user', isPublic: true, page: 1, perPage: 20 })
     );
@@ -257,38 +261,6 @@ describe('workflow library page fetching', () => {
     api.listLibraryWorkflows.mockClear();
 
     browse.setWorkflowLibraryBrowseFilter({ category: 'user', search: '' });
-
-    expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
-  });
-
-  it('appends the next page and stops once the last page is loaded', async () => {
-    api.listLibraryWorkflows.mockImplementation(({ page }: { page: number }) =>
-      Promise.resolve(
-        buildPage([buildItem(`page-${page}-a`), buildItem(`page-${page}-b`)], { page, pages: 2, total: 4 })
-      )
-    );
-
-    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
-    demandEntries();
-    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(2);
-
-    browse.loadNextWorkflowLibraryPage();
-    await vi.waitFor(() => {
-      demandEntries();
-      expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded');
-    });
-
-    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
-    expect(snapshot.entries.map((entry) => entry.item.workflow_id)).toEqual([
-      'page-0-a',
-      'page-0-b',
-      'page-1-a',
-      'page-1-b',
-    ]);
-    expect(snapshot.page).toBe(1);
-
-    api.listLibraryWorkflows.mockClear();
-    browse.loadNextWorkflowLibraryPage();
 
     expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
   });
@@ -736,128 +708,54 @@ describe('workflow library browse refresh', () => {
     expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('idle');
   });
 
-  describe('racing infinite scroll', () => {
-    // Deleting `b` elsewhere shifts every later row up one place.
-    const BEFORE_DELETE = [
-      ['a', 'b'],
-      ['c', 'd'],
-      ['e', 'f'],
-    ];
-    const AFTER_DELETE = [['a', 'c'], ['d', 'e'], ['f']];
-    const listPage = (library: string[][], page: number) =>
+  it.each(['range first', 'refresh first'])('fences overlapping range and refresh publications: %s', async (order) => {
+    const page = (index: number, revision = 1) =>
       buildPage(
-        (library[page] ?? []).map((id) => buildItem(id)),
-        {
-          page,
-          pages: library.length,
-          total: library.flat().length,
-        }
+        Array.from({ length: 20 }, (_, i) => buildItem(`wf-${index * 20 + i}`, { revision })),
+        { page: index, pages: 10, total: 200 }
       );
-    const entryIds = () => browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id);
-
-    /** Holds every page request open so each test chooses the completion order. */
-    const holdPageRequests = async () => {
-      const held: { page: number; response: Deferred<WorkflowLibraryPage> }[] = [];
-
-      api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) => {
-        if (perPage === 1) {
-          return Promise.resolve(buildPage([], { total: 0 }));
-        }
-
-        const response = createDeferred<WorkflowLibraryPage>();
-
-        held.push({ page, response });
-
-        return response.promise;
-      });
-
-      const loading = browse.ensureWorkflowLibraryBrowseLoaded('updated');
-
-      held[0]?.response.resolve(listPage(BEFORE_DELETE, 0));
-      await loading;
-
-      return held;
-    };
-
-    it.each(['the scrolled page', 'the revalidation'])(
-      'rereads a page requested before a revalidation and drops its stale response when %s lands first',
-      async (first) => {
-        const held = await holdPageRequests();
-
-        browse.loadNextWorkflowLibraryPage();
-        // The delete's revalidation starts while the scrolled page is in flight.
-        const refreshing = browse.refreshWorkflowLibraryBrowse();
-        const [, scrolled, ...reads] = held;
-        const answerScroll = () => scrolled?.response.resolve(listPage(BEFORE_DELETE, 1));
-        const answerReads = () => reads.forEach(({ page, response }) => response.resolve(listPage(AFTER_DELETE, page)));
-
-        if (first === 'the scrolled page') {
-          answerScroll();
-          await flushAsyncWork();
-          answerReads();
-        } else {
-          answerReads();
-          await flushAsyncWork();
-          answerScroll();
-        }
-        await refreshing;
-        await flushAsyncWork();
-
-        expect(entryIds()).toEqual(['a', 'c', 'd', 'e']);
-        expect(browse.getWorkflowLibraryBrowseSnapshot()).toMatchObject({ page: 1, status: 'loaded', total: 5 });
-      }
-    );
-
-    it('holds a scroll during a revalidation, then loads the next page of the revalidated list', async () => {
-      const held = await holdPageRequests();
-      const refreshing = browse.refreshWorkflowLibraryBrowse();
-
-      browse.loadNextWorkflowLibraryPage();
-      expect(held.map(({ page }) => page)).toEqual([0, 0]);
-      expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loadingMore');
-
-      held[1]?.response.resolve(listPage(AFTER_DELETE, 0));
-      await vi.waitFor(() => expect(held).toHaveLength(3));
-      expect(held[2]?.page).toBe(1);
-
-      held[2]?.response.resolve(listPage(AFTER_DELETE, 1));
-      await refreshing;
-      await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
-
-      expect(entryIds()).toEqual(['a', 'c', 'd', 'e']);
-      expect(browse.getWorkflowLibraryBrowseSnapshot().page).toBe(1);
+    api.listLibraryWorkflows.mockImplementation(({ page: index }: { page: number }) => Promise.resolve(page(index)));
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    const held: { index: number; response: Deferred<WorkflowLibraryPage> }[] = [];
+    api.listLibraryWorkflows.mockImplementation(({ page: index }: { page: number }) => {
+      const response = createDeferred<WorkflowLibraryPage>();
+      held.push({ index, response });
+      return response.promise;
     });
+    const first =
+      order === 'range first' ? browse.loadWorkflowLibraryRange(100, 110) : browse.refreshWorkflowLibraryBrowse();
+    const old = [...held];
+    const second =
+      order === 'range first' ? browse.refreshWorkflowLibraryBrowse() : browse.loadWorkflowLibraryRange(100, 110);
+    const current = held.slice(old.length);
+    current.forEach(({ index, response }) => response.resolve(page(index, 2)));
+    await second;
+    old.forEach(({ index, response }) => response.resolve(page(index)));
+    await first;
+    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+    expect(snapshot.startIndex).toBe(order === 'range first' ? 0 : 100);
+    expect(snapshot.entries.every((entry) => entry.item.revision === 2)).toBe(true);
+    expect(snapshot.entries).toHaveLength(order === 'range first' ? 20 : 60);
   });
 
-  it('refetches every loaded page and keeps unchanged entry identities', async () => {
+  it('revalidates resident pages and preserves unchanged entry identities', async () => {
     api.listLibraryWorkflows.mockImplementation(({ page }: { page: number }) =>
-      Promise.resolve(buildPage([buildItem(`page-${page}`)], { page, pages: 2, total: 2 }))
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: 20 }, (_, index) => buildItem(`wf-${page * 20 + index}`)),
+          { page, pages: 5, total: 100 }
+        )
+      )
     );
-
     await browse.ensureWorkflowLibraryBrowseLoaded('updated');
-    demandEntries();
-    browse.loadNextWorkflowLibraryPage();
-    await vi.waitFor(() => {
-      demandEntries();
-      expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(2);
-    });
-
-    await vi.waitFor(() =>
-      expect(
-        browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'ready')
-      ).toBe(true)
-    );
+    await browse.loadWorkflowLibraryRange(20, 25);
     const before = browse.getWorkflowLibraryBrowseSnapshot().entries;
     api.listLibraryWorkflows.mockClear();
-
     await browse.refreshWorkflowLibraryBrowse();
-
-    expect(api.listLibraryWorkflows.mock.calls.map(([params]) => params.page)).toEqual([0, 1]);
-
-    const after = browse.getWorkflowLibraryBrowseSnapshot().entries;
-    expect(after.map((entry) => entry.item.workflow_id)).toEqual(['page-0', 'page-1']);
-    expect(after[0]).toBe(before[0]);
-    expect(after[1]).toBe(before[1]);
+    expect(api.listLibraryWorkflows.mock.calls.map(([params]) => params.page)).toEqual([1, 2, 3]);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry, index) => entry === before[index])).toBe(
+      true
+    );
   });
 
   it('re-enriches a row whose server record changed', async () => {
@@ -1132,7 +1030,7 @@ describe('large library retention fixture', () => {
       ).toBeLessThanOrEqual(7);
     }
     expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(300);
-    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(53);
+    expect(api.listLibraryWorkflows).toHaveBeenCalledTimes(51);
     expect(browse.getWorkflowLibraryBrowseSnapshot().selectedEntry?.item.workflow_id).toBe('large-0');
     await browse.loadWorkflowLibraryRange(0, 5);
     expect(browse.getWorkflowLibraryBrowseSnapshot().entries[0]?.item.workflow_id).toBe('large-0');
@@ -1431,12 +1329,14 @@ describe('review regressions', () => {
       await gate;
       return list(params);
     });
+    const before = api.listLibraryWorkflows.mock.calls.length;
     const first = browse.loadWorkflowLibraryRange(100, 105);
     const joined = browse.loadWorkflowLibraryRange(100, 105);
-    expect(joined).toBe(first);
+    expect(api.listLibraryWorkflows.mock.calls.length - before).toBe(3);
     const newer = browse.loadWorkflowLibraryRange(200, 205);
     release();
     expect(await first).toBe(false);
+    expect(await joined).toBe(false);
     expect(await newer).toBe(true);
     expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(200);
   });
@@ -1449,6 +1349,227 @@ describe('review regressions', () => {
     expect(await browse.loadWorkflowLibraryRange(400, 410, true)).toBe(true);
     expect(api.listLibraryWorkflows.mock.calls.length).toBe(before + 3);
     expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBeNull();
+  });
+});
+
+describe('overlapping metadata windows', () => {
+  const seed = async () => {
+    api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) =>
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: Math.min(perPage, 125 - page * perPage) }, (_, index) =>
+            buildItem(`wf-${page * perPage + index}`)
+          ),
+          { page, pages: Math.ceil(125 / perPage), total: 125 }
+        )
+      )
+    );
+    await browse.ensureWorkflowLibraryBrowseLoaded('updated');
+    api.listLibraryWorkflows.mockClear();
+  };
+  const requests = () => api.listLibraryWorkflows.mock.calls.map(([params]) => params.page);
+  const ids = () => browse.getWorkflowLibraryBrowseSnapshot().entries.map((entry) => entry.item.workflow_id);
+  it('fetches only missing complete pages when moving forward and back', async () => {
+    await seed();
+    expect(await browse.loadWorkflowLibraryRange(0, 59)).toBe(true);
+    expect(requests()).toEqual([1, 2]);
+    api.listLibraryWorkflows.mockClear();
+    expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+    expect(requests()).toEqual([3]);
+    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${20 + i}`));
+    api.listLibraryWorkflows.mockClear();
+    expect(await browse.loadWorkflowLibraryRange(0, 59)).toBe(true);
+    expect(requests()).toEqual([0]);
+    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${i}`));
+    api.listLibraryWorkflows.mockClear();
+    await browse.loadWorkflowLibraryRange(0, 59, true);
+    expect(requests()).toEqual([0, 1, 2]);
+  });
+  it('loads a four-page span without retaining partial pages as complete positions', async () => {
+    await seed();
+    expect(await browse.loadWorkflowLibraryRange(19, 61)).toBe(true);
+    expect(requests()).toEqual([1, 2, 3]);
+    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${19 + i}`));
+    api.listLibraryWorkflows.mockClear();
+    expect(await browse.loadWorkflowLibraryRange(0, 59)).toBe(true);
+    expect(requests()).toEqual([0]);
+    api.listLibraryWorkflows.mockClear();
+    await browse.loadWorkflowLibraryRange(19, 61);
+    api.listLibraryWorkflows.mockClear();
+    await browse.refreshWorkflowLibraryBrowse();
+    expect(requests()).toEqual([0, 1, 2, 3]);
+    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${19 + i}`));
+  });
+  it('rereads reused offsets when a missing page reveals a deletion and changed total', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    api.listLibraryWorkflows.mockClear().mockImplementation(({ page }: { page: number }) =>
+      Promise.resolve(
+        buildPage(
+          Array.from({ length: Math.min(20, 124 - page * 20) }, (_, index) =>
+            buildItem(`wf-${page * 20 + index + 1}`, { revision: 2 })
+          ),
+          { page, pages: 7, total: 124 }
+        )
+      )
+    );
+    expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+    expect(requests()).toEqual([3, 1, 2]);
+    expect(ids()).toEqual(Array.from({ length: 60 }, (_, i) => `wf-${21 + i}`));
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.item.revision === 2)).toBe(true);
+  });
+  it('does not join a forced retry to an ordinary flight that reused resident pages', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    const deferred = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockClear().mockReturnValueOnce(deferred.promise);
+    const ordinary = browse.loadWorkflowLibraryRange(20, 79);
+    const forced = browse.loadWorkflowLibraryRange(20, 79, true);
+    expect(api.listLibraryWorkflows.mock.calls[0]?.[0].signal.aborted).toBe(true);
+    expect(requests()).toEqual([3, 1, 2, 3]);
+    deferred.resolve(buildPage([], { page: 3, pages: 7, total: 125 }));
+    expect(await ordinary).toBe(false);
+    expect(await forced).toBe(true);
+  });
+  it('supersedes a distant flight when the latest demand returns to resident positions', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    const resident = browse.getWorkflowLibraryBrowseSnapshot().entries;
+    const deferred = createDeferred<void>();
+    const list = api.listLibraryWorkflows.getMockImplementation()!;
+    api.listLibraryWorkflows.mockClear().mockImplementation(async (params) => {
+      await deferred.promise;
+      return list(params);
+    });
+    const distant = browse.loadWorkflowLibraryRange(80, 85);
+    expect(requests()).toEqual([4, 5, 6]);
+    expect(await browse.loadWorkflowLibraryRange(0, 10)).toBe(true);
+    expect(api.listLibraryWorkflows.mock.calls.every(([params]) => params.signal.aborted)).toBe(true);
+    deferred.resolve();
+    expect(await distant).toBe(false);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(resident);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
+    expect(requests()).toEqual([4, 5, 6]);
+  });
+  it.each(['resident', 'failed refresh'])('preserves a covering forced retry during %s demand', async (state) => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    if (state === 'failed refresh') {
+      api.listLibraryWorkflows.mockRejectedValueOnce(new Error('refresh offline'));
+      await browse.refreshWorkflowLibraryBrowse();
+    }
+    const deferred = createDeferred<void>();
+    const list = api.listLibraryWorkflows.getMockImplementation()!;
+    api.listLibraryWorkflows.mockClear().mockImplementation(async (params) => {
+      await deferred.promise;
+      return list(params);
+    });
+    const retry = browse.loadWorkflowLibraryRange(0, 59, true);
+    const current = browse.loadWorkflowLibraryRange(20, 25);
+    expect(requests()).toEqual([0, 1, 2]);
+    expect(api.listLibraryWorkflows.mock.calls.every(([params]) => !params.signal.aborted)).toBe(true);
+    deferred.resolve();
+    expect(await retry).toBe(true);
+    expect(await current).toBe(true);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().error).toBeNull();
+  });
+  it('does not report the position after the last resident entry as ready', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(119, 124);
+    expect(await browse.loadWorkflowLibraryRange(125, 125)).toBe(false);
+  });
+  it.each([0, 5])('does not report readiness when a shrink to %i removes the requested position', async (total) => {
+    await seed();
+    const deferred = createDeferred<void>();
+    api.listLibraryWorkflows.mockImplementation(async ({ page }: { page: number }) => {
+      await deferred.promise;
+      return buildPage(page === 0 ? Array.from({ length: total }, (_, index) => buildItem(`remaining-${index}`)) : [], {
+        page,
+        pages: total ? 1 : 0,
+        total,
+      });
+    });
+    const loading = browse.loadWorkflowLibraryRange(80, 85);
+    deferred.resolve();
+    expect(await loading).toBe(false);
+    expect(browse.getWorkflowLibraryBrowseSnapshot().total).toBe(total);
+    expect(ids()).toEqual(Array.from({ length: total }, (_, index) => `remaining-${index}`));
+  });
+  it.each([
+    { force: true, total: 5, start: 0, end: 59, missing: 20, valid: 1 },
+    { force: true, total: 10, start: 0, end: 59, missing: 20, valid: 1 },
+    { force: false, total: 100, start: 80, end: 85, missing: 100, valid: 90 },
+  ])(
+    'checks each joined caller after a shrink to $total (forced: $force)',
+    async ({ force, total, start, end, missing, valid }) => {
+      await seed();
+      const gate = createDeferred<void>();
+      api.listLibraryWorkflows.mockClear().mockImplementation(async ({ page }: { page: number }) => {
+        await gate.promise;
+        return buildPage(
+          Array.from({ length: Math.max(0, Math.min(20, total - page * 20)) }, (_, index) =>
+            buildItem(`wf-${page * 20 + index}`)
+          ),
+          { page, pages: Math.ceil(total / 20), total }
+        );
+      });
+      const initiating = browse.loadWorkflowLibraryRange(start, end, force);
+      const removed = browse.loadWorkflowLibraryRange(missing, missing + 2);
+      const surviving = browse.loadWorkflowLibraryRange(valid, valid + 2);
+      expect(requests()).toEqual(force ? [0, 1, 2] : [4, 5, 6]);
+      gate.resolve();
+      expect(await initiating).toBe(true);
+      expect(await removed).toBe(false);
+      expect(await surviving).toBe(true);
+      expect(requests()).toEqual(force ? [0, 1, 2] : [4, 5, 6]);
+    }
+  );
+  it.each([false, true])('reports shared transport failure to every caller (forced: %s)', async (force) => {
+    await seed();
+    const gate = createDeferred<void>();
+    api.listLibraryWorkflows.mockClear().mockImplementation(async () => {
+      await gate.promise;
+      throw new Error('shared range offline');
+    });
+    const first = browse.loadWorkflowLibraryRange(80, 85, force);
+    const joined = browse.loadWorkflowLibraryRange(100, 105);
+    const other = browse.loadWorkflowLibraryRange(90, 95);
+    expect(requests()).toEqual([4, 5, 6]);
+    gate.resolve();
+    expect(await Promise.all([first, joined, other])).toEqual([false, false, false]);
+    expect(requests()).toEqual([4, 5, 6]);
+  });
+  it('never reports readiness for demand exceeding its resident capacity', async () => {
+    await seed();
+    expect(await browse.loadWorkflowLibraryRange(19, 100)).toBe(false);
+    expect(ids()).toHaveLength(60);
+    expect(ids()[0]).toBe('wf-19');
+    expect(ids().at(-1)).toBe('wf-78');
+  });
+  it('does not reuse positions after an invalidation, including before its refresh microtask', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    api.listLibraryWorkflows.mockClear();
+    invalidate();
+    const range = browse.loadWorkflowLibraryRange(20, 79);
+    expect(requests()).toEqual([1, 2, 3]);
+    await range;
+    await flushAsyncWork();
+    expect(requests().slice(3)).toEqual([0, 1, 2]);
+  });
+  it('keeps failed overlaps retryable and bounds the partial last page', async () => {
+    await seed();
+    await browse.loadWorkflowLibraryRange(0, 59);
+    api.listLibraryWorkflows.mockRejectedValueOnce(new Error('range offline'));
+    expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(false);
+    expect(ids()[0]).toBe('wf-0');
+    expect(await browse.loadWorkflowLibraryRange(20, 79)).toBe(true);
+    expect(await browse.loadWorkflowLibraryRange(119, 124)).toBe(true);
+    expect(ids()).toEqual(Array.from({ length: 45 }, (_, i) => `wf-${80 + i}`));
+    api.listLibraryWorkflows.mockClear();
+    expect(await browse.loadWorkflowLibraryRange(120, 124)).toBe(true);
+    expect(requests()).toEqual([]);
+    expect(browse.getWorkflowLibraryBrowseRetention().metadataEntries).toBeLessThanOrEqual(60);
   });
 });
 

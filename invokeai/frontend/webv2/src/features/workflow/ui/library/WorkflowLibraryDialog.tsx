@@ -139,7 +139,6 @@ const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
   category: snapshot.filter.category,
   entries: snapshot.entries,
   startIndex: snapshot.startIndex ?? 0,
-  scrollAnchor: snapshot.scrollAnchor ?? null,
   filter: snapshot.filter,
   total: snapshot.total,
   selectedEntry: snapshot.selectedEntry,
@@ -196,7 +195,6 @@ export const WorkflowLibraryDialog = ({
     tag,
     tagCounts,
     startIndex,
-    scrollAnchor,
     filter,
     total,
     selectedEntry,
@@ -212,6 +210,7 @@ export const WorkflowLibraryDialog = ({
   const thumbnailFit = useWorkflowPreferencesSelector((preferences) => preferences.workflowLibraryThumbnailFit);
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
+  const [removedWorkflowId, setRemovedWorkflowId] = useState<string | null>(null);
   // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
   // them on reopen.
   const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
@@ -406,9 +405,10 @@ export const WorkflowLibraryDialog = ({
   );
 
   const handleDeleted = useCallback(() => {
+    setRemovedWorkflowId(activeWorkflowId);
     setSelectedWorkflowId(null);
     setContextMenuPoint(null);
-  }, []);
+  }, [activeWorkflowId]);
   const handleCardContextMenu = useCallback(
     (workflowId: string, point: WorkflowCardMenuAnchor) => {
       if (tab === 'project') {
@@ -446,10 +446,7 @@ export const WorkflowLibraryDialog = ({
     [projectId]
   );
 
-  const browseWindow = useMemo(
-    () => ({ startIndex, scrollAnchor, total, filter }),
-    [startIndex, scrollAnchor, total, filter]
-  );
+  const browseWindow = useMemo(() => ({ startIndex, total, filter }), [startIndex, total, filter]);
   const isProjectTab = tab === 'project';
   const tabsIdBase = useId();
   const activeTab: WorkflowLibraryTab = tab;
@@ -601,6 +598,7 @@ export const WorkflowLibraryDialog = ({
                       <WorkflowLibraryGrid
                         key={`${authSession.user?.user_id}:${viewKey}`}
                         window={browseWindow}
+                        removedWorkflowId={removedWorkflowId}
                         entries={entries}
                         error={error}
                         missingCounts={missingCounts}

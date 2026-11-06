@@ -1,5 +1,6 @@
 import type { ListWorkflowsParams, WorkflowLibraryListItem, WorkflowLibraryPage } from '@features/workflow/data/api';
 import type { WorkflowUiAdapter, WorkflowPreferences } from '@features/workflow/ui/WorkflowUiContext';
+import type * as DialogModule from '@platform/ui/Dialog';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { GalleryHostProvider } from '@features/gallery/picker';
@@ -9,25 +10,72 @@ import { WorkflowUiProvider, WorkflowGraphPreviewProvider } from '@features/work
 import { setWorkflowLibraryTab } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph } from '@features/workflow/utility';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { ApiError } from '@platform/transport/http';
 import { system } from '@theme/system';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, Profiler, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
+
+import type * as DetailModule from './WorkflowLibraryDetailPanel';
 
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
 
 const transport = vi.hoisted(() => ({
   list: vi.fn<(params: ListWorkflowsParams) => Promise<WorkflowLibraryPage>>(),
   record: vi.fn(),
+  delete: vi.fn(),
 }));
 vi.mock('@features/workflow/data/api', async (original) => ({
   ...(await original<Record<string, unknown>>()),
   listLibraryWorkflows: (params: ListWorkflowsParams) => transport.list(params),
   getLibraryWorkflowRecord: (id: string) => transport.record(id),
+  deleteLibraryWorkflow: (id: string) => transport.delete(id),
   getWorkflowTagCounts: () => Promise.resolve({ fixture1000: 1000 }),
   getAllWorkflowTags: () => Promise.resolve(['fixture1000']),
 }));
+const commits = vi.hoisted(() => ({ shell: 0, toolbar: 0, detail: 0 }));
+const recordToolbarCommit = () => {
+  commits.toolbar += 1;
+};
+const recordDetailCommit = () => {
+  commits.detail += 1;
+};
+vi.mock('@features/workflow/data/libraryBrowseStore', async (original) => {
+  const actual = await original<typeof browse>();
+  return {
+    ...actual,
+    useWorkflowLibraryBrowseSelector: (...args: Parameters<typeof actual.useWorkflowLibraryBrowseSelector>) => {
+      commits.shell += 1;
+      return actual.useWorkflowLibraryBrowseSelector(...args);
+    },
+  };
+});
+vi.mock('@platform/ui/Dialog', async (original) => {
+  const actual = await original<typeof DialogModule>();
+  return {
+    ...actual,
+    Dialog: {
+      ...actual.Dialog,
+      Header: (props: ComponentProps<typeof actual.Dialog.Header>) => (
+        <Profiler id="toolbar" onRender={recordToolbarCommit}>
+          <actual.Dialog.Header {...props} />
+        </Profiler>
+      ),
+    },
+  };
+});
+vi.mock('./WorkflowLibraryDetailPanel', async (original) => {
+  const actual = await original<typeof DetailModule>();
+  return {
+    ...actual,
+    WorkflowLibraryDetailPanel: (props: ComponentProps<typeof actual.WorkflowLibraryDetailPanel>) => (
+      <Profiler id="detail" onRender={recordDetailCommit}>
+        <actual.WorkflowLibraryDetailPanel {...props} />
+      </Profiler>
+    ),
+  };
+});
 const templatesSnapshot = {
   status: 'loaded',
   error: null,
@@ -153,6 +201,7 @@ beforeEach(async () => {
   accountLifecycle.invalidate();
   count = 1000;
   transport.list.mockReset().mockImplementation(list);
+  transport.delete.mockReset().mockResolvedValue(undefined);
   transport.record.mockReset().mockImplementation((id: string) =>
     Promise.resolve({
       ...item(Number(id.slice(3))),
@@ -558,3 +607,123 @@ it.each(['finish', 'retry', 'wheel', 'pointer', 'key', 'filter', 'rapid return',
   },
   15000
 );
+
+it('records fractional scroll without rendering the shell or committing toolbar and detail', async () => {
+  await open();
+  await settle();
+  const scroll = viewport()!;
+  await scrollTo(scroll, 20);
+  await settle();
+  const before = browse.getWorkflowLibraryBrowseSnapshot();
+  const first = firstVisibleRow(scroll).id;
+  expect(commits.shell).toBeGreaterThan(0);
+  expect(commits.toolbar).toBeGreaterThan(0);
+  expect(commits.detail).toBeGreaterThan(0);
+  commits.shell = commits.toolbar = commits.detail = 0;
+  await scrollTo(scroll, 25);
+  await settle();
+  const after = browse.getWorkflowLibraryBrowseSnapshot();
+  expect(firstVisibleRow(scroll).id).toBe(first);
+  expect(after.entries).toBe(before.entries);
+  expect(after.startIndex).toBe(before.startIndex);
+  expect(after.scrollAnchor?.fraction).toBeGreaterThan(before.scrollAnchor?.fraction ?? 0);
+  expect(commits.shell).toBe(0);
+  expect(commits.toolbar).toBe(0);
+  expect(commits.detail).toBe(0);
+});
+
+it('fills a tall viewport crossing four server pages and settles without refetch loops', async () => {
+  await page.viewport(1280, 4800);
+  await open();
+  await settle();
+  const scroll = viewport()!;
+  const rows = Array.from(scroll.querySelectorAll<HTMLElement>('[data-index]'));
+  const rowHeight = rows[0]!.getBoundingClientRect().height;
+  await scrollTo(scroll, rowHeight * 6.95);
+  await settle();
+  const bounds = scroll.getBoundingClientRect();
+  const renderedRows = Array.from(scroll.querySelectorAll<HTMLElement>('[data-index]')).filter((row) => {
+    const rect = row.getBoundingClientRect();
+    return rect.bottom > bounds.top && rect.top < bounds.bottom;
+  });
+  const indexes = renderedRows.map((row) => Number(row.dataset.index));
+  expect((Math.max(...indexes) - Math.min(...indexes) + 1) * 3).toBeGreaterThan(41);
+  for (const row of renderedRows) {
+    expect(row.querySelectorAll('[data-workflow-card]')).toHaveLength(3);
+    expect(row.querySelector('[aria-busy=true]')).toBeNull();
+  }
+  await waitFor(() => expect(browse.getWorkflowLibraryBrowseRetention().activeReads).toBe(0));
+  const visibleCards = renderedRows.flatMap((row) =>
+    Array.from(row.querySelectorAll<HTMLElement>('[data-workflow-card]'))
+  );
+  expect(firstVisibleRow(scroll).fraction).toBeGreaterThan(0.9);
+  expect(visibleCards.length).toBeLessThanOrEqual(48);
+  for (const card of visibleCards) {
+    expect(card.textContent).toContain('0 nodes');
+    expect(card.querySelector('[data-enrichment-placeholder]')).toBeNull();
+  }
+  expect(document.querySelectorAll('[data-workflow-card]').length).toBeLessThanOrEqual(60);
+  expect(
+    browse.getWorkflowLibraryBrowseSnapshot().entries.filter((entry) => entry.enrichment.status === 'ready').length
+  ).toBeLessThanOrEqual(48);
+  expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(60);
+  expect((browse.getWorkflowLibraryBrowseSnapshot().startIndex ?? 0) % 20).toBeGreaterThan(0);
+  const requests = transport.list.mock.calls.length;
+  await settle();
+  expect(transport.list.mock.calls).toHaveLength(requests);
+});
+
+it('releases a confirmed deleted focused card while preserving valid focus outside the resident window', async () => {
+  await open();
+  await settle();
+  await act(() => card(0)!.focus());
+  const scroll = viewport()!;
+  await scrollTo(scroll, 39600);
+  await settle();
+  expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBeGreaterThan(400);
+  expect(card(0)).not.toBeNull();
+  expect(document.activeElement).toBe(card(0));
+  let deleted = false;
+  const record = transport.record.getMockImplementation()!;
+  transport.record.mockImplementation((id: string) =>
+    deleted && id === 'wf-0' ? Promise.reject(new ApiError('deleted', 404)) : record(id)
+  );
+  transport.delete.mockImplementation(() => {
+    deleted = true;
+    return Promise.resolve();
+  });
+  transport.list.mockImplementation(async (params: ListWorkflowsParams) => {
+    const result = await list(params);
+    return deleted
+      ? {
+          ...result,
+          total: count - 1,
+          items: result.items.map((entry) => item(Number(entry.workflow_id.slice(3)) + 1)),
+        }
+      : result;
+  });
+  await act(() => userEvent.click(detail().querySelector<HTMLElement>('[aria-label="workflowLibrary.moreActions"]')!));
+  await act(() => userEvent.click(page.getByRole('menuitem', { name: 'workflowLibrary.delete', exact: false })));
+  await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.delete', exact: true })));
+  await waitFor(() => expect(transport.delete).toHaveBeenCalledWith('wf-0'));
+  await settle();
+  expect(card(0)).toBeNull();
+  expect(document.querySelector('[data-workflow-detail="wf-0"]')).toBeNull();
+});
+
+it('returns detail selection to the first resident entry when the previous choice is absent', async () => {
+  await open();
+  const scroll = viewport()!;
+  await scrollTo(scroll, 39600);
+  await settle();
+  const resident = browse.getWorkflowLibraryBrowseSnapshot().entries[0]!.item.workflow_id;
+  const before = firstVisibleRow(scroll);
+  await act(() => userEvent.click(page.getByRole('button', { name: 'fixture1000', exact: false })));
+  await settle();
+  const requests = transport.list.mock.calls.length;
+  await act(() => userEvent.click(page.getByRole('button', { name: 'workflowLibrary.allTag', exact: false })));
+  await settle();
+  expect(document.querySelector(`[data-workflow-detail="${resident}"]`)).not.toBeNull();
+  expect(firstVisibleRow(viewport()!).id).toBe(before.id);
+  expect(transport.list.mock.calls).toHaveLength(requests);
+});

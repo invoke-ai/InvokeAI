@@ -1,10 +1,6 @@
-import type {
-  WorkflowLibraryBrowseSnapshot,
-  WorkflowLibraryEntry,
-  WorkflowLibraryScrollAnchor,
-} from '@features/workflow/data/libraryBrowseStore';
+import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 
-import { Box, HStack, Spinner, Text } from '@chakra-ui/react';
+import { Box, Text } from '@chakra-ui/react';
 import {
   getWorkflowLibraryBrowseSnapshot,
   loadWorkflowLibraryRange,
@@ -29,6 +25,8 @@ import {
 
 /** Two rows before and after the viewport, plus one focused/menu row. */
 const OVERSCAN_ROWS = 2;
+// A partial row and four overscan rows still fit 60 metadata positions at three columns.
+const MAX_VISIBLE_ROWS = 15;
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
 // A flow layout still needs a finite virtual viewport, independent of the collection's total row height.
 const GRID_CSS = {
@@ -45,7 +43,6 @@ export interface WorkflowLibraryGridProps {
   window?: {
     startIndex: number;
     total: number;
-    scrollAnchor: WorkflowLibraryScrollAnchor | null;
     filter: WorkflowLibraryBrowseSnapshot['filter'];
   };
   error: string | null;
@@ -56,17 +53,14 @@ export interface WorkflowLibraryGridProps {
   /** Missing-model counts by workflow id; absent ids render no badge. */
   missingCounts?: ReadonlyMap<string, number>;
   selectedWorkflowId: string | null;
+  removedWorkflowId?: string | null;
   status: WorkflowLibraryBrowseSnapshot['status'];
   onContextMenu: WorkflowLibraryCardProps['onContextMenu'];
   onOpen: (workflowId: string) => void;
   onSelect: (workflowId: string) => void;
 }
 
-/**
- * A refresh landing while an append is in flight can publish the same row
- * twice for one frame. Duplicate React keys would corrupt the reconciliation,
- * so the grid keeps the first occurrence and drops the rest.
- */
+/** Keep duplicate server identities from corrupting card reconciliation. */
 const dedupeByWorkflowId = (entries: readonly WorkflowLibraryEntry[]): WorkflowLibraryEntry[] => {
   const seen = new Set<string>();
   const unique: WorkflowLibraryEntry[] = [];
@@ -93,6 +87,7 @@ export const WorkflowLibraryGrid = ({
   onOpen,
   onSelect,
   selectedWorkflowId,
+  removedWorkflowId = null,
   status,
 }: WorkflowLibraryGridProps) => {
   const { t } = useTranslation();
@@ -136,11 +131,17 @@ export const WorkflowLibraryGrid = ({
   }, []);
   const [width, setWidth] = useState(0);
   const [owner] = useState(captureAccountScope);
-  const [restoreAnchor, setRestoreAnchor] = useState(() => browseWindow?.scrollAnchor ?? null);
+  const [restoreAnchor, setRestoreAnchor] = useState(() => {
+    const snapshot = getWorkflowLibraryBrowseSnapshot();
+    return browseWindow?.filter === snapshot.filter ? (snapshot.scrollAnchor ?? null) : null;
+  });
   const restorePending = useRef(restoreAnchor !== null);
   const mounted = useRef(false);
   const positionedAt = useRef<{ row: number; width: number } | null>(null);
   const [focusCard, setFocusCard] = useState<{ entry: WorkflowLibraryEntry; index: number } | null>(null);
+  if (focusCard?.entry.item.workflow_id === removedWorkflowId && focusCard !== null) {
+    setFocusCard(null);
+  }
   const visibleEntries = useMemo(() => dedupeByWorkflowId(entries), [entries]);
   const startIndex = browseWindow?.startIndex ?? 0;
   const total = browseWindow?.total ?? visibleEntries.length;
@@ -315,24 +316,28 @@ export const WorkflowLibraryGrid = ({
     visibleEntries,
   ]);
   // Do not let the mount's unknown width/top range replace the cached window needed for restoration.
-  const first = Math.max(0, (restoreRow ?? virtualizer.range?.startIndex ?? 0) - OVERSCAN_ROWS) * columns;
-  const last = Math.min(
-    total - 1,
-    ((restoreRow === null
+  const firstVisibleRow = restoreRow ?? virtualizer.range?.startIndex ?? 0;
+  const lastVisibleRow =
+    restoreRow === null
       ? (virtualizer.range?.endIndex ?? 0)
-      : restoreRow + Math.ceil((virtualizer.scrollRect?.height ?? 0) / rowHeight)) +
-      OVERSCAN_ROWS +
-      1) *
-      columns -
-      1
-  );
-  const ids = useMemo(
-    () =>
-      visibleEntries
-        .filter((_, index) => startIndex + index >= first && startIndex + index <= last)
-        .map((entry) => entry.item.workflow_id),
-    [visibleEntries, startIndex, first, last]
-  );
+      : restoreRow + Math.ceil((virtualizer.scrollRect?.height ?? 0) / rowHeight);
+  const visibleFirst = firstVisibleRow * columns;
+  const visibleLast = Math.min(total - 1, (lastVisibleRow + 1) * columns - 1);
+  const first = Math.max(0, firstVisibleRow - OVERSCAN_ROWS) * columns;
+  const last = Math.min(total - 1, (lastVisibleRow + OVERSCAN_ROWS + 1) * columns - 1);
+  const ids = useMemo(() => {
+    const visible: string[] = [];
+    const overscan: string[] = [];
+    for (const [index, entry] of visibleEntries.entries()) {
+      const position = startIndex + index;
+      if (position >= first && position <= last) {
+        // The owner's bounded enrichment slots must reach every visible card before either overscan edge.
+        const demand = position >= visibleFirst && position <= visibleLast ? visible : overscan;
+        demand.push(entry.item.workflow_id);
+      }
+    }
+    return visible.concat(overscan);
+  }, [visibleEntries, startIndex, first, last, visibleFirst, visibleLast]);
   const hasEntries = visibleEntries.length > 0;
   // Idle precedes the first open-time load; render loading rather than an empty result.
   const isPending = status === 'idle' || status === 'loading';
@@ -445,6 +450,7 @@ export const WorkflowLibraryGrid = ({
       flex="1"
       label={t('workflowLibrary.title')}
       minH="0"
+      maxH={browseWindow ? `${rowHeight * MAX_VISIBLE_ROWS}px` : undefined}
       minW="0"
       viewportRef={viewportRef}
       viewportProps={viewportProps}
@@ -535,12 +541,6 @@ export const WorkflowLibraryGrid = ({
           <Text color="fg.subtle" fontSize="md" py="6" textAlign="center">
             {error ?? t('workflowLibrary.empty')}
           </Text>
-        ) : null}
-        {hasEntries && status === 'loadingMore' ? (
-          <HStack color="fg.subtle" gap="2" justify="center" py="2">
-            <Spinner />
-            <Text fontSize="xs">{t('workflowLibrary.loadingMore')}</Text>
-          </HStack>
         ) : null}
       </Box>
     </Scrollable>
