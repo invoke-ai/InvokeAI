@@ -12,6 +12,7 @@ class BulkDownloadBase(ABC):
         board_id: Optional[str],
         bulk_download_item_id: Optional[str],
         user_id: str = "system",
+        uncategorized_owner_id: Optional[str] = None,
     ) -> None:
         """
         Create a zip file containing the images specified by the given image names or board id.
@@ -20,6 +21,7 @@ class BulkDownloadBase(ABC):
         :param board_id: The ID of the board. If provided, all images associated with the board will be included in the zip file.
         :param bulk_download_item_id: The bulk_download_item_id that will be used to retrieve the bulk download item when it is prepared, if none is provided a uuid will be generated.
         :param user_id: The ID of the user who initiated the download.
+        :param uncategorized_owner_id: For board_id "none", include only this user's uncategorized images. None includes every account's (admins).
         """
 
     @abstractmethod

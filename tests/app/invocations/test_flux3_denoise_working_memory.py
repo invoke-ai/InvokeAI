@@ -3,11 +3,12 @@ it replaced.
 
 The estimate prices with the lines `backend/working_memory/data/denoise.json` ships, the fit of the forwards measured
 there, which `tests/backend/working_memory/` holds it to, plus its analytic terms (`TestEstimate`): the largest layer
-partial loading streams, a quantized build's dequantization copy and an fp8-stored transformer's cast transient, which
-no measured forward carries, and the score matrix an attention build without a fused kernel materializes, which only
-the forced-math forwards carry. Every platform nothing is measured on prices as a measured one, whose entry floors
-every value at the constants the node reserved by hand, and `TestUnmeasuredPlatforms` holds it to that formula, frozen
-below, at least. `TestMeasuredChecks` holds the estimate to the forced-math forwards the shipped points leave out.
+partial loading streams, a quantized build's dequantization copy, an fp8-stored transformer's cast transient and the
+LoRAs' sidecars, which no measured forward carries, and the score matrix an attention build without a fused kernel
+materializes, which only the forced-math forwards carry. Every platform nothing is measured on prices as a measured one,
+whose entry floors every value at the constants the node reserved by hand, and `TestUnmeasuredPlatforms` holds it to
+that formula, frozen below, at least. `TestMeasuredChecks` holds the estimate to the forced-math forwards the shipped
+points leave out.
 """
 
 import itertools
@@ -24,7 +25,10 @@ from invokeai.app.invocations.flux3.flux3_denoise import Flux3DenoiseInvocation
 from invokeai.backend.flux3.denoise_working_memory import FLUX3_DENOISE_SPEC, estimate_flux3_denoise_working_memory
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loaders.flux3 import _build_transformer
-from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelFormat, ModelType
+from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import FLUX3_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Flux3ConditioningInfo
@@ -78,7 +82,17 @@ def _released_transformer(flow_map: bool = True) -> torch.nn.Module:
 
 
 def _estimate(
-    transformer=None, *, image=4096, refs=0, text=560, batch=1, resident=False, dtype=torch.bfloat16, device="cuda"
+    transformer=None,
+    *,
+    image=4096,
+    refs=0,
+    text=560,
+    batch=1,
+    resident=False,
+    loras=(),
+    model_format=None,
+    dtype=torch.bfloat16,
+    device="cuda",
 ):
     return estimate_flux3_denoise_working_memory(
         transformer if transformer is not None else _dense_transformer(),
@@ -87,6 +101,8 @@ def _estimate(
         text_seq_len=text,
         batch_size=batch,
         weights_resident=resident,
+        loras=loras,
+        model_format=model_format,
         device=torch.device(device),
         dtype=dtype,
     )
@@ -170,6 +186,37 @@ class TestEstimate:
             terms = _estimate(resident=True, device=attention_build.device.type).terms
 
         assert [(term.bytes, term.included) for term in terms if term.name == "attention_scores"] == [(scores, True)]
+
+    @pytest.mark.parametrize(
+        "module, added",
+        [
+            # Its 2 x 8 + 4 x 2 elements, and per token of the joint sequence of both samples, 64 image, 100 reference
+            # and 80 caption tokens each, a row of the module's 4 outputs and of the LoRA's 2 ranks.
+            ("proj_out", (2 * 8 + 4 * 2 + 2 * (64 + 100 + 80) * (4 + 2)) * 4),
+            # Its 2 x 8 + 16 x 2 elements, and a row of 16 outputs and 2 ranks per sample.
+            ("timestep_embedder.linear_1", (2 * 8 + 16 * 2 + 2 * (16 + 2)) * 4),
+        ],
+        ids=["per-token", "per-sample"],
+    )
+    def test_a_lora_sidecar_updates_a_row_per_token_of_every_sample_but_in_a_timestep_embedder(self, module, added):
+        """On a GGUF transformer a LoRA runs as a sidecar, which holds its tensors and adds an update of the module's
+        output, in the compute dtype (float32 here). The timestep embedders run once per sample."""
+        model = _dense_transformer()
+        model.proj_out = torch.nn.Linear(8, 4, bias=False)
+        model.timestep_embedder = torch.nn.Module()
+        model.timestep_embedder.linear_1 = torch.nn.Linear(8, 16, bias=False)
+        out_features = model.get_submodule(module).out_features
+        layer = any_lora_layer_from_state_dict(
+            {"lora_down.weight": torch.ones(2, 8), "lora_up.weight": torch.ones(out_features, 2)}
+        )
+        lora = ModelPatchRaw(layers={FLUX3_LORA_TRANSFORMER_PREFIX + module: layer})
+        sequence = {"image": 64, "refs": 100, "text": 80, "batch": 2, "resident": True, "dtype": torch.float32}
+
+        with ATTENTION["cuda"].answers():
+            with_lora = _estimate(model, loras=[lora], model_format=ModelFormat.GGUFQuantized, **sequence)
+            without = _estimate(model, **sequence)
+
+        assert with_lora.reservation_bytes - without.reservation_bytes == added
 
     @pytest.mark.parametrize("heads, dtype", [(32, torch.bfloat16), (KLEIN_HEADS, torch.float64)])
     def test_a_dtype_or_width_without_a_line_is_refused(self, heads, dtype):
@@ -313,7 +360,7 @@ def _requested_features(
 
     context = MagicMock()
     context.models.get_config.return_value = SimpleNamespace(
-        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant
+        base=BaseModelType.Flux3, type=ModelType.Main, name="flux3", variant=variant, format=ModelFormat.Checkpoint
     )
     context.models.load.side_effect = lambda key: vae_info if key == "vae" else transformer_info
     lengths = {"pos": positive_tokens, "neg": negative_tokens}

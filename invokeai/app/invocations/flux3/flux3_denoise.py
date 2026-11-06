@@ -1,3 +1,4 @@
+from collections.abc import Iterator
 from contextlib import ExitStack
 from typing import Callable, Optional
 
@@ -32,6 +33,12 @@ from invokeai.backend.flux3.sampling import (
     text_position_ids,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Flux3VariantType, ModelType
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
+from invokeai.backend.patches.layers.dora_layer import DoRALayer
+from invokeai.backend.patches.layers.swapped_halves_layer_patch import SwappedHalvesLayerPatch
+from invokeai.backend.patches.lora_conversions.flux3_lora_constants import FLUX3_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+from invokeai.backend.quantization.dequantizing_linear import DequantizingLinear, requires_sidecar_patching
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Flux3ConditioningInfo
@@ -113,6 +120,7 @@ class Flux3DenoiseInvocation(BaseInvocation):
         transformer_config = context.models.get_config(self.transformer.transformer)
         if transformer_config.base is not BaseModelType.Flux3 or transformer_config.type is not ModelType.Main:
             raise ValueError(f"'{transformer_config.name}' is not a FLUX.3 transformer.")
+        self._require_flux3_loras(context)
 
         references = self._reference_fields()
         if len(references) > FLUX3_MAX_REFERENCE_IMAGES:
@@ -205,6 +213,8 @@ class Flux3DenoiseInvocation(BaseInvocation):
 
         with ExitStack() as exit_stack:
             transformer_info = context.models.load(self.transformer.transformer)
+            loras = self._active_loras(context)
+            self._refuse_dora_on_quantized_layers(loras, transformer_info.model)
             # Ask the model cache to keep free what one transformer forward needs. Reference images are the dominant
             # term: their tokens join the attended sequence, so ten 1 MP references add ten times the tokens of a
             # 1 MP image. Priced on the unlocked model, whose GGUF or fp8-stored layers add a transient per forward,
@@ -216,10 +226,25 @@ class Flux3DenoiseInvocation(BaseInvocation):
                 ref_image_seq_len=ref_tokens.shape[1] if ref_tokens is not None else 0,
                 text_seq_len=max(txt.shape[1], neg_txt.shape[1] if neg_txt is not None else 0),
                 batch_size=batch_size,
+                loras=[patch for _, patch in loras],
+                model_format=transformer_config.format,
                 device=device,
                 dtype=compute_dtype,
             )
-            (_, transformer) = exit_stack.enter_context(transformer_info.model_on_device(working_memory=working_memory))
+            (cached_weights, transformer) = exit_stack.enter_context(
+                transformer_info.model_on_device(working_memory=working_memory)
+            )
+            # GGUF, int8 and nvfp4 weights cannot take an update in place: those LoRAs run as sidecars.
+            exit_stack.enter_context(
+                LayerPatcher.apply_smart_model_patches(
+                    model=transformer,
+                    patches=self._lora_iterator(context),
+                    prefix=FLUX3_LORA_TRANSFORMER_PREFIX,
+                    dtype=compute_dtype,
+                    cached_weights=cached_weights,
+                    force_sidecar_patching=requires_sidecar_patching(transformer, transformer_config.format),
+                )
+            )
             x = denoise(
                 model=transformer,
                 img=x,
@@ -250,6 +275,57 @@ class Flux3DenoiseInvocation(BaseInvocation):
         if isinstance(self.kontext_conditioning, list):
             return self.kontext_conditioning
         return [self.kontext_conditioning]
+
+    def _require_flux3_loras(self, context: InvocationContext) -> None:
+        """Refuse, before anything loads, a LoRA that is not a FLUX.3 one: one applied by another family's loader node
+        would be converted for that family's transformer, whose layers this one does not have."""
+        for lora in self.transformer.loras:
+            config = context.models.get_config(lora.lora)
+            if config.type is not ModelType.LoRA:
+                raise ValueError(f"'{config.name}' is a {config.type.value} model, not a LoRA.")
+            if config.base is not BaseModelType.Flux3:
+                raise ValueError(
+                    f"LoRA '{config.name}' is for {config.base.value} models, not FLUX.3. Apply FLUX.3 LoRAs with "
+                    "Apply LoRA - FLUX.3."
+                )
+
+    def _active_loras(self, context: InvocationContext) -> list[tuple[str, ModelPatchRaw]]:
+        """The name and patch of each LoRA the patcher applies: those at a weight other than 0."""
+        return [
+            (lora.lora.name, context.models.load(lora.lora).model)
+            for lora in self.transformer.loras
+            if lora.weight != 0
+        ]
+
+    @staticmethod
+    def _refuse_dora_on_quantized_layers(loras: list[tuple[str, ModelPatchRaw]], transformer: torch.nn.Module) -> None:
+        """Fail before loading the transformer onto the device, not at the first step: a DoRA layer normalizes the
+        updated weight, which a Linear keeping its weight quantized in buffers never forms (`DoRALayer.get_parameters`
+        raises on the shape it hands over instead)."""
+        # Reached once quantized FLUX.3 builds, whose Linears are `DequantizingLinear`s, load.
+        if not loras:
+            return
+        modules = dict(transformer.named_modules())
+        for name, patch in loras:
+            for key, layer in patch.layers.items():
+                # A layer on BFL's output modulation comes wrapped, to swap its halves.
+                if isinstance(layer, SwappedHalvesLayerPatch):
+                    layer = layer.layer
+                module = modules.get(key.removeprefix(FLUX3_LORA_TRANSFORMER_PREFIX))
+                if isinstance(layer, DoRALayer) and isinstance(module, DequantizingLinear):
+                    raise ValueError(
+                        f"LoRA '{name}' has DoRA layers, which do not run on this transformer's quantized layers. Use "
+                        "it with an unquantized or GGUF build of the transformer."
+                    )
+
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
+        for lora in self.transformer.loras:
+            lora_info = context.models.load(lora.lora)
+            if not isinstance(lora_info.model, ModelPatchRaw):
+                raise TypeError(
+                    f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}."
+                )
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
 
     @staticmethod
     def _load_conditioning(

@@ -248,8 +248,10 @@ export interface GenerateSettings {
   hiDiffusionEnabled: boolean;
   hiDiffusionRauNetEnabled: boolean;
   hiDiffusionWindowAttentionEnabled: boolean;
-  hiDiffusionT1Ratio: number;
-  hiDiffusionT2Ratio: number;
+  hiDiffusionT1Ratio: number | null;
+  hiDiffusionT2Ratio: number | null;
+  /** Manual slider positions retained while the active ratios use automatic presets. */
+  hiDiffusionManualRatios?: { t1: number; t2: number };
   seed: number;
   seedMode: SeedMode;
   seamlessXAxis: boolean;
@@ -359,6 +361,17 @@ export interface GenerateSettings {
   /** Fraction of the schedule at which the base model hands its latents to the refiner. */
   refinerStart: number;
 }
+
+/** The dynamic prompts fields every surface whose prompt expands persists (Generate, Video). */
+export type DynamicPromptsSettings = Pick<
+  GenerateSettings,
+  | 'dynamicPromptsCombinatorial'
+  | 'dynamicPromptsEnabled'
+  | 'dynamicPromptsMaxPrompts'
+  | 'dynamicPromptsResample'
+  | 'dynamicPromptsSampleSeed'
+  | 'dynamicPromptsSeedBehaviour'
+>;
 
 export type OpenAIImageQuality = 'auto' | 'high' | 'medium' | 'low';
 export type OpenAIImageBackground = 'auto' | 'transparent' | 'opaque';
