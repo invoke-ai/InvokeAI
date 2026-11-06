@@ -69,8 +69,8 @@ Others are recognized by their layer names and fail, or misbehave, only when the
 | Qwen3 0.6B / 4B / 8B | Z-Image (4B), FLUX.2 Klein (4B, 8B), Anima (0.6B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Qwen3-VL 4B / 8B | Krea-2, FLUX.3, Ideogram 4, Qwen-Image-2.1 (8B) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✗ |
 | Qwen3-VL 32B (truncated) | MiniMax H3 | in the Diffusers folder | ✓ | L | ✓ | L | ✗ | ✗ |
-| Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | L | L | L | ✗ | ✗ |
-| Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | L | L | L | ✗ | ✗ |
+| Qwen3.5 4B | Anima 3.8B | ✗ | ✓ | R | – | R | ✗ | ✗ |
+| Qwen3.5 9B | MOSS-Image | in the Diffusers folder | ✓ | R | ✓ | R | ✗ | ✗ |
 | Qwen2.5-VL | Qwen-Image | ✓ | ✓ | ✓ | L | ✓ | ✗ | ✗ |
 | Mistral Small 3 | FLUX.2 dev | ✓ | ✓ | ✓ | L | ✓ | ✓ | ✗ |
 | Ministral 3B | ERNIE-Image | ✓ | ✓ | ✓ | L | L | R | ✗ |
@@ -107,6 +107,16 @@ The Qwen3.5 4B and 9B install as the same encoder type but are not interchangeab
 the 4B and MOSS-Image only the 9B, and each refuses the other. A 9B file must hold the whole language model:
 of a sharded export, the first shard is refused at install with a message and the others install as unknown
 models. Install the whole MOSS-Image Diffusers folder or a merged single file instead.
+
+The Qwen3.5 9B encoder also installs in ComfyUI's `int8_convrot` build. It keeps its quantized layers in int8 and
+widens the embedding when it loads; the vision tower, LM head and multi-token-prediction head in the file are not read.
+The files in Comfy-Org's MOSS-Image repository (`text_encoders/`) have the same tensors as the FLUX.3 prompt
+upsampler, so nothing in the file tells the two apart; InvokeAI goes by where the file came from. Installing it from
+that repository by URL, or with the **Qwen3.5 9B Encoder (int8)** starter model, gives a Qwen3.5 encoder, and
+Reidentify repairs an older Text LLM record made from that URL. A local copy of the file installs as a
+[Text LLM](#text-llms), so use the starter or the URL. A model already installed as a Qwen3.5 encoder stays one when
+it is reidentified. w4a8, fp8 scaled, nvfp4 and mxfp8 builds are refused at install with a message. No int8 build
+of the 4B exists to test against.
 
 ## Text LLMs
 

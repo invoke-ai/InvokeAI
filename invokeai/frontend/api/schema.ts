@@ -50611,8 +50611,8 @@ export type components = {
          *     The layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3
          *     prompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file
          *     carries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,
-         *     which exist for the 9B. Its LM head sets it apart from the Qwen3.5 text-encoder exports, which have none and
-         *     are `Qwen35Encoder_Checkpoint_Config`'s.
+         *     which exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are
+         *     `Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source.
          */
         TextLLM_Checkpoint_Config: {
             /**
