@@ -401,6 +401,7 @@ export interface CanvasApplicationPort {
     isGuardCurrent(guard: LayerExportGuard): boolean;
   }): CanvasOperationController;
   runGraph(options: {
+    prepend?: boolean;
     graph: BackendGraphContract;
     outputNodeId?: string;
     signal?: AbortSignal;

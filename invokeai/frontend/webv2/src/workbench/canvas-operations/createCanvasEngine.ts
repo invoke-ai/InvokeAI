@@ -2,7 +2,6 @@ import type {
   CanvasEngineImplementation as CoreCanvasEngineImplementation,
   CanvasEngineOptions as CoreCanvasEngineOptions,
 } from '@workbench/canvas-engine/engine';
-import type { CanvasUtilityGraphResult } from '@workbench/canvas-operations/contracts';
 import type { GenerationCompositeHost } from '@workbench/canvas-operations/generationComposite';
 import type { BackendGraphContract } from '@workbench/graphContracts';
 
@@ -13,6 +12,7 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { createCanvasEngine as createCanvasEngineCore } from '@workbench/canvas-engine/engine';
+import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { canvasApplicationPort } from '@workbench/canvas-operations/applicationPort';
 import { isUploadProjectNotFound } from '@workbench/canvas-operations/backend/canvasImages';
 import { createBoundedCompositeDedupeCache } from '@workbench/canvas-operations/compositeForGeneration';
@@ -20,14 +20,14 @@ import { createControlDetectionCoordinator } from '@workbench/canvas-operations/
 import { composeForGeneration } from '@workbench/canvas-operations/generationComposite';
 import { controlTypeForDetector } from '@workbench/controlTypes';
 
-import type { CanvasOperationCapability, CanvasOperationImplementation } from './contracts';
+import type { CanvasOperationCapability, CanvasOperationImplementation, CanvasUtilityGraphResult } from './contracts';
 
 import { attachCanvasOperations } from './operationAccess';
 import { bindCanvasToolMemory, type CanvasToolMemoryPort } from './toolMemory';
 
 export interface CanvasEngineOptions extends Omit<
   CoreCanvasEngineOptions,
-  'uploadImage' | 'uploadIntermediateImage' | 'getMainModelBase'
+  'uploadImage' | 'uploadIntermediateImage' | 'getMainModelBase' | 'resampleTransform'
 > {
   /**
    * Waits for the owning project identity to be acknowledged by the server, so uploads can carry it as provenance.
@@ -66,9 +66,24 @@ export type CanvasOperationsCapability = CanvasOperationCapability;
 /** Settles with `promise`, or rejects with the abort reason as soon as `signal` aborts. */
 const raceAbort = <T>(promise: Promise<T>, signal: AbortSignal): Promise<T> =>
   new Promise<T>((resolve, reject) => {
-    const onAbort = (): void => reject(signal.reason);
+    const onAbort = (): void => {
+      signal.removeEventListener('abort', onAbort);
+      reject(signal.reason);
+    };
     signal.addEventListener('abort', onAbort, { once: true });
-    promise.then(resolve, reject).finally(() => signal.removeEventListener('abort', onAbort));
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error);
+      }
+    );
+    if (signal.aborted) {
+      onAbort();
+    }
   });
 
 /** How long uploads skip provenance after the server reported the project missing, before trying it again. */
@@ -134,6 +149,24 @@ export const createCanvasEngine = (options: CanvasEngineOptions): CanvasEngine =
   const composition = createCanvasEngineCore({
     ...coreOptions,
     getMainModelBase: options.getMainModelBase,
+    resampleTransform: async (surface, target, mode, signal) => {
+      const lifetime = AbortSignal.any([owner.signal, uploadLifetime.signal]);
+      signal.throwIfAborted();
+      lifetime.throwIfAborted();
+      const { createTransformResampler } = await raceAbort(
+        import('./transformResampling'),
+        AbortSignal.any([signal, lifetime])
+      );
+      signal.throwIfAborted();
+      lifetime.throwIfAborted();
+      return createTransformResampler({
+        lifetime,
+        backend: options.backend ?? createDomRasterBackend(),
+        resolveImage: options.imageResolver,
+        upload: (blob, uploadSignal) => uploadImage(blob, { isIntermediate: true, signal: uploadSignal }),
+        runGraph: (runOptions) => canvasApplicationPort.runGraph(runOptions),
+      })(surface, target, mode, signal);
+    },
     uploadImage: (blob) => uploadImage(blob),
     uploadIntermediateImage: (blob) => uploadImage(blob, { isIntermediate: true }),
   });

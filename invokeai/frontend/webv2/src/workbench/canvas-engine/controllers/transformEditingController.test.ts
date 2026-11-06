@@ -15,7 +15,7 @@ import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
-import { TransformEditingController } from './transformEditingController';
+import { TransformEditingController, type TransformResampler } from './transformEditingController';
 
 const MOVED = { rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 4 };
 
@@ -25,7 +25,7 @@ const MOVED = { rotation: 0, scaleX: 1, scaleY: 1, x: 12, y: 4 };
  */
 const createHarness = (
   layers: CanvasLayerContract | CanvasLayerContract[],
-  options: { byteBudget?: number; commitStatus?: 'committed' | 'busy' } = {}
+  options: { byteBudget?: number; commitStatus?: 'committed' | 'busy'; resample?: TransformResampler } = {}
 ) => {
   const [layer] = Array.isArray(layers) ? layers : [layers];
   if (!layer) {
@@ -38,12 +38,15 @@ const createHarness = (
   const history = createHistory({ byteBudget: options.byteBudget });
   const backend = createTestStubRasterBackend();
   const caches = createLayerCacheStore(backend);
-  caches.getOrCreateRect(layer.id, { height: 4, width: 4, x: 0, y: 0 });
+  const cache = caches.getOrCreateRect(layer.id, { height: 4, width: 4, x: 0, y: 0 });
+  cache.stale = false;
+  cache.hasPublishedPixels = true;
   const dispatch = (action: CanvasProjectMutation): boolean => {
     project = applyCanvasProjectMutation(project, action);
     return true;
   };
   const rasterFits = { value: true };
+  const releaseRaster = vi.fn();
   const ctx = createCanvasMutationContext({
     commitEdit: vi.fn(),
     createLayerId: () => 'unused',
@@ -53,17 +56,18 @@ const createHarness = (
     getDocument: () => project.canvas.document,
     getReducerDocument: () => project.canvas.document,
     history,
-    installPrepared: () => undefined,
+    installPrepared: (prepared) => {
+      caches.installReplacement(prepared);
+      calls.restoreCache(prepared.layerId, prepared.rect, prepared.surface);
+    },
     isGestureActive: () => false,
     isGuardCurrent: () => true,
-    preparePixels: () => {
-      throw new Error('unused');
-    },
+    preparePixels: (layerId, rect, pixels) => caches.prepareReplacement(layerId, rect, pixels),
     projectId: project.id,
     refreshMirror: () => undefined,
     reserveRaster: () =>
       rasterFits.value
-        ? { lease: { release: () => undefined }, status: 'ok' }
+        ? { lease: { release: releaseRaster }, status: 'ok' }
         : { availableBytes: 0, requestedBytes: 1, status: 'over-budget' },
     subscribeReducer: () => () => undefined,
   });
@@ -88,6 +92,8 @@ const createHarness = (
   };
   const controller = new TransformEditingController({
     backend,
+    getOptions: () => ({ fitMode: 'contain', resampleMode: 'lanczos', smoothing: !!options.resample }),
+    resample: options.resample,
     canEdit: () => state.canEdit,
     commitStructural: calls.commitStructural,
     ctx,
@@ -102,13 +108,15 @@ const createHarness = (
     pending: { get: () => pending, set: (value) => (pending = value) },
     reportRefusal: calls.reportRefusal,
     rebaseLineEnd: calls.rebaseLineEnd,
-    restoreCache: calls.restoreCache,
     select: calls.select,
     session: { get: () => session, set: (value) => (session = value) },
     setOverride: calls.setOverride,
   });
   return {
+    backend,
+    caches,
     calls,
+    ctx,
     controller,
     dispatch,
     document: () => project.canvas.document,
@@ -116,6 +124,7 @@ const createHarness = (
     layer: () => getDocumentLayer(project.canvas.document, layer.id),
     pending: () => pending,
     rasterFits,
+    releaseRaster,
     session: () => session,
     state,
   };
@@ -463,5 +472,216 @@ describe('TransformEditingController pending transform', () => {
     h.controller.onUploadFailed('stroke');
     expect(h.pending()).toBeNull();
     expect(h.calls.reportRefusal).toHaveBeenCalledExactlyOnceWith('not-ready');
+  });
+});
+
+describe('Transform resampling', () => {
+  const pixels = (width = 4, height = 4) =>
+    createTestStubRasterBackend().createSurface(width, height).ctx.getImageData(0, 0, width, height);
+  const image = layerContract('image', 'raster', {
+    source: { type: 'image', image: { imageName: 'source.png', width: 4, height: 4 } },
+  } as Partial<CanvasLayerContract>);
+
+  it('releases the raster reservation when a pending resample is cancelled', async () => {
+    const h = createHarness(paint, {
+      resample: (_surface, _size, _mode, signal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }),
+    });
+    h.controller.begin(paint.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    expect(h.session()?.processing).toBe(true);
+    expect(h.releaseRaster).not.toHaveBeenCalled();
+    h.controller.cancel();
+    await vi.waitFor(() => expect(h.releaseRaster).toHaveBeenCalledOnce());
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.layer()).toEqual(paint);
+  });
+
+  it.each([paint, image])('supersamples $id and restores its source and pixels in one undo step', async (layer) => {
+    const resample = vi.fn(() => Promise.resolve(pixels()));
+    const h = createHarness(layer, { resample });
+    h.controller.begin(layer.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    h.controller.apply();
+    expect(h.session()?.processing).toBe(true);
+    expect(resample).toHaveBeenCalledTimes(1);
+    expect(resample.mock.calls[0]).toMatchObject([
+      { width: 8, height: 8 },
+      { width: 4, height: 4, x: 12, y: 4 },
+      'lanczos',
+      expect.any(AbortSignal),
+    ]);
+    await vi.waitFor(() => expect(h.session()).toBeNull());
+    expect(h.layer()?.transform).toMatchObject({ x: 0, y: 0, scaleX: 1 });
+    expect(h.layer()).toMatchObject({ source: { type: 'paint', offset: { x: 12, y: 4 } } });
+    expect(h.history.entries().past).toEqual(['Transform layer']);
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
+    expect(h.layer()).toEqual(layer);
+    expect(await h.history.redo()).toEqual({ status: 'applied' });
+    expect(h.layer()).toMatchObject({ source: { type: 'paint' } });
+    expect(h.calls.restoreCache).toHaveBeenCalledTimes(3);
+  });
+
+  it.each(['cancel', 'dispose', 'onReplay', 'onDocumentReplaced'] as const)(
+    'discards a late response after %s',
+    async (end) => {
+      let resolve!: (value: ImageData) => void;
+      const result = new Promise<ImageData>((done) => {
+        resolve = done;
+      });
+      const resample = vi.fn<TransformResampler>(() => result);
+      const h = createHarness(paint, { resample });
+      h.controller.begin(paint.id);
+      h.controller.update(MOVED);
+      h.controller.apply();
+      h.controller[end]();
+      expect(resample.mock.calls[0]?.[3].aborted).toBe(true);
+      resolve(pixels());
+      await result;
+      await Promise.resolve();
+      expect(h.calls.restoreCache).not.toHaveBeenCalled();
+      expect(h.history.canUndo()).toBe(false);
+      expect(h.layer()).toEqual(paint);
+    }
+  );
+
+  it('refuses unloaded image pixels without starting the graph', () => {
+    const resample = vi.fn<TransformResampler>();
+    const h = createHarness(image, { resample });
+    h.caches.get(image.id)!.stale = true;
+    h.controller.begin(image.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    expect(resample).not.toHaveBeenCalled();
+    expect(h.calls.reportRefusal).toHaveBeenCalledWith('not-ready');
+    expect(h.session()?.transform).toEqual(MOVED);
+  });
+
+  it('keeps the preview recoverable after a failed resize, and permits retry', async () => {
+    const resample = vi
+      .fn<TransformResampler>()
+      .mockRejectedValueOnce(new Error('queue unavailable'))
+      .mockResolvedValueOnce(pixels());
+    const h = createHarness(paint, { resample });
+    h.controller.begin(paint.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    await vi.waitFor(() => expect(h.session()?.processing).toBe(false));
+    expect(h.calls.reportRefusal).toHaveBeenCalledWith('not-ready');
+    expect(h.history.canUndo()).toBe(false);
+    h.controller.apply();
+    await vi.waitFor(() => expect(h.session()).toBeNull());
+    expect(h.history.canUndo()).toBe(true);
+  });
+
+  it('does not publish when source pixels changed while the graph ran', async () => {
+    let resolve!: (value: ImageData) => void;
+    const result = new Promise<ImageData>((done) => {
+      resolve = done;
+    });
+    const h = createHarness(paint, { resample: () => result });
+    h.controller.begin(paint.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    h.caches.get(paint.id)!.version++;
+    resolve(pixels());
+    await result;
+    await Promise.resolve();
+    expect(h.calls.restoreCache).not.toHaveBeenCalled();
+    expect(h.history.canUndo()).toBe(false);
+  });
+});
+
+describe('resampled detected control', () => {
+  it('moves the kept original and undoes the bake as one step', async () => {
+    const originalTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 2, y: 3 };
+    const control = {
+      ...layerContract('map', 'control'),
+      controlType: 'depth',
+      detection: { type: 'depth_anything_depth_estimation', settings: {} },
+      filter: { type: 'depth_anything_depth_estimation', settings: {} },
+      source: { type: 'paint', bitmap: { imageName: 'map.png', width: 4, height: 4 } },
+      original: { type: 'image', image: { imageName: 'original.png', width: 4, height: 4 } },
+      originalTransform,
+    } as CanvasControlLayerContract;
+    const resample: TransformResampler = (_, size) =>
+      Promise.resolve(
+        createTestStubRasterBackend()
+          .createSurface(size.width, size.height)
+          .ctx.getImageData(0, 0, size.width, size.height)
+      );
+    const h = createHarness(control, { resample });
+    const transform = { ...MOVED, scaleX: 2, scaleY: 2 };
+    h.controller.begin(control.id);
+    h.controller.update(transform);
+    h.controller.apply();
+    await vi.waitFor(() => expect(h.session()).toBeNull());
+    expect(restoreControlOriginal(h.layer() as CanvasControlLayerContract).transform).toEqual(
+      composeLayerTransforms(transform, originalTransform)
+    );
+    expect(h.history.heldAssetRefs().images).toContain('original.png');
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
+    expect(h.layer()).toEqual(control);
+    expect(await h.history.redo()).toEqual({ status: 'applied' });
+    expect(h.history.entries().past).toEqual(['Transform layer']);
+  });
+});
+
+describe('prepared transform pixels', () => {
+  it.each([false, true])(
+    'leaves the source, cache and history intact on preparation failure (smoothing %s)',
+    async (smoothing) => {
+      const resample: TransformResampler = (_, size) =>
+        Promise.resolve(
+          createTestStubRasterBackend()
+            .createSurface(size.width, size.height)
+            .ctx.getImageData(0, 0, size.width, size.height)
+        );
+      const h = createHarness(paint, { resample: smoothing ? resample : undefined });
+      const original = h.caches.get(paint.id);
+      const prepare = vi.spyOn(h.ctx, 'preparePixels').mockImplementationOnce(() => {
+        throw new Error('allocation failed');
+      });
+      h.controller.begin(paint.id);
+      h.controller.update(MOVED);
+      h.controller.apply();
+      await vi.waitFor(() => expect(prepare).toHaveBeenCalledOnce());
+      expect(h.layer()).toEqual(paint);
+      expect(h.caches.get(paint.id)).toBe(original);
+      expect(h.calls.restoreCache).not.toHaveBeenCalled();
+      expect(h.history.canUndo()).toBe(false);
+      expect(h.session()?.transform).toEqual(MOVED);
+    }
+  );
+
+  it('prepares undo and redo before mutating, even when the old cache was evicted', async () => {
+    const h = createHarness(paint);
+    h.controller.begin(paint.id);
+    h.controller.update(MOVED);
+    h.controller.apply();
+    const baked = h.layer();
+    h.caches.delete(paint.id);
+    const prepare = vi.spyOn(h.ctx, 'preparePixels').mockImplementationOnce(() => {
+      throw new Error('allocation failed');
+    });
+    expect(await h.history.undo()).toMatchObject({ status: 'failed' });
+    expect(h.layer()).toBe(baked);
+    expect(h.caches.get(paint.id)).toBeUndefined();
+    expect(h.history.entries().past).toEqual(['Transform layer']);
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
+    expect(h.layer()).toEqual(paint);
+    const restored = h.caches.get(paint.id);
+    prepare.mockImplementationOnce(() => {
+      throw new Error('allocation failed');
+    });
+    expect(await h.history.redo()).toMatchObject({ status: 'failed' });
+    expect(h.layer()).toEqual(paint);
+    expect(h.caches.get(paint.id)).toBe(restored);
+    expect(h.history.entries().future).toEqual(['Transform layer']);
+    expect(await h.history.redo()).toEqual({ status: 'applied' });
   });
 });

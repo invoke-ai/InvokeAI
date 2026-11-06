@@ -451,6 +451,17 @@ describe('fitLayerTransformToBbox', () => {
   });
 });
 
+it.each([
+  ['cover', { scaleX: 1, scaleY: 1, x: -60, y: -20 }],
+  ['fill', { scaleX: 0.5, scaleY: 1, x: -5, y: -20 }],
+] as const)('fits offset content with %s', (mode, expected) => {
+  const layer = paintLayer('fit', {
+    source: { type: 'paint', bitmap: { imageName: 'fit.png', width: 200, height: 100 }, offset: { x: 10, y: 20 } },
+  });
+  const bbox = { x: 0, y: 0, width: 100, height: 100 };
+  expect(fitLayerTransformToBbox(layer, bbox, bbox, mode)).toEqual({ rotation: 0, ...expected });
+});
+
 describe('menu patch helpers', () => {
   it('builds control transparency effect patches', () => {
     const layer = createControlLayer({ id: 'c1', name: 'control' });

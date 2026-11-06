@@ -2922,6 +2922,15 @@
       }
     },
     "transform": {
+      "smoothing": "Smoothing",
+      "resampleMode": "Resample Mode",
+      "resampling": "Resampling",
+      "fitMode": "Fit Mode",
+      "fitToBbox": "Fit to Frame",
+      "contain": "Contain",
+      "cover": "Cover",
+      "fill": "Fill",
+      "smoothingHint": "Image and paint layers are resampled on Apply. Shape, gradient and text layers keep their editable sources.",
       "edit": "Transform layer",
       "groupSelected": "Select a layer inside this group to transform.",
       "hint": "Each field commits one undoable change to the selected layer.",

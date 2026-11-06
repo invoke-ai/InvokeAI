@@ -10,6 +10,8 @@ Retry re-runs failed or canceled backend items under new ids; the run owning the
 
 `submitUtilityGraph` (`@features/queue/utility`) returns once the backend accepts the graph; its `settled` watch ends on the first of: a terminal status event for its origin; a re-read of its accepted items that finds a terminal status or answers 404 (`removed`), triggered by `queue_cleared`, a reconnect after a disconnect, `queue_items_canceled` naming an accepted id, or the periodic reconcile read, which re-arms while the item stays open; or an abort of its signal (`aborted`), which stops watching and leaves the backend item alone.
 
+`runUtilityGraph` also accepts `prepend: true` for an interactive utility that must run ahead of queued generation work (such as applying Canvas transform resampling). Without it, the utility appends normally. This changes enqueue priority only; output routing, cancellation and settlement remain the utility runner's responsibility.
+
 ## Actions
 
 `ui/queueMenuActions.tsx` is the one queue action model: the top bar's button and menu, the widget header and its menu, and shortcuts (`requestQueueAction` in `@features/queue/reveal`, taken by the queue's always-mounted host once the read model has loaded) all call an action's `trigger`, never its runner. Its policy: cancelling the running item never asks, since Retry brings it back; cancelling all, cancelling all but the current item, and clearing failed, finished or all items always confirm, naming the scope and how many items they reach, with a way out that never reads "Cancel". Results report the same scope and counts. Pause and resume are one toggle that states what waits on the processor.
