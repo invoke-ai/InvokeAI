@@ -23,8 +23,7 @@ export const workbenchReducer = (
 ): WorkbenchState =>
   __workbenchReducerInternal(
     state,
-    action.type === 'submitInvocationSnapshot' ||
-      action.type === 'submitResolvedInvocationSnapshot' ||
+    action.type === 'submitResolvedInvocationSnapshot' ||
       action.type === 'submitCanvasInvocationSnapshot' ||
       action.type === 'submitModelOnlyUpscale'
       ? ({
@@ -36,9 +35,7 @@ export const workbenchReducer = (
                 ? action.route.sourceId
                 : action.type === 'submitCanvasInvocationSnapshot'
                   ? 'canvas'
-                  : action.type === 'submitModelOnlyUpscale'
-                    ? 'upscale'
-                    : state.projects.find((project) => project.id === state.activeProjectId)!.invocation.sourceId
+                  : 'upscale'
             ),
         } as __WorkbenchReducerActionInternal)
       : (action as __WorkbenchReducerActionInternal),

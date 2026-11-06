@@ -496,7 +496,12 @@ const primeGenerate = (
 ) => workbenchReducer(state, { type: 'setGenerateSettings', values: createGenerateValues(overrides) });
 
 const submitGenerate = (state: WorkbenchState) =>
-  workbenchReducer(state, { backendSupportsCancellation: true, type: 'submitInvocationSnapshot' });
+  workbenchReducer(state, {
+    backendSupportsCancellation: true,
+    projectId: state.activeProjectId,
+    route: getActiveProject(state).invocation,
+    type: 'submitResolvedInvocationSnapshot',
+  });
 
 describe('Invoke Front', () => {
   const getQueuedSnapshot = (state: WorkbenchState) => getActiveProject(state).queue.items[0]?.snapshot;
@@ -5592,7 +5597,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       state = workbenchReducer(state, {
         backendSupportsCancellation: true,
         models: [wanModel],
-        type: 'submitInvocationSnapshot',
+        projectId: state.activeProjectId,
+        route: getActiveProject(state).invocation,
+        type: 'submitResolvedInvocationSnapshot',
       });
 
       expect(readSubmission(state)).toMatchObject({ batchCount: 3, seed: 7, seedStep: -1 });
@@ -5872,7 +5879,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       models: [wanModel],
-      type: 'submitInvocationSnapshot',
+      projectId: state.activeProjectId,
+      route: getActiveProject(state).invocation,
+      type: 'submitResolvedInvocationSnapshot',
     });
 
     const submission = getActiveProject(state).queue.items[0]?.snapshot.recall?.videoValues;

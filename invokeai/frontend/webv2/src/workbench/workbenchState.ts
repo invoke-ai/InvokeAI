@@ -15,6 +15,7 @@ import type {
   ExpandedPositivePrompts,
   InvocationRoute,
   InvocationSourceId,
+  ResolvedInvocationRoute,
   ResultDestination,
   UpscaleSourceMetadata,
 } from '@workbench/invocationContracts';
@@ -421,12 +422,6 @@ type WorkbenchReducerAction =
     }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
-  | {
-      type: 'submitInvocationSnapshot';
-      runtime: InvocationRuntimeInputs;
-      backendSupportsCancellation: boolean;
-      models?: readonly ModelConfig[];
-    }
   | ({
       type: 'submitResolvedInvocationSnapshot';
       runtime: InvocationRuntimeInputs;
@@ -4244,7 +4239,7 @@ const submitInvocationSnapshot = (
   defaults: ScopedDefaults,
   backendSupportsCancellation: boolean,
   runtime: InvocationRuntimeInputs,
-  route = resolveInvocationRoute(project, 'global', project.invocation, undefined, undefined, runtime.templates),
+  route: ResolvedInvocationRoute,
   models?: readonly ModelConfig[],
   expansion: Partial<ExpandedPositivePrompts> = {},
   workflowGenerators?: WorkflowGeneratorResolutions,
@@ -5470,22 +5465,6 @@ const reduceWorkbenchAction = (
     case 'redoWorkflowChange': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
         redoProjectWorkflow(project, action.workflowId ?? project.workflows.activeWorkflowId, now())
-      );
-    }
-    case 'submitInvocationSnapshot': {
-      return withEnqueueNotification(
-        state,
-        updateActiveProject(state, (project) =>
-          submitInvocationSnapshot(
-            project,
-            state.scopedDefaults,
-            action.backendSupportsCancellation,
-            action.runtime,
-            undefined,
-            action.models
-          )
-        ),
-        state.activeProjectId
       );
     }
     case 'submitResolvedInvocationSnapshot': {
