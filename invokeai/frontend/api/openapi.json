@@ -1527,6 +1527,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2090,6 +2093,9 @@
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                     },
                     {
@@ -2651,6 +2657,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -3259,6 +3268,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -3894,6 +3906,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -5404,6 +5419,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
                     },
                     {
                       "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -21171,6 +21189,9 @@
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+          },
+          {
+            "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
           },
           {
             "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -77742,7 +77763,7 @@
           "format"
         ],
         "title": "Main_Checkpoint_MossImage_Config",
-        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Only dense (bf16/fp16/fp32) files load. A quantized one is refused at install with\n`InvalidMatchError`: the loader has no quantization path, and `NotAMatchError` would let it register as an unknown\nmodel instead."
+        "description": "Model config for MOSS-Image single-file transformers (safetensors), such as the ComfyUI export.\n\nThe file holds the transformer alone; the Qwen3.5-9B encoder and the FLUX.2 VAE are separate models, selected on\nthe loader node. Dense (bf16/fp16/fp32) files load, and so does Comfy-Org's `int8_tensorwise` convrot export; both\nmay fuse each block's `q`, `k`, `v` into `proj.qkv`. Any other quantization is refused at install with\n`InvalidMatchError`, and `NotAMatchError` would let it register as an unknown model instead."
       },
       "Main_Checkpoint_QwenImage21_Config": {
         "properties": {
@@ -83604,6 +83625,171 @@
         ],
         "title": "Main_GGUF_LTX2_Config",
         "description": "An LTX-2 single-file transformer in GGUF, in the official key layout.\n\nThe community builds are conversions of the official single files: the transformer's keys, bare or\nunder ``model.diffusion_model.``, with the two text connectors bundled beside them -- which, as for\nthe official files, the component folder supplies instead. Their ``general.architecture`` is ``ltxv``\nfor every generation, and some carry another model's metadata outright, so the keys identify them,\nexactly as they do the safetensors files. Some keep the official ``model_version`` string and some\ndrop it; the structure dates those. Dev and Distilled are told apart by the filename."
+      },
+      "Main_GGUF_MossImage_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "main",
+            "title": "Type",
+            "default": "main"
+          },
+          "trigger_phrases": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Phrases",
+            "description": "Set of trigger phrases for this model"
+          },
+          "default_settings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MainModelDefaultSettings"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Default settings for this model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "base": {
+            "type": "string",
+            "const": "moss-image",
+            "title": "Base",
+            "default": "moss-image"
+          },
+          "format": {
+            "type": "string",
+            "const": "gguf_quantized",
+            "title": "Format",
+            "default": "gguf_quantized"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "trigger_phrases",
+          "default_settings",
+          "config_path",
+          "base",
+          "format"
+        ],
+        "title": "Main_GGUF_MossImage_Config",
+        "description": "Model config for GGUF-quantized MOSS-Image transformers (single-file).\n\nTwo layouts: unsloth's builds declare `general.architecture = moss_image` and keep `proj.q`, `proj.k`, `proj.v`;\nleejet's carry no metadata at all and fuse them into `proj.qkv`. The key fingerprint identifies both, so\nidentification does not depend on the metadata. ComfyUI-GGUF's own convrot quantization (`comfy.gguf.quant.*`) is\nrefused by the factory, since `DECODES_GGUF_CONVROT` stays empty."
       },
       "Main_GGUF_QwenImage21_Config": {
         "properties": {
@@ -92070,6 +92256,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -92879,6 +93068,9 @@
                     "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
                   },
                   {
@@ -93618,6 +93810,9 @@
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
               },
               {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
+              },
+              {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
               },
               {
@@ -94166,6 +94361,9 @@
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+              },
+              {
+                "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
               },
               {
                 "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -95213,6 +95411,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_LTX2_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/Main_GGUF_MossImage_Config"
                 },
                 {
                   "$ref": "#/components/schemas/Main_GGUF_Anima_Config"
@@ -110596,6 +110797,14 @@
             "title": "Previous Names",
             "default": []
           },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -110790,6 +110999,14 @@
             },
             "type": "array",
             "title": "Previous Names",
+            "default": []
+          },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
             "default": []
           }
         },

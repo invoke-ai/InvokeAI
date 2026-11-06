@@ -18,8 +18,10 @@ import {
 import { publishLayerPanelSelection } from '@workbench/layerPanelState';
 import {
   CANVAS_HISTORY_HOTKEYS,
+  CANVAS_MERGE_DOWN_HOTKEY,
   executeCanvasToolCommand,
   isCanvasToolCommand,
+  mergeSelectedLayerDown,
   type CanvasToolCommandContext,
   type HotkeyTableEntry,
 } from '@workbench/widgets/canvas/canvasToolCommands';
@@ -36,7 +38,6 @@ import {
   removeFromGroup,
   ungroupLayers,
 } from '@workbench/widgets/layers/layerGroupCommands';
-import { canMergeLayerDown } from '@workbench/widgets/layers/layerOps';
 
 /** Keys that act only while the Canvas itself holds focus; rows and fields own them elsewhere. */
 export const CANVAS_ONLY_HOTKEYS = [
@@ -69,7 +70,7 @@ export const CANVAS_ONLY_HOTKEYS = [
   ['canvas.duplicateLayer', 'widgets.canvas.commands.duplicateLayer', ['mod+j']],
   ['canvas.groupLayers', 'widgets.canvas.commands.groupLayers', ['mod+g']],
   ['canvas.ungroupLayers', 'widgets.canvas.commands.ungroupLayers', ['mod+shift+g']],
-  ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']],
+  CANVAS_MERGE_DOWN_HOTKEY,
   ['canvas.layerForward', 'widgets.canvas.commands.layerForward', ['mod+]']],
   ['canvas.layerBackward', 'widgets.canvas.commands.layerBackward', ['mod+[']],
   ['canvas.layerToFront', 'widgets.canvas.commands.layerToFront', ['mod+shift+]']],
@@ -323,16 +324,6 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
       );
     }
   } else if (commandId === 'canvas.mergeDown') {
-    // Share canMergeLayerDown with the layer menu so shortcuts respect identical eligibility.
-    if (engine && selectedLayer && canMergeLayerDown(document, selectedLayer.id, true)) {
-      void engine.layers.mergeLayerDown(selectedLayer.id).then(
-        (result) => {
-          if (result !== 'merged') {
-            ctx.reportLayerOperation(result);
-          }
-        },
-        () => ctx.reportLayerOperation('failed')
-      );
-    }
+    mergeSelectedLayerDown(engine, document, ctx.reportLayerOperation);
   }
 };
