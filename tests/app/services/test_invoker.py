@@ -94,7 +94,9 @@ def test_a_calibration_item_pending_at_startup_runs_once_every_service_started(
     creator.start(mock_invoker)
     graph = Graph()
     graph.add_node(AddInvocation(id="add", a=1, b=2))
-    created = asyncio.run(creator.create_run("model-key", WorkingMemoryCalibrationRequest(graph=graph), "system"))
+    created = asyncio.run(
+        creator.create_run("model-key", WorkingMemoryCalibrationRequest(graph_models={}, graph=graph), "system")
+    )
     [item_id] = created.item_ids
 
     # This process: new services over the same database and root, started by its invoker.

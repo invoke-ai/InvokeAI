@@ -1,29 +1,36 @@
 import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 
 import { SettingControl } from '@platform/ui/settings/SettingControl';
-import { useWidgetSettingsTarget } from '@workbench/settings/useWidgetSettingsTarget';
+import { useLayeredSetting } from '@workbench/settings/useLayeredSetting';
 import { useCallback } from 'react';
 
 import { getPreviewComparisonMode, getPreviewFilmstripVisible } from './previewSettings';
 
+const EMPTY = {};
+
 export const Field = ({ field, surface, target }: SettingFieldProps) => {
-  const { disabled, patch, value } = useWidgetSettingsTarget<boolean | string>('preview', target, (values) =>
-    field.id === 'comparisonMode' ? getPreviewComparisonMode(values) : getPreviewFilmstripVisible(values)
+  const read = field.id === 'comparisonMode' ? getPreviewComparisonMode : getPreviewFilmstripVisible;
+  const { disabled, layer, set, value } = useLayeredSetting<boolean | string>(
+    'preview',
+    field.id,
+    target,
+    read,
+    read(EMPTY),
+    field
   );
   const onChange = useCallback(
     (next: boolean | string | number) => {
       if (field.id === 'comparisonMode' && (next === 'slider' || next === 'side-by-side' || next === 'hover')) {
-        patch({ comparisonMode: next });
+        set(next);
       } else if (field.id === 'filmstripVisible' && typeof next === 'boolean') {
-        patch({ filmstripVisible: next });
+        set(next);
       }
     },
-    [field.id, patch]
+    [field.id, set]
   );
-  const defaultValue = field.id === 'comparisonMode' ? getPreviewComparisonMode({}) : getPreviewFilmstripVisible({});
   return (
     <SettingControl
-      isModified={value !== defaultValue}
+      layer={layer}
       disabled={disabled}
       field={field}
       surface={surface}

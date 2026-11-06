@@ -30,6 +30,8 @@ export {
   isControlModelUsableForKind,
 } from './core/canvas/controlValidation';
 export {
+  getEffectiveLayoutKind,
+  getLayoutDraftRejectionReason,
   getLayoutPromptRejectionReason,
   getLayoutRegionIssue,
   getRegionalGuidanceRejectionReason,

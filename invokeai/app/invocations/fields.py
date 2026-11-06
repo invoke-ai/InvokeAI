@@ -152,8 +152,16 @@ class FieldDescriptions:
     hidiffusion = "Apply HiDiffusion (RAU-Net + MSW-MSA) for higher-resolution denoising"
     hidiffusion_raunet = "Apply HiDiffusion RAU-Net blocks"
     hidiffusion_window_attn = "Apply HiDiffusion window attention blocks"
-    hidiffusion_t1_ratio = "Override HiDiffusion early switch threshold (T1 ratio)"
-    hidiffusion_t2_ratio = "Override HiDiffusion late switch threshold (T2 ratio)"
+    hidiffusion_auto_ratios = "Use model- and resolution-specific presets for both HiDiffusion ratios"
+    hidiffusion_t1_ratio = (
+        "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). "
+        "At extreme resolutions this is the later of the two RAU-Net cutoffs."
+    )
+    hidiffusion_t2_ratio = (
+        "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key "
+        "T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values "
+        "can reduce composition diversity or introduce artifacts."
+    )
     scheduler = "Scheduler to use during inference"
     positive_cond = "Positive conditioning tensor"
     negative_cond = "Negative conditioning tensor"
@@ -184,6 +192,7 @@ class FieldDescriptions:
     flux2_dev_model = "FLUX.2 [dev] model (Transformer) to load"
     krea2_model = "Krea-2 model (Transformer) to load"
     qwen_image_2_1_model = "Qwen-Image-2.1 model (Transformer) to load"
+    flux3_model = "FLUX.3 model (Transformer) to load"
     qwen_image_model = "Qwen Image Edit model (Transformer) to load"
     qwen_vl_encoder = "Qwen2.5-VL tokenizer, processor and text/vision encoder"
     wan_model = "Wan 2.2 model (Transformer) to load"
@@ -421,6 +430,12 @@ class Krea2ConditioningField(BaseModel):
 
 class QwenImage21ConditioningField(BaseModel):
     """A Qwen-Image-2.1 conditioning tensor primitive value"""
+
+    conditioning_name: str = Field(description="The name of conditioning tensor")
+
+
+class Flux3ConditioningField(BaseModel):
+    """A FLUX.3 conditioning tensor primitive value"""
 
     conditioning_name: str = Field(description="The name of conditioning tensor")
 

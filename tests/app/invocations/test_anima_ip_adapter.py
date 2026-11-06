@@ -17,7 +17,7 @@ from invokeai.app.invocations.fields import AnimaConditioningField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.anima.ip_adapter import AnimaIPAdapter
 from invokeai.backend.model_manager.starter_models.common import siglip, siglip2_base_512
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo, ConditioningFieldData
 
 _DEPTH = 28
@@ -27,6 +27,7 @@ class _Loaded:
     def __init__(self, model):
         self.model = model
         self.compute_device = torch.device("cpu")
+        self.config = SimpleNamespace(format=ModelFormat.Checkpoint)
 
     @contextmanager
     def model_on_device(self, working_mem_bytes=None):

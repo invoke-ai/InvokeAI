@@ -192,6 +192,33 @@ def test_physical_availability_shares_the_reclaimable_credit_policy(monkeypatch:
     assert cache._get_physical_vram_available() == 3 * GB
 
 
+def test_making_room_keeps_free_the_reserve_a_lock_with_that_working_memory_keeps(monkeypatch: pytest.MonkeyPatch):
+    """A caller about to lock a model with `working_mem_bytes` asks `make_room_in_vram` with the same figure: the
+    reserve is that request, but never less than `device_working_mem_gb`, exactly as the lock's."""
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (4 * GB, 24 * GB))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 5 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_stats", lambda device: {"inactive_split_bytes.all.current": GB})
+    monkeypatch.delenv("PYTORCH_CUDA_ALLOC_CONF", raising=False)
+    monkeypatch.delenv("PYTORCH_ALLOC_CONF", raising=False)
+    monkeypatch.delenv("PYTORCH_HIP_ALLOC_CONF", raising=False)
+
+    # 4 GB free + 2 GB reclaimable, less the reserve.
+    assert cache.make_room_in_vram(GB) == 5 * GB
+    assert cache.make_room_in_vram(GB, working_mem_bytes=GB // 2) == 5 * GB
+    assert cache.make_room_in_vram(GB, working_mem_bytes=5 * GB // 2) == 7 * GB // 2
+
+
 def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch: pytest.MonkeyPatch):
     """On Windows ROCm, torch reports the device total minus this process's usage. Windows pages allocations into
     shared system memory once the process passes its video-memory budget, so the budget's headroom is what the cache
@@ -402,3 +429,45 @@ def test_lock_hands_cached_blocks_back_when_the_reserve_is_not_driver_free():
     finally:
         cache.unlock(record)
         torch.cuda.empty_cache()
+
+
+def _calibrating_cache(device: str, cap_gb: float | None) -> ModelCache:
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        max_vram_cache_size_gb=cap_gb,
+        reserve_vram_gb=0.5,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device(device)  # policy only; every memory query below is patched out
+    return cache
+
+
+@pytest.mark.parametrize("cap_gb", [None, 8.0], ids=["uncapped", "capped"])
+def test_a_calibration_on_a_shared_memory_device_plans_with_what_its_lock_budgets(
+    monkeypatch: pytest.MonkeyPatch, cap_gb: float | None
+):
+    """On MPS the calibration's pre-lock offload moves nothing, so what is live stays live: the capacity it plans with
+    is the lock's budget with the working memory given back. 10 GB available and 2 GB the driver holds, 3 GB live:
+    9 GB, or 5 GB under an 8 GB cap; less the 0.5 GB reserve."""
+    monkeypatch.setattr(model_cache_module.psutil, "virtual_memory", lambda: MagicMock(available=10 * GB))
+    monkeypatch.setattr(torch.mps, "driver_allocated_memory", lambda: 2 * GB)
+    monkeypatch.setattr(torch.mps, "current_allocated_memory", lambda: 3 * GB)
+    cache = _calibrating_cache("mps", cap_gb)
+    working = 4 * GB
+
+    assert cache.calibration_capacity() == (8.5 if cap_gb is None else 4.5) * GB
+    assert cache.calibration_capacity() == cache._get_vram_available(working) + working
+
+
+def test_a_calibration_on_a_dedicated_card_counts_the_models_its_offload_moves_out(monkeypatch: pytest.MonkeyPatch):
+    """6 GB free and 2 GB the resident models hold: the offload moves them out before the lock, so 8 GB, less the
+    reserve."""
+    monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, device: (6 * GB, 24 * GB)))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device=None: 2 * GB)
+
+    assert _calibrating_cache("cuda", None).calibration_capacity() == 7.5 * GB

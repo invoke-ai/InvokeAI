@@ -13,6 +13,9 @@ from invokeai.backend.flux.controlnet.state_dict_utils import (
 )
 from tests.backend.flux.controlnet.instantx_flux_controlnet_state_dict import instantx_config, instantx_sd_shapes
 from tests.backend.flux.controlnet.xlabs_flux_controlnet_state_dict import xlabs_sd_shapes
+from tests.backend.model_manager.load.state_dicts.qwen_image_instantx_controlnet_keys import (
+    state_dict_keys as qwen_image_instantx_keys,
+)
 
 
 @pytest.mark.parametrize(
@@ -33,6 +36,8 @@ def test_is_state_dict_xlabs_controlnet(sd_shapes: dict[str, list[int]], expecte
     [
         (instantx_sd_shapes, True),
         (xlabs_sd_shapes, False),
+        # InstantX's Qwen-Image ControlNet: the same `controlnet_*` keys over Qwen-Image's own blocks.
+        (qwen_image_instantx_keys, False),
         (["foo"], False),
     ],
 )

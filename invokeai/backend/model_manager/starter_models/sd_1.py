@@ -1,10 +1,20 @@
 """Stable Diffusion 1.x starter models."""
 
-from invokeai.backend.model_manager.starter_models.common import ip_adapter_sd_image_encoder
+from invokeai.backend.model_manager.starter_models.common import TINY_AUTOENCODER_NOTE, ip_adapter_sd_image_encoder
 from invokeai.backend.model_manager.starter_models.types import StarterModel
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
+    ModelFormat,
     ModelType,
+)
+
+taesd = StarterModel(
+    name="TAESD (SD 1.x/2.x preview decoder)",
+    base=BaseModelType.StableDiffusion1,
+    source="https://huggingface.co/madebyollin/taesd/resolve/614f76814bbe30edbe2e627ace1c2234c81a2c0e/taesd_decoder.safetensors",
+    description=f"Sharp live previews for SD 1.x and SD 2.x. {TINY_AUTOENCODER_NOTE} ~5MB",
+    type=ModelType.TinyAutoencoder,
+    format=ModelFormat.Checkpoint,
 )
 
 cyberrealistic_negative = StarterModel(

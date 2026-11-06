@@ -1,10 +1,13 @@
+import os
 import sys
+from collections.abc import Mapping
 from dataclasses import astuple, dataclass, replace
-from typing import Final, Literal
+from typing import Final, Literal, Optional, cast, get_args
 
 import torch
 
-from invokeai.app.util.torch_cuda_allocator import expandable_segments_enabled
+from invokeai.app.util.torch_cuda_allocator import ALLOCATOR_CONF_ENV_VARS, expandable_segments_enabled
+from invokeai.backend.working_memory.counters import Backend, backend_for
 
 ConvBackend = Literal["cudnn", "miopen", "mps", "xpu", "cpu"]
 Allocator = Literal["native", "cudaMallocAsync", "expandable"]
@@ -66,39 +69,66 @@ def priced_as(platform: Platform) -> Platform:
     return replace(platform, allocator="native")
 
 
-def _allocator_for(device: torch.device) -> Allocator:
-    """The caching allocator an operation on `device` allocates through: `native` for anything but a CUDA/HIP GPU.
+_CONV_BACKENDS: Final[Mapping[Optional[Backend], ConvBackend]] = {
+    "cuda": "cudnn",
+    "hip": "miopen",
+    "mps": "mps",
+    "xpu": "xpu",
+    None: "cpu",
+}
+"""The convolution backend of each GPU backend. A HIP build reports its GPUs as ``cuda`` devices, so the torch build --
+not the device string -- separates MIOpen from cuDNN, and a `cpu_only` model on a ROCm build is not on MIOpen. Any
+device type other than CUDA, MPS and XPU runs torch's CPU kernels, or none at all, and is priced as the CPU."""
 
-    The backend is fixed before torch initializes CUDA, so torch's answer holds for the process; it is asked first,
-    because the driver's pool ignores expandable segments. Expandable segments are a mode of the native allocator, read
+
+def _allocator(backend: Optional[Backend], allocator_backend: Optional[str], environ: Mapping[str, str]) -> Allocator:
+    """The caching allocator of a `backend` device under torch's allocator backend and these allocator variables:
+    `native` for anything but a CUDA/HIP GPU. The driver's pool ignores expandable segments, so torch's backend
+    decides first; expandable segments are a mode of the native allocator."""
+    if backend not in ("cuda", "hip"):
+        return "native"
+    if allocator_backend == "cudaMallocAsync":
+        return "cudaMallocAsync"
+    return "expandable" if expandable_segments_enabled(environ) else "native"
+
+
+def _allocator_for(device: torch.device) -> Allocator:
+    """The caching allocator an operation on `device` allocates through.
+
+    The backend is fixed before torch initializes CUDA, so torch's answer holds for the process. The variables are read
     from the environment the model cache reads them from. A ``cuda`` device on a build without one (a test pinning the
     device) has no backend to ask.
     """
-    if device.type != "cuda":
-        return "native"
-    if torch.cuda.is_available() and torch.cuda.get_allocator_backend() == "cudaMallocAsync":
-        return "cudaMallocAsync"
-    return "expandable" if expandable_segments_enabled() else "native"
+    backend = backend_for(device)
+    allocator_backend = (
+        torch.cuda.get_allocator_backend() if backend in ("cuda", "hip") and torch.cuda.is_available() else None
+    )
+    return _allocator(backend, allocator_backend, os.environ)
 
 
 def _host_os() -> OperatingSystem:
+    """The operating system this process runs on, as platforms name it."""
     if sys.platform == "win32":
         return "windows"
     return "linux" if sys.platform.startswith("linux") else "other"
 
 
 def platform_for(device: torch.device) -> Platform:
-    """The platform an operation on `device` runs on.
+    """The platform an operation on `device` runs on."""
+    return Platform(_CONV_BACKENDS[backend_for(device)], _allocator_for(device), _host_os())
 
-    A HIP build reports ``device.type == "cuda"``, so the torch build -- not the device string -- is what separates
-    MIOpen from cuDNN, and a `cpu_only` model on a ROCm build is not on MIOpen. Any device type other than CUDA, MPS and
-    XPU runs torch's CPU kernels, or none at all, and is priced as the CPU.
+
+def platform_for_environment(backend: Backend, hard: Mapping[str, str]) -> Platform:
+    """The platform `platform_for` gives a `backend` device in the environment whose hard facts are `hard`
+    (`fingerprint.environment_for`), as a calibration store records them: torch's allocator backend, the allocator
+    variables and the OS. Raises ValueError when they lack a fact the platform needs.
     """
-    allocator, os = _allocator_for(device), _host_os()
-    if device.type == "cuda":
-        return Platform("miopen" if torch.version.hip is not None else "cudnn", allocator, os)
-    if device.type == "mps":
-        return Platform("mps", allocator, os)
-    if device.type == "xpu":
-        return Platform("xpu", allocator, os)
-    return Platform("cpu", allocator, os)
+    os_name = hard.get("os")
+    if os_name not in get_args(OperatingSystem):
+        raise ValueError(f"The environment records no operating system the platform knows: os={os_name!r}.")
+    allocator_backend = hard.get("allocator_backend")
+    if backend in ("cuda", "hip") and allocator_backend is None:
+        raise ValueError(f"The environment of a {backend} device records no allocator_backend.")
+    environ = {var: hard.get(f"env.{var}", "") for var in ALLOCATOR_CONF_ENV_VARS}
+    allocator = _allocator(backend, allocator_backend, environ)
+    return Platform(_CONV_BACKENDS[backend], allocator, cast(OperatingSystem, os_name))

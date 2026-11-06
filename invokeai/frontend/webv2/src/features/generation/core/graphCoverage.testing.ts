@@ -35,9 +35,10 @@ const DEFAULT_SHAPES: readonly ModelShape[] = [
 
 /** Check per-base shape overrides against supported bases. */
 export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape[]>> = {
-  // Anima ships single files only; Anima-3.8B's variant adds a second encoder.
+  // Anima ships single files only, checkpoint or GGUF; Anima-3.8B's variant adds a second encoder.
   anima: [
     { label: 'qwen3', overrides: { format: 'checkpoint', variant: 'anima_qwen3' } },
+    { label: 'qwen3-gguf', overrides: { format: 'gguf_quantized', variant: 'anima_qwen3' } },
     { label: 'qwen35', overrides: { format: 'checkpoint', variant: 'anima_qwen35' } },
   ],
   // Ideogram's standalone fixture is a conditional checkpoint, not GGUF.
@@ -50,6 +51,12 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'dev-diffusers', overrides: { format: 'diffusers', variant: 'dev' } },
     { label: 'dev-standalone', overrides: { format: 'gguf_quantized', variant: 'dev' } },
     { label: 'klein-9b-standalone', overrides: { format: 'gguf_quantized', variant: 'klein_9b' } },
+  ],
+  // FLUX.3 Klein samples without CFG; Klein Base compiles the negative branch at its CFG default.
+  flux3: [
+    { label: 'klein-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein' } },
+    { label: 'klein-standalone', overrides: { format: 'gguf_quantized', variant: 'flux3_klein' } },
+    { label: 'klein-base-diffusers', overrides: { format: 'diffusers', variant: 'flux3_klein_base' } },
   ],
 };
 
@@ -251,6 +258,10 @@ export const tunedSettingsFor = (base: SupportedGenerateBase, shape: ModelShape)
       ...settings,
       // CFG above 1 adds the negative prompt, which Qwen-Image-2.1 also encodes with the references.
       cfgScale: base === 'qwen-image-2-1' ? 4 : settings.cfgScale,
+      // Exercise explicit zero overrides as well as the default automatic metadata contract.
+      hiDiffusionEnabled: base === 'sd-1' || base === 'sdxl',
+      hiDiffusionT1Ratio: 0,
+      hiDiffusionT2Ratio: 0,
       fluxDypeExponent: 1,
       fluxDypePreset: 'manual' as const,
       fluxDypeScale: 3,

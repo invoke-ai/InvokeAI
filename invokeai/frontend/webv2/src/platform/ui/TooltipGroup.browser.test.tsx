@@ -7,7 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import { TooltipGroup } from './Tooltip';
+import { Tooltip, TooltipGroup } from './Tooltip';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -28,24 +28,32 @@ const moveFocus = (event: KeyboardEvent<HTMLButtonElement>) => {
 };
 
 const Group = () => (
-  <TooltipGroup.Root content="Shared tip" getTriggerId={getTriggerId} isEnabled={isEnabled}>
-    <div role="toolbar">
-      {VALUES.map((value) => (
-        <TooltipGroup.Trigger key={value} value={value}>
-          <button id={getTriggerId(value)} tabIndex={value === 'alpha' ? 0 : -1} type="button" onKeyDown={moveFocus}>
-            {value}
-          </button>
-        </TooltipGroup.Trigger>
-      ))}
-    </div>
-  </TooltipGroup.Root>
+  <>
+    <TooltipGroup.Root content="Shared tip" getTriggerId={getTriggerId} isEnabled={isEnabled}>
+      <div role="toolbar">
+        {VALUES.map((value) => (
+          <TooltipGroup.Trigger key={value} value={value}>
+            <button id={getTriggerId(value)} tabIndex={value === 'alpha' ? 0 : -1} type="button" onKeyDown={moveFocus}>
+              {value}
+            </button>
+          </TooltipGroup.Trigger>
+        ))}
+      </div>
+    </TooltipGroup.Root>
+    {/* After the group, so tabbing in from the page lands on the group first. */}
+    <Tooltip content="Other tip">
+      <button type="button">other</button>
+    </Tooltip>
+  </>
 );
 
 let host: HTMLDivElement;
 let root: Root;
 const trigger = (value: string) => document.getElementById(getTriggerId(value))!;
-const openTip = () =>
-  document.querySelector<HTMLElement>('[data-scope="tooltip"][data-part="content"][data-state="open"]');
+const openTips = () => [
+  ...document.querySelectorAll<HTMLElement>('[data-scope="tooltip"][data-part="content"][data-state="open"]'),
+];
+const openTip = () => openTips().find((tip) => tip.textContent === 'Shared tip') ?? null;
 const describedTriggers = () =>
   VALUES.filter((value) => {
     const describedBy = trigger(value).getAttribute('aria-describedby');
@@ -93,5 +101,27 @@ describe('TooltipGroup', () => {
     expect(document.activeElement).toBe(trigger('gamma'));
     await expect.poll(openTip, POLL).toBeNull();
     expect(describedTriggers()).toEqual([]);
+  });
+
+  it('shows nothing on a trigger that is not enabled when the pointer arrives from another tooltip', async () => {
+    const other = [...host.querySelectorAll('button')].find((button) => button.textContent === 'other')!;
+    await act(() => userEvent.hover(other));
+    await expect.poll(() => openTips().map((tip) => tip.textContent), POLL).toEqual(['Other tip']);
+
+    await act(() => userEvent.hover(trigger('gamma')));
+    // Past the open delay a wrongly opened tip would have waited for.
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, 600);
+        })
+    );
+    expect(openTip()).toBeNull();
+    await act(() => userEvent.unhover(trigger('gamma')));
+    await expect.poll(openTips, POLL).toEqual([]);
+
+    // The group still shows its tip on an enabled trigger.
+    await act(() => userEvent.hover(trigger('alpha')));
+    await expect.poll(() => openTip()?.textContent, POLL).toBe('Shared tip');
   });
 });

@@ -8,16 +8,18 @@ them, without measuring anything.
 import threading
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Literal, Optional
 
 import pytest
 import torch
 
 from invokeai.app.services.session_queue import session_queue_default
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_default import (
+    DeviceMemory,
     SettingValue,
     WorkingMemoryCalibrationService,
 )
+from invokeai.app.services.working_memory_calibration.working_memory_calibration_plan import VaeDtypes
 from invokeai.app.services.working_memory_calibration.working_memory_calibration_store import CalibrationStore
 from invokeai.backend.working_memory.estimate import WorkingMemoryTerm
 from invokeai.backend.working_memory.fingerprint import DeviceClass, Environment
@@ -25,12 +27,13 @@ from invokeai.backend.working_memory.probe import MeasuredWindow, Reason
 
 GPU = torch.device("cuda:0")
 GPU_CLASS = DeviceClass(vendor="nvidia", name="Test GPU 24GB", total_mib=24564, backend="cuda", arch="sm_89")
+GPU_VAE_DTYPES = VaeDtypes(standalone_flux="bf16", z_image_pipeline="bf16", sdnq_quantized_vae=lambda config: False)
 OTHER_CLASS = DeviceClass(vendor="amd", name="Test GPU 16GB", total_mib=16304, backend="hip", arch="gfx1200")
 
 
 def fake_environment(device: torch.device, settings: Mapping[str, SettingValue]) -> Environment:
     hard = {"torch": "2.7", **{f"setting.{key}": str(value) for key, value in settings.items()}}
-    return Environment(hard=hard, soft={"driver": "1.0", "os": "test"})
+    return Environment(hard=hard, soft={"driver": "1.0", "os_build": "test"})
 
 
 class HeldEnqueue:
@@ -55,13 +58,26 @@ def calibration_service(
     root: Path,
     devices: Optional[Callable[[], list[torch.device]]] = None,
     device_class: DeviceClass = GPU_CLASS,
+    environment_for: Callable[[torch.device, Mapping[str, SettingValue]], Environment] = fake_environment,
+    untiled_decode_reservation: Optional[Callable[[str, int, int, str, torch.device], int]] = None,
+    device_memory: Optional[Callable[[torch.device], DeviceMemory]] | Literal["whole card"] = "whole card",
+    vae_dtypes: VaeDtypes = GPU_VAE_DTYPES,
 ) -> WorkingMemoryCalibrationService:
-    """A service storing under `root`; not started (call `start(invoker)`)."""
+    """A service storing under `root`; not started (call `start(invoker)`, and `stop(invoker)` once it registered
+    the user-fit provider estimates ask). What the cache can give a calibration's lock defaults to the whole card, with
+    nothing outside torch; None asks the model cache of the invoker's model manager, as the service does. The VAE
+    dtypes default to those of a GPU with bf16 under `precision: auto`."""
+    extra = {} if untiled_decode_reservation is None else {"untiled_decode_reservation": untiled_decode_reservation}
     return WorkingMemoryCalibrationService(
         CalibrationStore(root / "working_memory"),
         generation_devices=devices or (lambda: [GPU]),
         device_class_for=lambda device: device_class,
-        environment_for=fake_environment,
+        environment_for=environment_for,
+        device_memory=(lambda device: DeviceMemory(device_class.total_mib * 2**20, 0))
+        if device_memory == "whole card"
+        else device_memory,
+        vae_dtypes=lambda device, models_path: vae_dtypes,
+        **extra,
     )
 
 

@@ -1,10 +1,39 @@
-import type { BeginTransformResult, CanvasEngine } from '@workbench/canvas-engine/api';
+import type {
+  AdjustmentRefusal,
+  BeginTransformResult,
+  CanvasDocumentContractV3,
+  CanvasEngine,
+  LayerUnreadable,
+} from '@workbench/canvas-engine/api';
 import type { TFunction } from 'i18next';
 
-import { reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
+import { mergeDownEligibility } from '@workbench/canvas-engine/api';
+import { reportLayerOperation, type LayerOperationRefusal } from '@workbench/widgets/canvas/useStructuralCommit';
 
 /** One hotkey row: its command id, title key and default keys. */
 export type HotkeyTableEntry = readonly [id: string, titleKey: string, defaultKeys: readonly string[]];
+
+/** The same layer operation is available from the Canvas and the Layers widget. */
+export const CANVAS_MERGE_DOWN_HOTKEY = ['canvas.mergeDown', 'widgets.canvas.commands.mergeDown', ['mod+e']] as const;
+
+export const mergeSelectedLayerDown = (
+  engine: Pick<CanvasEngine, 'layers'> | null,
+  document: CanvasDocumentContractV3,
+  report: (refusal: LayerOperationRefusal | AdjustmentRefusal | LayerUnreadable) => void
+): void => {
+  const id = document.selectedLayerId;
+  if (!engine || !id || mergeDownEligibility(document, id).status !== 'eligible') {
+    return;
+  }
+  void engine.layers.mergeLayerDown(id).then(
+    (result) => {
+      if (result !== 'merged') {
+        report(result);
+      }
+    },
+    () => report('failed')
+  );
+};
 
 /**
  * Canvas keys that also act while a companion widget (Layers, with its Color pane) holds focus: tools, the
@@ -19,10 +48,13 @@ export const CANVAS_COMPANION_HOTKEYS = [
   ['canvas.tool.brush', 'widgets.canvas.commands.selectBrushTool', ['b']],
   ['canvas.tool.eraser', 'widgets.canvas.commands.selectEraserTool', ['e']],
   ['canvas.tool.lasso', 'widgets.canvas.commands.selectLassoTool', ['l']],
-  ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['u']],
-  ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['r']],
+  // M and U as in other image editors: Marquee, then the Shape tool family.
+  ['canvas.tool.marquee', 'widgets.canvas.commands.selectMarqueeTool', ['m']],
+  ['canvas.tool.shape', 'widgets.canvas.commands.selectShapeTool', ['u']],
   ['canvas.tool.text', 'widgets.canvas.commands.selectTextTool', ['t']],
   ['canvas.tool.gradient', 'widgets.canvas.commands.selectGradientTool', ['g']],
+  // A sticky picker for those who would rather not hold Alt; Alt still picks from tools that do not read it.
+  ['canvas.tool.colorPicker', 'widgets.canvas.commands.selectColorPickerTool', ['i']],
   ['canvas.brushSizeDown', 'widgets.canvas.commands.decreaseBrushSize', ['[']],
   ['canvas.brushSizeUp', 'widgets.canvas.commands.increaseBrushSize', [']']],
   // The active color pair: X swaps, D resets to black/white.
@@ -61,7 +93,6 @@ export const reportTransformRefusal = (
 /** What the companion keys need; the Canvas and the Layers widget each build it from their own state. */
 export interface CanvasToolCommandContext {
   readonly engine: Pick<CanvasEngine, 'interaction' | 'layers' | 'tools'> | null;
-  readonly isInteractionLocked: boolean;
   /** The selected leaf that Transform opens on; null when nothing or a group is selected. */
   readonly selectedLayerId: string | null;
   /** Swaps the project foreground/background pair — a preference, never a document edit. */
@@ -71,10 +102,7 @@ export interface CanvasToolCommandContext {
   readonly reportTransformRefusal: (refusal: TransformRefusal) => void;
 }
 
-/**
- * Runs one companion key. The color pair is a preference, not a document edit, so X/D stay live while the surface
- * is interaction-locked; of the rest only the view tool works then.
- */
+/** Runs one companion key. The color pair is a preference, not a document edit: X/D need no engine. */
 export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: CanvasToolCommandContext): void => {
   const { engine } = ctx;
   if (commandId === 'canvas.toggleFillColor') {
@@ -83,9 +111,6 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
   }
   if (commandId === 'canvas.setFillColorsToDefault') {
     ctx.resetActiveColors();
-    return;
-  }
-  if (ctx.isInteractionLocked && commandId !== 'canvas.tool.view') {
     return;
   }
   if (!engine) {
@@ -160,6 +185,9 @@ export const executeCanvasToolCommand = (commandId: CanvasToolCommandId, ctx: Ca
       return;
     case 'canvas.tool.gradient':
       engine.tools.setTool('gradient');
+      return;
+    case 'canvas.tool.colorPicker':
+      engine.tools.setTool('colorPicker');
       return;
     case 'canvas.brushSizeDown':
       engine.tools.stepBrushSize(-1);

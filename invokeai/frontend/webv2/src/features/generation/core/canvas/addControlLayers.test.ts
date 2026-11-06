@@ -473,6 +473,38 @@ describe('addControlLayers — Qwen-Image control', () => {
     ]);
   });
 
+  it('hands an InstantX union the control image alone, as the canvas inpaints', () => {
+    const graph = run({
+      base: 'qwen-image',
+      inpaint,
+      layers: [qwenLayer('Q1', { modelControlArchitecture: 'instantx_union' })],
+    });
+
+    expect(graph.nodes.qwen_image_control_Q1).toEqual({
+      begin_step_percent: 0,
+      control_context_scale: 0.85,
+      control_model: union,
+      end_step_percent: 1,
+      id: 'qwen_image_control_Q1',
+      image: { image_name: 'Q1.png' },
+      is_intermediate: true,
+      type: 'qwen_image_control',
+      use_cache: true,
+    });
+    expect(Object.keys(graph.nodes)).toEqual(['denoise_latents', 'qwen_image_control_Q1']);
+    expect(graph.edges.map((edge) => edge.destination)).toEqual([{ field: 'control', node_id: 'denoise_latents' }]);
+  });
+
+  it.each(['fun_union', null, undefined] as const)(
+    'hands a Fun union (record says %s) the inpainted region as well',
+    (modelControlArchitecture) => {
+      const graph = run({ base: 'qwen-image', inpaint, layers: [qwenLayer('Q1', { modelControlArchitecture })] });
+
+      expect(graph.nodes.qwen_image_control_Q1).toMatchObject({ inpaint_image: { image_name: 'composite.png' } });
+      expect(edgesTo(graph, 'qwen_image_control_Q1', 'inpaint_mask')).toHaveLength(1);
+    }
+  );
+
   it('leaves the inpaint inputs to the kinds that condition on the region', () => {
     const graph = run({
       base: 'z-image',

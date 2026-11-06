@@ -25,7 +25,12 @@ register(
                 scheduler="euler", steps=40, cfg_scale=6.0, width=1024, height=1024
             ),
             None: MainModelDefaultSettings(scheduler="euler", steps=35, cfg_scale=4.5, width=1024, height=1024),
-        }
+        },
+        # Anima Turbo shares the base model's architecture and config, so its name is the only signal. Its model
+        # card: CFG 1 and 8-12 steps, with Euler among the samplers it names as good for Turbo.
+        by_name_hint={
+            "turbo": MainModelDefaultSettings(scheduler="euler", steps=10, cfg_scale=1.0, width=1024, height=1024)
+        },
     ),
     ModalityFacet(frozenset({"txt2img", "img2img", "inpaint", "outpaint"}), metadata_slug="anima"),
     FeaturesFacet(

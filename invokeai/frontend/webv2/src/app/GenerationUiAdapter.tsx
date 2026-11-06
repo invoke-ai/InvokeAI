@@ -10,14 +10,16 @@ import {
   invalidateGallery,
 } from '@features/gallery/queries';
 import { galleryImageUrls } from '@features/gallery/utility';
-import { GenerationUiProvider } from '@features/generation/react';
+import { clearGenerateModelSwitchConfirmation, GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
 import {
   ensureModelsLoaded,
+  refreshModels,
   getModelBaseColorPalette,
   getModelBaseLabel,
   getModelImageUrl,
+  openModelManager,
   useModelsSelector,
   useOpenModelInManager,
 } from '@features/models';
@@ -29,10 +31,11 @@ import {
 } from '@features/queue/contracts';
 import { createUuid } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
+import { createActionToast } from '@platform/ui/toaster';
 import { type QueryClient, QueryObserver, useQueryClient } from '@tanstack/react-query';
-import { resetGenerateDims } from '@workbench/canvasDimsSync';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   getWorkbenchPreferences,
@@ -40,7 +43,7 @@ import {
   useWorkbenchPreferenceSelector,
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
-import { getProjectWidgetValues } from '@workbench/widgetState';
+import { getProjectWidgetValues, getResolvedProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { lazy, useCallback, useMemo } from 'react';
 
@@ -62,6 +65,22 @@ const RECENT_RUN_WINDOW = 10;
 const SEED_HISTORY_LIMIT = 6;
 
 type GenerationQueueInsights = ReturnType<GenerationUiAdapter['queueInsights']['getSnapshot']>;
+
+/** A removed preset put back at its old position (or last), or null while one with its id is still saved. */
+const reinsertPreset = <Preset extends { id: string }>(
+  presets: readonly Preset[],
+  preset: Preset,
+  index: number
+): Preset[] | null => {
+  if (presets.some((candidate) => candidate.id === preset.id)) {
+    return null;
+  }
+
+  const next = [...presets];
+
+  next.splice(Math.min(Math.max(index, 0), next.length), 0, preset);
+  return next;
+};
 
 const EMPTY_QUEUE_INSIGHTS: GenerationQueueInsights = { secondsPerRun: null, seedHistory: [] };
 
@@ -190,6 +209,20 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     void import('@features/models/react');
   });
   const store = useWorkbenchInternalStore();
+  // A model switch waiting for confirmation belongs to the project it was asked in; leaving that project drops it, so
+  // the dialog never pops up later in another context.
+  useMountEffect(() => {
+    let activeProjectId = store.getSnapshot().activeProject.id;
+
+    return store.subscribe(() => {
+      const next = store.getSnapshot().activeProject.id;
+
+      if (next !== activeProjectId) {
+        activeProjectId = next;
+        clearGenerateModelSwitchConfirmation();
+      }
+    });
+  });
   const generateValues = useMemo(
     () =>
       createProjectedExternalStore({
@@ -243,7 +276,8 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   // The board is read from the project before anything is awaited, so a later change cannot redirect an upload
   // already under way.
   const getUploadBoardId = useCallback<GenerationUiAdapter['gallery']['getUploadBoardId']>(async () => {
-    const galleryValues = getProjectWidgetValues(store.getSnapshot().activeProject, 'gallery');
+    const { activeProject, scopedDefaults } = store.getSnapshot();
+    const galleryValues = getResolvedProjectWidgetValues(activeProject, 'gallery', scopedDefaults);
     const pendingListing = ensureGalleryBoardDestinations(queryClient);
 
     if (pendingListing) {
@@ -269,49 +303,52 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       ModelSelect,
       catalog: modelsCatalog,
       ensureLoaded: ensureModelsLoaded,
+      refresh: () => refreshModels(),
       error: modelsError,
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
       getImageUrl: getModelImageUrl,
       openInModelManager: openInModelManager ?? undefined,
-      // Use hash navigation and lazy filter seeding to keep router/manager code out of initial bundles; set the
-      // filter before navigation.
-      openManager: (options) => {
-        const navigateToManager = () => {
-          window.location.hash = `#/models?project=${encodeURIComponent(project.activeProjectId)}`;
-        };
-        const modelType = options?.modelType;
-
-        if (modelType === undefined) {
-          navigateToManager();
-          return;
-        }
-
-        void import('@features/models/launchpad').then(({ requestAddModelsTypeFilter }) => {
-          requestAddModelsTypeFilter(modelType);
-          navigateToManager();
-        });
-      },
+      openManager: (options) => openModelManager({ modelType: options?.modelType, projectId: project.activeProjectId }),
       status: modelsStatus,
     }),
     [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
-    () => ({ error: notify.error, info: notify.info, reportError: notifications.reportError }),
-    [notifications.reportError, notify.error, notify.info]
+    () => ({
+      error: notify.error,
+      info: notify.info,
+      offer: (title, { actions, message }) =>
+        void createActionToast({
+          actions,
+          description: message,
+          duration: Number.POSITIVE_INFINITY,
+          signal: captureAccountScope().signal,
+          title,
+          type: 'info',
+        }),
+      reportError: notifications.reportError,
+      undoable: notify.undoable,
+    }),
+    [notifications.reportError, notify.error, notify.info, notify.undoable]
   );
   const promptHistoryGroup = useMemo<GenerationUiAdapter['promptHistory']>(
     () => ({
-      clear: () => generation.clearPromptHistory(),
+      clear: generation.clearPromptHistory,
       items: promptHistoryItems,
       remove: generation.removePromptFromHistory,
+      restore: generation.restorePromptHistory,
     }),
     [generation, promptHistoryItems]
   );
   const settingsGroup = useMemo<GenerationUiAdapter['settings']>(
     () => ({
       patchGenerateSettings: generation.patchSettings,
-      resetDimensions: (values, projectId) => resetGenerateDims(store, values, projectId),
+      readGenerateValues: (projectId) => {
+        const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
+
+        return project ? getProjectWidgetValues(project, 'generate') : null;
+      },
     }),
     [generation, store]
   );
@@ -346,6 +383,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
           ),
         });
       },
+      restore: (preset, index) => {
+        const restored = reinsertPreset(getWorkbenchPreferences().krea2RebalancePresets, preset, index);
+
+        if (restored) {
+          void patchWorkbenchPreferences({ krea2RebalancePresets: restored });
+        }
+      },
       save: (label, weights, multiplier) => {
         const preset = { id: createUuid(), label, multiplier, weights };
 
@@ -359,8 +403,12 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     [krea2RebalancePresets]
   );
   const generatePresets = useWorkbenchPreferenceSelector((preferences) => preferences.generatePresets);
+  const generatePresetsIncludePrompts = useWorkbenchPreferenceSelector(
+    (preferences) => preferences.generatePresetsIncludePrompts
+  );
   const presetsGroup = useMemo<GenerationUiAdapter['presets']>(
     () => ({
+      includePrompts: generatePresetsIncludePrompts,
       // Presets are shape-checked in storage and normalized against current models on application.
       presets: generatePresets,
       remove: (presetId) => {
@@ -375,6 +423,13 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
           ),
         });
       },
+      restore: (preset, index) => {
+        const restored = reinsertPreset(getWorkbenchPreferences().generatePresets, preset, index);
+
+        if (restored) {
+          void patchWorkbenchPreferences({ generatePresets: restored });
+        }
+      },
       save: (label, values) => {
         const preset = { id: createUuid(), label, values };
 
@@ -384,8 +439,11 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
 
         return preset;
       },
+      setIncludePrompts: (includePrompts) => {
+        void patchWorkbenchPreferences({ generatePresetsIncludePrompts: includePrompts });
+      },
     }),
-    [generatePresets]
+    [generatePresets, generatePresetsIncludePrompts]
   );
   const generateSectionsOpen = useWorkbenchPreferenceSelector((preferences) => preferences.generateSectionsOpen);
   const sectionPreferencesGroup = useMemo<GenerationUiAdapter['sectionPreferences']>(

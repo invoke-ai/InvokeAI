@@ -70,20 +70,20 @@ export const useQueueItemRecall = (
           : !current && !hasArchitectureCapabilities()
             ? 'widgets.queue.recallUnavailableCapabilities'
             : 'widgets.queue.recallUnavailable';
-        notify.info(getImageRecallTitle(kind), t(reason));
+        notify.info(getImageRecallTitle(kind, t), t(reason));
         return;
       }
 
       if (plan.target === 'video') {
         widgets.patchValues('video', plan.patch);
         openWidget('video', { preferredRegions: ['left'] });
-        notify.success(getImageRecallTitle(kind), t('widgets.queue.settingsRecalledIntoVideoDescription'));
+        notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledIntoVideoDescription'));
         return;
       }
 
       generation.setSettings(plan.values);
       openWidget('generate', { preferredRegions: ['left'] });
-      notify.success(getImageRecallTitle(kind), t('widgets.queue.settingsRecalledDescription'));
+      notify.success(getImageRecallTitle(kind, t), t('widgets.queue.settingsRecalledDescription'));
     },
     [
       generateValues,

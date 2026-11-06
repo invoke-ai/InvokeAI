@@ -17,6 +17,7 @@ from safetensors.torch import save_file
 from transformers import SiglipVisionConfig, SiglipVisionModel
 
 from invokeai.backend.anima.anima_transformer import AnimaTransformer, CosmosAttention, MiniTrainDIT
+from invokeai.backend.anima.checkpoint_layout import ANIMA_TRANSFORMER_CONFIG
 from invokeai.backend.anima.ip_adapter import (
     AnimaIPAdapter,
     AnimaIPAdapterExtension,
@@ -31,10 +32,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.torch_module_autocast import (
     apply_custom_layers_to_model,
 )
-from invokeai.backend.model_manager.load.model_loaders.anima import (
-    ANIMA_TRANSFORMER_CONFIG,
-    AnimaIPAdapterModelLoader,
-)
+from invokeai.backend.model_manager.load.model_loaders.anima import AnimaIPAdapterModelLoader
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_data
 from invokeai.backend.patches.layer_patcher import LayerPatcher
 from invokeai.backend.patches.layers.lora_layer import LoRALayer

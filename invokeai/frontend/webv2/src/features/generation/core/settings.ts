@@ -5,6 +5,7 @@ import type { DynamicPromptsConfig } from './dynamicPrompts';
 import type {
   AspectRatioId,
   ComponentModelConfig,
+  DynamicPromptsSettings,
   GenerateLora,
   GenerateModelConfig,
   GenerateReferenceImage,
@@ -16,6 +17,7 @@ import type {
   Ideogram4SamplerPreset,
   LoraModelConfig,
   MainModelConfig,
+  ModelIdentifierConfig,
   QwenImageEncoderQuantization,
   VaeModelConfig,
   VaePrecision,
@@ -30,7 +32,12 @@ import {
   KREA2_REBALANCE_WEIGHT_COUNT,
 } from './conditioningRebalance';
 import { MAX_DIMENSION, MIN_DIMENSION } from './dimensionLimits';
-import { isDynamicPromptsSeedBehaviour, sanitizeMaxPrompts, sanitizeSampleSeed } from './dynamicPrompts';
+import {
+  DEFAULT_DYNAMIC_PROMPTS_SETTINGS,
+  isDynamicPromptsSeedBehaviour,
+  sanitizeMaxPrompts,
+  sanitizeSampleSeed,
+} from './dynamicPrompts';
 import {
   GEMINI_TEMPERATURE_MAX,
   GEMINI_TEMPERATURE_MIN,
@@ -96,31 +103,62 @@ export const isAspectRatioId = (value: unknown): value is AspectRatioId =>
 export const DIMENSION_GRID = 8;
 
 /** The expansion config the settings describe, under the names the expansion route and preview use. */
-export const getDynamicPromptsConfig = (
-  settings: Pick<
-    GenerateSettings,
-    | 'dynamicPromptsCombinatorial'
-    | 'dynamicPromptsMaxPrompts'
-    | 'dynamicPromptsResample'
-    | 'dynamicPromptsSampleSeed'
-    | 'dynamicPromptsSeedBehaviour'
-  >
-): DynamicPromptsConfig => ({
+export const getDynamicPromptsConfig = (settings: DynamicPromptsSettings): DynamicPromptsConfig => ({
   combinatorial: settings.dynamicPromptsCombinatorial,
+  enabled: settings.dynamicPromptsEnabled,
   maxPrompts: settings.dynamicPromptsMaxPrompts,
   resample: settings.dynamicPromptsResample,
   sampleSeed: settings.dynamicPromptsSampleSeed,
   seedBehaviour: settings.dynamicPromptsSeedBehaviour,
 });
+
+/** The flat settings field behind each dynamic prompts config key. */
+const DYNAMIC_PROMPT_SETTING_KEYS = {
+  combinatorial: 'dynamicPromptsCombinatorial',
+  enabled: 'dynamicPromptsEnabled',
+  maxPrompts: 'dynamicPromptsMaxPrompts',
+  resample: 'dynamicPromptsResample',
+  sampleSeed: 'dynamicPromptsSampleSeed',
+  seedBehaviour: 'dynamicPromptsSeedBehaviour',
+} as const satisfies Record<keyof DynamicPromptsConfig, keyof DynamicPromptsSettings>;
+
+/** A dynamic prompts panel edit, as the settings patch that stores it. */
+export const getDynamicPromptsSettingsPatch = (patch: Partial<DynamicPromptsConfig>): Partial<DynamicPromptsSettings> =>
+  Object.fromEntries(
+    Object.entries(patch).map(([key, value]) => [DYNAMIC_PROMPT_SETTING_KEYS[key as keyof DynamicPromptsConfig], value])
+  );
+
+/** Each field a stored record lacks reads as its default: Generate's unless the surface gives its own. */
+export const normalizeDynamicPromptsSettings = (
+  values: Partial<Record<keyof DynamicPromptsSettings, unknown>>,
+  defaults: Readonly<DynamicPromptsSettings> = DEFAULT_DYNAMIC_PROMPTS_SETTINGS
+): DynamicPromptsSettings => ({
+  dynamicPromptsCombinatorial:
+    typeof values.dynamicPromptsCombinatorial === 'boolean'
+      ? values.dynamicPromptsCombinatorial
+      : defaults.dynamicPromptsCombinatorial,
+  dynamicPromptsEnabled:
+    typeof values.dynamicPromptsEnabled === 'boolean' ? values.dynamicPromptsEnabled : defaults.dynamicPromptsEnabled,
+  dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts, defaults.dynamicPromptsMaxPrompts),
+  dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
+  dynamicPromptsResample:
+    typeof values.dynamicPromptsResample === 'boolean'
+      ? values.dynamicPromptsResample
+      : defaults.dynamicPromptsResample,
+  dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
+    ? values.dynamicPromptsSeedBehaviour
+    : defaults.dynamicPromptsSeedBehaviour,
+});
+
 export const MIN_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MAX_NEGATIVE_PROMPT_HEIGHT_PX = 240;
 export const DEFAULT_NEGATIVE_PROMPT_HEIGHT_PX = 56;
 export const MIN_POSITIVE_PROMPT_HEIGHT_PX = 96;
 export const MAX_POSITIVE_PROMPT_HEIGHT_PX = 360;
 export const DEFAULT_POSITIVE_PROMPT_HEIGHT_PX = 96;
-export const DEFAULT_HIDIFFUSION_T1_RATIO = 0.4;
-export const DEFAULT_HIDIFFUSION_T2_RATIO = 0;
-export const MIN_HIDIFFUSION_T1_RATIO = 0.1;
+export const DEFAULT_HIDIFFUSION_T1_RATIO = null;
+export const DEFAULT_HIDIFFUSION_T2_RATIO = null;
+export const MIN_HIDIFFUSION_T1_RATIO = 0;
 export const MAX_HIDIFFUSION_RATIO = 1;
 /** `anima_lllite.weight` bounds; the picker's track spans 0 to 2 like the legacy slider, typed values the full range. */
 export const DEFAULT_ANIMA_INPAINT_ADAPTER_WEIGHT = 1;
@@ -533,6 +571,19 @@ const areModelSnapshotsEqual = (a: unknown, b: unknown): boolean => {
   }
 };
 
+/**
+ * Whether an installed model is the same file as a saved choice that is no longer installed: a reinstall gives the
+ * file a new key but keeps its hash. Type, base and (where the saved choice names one) variant must agree as well, so
+ * a file registered differently is not taken for it.
+ */
+export const isSameModelFile = (candidate: ModelIdentifierConfig, saved: ModelIdentifierConfig): boolean =>
+  Boolean(saved.hash) &&
+  candidate.hash === saved.hash &&
+  candidate.type === saved.type &&
+  candidate.base === saved.base &&
+  (saved.variant === undefined || saved.variant === null || candidate.variant === saved.variant);
+
+/** Refreshes each concept from the catalog, finding a reinstalled LoRA again by its file hash. */
 export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: readonly unknown[]): GenerateLora[] => {
   const modelsByKey = new Map<string, LoraModelConfig>();
 
@@ -542,9 +593,23 @@ export const syncGenerateLorasWithModels = (loras: GenerateLora[], models: reado
     }
   }
 
+  // Keys the list holds, and keys a rematch in this pass has given out: two removed concepts with the same file must
+  // not both become the one reinstalled concept.
+  const claimedKeys = new Set(loras.map((lora) => lora.model.key));
+  const findReinstalled = (saved: LoraModelConfig): LoraModelConfig | undefined => {
+    for (const model of modelsByKey.values()) {
+      if (isSameModelFile(model, saved) && !claimedKeys.has(model.key)) {
+        claimedKeys.add(model.key);
+        return model;
+      }
+    }
+
+    return undefined;
+  };
+
   let didSync = false;
   const syncedLoras = loras.map((lora) => {
-    const currentModel = modelsByKey.get(lora.model.key);
+    const currentModel = modelsByKey.get(lora.model.key) ?? findReinstalled(lora.model);
 
     if (!currentModel || areModelSnapshotsEqual(currentModel, lora.model)) {
       return lora;
@@ -776,6 +841,25 @@ export const GENERATE_TOOL_MODEL_PICK_KEYS = [
   'imageToPromptModelKey',
 ] as const satisfies readonly (keyof GenerateSettings)[];
 
+/**
+ * What reverts `after` back to `before`: the earlier value of every key the change touched, the model included. Keys
+ * the change left alone stay out, so an Undo keeps edits made since (a prompt typed after a model switch). Batch count
+ * belongs to the top bar and is never reverted.
+ */
+export const getGenerateValuesRevertPatch = (before: object, after: object): Record<string, unknown> => {
+  const patch: Record<string, unknown> = {};
+  const beforeValues = before as Readonly<Record<string, unknown>>;
+  const afterValues = after as Readonly<Record<string, unknown>>;
+
+  for (const key of new Set([...Object.keys(beforeValues), ...Object.keys(afterValues)])) {
+    if (key !== 'batchCount' && !areJsonValuesStructurallyEqual(beforeValues[key], afterValues[key])) {
+      patch[key] = beforeValues[key];
+    }
+  }
+
+  return patch;
+};
+
 /** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
 export const GENERATE_UI_STATE_KEYS = {
   aspectRatioIsLocked: true,
@@ -806,6 +890,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
     return null;
   }
 
+  const manualHiDiffusion =
+    hasFiniteNumber(values, 'hiDiffusionT1Ratio') || hasFiniteNumber(values, 'hiDiffusionT2Ratio');
   const width = values.width as number;
   const height = values.height as number;
 
@@ -832,28 +918,33 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       typeof values.hiDiffusionRauNetEnabled === 'boolean' ? values.hiDiffusionRauNetEnabled : true,
     hiDiffusionWindowAttentionEnabled:
       typeof values.hiDiffusionWindowAttentionEnabled === 'boolean' ? values.hiDiffusionWindowAttentionEnabled : true,
-    hiDiffusionT1Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT1Ratio',
-      MIN_HIDIFFUSION_T1_RATIO,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T1_RATIO
-    ),
-    hiDiffusionT2Ratio: getClampedNumber(
-      values,
-      'hiDiffusionT2Ratio',
-      0,
-      MAX_HIDIFFUSION_RATIO,
-      DEFAULT_HIDIFFUSION_T2_RATIO
-    ),
-    dynamicPromptsCombinatorial:
-      typeof values.dynamicPromptsCombinatorial === 'boolean' ? values.dynamicPromptsCombinatorial : true,
-    dynamicPromptsMaxPrompts: sanitizeMaxPrompts(values.dynamicPromptsMaxPrompts),
-    dynamicPromptsSampleSeed: sanitizeSampleSeed(values.dynamicPromptsSampleSeed),
-    dynamicPromptsResample: typeof values.dynamicPromptsResample === 'boolean' ? values.dynamicPromptsResample : true,
-    dynamicPromptsSeedBehaviour: isDynamicPromptsSeedBehaviour(values.dynamicPromptsSeedBehaviour)
-      ? values.dynamicPromptsSeedBehaviour
-      : 'per-iteration',
+    ...(Object.hasOwn(values, 'hiDiffusionManualRatios')
+      ? {
+          hiDiffusionManualRatios: {
+            t1: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't1',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0.4
+            ),
+            t2: getClampedNumber(
+              isRecord(values.hiDiffusionManualRatios) ? values.hiDiffusionManualRatios : {},
+              't2',
+              0,
+              MAX_HIDIFFUSION_RATIO,
+              0
+            ),
+          },
+        }
+      : {}),
+    hiDiffusionT1Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT1Ratio', MIN_HIDIFFUSION_T1_RATIO, MAX_HIDIFFUSION_RATIO, 0),
+    hiDiffusionT2Ratio: !manualHiDiffusion
+      ? null
+      : getClampedNumber(values, 'hiDiffusionT2Ratio', 0, MAX_HIDIFFUSION_RATIO, 0),
+    ...normalizeDynamicPromptsSettings(values),
     height,
     loras: Array.isArray(values.loras) ? values.loras.filter(isGenerateLora) : [],
     modelKey: values.modelKey as string,

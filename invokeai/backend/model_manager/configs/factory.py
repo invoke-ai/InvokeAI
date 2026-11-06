@@ -44,7 +44,10 @@ from invokeai.backend.model_manager.configs.gemma2_encoder import (
     Gemma2Encoder_Gemma2Encoder_Config,
     Gemma2Encoder_GGUF_Config,
 )
-from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.gemma4_encoder import (
+    Gemma4Encoder_Gemma4Encoder_LTX2_Config,
+    Gemma4Encoder_GGUF_LTX2_Config,
+)
 from invokeai.backend.model_manager.configs.identification_utils import InvalidMatchError, NotAMatchError
 from invokeai.backend.model_manager.configs.ip_adapter import (
     IPAdapter_Checkpoint_Anima_Config,
@@ -60,6 +63,7 @@ from invokeai.backend.model_manager.configs.llava_onevision import LlavaOnevisio
 from invokeai.backend.model_manager.configs.lora import (
     ControlLoRA_LyCORIS_FLUX_Config,
     LoRA_Diffusers_Flux2_Config,
+    LoRA_Diffusers_Flux3_Config,
     LoRA_Diffusers_FLUX_Config,
     LoRA_Diffusers_SD1_Config,
     LoRA_Diffusers_SD2_Config,
@@ -67,10 +71,12 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_Diffusers_ZImage_Config,
     LoRA_LyCORIS_Anima_Config,
     LoRA_LyCORIS_Flux2_Config,
+    LoRA_LyCORIS_Flux3_Config,
     LoRA_LyCORIS_FLUX_Config,
     LoRA_LyCORIS_Krea2_Config,
     LoRA_LyCORIS_LTX2_Config,
     LoRA_LyCORIS_MiniMaxH3_Config,
+    LoRA_LyCORIS_QwenImage21_Config,
     LoRA_LyCORIS_QwenImage_Config,
     LoRA_LyCORIS_SD1_Config,
     LoRA_LyCORIS_SD2_Config,
@@ -87,6 +93,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Anima_Config,
     Main_Checkpoint_ErnieImage_Config,
     Main_Checkpoint_Flux2_Config,
+    Main_Checkpoint_Flux3_Config,
     Main_Checkpoint_FLUX_Config,
     Main_Checkpoint_Ideogram4_Config,
     Main_Checkpoint_Krea2_Config,
@@ -104,6 +111,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_CogView4_Config,
     Main_Diffusers_ErnieImage_Config,
     Main_Diffusers_Flux2_Config,
+    Main_Diffusers_Flux3_Config,
     Main_Diffusers_FLUX_Config,
     Main_Diffusers_Ideogram4_Config,
     Main_Diffusers_Krea2_Config,
@@ -119,11 +127,15 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Diffusers_SDXLRefiner_Config,
     Main_Diffusers_Wan_Config,
     Main_Diffusers_ZImage_Config,
+    Main_GGUF_Anima_Config,
     Main_GGUF_ErnieImage_Config,
     Main_GGUF_Flux2_Config,
+    Main_GGUF_Flux3_Config,
     Main_GGUF_FLUX_Config,
     Main_GGUF_Ideogram4_Config,
     Main_GGUF_Krea2_Config,
+    Main_GGUF_LTX2_Config,
+    Main_GGUF_MossImage_Config,
     Main_GGUF_QwenImage21_Config,
     Main_GGUF_QwenImage_Config,
     Main_GGUF_Wan_Config,
@@ -173,11 +185,12 @@ from invokeai.backend.model_manager.configs.t2i_adapter import (
 )
 from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_BnBLLMint8_Config,
+    T5Encoder_Checkpoint_Config,
     T5Encoder_GGUF_Config,
     T5Encoder_SDNQ_Config,
     T5Encoder_T5Encoder_Config,
 )
-from invokeai.backend.model_manager.configs.text_llm import TextLLM_Diffusers_Config
+from invokeai.backend.model_manager.configs.text_llm import TextLLM_Checkpoint_Config, TextLLM_Diffusers_Config
 from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_File_SD1_Config,
     TI_File_SD2_Config,
@@ -185,6 +198,14 @@ from invokeai.backend.model_manager.configs.textual_inversion import (
     TI_Folder_SD1_Config,
     TI_Folder_SD2_Config,
     TI_Folder_SDXL_Config,
+)
+from invokeai.backend.model_manager.configs.tiny_autoencoder import (
+    TinyAutoencoder_Checkpoint_Flux2_Config,
+    TinyAutoencoder_Checkpoint_FLUX_Config,
+    TinyAutoencoder_Checkpoint_QwenImage21_Config,
+    TinyAutoencoder_Checkpoint_SD1_Config,
+    TinyAutoencoder_Checkpoint_SD3_Config,
+    TinyAutoencoder_Checkpoint_SDXL_Config,
 )
 from invokeai.backend.model_manager.configs.unknown import Unknown_Config
 from invokeai.backend.model_manager.configs.vae import (
@@ -215,7 +236,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     variant_type_adapter,
 )
-from invokeai.backend.quantization.gguf.loaders import parse_q8_cr_markers
+from invokeai.backend.quantization.gguf.loaders import COMFY_QUANT_KEY_PREFIX, parse_gguf_convrot_markers
 
 logger = logging.getLogger(__name__)
 
@@ -315,8 +336,9 @@ def _identified_default_settings(
 
 app_config = get_config()
 
-# Known model file extensions for sanity checking
-_MODEL_EXTENSIONS = {
+#: The suffixes of the files the factory identifies as single-file models, and looks for in a folder without a
+#: recognized model config.
+SINGLE_FILE_MODEL_SUFFIXES = {
     ".safetensors",
     ".ckpt",
     ".pt",
@@ -359,6 +381,7 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
     """Return whether a root config names a class/model type provided by our model libraries."""
     import diffusers
     import transformers
+    from diffusers import ModularPipeline
     from diffusers.models.modeling_utils import ModelMixin
     from diffusers.pipelines.pipeline_utils import DiffusionPipeline
     from transformers import PretrainedConfig, PreTrainedModel
@@ -381,8 +404,9 @@ def _is_known_model_marker(config_name: str, config: Any) -> bool:
     if config_name in ("model_index.json", "modular_model_index.json"):
         class_name = config.get("_class_name")
         # Non-str _class_name (e.g. a list) must read as "not a marker", not TypeError on the set lookup.
+        # A modular_model_index.json names a ModularPipeline, which does not derive from DiffusionPipeline.
         return (isinstance(class_name, str) and class_name in _PINNED_MODEL_CLASS_MARKERS) or has_model_export(
-            diffusers, class_name, (DiffusionPipeline,)
+            diffusers, class_name, (DiffusionPipeline, ModularPipeline)
         )
 
     class_name = config.get("_class_name")
@@ -421,6 +445,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Diffusers_ErnieImage_Config, Main_Diffusers_ErnieImage_Config.get_tag()],
         Annotated[Main_Diffusers_Ideogram4_Config, Main_Diffusers_Ideogram4_Config.get_tag()],
         Annotated[Main_Diffusers_Krea2_Config, Main_Diffusers_Krea2_Config.get_tag()],
+        Annotated[Main_Diffusers_Flux3_Config, Main_Diffusers_Flux3_Config.get_tag()],
         Annotated[Main_Diffusers_MiniMaxH3_Config, Main_Diffusers_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Diffusers_LTX2_Config, Main_Diffusers_LTX2_Config.get_tag()],
         Annotated[Main_Diffusers_MossImage_Config, Main_Diffusers_MossImage_Config.get_tag()],
@@ -440,6 +465,7 @@ AnyModelConfig = Annotated[
         Annotated[Main_Checkpoint_ErnieImage_Config, Main_Checkpoint_ErnieImage_Config.get_tag()],
         Annotated[Main_Checkpoint_Ideogram4_Config, Main_Checkpoint_Ideogram4_Config.get_tag()],
         Annotated[Main_Checkpoint_Krea2_Config, Main_Checkpoint_Krea2_Config.get_tag()],
+        Annotated[Main_Checkpoint_Flux3_Config, Main_Checkpoint_Flux3_Config.get_tag()],
         Annotated[Main_Checkpoint_Anima_Config, Main_Checkpoint_Anima_Config.get_tag()],
         Annotated[Main_Checkpoint_MiniMaxH3_Config, Main_Checkpoint_MiniMaxH3_Config.get_tag()],
         Annotated[Main_Checkpoint_LTX2_Config, Main_Checkpoint_LTX2_Config.get_tag()],
@@ -455,8 +481,12 @@ AnyModelConfig = Annotated[
         Annotated[Main_GGUF_Wan_Config, Main_GGUF_Wan_Config.get_tag()],
         Annotated[Main_GGUF_ZImage_Config, Main_GGUF_ZImage_Config.get_tag()],
         Annotated[Main_GGUF_Krea2_Config, Main_GGUF_Krea2_Config.get_tag()],
+        Annotated[Main_GGUF_Flux3_Config, Main_GGUF_Flux3_Config.get_tag()],
         Annotated[Main_GGUF_Ideogram4_Config, Main_GGUF_Ideogram4_Config.get_tag()],
         Annotated[Main_GGUF_ErnieImage_Config, Main_GGUF_ErnieImage_Config.get_tag()],
+        Annotated[Main_GGUF_LTX2_Config, Main_GGUF_LTX2_Config.get_tag()],
+        Annotated[Main_GGUF_MossImage_Config, Main_GGUF_MossImage_Config.get_tag()],
+        Annotated[Main_GGUF_Anima_Config, Main_GGUF_Anima_Config.get_tag()],
         # IMPORTANT: FLUX.2 must be listed BEFORE FLUX.1 here. An ambiguous SDNQ transformer
         # checkpoint (prefixed FLUX.2 keys) can look like a FLUX.1 main model, so FLUX.2 must get
         # first refusal. Main_SDNQ_FLUX_Config additionally rejects FLUX.2 state dicts to keep the
@@ -495,6 +525,15 @@ AnyModelConfig = Annotated[
         Annotated[PiDDecoder_Checkpoint_SD3_Config, PiDDecoder_Checkpoint_SD3_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_SDXL_Config, PiDDecoder_Checkpoint_SDXL_Config.get_tag()],
         Annotated[PiDDecoder_Checkpoint_QwenImage_Config, PiDDecoder_Checkpoint_QwenImage_Config.get_tag()],
+        # Tiny AutoEncoder (denoise preview decoder) - checkpoint format
+        Annotated[TinyAutoencoder_Checkpoint_SD1_Config, TinyAutoencoder_Checkpoint_SD1_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_SDXL_Config, TinyAutoencoder_Checkpoint_SDXL_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_SD3_Config, TinyAutoencoder_Checkpoint_SD3_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_FLUX_Config, TinyAutoencoder_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[TinyAutoencoder_Checkpoint_Flux2_Config, TinyAutoencoder_Checkpoint_Flux2_Config.get_tag()],
+        Annotated[
+            TinyAutoencoder_Checkpoint_QwenImage21_Config, TinyAutoencoder_Checkpoint_QwenImage21_Config.get_tag()
+        ],
         # ControlNet - checkpoint format
         Annotated[ControlNet_Checkpoint_SD1_Config, ControlNet_Checkpoint_SD1_Config.get_tag()],
         Annotated[ControlNet_Checkpoint_SD2_Config, ControlNet_Checkpoint_SD2_Config.get_tag()],
@@ -520,6 +559,10 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_LyCORIS_ZImage_Config, LoRA_LyCORIS_ZImage_Config.get_tag()],
         Annotated[LoRA_LyCORIS_Krea2_Config, LoRA_LyCORIS_Krea2_Config.get_tag()],
         Annotated[LoRA_LyCORIS_QwenImage_Config, LoRA_LyCORIS_QwenImage_Config.get_tag()],
+        Annotated[LoRA_LyCORIS_QwenImage21_Config, LoRA_LyCORIS_QwenImage21_Config.get_tag()],
+        # FLUX.3 names modules FLUX.1/FLUX.2 lack; `flux_format_from_state_dict` keeps their probes off its files
+        # (locked in by ``test_flux3_lora_probe_independence.py``).
+        Annotated[LoRA_LyCORIS_Flux3_Config, LoRA_LyCORIS_Flux3_Config.get_tag()],
         # MiniMax H3 keys on H3-exclusive submodules (fused ``attn.qkv_proj``,
         # ``adaln_proj.linear``) and rejects other architectures' signatures, so it
         # is mutually exclusive with Wan/Anima regardless of order (locked in by
@@ -545,6 +588,7 @@ AnyModelConfig = Annotated[
         Annotated[LoRA_Diffusers_SDXL_Config, LoRA_Diffusers_SDXL_Config.get_tag()],
         Annotated[LoRA_Diffusers_Flux2_Config, LoRA_Diffusers_Flux2_Config.get_tag()],
         Annotated[LoRA_Diffusers_FLUX_Config, LoRA_Diffusers_FLUX_Config.get_tag()],
+        Annotated[LoRA_Diffusers_Flux3_Config, LoRA_Diffusers_Flux3_Config.get_tag()],
         Annotated[LoRA_Diffusers_ZImage_Config, LoRA_Diffusers_ZImage_Config.get_tag()],
         # ControlLoRA - diffusers format
         Annotated[ControlLoRA_LyCORIS_FLUX_Config, ControlLoRA_LyCORIS_FLUX_Config.get_tag()],
@@ -553,6 +597,7 @@ AnyModelConfig = Annotated[
         Annotated[T5Encoder_BnBLLMint8_Config, T5Encoder_BnBLLMint8_Config.get_tag()],
         Annotated[T5Encoder_SDNQ_Config, T5Encoder_SDNQ_Config.get_tag()],
         Annotated[T5Encoder_GGUF_Config, T5Encoder_GGUF_Config.get_tag()],
+        Annotated[T5Encoder_Checkpoint_Config, T5Encoder_Checkpoint_Config.get_tag()],
         # Qwen3-VL Encoder (Qwen3-VL multimodal encoder for Krea-2) - checked BEFORE the text-only Qwen3
         # encoder so single-file VL checkpoints (which also carry generic model.layers.* keys) are not
         # misclassified as the Z-Image Qwen3 encoder. The VL probe requires the visual tower.
@@ -583,6 +628,7 @@ AnyModelConfig = Annotated[
         # Gemma 2 Encoder (used by PiD)
         Annotated[Gemma2Encoder_Gemma2Encoder_Config, Gemma2Encoder_Gemma2Encoder_Config.get_tag()],
         Annotated[Gemma4Encoder_Gemma4Encoder_LTX2_Config, Gemma4Encoder_Gemma4Encoder_LTX2_Config.get_tag()],
+        Annotated[Gemma4Encoder_GGUF_LTX2_Config, Gemma4Encoder_GGUF_LTX2_Config.get_tag()],
         Annotated[Gemma2Encoder_GGUF_Config, Gemma2Encoder_GGUF_Config.get_tag()],
         # Qwen VL Encoder (Qwen2.5-VL multimodal encoder for Qwen Image)
         Annotated[QwenVLEncoder_Diffusers_Config, QwenVLEncoder_Diffusers_Config.get_tag()],
@@ -622,6 +668,7 @@ AnyModelConfig = Annotated[
         Annotated[LTX2DurationHead_Checkpoint_Config, LTX2DurationHead_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
         Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
+        Annotated[TextLLM_Checkpoint_Config, TextLLM_Checkpoint_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],
         # Unknown model (fallback)
         Annotated[Unknown_Config, Unknown_Config.get_tag()],
@@ -702,13 +749,28 @@ class ModelConfigFactory:
         """
         if getattr(config, "format", None) is not ModelFormat.GGUFQuantized:
             return
+        metadata = mod.metadata()
+        decodes = type(config).DECODES_GGUF_CONVROT
+        if not decodes:
+            # Nothing this config's loader runs decodes any of the converter's schemes, so whatever its
+            # JSON says is beside the point -- parsing it first would report a detail of the scheme (a
+            # marker on a tensor that is not a weight, say) in place of the reason the file is refused.
+            if any(key.startswith(COMFY_QUANT_KEY_PREFIX) for key in metadata):
+                raise InvalidMatchError(
+                    f"{mod.path.name} uses ComfyUI-GGUF's own quantization (Q8_CR, Q4_CR or similar), which this "
+                    "model type cannot load yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
+                )
+            return
         try:
-            markers = parse_q8_cr_markers(mod.metadata(), mod.path.name)
+            markers = parse_gguf_convrot_markers(metadata, mod.path.name)
         except ValueError as e:
             raise InvalidMatchError(str(e)) from None
-        if markers and not type(config).DECODES_GGUF_Q8_CR:
+        undecodable = sorted({m["format"] for m in markers.values()} - decodes)
+        if undecodable:
+            names = {"int8_tensorwise": "Q8_CR", "int4_tensorwise": "Q4_CR"}
+            kinds = " and ".join(names.get(fmt, fmt) for fmt in undecodable)
             raise InvalidMatchError(
-                f"{mod.path.name} is a ComfyUI-GGUF Q8_CR (int8 convrot) file, which this model type cannot load "
+                f"{mod.path.name} is a ComfyUI-GGUF convrot ({kinds}) file, which this model type cannot load "
                 "yet. Use a GGML-quantized (Q8_0, Q4_K, ...) or safetensors build instead."
             )
 
@@ -785,10 +847,10 @@ class ModelConfigFactory:
         """
         if path.is_file():
             # For files, just check the extension
-            if path.suffix.lower() not in _MODEL_EXTENSIONS:
+            if path.suffix.lower() not in SINGLE_FILE_MODEL_SUFFIXES:
                 raise ValueError(
                     f"File extension {path.suffix} is not a recognized model format. "
-                    f"Expected one of: {', '.join(sorted(_MODEL_EXTENSIONS))}"
+                    f"Expected one of: {', '.join(sorted(SINGLE_FILE_MODEL_SUFFIXES))}"
                 )
         else:
             # Recognized Diffusers/Transformers configs are safe model markers. A generic config.json
@@ -835,7 +897,7 @@ class ModelConfigFactory:
                     return False
                 try:
                     for item in current_path.iterdir():
-                        if item.is_file() and item.suffix.lower() in _MODEL_EXTENSIONS:
+                        if item.is_file() and item.suffix.lower() in SINGLE_FILE_MODEL_SUFFIXES:
                             return True
                         elif item.is_dir() and find_model_files(item, depth + 1):
                             return True
@@ -846,7 +908,7 @@ class ModelConfigFactory:
             if not find_model_files(path, 0):
                 raise ValueError(
                     f"No model files or config files found in directory {path}. "
-                    f"Expected to find model files with extensions: {', '.join(sorted(_MODEL_EXTENSIONS))} "
+                    f"Expected to find model files with extensions: {', '.join(sorted(SINGLE_FILE_MODEL_SUFFIXES))} "
                     f"or config files: {', '.join(sorted(_CONFIG_FILES))}"
                 )
 

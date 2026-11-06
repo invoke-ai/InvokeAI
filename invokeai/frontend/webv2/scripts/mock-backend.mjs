@@ -14,6 +14,7 @@ import {
   MOCK_BACKEND_FIXED_EPOCH,
   MODEL_SEED_SETS,
 } from './mock-backend-fixtures.mjs';
+import { createWorkingMemoryMock, WORKING_MEMORY_SCENARIOS } from './mock-working-memory.mjs';
 
 /** The canvas schema every mock project declares; the real server keeps the same floor per record. */
 const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
@@ -86,6 +87,10 @@ const ARCHITECTURE_CAPABILITIES = JSON.parse(
  * already false). Like the real service, Start Move is refused while any queue item is pending or in progress (the
  * representative profile seeds some; clear the queue first). While a move runs or a job awaits recovery, image files,
  * media mutations and enqueueing answer 409 like the real maintenance guard; listings stay readable.
+ * `workingMemory` selects a calibration device scenario, and `stoppedCalibration: <main model key>` gives that model an
+ * attempt Stop aborted, `runningCalibration: <main model key>` one still running, which holds the GPU,
+ * `modelChangedCalibration: <main model key>` one whose steps failed for a changed model (see
+ * mock-working-memory.mjs).
  */
 const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
 const INTERMEDIATES_CALLERS = new Set(['admin', 'user', 'multiuser-admin']);
@@ -97,7 +102,12 @@ const IMAGE_STORAGE_LAYOUTS = new Set(['flat', 'date', 'type', 'hash']);
 /** Status reads a running move or recovery takes to finish, so polling clients observe it in progress. */
 const IMAGE_MOVE_TICKS = 2;
 
-const createFaults = () => ({ capabilities: 'ok', imageMoves: 'idle', intermediatesCaller: 'admin' });
+const createFaults = () => ({
+  capabilities: 'ok',
+  imageMoves: 'idle',
+  intermediatesCaller: 'admin',
+  workingMemory: 'ok',
+});
 
 /**
  * Every fixture image is stored flat, so the move count is the whole library whenever the configured layout
@@ -449,8 +459,10 @@ const sortedWildcards = (state) =>
 const wildcardNameTaken = (state, name, exceptId = null) =>
   [...state.wildcards.values()].some((wildcard) => wildcard.name === name && wildcard.id !== exceptId);
 
-const createState = (profile) => {
+/** `clock` is the working-memory mock's time source (see mock-working-memory.mjs). */
+const createState = (profile, clock) => {
   const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
+  const models = new Map(fixture.models.map((model) => [model.key, clone(model)]));
 
   return {
     boardMembers: new Map(),
@@ -465,7 +477,7 @@ const createState = (profile) => {
     externalProviders: createExternalProviderConfigs(fixture.models),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     imageStorage: createImageStorage(),
-    models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    models,
     /** What re-identify fills in per model key; only `POST /__models` seeds entries. */
     modelProbes: new Map(),
     mutationClock: 0,
@@ -487,6 +499,7 @@ const createState = (profile) => {
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     wildcards: createWildcards(profile === 'empty' ? 0 : SEEDED_WILDCARD_NAMES.length),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
+    workingMemory: createWorkingMemoryMock(fixture.models, { clock, currentModel: (key) => models.get(key) }),
     nextWorkflowNumber: fixture.workflows.length + 1,
     /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
     workflowThumbnails: new Map(),
@@ -1148,9 +1161,9 @@ const parseByteRange = (value, size) => {
     : null;
 };
 
-export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
+export const startMockBackend = async (port, { clock = Date.now, profile = 'empty' } = {}) => {
   const initialProfile = assertMockBackendProfileName(profile);
-  let state = createState(initialProfile);
+  let state = createState(initialProfile, clock);
   let faults = createFaults();
 
   const server = createServer(async (request, response) => {
@@ -1169,7 +1182,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         const requestedProfile = url.searchParams.get('profile') ?? body.profile ?? initialProfile;
 
         try {
-          state = createState(assertMockBackendProfileName(requestedProfile));
+          state = createState(assertMockBackendProfileName(requestedProfile), clock);
         } catch (error) {
           return json(400, { detail: error instanceof Error ? error.message : String(error) });
         }
@@ -1230,6 +1243,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           const body = await readJsonBody(request);
           const requested = url.searchParams.get('capabilities') ?? body.capabilities;
           const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
+          const workingMemory = url.searchParams.get('workingMemory') ?? body.workingMemory;
           const imageMoves = url.searchParams.get('imageMoves') ?? body.imageMoves;
 
           if (body.sharedBoards === true && !state.boards.has(SHARED_BOARD_FIXTURES[0].board_id)) {
@@ -1250,6 +1264,35 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             }
 
             faults.intermediatesCaller = caller;
+          }
+
+          if (workingMemory !== undefined && workingMemory !== null) {
+            if (!WORKING_MEMORY_SCENARIOS.has(workingMemory)) {
+              return json(400, { detail: `Unknown working-memory scenario: ${String(workingMemory)}` });
+            }
+
+            faults.workingMemory = workingMemory;
+          }
+
+          if (
+            body.modelChangedCalibration !== undefined &&
+            !state.workingMemory.seedModelChanged(body.modelChangedCalibration)
+          ) {
+            return json(400, {
+              detail: `No main model to seed a changed-model calibration on: ${String(body.modelChangedCalibration)}`,
+            });
+          }
+
+          if (body.runningCalibration !== undefined && !state.workingMemory.seedRunning(body.runningCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a running calibration on: ${String(body.runningCalibration)}`,
+            });
+          }
+
+          if (body.stoppedCalibration !== undefined && !state.workingMemory.seedStopped(body.stoppedCalibration)) {
+            return json(400, {
+              detail: `No main model to seed a stopped calibration on: ${String(body.stoppedCalibration)}`,
+            });
           }
 
           if (imageMoves !== undefined && imageMoves !== null) {
@@ -2054,6 +2097,23 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
 
           return json(200, { item_ids: returned, total_count: returned.length });
         }
+        if (action === 'cancel_all' && method === 'PUT') {
+          const originPrefix = url.searchParams.get('origin_prefix');
+
+          // Calibration items live with the working-memory mock; see mock-working-memory.mjs.
+          if (originPrefix !== null && state.workingMemory.isCalibrationPrefix(originPrefix)) {
+            return json(200, { canceled: state.workingMemory.cancelByOrigin(originPrefix) });
+          }
+
+          let canceled = 0;
+          for (const item of scopedItems) {
+            if (item.status === 'pending' || item.status === 'in_progress') {
+              item.status = 'canceled';
+              canceled += 1;
+            }
+          }
+          return json(200, { canceled });
+        }
         if (action === 'clear' && method === 'PUT') {
           state.queueItems.clear();
           return json(200, { deleted: true });
@@ -2135,6 +2195,15 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         }
 
         return json(200, null);
+      }
+
+      if (path.startsWith('/api/v2/models/') && path.includes('working_memory')) {
+        const body = method === 'POST' ? await readJsonBody(request) : null;
+        const answer = state.workingMemory.handle({ body, method, path, scenario: faults.workingMemory });
+
+        if (answer) {
+          return json(answer.status, answer.body);
+        }
       }
 
       if (method === 'GET' && path === '/api/v2/models/stats') {

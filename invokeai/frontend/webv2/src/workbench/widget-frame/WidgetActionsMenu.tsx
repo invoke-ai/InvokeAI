@@ -12,6 +12,7 @@ import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { toaster } from '@platform/ui/toaster';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { createGraphBearingSurface } from '@workbench/graphSurfaces';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -107,6 +108,7 @@ export const WidgetActionsMenu = ({
   // Keep the host until exit transition completion to avoid abrupt dialog removal.
   const [isPreviewMounted, setIsPreviewMounted] = useState(false);
   const label = resolveWidgetLabel(manifest, t);
+  const triggerIds = useTooltipTriggerIds();
   const surface = useMemo(
     () =>
       manifest.graphBearing?.surfaces.includes(region) ? createGraphBearingSurface(manifest, region, label) : null,
@@ -139,12 +141,14 @@ export const WidgetActionsMenu = ({
 
   return (
     <>
-      <Menu.Root positioning={MENU_POSITIONING}>
-        <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.actionsLabel', { label })} color="fg.muted" size="sm" variant="ghost">
-            <MoreHorizontalIcon />
-          </IconButton>
-        </Menu.Trigger>
+      <Menu.Root ids={triggerIds} positioning={MENU_POSITIONING}>
+        <Tooltip content={t('widgets.actionsLabel', { label })} ids={triggerIds}>
+          <Menu.Trigger asChild>
+            <IconButton aria-label={t('widgets.actionsLabel', { label })} color="fg.muted" size="sm" variant="ghost">
+              <MoreHorizontalIcon />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
         <Portal>
           <Menu.Positioner>
             <MenuContent minW="13rem">

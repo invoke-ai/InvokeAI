@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomConv2d,
 )
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_dequantizing_linear import (
+    CustomInt4ConvrotLinear,
     CustomInt8ConvrotLinear,
     CustomNVFP4Linear,
 )
@@ -36,7 +37,7 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
     CustomModuleMixin,
 )
 from invokeai.backend.quantization.bnb_import import record_bnb_import_failure
-from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.quantization.int8_convrot import Int4ConvrotLinear, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
@@ -49,6 +50,7 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     FluxRMSNorm: CustomFluxRMSNorm,
     DiffusersRMSNorm: CustomDiffusersRMSNorm,
     Int8ConvrotLinear: CustomInt8ConvrotLinear,
+    Int4ConvrotLinear: CustomInt4ConvrotLinear,
     NVFP4Linear: CustomNVFP4Linear,
 }
 
