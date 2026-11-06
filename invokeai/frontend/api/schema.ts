@@ -12187,14 +12187,20 @@ export type components = {
              */
             hidiffusion_window_attn?: boolean;
             /**
+             * HiDiffusion: Automatic Ratios
+             * @description Use model- and resolution-specific presets for both HiDiffusion ratios
+             * @default false
+             */
+            hidiffusion_auto_ratios?: boolean;
+            /**
              * HiDiffusion: T1 Ratio
-             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
              * @default 0.4
              */
             hidiffusion_t1_ratio?: number;
             /**
              * HiDiffusion: T2 Ratio
-             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
              * @default 0
              */
             hidiffusion_t2_ratio?: number;
@@ -12335,14 +12341,20 @@ export type components = {
              */
             hidiffusion_window_attn?: boolean;
             /**
+             * HiDiffusion: Automatic Ratios
+             * @description Use model- and resolution-specific presets for both HiDiffusion ratios
+             * @default false
+             */
+            hidiffusion_auto_ratios?: boolean;
+            /**
              * HiDiffusion: T1 Ratio
-             * @description Override HiDiffusion early switch threshold (T1 ratio)
+             * @description Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.
              * @default 0.4
              */
             hidiffusion_t1_ratio?: number;
             /**
              * HiDiffusion: T2 Ratio
-             * @description Override HiDiffusion late switch threshold (T2 ratio)
+             * @description Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.
              * @default 0
              */
             hidiffusion_t2_ratio?: number;
@@ -50611,8 +50623,8 @@ export type components = {
          *     The layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3
          *     prompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file
          *     carries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,
-         *     which exist for the 9B. Its LM head sets it apart from the Qwen3.5 text-encoder exports, which have none and
-         *     are `Qwen35Encoder_Checkpoint_Config`'s.
+         *     which exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are
+         *     `Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source.
          */
         TextLLM_Checkpoint_Config: {
             /**

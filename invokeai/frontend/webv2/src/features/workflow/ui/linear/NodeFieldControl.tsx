@@ -8,6 +8,11 @@ import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldIn
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  areHiDiffusionRatiosAutomatic,
+  getHiDiffusionRatioOrderIssue,
+  getHiDiffusionRatioTemplate,
+  isHiDiffusionNode,
+  isHiDiffusionRatioField,
   applyNodeFieldFormSettings,
   cloneWorkflowFieldDefault,
   getEffectiveWorkflowFieldDescription,
@@ -75,14 +80,27 @@ export const NodeFieldControl = ({
   // Seed focused label drafts from displayed text, including template fallback.
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
 
-  const isConnected = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges).some(
-    (edge) => edge.target === nodeId && edge.targetHandle === fieldName
-  );
+  const resolvedEdges = getResolvedWorkflowEdges(projectGraph.nodes, projectGraph.edges);
+  const isConnected = resolvedEdges.some((edge) => edge.target === nodeId && edge.targetHandle === fieldName);
   const label = instance?.label || template?.title || '';
   const description = getEffectiveWorkflowFieldDescription(instance, template);
-  const invalidReason = effectiveTemplate
-    ? getWorkflowFieldInvalidReason({ isConnected, template: effectiveTemplate, value: instance?.value })
-    : null;
+  const connectedFields = new Set(
+    resolvedEdges.filter((edge) => edge.target === nodeId).map((edge) => edge.targetHandle)
+  );
+  const ratiosDisabled =
+    !!invocationNode &&
+    isHiDiffusionNode(invocationNode.data.type) &&
+    isHiDiffusionRatioField(fieldName) &&
+    areHiDiffusionRatiosAutomatic(invocationNode);
+  const ratioIssue =
+    invocationNode && isHiDiffusionRatioField(fieldName)
+      ? getHiDiffusionRatioOrderIssue(invocationNode, connectedFields)
+      : null;
+  const invalidReason =
+    ratioIssue ??
+    (effectiveTemplate
+      ? getWorkflowFieldInvalidReason({ isConnected, template: effectiveTemplate, value: instance?.value })
+      : null);
   const isInvalid = invalidReason !== null;
   const canReset =
     !!template &&
@@ -200,13 +218,18 @@ export const NodeFieldControl = ({
           <HStack alignItems="start" gap="1" minW="0" w="full">
             <Box flex="1" minW="0">
               <WorkflowFieldInput
+                disabled={ratiosDisabled}
                 formSettings={formSettings}
                 id={valueInputId}
                 invalid={isInvalid}
                 nodeId={nodeId}
                 seedMode={getWorkflowFieldSeedMode(instance)}
-                template={effectiveTemplate}
-                value={instance?.value}
+                template={getHiDiffusionRatioTemplate(invocationNode, effectiveTemplate, connectedFields)}
+                value={
+                  isHiDiffusionNode(invocationNode.data.type) && isHiDiffusionRatioField(fieldName)
+                    ? (instance?.value ?? 0)
+                    : instance?.value
+                }
                 workflowId={projectGraph.id}
                 onChange={onValueChange}
                 onSeedModeChange={onSeedModeChange}

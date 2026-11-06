@@ -33587,9 +33587,19 @@
             "title": "HiDiffusion: Window Attention",
             "type": "boolean"
           },
+          "hidiffusion_auto_ratios": {
+            "default": false,
+            "description": "Use model- and resolution-specific presets for both HiDiffusion ratios",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion: Automatic Ratios",
+            "type": "boolean"
+          },
           "hidiffusion_t1_ratio": {
             "default": 0.4,
-            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "description": "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
@@ -33600,13 +33610,13 @@
             "type": "number"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
-            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "default": 0,
+            "description": "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
             "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": 0,
             "orig_required": false,
             "title": "HiDiffusion: T2 Ratio",
             "type": "number"
@@ -33657,7 +33667,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL",
         "type": "object",
-        "version": "1.6.0",
+        "version": "1.8.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -34000,9 +34010,19 @@
             "title": "HiDiffusion: Window Attention",
             "type": "boolean"
           },
+          "hidiffusion_auto_ratios": {
+            "default": false,
+            "description": "Use model- and resolution-specific presets for both HiDiffusion ratios",
+            "field_kind": "input",
+            "input": "direct",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "HiDiffusion: Automatic Ratios",
+            "type": "boolean"
+          },
           "hidiffusion_t1_ratio": {
             "default": 0.4,
-            "description": "Override HiDiffusion early switch threshold (T1 ratio)",
+            "description": "Override the duration of HiDiffusion's primary RAU-Net stage (upstream code key T1_ratio). At extreme resolutions this is the later of the two RAU-Net cutoffs.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
@@ -34013,13 +34033,13 @@
             "type": "number"
           },
           "hidiffusion_t2_ratio": {
-            "default": 0.0,
-            "description": "Override HiDiffusion late switch threshold (T2 ratio)",
+            "default": 0,
+            "description": "Override the duration of HiDiffusion's additional extreme-resolution RAU-Net stage (upstream code key T2_ratio). This is the earlier cutoff when both stages are active and cannot exceed T1; excessive values can reduce composition diversity or introduce artifacts.",
             "field_kind": "input",
             "input": "any",
             "maximum": 1,
             "minimum": 0,
-            "orig_default": 0.0,
+            "orig_default": 0,
             "orig_required": false,
             "title": "HiDiffusion: T2 Ratio",
             "type": "number"
@@ -34070,7 +34090,7 @@
         "tags": ["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
         "title": "Denoise - SD1.5, SDXL + Metadata",
         "type": "object",
-        "version": "1.2.0",
+        "version": "1.4.0",
         "output": {
           "$ref": "#/components/schemas/LatentsMetaOutput"
         }
@@ -114683,7 +114703,7 @@
           "supports_images"
         ],
         "title": "TextLLM_Checkpoint_Config",
-        "description": "Model config for a single-file Qwen3.5 vision-language model, run as a text LLM.\n\nThe layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3\nprompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file\ncarries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,\nwhich exist for the 9B. Its LM head sets it apart from the Qwen3.5 text-encoder exports, which have none and\nare `Qwen35Encoder_Checkpoint_Config`'s."
+        "description": "Model config for a single-file Qwen3.5 vision-language model, run as a text LLM.\n\nThe layout is transformers' own `Qwen3_5ForConditionalGeneration` state dict, as ComfyUI exports the FLUX.3\nprompt upsampler (bf16, or `int8_tensorwise` with a multi-token-prediction head the loader drops). The file\ncarries weights only; the loader supplies config, tokenizer and processor from the vendored Qwen3.5 assets,\nwhich exist for the 9B. Comfy-Org's MOSS-Image encoders have the same tensors and are\n`Qwen35Encoder_Checkpoint_Config`'s; they are told apart by their install source."
       },
       "TextLLM_Diffusers_Config": {
         "properties": {
