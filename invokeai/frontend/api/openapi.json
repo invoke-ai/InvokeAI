@@ -110596,6 +110596,14 @@
             "title": "Previous Names",
             "default": []
           },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
+            "default": []
+          },
           "dependencies": {
             "anyOf": [
               {
@@ -110790,6 +110798,14 @@
             },
             "type": "array",
             "title": "Previous Names",
+            "default": []
+          },
+          "previous_sources": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Previous Sources",
             "default": []
           }
         },
