@@ -993,6 +993,149 @@ describe('workflow library view cache', () => {
   });
 });
 
+describe('stale cached view revalidation', () => {
+  type HeldPage = { query: string; page: number; response: Deferred<WorkflowLibraryPage> };
+  const page = (query: string, index: number, perPage: number, fresh: boolean) => {
+    const ids = Array.from({ length: 125 }, (_, position) => position);
+    if (fresh && query === '') {
+      ids.reverse();
+    }
+    const items = ids.map((id, position) =>
+      buildItem(`${query || 'all'}-${id}`, {
+        name: `${fresh ? 'Renamed' : 'Original'} ${String(position).padStart(3, '0')}`,
+        revision: fresh ? 2 : 1,
+      })
+    );
+    return buildPage(items.slice(index * perPage, (index + 1) * perPage), {
+      page: index,
+      pages: Math.ceil(items.length / perPage),
+      total: items.length,
+    });
+  };
+  const seed = async () => {
+    api.listLibraryWorkflows.mockImplementation(
+      ({ query = '', page: index, perPage }: { query?: string; page: number; perPage: number }) =>
+        Promise.resolve(page(query, index, perPage, false))
+    );
+    await browse.ensureWorkflowLibraryBrowseLoaded('name');
+    await browse.loadWorkflowLibraryRange(0, 59);
+    browse.setWorkflowLibraryBrowseFilter({ search: 'other' });
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+    const held: HeldPage[] = [];
+    api.listLibraryWorkflows
+      .mockClear()
+      .mockImplementation(({ query = '', page: index }: { query?: string; page: number }) => {
+        const read = { query, page: index, response: createDeferred<WorkflowLibraryPage>() };
+        held.push(read);
+        return read.response.promise;
+      });
+    return held;
+  };
+  const answer = (reads: readonly HeldPage[]) => {
+    for (const read of reads) {
+      read.response.resolve(page(read.query, read.page, 20, true));
+    }
+  };
+  const expectFreshWindow = () => {
+    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+    expect(snapshot.startIndex).toBe(20);
+    expect(snapshot.entries.map(({ item }) => [item.workflow_id, item.name, item.revision])).toEqual(
+      Array.from({ length: 60 }, (_, index) => [
+        `all-${104 - index}`,
+        `Renamed ${String(20 + index).padStart(3, '0')}`,
+        2,
+      ])
+    );
+  };
+  const leaveForThird = async (held: HeldPage[]) => {
+    browse.setWorkflowLibraryBrowseFilter({ search: 'third' });
+    answer(held.filter((read) => read.query === 'third'));
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+  };
+
+  it.each(['refresh first', 'range first'])(
+    'rereads overlapping restored positions when %s completes',
+    async (order) => {
+      const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+      try {
+        const held = await seed();
+        now.mockReturnValue(160_001);
+        browse.setWorkflowLibraryBrowseFilter({ search: '' });
+        expect(browse.getWorkflowLibraryBrowseSnapshot().entries[20]?.item.revision).toBe(1);
+        const refreshing = held.slice();
+        const range = browse.loadWorkflowLibraryRange(20, 79);
+        const overlapping = held.slice(refreshing.length);
+        expect(held.map((read) => [read.query, read.page])).toEqual([
+          ['', 0],
+          ['', 1],
+          ['', 2],
+          ['', 1],
+          ['', 2],
+          ['', 3],
+        ]);
+        if (order === 'refresh first') {
+          answer(refreshing);
+          await flushAsyncWork();
+          expect(browse.getWorkflowLibraryBrowseSnapshot().startIndex).toBe(0);
+          expect(browse.getWorkflowLibraryBrowseSnapshot().entries[20]?.item.revision).toBe(1);
+        }
+        answer(overlapping);
+        expect(await range).toBe(true);
+        if (order === 'range first') {
+          answer(refreshing);
+        }
+        await flushAsyncWork();
+        expectFreshWindow();
+        await leaveForThird(held);
+        const beforeReturn = held.length;
+        now.mockReturnValue(160_002);
+        browse.setWorkflowLibraryBrowseFilter({ search: '' });
+        await flushAsyncWork();
+        expect(held).toHaveLength(beforeReturn);
+        expectFreshWindow();
+      } finally {
+        now.mockRestore();
+      }
+    }
+  );
+
+  it('does not cache stale overlap as fresh when its revalidation queues behind another filter', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    try {
+      const held = await seed();
+      now.mockReturnValue(160_001);
+      const previousFilterRefresh = browse.refreshWorkflowLibraryBrowse();
+      expect(held.map((read) => [read.query, read.page])).toEqual([['other', 0]]);
+      browse.setWorkflowLibraryBrowseFilter({ search: '' });
+      const range = browse.loadWorkflowLibraryRange(20, 79);
+      answer(held.filter((read) => read.query === ''));
+      expect(await range).toBe(true);
+      await leaveForThird(held);
+      answer(held.filter((read) => read.query === 'other'));
+      await previousFilterRefresh;
+      await vi.waitFor(() => expect(held.filter((read) => read.query === 'third')).toHaveLength(2));
+      answer(held.filter((read) => read.query === 'third'));
+      await flushAsyncWork();
+      const beforeReturn = held.length;
+      now.mockReturnValue(160_002);
+      browse.setWorkflowLibraryBrowseFilter({ search: '' });
+      await flushAsyncWork();
+      expect(held).toHaveLength(beforeReturn);
+      expectFreshWindow();
+      expect(held.map((read) => [read.query, read.page])).toEqual([
+        ['other', 0],
+        ['', 1],
+        ['', 2],
+        ['', 3],
+        ['third', 0],
+        ['third', 0],
+      ]);
+    } finally {
+      now.mockRestore();
+    }
+  });
+});
+
 describe('large library retention fixture', () => {
   const seedLargeLibrary = () => {
     api.listLibraryWorkflows.mockImplementation(({ page, perPage }: { page: number; perPage: number }) =>

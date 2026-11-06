@@ -723,8 +723,10 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   const cached = viewCache.get(getFilterKey(filter));
 
   if (cached) {
+    const isStale = Date.now() - cached.fetchedAt > VIEW_FRESH_MS;
     currentViewFetchedAt = cached.fetchedAt;
-    metadataGeneration = listGeneration;
+    // Revalidation may queue behind another filter; stale positions cannot satisfy overlapping demand.
+    metadataGeneration = isStale ? -1 : listGeneration;
     store.patchSnapshot({
       entries: cached.entries,
       startIndex: cached.startIndex,
@@ -740,7 +742,7 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
     });
     pumpEnrichment();
 
-    if (Date.now() - cached.fetchedAt > VIEW_FRESH_MS) {
+    if (isStale) {
       void refreshWorkflowLibraryBrowse();
     }
     return;
