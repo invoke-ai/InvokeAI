@@ -2202,6 +2202,56 @@ describe('compileCanvasGraph — regional guidance', () => {
     expect(getEdge(backendGraph, 'pos_cond_collect', 'item')?.source.node_id).toBe('pos_cond');
   });
 
+  it('joins regional FLUX Redux references to the collector the builder feeds from the global ones', () => {
+    const reduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' } as const;
+    const { backendGraph } = compile(fluxModel, 'txt2img', {
+      regionalGuidance: [
+        region('r1', {
+          referenceImages: [
+            {
+              id: 'regional',
+              imageName: 'regional-redux.png',
+              model: reduxModel,
+              settings: { downsampling_factor: 1, weight: 1 },
+              type: 'flux_redux',
+            },
+          ],
+        }),
+      ],
+      settings: {
+        referenceImages: [
+          {
+            config: {
+              image: { original: { image: { height: 512, image_name: 'global-redux.png', width: 512 } } },
+              imageInfluence: 'medium',
+              model: reduxModel,
+              type: 'flux_redux',
+            },
+            id: 'global',
+            isEnabled: true,
+          },
+        ],
+      },
+    });
+    const reduxInputs = backendGraph.edges.filter(
+      (edge) => edge.destination.node_id === 'denoise_latents' && edge.destination.field === 'redux_conditioning'
+    );
+
+    expect(reduxInputs).toHaveLength(1);
+    const builderCollector = reduxInputs[0]!.source.node_id;
+    expect(builderCollector).toMatch(/^flux_redux_collector_/);
+    expect(backendGraph.nodes.regional_flux_redux_collector).toBeUndefined();
+    expect(getEdge(backendGraph, builderCollector, 'item')).toBeDefined();
+    expect(
+      backendGraph.edges.some(
+        (edge) =>
+          edge.source.node_id === 'flux_redux_regional' &&
+          edge.source.field === 'redux_cond' &&
+          edge.destination.node_id === builderCollector
+      )
+    ).toBe(true);
+  });
+
   it('grafts FLUX.2 [dev] regions through Mistral conditioning', () => {
     const { backendGraph } = compile(flux2DevModel, 'txt2img', { regionalGuidance: [region('r1')] });
 
