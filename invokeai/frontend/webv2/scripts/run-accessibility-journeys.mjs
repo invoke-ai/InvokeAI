@@ -6,7 +6,7 @@ import { inspect } from 'node:util';
 import { chromium } from 'playwright';
 
 import { assertNoAxeViolations } from './accessibility/axe.mjs';
-import { observeBrowserDiagnostics, waitForRenderedMedia } from './browser-validation.mjs';
+import { observeBrowserDiagnostics, waitForRenderedMedia, withBrowserNavigation } from './browser-validation.mjs';
 import { MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { killPreview, spawnPreview } from './preview-server.mjs';
@@ -98,7 +98,7 @@ const openRepresentativePage = async (browser, path, viewport = { height: 1_000,
   const page = await context.newPage();
   const pageErrors = [];
   const consoleErrors = [];
-  observeBrowserDiagnostics(page, {
+  await observeBrowserDiagnostics(page, {
     onError: (event) => {
       pageErrors.push(new Error(JSON.stringify(event)));
       if (event.kind === 'console') {
@@ -258,7 +258,7 @@ const surfaces = [
         body: JSON.stringify({ set: 'control-sdxl' }),
       });
       assert.ok(seeded.ok, `Could not seed control models: ${String(seeded.status)}.`);
-      await page.reload({ waitUntil: 'domcontentloaded' });
+      await withBrowserNavigation(page, () => page.reload({ waitUntil: 'domcontentloaded' }));
       await waitForWorkbench(page);
       await selectLayoutPreset(page, 'Edit', 'Canvas');
       await waitForRenderedMedia(page, { canvas: true });
@@ -622,9 +622,9 @@ const runResponsiveTopbarJourney = async (browser) => {
 
   try {
     await waitForWorkbench(page);
-    // This journey measures layout; the representative queue may already be reconnecting with pending work.
+    // The representative fixture has exactly 167 pending outputs; connection state may change its label.
     await page
-      .getByRole('button', { name: /^\d+ (?:images? remaining|items? waiting for the connection)\. Open queue$/ })
+      .getByRole('button', { name: /^167 (?:images remaining|items waiting for the connection)\. Open queue$/ })
       .waitFor();
 
     for (const width of [1_024, 900]) {

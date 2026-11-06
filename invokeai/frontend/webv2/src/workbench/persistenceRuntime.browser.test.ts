@@ -11,6 +11,10 @@ describe('browser page lifecycle', () => {
     let visibility: DocumentVisibilityState = 'visible';
     const visibilityState = vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
     const unsubscribe = browserPageLifecycle.subscribeHidden(() => checkpoints.push(signal));
+    const unsubscribeUnload = browserPageLifecycle.subscribeBeforeUnload(() => {
+      checkpoints.push(signal);
+      return false;
+    });
     try {
       expect(unload()).toBe(false);
       expect(checkpoints).toEqual(['beforeunload']);
@@ -24,6 +28,7 @@ describe('browser page lifecycle', () => {
       document.dispatchEvent(new Event('visibilitychange'));
       expect(checkpoints).toEqual(['beforeunload', 'pagehide', 'hidden']);
       unsubscribe();
+      unsubscribeUnload();
       signal = 'after disposal';
       expect(unload()).toBe(false);
       window.dispatchEvent(new Event('pagehide'));
@@ -31,6 +36,7 @@ describe('browser page lifecycle', () => {
       expect(checkpoints).toEqual(['beforeunload', 'pagehide', 'hidden']);
     } finally {
       unsubscribe();
+      unsubscribeUnload();
       visibilityState.mockRestore();
     }
   });

@@ -104,11 +104,6 @@ jobs:
           WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}
           WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outputs.cache-matched-key }}
 
-      - name: browser lifecycle smoke
-        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm test:browser:smoke'
-        shell: bash
-
       # Recorded even when the gate failed: a main that has outgrown the committed baseline is
       # still the right thing for a pull request to be compared with. A main job that ran the gate
       # but produced no reference (a failure before the browser stage) records nothing and says so;

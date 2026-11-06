@@ -342,7 +342,7 @@ const runSample = async (browser, fixture, sample) => {
   }
 
   const page = await context.newPage();
-  const diagnostics = observeBrowserDiagnostics(page);
+  const diagnostics = await observeBrowserDiagnostics(page);
   try {
     await page.addInitScript(() => {
       window.__architectureLongTasks = [];
@@ -566,7 +566,7 @@ const runSample = async (browser, fixture, sample) => {
     const routeReadyMs = await waitForSemanticMark(page, fixture.readyMark);
     const renderedMedia = await waitForRenderedMedia(page, {
       canvas: fixture.id === 'editor-canvas' && fixture.stateProfile === 'representative',
-      requireImage: fixture.stateProfile === 'representative' && fixture.id === 'launchpad',
+      requireImage: fixture.stateProfile === 'representative' && ['launchpad', 'editor-minimal'].includes(fixture.id),
     });
     const resources = await resourceCollector.settle();
     const activatedResources = resources.filter((resource) => activatedResourcePaths.has(resource.path));
@@ -575,8 +575,7 @@ const runSample = async (browser, fixture, sample) => {
     const layoutReturnSwitchMs = await measureLayoutReturnSwitch(page, fixture);
 
     const sustained =
-      mode !== 'resources' &&
-      sample.kind === 'scored' &&
+      (mode === 'resources' || sample.kind === 'scored') &&
       fixture.id === 'editor-minimal' &&
       fixture.stateProfile === 'representative'
         ? await runSustainedWorkload(page)

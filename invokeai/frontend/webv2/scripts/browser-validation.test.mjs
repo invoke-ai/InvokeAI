@@ -3,8 +3,13 @@ import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { crc32, inflateSync } from 'node:zlib';
 
-import { isExpectedWebKitUnloadError, isQueueReadRequest } from './browser-smoke-expectations.mjs';
-import { assertRetirement, distribution, observeBrowserDiagnostics } from './browser-validation.mjs';
+import { isExpectedDocumentUnload, isQueueReadRequest } from './browser-smoke-expectations.mjs';
+import {
+  assertRetirement,
+  distribution,
+  observeBrowserDiagnostics,
+  withBrowserNavigation,
+} from './browser-validation.mjs';
 import { createMockBackendFixture } from './mock-backend-fixtures.mjs';
 import { startMockBackend } from './mock-backend.mjs';
 import { fixturePng, mediaDimensions } from './mock-media.mjs';
@@ -83,7 +88,7 @@ test('seeded media routes carry decodable PNG pixels at metadata and aspect-pres
 
 test('nominal diagnostics attribute only the mock socket 404 and reject failed media, HTTP and runtime errors', async () => {
   const page = new EventEmitter();
-  const diagnostics = observeBrowserDiagnostics(page);
+  const diagnostics = await observeBrowserDiagnostics(page);
   const response = (url, status) => ({ url: () => url, status: () => status });
   page.emit('response', response('http://localhost/ws/socket.io/?transport=polling', 404));
   await diagnostics.assertHealthy();
@@ -119,7 +124,7 @@ test('retirement checks detect induced retained portals and sustained growth whi
 
 test('diagnostics await Error argument extraction when Firefox console text loses the error message', async () => {
   const page = new EventEmitter();
-  const diagnostics = observeBrowserDiagnostics(page);
+  const diagnostics = await observeBrowserDiagnostics(page);
   let release;
   const available = new Promise((resolve) => {
     release = resolve;
@@ -143,108 +148,70 @@ test('diagnostics await Error argument extraction when Firefox console text lose
   assert.equal(diagnostics.errors[0].arguments[0].name, 'Error');
 });
 
-test('WebKit native unload-denial expectation is limited to the exact fixture operation and document navigation', () => {
-  const phase = { engine: 'webkit', navigating: true, origin: 'http://localhost:4180' };
-  const error = (operation, path) => ({
+test('document teardown is same-origin and active only; real failures and live mutations stay critical', async () => {
+  const phase = { navigating: true, origin: 'http://localhost:4180' };
+  const canceled = {
+    kind: 'requestfailed',
+    method: 'PUT',
+    url: `${phase.origin}/api/v1/projects/p/workspace`,
+    message: 'net::ERR_ABORTED',
+  };
+  const native = {
     kind: 'pageerror',
-    message: `${operation} cannot load http://localhost:4180${path} due to access control checks.\n    at native`,
+    message: `Fetch API cannot load ${phase.origin}/api/v1/new-read due to access control checks.`,
+  };
+  assert.equal(isExpectedDocumentUnload(canceled, phase), true);
+  assert.equal(isExpectedDocumentUnload(native, phase), true);
+  for (const event of [
+    { ...canceled, message: 'connection refused' },
+    { ...canceled, responseStatus: 500 },
+    { ...canceled, kind: 'response', status: 500 },
+    { ...canceled, url: 'http://foreign/api/v1/projects/p/workspace' },
+    { ...canceled, url: `${phase.origin}/assets/app.js` },
+    { ...native, kind: 'console' },
+    { ...native, message: 'Unexpected runtime error' },
+  ]) {
+    assert.equal(isExpectedDocumentUnload(event, phase), false);
+  }
+  assert.equal(isExpectedDocumentUnload(canceled, { ...phase, navigating: false }), false);
+  assert.equal(isExpectedDocumentUnload(native, { ...phase, navigating: false }), false);
+  const page = new EventEmitter();
+  const diagnostics = await observeBrowserDiagnostics(page, {
+    expected: (event) => isExpectedDocumentUnload(event, phase),
   });
-  const workspace = error('Fetch API', '/api/v1/projects/fixture-project-002/workspace');
-  assert.equal(isExpectedWebKitUnloadError(workspace, phase), true);
+  page.emit('pageerror', { message: native.message, stack: native.message });
+  await diagnostics.assertHealthy();
+  page.emit('response', { url: () => canceled.url, status: () => 500 });
+  await assert.rejects(() => diagnostics.assertHealthy(), /500/);
+});
+
+test('Queue owner cancellation includes bounded hydration but excludes command methods', () => {
+  const origin = 'http://localhost:4180';
   assert.equal(
-    isExpectedWebKitUnloadError(error('XMLHttpRequest', '/ws/socket.io/?EIO=4&transport=polling&t=1'), phase),
+    isQueueReadRequest({ method: 'POST', url: `${origin}/api/v1/queue/default/items_by_ids` }, origin),
     true
   );
-  for (const event of [
-    error('Fetch API', '/api/v1/projects/another-project/workspace'),
-    error('Fetch API', '/api/v1/projects/fixture-project-002/workspace?unexpected=1'),
-    error('Fetch API', '/api/v1/images/i/broken/full'),
-    error('XMLHttpRequest', '/ws/socket.io/?transport=websocket'),
-    error('XMLHttpRequest', '/api/v1/projects/fixture-project-002/workspace'),
-    { ...workspace, kind: 'console' },
-    { ...workspace, message: workspace.message.replace('localhost:4180', 'another-origin:4180') },
-    { ...workspace, message: workspace.message.replace('due to access control checks.', 'failed with HTTP 500.') },
-  ]) {
-    assert.equal(isExpectedWebKitUnloadError(event, phase), false);
-  }
-  assert.equal(isExpectedWebKitUnloadError(workspace, { ...phase, navigating: false }), false);
-  assert.equal(isExpectedWebKitUnloadError(workspace, { ...phase, engine: 'firefox' }), false);
-});
-
-test('Queue read-model hydration denied during WebKit document exit is expected without waiving writes or live-page errors', () => {
-  const phase = { engine: 'webkit', navigating: true, origin: 'http://127.0.0.1:4180' };
-  const event = {
-    kind: 'pageerror',
-    message:
-      'Fetch API cannot load http://127.0.0.1:4180/api/v1/queue/default/items_by_ids due to access control checks.\n    at queryFn',
-  };
-  assert.equal(isExpectedWebKitUnloadError(event, phase), true);
-  for (const path of ['enqueue_batch', 'cancel', 'clear', 'prune', 'item_summaries_by_ids']) {
-    assert.equal(
-      isExpectedWebKitUnloadError({ ...event, message: event.message.replace('items_by_ids', path) }, phase),
-      false
-    );
-  }
-  assert.equal(isExpectedWebKitUnloadError(event, { ...phase, navigating: false }), false);
-  assert.equal(isExpectedWebKitUnloadError({ ...event, kind: 'response', status: 500 }, phase), false);
-  assert.equal(
-    isExpectedWebKitUnloadError(
-      { ...event, message: event.message.replace('127.0.0.1:4180', 'another-origin:4180') },
-      phase
-    ),
-    false
-  );
-});
-
-test('Queue remount cancellation attribution covers the read pipeline with its actual GET and POST methods', () => {
-  const origin = 'http://127.0.0.1:4180';
-  for (const [operation, method] of [
-    ['status', 'GET'],
-    ['current', 'GET'],
-    ['next', 'GET'],
-    ['item_ids', 'GET'],
-    ['items_by_ids', 'POST'],
-  ]) {
-    const event = { method, url: `${origin}/api/v1/queue/default/${operation}` };
-    assert.equal(isQueueReadRequest(event, origin), true);
-    assert.equal(isQueueReadRequest({ ...event, method: method === 'GET' ? 'POST' : 'GET' }, origin), false);
-    assert.equal(
-      isExpectedWebKitUnloadError(
-        { kind: 'pageerror', message: `Fetch API cannot load ${event.url} due to access control checks.` },
-        { engine: 'webkit', navigating: true, origin }
-      ),
-      true
-    );
-  }
   assert.equal(
     isQueueReadRequest({ method: 'POST', url: `${origin}/api/v1/queue/default/enqueue_batch` }, origin),
     false
   );
-  assert.equal(
-    isQueueReadRequest({ method: 'POST', url: 'http://another-origin:4180/api/v1/queue/default/items_by_ids' }, origin),
-    false
-  );
-  assert.equal(isQueueReadRequest({ url: `${origin}/api/v1/queue/default/unexpected` }, origin), false);
+  assert.equal(isQueueReadRequest({ method: 'PUT', url: `${origin}/api/v1/queue/default/status` }, origin), false);
 });
 
-test('nominal diagnostics still reject a real Queue HTTP failure after an expected WebKit unload denial', async () => {
+test('natural navigation scopes cancellation to the owned transition and retires the expectation afterwards', async () => {
   const page = new EventEmitter();
-  const phase = { engine: 'webkit', navigating: true, origin: 'http://127.0.0.1:4180' };
-  const diagnostics = observeBrowserDiagnostics(page, {
-    expected: (event) => isExpectedWebKitUnloadError(event, phase),
+  page.url = () => 'http://localhost:4180/#/app';
+  const diagnostics = await observeBrowserDiagnostics(page);
+  const cancellation = () =>
+    page.emit('requestfailed', {
+      url: () => 'http://localhost:4180/api/v1/projects/p/workspace',
+      method: () => 'PUT',
+      failure: () => ({ errorText: 'net::ERR_ABORTED' }),
+    });
+  await withBrowserNavigation(page, () => {
+    cancellation();
   });
-  const url = `${phase.origin}/api/v1/queue/default/items_by_ids`;
-  const message = `Fetch API cannot load ${url} due to access control checks.`;
-  const nativeError = { message, stack: `${message}\n    at queryFn` };
-  page.emit('pageerror', nativeError);
   await diagnostics.assertHealthy();
-  page.emit('response', { url: () => url, status: () => 500 });
-  await assert.rejects(() => diagnostics.assertHealthy(), /500/);
-  phase.navigating = false;
-  page.emit('pageerror', nativeError);
-  assert.equal(
-    diagnostics.errors.length,
-    2,
-    'A live-page native error and real HTTP failure must both remain critical'
-  );
+  cancellation();
+  await assert.rejects(() => diagnostics.assertHealthy(), /workspace/);
 });

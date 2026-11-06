@@ -167,10 +167,10 @@ test('a browser error raised during teardown prevents a success result', async (
   assert.equal(events.at(-1), 'temp:remove');
 });
 
-test('import waives only a missing archived video probe body cancellation after that request received its expected response', () => {
+test('import waives only a missing archived video probe body cancellation after that request received its expected response', async () => {
   const page = new EventEmitter();
   const errors = [];
-  observeBrowserErrors(page, 'import', errors);
+  await observeBrowserErrors(page, 'import', errors);
   const url = 'http://localhost/api/v1/videos/i/fixture-video-001.mp4';
   const request = (target, errorText) => ({
     url: () => target,

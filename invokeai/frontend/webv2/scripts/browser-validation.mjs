@@ -1,5 +1,34 @@
+import { isExpectedDocumentUnload } from './browser-smoke-expectations.mjs';
+
+const navigations = new WeakMap();
+
+/** Scope natural cancellation to an explicitly owned document transition, through DOMContentLoaded only. */
+export const withBrowserNavigation = async (page, action) => {
+  navigations.set(page, { navigating: true, origin: new URL(page.url()).origin });
+  try {
+    return await action();
+  } finally {
+    navigations.delete(page);
+  }
+};
+
+const installMediaFailures = () => {
+  window.__browserMediaFailures = [];
+  window.addEventListener(
+    'error',
+    (event) => {
+      if (event.target instanceof HTMLImageElement) {
+        const url = event.target.currentSrc || event.target.src;
+        window.__browserMediaFailures.push(url);
+        void window.__recordBrowserMediaFailure(url).catch(() => {});
+      }
+    },
+    true
+  );
+};
+
 /** Strict nominal-journey diagnostics; expected failures are scenario-local predicates. */
-export const observeBrowserDiagnostics = (page, { expected = () => false, onError = () => {} } = {}) => {
+export const observeBrowserDiagnostics = async (page, { expected = () => false, onError = () => {} } = {}) => {
   const errors = [];
   const media = [];
   const responseStatuses = new WeakMap();
@@ -9,11 +38,15 @@ export const observeBrowserDiagnostics = (page, { expected = () => false, onErro
     return parsed.pathname === '/ws/socket.io/' && parsed.searchParams.get('transport') === 'polling' && status === 404;
   };
   const record = (event) => {
-    if (!expected(event)) {
+    if (!expected(event) && !isExpectedDocumentUnload(event, navigations.get(page) ?? {})) {
       errors.push(event);
       onError(event);
     }
   };
+  await page.exposeBinding?.('__recordBrowserMediaFailure', (_source, url) =>
+    record({ kind: 'media', url, message: `Image failed to decode: ${url}` })
+  );
+  await page.addInitScript?.(installMediaFailures);
   page.on('pageerror', (error) => record({ kind: 'pageerror', message: error.stack ?? error.message }));
   page.on('console', (message) => {
     if (message.type() !== 'error') {
@@ -43,9 +76,13 @@ export const observeBrowserDiagnostics = (page, { expected = () => false, onErro
     void details.finally(() => pendingConsoleDetails.delete(details));
   });
   page.on('requestfailed', (request) => {
-    // Queue polling is canceled by its owner on route exit; an HTTP failure still fails below.
+    // This read is explicitly canceled by Queue's owner on retirement, even within one document.
+    const url = new URL(request.url());
     if (
-      new URL(request.url()).pathname === '/api/v1/queue/default/status' &&
+      url.origin === new URL(page.url?.() ?? request.url()).origin &&
+      url.pathname === '/api/v1/queue/default/status' &&
+      request.method?.() === 'GET' &&
+      !(responseStatuses.get(request) >= 400) &&
       /(?:ERR_ABORTED|NS_BINDING_ABORTED|cancelled)/i.test(request.failure()?.errorText ?? '')
     ) {
       return;
@@ -84,9 +121,14 @@ export const observeBrowserDiagnostics = (page, { expected = () => false, onErro
 };
 
 /** Mount marks are separate: this proves visible decoded images and raster pixels, without product test flags. */
-export const waitForRenderedMedia = async (page, { canvas = false, requireImage = false } = {}) => {
+export const waitForRenderedMedia = async (page, { canvas = false, requireImage = !canvas, timeout = 20_000 } = {}) => {
   await page.waitForFunction(
     ({ canvasRequired, imageRequired }) => {
+      if (window.__browserMediaFailures?.length) {
+        throw new Error(
+          `Media failed to decode (including removed images): ${window.__browserMediaFailures.join(', ')}`
+        );
+      }
       const visible = (element) => element.checkVisibility() && element.getBoundingClientRect().width > 0;
       const images = [...document.images].filter(visible);
       if (imageRequired && images.length === 0) {
@@ -102,7 +144,7 @@ export const waitForRenderedMedia = async (page, { canvas = false, requireImage 
       if (!canvasRequired) {
         return true;
       }
-      const hasPixels = (selector, fixtureColours) =>
+      const hasPixels = (selector) =>
         [...document.querySelectorAll(selector)].filter(visible).some((surface) => {
           if (!surface.width || !surface.height) {
             return false;
@@ -113,9 +155,9 @@ export const waitForRenderedMedia = async (page, { canvas = false, requireImage 
           }
           for (let i = 0; i < pixels.length; i += 4) {
             if (
-              fixtureColours
-                ? (pixels[i] === 64 && pixels[i + 1] === 160) || (pixels[i] === 192 && pixels[i + 1] === 80)
-                : pixels[i + 3] > 0
+              pixels[i + 3] > 0 &&
+              pixels[i + 2] === 128 &&
+              ((pixels[i] === 64 && pixels[i + 1] === 160) || (pixels[i] === 192 && pixels[i + 1] === 80))
             ) {
               return true;
             }
@@ -123,12 +165,12 @@ export const waitForRenderedMedia = async (page, { canvas = false, requireImage 
           return false;
         });
       return (
-        hasPixels('[data-hotkey-widget-type-id="canvas"] canvas', true) &&
-        hasPixels('[data-hotkey-widget-type-id="layers"] canvas', false)
+        hasPixels('[data-hotkey-widget-type-id="canvas"] canvas') &&
+        hasPixels('[data-hotkey-widget-type-id="layers"] [data-layer-row-id] canvas')
       );
     },
     { canvasRequired: canvas, imageRequired: requireImage },
-    { timeout: 20_000 }
+    { timeout }
   );
   return page.evaluate(async (canvasRequired) => {
     const images = [...document.images].filter((image) => image.checkVisibility());
@@ -174,6 +216,7 @@ export const runSustainedWorkload = async (page) => {
   const onRequest = (request) => requests.push(request.url());
   page.on('request', onRequest);
   const samples = [];
+  let currentCycle;
   const ownedPopoverIds = [];
   const longTaskStart = await page.evaluate(() => window.__architectureLongTasks?.length ?? 0);
   try {
@@ -194,7 +237,20 @@ export const runSustainedWorkload = async (page) => {
       await page.keyboard.press(cycle % 2 ? 'ArrowLeft' : 'ArrowRight');
       await page.keyboard.press('Escape');
       await popup.waitFor({ state: 'hidden' });
-      await page.waitForFunction((ids) => ids.every((id) => !document.getElementById(id)), ownedPopoverIds);
+      // Allow the close animation and React's removal to finish, then inspect rather than wait away leaks.
+      await page.evaluate(async () => {
+        await Promise.allSettled(
+          document
+            .getAnimations()
+            .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+            .map((animation) => animation.finished)
+        );
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(resolve);
+          });
+        });
+      });
       const retained = await page.evaluate(
         (ids) => ({
           domNodes: document.querySelectorAll('*').length,
@@ -203,8 +259,10 @@ export const runSustainedWorkload = async (page) => {
         }),
         ownedPopoverIds
       );
+      currentCycle = { ...retained, cycle, latencyMs: performance.now() - start, requests: requests.length };
+      assertRetirement([currentCycle], { popovers: 0 });
       if (cycle > 0) {
-        samples.push({ ...retained, cycle, latencyMs: performance.now() - start, requests: requests.length });
+        samples.push(currentCycle);
       }
     }
     assertRetirement(samples, { popovers: 0 });
@@ -220,7 +278,7 @@ export const runSustainedWorkload = async (page) => {
       timingEnforced: false,
     };
   } catch (error) {
-    error.sustained = { workload: 'gallery-quick-settings', samples };
+    error.sustained = { workload: 'gallery-quick-settings', samples, failedCycle: currentCycle };
     throw error;
   } finally {
     page.off('request', onRequest);

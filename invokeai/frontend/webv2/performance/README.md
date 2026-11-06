@@ -92,33 +92,39 @@ HTTP failures for that endpoint still fail. Lifecycle/fault journeys declare the
 Browser reports keep API media requests and decoded dimensions separate from static-resource byte accounting.
 Failures retain diagnostics, screenshots and the existing diagnostic traces under `artifacts/architecture-performance`.
 
-Full profiles add a bounded Gallery quick-settings workload after startup and return-switch measurements on the
-representative Compose fixture: one warmup and six open/change/close cycles per scored sample. Every cycle waits for
-the popup portal to retire. Retained popover count must be zero; monotonically growing retained counts also fail.
+Both routine resource observations and full profiles run a bounded Gallery quick-settings workload after startup and return-switch measurements on the
+representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle waits for the close animation and two rendering frames, then samples owner portal identities.
+Retained popover count must be zero; the runner fails immediately on a retained portal instead of waiting it away.
+Routine resource observations also run this bounded correctness phase, independently of report-only timing.
 DOM nodes, Canvas elements and request counts are diagnostic observations, not universal lifetime bounds. The
 report includes every cycle, interaction min/median/p95/max and observed long-task distributions. Long tasks cover
 the interaction phase, including its warmup, and interaction latency includes automation overhead; neither is an INP measurement. Failure
-artifacts preserve the workload context. Other owners can add scenarios through this shared runner plumbing.
+artifacts preserve the workload context. The workload is intentionally hard-coded to Gallery quick settings; other owners need their own journey before extending coverage.
 
-Sustained reports name the runner, engine version, platform, workload and sample policy. They remain report-only:
+Sustained reports name the runner, engine version, platform, workload and sample policy. Timing distributions remain report-only; portal retirement is enforced:
 `browser-baseline.json` still requires 20 stable runs on a designated runner before timing enforcement. Local runs
 cannot satisfy that calibration policy. Existing byte ceilings, timing sampling and goldens are unchanged.
 
 ## Browser lifecycle smoke
 
-`pnpm test:browser:smoke` uses the existing project-file preview/backend lifecycle and production `dist/` build.
-Run after `pnpm test:performance:build`. Install engines using the locked package:
+`pnpm test:browser:smoke` creates a fresh production build, then uses the existing project-file preview/backend lifecycle.
+`check:release` runs `test:browser:smoke:browser` after its shared performance build, so completion and CI build once.
+Use the raw `:browser` command only when the build is known current. Install engines using the locked package:
 `pnpm exec playwright install --with-deps chromium firefox webkit`. Ports default to 4180/4181; override
 `INVOKEAI_PROJECT_FILE_PORT` and `INVOKEAI_PROJECT_FILE_BACKEND_PORT` for an isolated focused run.
 
-The required localhost capabilities are IndexedDB and Web Locks. Each engine must recover a held prompt immediately
-after reload, give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
+The required localhost capabilities are IndexedDB and Web Locks. Each engine holds the initial fixture migration PUT before server dispatch, makes a new held prompt edit, and
+leaves for a neutral same-origin document immediately. Before any editor can reconcile it, the suite proves the
+committed journal has the new marker while the staged draft, held PUT bodies and server do not. Reopening must
+recover that marker. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
+checker-only thumbnail and empty Canvas, and injects retained portal DOM into the real sustained-workload collector.
+Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
 across route re-entry, advance keyboard focus, and disable copy controls with an explanation when clipboard is
 unavailable. This is targeted current-engine coverage, with no minimum-version support promise. Missing engines or
 required capabilities fail the command and are reported, rather than skipped. Every engine is attempted, even after
 another fails. Reports, failure screenshots and traces live in `artifacts/browser-smoke` and CI uploads them.
 
-History return records the real `pageshow.persisted` result and, where exposed, `notRestoredReasons`. A reload is
+A new held prompt is made immediately before history navigation. History return records the real `pageshow.persisted` result and, where exposed, `notRestoredReasons`. A reload is
 reported as such; it does not establish BFCache restoration. Playwright WebKit is not actual Safari verification,
 and says nothing about every Apple platform. The documented Chromium unload guarantee remains scoped to Chromium;
 other engine results are evidence for the tested engine/build/platform only, not a broader durability guarantee.
@@ -129,11 +135,21 @@ outside its coverage. The noncanceling unload checkpoint runs before `pagehide` 
 IndexedDB journal transaction started in `pagehide`, even after explicit commit. A `beforeunload` listener can reduce
 Firefox BFCache eligibility; restoring from the cache is reported only when the engine actually does so.
 
-During the deliberate WebKit reload, native `Fetch API`/`XMLHttpRequest` access-control diagnostics can describe
-old-document requests denied before dispatch. Only native messages for the fixture workspace-save, the finite Queue read-model pipeline, and mock Socket.IO polling, from the same origin while document navigation is active, are expected by that scenario. Other runtime
-errors and every real HTTP failure remain critical. Queue reader cancellations during route re-entry are limited
-to the same Queue read interface whose query/owner signals are retired: status, current, next and item IDs (GET),
-then bounded item hydration (`items_by_ids`, read-only POST); the fault probes use independent strict diagnostics.
+Document-navigation cancellation expectations are shared by smoke and release journeys. They apply only inside an
+explicitly owned navigation through DOMContentLoaded, on the same origin's `/api/` requests or mock Socket.IO polling.
+All engines may cancel old-document reads and writes; WebKit may instead emit its exact native Fetch/XMLHttpRequest
+access-control-denial message. A canceled mutation is teardown evidence, never evidence of a successful save: the
+held-edit scenario separately proves journal-only recovery. HTTP 4xx/5xx responses, non-abort failures, cross-origin
+requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
+cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
+then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the
+shared observer because that owner's polling read retires during ordinary in-document switches. The fault probes
+use independent strict diagnostics and separately assert that request and runtime failures reached the validator.
+
+Image readiness requires visible decoded images by default, or representative fixture pixels from both Canvas
+owners in Canvas mode. Empty fixtures explicitly opt out of image requirements after their owner semantic-ready
+assertion. An early capturing image-error listener remembers failed images even when an owner's `onError` removes
+them. The smoke proves both corrupt-visible and corrupt-removed image failures, independently of console errors.
 
 Accessibility runner failures retain nested aggregate diagnostics in `artifacts/accessibility/failure.txt`; the
 settings journey also captures its failing page as text and a screenshot before the browser context closes.

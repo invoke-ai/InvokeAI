@@ -74,6 +74,7 @@ describe('architecture workflow', () => {
       /scripts\/measure-architecture-performance.mjs$/,
       /scripts\/run-project-file-journey.mjs$/,
       /scripts\/run-accessibility-journeys.mjs$/,
+      /scripts\/run-browser-smoke.mjs$/,
     ];
     for (const [name, commands] of [
       ['local release', expand('pnpm check:release')],
