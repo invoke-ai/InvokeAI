@@ -159,6 +159,7 @@ export const getWorkflowSelectedGalleryImage = getSelectedGalleryImageFromValues
 export interface WorkflowFieldInputProps {
   id?: string;
   invalid?: boolean;
+  disabled?: boolean;
   /** Owning invocation node, when known — lets widgets read sibling fields (e.g. the frame scrubber's companion video). */
   nodeId?: string;
   /** Owning project workflow, when known — an upload that finishes after a switch still lands in this one. */
@@ -270,6 +271,7 @@ const NumberFieldInput = (props: ScalarInputProps) => {
   return (
     <NumericSliderInput
       ariaLabel={props.ariaLabel}
+      disabled={props.disabled}
       range={range}
       template={template}
       value={props.value}
