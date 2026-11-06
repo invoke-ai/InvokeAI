@@ -16176,6 +16176,42 @@ describe('masks while a result is staged', () => {
     h.dispose();
   });
 
+  it.each(['rect', 'freehand'] as const)(
+    'cuts the selected mask with a release-only modifier for %s without leaving masks above the preview',
+    async (kind) => {
+      const h = setup();
+      const { frame, overlay } = h;
+      h.select('m');
+      h.useTool('shape');
+      // Give the cutout mask pixels to erase, through the same tool interface.
+      overlay.fire('pointerdown', pointerAt(0, 0));
+      overlay.fire('pointermove', pointerAt(20, 20));
+      overlay.fire('pointerup', pointerAt(20, 20, { buttons: 0 }));
+      await h.showPreview();
+      frame();
+      h.engine.stores.shapeOptions.set({ ...h.engine.stores.shapeOptions.get(), kind, target: 'new' });
+      const strokes: StrokeCommittedEvent[] = [];
+      h.engine.tools.onStrokeCommitted((stroke) => strokes.push(stroke));
+
+      overlay.fire('pointerdown', pointerAt(5, 5));
+      expect(frame().drawn ?? []).not.toContain('m');
+      overlay.fire('pointermove', pointerAt(15, 5));
+      overlay.fire('pointermove', pointerAt(15, 15));
+      expect(frame().drawn ?? []).not.toContain('m');
+      // Release ends the gesture before the tool commits, so no mask-reveal gesture remains to announce.
+      overlay.fire('pointerup', {
+        ...pointerAt(kind === 'freehand' ? 5 : 15, 15, { buttons: 0 }),
+        ctrlKey: true,
+        metaKey: true,
+      });
+
+      expect(strokes).toHaveLength(1);
+      expect(strokes[0]).toMatchObject({ layerId: 'm', tool: 'shape-cutout' });
+      expect(frame()).toMatchObject(UNMASKED);
+      h.dispose();
+    }
+  );
+
   it.each([
     ['a locked mask, which refuses every edit', [{ ...maskLayer('m'), isLocked: true }, rasterLayer('a')], 'm', false],
     [
