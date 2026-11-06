@@ -63,6 +63,8 @@ def _checkpoint(path: Path, scaled: bool) -> Path:
 def _loader(cast_calls: list, *, asks_for_fp8: bool = True) -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     # The branch under test consults the gate to decide whether the decline is worth reporting; the
     # gate itself has its own cells in `test_load_default_fp8.py`.
     loader._should_use_fp8 = lambda *_args, **_kwargs: asks_for_fp8
@@ -140,6 +142,8 @@ class TestTheCheckpointLoader:
         observed: list[int] = []
         loader = object.__new__(WanCheckpointModel)
         loader._ram_cache = MagicMock()
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
         loader._should_use_fp8 = lambda *_args, **_kwargs: True
 
         captured: dict[str, dict] = {}
@@ -170,6 +174,8 @@ class TestTheDiffusersLoader:
         there to be found in the parent's source."""
         cast_calls: list = []
         loader = object.__new__(WanDiffusersModel)
+        loader._torch_device = torch.device("cpu")
+        loader._torch_dtype = torch.float32
         loader._apply_fp8_layerwise_casting = lambda model, config, submodel: (
             cast_calls.append((config, submodel)),
             model,

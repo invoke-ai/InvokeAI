@@ -912,6 +912,8 @@ def test_a_flux2_diffusers_pipelines_own_vae_loads_in_the_dtype_the_plan_sizes_f
     _save_tiny_vae(tmp_path / "vae", AutoencoderKLFlux2, torch.float32)
     (tmp_path / "model_index.json").write_text(json.dumps({"vae": ["diffusers", "AutoencoderKLFlux2"]}))
     loader = Flux2DiffusersModel.__new__(Flux2DiffusersModel)
+    loader._torch_device = torch.device("cpu")
+    loader._torch_dtype = torch.float32
     loader._apply_fp8_layerwise_casting = lambda model, config, submodel_type: model
 
     vae = loader._load_model(SimpleNamespace(path=str(tmp_path), repo_variant=None), SubModelType.VAE)
