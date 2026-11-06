@@ -29,6 +29,7 @@ import {
   workflowUiStore,
 } from '@features/workflow/ui/workflowUiStore';
 import { buildInvocationNode, createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
+import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
@@ -200,6 +201,18 @@ vi.mock('@features/models', async (importOriginal) => ({
 
 // Provide English/plural strings without booting the HTTP-backed i18n client.
 const TRANSLATIONS: Record<string, string> = {
+  'workflowLibrary.openProjectWorkflowHint': 'Makes it the active workflow',
+  'workflowLibrary.renameProjectWorkflowHint': 'Changes its name in this project; a linked template keeps its own',
+  'workflowLibrary.duplicateProjectWorkflowHint': 'A copy beside it in this project',
+  'workflowLibrary.saveToLibraryHint': 'Creates a new template from this workflow',
+  'workflowLibrary.updateTemplateHint': 'Writes this workflow over its library template',
+  'workflowLibrary.removeHint': 'Removes it from this project only',
+  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
+  'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
+  'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
+  'workflowLibrary.forkIntoProjectHint': 'Copies it into a new project',
+  'workflowLibrary.deleteHint': 'Removes it from your library',
+
   'common.close': 'Close',
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
@@ -560,6 +573,33 @@ describe('WorkflowLibraryDialog', () => {
   };
 
   const gridViewport = () => document.querySelector<HTMLElement>('[role="region"][aria-label="Workflows"]');
+
+  const expectContained = (element: HTMLElement | Range, container: HTMLElement) => {
+    const box = element.getBoundingClientRect();
+    const bounds = container.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(bounds.left - 1);
+    expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
+    expect(box.top).toBeGreaterThanOrEqual(bounds.top - 1);
+    expect(
+      box.bottom,
+      element instanceof HTMLElement ? element.outerHTML.slice(0, 180) : 'metadata ending'
+    ).toBeLessThanOrEqual(bounds.bottom + 1);
+  };
+
+  const expectWrappedRenameHint = async (menu: HTMLElement, dialog: HTMLElement) => {
+    await act(() => userEvent.keyboard('{Home}{ArrowDown}'));
+    const rename = menu.querySelector<HTMLElement>('[data-menu-item="rename"]')!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(rename.id);
+      const hint = rename.querySelector('p')!;
+      expect(hint.textContent).toBe(TRANSLATIONS['workflowLibrary.renameProjectWorkflowHint']);
+      const text = document.createRange();
+      text.selectNodeContents(hint);
+      expect(text.getClientRects().length).toBeGreaterThan(1);
+      expectContained(text, menu);
+      expectContained(text, dialog);
+    });
+  };
 
   beforeEach(async () => {
     await resizeViewport(1280, 800);
@@ -1037,7 +1077,9 @@ describe('WorkflowLibraryDialog', () => {
       await openWith(withSnapshot({ entries, total: entries.length, pages: 51 }));
       if (view === 'project') {
         await clickSegment('project');
-        await act(() => card('wf-user')?.click());
+        await vi.waitFor(() => expect(card('wf-user')).not.toBeNull());
+        await act(() => card('wf-user')!.click());
+        expect(document.querySelector('[data-project-workflow-detail="wf-user"]')).not.toBeNull();
       }
 
       const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
@@ -1052,17 +1094,6 @@ describe('WorkflowLibraryDialog', () => {
         (button) => button.textContent === 'Preview graph'
       )!;
       const menu = detail.querySelector<HTMLButtonElement>('button[aria-label="More actions"]')!;
-      const expectContained = (element: HTMLElement | Range, container: HTMLElement) => {
-        const box = element.getBoundingClientRect();
-        const bounds = container.getBoundingClientRect();
-        expect(box.left).toBeGreaterThanOrEqual(bounds.left - 1);
-        expect(box.right).toBeLessThanOrEqual(bounds.right + 1);
-        expect(box.top).toBeGreaterThanOrEqual(bounds.top - 1);
-        expect(
-          box.bottom,
-          element instanceof HTMLElement ? element.outerHTML.slice(0, 180) : 'metadata ending'
-        ).toBeLessThanOrEqual(bounds.bottom + 1);
-      };
 
       for (const [width, height] of [
         [1280, 800],
@@ -1209,7 +1240,19 @@ describe('WorkflowLibraryDialog', () => {
       await act(() => userEvent.keyboard('{Enter}'));
       await vi.waitFor(() => expect(menu.getAttribute('aria-expanded')).toBe('true'));
       const menuContent = document.querySelector<HTMLElement>('[role="menu"]')!;
+      // Open state precedes the entry slide's final geometry.
+      await act(() => settleAnimations(menuContent));
       expectContained(menuContent, dialog);
+      if (view === 'project' && targetWidth === 320) {
+        await expectWrappedRenameHint(menuContent, dialog);
+      }
+      await act(() => userEvent.keyboard('{End}'));
+      const lastAction = [...menuContent.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+      await vi.waitFor(() => {
+        expect(menuContent.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+        expectContained(lastAction, menuContent);
+        expectContained(lastAction, dialog);
+      });
       await act(() => userEvent.keyboard('{Escape}'));
       await act(() => preview.focus());
       expectUnclipped(preview);
@@ -1249,6 +1292,44 @@ describe('WorkflowLibraryDialog', () => {
       expect(document.activeElement?.getAttribute('data-workflow-card-menu')).toBe(`key-${index}`);
     }
     expect(cards().length).toBeLessThan(40);
+  });
+
+  it.each(['library', 'project'] as const)('keeps the %s card menu inside its dialog while resizing', async (view) => {
+    await resizeViewport(320, 320);
+    await openWith(LOADED_SNAPSHOT);
+    if (view === 'project') {
+      await clickSegment('project');
+    }
+    await vi.waitFor(() => expect(card(view === 'project' ? 'wf-alpha' : 'wf-landscape')).not.toBeNull());
+    const source = card(view === 'project' ? 'wf-alpha' : 'wf-landscape')!;
+    await act(() => source.focus());
+    // Keyboard context-menu events have no pointer coordinates.
+    await act(() => source.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })));
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+    );
+    const menu = document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"]')!;
+    const dialog = document.querySelector<HTMLElement>('[data-scope="dialog"][data-part="content"]')!;
+    await act(() => settleAnimations(menu));
+    expectContained(menu, dialog);
+    if (view === 'project') {
+      await expectWrappedRenameHint(menu, dialog);
+    }
+    await act(() => userEvent.keyboard('{End}'));
+    const lastAction = [...menu.querySelectorAll<HTMLElement>('[role="menuitem"]')].at(-1)!;
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('aria-activedescendant')).toBe(lastAction.id);
+      expectContained(lastAction, menu);
+      expectContained(lastAction, dialog);
+    });
+    await resizeViewport(700, 320);
+    await vi.waitFor(() => {
+      expect(menu.getAttribute('data-state')).toBe('open');
+      expectContained(menu, dialog);
+    });
+    await act(() => userEvent.keyboard('{Escape}'));
+    await vi.waitFor(() => expect(document.activeElement).toBe(source));
+    expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull();
   });
 
   it('auto-selects the first entry and moves the selection when it disappears', async () => {

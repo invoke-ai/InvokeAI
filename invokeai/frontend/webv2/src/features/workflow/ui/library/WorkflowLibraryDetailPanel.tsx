@@ -124,6 +124,14 @@ export const WorkflowLibraryDetailPanel = ({
   onPreview,
   projectWorkflows,
 }: WorkflowLibraryDetailPanelProps) => {
+  const panelRef = useRef<HTMLDivElement>(null);
+  // Portaled action menus belong to this dialog's visible bounds, rather than the whole viewport.
+  const menuPositioning = useMemo(
+    () => ({
+      boundary: () => panelRef.current?.closest<HTMLElement>('[data-scope="dialog"][data-part="content"]') ?? [],
+    }),
+    []
+  );
   const { t } = useTranslation();
   const deps = useModelRequirementDeps();
   const notify = useWorkflowNotifications();
@@ -367,11 +375,12 @@ export const WorkflowLibraryDetailPanel = ({
     () =>
       contextMenuPoint?.kind === 'point'
         ? {
+            ...menuPositioning,
             getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
             placement: 'bottom-start' as const,
           }
-        : { placement: 'bottom-end' as const },
-    [contextMenuPoint]
+        : { ...menuPositioning, placement: 'bottom-end' as const },
+    [contextMenuPoint, menuPositioning]
   );
   const handleContextMenuOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -641,6 +650,7 @@ export const WorkflowLibraryDetailPanel = ({
           borderColor="border.subtle"
           borderWidth="1px"
           css={DETAIL_RAIL_CSS}
+          ref={panelRef}
           data-workflow-detail={item.workflow_id}
           flexShrink={0}
           gap="0"
@@ -767,7 +777,7 @@ export const WorkflowLibraryDetailPanel = ({
                   {openLabel}
                 </Button>
               )}
-              <Menu.Root ids={moreActionsIds}>
+              <Menu.Root ids={moreActionsIds} positioning={menuPositioning}>
                 {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
                 menu never takes focus and the first pointer move onto it closes it. */}
                 <Menu.Trigger asChild>
@@ -779,7 +789,9 @@ export const WorkflowLibraryDetailPanel = ({
                 </Menu.Trigger>
                 <Portal>
                   <Menu.Positioner>
-                    <MenuContent minW="16rem">{actionItems}</MenuContent>
+                    <MenuContent minW="min(16rem, var(--available-width))" maxW="var(--available-width)">
+                      {actionItems}
+                    </MenuContent>
                   </Menu.Positioner>
                 </Portal>
               </Menu.Root>
@@ -807,7 +819,11 @@ export const WorkflowLibraryDetailPanel = ({
           >
             <Portal>
               <Menu.Positioner>
-                <MenuContent data-workflow-context-menu minW="16rem">
+                <MenuContent
+                  data-workflow-context-menu
+                  minW="min(16rem, var(--available-width))"
+                  maxW="var(--available-width)"
+                >
                   {actionItems}
                 </MenuContent>
               </Menu.Positioner>
