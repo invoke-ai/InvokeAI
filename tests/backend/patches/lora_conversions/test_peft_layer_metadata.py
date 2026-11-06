@@ -104,7 +104,6 @@ def test_saved_alpha_scales_existing_lora_sidecar_on_packed_int8():
             f"{source}.lora_A.weight": torch.ones(rank, in_features),
             f"{source}.lora_B.weight": torch.ones(out_features, rank),
             f"{source}.alpha": torch.tensor(1),
-            f"{source}.dora_scale": torch.ones(out_features, 1),
         }
     )
     x = torch.ones(1, in_features)
