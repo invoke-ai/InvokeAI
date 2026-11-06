@@ -411,17 +411,15 @@ describe('Properties pane', () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('shape'));
     await settle();
-    // Nothing selected: the chip says the form edits the creation defaults.
-    expect(host!.textContent).toContain('Defaults');
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Rectangle' })).toBeInTheDocument();
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Triangle' })).toBeInTheDocument();
-    await expect.element(page.getByRole('radio', { exact: true, name: 'Star' })).toBeInTheDocument();
+    const appearance = page.getByRole('group', { exact: true, name: 'Appearance' });
+    // Nothing selected: the chip says fill and stroke edit the creation defaults.
+    await expect.element(appearance.getByText('Defaults', { exact: true })).toBeVisible();
 
     await act(() => root?.unmount());
     await mount(PropertiesPane, 'shape');
     await act(() => engine!.tools.setTool('shape'));
     await settle();
-    expect(host!.textContent).toContain('Editing: My Shape');
+    await expect.element(appearance.getByText('Editing: My Shape', { exact: true })).toBeVisible();
     // The fixture shape has no stroke, so the width slider is disabled in place.
     const width = page.getByRole('slider', { exact: true, name: 'Stroke width' });
     await expect.element(width).toBeVisible();
