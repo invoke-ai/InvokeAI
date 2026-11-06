@@ -49,7 +49,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
       - Use `.` instead of `invokeai` to install from the current directory. You don't need to specify the version.
       - Use `uv sync` instead of `uv pip install` so the environment is synchronized from the repository lockfile.
       - The current project is installed as an editable install by default. That means your changes to the python code will be reflected when you restart the Invoke server.
-      - Add the `dev`, `test`, `docs`, and appropriate GPU package options with `--extra`. You may or may not need the `xformers` option - follow the manual install guide to figure that out.
+      - Add the `dev`, `test`, and appropriate GPU package options with `--extra`. The docs site has its own pnpm package. You may or may not need the `xformers` option - follow the manual install guide to figure that out.
 
       With the modifications made, the sync command should look something like this:
 
@@ -59,7 +59,6 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
           --managed-python \
           --extra dev \
           --extra test \
-          --extra docs \
           --extra cuda \
           --extra xformers
         ```
