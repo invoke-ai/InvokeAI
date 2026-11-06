@@ -31,6 +31,7 @@ Reference modes:
 
 ## Running
 
+- CI’s 20-minute job timeout covers completion, including the three-engine lifecycle smoke.
 - CI splits `check:release` between `lint:code` in the checks job and `check:release:tests` in the tests job. Architecture tests run in the complete unit suite; inventories are generated once and the performance build serves all subsequent browser journeys.
 - `check:release` stops at the first failing gate; later gates did not run. In CI logs the failure sits at the tail, after passing test summaries.
 - Browser gate binds ports 4176 and 4177 (`INVOKEAI_PERFORMANCE_PORT`, `INVOKEAI_PERFORMANCE_BACKEND_PORT`). One performance gate per machine, nothing else building or testing.
@@ -93,7 +94,7 @@ Browser reports keep API media requests and decoded dimensions separate from sta
 Failures retain diagnostics, screenshots and the existing diagnostic traces under `artifacts/architecture-performance`.
 
 Both routine resource observations and full profiles run a bounded Gallery quick-settings workload after startup and return-switch measurements on the
-representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle arms the pinned Chakra presence owner’s native `exitcomplete` event before closing, waits at most five seconds for it, then samples owner portal identities at the next rendering opportunity. Animation-finished promises alone do not establish presence completion.
+representative Compose fixture: one warmup and six open/change/close cycles per routine observation or scored profile sample. Every cycle arms the pinned Chakra presence owner’s native `exitcomplete` event before closing, waits at most five seconds for it, then polls React removal for at most 250 ms before reporting actual retained counts. Persistent DOM is still rejected by the zero-retention bound. Animation-finished promises alone do not establish presence completion.
 Retained popover count must be zero; the runner fails immediately on a retained portal instead of waiting it away.
 Routine resource observations also run this bounded correctness phase, independently of report-only timing.
 DOM nodes, Canvas elements and request counts are diagnostic observations, not universal lifetime bounds. The
@@ -117,9 +118,9 @@ The required localhost capabilities are IndexedDB and Web Locks. Each engine hol
 leaves for a neutral same-origin document immediately. Before any editor can reconcile it, the suite proves the
 committed journal has the new marker while the staged draft, held PUT bodies and server do not. Reopening must
 recover that marker. Each engine also verifies actual Canvas and layer-thumbnail fixture pixels, rejects an opaque
-checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, and injects retained portal DOM into the real sustained-workload collector.
+checker-only thumbnail and empty Canvas, holds native animation-end delivery to prove retirement waits for the owner’s exit event, defers actual owner DOM removal by 100 ms to exercise the bounded React-removal grace, and injects retained portal DOM into the real sustained-workload collector.
 Engines must give duplicated tabs separate live editor sessions, release a closed tab's session lock, preserve edits
-across route re-entry, advance keyboard focus, and disable copy controls with an explanation when clipboard is
+across route re-entry after Launchpad owner/media readiness (all mounted cover images finish decoding), advance keyboard focus, and disable copy controls with an explanation when clipboard is
 unavailable. This is targeted current-engine coverage, with no minimum-version support promise. Missing engines or
 required capabilities fail the command and are reported, rather than skipped. Every engine is attempted, even after
 another fails. Reports, failure screenshots and traces live in `artifacts/browser-smoke` and CI uploads them.
@@ -143,7 +144,11 @@ held-edit scenario separately proves journal-only recovery. HTTP 4xx/5xx respons
 requests, asset failures, live-document mutations and unrelated runtime/console errors remain critical. Queue reader
 cancellations during route re-entry are limited to its actual read interface: status, current, next and item IDs (GET),
 then bounded item hydration (`items_by_ids`, read-only POST). Queue status GET cancellation is also recognized at the
-shared observer because that owner's polling read retires during ordinary in-document switches. The fault probes
+shared observer because that owner's polling read retires during ordinary in-document switches. Only the explicit
+`measureProjectSwitch` phase also expects same-origin aborted `GET /api/v1/gallery/items/` reads: Query cancels the
+old project's listing when its last observer leaves, including after HTTP 200 while the body is pending. This phase
+covers temporary-project creation and return to the original project; live-page aborts, other endpoints/methods and
+HTTP failures (including a later aborted error body) remain critical. The fault probes
 use independent strict diagnostics and separately assert that request and runtime failures reached the validator.
 
 Image readiness requires visible decoded images by default, or representative fixture pixels from both Canvas

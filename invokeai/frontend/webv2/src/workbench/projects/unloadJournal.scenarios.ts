@@ -822,6 +822,130 @@ export const testUnloadJournalScenarios = (createStore: () => Promise<ProjectDra
     expect(recovered.state.projects).toMatchObject([{ id: project.id, name: 'Typed, undone, redone' }]);
   });
 
+  it('keeps the latest journal and workspace conflict when the recovered merge cannot be staged', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    const remote = prompted(loaded.state, 'Workspace saved elsewhere');
+    const record = server.records.get(project.id)!;
+    const workspace = splitProjectDocument(serializeProjectDocumentV3(remote.projects[0]!)).workspace;
+    server.records.set(project.id, {
+      ...record,
+      workspace: { data: workspace as unknown as Record<string, unknown>, revision: 2, updated_at: now },
+    });
+    const local = prompted(loaded.state, 'Workspace edited here');
+    await expect(tab.saveWorkbench(local)).resolves.toMatchObject({ conflicts: [{ half: 'workspace' }] });
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async () => {
+      started();
+      await gate;
+      return { kind: 'fenced' };
+    };
+    const resolving = tab.resolveConflictUseServer(project.id);
+    const rejected = expect(resolving).rejects.toMatchObject({
+      name: 'ProjectDraftWriteRejectedError',
+      reason: 'fenced',
+    });
+    await staging;
+    // The existing conflict was resumed successfully before the merge's stage failed.
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'dirty' } });
+    const latest = named(local, 'Typed while workspace recovery waited');
+    const journal = tab.journalBeforeUnload(latest);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    store.stage = stage;
+    release();
+    await rejected;
+    expect(server.updates).toBe(0);
+    expect(server.workspaceUpdates).toBe(1);
+    expect(server.creates).toBe(0);
+    expect(server.records.get(project.id)?.workspace).toMatchObject({
+      data: { promptHistory: [{ positivePrompt: 'Workspace saved elsewhere' }] },
+      revision: 2,
+    });
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'conflict' } });
+    expect(getProjectSyncSnapshot().projects[project.id]?.conflict).toMatchObject({ half: 'workspace' });
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toMatchObject([{ half: 'workspace' }]);
+    expect(recovered.state.projects).toMatchObject([{ name: 'Typed while workspace recovery waited' }]);
+    const retried = await reloaded.resolveConflictUseServer(project.id);
+    expect(retried.status).toBe('loaded');
+    if (retried.status !== 'loaded') {
+      throw new Error('Expected workspace recovery to remain available.');
+    }
+    reloaded.acknowledgeProjectResolution(project.id);
+    await expect(reloaded.saveWorkbench(stateWith([retried.project]))).resolves.toMatchObject({
+      conflicts: [],
+      hasPendingChanges: false,
+    });
+    expect(serverName()).toBe('Typed while workspace recovery waited');
+    expect(retried.project.promptHistory).toEqual(remote.projects[0]!.promptHistory);
+  });
+
+  it('keeps the latest journal and source conflict when preparing a copy is fenced', async () => {
+    const tab = openTab();
+    const loaded = await tab.loadWorkbench();
+    saveElsewhere('Saved elsewhere', 2);
+    const local = named(loaded.state, 'Conflicted local edit');
+    await expect(tab.saveWorkbench(local)).resolves.toMatchObject({ conflicts: [{ kind: 'revision' }] });
+    const stage = store.stage;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let started!: () => void;
+    const staging = new Promise<void>((resolve) => {
+      started = resolve;
+    });
+    store.stage = async () => {
+      started();
+      await gate;
+      return { kind: 'fenced' };
+    };
+    const copying = tab.resolveConflictSaveAsNew(named(local, 'Edit selected for copying').projects[0]!);
+    const rejected = expect(copying).rejects.toMatchObject({
+      name: 'ProjectDraftWriteRejectedError',
+      reason: 'fenced',
+    });
+    await staging;
+    const latest = named(local, 'Typed while copy preparation waited');
+    const journal = tab.journalBeforeUnload(latest);
+    expect(journal.kind).toBe('journaled');
+    if (journal.kind === 'journaled') {
+      expect(await journal.written).toBe(true);
+    }
+    store.stage = stage;
+    release();
+    await rejected;
+    expect(copiesStarted).toBe(0);
+    expect(server.creates).toBe(0);
+    expect(serverName()).toBe('Saved elsewhere');
+    expect(server.updates).toBe(1);
+    await expect(store.get(project.id, 'tab-a')).resolves.toMatchObject({ draft: { state: 'conflict' } });
+    expect(getProjectSyncSnapshot().projects[project.id]?.conflict).toMatchObject({ kind: 'revision' });
+
+    const reloaded = openTab();
+    const recovered = await reloaded.loadWorkbench();
+    expect(recovered.conflicts).toMatchObject([{ kind: 'revision' }]);
+    expect(recovered.state.projects).toMatchObject([{ name: 'Typed while copy preparation waited' }]);
+    const retried = await reloaded.resolveConflictSaveAsNew(recovered.state.projects[0]!);
+    expect(copiesStarted).toBe(1);
+    expect(server.creates).toBe(1);
+    expect(server.records.get(retried.targetProjectId)?.data.name).toBe('Typed while copy preparation waited (copy)');
+    expect(serverName()).toBe('Saved elsewhere');
+  });
+
   describe('a hidden event during save-as-new', () => {
     const startCopy = async () => {
       const tab = openTab();

@@ -254,21 +254,24 @@ export const runSustainedWorkload = async (page) => {
         await exitState.evaluate((state) => state.cleanup()).catch(() => {});
         await exitState.dispose().catch(() => {});
       }
-      // exitcomplete precedes React's removal commit; sample at its next rendering opportunity, without polling DOM absence.
-      await page.evaluate(
-        () =>
-          new Promise((resolve) => {
-            requestAnimationFrame(resolve);
-          })
-      );
-      const retained = await page.evaluate(
-        (ids) => ({
+      // Presence completes before React's removal commit; allow a short grace, then report actual retained DOM.
+      const retained = await page.evaluate(async (ids) => {
+        const deadline = performance.now() + 250;
+        while (ids.some((id) => document.getElementById(id))) {
+          const remaining = deadline - performance.now();
+          if (remaining <= 0) {
+            break;
+          }
+          await new Promise((resolve) => {
+            setTimeout(resolve, Math.min(16, remaining));
+          });
+        }
+        return {
           domNodes: document.querySelectorAll('*').length,
           popovers: ids.filter((id) => document.getElementById(id)).length,
           canvases: document.querySelectorAll('canvas').length,
-        }),
-        ownedPopoverIds
-      );
+        };
+      }, ownedPopoverIds);
       currentCycle = {
         ...retained,
         cycle,

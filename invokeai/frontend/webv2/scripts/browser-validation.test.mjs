@@ -3,7 +3,11 @@ import { EventEmitter } from 'node:events';
 import test from 'node:test';
 import { crc32, inflateSync } from 'node:zlib';
 
-import { isExpectedDocumentUnload, isQueueReadRequest } from './browser-smoke-expectations.mjs';
+import {
+  isExpectedDocumentUnload,
+  isQueueReadRequest,
+  isExpectedGalleryProjectSwitchAbort,
+} from './browser-smoke-expectations.mjs';
 import {
   assertRetirement,
   distribution,
@@ -185,17 +189,60 @@ test('document teardown is same-origin and active only; real failures and live m
   await assert.rejects(() => diagnostics.assertHealthy(), /500/);
 });
 
-test('Queue owner cancellation includes bounded hydration but excludes command methods', () => {
+test('socket polling teardown excludes websocket, cross-origin and live-page failures', async () => {
+  const phase = { navigating: true, origin: 'http://localhost:4180' };
+  const pollingUrl = `${phase.origin}/ws/socket.io/?EIO=4&transport=polling&t=1`;
+  const canceled = { kind: 'requestfailed', method: 'GET', url: pollingUrl, message: 'net::ERR_ABORTED' };
+  const native = {
+    kind: 'pageerror',
+    message: `XMLHttpRequest cannot load ${pollingUrl} due to access control checks.`,
+  };
+  for (const event of [canceled, native]) {
+    assert.equal(isExpectedDocumentUnload(event, phase), true);
+    assert.equal(isExpectedDocumentUnload(event, { ...phase, navigating: false }), false);
+  }
+  for (const url of [pollingUrl.replace('polling', 'websocket'), pollingUrl.replace('localhost', 'foreign')]) {
+    assert.equal(isExpectedDocumentUnload({ ...canceled, url }, phase), false);
+    assert.equal(
+      isExpectedDocumentUnload({ ...native, message: native.message.replace(pollingUrl, url) }, phase),
+      false
+    );
+  }
+  const page = new EventEmitter();
+  const diagnostics = await observeBrowserDiagnostics(page, {
+    expected: (event) => isExpectedDocumentUnload(event, phase),
+  });
+  const request = { url: () => pollingUrl, method: () => 'GET', failure: () => ({ errorText: canceled.message }) };
+  page.emit('requestfailed', request);
+  page.emit('pageerror', { message: native.message, stack: native.message });
+  await diagnostics.assertHealthy();
+  page.emit('response', { url: () => pollingUrl, status: () => 500 });
+  await assert.rejects(() => diagnostics.assertHealthy(), /500/);
+  phase.navigating = false;
+  page.emit('requestfailed', request);
+  page.emit('pageerror', { message: native.message, stack: native.message });
+  assert.equal(diagnostics.errors.length, 3, 'The HTTP failure and both live-page errors remain fatal');
+});
+
+test('Queue owner cancellation includes its read methods and excludes commands, cross-origin requests and wrong methods', () => {
   const origin = 'http://localhost:4180';
-  assert.equal(
-    isQueueReadRequest({ method: 'POST', url: `${origin}/api/v1/queue/default/items_by_ids` }, origin),
-    true
-  );
+  for (const [operation, method] of [
+    ['status', 'GET'],
+    ['current', 'GET'],
+    ['next', 'GET'],
+    ['item_ids', 'GET'],
+    ['items_by_ids', 'POST'],
+  ]) {
+    const url = `${origin}/api/v1/queue/default/${operation}`;
+    assert.equal(isQueueReadRequest({ method, url }, origin), true);
+    assert.equal(isQueueReadRequest({ method: method === 'GET' ? 'POST' : 'GET', url }, origin), false);
+    assert.equal(isQueueReadRequest({ method, url: url.replace('localhost', 'foreign') }, origin), false);
+  }
   assert.equal(
     isQueueReadRequest({ method: 'POST', url: `${origin}/api/v1/queue/default/enqueue_batch` }, origin),
     false
   );
-  assert.equal(isQueueReadRequest({ method: 'PUT', url: `${origin}/api/v1/queue/default/status` }, origin), false);
+  assert.equal(isQueueReadRequest({ url: `${origin}/api/v1/queue/default/unexpected` }, origin), false);
 });
 
 test('natural navigation scopes cancellation to the owned transition and retires the expectation afterwards', async () => {
@@ -214,4 +261,48 @@ test('natural navigation scopes cancellation to the owned transition and retires
   await diagnostics.assertHealthy();
   cancellation();
   await assert.rejects(() => diagnostics.assertHealthy(), /workspace/);
+});
+
+test('Gallery project-switch cancellation is an exact same-origin read expectation, never a live-page or HTTP waiver', async () => {
+  const phase = { switchingProject: true, origin: 'http://localhost:4180' };
+  const url = `${phase.origin}/api/v1/gallery/items/?board_id=fixture-project-board-01&offset=0`;
+  const aborted = { kind: 'requestfailed', method: 'GET', url, responseStatus: 200, message: 'net::ERR_ABORTED' };
+  assert.equal(isExpectedGalleryProjectSwitchAbort(aborted, phase), true);
+  assert.equal(isExpectedGalleryProjectSwitchAbort(aborted, { ...phase, switchingProject: false }), false);
+  for (const event of [
+    { ...aborted, url: url.replace('localhost', 'foreign') },
+    { ...aborted, url: `${phase.origin}/api/v1/gallery/items/location` },
+    { ...aborted, url: `${phase.origin}/api/v1/gallery/items/names` },
+    { ...aborted, url: `${phase.origin}/api/v1/images/i/broken/thumbnail` },
+    { ...aborted, url: `${phase.origin}/assets/app.js` },
+    { ...aborted, method: 'POST' },
+    { ...aborted, method: 'PUT' },
+    { ...aborted, message: 'net::ERR_CONNECTION_REFUSED' },
+    { ...aborted, responseStatus: 404 },
+    { ...aborted, responseStatus: 500 },
+    { ...aborted, kind: 'response', status: 500 },
+    { ...aborted, kind: 'pageerror' },
+  ]) {
+    assert.equal(isExpectedGalleryProjectSwitchAbort(event, phase), false);
+  }
+  const page = new EventEmitter();
+  const diagnostics = await observeBrowserDiagnostics(page, {
+    expected: (event) => isExpectedGalleryProjectSwitchAbort(event, phase),
+  });
+  const request = () => ({ url: () => url, method: () => 'GET', failure: () => ({ errorText: 'net::ERR_ABORTED' }) });
+  const retired = request();
+  page.emit('response', { url: () => url, status: () => 200, request: () => retired });
+  page.emit('requestfailed', retired);
+  await diagnostics.assertHealthy();
+  phase.switchingProject = false;
+  page.emit('requestfailed', retired);
+  phase.switchingProject = true;
+  const failed = request();
+  page.emit('response', { url: () => url, status: () => 500, request: () => failed });
+  page.emit('requestfailed', failed);
+  assert.equal(diagnostics.errors.length, 3, 'Live abort, HTTP failure and its aborted body all remain fatal');
+  await assert.rejects(
+    () => diagnostics.assertHealthy(),
+    (error) => error.message.includes('500') && error.message.includes('ERR_ABORTED')
+  );
 });

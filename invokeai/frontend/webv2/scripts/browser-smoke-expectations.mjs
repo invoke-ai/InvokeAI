@@ -37,3 +37,18 @@ export const isExpectedDocumentUnload = (event, { navigating, origin }) => {
       (url.pathname === '/ws/socket.io/' && url.searchParams.get('transport') === 'polling'))
   );
 };
+
+/** Leaving the observed project retires its Gallery page reader, including a response whose body is still pending. */
+export const isExpectedGalleryProjectSwitchAbort = (event, { switchingProject, origin }) => {
+  if (
+    !switchingProject ||
+    event.kind !== 'requestfailed' ||
+    event.method !== 'GET' ||
+    event.responseStatus >= 400 ||
+    !/(?:ERR_ABORTED|NS_BINDING_ABORTED|cancelled)/i.test(event.message)
+  ) {
+    return false;
+  }
+  const url = new URL(event.url);
+  return url.origin === origin && url.pathname === '/api/v1/gallery/items/';
+};

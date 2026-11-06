@@ -45,7 +45,7 @@ concurrency:
 jobs:
   frontend-webv2-tests:
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 20 # Includes browser suites, performance sampling, project files, and accessibility.
+    timeout-minutes: 20 # Includes browser suites, performance sampling, project files, accessibility, and 3-engine smoke.
     defaults:
       run:
         working-directory: invokeai/frontend/webv2

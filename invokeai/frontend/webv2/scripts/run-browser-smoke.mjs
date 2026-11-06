@@ -198,12 +198,42 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               .click();
             // Hold native exit delivery after the browser finishes its animation: presence still owns the popup.
             await page.getByRole('button', { exact: true, name: 'Gallery settings' }).evaluate((trigger) => {
+              const removeChild = Node.prototype.removeChild;
+              const delayedRemoval = { deferred: false, removed: false };
+              let galleryContent;
+              let pendingRemoval;
+              window.__delayedPopoverRemoval = delayedRemoval;
+              window.__restorePopoverRemoval = () => {
+                Node.prototype.removeChild = removeChild;
+                if (pendingRemoval) {
+                  clearTimeout(pendingRemoval.timer);
+                  pendingRemoval.finish();
+                }
+              };
+              Node.prototype.removeChild = function (child) {
+                if (galleryContent && child.contains(galleryContent)) {
+                  Node.prototype.removeChild = removeChild;
+                  delayedRemoval.deferred = true;
+                  const parent = this;
+                  const finish = () => {
+                    if (child.parentNode === parent) {
+                      removeChild.call(parent, child);
+                    }
+                    delayedRemoval.removed = !child.isConnected;
+                    pendingRemoval = null;
+                  };
+                  pendingRemoval = { finish, timer: setTimeout(finish, 100) };
+                  return child;
+                }
+                return removeChild.call(this, child);
+              };
               window.__heldPopoverEnds = [];
               window.__holdPopoverEnd = (event) => {
                 if (
                   event.target.id === trigger.getAttribute('aria-controls') &&
                   event.target.matches?.('[data-scope="popover"][data-part="content"][data-state="closed"]')
                 ) {
+                  galleryContent = event.target;
                   event.stopImmediatePropagation();
                   window.__heldPopoverEnds.push({
                     target: event.target,
@@ -225,34 +255,51 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               }
             );
             try {
-              await Promise.race([
-                workload,
-                page.waitForFunction(() => window.__heldPopoverEnds.length > 0, null, { timeout: 10_000 }),
-              ]);
-              // Keep the owner event withheld across rendering turns, beyond the old animation-snapshot sampler.
-              await page.evaluate(async () => {
-                for (let frame = 0; frame < 4; frame += 1) {
-                  await new Promise((resolve) => {
-                    requestAnimationFrame(resolve);
-                  });
-                }
-              });
-              assert.equal(workloadSettled, false, 'Retirement must wait for the owner exit event');
+              try {
+                await Promise.race([
+                  workload,
+                  page.waitForFunction(() => window.__heldPopoverEnds.length > 0, null, { timeout: 10_000 }),
+                ]);
+                // Keep the owner event withheld across rendering turns, beyond the old animation-snapshot sampler.
+                await page.evaluate(async () => {
+                  for (let frame = 0; frame < 4; frame += 1) {
+                    await new Promise((resolve) => {
+                      requestAnimationFrame(resolve);
+                    });
+                  }
+                });
+                assert.equal(workloadSettled, false, 'Retirement must wait for the owner exit event');
+              } finally {
+                await page
+                  .evaluate(() => {
+                    document.removeEventListener('animationend', window.__holdPopoverEnd, true);
+                    for (const { target, animationName, elapsedTime } of window.__heldPopoverEnds) {
+                      target.dispatchEvent(
+                        new AnimationEvent('animationend', { animationName, elapsedTime, bubbles: true })
+                      );
+                    }
+                    delete window.__heldPopoverEnds;
+                    delete window.__holdPopoverEnd;
+                  })
+                  .catch(() => {});
+              }
+              report.sustained = await workload;
+              assert.ok(
+                await page.evaluate(
+                  () => window.__delayedPopoverRemoval.deferred && window.__delayedPopoverRemoval.removed
+                ),
+                'The actual owner removal must cross the grace period'
+              );
+              report.delayedRemovalProbe = 'passed';
             } finally {
               await page
                 .evaluate(() => {
-                  document.removeEventListener('animationend', window.__holdPopoverEnd, true);
-                  for (const { target, animationName, elapsedTime } of window.__heldPopoverEnds) {
-                    target.dispatchEvent(
-                      new AnimationEvent('animationend', { animationName, elapsedTime, bubbles: true })
-                    );
-                  }
-                  delete window.__heldPopoverEnds;
-                  delete window.__holdPopoverEnd;
+                  window.__restorePopoverRemoval();
+                  delete window.__restorePopoverRemoval;
+                  delete window.__delayedPopoverRemoval;
                 })
                 .catch(() => {});
             }
-            report.sustained = await workload;
             report.delayedExitProbe = 'passed';
             // Inject retained owner DOM into the real collector/runner, rather than fabricated counts.
             await page.evaluate(() => {
@@ -315,6 +362,13 @@ for (const [engine, type] of Object.entries({ chromium, firefox, webkit })) {
               await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
               await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
               await page.waitForURL(/#\/$/);
+              // Cards appear after the library and cover index load; finish even below-fold cover reads before leaving.
+              await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
+              await page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' }).waitFor();
+              await waitForRenderedMedia(page);
+              await page
+                .locator('main img')
+                .evaluateAll((images) => Promise.all(images.map((image) => image.decode())));
               await open();
               await expect(prompt, 'Route exit/re-entry must keep the edit').toHaveValue(marker);
               await prompt.focus();
