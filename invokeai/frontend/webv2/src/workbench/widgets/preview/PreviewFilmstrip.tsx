@@ -1,17 +1,18 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
-import { Box, HStack, Icon, ProgressCircle, Skeleton } from '@chakra-ui/react';
+import { Box, HStack, Skeleton } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { toGalleryItemKey, toGalleryItemRef } from '@features/gallery/contracts';
 import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/utility';
 import { getDeterminateProgressPercent } from '@features/queue/contracts';
 import { useDeviceLabel } from '@features/queue/devices';
 import { useItemProgress, useQueueItemProgressImage } from '@features/queue/react';
+import { ProgressBadge } from '@platform/ui/ProgressBadge';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
-import { CheckIcon, HourglassIcon, PinIcon } from 'lucide-react';
+import { PinIcon } from 'lucide-react';
 import { memo, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -232,29 +233,11 @@ const FilmstripLiveThumb = ({
       >
         {session.state === 'queued' ? <Box bg="bg.subtle" h="full" w="full" /> : <Skeleton h="full" w="full" />}
       </StreamingImageFrame>
-      <Box
-        bg="bg/85"
-        bottom="0.5"
-        display="flex"
-        p="0.5"
-        pointerEvents="none"
-        position="absolute"
-        right="0.5"
-        rounded="full"
-      >
-        {isPinned ? (
-          <Icon aria-hidden as={PinIcon} boxSize="3" />
-        ) : isRunning ? (
-          <ProgressCircle.Root aria-hidden value={percentage}>
-            <ProgressCircle.Circle>
-              <ProgressCircle.Track />
-              <ProgressCircle.Range />
-            </ProgressCircle.Circle>
-          </ProgressCircle.Root>
-        ) : (
-          <Icon aria-hidden as={session.state === 'queued' ? HourglassIcon : CheckIcon} boxSize="3" />
-        )}
-      </Box>
+      <ProgressBadge
+        icon={isPinned ? PinIcon : undefined}
+        percentage={percentage}
+        state={session.state === 'settling' ? 'completed' : session.state}
+      />
     </Box>
   );
 };

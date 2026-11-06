@@ -34,8 +34,10 @@ from invokeai.backend.model_manager.util.qwen3_vl import (
     read_qwen3vl_visual_tower_tensors,
 )
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear, build_regular_hadamard
+from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 from invokeai.backend.qwen3_vl.qwen3_vl_assets import load_bundled_qwen3_vl_tokenizer
 from tests.backend.model_manager.load.qwen3vl_gguf_fixture import tiny_qwen3vl_config
+from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_signed_tensors
 
 _LOADERS = "invokeai.backend.model_manager.load.model_loaders.krea2"
 
@@ -79,8 +81,10 @@ def _loader(cls):
     return loader
 
 
-def _single_file(path: Path, state_dict: dict[str, torch.Tensor], te_config) -> Qwen3VLEncoderCheckpointLoader:
-    save_file({k: v.contiguous() for k, v in state_dict.items()}, str(path))
+def _single_file(
+    path: Path, state_dict: dict[str, torch.Tensor], te_config, metadata: dict[str, str] | None = None
+) -> Qwen3VLEncoderCheckpointLoader:
+    save_file({k: v.contiguous() for k, v in state_dict.items()}, str(path), metadata=metadata)
     loader = _loader(Qwen3VLEncoderCheckpointLoader)
     loader._load_te_config = lambda _config: te_config
     return loader
@@ -163,6 +167,132 @@ def test_an_int8_tower_stays_int8(tmp_path: Path) -> None:
     x = torch.randn(4, CONVROT_GROUP_SIZE)
     torch.testing.assert_close(tower.blocks[0].attn.proj(x), reference.visual.blocks[0].attn.proj(x), atol=0.05, rtol=0)
     assert torch.equal(tower.blocks[1].attn.proj.weight, reference.visual.blocks[1].attn.proj.weight)
+
+
+# Tower Linears of the tiny config that are whole nvfp4 scale tiles (128 rows by 64 columns): one in a block, one
+# in the merger.
+_NVFP4_TOWER_LAYERS = ("blocks.0.mlp.linear_fc1", "merger.linear_fc1")
+
+
+def _nvfp4_tower_checkpoint(naming: str):
+    """A ComfyUI-layout file whose tower packs `_NVFP4_TOWER_LAYERS`, named in `.comfy_quant` markers or the header;
+    and the reference encoder, its Linears there set to the +-0.5 weights the packed codes stand for."""
+    reference = _tiny_encoder()
+    state_dict = {f"model.{k}": v for k, v in reference.state_dict().items()}
+    header: dict[str, dict[str, str]] = {}
+    generator = torch.Generator().manual_seed(1)
+    for layer in _NVFP4_TOWER_LAYERS:
+        path = f"model.visual.{layer}"
+        linear = reference.visual.get_submodule(layer)
+        tensors, weight = nvfp4_signed_tensors(path, torch.rand(linear.weight.shape, generator=generator) > 0.5)
+        del state_dict[f"{path}.weight"]
+        state_dict.update(tensors)
+        if naming == "marker":
+            state_dict[f"{path}.comfy_quant"] = comfy_quant_marker({"format": "nvfp4"})
+        else:
+            header[path] = {"format": "nvfp4"}
+        with torch.no_grad():
+            linear.weight.copy_(weight)
+    metadata = {"_quantization_metadata": json.dumps({"layers": header})} if header else None
+    return state_dict, metadata, reference
+
+
+def _packed_bytes(linear: torch.nn.Linear) -> int:
+    """An nvfp4 layer as held: two codes per byte, an e4m3 scale per 16 weights, a float32 global scale."""
+    rows, columns = linear.weight.shape
+    return rows * columns // 2 + rows * (columns // 16) + 4
+
+
+def _dense_elements(reference, *replaced_layers: str) -> int:
+    replaced = {f"{layer}.weight" for layer in replaced_layers}
+    return sum(t.nelement() for key, t in reference.visual.state_dict().items() if key not in replaced)
+
+
+def _reserved(loader) -> list[int]:
+    return [call.args[0] for call in loader._ram_cache.make_room.call_args_list]
+
+
+@pytest.mark.parametrize("naming", ["marker", "header"])
+def test_an_nvfp4_tower_stays_packed_and_is_reserved_as_held(tmp_path: Path, naming: str) -> None:
+    """A repack that packs the tower too. Read as plain Linears, its packed weights would lose their scales to the
+    fp8 extraction and fail the load on their halved width."""
+    state_dict, metadata, reference = _nvfp4_tower_checkpoint(naming)
+    path = tmp_path / "qwen3vl_nvfp4.safetensors"
+    loader = _single_file(path, state_dict, tiny_qwen3vl_config(), metadata)
+
+    tower = loader._load_model(_checkpoint_config(path), SubModelType.VisionEncoder)
+
+    for layer in _NVFP4_TOWER_LAYERS:
+        assert isinstance(tower.get_submodule(layer), NVFP4Linear), layer
+    # One image of 4x4 patches, flattened as the processor hands them to the tower.
+    vision = reference.visual.config
+    patches = torch.randn(16, vision.in_channels * vision.temporal_patch_size * vision.patch_size**2)
+    grid = torch.tensor([[1, 4, 4]])
+    with torch.no_grad():
+        torch.testing.assert_close(
+            tower(patches, grid_thw=grid).pooler_output, reference.visual(patches, grid_thw=grid).pooler_output
+        )
+    # One reservation: the rest at the compute dtype, the packed layers as held.
+    packed = sum(_packed_bytes(reference.visual.get_submodule(layer)) for layer in _NVFP4_TOWER_LAYERS)
+    dense = _dense_elements(reference, *_NVFP4_TOWER_LAYERS) * torch.float32.itemsize
+    assert _reserved(loader) == [dense + packed]
+
+
+def test_an_int8_neighbour_leaves_the_nvfp4_tower_layers_packed_and_reserved(tmp_path: Path) -> None:
+    """An int8 layer sends the tower down the int8 branch, whose reservation is its only one, so it has to count the
+    packed layers that left the state dict."""
+    state_dict, metadata, reference = _nvfp4_tower_checkpoint("marker")
+    int8 = "blocks.1.attn.proj"
+    rows, columns = reference.visual.get_submodule(int8).weight.shape
+    codes = torch.randint(-127, 128, (rows, columns), dtype=torch.int8, generator=torch.Generator().manual_seed(2))
+    scale = torch.rand(rows, 1, generator=torch.Generator().manual_seed(3)) + 0.5
+    state_dict[f"model.visual.{int8}.weight"] = codes
+    state_dict[f"model.visual.{int8}.weight_scale"] = scale
+    state_dict[f"model.visual.{int8}.comfy_quant"] = comfy_quant_marker({"format": "int8_tensorwise", "convrot": False})
+    path = tmp_path / "qwen3vl_int8_nvfp4.safetensors"
+    loader = _single_file(path, state_dict, tiny_qwen3vl_config(), metadata)
+
+    tower = loader._load_model(_checkpoint_config(path), SubModelType.VisionEncoder)
+
+    for layer in _NVFP4_TOWER_LAYERS:
+        assert isinstance(tower.get_submodule(layer), NVFP4Linear), layer
+    int8_module = tower.get_submodule(int8)
+    assert isinstance(int8_module, Int8ConvrotLinear)
+    torch.testing.assert_close(
+        int8_module._dequantized_weight(torch.device("cpu"), torch.float32), codes.float() * scale
+    )
+    packed = sum(_packed_bytes(reference.visual.get_submodule(layer)) for layer in _NVFP4_TOWER_LAYERS)
+    held_int8 = codes.nelement() + scale.nelement() * scale.element_size()
+    dense = _dense_elements(reference, *_NVFP4_TOWER_LAYERS, int8) * torch.float32.itemsize
+    assert _reserved(loader) == [dense + held_int8 + packed]
+
+
+_FIRST_PACKED = f"model.visual.{_NVFP4_TOWER_LAYERS[0]}"
+
+
+@pytest.mark.parametrize(
+    ("mutate", "reason"),
+    [
+        pytest.param(
+            lambda sd: sd.pop(f"{_FIRST_PACKED}.comfy_quant"), "no ComfyUI `comfy_quant` marker", id="unnamed"
+        ),
+        pytest.param(lambda sd: sd.pop(f"{_FIRST_PACKED}.weight_scale_2"), "no weight_scale_2", id="no-global-scale"),
+        pytest.param(lambda sd: sd.update({f"{_FIRST_PACKED}.pre_quant_scale": torch.ones(64)}), "AWQ", id="awq"),
+    ],
+)
+def test_an_undecodable_nvfp4_tower_layer_is_refused_as_the_vision_tower(tmp_path: Path, mutate, reason: str) -> None:
+    """Identification ignores the tower, so that it never blocks text-only use; the refusal comes at this load, and
+    has to say which part of the encoder failed and what it is needed for."""
+    state_dict, metadata, _ = _nvfp4_tower_checkpoint("marker")
+    mutate(state_dict)
+    path = tmp_path / "qwen3vl_nvfp4.safetensors"
+    loader = _single_file(path, state_dict, tiny_qwen3vl_config(), metadata)
+
+    with pytest.raises(ValueError, match="Qwen3-VL vision tower, which Krea-2 edit needs for reference images") as e:
+        loader._load_model(_checkpoint_config(path), SubModelType.VisionEncoder)
+
+    assert reason in str(e.value)
+    assert _reserved(loader) == []
 
 
 def test_a_file_without_a_tower_is_refused(tmp_path: Path) -> None:

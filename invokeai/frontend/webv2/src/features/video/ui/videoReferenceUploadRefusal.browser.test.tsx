@@ -39,6 +39,7 @@ const touchGalleryImages = vi.fn();
 const adapter = {
   findInGallery: () => undefined,
   getUploadBoardId,
+  notifications: { info: () => undefined, undoable: () => undefined },
   patchValues: (_values: Partial<VideoWidgetValues>) => undefined,
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',

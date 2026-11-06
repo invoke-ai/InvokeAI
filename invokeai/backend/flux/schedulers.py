@@ -50,11 +50,11 @@ def set_heun_timesteps_from_sigmas(
     terminal_sigma: float,
     device: str | torch.device | None,
 ) -> None:
-    """Set Diffusers 0.41.0's Heun layout from InvokeAI's shifted model sigmas."""
+    """Set the Diffusers Heun scheduler's layout from InvokeAI's shifted model sigmas."""
     if not sigmas:
         raise ValueError("At least one model-evaluation sigma is required")
 
-    # In Diffusers 0.41.0, set_timesteps() creates a schedule with the first
+    # Diffusers' Heun set_timesteps() creates a schedule with the first
     # sigma evaluated once and every later sigma twice. The final interval ends
     # at the terminal sigma and has no second-order evaluation.
     scheduler.set_timesteps(num_inference_steps=len(sigmas), device=device)

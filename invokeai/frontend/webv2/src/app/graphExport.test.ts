@@ -180,7 +180,7 @@ describe('graph export', () => {
     ).cases;
 
     expect(errorOf(unsupported)).toBe('reference_images: z-image-gguf name takes no reference images.');
-    expect(errorOf(tooMany)).toBe('Generate supports at most 5 reference images for sdxl name.');
+    expect(errorOf(tooMany)).toBe('sdxl name supports at most 5 reference images. Turn off or remove the extra ones.');
   });
 
   it('sends img2img through Canvas with the uploaded image and strength', () => {
@@ -278,6 +278,17 @@ describe('graph export', () => {
     expect(graph.nodes.denoise_latents).toMatchObject({ cfg_scale: 3.5, scheduler: 'dpmpp_2m' });
     expect(errorOf(badPid)).toMatch(/^settings\.pidMode: Generate does not keep "sideways"/);
     expect(errorOf(badScheduler)).toMatch(/^settings\.scheduler: .* Options: .*euler_a/);
+  });
+
+  it('rejects a prompt with dynamic syntax while dynamic prompts are on, and sends it as typed when they are off', () => {
+    const prompt = 'a {red|green} lighthouse';
+    const [expanding] = exportGraphs(request([sdxlCase('on', { positive_prompt: prompt })])).cases;
+    const { batch } = exportOne(
+      sdxlCase('off', { positive_prompt: prompt, settings: { dynamicPromptsEnabled: false } })
+    );
+
+    expect(errorOf(expanding)).toMatch(/^positive_prompt has dynamic prompt syntax/);
+    expect(batch.data[0]).toContainEqual({ field_name: 'value', items: [prompt], node_path: 'positive_prompt' });
   });
 
   it('reports unknown names per case, with the valid choices, and still exports the other cases', () => {

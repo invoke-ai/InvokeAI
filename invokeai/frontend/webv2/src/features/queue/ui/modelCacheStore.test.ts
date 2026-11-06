@@ -2,6 +2,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  formatModelCacheRange,
   getModelCacheClearToast,
   getModelCacheSnapshot,
   getModelCacheUsage,
@@ -72,6 +73,14 @@ describe('model cache stats helpers', () => {
       status: 'info',
       title: 'No cached models cleared',
     });
+  });
+
+  it('names a shared unit once in the usage range, and both units when they differ', () => {
+    const gib = 1024 ** 3;
+
+    expect(formatModelCacheRange(6.2 * gib, 12 * gib)).toBe('6.2/12.0\u00a0GiB');
+    expect(formatModelCacheRange(512 * 1024 ** 2, 12 * gib)).toBe('512.0\u00a0MiB/12.0\u00a0GiB');
+    expect(formatModelCacheRange(0, 0)).toBe('0/0\u00a0B');
   });
 
   it('normalizes legacy null clear-cache responses', () => {

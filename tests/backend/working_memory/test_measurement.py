@@ -1,8 +1,10 @@
-"""Fresh windows (`measurement.measure`): one operation measured alone, as the calibration scripts measure their points.
+"""Fresh windows (`measurement.measure`): one operation measured alone, as the calibration scripts measure their points,
+and the point a cold and a warm window of it make.
 
 They run on the probe tests' scripted device, whose release returns the allocator's cached blocks when
 `TorchDevice.empty_cache` runs. What a window's readings mean -- the demand, the method, the reasons -- is shared with
-the probe's windows and tested there; these cover what a fresh window does around the operation.
+the probe's windows and tested there; these cover what a fresh window does around the operation, and which of a point's
+windows decides its bytes.
 """
 
 from typing import Iterator
@@ -12,7 +14,13 @@ import torch
 
 from invokeai.backend.util import devices
 from invokeai.backend.working_memory import counters, measurement
-from invokeai.backend.working_memory.measurement import measure
+from invokeai.backend.working_memory.measurement import (
+    FreshWindow,
+    measure,
+    measure_cold_and_warm,
+    measured_bytes_and_method,
+    point_reasons,
+)
 from tests.backend.working_memory.test_probe import FakeCounters, FakeDevice
 
 GIB = 2**30
@@ -97,3 +105,57 @@ def test_only_spill_that_persists_after_the_operation_voids_a_fresh_window(
     window = measure(torch.device("cpu"), lambda: None)
 
     assert (window.paged, window.reasons) == (600 * MIB, reasons)
+
+
+@pytest.mark.parametrize("cold_gib, warm_gib", [(3, 2), (2, 3)], ids=["cold-larger", "warm-larger"])
+def test_a_point_runs_its_operation_cold_then_warm_and_takes_the_larger_demand(
+    device: FakeDevice, cold_gib: int, warm_gib: int
+):
+    """Either run can be the peak: a first run maps kernel modules and workspaces, and a warm one under
+    `cudaMallocAsync` measured more than its cold one."""
+    runs = iter((cold_gib, warm_gib))
+
+    def forward() -> None:
+        size = next(runs) * GIB
+        device.alloc(size)
+        device.free(size)
+
+    windows = measure_cold_and_warm(torch.device("cpu"), forward)
+
+    assert [window.demand for window in windows] == [cold_gib * GIB, warm_gib * GIB]
+    assert point_reasons(windows) == []
+    assert measured_bytes_and_method(windows) == (3 * GIB, "demand_peak")
+
+
+def test_a_cold_run_out_of_memory_ends_the_point(device: FakeDevice):
+    """A warm run would measure what the failed allocation left behind."""
+    calls = []
+
+    def out_of_memory() -> None:
+        calls.append(None)
+        device.num_ooms += 1
+        raise torch.OutOfMemoryError("CUDA out of memory. Tried to allocate 20.00 GiB")
+
+    windows = measure_cold_and_warm(torch.device("cpu"), out_of_memory)
+
+    assert (len(calls), len(windows), point_reasons(windows)) == (1, 1, ["oom"])
+
+
+def _window(driver, reserved, allocated) -> FreshWindow:
+    readable = [delta for delta in (driver, reserved, allocated) if delta is not None]
+    method = "windows-d3dkmt" if driver is not None else "torch-only"
+    return FreshWindow(driver, reserved, allocated, 0, max(readable), method, ())
+
+
+def test_a_cold_runs_driver_figure_survives_a_warm_run_without_one():
+    """On ROCm a first forward maps a few hundred MiB above torch's reserve; a warm run that cannot read the driver must
+    not drop that figure for torch's counters alone."""
+    windows = [_window(7800, 2000, 1500), _window(None, 2500, 2800)]
+
+    assert measured_bytes_and_method(windows) == (7800, "demand_peak")
+
+
+def test_the_method_names_the_counter_the_largest_figure_came_from():
+    windows = [_window(2000, 1900, 1500), _window(None, 2500, 2800)]
+
+    assert measured_bytes_and_method(windows) == (2800, "reserved_peak")

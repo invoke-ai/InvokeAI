@@ -1,0 +1,259 @@
+---
+title: FLUX.3
+description: Generate and edit images with FLUX.3 Image Klein (step-distilled) and Klein Base, including editing with up to ten reference images, LoRAs, layout boxes from Canvas regional guidance and the GGUF / single-file workflow.
+lastUpdated: 2026-11-03
+sidebar:
+  order: 6
+---
+
+FLUX.3 Image Klein is a 5.6B diffusion transformer from Black Forest Labs that generates images from text
+and edits or combines up to ten reference images. InvokeAI supports both published checkpoints:
+
+- **FLUX.3 Klein**: step-distilled, for everyday use. Runs at **16 steps** with **CFG off** (CFG Scale `1.0`).
+  It always samples without CFG, so Invoke is unavailable while CFG Scale is above 1.
+- **FLUX.3 Klein Base**: the undistilled checkpoint. Runs at **50 steps** with **CFG 3.5** and a negative
+  prompt. It is meant mainly for fine-tuning and LoRA training, but generates normally too.
+
+The variant is detected on install. A new FLUX.3 model starts with the defaults of its variant (steps, CFG,
+1024×1024); when you switch from one variant to the other, use **Reset all to model defaults** in the
+Generate panel header to take over the new defaults.
+
+## License
+
+Both checkpoints are released under the **FLUX Kommunity License v1.0**: non-commercial use, or commercial use
+for companies below US$5M in annual revenue. The Black Forest Labs repositories are gated: accept the license on
+the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The GGUF
+copies are not gated, but the same license applies.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model
+commercially.
+
+## Hardware
+
+| Transformer build           | Transformer size | Notes                                   |
+| --------------------------- | ---------------- | --------------------------------------- |
+| bf16 (Diffusers or single file) | ≈ 10.3 GiB   | reference quality                       |
+| GGUF Q8_0 (starter model)   | ≈ 5.6 GiB        | close to bf16                           |
+| GGUF Q4_K_M (starter model) | ≈ 3.1 GiB        | lowest VRAM; fine detail differs from bf16 |
+
+The Qwen3-VL 4B encoder (≈ 8.5 GB as bf16, about half as fp8) and the FLUX.2 VAE come on top. The encoder runs
+before the transformer, so the two do not have to fit on the GPU at the same time.
+
+Reference images add to the work per step: each 1 MP reference costs about as much as the image itself. On an
+RTX 4090 a 1024² image takes about 15 s with Klein, 25 s with one reference, 50 s with three references, and
+about 50 s with Klein Base.
+
+## Installing
+
+The **FLUX.3** bundle in the Model Manager installs the GGUF Q4_K_M transformer, the Qwen3-VL 4B encoder
+and the FLUX.2 VAE. None of these are gated.
+
+FLUX.3 needs three components:
+
+| Component                 | Diffusers install       | GGUF / single-file install |
+| ------------------------- | ----------------------- | -------------------------- |
+| Transformer               | bundled                 | the `.gguf` or `.safetensors` file |
+| VAE (FLUX.2)              | bundled                 | installed separately       |
+| Text encoder (Qwen3-VL 4B) | bundled                | installed separately       |
+
+- **Diffusers** (`black-forest-labs/flux-3-image-klein`, `black-forest-labs/flux-3-image-klein-base`): an install
+  of about 20 GB that bundles the VAE and the text encoder. Installing by repository id downloads only the
+  Diffusers folders, not the single-file copy that sits next to them in the repository.
+- **GGUF / single file**: the file holds only the transformer. Install the **FLUX.2 VAE** and the **Qwen3-VL 4B
+  encoder** as well. They are the same models FLUX.2 and Krea-2 use, so an existing install serves FLUX.3 too.
+
+When you select a GGUF or single-file FLUX.3 model, pick the VAE and the Qwen3-VL encoder under **Components** if
+they are not filled in. A Diffusers model uses its bundled components unless you override them there.
+
+:::note[Quantized single files]
+The fp8, int8 and nvfp4 transformer single files from Black Forest Labs and Comfy-Org are not supported yet. Installing
+one is refused with a message saying so. Use the bf16 file or a GGUF.
+:::
+
+## Reference images
+
+Add up to **ten** reference images on the Generate tab or the Canvas and describe the edit in the prompt. No extra
+model is needed. A single reference is used at up to 4 MP; with several, each is limited to 1 MP.
+
+FLUX.3 names its references in the prompt as `<ref_image_0>`, `<ref_image_1>` and so on, for example
+`The fox from <ref_image_0> sitting next to the fox from <ref_image_1>`. Each reference card shows its tag; click
+the tag to copy it. Only enabled cards with an image are numbered, so turning a card off renumbers the cards below
+it.
+
+In the workflow editor, wrap each image in a **Kontext Conditioning - FLUX** node and connect them, or a collection
+of them, to the **Reference Images** input of **Denoise - FLUX.3**.
+
+On Nvidia GPUs reference images are encoded whole, as in the reference pipelines, unless the card is too small for a
+large reference (a 4 MP reference needs about 8.5 GB to encode whole, so cards below 24 GB tile it). On AMD GPUs and
+Apple Silicon, where the encoder's attention would need memory that grows with the square of the image size, they
+are always encoded in 512 px tiles. Tiling keeps memory bounded but changes the edit slightly.
+
+## LoRAs
+
+FLUX.3 LoRAs install like any other and appear under **Concepts** in the Generate panel. Install the LoRA's
+`.safetensors` file, for example by pasting its download URL into the Model Manager, or a Diffusers LoRA folder
+(`pytorch_lora_weights.safetensors`). A LoRA may name the transformer's layers in either of two ways:
+
+- diffusers' module names: under `transformer.`, as diffusers' and SimpleTuner's trainers save a pipeline's LoRA;
+  without a prefix, as diffusers saves the transformer's own adapter (`save_lora_adapter`) and PEFT a model's state
+  dict, which carries the adapter's name in each key (`lora_A.default.weight`); or under `base_model.model.`, as PEFT
+  saves an adapter;
+- Black Forest Labs' native module names, under `diffusion_model.` as ai-toolkit writes them and ComfyUI conversions
+  store them.
+
+A per-layer `.alpha` in the file sets that layer's scale. A layer without one takes the scale PEFT gives it from the
+PEFT settings diffusers saves in the file's header: `lora_alpha` divided by the rank, or by the rank's square root with
+rsLoRA. A pipeline's save keys them `transformer.r`, `transformer.lora_alpha` and so on, and the transformer's own
+save writes them without the prefix. A header with both is read by its `transformer.` settings. A file whose header
+sets the rank or alpha per layer (`rank_pattern`, `alpha_pattern`) is refused.
+
+Klein and Klein Base share one transformer, so a LoRA trained on either runs on both; most published FLUX.3 LoRAs
+are trained on Klein Base. How well one holds up at Klein's step count depends on the LoRA.
+
+- LoRAs change the transformer only. A file that also has text-encoder layers is refused.
+- Low-rank (`lora_A`/`lora_B` or `lora_down`/`lora_up`), DoRA, LoKR and LoHA layers are recognized, and so are full
+  weight differences (`diff`) on the transformer's linear layers. LoKR and LoHA layers (`lokr_*` and `hada_*`
+  parameters) load under the diffusers or Black Forest Labs module names above, in a file without diffusers' PEFT
+  header. LyCORIS's own flattened key names (`lycoris_…`, as SimpleTuner's LyCORIS output writes them) are not
+  recognized, so such a file does not install as a FLUX.3 LoRA. A PEFT LoKr or LoHa adapter saved with diffusers'
+  header (`peft_type` LOKR or LOHA) is refused at install: how PEFT scales those layers is not verified against
+  InvokeAI's.
+- A layer on Klein's flow-map embedder (`ref_time_in`) has no counterpart in Klein Base and is skipped there, with a
+  warning in the log.
+- On GGUF transformers, and with FP8 Storage on, a LoRA runs alongside the weights rather than being merged into them.
+- A FLUX.3 LoRA installs only if all of it applies: every layer it targets exists in the FLUX.3 transformer, is
+  complete and has the shape of the weight it changes. One with any other part is refused at install, with a message
+  naming what does not apply. That includes distillation extracts that change norm scales or add the flow-map embedder
+  (`delta.*` tensors, `set_weight`), such as terminusresearch's Klein extract: to sample with distilled weights,
+  install FLUX.3 Klein itself.
+- A LoRA is recognized as a FLUX.3 LoRA by at least one module that only FLUX.3's transformer has: its mode blocks,
+  modulations, embedders or the feed-forward layers (`ff.linear_in`, `ff.linear_out`) of its single blocks. A LoRA that
+  changes only modules other transformers share, such as the attention layers of the single blocks (`attn.to_q` and
+  the like), is not recognized as a FLUX.3 LoRA. It is registered as an unknown model, which cannot be used as a LoRA,
+  or, with `allow_unknown_models` off, refused at install.
+- PDD few-step LoRAs carry per-step output heads (`proj_out.weight` or `pdd.heads`), which PDD's own sampler fuses per
+  jump. InvokeAI loads such a LoRA without them and says so in the log. Use it on Klein Base with CFG Scale `1.0` and
+  4 to 8 steps; results differ from those of PDD's own sampler.
+- LoRAs installed with an earlier version of InvokeAI were registered as FLUX.1 LoRAs or as unknown models. Select one
+  in the Model Manager and use **Re-identify model** to register it as a FLUX.3 LoRA.
+
+## Canvas
+
+Image-to-image, inpainting and outpainting work on the Canvas as they do for FLUX.2. Using the canvas itself as a
+reference image is a manual step: create a reference image from the bounding box.
+
+### Layout boxes from regional guidance
+
+On the Canvas, each enabled **Regional Guidance** layer becomes one box in the prompt. The layer's **Positive prompt**
+describes what goes in the box, and the box is the rectangle around everything painted on the layer inside the
+generation frame. The shape does not matter, and separate painted areas on one layer share one box. A layer without a
+positive prompt is left out.
+
+Without reference images, each box places an object. With reference images, FLUX.3 edits them, and each box says
+where its content goes in the output: the boxes become edit rows with `"from": "target"` (see below).
+
+FLUX.3 has one kind of box, so the layer offers no **Region type**. Regional negative prompts, auto-negative and
+regional reference images are not used with FLUX.3; the layer hides its negative prompt and auto-negative controls.
+When a layer with a positive prompt has paint inside the generation frame, the main prompt cannot be blank: Invoke is
+disabled with *FLUX.3 needs a prompt to place regional guidance in its layout. Enter a prompt or disable the regional
+guidance layers.*
+
+The boxes are added when the generation runs, as the box table described below, so dynamic prompts and batches vary
+the prompt in front of them. The caption FLUX.3 encoded is saved in the image's metadata as `flux3_caption`; recalling
+the image restores the prompt you typed.
+
+## Layout and box edits in the prompt
+
+FLUX.3 reads a layout as the caption, one space, and a JSON list of rows, the box table, at the end of the prompt.
+
+:::caution[Hand-written tables and dynamic prompts]
+A table written into the prompt by hand reaches FLUX.3 from the workflow editor and through the API. In the Generate
+panel and on the Canvas, every prompt that contains `{` and `}` goes through dynamic prompts, which read the braces as
+variant syntax and remove them, so a table written there does not reach FLUX.3 as a table, and boxes from regional
+guidance start a table of their own after it. Those boxes are added after dynamic prompts have run and are not
+affected.
+:::
+
+Boxes are `[y_min, x_min, y_max, x_max]` in whole numbers from 0 to 1000 across the image, with (0, 0) at the top
+left. An object row places an object:
+
+```text
+A misty coast at dawn. [{"id": "obj_1", "bbox": [80, 100, 450, 420], "desc": "a red hot-air balloon"}, {"id": "obj_2", "bbox": [300, 600, 950, 900], "desc": "a lighthouse on a cliff"}]
+```
+
+An edit row, `{"id", "from", "src_bbox", "tgt_bbox", "desc"}`, takes an object from a reference image
+(`"from": "ref_image_0"`) or adds a new one (`"from": "target"`, with `"src_bbox": null`): `src_bbox` is where it is in
+the reference, `tgt_bbox` where it goes in the output. Regional guidance writes only object rows and target rows.
+
+Without regional guidance, InvokeAI adds nothing to the prompt. A list at the end of the prompt whose items are not
+all rows like these, such as `["SALE"]`, is part of the caption. When boxes are added to a prompt that already ends
+with a box table, its rows are kept, edit rows included, and the new rows follow them with ids numbered after the
+highest `obj_N`.
+
+## Prompt upsampler model
+
+FLUX.3 Klein works best with long, detailed captions. Black Forest Labs publishes a prompt upsampler that writes them:
+a 9B vision-language model, fine-tuned from Qwen3.5-9B and released under Apache-2.0. InvokeAI installs it as a
+**Text LLM**:
+
+| Starter model | Download | Source |
+| --- | --- | --- |
+| **FLUX.3 Prompt Upsampler** | ≈ 17.5 GiB (bf16) | `black-forest-labs/flux-3-image-klein-pup`, not gated |
+| **FLUX.3 Prompt Upsampler (int8)** | ≈ 9.1 GiB | ComfyUI's `int8_convrot` file from the gated `flux-3-image-klein-comfy` repository |
+
+Use it in [Expand Prompt](/users-guide/image-generation/prompt-tools/#the-flux3-prompt-upsampler) with Black Forest
+Labs' `t2i` system prompt. It rewrites your text prompt in the prompt box before you generate; generation does not
+run it on its own, and in the Generate panel Expand Prompt does not send it your reference images.
+
+The int8 file takes about 10.7 GiB once loaded, against 17.5 GiB for the bf16 model, because its language model keeps
+its weights in int8; it dequantizes them for every token it generates. With
+[int8 Compute](/configuration/optimization/int8-compute/) on, an NVIDIA GPU runs the language model's layers on its
+int8 tensor cores instead. The vision tower's layers, 108 of the 308 int8 layers, always dequantize; they run once per
+prompt with an image. Measured on an RTX 4090 (24 GB) through Expand Prompt with Black Forest Labs' `t2i` and `i2i`
+system prompts, captions of 237–305 tokens, the model already loaded, the default 3 GB of working memory and
+`reserve_vram_gb: 1`:
+
+| Build | Loaded, all on the GPU | Tokens/s, text prompt | Tokens/s, prompt with an image | VRAM peak (nvidia-smi, with the desktop) |
+| --- | --- | --- | --- | --- |
+| bf16 folder | 17.5 GiB | 21.3 | 18.7 | 19.7 GiB |
+| int8 file | 10.7 GiB | 8.9 | 8.6 | 12.8 GiB |
+| int8 file, int8 Compute on | 10.7 GiB | 14.5 | 14.4 | 12.8 GiB |
+
+The first expansion after a start also loads the model: it took 21.3 s instead of 13.0 s for the same caption with the
+bf16 model, and 45 s instead of 34 s with the int8 file. After int8 Compute was turned on, the first prompt with an
+image took about 8 s longer while the kernels were
+[tuned](/configuration/optimization/int8-compute/#the-first-generation-pauses) for its longer prompt; the tuning is kept
+on disk.
+
+The bf16 model is fast only while all of it is on the GPU: what does not fit is streamed in for every token. On the same
+card with 5 GB of working memory and the same 1 GB reserve, only 89 % of it fit, and it generated 4.2 tokens/s instead
+of 21.3. To keep the model entirely on the GPU, lower
+[`device_working_mem_gb`](/configuration/optimization/low-vram-mode/#working-memory) (on the 4090, the default 3 GB
+left room for the bf16 model) or use the int8 file, which fit entirely in both runs.
+
+ComfyUI's w4a8 build and single files in fp8 scaled, nvfp4 or mxfp8 are refused at install, and a GGUF of the
+upsampler is not recognized; [Model Format Support](/users-guide/models/model-format-support/#text-llms) lists what
+loads.
+
+Before this release, InvokeAI did not install the upsampler as a Text LLM: the folder was not identified, and both
+ComfyUI single files, bf16 and int8, were identified as Qwen3.5 encoders. Use **Re-identify model** in the Model
+Manager on such an install.
+
+## PiD super-resolution decode
+
+FLUX.3 latents are FLUX.2 latents, so the FLUX.2 PiD decoders decode them. See
+[PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
+
+## Workflow nodes
+
+| Node | Purpose |
+| --- | --- |
+| **Main Model - FLUX.3** | Loads the transformer, encoder and VAE |
+| **Apply LoRA - FLUX.3** / **Apply LoRA Collection - FLUX.3** | Apply one LoRA, or a collection of them, to the transformer |
+| **Layout Prompt - FLUX.3** | Adds boxes to a prompt as its box table, or to the table it already ends with: object rows, or with **Edit Targets** on, rows that place new content in the output of an edit. Each region is a description and a box `[y_min, x_min, y_max, x_max]` from 0 to 1000. Generate and Canvas graphs pass the prompt through it, turn on Edit Targets when reference images are attached, and fill its regions from regional guidance on the Canvas; the regions input has no editor widget |
+| **Prompt - FLUX.3** | Encodes the prompt |
+| **Denoise - FLUX.3** | Runs the diffusion; takes the VAE, optional reference images and, for Klein Base, CFG and a negative prompt |
+| **Latents to Image - FLUX2** / **Image to Latents - FLUX2** | VAE decode / encode |
+
+**Denoise - FLUX.3** has no scheduler input: Klein steps its own flow map and Klein Base samples with Euler, as in
+the reference implementation.

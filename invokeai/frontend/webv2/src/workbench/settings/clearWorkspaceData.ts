@@ -30,3 +30,9 @@ export const clearWorkspaceData = async (
     ...(settings.status === 'rejected' ? (['settings'] as const) : []),
   ];
 };
+
+/** The message for a clear that did not fully succeed: projects left behind matter more than settings. */
+export const describeWorkspaceClearFailure = (
+  failures: readonly WorkspaceClearFailure[]
+): 'settings.clearData.projectsFailed' | 'settings.clearData.settingsFailed' =>
+  failures.includes('projects') ? 'settings.clearData.projectsFailed' : 'settings.clearData.settingsFailed';

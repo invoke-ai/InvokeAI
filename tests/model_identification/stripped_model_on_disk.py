@@ -17,7 +17,7 @@ class StrippedModelOnDisk(ModelOnDisk):
         path = self.resolve_weight_file(path)
         return self.load_stripped_model(path)
 
-    def metadata(self, path: Optional[Path] = None) -> dict[str, str]:
+    def metadata(self, path: Optional[Path] = None) -> dict[str, Any]:
         path = self.resolve_weight_file(path)
         with open(path, "r") as f:
             contents = json.load(f)

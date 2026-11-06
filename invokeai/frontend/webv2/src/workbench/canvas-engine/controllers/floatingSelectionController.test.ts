@@ -496,7 +496,7 @@ describe('FloatingSelectionController: commit', () => {
     move(h.controller, 40, 0);
     h.controller.commit();
 
-    expect(h.history.entries()).toEqual({ future: [], past: ['Move selection'] });
+    expect(h.history.entries()).toEqual({ evicted: 0, future: [], past: ['Move selection'] });
     await h.history.undo();
     expect(h.calls.applyImagePatch).toHaveBeenCalledTimes(1);
     expect(h.selection.restore).toHaveBeenLastCalledWith(before);
@@ -614,7 +614,7 @@ describe('FloatingSelectionController: commit', () => {
     h.calls.applyImagePatch.mockRejectedValueOnce(new Error('evicted'));
 
     expect(await h.history.undo()).toMatchObject({ status: 'failed' });
-    expect(h.history.entries()).toEqual({ future: [], past: ['Move selection'] });
+    expect(h.history.entries()).toEqual({ evicted: 0, future: [], past: ['Move selection'] });
     expect(h.selection.restore).not.toHaveBeenCalled();
   });
 

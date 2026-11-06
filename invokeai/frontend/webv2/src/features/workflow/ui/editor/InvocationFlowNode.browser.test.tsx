@@ -8,6 +8,7 @@ import type { WorkflowNodeExecutionState } from '@features/workflow/ui/contracts
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 
+import openapi from '@api/openapi.json';
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { ChakraProvider } from '@chakra-ui/react';
 import { galleryImageUrls } from '@features/gallery/utility';
@@ -15,9 +16,11 @@ import {
   savedWorkflowDetailQueryKey,
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
+import { parseOpenApiToTemplates } from '@features/workflow/data/templates';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
+  buildInvocationNode,
   buildCurrentImageNode,
   buildNotesNode,
   createProjectGraph,
@@ -327,6 +330,35 @@ describe('InvocationFlowNode chrome and export', () => {
     );
   const image = () => host.querySelector<HTMLImageElement>('.react-flow__node img');
   const nodeHeight = () => host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect().height;
+
+  it('disables both HiDiffusion numeric controls under one Auto switch and retains manual values', async () => {
+    const denoiseTemplates = parseOpenApiToTemplates(openapi);
+    const node = buildInvocationNode(denoiseTemplates.denoise_latents!, { x: 0, y: 0 });
+    node.data.inputs.hidiffusion!.value = true;
+    node.data.inputs.hidiffusion_t1_ratio!.value = 0.7;
+    node.data.inputs.hidiffusion_t2_ratio!.value = 0.2;
+    for (const auto of [true, false]) {
+      node.data.inputs.hidiffusion_auto_ratios!.value = auto;
+      const graph = { ...createProjectGraph('hidiffusion'), nodes: [structuredClone(node)] };
+      const adapter = createAdapter(createExecutionPort(node.id).port, projectSnapshotFor(graph));
+      await render(adapter, 1, false, toFlowNodes(graph, [], denoiseTemplates));
+      for (const [name, value] of [
+        ['hidiffusion_t1_ratio', '0.7'],
+        ['hidiffusion_t2_ratio', '0.2'],
+      ]) {
+        const control = host.querySelector<HTMLInputElement>(`input[id="${node.id}-${name}-value-number-input"]`);
+        expect(control).not.toBeNull();
+        expect(control!.disabled).toBe(auto);
+        expect(control!.value).toBe(value);
+      }
+      expect(
+        host.querySelector<HTMLInputElement>(`input[id="${node.id}-hidiffusion_t1_ratio-value-number-input"]`)!.min
+      ).toBe(auto ? '0' : '0.2');
+      expect(
+        host.querySelector<HTMLInputElement>(`input[id="${node.id}-hidiffusion_t2_ratio-value-number-input"]`)!.max
+      ).toBe(auto ? '1' : '0.7');
+    }
+  });
 
   it('keeps field-description editing available in the workflow editor', async () => {
     const adapter = createAdapter(createExecutionPort().port);
@@ -2103,6 +2135,41 @@ describe('InvocationFlowNode template version', () => {
     await render(toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'loaded'));
     expect(borderColor()).not.toBe(knownBorder);
     expect(nodeText()).toContain('Unknown node type "preview". It cannot run on this backend.');
+  });
+
+  it('leads an unknown type to the Nodes Manager for an account that installs node packs, and to an admin otherwise', async () => {
+    const missingNodes = toFlowNodes(projectGraph, [], undefined, undefined, false, false, 'loaded');
+    const renderFor = (canManageNodes: boolean, openNodesManager = vi.fn()) =>
+      act(() =>
+        root.render(
+          <ChakraProvider value={system}>
+            <WorkflowUiProvider
+              adapter={{
+                ...createAdapter(createExecutionPort().port),
+                capabilities: { getSnapshot: () => ({ canManageNodes, canUseCache: true }), subscribe: () => () => {} },
+                openNodesManager,
+              }}
+            >
+              <ReactFlow edges={[]} nodes={missingNodes} nodeTypes={nodeTypes} />
+            </WorkflowUiProvider>
+          </ChakraProvider>
+        )
+      );
+    const openNodesManager = vi.fn();
+
+    await renderFor(true, openNodesManager);
+    const openButton = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Open Nodes Manager'
+    );
+
+    await userEvent.click(openButton!);
+    expect(openNodesManager).toHaveBeenCalledOnce();
+
+    await renderFor(false);
+    expect(host.querySelector('.react-flow__node')!.textContent).toContain(
+      'Ask an administrator to install the node pack that provides it.'
+    );
+    expect(host.querySelector('.react-flow__node button')).toBeNull();
   });
 });
 

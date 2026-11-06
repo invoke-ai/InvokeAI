@@ -431,6 +431,16 @@ class TorchDevice:
         return device
 
     @classmethod
+    def synchronize(cls, device: torch.device) -> None:
+        """Wait for the work already queued on `device`. A no-op on CPU, which runs synchronously."""
+        if device.type == "cuda":
+            torch.cuda.synchronize(device)
+        elif device.type == "xpu":
+            torch.xpu.synchronize(device)
+        elif device.type == "mps":
+            torch.mps.synchronize()
+
+    @classmethod
     def empty_cache(cls, force: bool = False) -> bool:
         """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
 
@@ -678,6 +688,21 @@ class TorchDevice:
         if config.precision == "auto":
             return cls.choose_bfloat16_safe_dtype(device)
         return NAME_TO_PRECISION[config.precision]
+
+    @classmethod
+    def choose_krea2_transformer_dtype(cls, is_gguf: bool, device: Optional[torch.device] = None) -> torch.dtype:
+        """Choose the dtype a Krea-2 transformer runs in. Its loader and the denoise step must agree.
+
+        GGUF on MPS runs in float32: with bfloat16 it produces noise there. The GGUF compute dtype is
+        not only the dequantization target -- on MPS every GGUF Linear casts its input to it, so the
+        whole transformer, and therefore the latents, conditioning and LoRA sidecar weights fed to it,
+        must use the same dtype. Everything else keeps the bfloat16-safe default. ``config.precision``
+        is deliberately not consulted, since the Krea-2 text encoder and other loaders ignore it too.
+        """
+        device = device or cls.choose_torch_device()
+        if is_gguf and device.type == "mps":
+            return torch.float32
+        return cls.choose_bfloat16_safe_dtype(device)
 
 
 _PEER_AWARE_SENTINEL = "_invokeai_peer_aware"

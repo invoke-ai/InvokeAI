@@ -213,6 +213,8 @@ export const createTransformTool = (): Tool => {
       return hoverCursor ?? 'default';
     },
     id: 'transform',
+    // Alt scales about the centre on a handle and bypasses the grid on a move, held before the drag or during it.
+    usesAltKey: true,
     onActivate: (ctx, opts) => {
       if (opts?.temporary) {
         // Temporary reactivation preserves existing edits and does not reopen from committed transforms. If
