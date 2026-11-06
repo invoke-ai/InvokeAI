@@ -53,8 +53,8 @@ Others are recognized by their layer names and fail, or misbehave, only when the
   (fp8 weights with one scale per output row) load as fp8 scaled for Qwen-Image-2.1 and MOSS-Image; other torchao
   layouts, such as per-tensor or block-wise fp8 and INT8 builds, are refused at install for both. Apart from that,
   MOSS-Image loads Comfy-Org's int8 build and GGUFs; its raw and ComfyUI scaled fp8, nvfp4 and w4a8 transformers are
-  refused at install. ComfyUI's other low-bit layouts (`w4a8`, `w6a8`, SVDQuant) are not supported;
-  Krea-2 refuses them at install.
+  refused at install. Ideogram 4 refuses every torchao export at install. ComfyUI's other low-bit layouts (`w4a8`,
+  `w6a8`, SVDQuant) are not supported; Krea-2 refuses them at install.
 - **GGUF** covers the llama.cpp types (Q4_0 through Q8_0, the K-quants, BF16). ComfyUI-GGUF's `Q8_CR` (int8) and
   `Q4_CR` (int4) files load for Krea-2 only; for every other model with GGUF support the install fails, as it does
   for `Q4_CR` files of ComfyUI-GGUF's retired W4A16 kind.
